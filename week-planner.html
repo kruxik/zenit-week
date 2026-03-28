@@ -211,14 +211,13 @@
     position: fixed;
     display: none;
     z-index: 500;
-    border: 2px solid #4A90D9;
+    border: 2px dashed #4A90D9;
     border-radius: 12px;
     padding: 0 10px;
-    background: #fff;
+    background: #E8F4FD;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     text-align: center;
     outline: none;
-    box-shadow: 0 0 0 3px rgba(74,144,217,0.18);
     color: #333;
     box-sizing: border-box;
     min-width: 60px;
@@ -632,26 +631,6 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
     }
   }
 
-  // Editing placeholder: just draw a dashed outline, no text
-  if (node && node._editing) {
-    const boxW = rx * 2;
-    const boxH = ry * 2;
-    const rect = svgEl('rect', {
-      class: 'node-rect',
-      x: -boxW / 2, y: -boxH / 2,
-      width: boxW, height: boxH,
-      rx: 12,
-      fill: BRANCH_COLORS[node.branch]?.light || '#fff',
-      stroke: BRANCH_COLORS[node.branch]?.main || '#aaa',
-      'stroke-width': 2,
-      'stroke-dasharray': '5 3',
-      opacity: '0.5',
-    });
-    g.appendChild(rect);
-    g.setAttribute('transform', `translate(${x},${y})`);
-    return g;
-  }
-
   const lines = (type === 'center')
     ? label.split('|').map(s => s.trim())
     : wrapText(label, maxW, fontSize);
@@ -790,6 +769,8 @@ function startAddNode(parentId) {
 function startRenameNode(nodeId) {
   const node = findNode(nodeId);
   if (!node || node.type === 'branch') return;
+  node._editing = true;
+  render();
   _openInlineInput(nodeId, false);
 }
 
@@ -802,15 +783,21 @@ function _openInlineInput(nodeId, isNew) {
   const sp = nodeScreenPos(nodeId);
   if (!sp) { cancelEdit(); return; }
 
-  const h = Math.max(36, 36) * zoom;
+  // Apply branch colors so input looks like the real node
+  const bc = BRANCH_COLORS[node.branch] || { main: '#4A90D9', light: '#E8F4FD', text: '#1a5c99' };
+  inlineInput.style.borderColor  = bc.main;
+  inlineInput.style.background   = bc.light;
+  inlineInput.style.color        = bc.text;
+
+  const h = 36 * zoom;
   const fontSize = 12 * zoom;
 
   inlineInput.value = isNew ? '' : node.label;
-  inlineInput.style.fontSize  = fontSize + 'px';
-  inlineInput.style.height    = h + 'px';
+  inlineInput.style.fontSize   = fontSize + 'px';
+  inlineInput.style.height     = h + 'px';
   inlineInput.style.lineHeight = h + 'px';
-  inlineInput.style.top       = (sp.y - h / 2) + 'px';
-  inlineInput.style.display   = 'block';
+  inlineInput.style.top        = (sp.y - h / 2) + 'px';
+  inlineInput.style.display    = 'block';
 
   // Size and center horizontally
   resizeInlineInput();
@@ -824,12 +811,12 @@ function commitEdit() {
   inlineInput.style.display = 'none';
 
   if (!editState) return;
-  const { nodeId, isNew } = editState;
+  const { nodeId, isNew, originalLabel } = editState;
   editState = null;
 
   if (!label) {
     // Empty label → treat as cancel
-    _cleanupCancel(nodeId, isNew, '');
+    _cleanupCancel(nodeId, isNew, originalLabel);
     return;
   }
 
@@ -860,7 +847,7 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
     weekData.nodes = weekData.nodes.filter(n => n.id !== nodeId);
   } else {
     const node = findNode(nodeId);
-    if (node) node.label = originalLabel;
+    if (node) { node.label = originalLabel; delete node._editing; }
   }
   render();
 }
@@ -932,8 +919,9 @@ function render() {
   const centerG = makeNodeGroup('center', 0, 0, centerLabel, 'center', null, null);
   nodesG.appendChild(centerG);
 
-  // Draw all other nodes
+  // Draw all other nodes (skip nodes currently being edited inline)
   weekData.nodes.forEach(node => {
+    if (node._editing) return;
     const pos = positions[node.id];
     if (!pos) return;
     const g = makeNodeGroup(
