@@ -568,9 +568,7 @@ function svgEl(tag, attrs) {
 }
 
 function wrapText(text, maxWidth, fontSize) {
-  // Approximate char width
-  const avgCharW = fontSize * 0.55;
-  const maxChars = Math.floor(maxWidth / avgCharW);
+  const maxChars = 32;
   const words = text.split(' ');
   const lines = [];
   let current = '';
@@ -579,7 +577,7 @@ function wrapText(text, maxWidth, fontSize) {
       current = (current + ' ' + word).trim();
     } else {
       if (current) lines.push(current);
-      current = word.length > maxChars ? word.slice(0, maxChars - 1) + '…' : word;
+      current = word;
     }
   });
   if (current) lines.push(current);
@@ -627,7 +625,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
   const lineH = fontSize * 1.35;
   const totalTextH = lines.length * lineH;
   const boxH = Math.max(ry * 2, totalTextH + padY * 2);
-  const boxW = rx * 2;
+  const avgCharW = fontSize * 0.55;
+  const longestLine = Math.max(...lines.map(l => l.length));
+  const boxW = Math.max(rx * 2, Math.ceil(longestLine * avgCharW) + padX * 2);
 
   // Shadow filter
   const filterRef = (type === 'center') ? 'url(#shadow)' : 'url(#shadow-sm)';
