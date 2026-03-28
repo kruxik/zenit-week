@@ -711,7 +711,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
   if (type !== 'center') {
     const btnColor = BRANCH_COLORS[branch]?.main || '#888';
     const btnR = 10;
-    const btnX = boxW / 2 + btnR + 4;
+    const btnX = boxW / 2;  // center on right edge: 50% inside, 50% outside
 
     const btnG = svgEl('g', { class: 'add-btn', 'data-parent': id });
 
@@ -723,9 +723,10 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
     const plus = svgEl('text', {
       x: btnX, y: 0,
       'text-anchor': 'middle',
-      'dominant-baseline': 'central',
-      'font-size': '15',
+      dy: '0.36em',
+      'font-size': '16',
       'font-weight': '300',
+      'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       fill: '#fff',
       'pointer-events': 'none',
     });
