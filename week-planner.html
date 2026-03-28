@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week Planner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f8f9fa;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  #toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  #week-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .nav-btn {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    color: #333;
+  }
+
+  .nav-btn:hover { background: #e0e0e0; }
+
+  #week-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #222;
+    min-width: 200px;
+    text-align: center;
+  }
+
+  #zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .zoom-btn {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    color: #333;
+  }
+
+  .zoom-btn:hover { background: #e0e0e0; }
+
+  #zoom-label {
+    font-size: 13px;
+    color: #666;
+    min-width: 42px;
+    text-align: center;
+  }
+
+  .reset-btn {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #555;
+    transition: background 0.15s;
+  }
+
+  .reset-btn:hover { background: #e0e0e0; }
+
+  #legend {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: #555;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  #canvas-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    cursor: grab;
+  }
+
+  #canvas-container.panning { cursor: grabbing; }
+
+  #main-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Context menu */
+  #context-menu {
+    position: fixed;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 6px 0;
+    z-index: 1000;
+    min-width: 160px;
+    display: none;
+  }
+
+  #context-menu.visible { display: block; }
+
+  .ctx-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+  }
+
+  .ctx-item:hover { background: #f5f5f5; }
+
+  .ctx-item.danger { color: #e74c3c; }
+  .ctx-item.danger:hover { background: #fef0f0; }
+
+  .ctx-separator {
+    height: 1px;
+    background: #eee;
+    margin: 4px 0;
+  }
+
+  /* Hint */
+  #hint {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0.85;
+  }
+
+  /* SVG node styles via inline attributes, but animations here */
+  .node-group { cursor: pointer; }
+
+  .node-rect {
+    transition: filter 0.15s;
+  }
+
+  .node-group:hover .node-rect {
+    filter: brightness(0.93);
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="toolbar">
+    <div id="week-nav">
+      <button class="nav-btn" id="prev-week" title="Previous week">&#8249;</button>
+      <div id="week-label">Week 13 | Mar 30 – Apr 5</div>
+      <button class="nav-btn" id="next-week" title="Next week">&#8250;</button>
+      <button class="reset-btn" id="today-btn">Today</button>
+    </div>
+    <div id="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#4A90D9"></div>Work</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#5CB85C"></div>Family</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#9B59B6"></div>Me</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#F39C12"></div>Unplanned</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#666"></div><b>Done</b></div>
+    </div>
+    <div id="zoom-controls">
+      <button class="zoom-btn" id="zoom-out" title="Zoom out">−</button>
+      <div id="zoom-label">100%</div>
+      <button class="zoom-btn" id="zoom-in" title="Zoom in">+</button>
+      <button class="reset-btn" id="reset-view">Reset View</button>
+    </div>
+  </div>
+
+  <div id="canvas-container">
+    <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.12)"/>
+        </filter>
+        <filter id="shadow-sm" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.10)"/>
+        </filter>
+      </defs>
+      <g id="map-root"></g>
+    </svg>
+  </div>
+</div>
+
+<div id="context-menu">
+  <div class="ctx-item" id="ctx-done">✓ Mark Done</div>
+  <div class="ctx-item" id="ctx-undone">↩ Mark Undone</div>
+  <div class="ctx-item" id="ctx-unplanned">⚡ Mark Unplanned</div>
+  <div class="ctx-separator"></div>
+  <div class="ctx-item" id="ctx-rename">✏ Rename</div>
+  <div class="ctx-item" id="ctx-add-child">＋ Add Sub-task</div>
+  <div class="ctx-separator"></div>
+  <div class="ctx-item danger" id="ctx-delete">✕ Delete</div>
+</div>
+
+<div id="hint">Double-click a branch or activity to add · Right-click any node for options · Drag to pan · Scroll to zoom</div>
+
+<script>
+'use strict';
+
+// ─── Colors ───────────────────────────────────────────────────────────────────
+const BRANCH_COLORS = {
+  work:   { main: '#4A90D9', light: '#E8F4FD', text: '#1a5c99' },
+  family: { main: '#5CB85C', light: '#EDF7ED', text: '#2d7a2d' },
+  me:     { main: '#9B59B6', light: '#F5EEF8', text: '#6c2d8a' },
+};
+const CENTER_COLOR  = { main: '#34495e', light: '#ecf0f1', text: '#fff' };
+const DONE_BG       = '#d5d5d5';
+const DONE_TEXT     = '#444';
+const UNPLANNED_BG  = '#FEF9E7';
+const UNPLANNED_BORDER = '#F39C12';
+
+// ─── Layout constants ─────────────────────────────────────────────────────────
+const CENTER_RADIUS_X = 88;
+const CENTER_RADIUS_Y = 30;
+const BRANCH_DIST     = 220;
+const ACTIVITY_DIST   = 190;
+const SUBACTIVITY_DIST = 170;
+const BRANCH_ARC      = 50;  // degrees spread for children
+const SUB_ARC         = 40;
+
+// Branch base angles (degrees): Work upper-right, Family bottom, Me upper-left
+const BRANCH_ANGLES = { work: -30, family: 90, me: 210 };
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let currentWeekKey = '';   // 'YYYY-WW'
+let weekData = {};          // { nodes: [...] }
+
+let zoom    = 1;
+let panX    = 0;
+let panY    = 0;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let panStartPanX = 0;
+let panStartPanY = 0;
+
+let contextTarget = null;  // node id
+
+// ─── Week utilities ───────────────────────────────────────────────────────────
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return { week: Math.ceil((((d - yearStart) / 86400000) + 1) / 7), year: d.getUTCFullYear() };
+}
+
+function weekKey(year, week) {
+  return `${year}-${String(week).padStart(2, '0')}`;
+}
+
+function getWeekBounds(year, week) {
+  // Find Monday of given ISO week
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const dayOfWeek = (jan4.getUTCDay() || 7);
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1 + (week - 1) * 7);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return { monday, sunday };
+}
+
+function formatWeekLabel(year, week) {
+  const { monday, sunday } = getWeekBounds(year, week);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mStart = `${months[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
+  const mEnd   = `${months[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
+  return `Week ${week} | ${mStart} – ${mEnd}`;
+}
+
+function parseWeekKey(key) {
+  const [y, w] = key.split('-').map(Number);
+  return { year: y, week: w };
+}
+
+function offsetWeek(key, delta) {
+  let { year, week } = parseWeekKey(key);
+  week += delta;
+  if (week < 1) {
+    year--;
+    week = weeksInYear(year) + week;
+  } else {
+    const max = weeksInYear(year);
+    if (week > max) { week -= max; year++; }
+  }
+  return weekKey(year, week);
+}
+
+function weeksInYear(year) {
+  const dec28 = new Date(Date.UTC(year, 11, 28));
+  return getISOWeek(dec28).week;
+}
+
+function todayWeekKey() {
+  const today = new Date();
+  const { year, week } = getISOWeek(today);
+  return weekKey(year, week);
+}
+
+// ─── Data management ──────────────────────────────────────────────────────────
+function storageKey(wk) { return `week-planner-${wk}`; }
+
+function loadWeek(wk) {
+  const raw = localStorage.getItem(storageKey(wk));
+  if (raw) {
+    try { return JSON.parse(raw); } catch(e) {}
+  }
+  return defaultWeekData();
+}
+
+function saveWeek(wk, data) {
+  localStorage.setItem(storageKey(wk), JSON.stringify(data));
+}
+
+function defaultWeekData() {
+  return {
+    nodes: [
+      { id: 'work',   type: 'branch', branch: 'work',   label: 'Work',   children: [] },
+      { id: 'family', type: 'branch', branch: 'family', label: 'Family', children: [] },
+      { id: 'me',     type: 'branch', branch: 'me',     label: 'Me',     children: [] },
+    ]
+  };
+}
+
+function genId() {
+  return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function findNode(id) {
+  return weekData.nodes.find(n => n.id === id);
+}
+
+function addNode(parentId, label) {
+  const parent = findNode(parentId);
+  if (!parent) return;
+  const branch = parent.branch || parent.id;
+  const node = {
+    id: genId(),
+    type: 'activity',
+    branch: branch,
+    parent: parentId,
+    label: label,
+    done: false,
+    unplanned: false,
+    children: [],
+  };
+  weekData.nodes.push(node);
+  parent.children.push(node.id);
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
+function deleteNode(id) {
+  // Recursively collect all descendants
+  function collect(nid) {
+    const n = findNode(nid);
+    if (!n) return [];
+    let ids = [nid];
+    (n.children || []).forEach(c => ids = ids.concat(collect(c)));
+    return ids;
+  }
+  const toRemove = new Set(collect(id));
+
+  // Remove from parent's children list
+  const node = findNode(id);
+  if (node && node.parent) {
+    const parent = findNode(node.parent);
+    if (parent) parent.children = parent.children.filter(c => c !== id);
+  } else if (node && node.type === 'branch') {
+    // Can't delete branch nodes
+    return;
+  }
+
+  weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
+function renameNode(id, label) {
+  const node = findNode(id);
+  if (!node || !label.trim()) return;
+  node.label = label.trim();
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
+function setStatus(id, status) {
+  const node = findNode(id);
+  if (!node) return;
+  if (status === 'done')      { node.done = true;  node.unplanned = false; }
+  if (status === 'undone')    { node.done = false; node.unplanned = false; }
+  if (status === 'unplanned') { node.done = false; node.unplanned = true;  }
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
+function deg2rad(d) { return d * Math.PI / 180; }
+
+function polarToCart(cx, cy, dist, angleDeg) {
+  const r = deg2rad(angleDeg);
+  return { x: cx + dist * Math.cos(r), y: cy + dist * Math.sin(r) };
+}
+
+function computeLayout() {
+  // Returns { nodeId: {x, y, angle} }
+  const positions = {};
+  const cx = 0, cy = 0;
+  positions['center'] = { x: cx, y: cy };
+
+  const branchIds = ['work', 'family', 'me'];
+
+  branchIds.forEach(bid => {
+    const angle = BRANCH_ANGLES[bid];
+    const bp = polarToCart(cx, cy, BRANCH_DIST, angle);
+    positions[bid] = { x: bp.x, y: bp.y, angle };
+
+    const branch = findNode(bid);
+    if (!branch) return;
+    const children = branch.children || [];
+    const n = children.length;
+
+    children.forEach((childId, i) => {
+      // Spread children in arc around branch angle
+      let childAngle;
+      if (n === 1) {
+        childAngle = angle;
+      } else {
+        const spread = Math.min(BRANCH_ARC, 20 * n);
+        childAngle = angle - spread / 2 + (spread / (n - 1)) * i;
+      }
+
+      const cp = polarToCart(bp.x, bp.y, ACTIVITY_DIST, childAngle);
+      positions[childId] = { x: cp.x, y: cp.y, angle: childAngle };
+
+      // Grandchildren
+      const child = findNode(childId);
+      if (!child) return;
+      const grandchildren = child.children || [];
+      const gn = grandchildren.length;
+
+      grandchildren.forEach((gcId, gi) => {
+        let gcAngle;
+        if (gn === 1) {
+          gcAngle = childAngle;
+        } else {
+          const spread = Math.min(SUB_ARC, 18 * gn);
+          gcAngle = childAngle - spread / 2 + (spread / (gn - 1)) * gi;
+        }
+        const gp = polarToCart(cp.x, cp.y, SUBACTIVITY_DIST, gcAngle);
+        positions[gcId] = { x: gp.x, y: gp.y, angle: gcAngle };
+
+        // Great-grandchildren (depth 3)
+        const gc = findNode(gcId);
+        if (!gc) return;
+        const ggc = gc.children || [];
+        const ggn = ggc.length;
+        ggc.forEach((ggId, ggi) => {
+          let ggAngle;
+          if (ggn === 1) {
+            ggAngle = gcAngle;
+          } else {
+            const spread = Math.min(30, 15 * ggn);
+            ggAngle = gcAngle - spread / 2 + (spread / (ggn - 1)) * ggi;
+          }
+          const ggp = polarToCart(gp.x, gp.y, 150, ggAngle);
+          positions[ggId] = { x: ggp.x, y: ggp.y, angle: ggAngle };
+        });
+      });
+    });
+  });
+
+  return positions;
+}
+
+// ─── SVG helpers ──────────────────────────────────────────────────────────────
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, v));
+  return el;
+}
+
+function wrapText(text, maxWidth, fontSize) {
+  // Approximate char width
+  const avgCharW = fontSize * 0.55;
+  const maxChars = Math.floor(maxWidth / avgCharW);
+  const words = text.split(' ');
+  const lines = [];
+  let current = '';
+  words.forEach(word => {
+    if ((current + ' ' + word).trim().length <= maxChars) {
+      current = (current + ' ' + word).trim();
+    } else {
+      if (current) lines.push(current);
+      current = word.length > maxChars ? word.slice(0, maxChars - 1) + '…' : word;
+    }
+  });
+  if (current) lines.push(current);
+  return lines;
+}
+
+function makeNodeGroup(id, x, y, label, type, branch, node) {
+  const g = svgEl('g', { class: 'node-group', 'data-id': id });
+
+  let rx, ry, fontSize, maxW, padX, padY;
+  if (type === 'center') {
+    rx = CENTER_RADIUS_X; ry = CENTER_RADIUS_Y;
+    fontSize = 14; maxW = 150; padX = 18; padY = 12;
+  } else if (type === 'branch') {
+    rx = 56; ry = 22;
+    fontSize = 13; maxW = 95; padX = 14; padY = 10;
+  } else {
+    rx = 52; ry = 18;
+    fontSize = 12; maxW = 88; padX = 12; padY = 8;
+  }
+
+  // Determine colors
+  let bgColor, borderColor, textColor, fontWeight = 'normal';
+  if (type === 'center') {
+    bgColor = CENTER_COLOR.main; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
+  } else if (type === 'branch') {
+    const bc = BRANCH_COLORS[branch];
+    bgColor = bc.main; borderColor = bc.main; textColor = '#fff';
+  } else {
+    // activity
+    if (node && node.done) {
+      bgColor = DONE_BG; borderColor = '#aaa'; textColor = DONE_TEXT; fontWeight = 'bold';
+    } else if (node && node.unplanned) {
+      bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = '#8a5c00';
+    } else {
+      const bc = BRANCH_COLORS[branch];
+      bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
+    }
+  }
+
+  const lines = (type === 'center')
+    ? label.split('|').map(s => s.trim())
+    : wrapText(label, maxW, fontSize);
+
+  const lineH = fontSize * 1.35;
+  const totalTextH = lines.length * lineH;
+  const boxH = Math.max(ry * 2, totalTextH + padY * 2);
+  const boxW = rx * 2;
+
+  // Shadow filter
+  const filterRef = (type === 'center') ? 'url(#shadow)' : 'url(#shadow-sm)';
+
+  const rect = svgEl('rect', {
+    class: 'node-rect',
+    x: -boxW / 2, y: -boxH / 2,
+    width: boxW, height: boxH,
+    rx: (type === 'center') ? 18 : (type === 'branch') ? 14 : 12,
+    fill: bgColor,
+    stroke: borderColor,
+    'stroke-width': (type === 'activity' && node && (node.done || node.unplanned)) ? 2 : (type === 'center' ? 0 : 1.5),
+    filter: filterRef,
+  });
+  g.appendChild(rect);
+
+  // Text
+  lines.forEach((line, i) => {
+    const textY = -totalTextH / 2 + lineH * i + lineH * 0.75;
+    const t = svgEl('text', {
+      x: 0, y: textY,
+      'text-anchor': 'middle',
+      'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      'font-size': (type === 'center' && i === 0) ? (fontSize + 1) : fontSize,
+      'font-weight': (type === 'branch') ? '600' : fontWeight,
+      fill: textColor,
+      'pointer-events': 'none',
+    });
+    t.textContent = line;
+    g.appendChild(t);
+  });
+
+  // Done checkmark badge
+  if (node && node.done) {
+    const badge = svgEl('text', {
+      x: boxW / 2 - 4, y: -boxH / 2 + 13,
+      'text-anchor': 'end',
+      'font-size': 10,
+      fill: '#666',
+      'pointer-events': 'none',
+    });
+    badge.textContent = '✓';
+    g.appendChild(badge);
+  }
+
+  // Unplanned badge
+  if (node && node.unplanned) {
+    const badge = svgEl('text', {
+      x: boxW / 2 - 4, y: -boxH / 2 + 13,
+      'text-anchor': 'end',
+      'font-size': 10,
+      fill: UNPLANNED_BORDER,
+      'pointer-events': 'none',
+    });
+    badge.textContent = '⚡';
+    g.appendChild(badge);
+  }
+
+  g.setAttribute('transform', `translate(${x},${y})`);
+  return g;
+}
+
+function makeCurve(x1, y1, x2, y2, color, strokeWidth) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  // Quadratic bezier with control point pulled toward midpoint
+  const cpx = (x1 * 0.25 + mx * 0.75);
+  const cpy = (y1 * 0.25 + my * 0.75);
+
+  const path = svgEl('path', {
+    d: `M ${x1} ${y1} Q ${cpx} ${cpy} ${x2} ${y2}`,
+    fill: 'none',
+    stroke: color,
+    'stroke-width': strokeWidth || 2,
+    'stroke-linecap': 'round',
+    opacity: '0.6',
+    'pointer-events': 'none',
+  });
+  return path;
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const root = document.getElementById('map-root');
+  // Clear
+  while (root.firstChild) root.removeChild(root.firstChild);
+
+  const { year, week } = parseWeekKey(currentWeekKey);
+  document.getElementById('week-label').textContent = formatWeekLabel(year, week);
+
+  const positions = computeLayout();
+
+  // Lines layer (drawn first, behind nodes)
+  const linesG = svgEl('g', { id: 'lines-layer' });
+  root.appendChild(linesG);
+
+  // Nodes layer
+  const nodesG = svgEl('g', { id: 'nodes-layer' });
+  root.appendChild(nodesG);
+
+  // Helper: get branch color
+  function branchColor(branch) {
+    return BRANCH_COLORS[branch]?.main || '#888';
+  }
+
+  // Draw all edges
+  function drawEdges(nodeId) {
+    const node = findNode(nodeId);
+    if (!node) return;
+    const pos = positions[nodeId];
+    if (!pos) return;
+
+    (node.children || []).forEach(childId => {
+      const childPos = positions[childId];
+      if (!childPos) return;
+      const color = branchColor(node.branch || node.id);
+      const sw = (node.type === 'branch') ? 2.5 : 1.8;
+      linesG.appendChild(makeCurve(pos.x, pos.y, childPos.x, childPos.y, color, sw));
+      drawEdges(childId);
+    });
+  }
+
+  // Draw center → branch edges
+  const branchIds = ['work', 'family', 'me'];
+  branchIds.forEach(bid => {
+    const bPos = positions[bid];
+    if (!bPos) return;
+    const color = branchColor(bid);
+    linesG.appendChild(makeCurve(0, 0, bPos.x, bPos.y, color, 3));
+    drawEdges(bid);
+  });
+
+  // Draw center node
+  const { year: y, week: w } = parseWeekKey(currentWeekKey);
+  const centerLabel = formatWeekLabel(y, w);
+  const centerG = makeNodeGroup('center', 0, 0, centerLabel, 'center', null, null);
+  nodesG.appendChild(centerG);
+
+  // Draw all other nodes
+  weekData.nodes.forEach(node => {
+    const pos = positions[node.id];
+    if (!pos) return;
+    const g = makeNodeGroup(
+      node.id, pos.x, pos.y, node.label,
+      node.type, node.branch || node.id, node
+    );
+    nodesG.appendChild(g);
+  });
+
+  // Attach event listeners after rendering
+  attachNodeListeners();
+}
+
+function attachNodeListeners() {
+  document.querySelectorAll('.node-group').forEach(g => {
+    const id = g.getAttribute('data-id');
+
+    g.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const name = prompt('Add activity:');
+      if (name && name.trim()) {
+        addNode(id, name.trim());
+      }
+    });
+
+    g.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(e.clientX, e.clientY, id);
+    });
+  });
+}
+
+// ─── Context menu ─────────────────────────────────────────────────────────────
+const ctxMenu = document.getElementById('context-menu');
+
+function showContextMenu(x, y, nodeId) {
+  contextTarget = nodeId;
+  const node = findNode(nodeId);
+  const isBranch = !node || node.type === 'branch';
+
+  // Show/hide items depending on node type
+  document.getElementById('ctx-done').style.display      = isBranch ? 'none' : '';
+  document.getElementById('ctx-undone').style.display    = isBranch ? 'none' : '';
+  document.getElementById('ctx-unplanned').style.display = isBranch ? 'none' : '';
+  document.getElementById('ctx-delete').style.display    = isBranch ? 'none' : '';
+  document.getElementById('ctx-add-child').style.display = (nodeId === 'center') ? 'none' : '';
+
+  // Position within viewport
+  const menuW = 170, menuH = 200;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const mx = Math.min(x, vw - menuW - 8);
+  const my = Math.min(y, vh - menuH - 8);
+
+  ctxMenu.style.left = mx + 'px';
+  ctxMenu.style.top  = my + 'px';
+  ctxMenu.classList.add('visible');
+}
+
+function hideContextMenu() {
+  ctxMenu.classList.remove('visible');
+  contextTarget = null;
+}
+
+document.getElementById('ctx-done').addEventListener('click', () => {
+  if (contextTarget) setStatus(contextTarget, 'done');
+  hideContextMenu();
+});
+
+document.getElementById('ctx-undone').addEventListener('click', () => {
+  if (contextTarget) setStatus(contextTarget, 'undone');
+  hideContextMenu();
+});
+
+document.getElementById('ctx-unplanned').addEventListener('click', () => {
+  if (contextTarget) setStatus(contextTarget, 'unplanned');
+  hideContextMenu();
+});
+
+document.getElementById('ctx-rename').addEventListener('click', () => {
+  if (!contextTarget) { hideContextMenu(); return; }
+  const node = findNode(contextTarget);
+  const current = node ? node.label : '';
+  const name = prompt('Rename:', current);
+  if (name !== null && name.trim()) renameNode(contextTarget, name.trim());
+  hideContextMenu();
+});
+
+document.getElementById('ctx-add-child').addEventListener('click', () => {
+  if (!contextTarget) { hideContextMenu(); return; }
+  const name = prompt('Add activity:');
+  if (name && name.trim()) addNode(contextTarget, name.trim());
+  hideContextMenu();
+});
+
+document.getElementById('ctx-delete').addEventListener('click', () => {
+  if (!contextTarget) { hideContextMenu(); return; }
+  const node = findNode(contextTarget);
+  const hasChildren = node && node.children && node.children.length > 0;
+  if (!hasChildren || confirm('Delete this node and all its sub-tasks?')) {
+    deleteNode(contextTarget);
+  }
+  hideContextMenu();
+});
+
+document.addEventListener('click', (e) => {
+  if (!ctxMenu.contains(e.target)) hideContextMenu();
+});
+
+document.addEventListener('contextmenu', (e) => {
+  // If not on a node, prevent default but don't show menu
+  if (!e.target.closest('.node-group')) e.preventDefault();
+});
+
+// ─── Zoom / Pan ───────────────────────────────────────────────────────────────
+const container = document.getElementById('canvas-container');
+const mapRoot   = document.getElementById('map-root');
+
+function applyTransform() {
+  mapRoot.setAttribute('transform',
+    `translate(${panX},${panY}) scale(${zoom})`
+  );
+  document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
+}
+
+function resetView() {
+  const svg = document.getElementById('main-svg');
+  const w = svg.clientWidth  || svg.getBoundingClientRect().width  || 800;
+  const h = svg.clientHeight || svg.getBoundingClientRect().height || 600;
+  zoom = 0.85;
+  panX = w / 2;
+  panY = h / 2;
+  applyTransform();
+}
+
+function zoomAt(cx, cy, factor) {
+  const newZoom = Math.max(0.2, Math.min(3, zoom * factor));
+  // Adjust pan so the point under cursor stays fixed
+  panX = cx - (cx - panX) * (newZoom / zoom);
+  panY = cy - (cy - panY) * (newZoom / zoom);
+  zoom = newZoom;
+  applyTransform();
+}
+
+container.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = container.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  zoomAt(cx, cy, factor);
+}, { passive: false });
+
+container.addEventListener('mousedown', (e) => {
+  // Only pan on background (not nodes)
+  if (e.target.closest('.node-group')) return;
+  if (e.button !== 0) return;
+  isPanning = true;
+  panStartX = e.clientX;
+  panStartY = e.clientY;
+  panStartPanX = panX;
+  panStartPanY = panY;
+  container.classList.add('panning');
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  panX = panStartPanX + (e.clientX - panStartX);
+  panY = panStartPanY + (e.clientY - panStartY);
+  applyTransform();
+});
+
+window.addEventListener('mouseup', () => {
+  if (isPanning) {
+    isPanning = false;
+    container.classList.remove('panning');
+  }
+});
+
+document.getElementById('zoom-in').addEventListener('click', () => {
+  const svg = document.getElementById('main-svg');
+  const w = svg.clientWidth  || 800;
+  const h = svg.clientHeight || 600;
+  zoomAt(w / 2, h / 2, 1.2);
+});
+
+document.getElementById('zoom-out').addEventListener('click', () => {
+  const svg = document.getElementById('main-svg');
+  const w = svg.clientWidth  || 800;
+  const h = svg.clientHeight || 600;
+  zoomAt(w / 2, h / 2, 1 / 1.2);
+});
+
+document.getElementById('reset-view').addEventListener('click', resetView);
+
+// ─── Week navigation ──────────────────────────────────────────────────────────
+function loadAndRender(wk) {
+  currentWeekKey = wk;
+  weekData = loadWeek(wk);
+  render();
+}
+
+document.getElementById('prev-week').addEventListener('click', () => {
+  loadAndRender(offsetWeek(currentWeekKey, -1));
+});
+
+document.getElementById('next-week').addEventListener('click', () => {
+  loadAndRender(offsetWeek(currentWeekKey, +1));
+});
+
+document.getElementById('today-btn').addEventListener('click', () => {
+  loadAndRender(todayWeekKey());
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  currentWeekKey = todayWeekKey();
+  weekData = loadWeek(currentWeekKey);
+  render();
+
+  // Small delay to let SVG lay out before computing center
+  requestAnimationFrame(() => {
+    resetView();
+  });
+});
+
+window.addEventListener('resize', () => {
+  resetView();
+});
+</script>
+</body>
+</html>
