@@ -720,20 +720,21 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
       fill: btnColor,
     });
 
-    const plus = svgEl('text', {
-      x: btnX, y: 0,
-      'text-anchor': 'middle',
-      dy: '0.36em',
-      'font-size': '16',
-      'font-weight': '300',
-      'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      fill: '#fff',
+    const arm = 4.5;
+    const hLine = svgEl('line', {
+      x1: btnX - arm, y1: 0, x2: btnX + arm, y2: 0,
+      stroke: '#fff', 'stroke-width': '2', 'stroke-linecap': 'round',
       'pointer-events': 'none',
     });
-    plus.textContent = '+';
+    const vLine = svgEl('line', {
+      x1: btnX, y1: -arm, x2: btnX, y2: arm,
+      stroke: '#fff', 'stroke-width': '2', 'stroke-linecap': 'round',
+      'pointer-events': 'none',
+    });
 
     btnG.appendChild(circle);
-    btnG.appendChild(plus);
+    btnG.appendChild(hLine);
+    btnG.appendChild(vLine);
     g.appendChild(btnG);
   }
 
