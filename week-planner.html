@@ -205,6 +205,34 @@
   .node-group:hover .node-rect {
     filter: brightness(0.93);
   }
+
+  /* Inline edit input */
+  #inline-input {
+    position: fixed;
+    display: none;
+    z-index: 500;
+    border: 2px solid #4A90D9;
+    border-radius: 12px;
+    padding: 0 10px;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    text-align: center;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(74,144,217,0.18);
+    color: #333;
+    box-sizing: border-box;
+    min-width: 60px;
+  }
+
+  #inline-sizer {
+    position: fixed;
+    top: -9999px;
+    left: -9999px;
+    visibility: hidden;
+    white-space: pre;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    pointer-events: none;
+  }
 </style>
 </head>
 <body>
@@ -258,7 +286,10 @@
   <div class="ctx-item danger" id="ctx-delete">✕ Delete</div>
 </div>
 
-<div id="hint">Double-click a branch or activity to add · Right-click any node for options · Drag to pan · Scroll to zoom</div>
+<input id="inline-input" type="text" autocomplete="off" spellcheck="false" />
+<span id="inline-sizer"></span>
+
+<div id="hint">Double-click branch to add · Double-click activity to rename · Right-click for options · Drag to pan · Scroll to zoom</div>
 
 <script>
 'use strict';
@@ -301,6 +332,7 @@ let panStartPanX = 0;
 let panStartPanY = 0;
 
 let contextTarget = null;  // node id
+let editState = null;      // { nodeId, isNew, originalLabel }
 
 // ─── Week utilities ───────────────────────────────────────────────────────────
 function getISOWeek(date) {
@@ -600,6 +632,26 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
     }
   }
 
+  // Editing placeholder: just draw a dashed outline, no text
+  if (node && node._editing) {
+    const boxW = rx * 2;
+    const boxH = ry * 2;
+    const rect = svgEl('rect', {
+      class: 'node-rect',
+      x: -boxW / 2, y: -boxH / 2,
+      width: boxW, height: boxH,
+      rx: 12,
+      fill: BRANCH_COLORS[node.branch]?.light || '#fff',
+      stroke: BRANCH_COLORS[node.branch]?.main || '#aaa',
+      'stroke-width': 2,
+      'stroke-dasharray': '5 3',
+      opacity: '0.5',
+    });
+    g.appendChild(rect);
+    g.setAttribute('transform', `translate(${x},${y})`);
+    return g;
+  }
+
   const lines = (type === 'center')
     ? label.split('|').map(s => s.trim())
     : wrapText(label, maxW, fontSize);
@@ -689,6 +741,140 @@ function makeCurve(x1, y1, x2, y2, color, strokeWidth) {
   return path;
 }
 
+// ─── Inline editing ───────────────────────────────────────────────────────────
+const inlineInput = document.getElementById('inline-input');
+const inlineSizer = document.getElementById('inline-sizer');
+
+function nodeScreenPos(nodeId) {
+  const positions = computeLayout();
+  const pos = positions[nodeId];
+  if (!pos) return null;
+  const rect = container.getBoundingClientRect();
+  return {
+    x: rect.left + panX + pos.x * zoom,
+    y: rect.top  + panY + pos.y * zoom,
+  };
+}
+
+function resizeInlineInput() {
+  inlineSizer.style.fontSize = inlineInput.style.fontSize;
+  inlineSizer.style.fontFamily = inlineInput.style.fontFamily || inlineInput.style.font;
+  inlineSizer.textContent = inlineInput.value || ' ';
+  const pad = 24 * zoom;
+  const minW = 64 * zoom;
+  const newW = Math.max(minW, inlineSizer.offsetWidth + pad);
+  inlineInput.style.width = newW + 'px';
+  // Re-center horizontally
+  if (editState) {
+    const sp = nodeScreenPos(editState.nodeId);
+    if (sp) inlineInput.style.left = (sp.x - newW / 2) + 'px';
+  }
+}
+
+function startAddNode(parentId) {
+  const parent = findNode(parentId);
+  if (!parent) return;
+  const branch = parent.branch || parent.id;
+  const id = genId();
+  const node = {
+    id, type: 'activity', branch, parent: parentId,
+    label: '', done: false, unplanned: false, children: [],
+    _editing: true,
+  };
+  weekData.nodes.push(node);
+  parent.children.push(id);
+  render();
+  _openInlineInput(id, true);
+}
+
+function startRenameNode(nodeId) {
+  const node = findNode(nodeId);
+  if (!node || node.type === 'branch') return;
+  _openInlineInput(nodeId, false);
+}
+
+function _openInlineInput(nodeId, isNew) {
+  const node = findNode(nodeId);
+  if (!node) return;
+
+  editState = { nodeId, isNew, originalLabel: node.label };
+
+  const sp = nodeScreenPos(nodeId);
+  if (!sp) { cancelEdit(); return; }
+
+  const h = Math.max(36, 36) * zoom;
+  const fontSize = 12 * zoom;
+
+  inlineInput.value = isNew ? '' : node.label;
+  inlineInput.style.fontSize  = fontSize + 'px';
+  inlineInput.style.height    = h + 'px';
+  inlineInput.style.lineHeight = h + 'px';
+  inlineInput.style.top       = (sp.y - h / 2) + 'px';
+  inlineInput.style.display   = 'block';
+
+  // Size and center horizontally
+  resizeInlineInput();
+
+  inlineInput.focus();
+  if (!isNew) inlineInput.select();
+}
+
+function commitEdit() {
+  const label = inlineInput.value.trim();
+  inlineInput.style.display = 'none';
+
+  if (!editState) return;
+  const { nodeId, isNew } = editState;
+  editState = null;
+
+  if (!label) {
+    // Empty label → treat as cancel
+    _cleanupCancel(nodeId, isNew, '');
+    return;
+  }
+
+  const node = findNode(nodeId);
+  if (node) {
+    node.label = label;
+    delete node._editing;
+    saveWeek(currentWeekKey, weekData);
+  }
+  render();
+}
+
+function cancelEdit() {
+  inlineInput.style.display = 'none';
+  if (!editState) return;
+  const { nodeId, isNew, originalLabel } = editState;
+  editState = null;
+  _cleanupCancel(nodeId, isNew, originalLabel);
+}
+
+function _cleanupCancel(nodeId, isNew, originalLabel) {
+  if (isNew) {
+    const node = findNode(nodeId);
+    if (node && node.parent) {
+      const parent = findNode(node.parent);
+      if (parent) parent.children = parent.children.filter(c => c !== nodeId);
+    }
+    weekData.nodes = weekData.nodes.filter(n => n.id !== nodeId);
+  } else {
+    const node = findNode(nodeId);
+    if (node) node.label = originalLabel;
+  }
+  render();
+}
+
+inlineInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter')  { e.preventDefault(); commitEdit(); }
+  if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+  e.stopPropagation();
+});
+inlineInput.addEventListener('input', resizeInlineInput);
+// Prevent clicks inside input from bubbling to canvas
+inlineInput.addEventListener('mousedown', (e) => e.stopPropagation());
+inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
   const root = document.getElementById('map-root');
@@ -768,9 +954,13 @@ function attachNodeListeners() {
     g.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      const name = prompt('Add activity:');
-      if (name && name.trim()) {
-        addNode(id, name.trim());
+      const node = findNode(id);
+      if (!node || node.type === 'branch') {
+        // Double-click on branch (or center) → add child
+        if (id !== 'center') startAddNode(id);
+      } else {
+        // Double-click on activity → rename inline
+        startRenameNode(id);
       }
     });
 
@@ -829,19 +1019,15 @@ document.getElementById('ctx-unplanned').addEventListener('click', () => {
 });
 
 document.getElementById('ctx-rename').addEventListener('click', () => {
-  if (!contextTarget) { hideContextMenu(); return; }
-  const node = findNode(contextTarget);
-  const current = node ? node.label : '';
-  const name = prompt('Rename:', current);
-  if (name !== null && name.trim()) renameNode(contextTarget, name.trim());
+  const id = contextTarget;
   hideContextMenu();
+  if (id) startRenameNode(id);
 });
 
 document.getElementById('ctx-add-child').addEventListener('click', () => {
-  if (!contextTarget) { hideContextMenu(); return; }
-  const name = prompt('Add activity:');
-  if (name && name.trim()) addNode(contextTarget, name.trim());
+  const id = contextTarget;
   hideContextMenu();
+  if (id) startAddNode(id);
 });
 
 document.getElementById('ctx-delete').addEventListener('click', () => {
@@ -903,9 +1089,12 @@ container.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 container.addEventListener('mousedown', (e) => {
+  // Commit edit if clicking outside the input
+  if (editState && e.target !== inlineInput) commitEdit();
   // Only pan on background (not nodes)
   if (e.target.closest('.node-group')) return;
   if (e.button !== 0) return;
+  if (editState) return;
   isPanning = true;
   panStartX = e.clientX;
   panStartY = e.clientY;
