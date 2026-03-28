@@ -213,7 +213,7 @@
     z-index: 500;
     border: 2px dashed #4A90D9;
     border-radius: 12px;
-    padding: 0 10px;
+    padding: 0 12px;
     background: #E8F4FD;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     text-align: center;
@@ -739,8 +739,9 @@ function resizeInlineInput() {
   inlineSizer.style.fontSize = inlineInput.style.fontSize;
   inlineSizer.style.fontFamily = inlineInput.style.fontFamily || inlineInput.style.font;
   inlineSizer.textContent = inlineInput.value || ' ';
-  const pad = 24 * zoom;
-  const minW = 64 * zoom;
+  // SVG activity node: rx*2=104px wide, padX=12 each side (24px), border 2px each side (4px) = 28px overhead
+  const pad = 28 * zoom;
+  const minW = 104 * zoom;
   const newW = Math.max(minW, inlineSizer.offsetWidth + pad);
   inlineInput.style.width = newW + 'px';
   // Re-center horizontally
