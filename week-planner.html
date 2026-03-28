@@ -516,64 +516,43 @@ function computeLayout() {
 
   const branchIds = ['work', 'family', 'me'];
 
+  // Recursively lay out children of a node.
+  // depth 1 = direct children of a branch node.
+  function layoutChildren(nodeId, parentX, parentY, parentAngle, depth) {
+    const node = findNode(nodeId);
+    if (!node) return;
+    const children = node.children || [];
+    const n = children.length;
+    if (n === 0) return;
+
+    let dist, maxSpread, spreadPerChild;
+    if (depth === 1) {
+      dist = ACTIVITY_DIST;    maxSpread = BRANCH_ARC;  spreadPerChild = 20;
+    } else if (depth === 2) {
+      dist = SUBACTIVITY_DIST; maxSpread = SUB_ARC;     spreadPerChild = 18;
+    } else {
+      dist = 150;              maxSpread = 30;           spreadPerChild = 15;
+    }
+
+    children.forEach((childId, i) => {
+      let childAngle;
+      if (n === 1) {
+        childAngle = parentAngle;
+      } else {
+        const spread = Math.min(maxSpread, spreadPerChild * n);
+        childAngle = parentAngle - spread / 2 + (spread / (n - 1)) * i;
+      }
+      const cp = polarToCart(parentX, parentY, dist, childAngle);
+      positions[childId] = { x: cp.x, y: cp.y, angle: childAngle };
+      layoutChildren(childId, cp.x, cp.y, childAngle, depth + 1);
+    });
+  }
+
   branchIds.forEach(bid => {
     const angle = BRANCH_ANGLES[bid];
     const bp = polarToCart(cx, cy, BRANCH_DIST, angle);
     positions[bid] = { x: bp.x, y: bp.y, angle };
-
-    const branch = findNode(bid);
-    if (!branch) return;
-    const children = branch.children || [];
-    const n = children.length;
-
-    children.forEach((childId, i) => {
-      // Spread children in arc around branch angle
-      let childAngle;
-      if (n === 1) {
-        childAngle = angle;
-      } else {
-        const spread = Math.min(BRANCH_ARC, 20 * n);
-        childAngle = angle - spread / 2 + (spread / (n - 1)) * i;
-      }
-
-      const cp = polarToCart(bp.x, bp.y, ACTIVITY_DIST, childAngle);
-      positions[childId] = { x: cp.x, y: cp.y, angle: childAngle };
-
-      // Grandchildren
-      const child = findNode(childId);
-      if (!child) return;
-      const grandchildren = child.children || [];
-      const gn = grandchildren.length;
-
-      grandchildren.forEach((gcId, gi) => {
-        let gcAngle;
-        if (gn === 1) {
-          gcAngle = childAngle;
-        } else {
-          const spread = Math.min(SUB_ARC, 18 * gn);
-          gcAngle = childAngle - spread / 2 + (spread / (gn - 1)) * gi;
-        }
-        const gp = polarToCart(cp.x, cp.y, SUBACTIVITY_DIST, gcAngle);
-        positions[gcId] = { x: gp.x, y: gp.y, angle: gcAngle };
-
-        // Great-grandchildren (depth 3)
-        const gc = findNode(gcId);
-        if (!gc) return;
-        const ggc = gc.children || [];
-        const ggn = ggc.length;
-        ggc.forEach((ggId, ggi) => {
-          let ggAngle;
-          if (ggn === 1) {
-            ggAngle = gcAngle;
-          } else {
-            const spread = Math.min(30, 15 * ggn);
-            ggAngle = gcAngle - spread / 2 + (spread / (ggn - 1)) * ggi;
-          }
-          const ggp = polarToCart(gp.x, gp.y, 150, ggAngle);
-          positions[ggId] = { x: ggp.x, y: ggp.y, angle: ggAngle };
-        });
-      });
-    });
+    layoutChildren(bid, bp.x, bp.y, angle, 1);
   });
 
   return positions;
