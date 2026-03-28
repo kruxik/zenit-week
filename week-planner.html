@@ -206,6 +206,16 @@
     filter: brightness(0.93);
   }
 
+  .add-btn {
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    cursor: pointer;
+  }
+
+  .node-group:hover .add-btn {
+    opacity: 1;
+  }
+
   /* Inline edit input */
   #inline-input {
     position: fixed;
@@ -697,6 +707,35 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
     g.appendChild(badge);
   }
 
+  // "+" add-child button (hidden, fades in on hover)
+  if (type !== 'center') {
+    const btnColor = BRANCH_COLORS[branch]?.main || '#888';
+    const btnR = 10;
+    const btnX = boxW / 2 + btnR + 4;
+
+    const btnG = svgEl('g', { class: 'add-btn', 'data-parent': id });
+
+    const circle = svgEl('circle', {
+      cx: btnX, cy: 0, r: btnR,
+      fill: btnColor,
+    });
+
+    const plus = svgEl('text', {
+      x: btnX, y: 0,
+      'text-anchor': 'middle',
+      'dominant-baseline': 'central',
+      'font-size': '15',
+      'font-weight': '300',
+      fill: '#fff',
+      'pointer-events': 'none',
+    });
+    plus.textContent = '+';
+
+    btnG.appendChild(circle);
+    btnG.appendChild(plus);
+    g.appendChild(btnG);
+  }
+
   g.setAttribute('transform', `translate(${x},${y})`);
   return g;
 }
@@ -944,13 +983,15 @@ function attachNodeListeners() {
       e.stopPropagation();
       e.preventDefault();
       const node = findNode(id);
-      if (!node || node.type === 'branch') {
-        // Double-click on branch (or center) → add child
-        if (id !== 'center') startAddNode(id);
-      } else {
-        // Double-click on activity → rename inline
-        startRenameNode(id);
-      }
+      if (node && node.type === 'activity') startRenameNode(id);
+    });
+
+    g.querySelectorAll('.add-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        startAddNode(btn.getAttribute('data-parent'));
+      });
     });
 
     g.addEventListener('contextmenu', (e) => {
