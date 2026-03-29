@@ -991,9 +991,10 @@ function showContextMenu(x, y, nodeId) {
   const node = findNode(nodeId);
   const isBranch = !node || node.type === 'branch';
 
-  // Show/hide items depending on node type
-  document.getElementById('ctx-done').style.display      = isBranch ? 'none' : '';
-  document.getElementById('ctx-undone').style.display    = isBranch ? 'none' : '';
+  // Show/hide items depending on node type and status
+  const isDone = node && node.done === true;
+  document.getElementById('ctx-done').style.display      = (isBranch || isDone)  ? 'none' : '';
+  document.getElementById('ctx-undone').style.display    = (isBranch || !isDone) ? 'none' : '';
   document.getElementById('ctx-unplanned').style.display = isBranch ? 'none' : '';
   document.getElementById('ctx-delete').style.display    = isBranch ? 'none' : '';
   document.getElementById('ctx-add-child').style.display = (nodeId === 'center') ? 'none' : '';
