@@ -310,7 +310,8 @@ const BRANCH_COLORS = {
   me:     { main: '#9B59B6', light: '#F5EEF8', text: '#6c2d8a' },
 };
 const CENTER_COLOR  = { main: '#34495e', light: '#ecf0f1', text: '#fff' };
-const DONE_BG       = '#d5d5d5';
+const DONE_BG               = '#d5d5d5';
+const DONE_UNPLANNED_BG     = '#e5e5e5';
 const DONE_TEXT     = '#444';
 const UNPLANNED_BG  = '#FEF9E7';
 const UNPLANNED_BORDER = '#F39C12';
@@ -493,8 +494,8 @@ function renameNode(id, label) {
 function setStatus(id, status) {
   const node = findNode(id);
   if (!node) return;
-  if (status === 'done')      { node.done = true;  node.unplanned = false; }
-  if (status === 'undone')    { node.done = false; node.unplanned = false; }
+  if (status === 'done')      { node.done = true; }
+  if (status === 'undone')    { node.done = false; }
   if (status === 'unplanned') { node.done = false; node.unplanned = true;  }
   saveWeek(currentWeekKey, weekData);
   render();
@@ -608,7 +609,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
     bgColor = bc.main; borderColor = bc.main; textColor = '#fff';
   } else {
     // activity
-    if (node && node.done) {
+    if (node && node.done && node.unplanned) {
+      bgColor = DONE_UNPLANNED_BG; borderColor = '#bbb'; textColor = DONE_TEXT; fontWeight = 'bold';
+    } else if (node && node.done) {
       bgColor = DONE_BG; borderColor = '#aaa'; textColor = DONE_TEXT; fontWeight = 'bold';
     } else if (node && node.unplanned) {
       bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = '#8a5c00';
@@ -660,8 +663,18 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
     g.appendChild(t);
   });
 
-  // Done checkmark badge
-  if (node && node.done) {
+  // Done / unplanned badge
+  if (node && node.done && node.unplanned) {
+    const badge = svgEl('text', {
+      x: boxW / 2 - 4, y: -boxH / 2 + 13,
+      'text-anchor': 'end',
+      'font-size': 10,
+      fill: '#666',
+      'pointer-events': 'none',
+    });
+    badge.textContent = '⚡✓';
+    g.appendChild(badge);
+  } else if (node && node.done) {
     const badge = svgEl('text', {
       x: boxW / 2 - 4, y: -boxH / 2 + 13,
       'text-anchor': 'end',
@@ -671,10 +684,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
     });
     badge.textContent = '✓';
     g.appendChild(badge);
-  }
-
-  // Unplanned badge
-  if (node && node.unplanned) {
+  } else if (node && node.unplanned) {
     const badge = svgEl('text', {
       x: boxW / 2 - 4, y: -boxH / 2 + 13,
       'text-anchor': 'end',
