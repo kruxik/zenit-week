@@ -974,7 +974,13 @@ function render() {
         x2 = childPos.x + childW / 2;
       }
 
-      linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw));
+      // Family edges are drawn child→parent (same convention as center→Family)
+      // so the S-curve flip direction is consistent across the whole branch.
+      if (branch === 'family') {
+        linesG.appendChild(makeCurve(x2, childPos.y, x1, pos.y, color, sw));
+      } else {
+        linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw));
+      }
       drawEdges(childId);
     });
   }
