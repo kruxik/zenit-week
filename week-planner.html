@@ -326,7 +326,7 @@ const BRANCH_ARC      = 50;  // degrees spread for children
 const SUB_ARC         = 40;
 
 // Branch base angles (degrees): Work upper-right, Family bottom, Me upper-left
-const BRANCH_ANGLES = { work: -30, family: 90, me: 210 };
+const BRANCH_ANGLES = { work: -30, family: 150, me: 210 };
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentWeekKey = '';   // 'YYYY-WW'
@@ -568,6 +568,24 @@ function svgEl(tag, attrs) {
   return el;
 }
 
+function getNodeBoxW(nodeId) {
+  if (nodeId === 'center') return CENTER_RADIUS_X * 2;
+  const node = findNode(nodeId);
+  if (!node) return 104;
+  const type = node.type || 'activity';
+  const label = node.label || '';
+  let rx, fontSize, maxW, padX;
+  if (type === 'branch') {
+    rx = 56; fontSize = 13; maxW = 95; padX = 14;
+  } else {
+    rx = 52; fontSize = 12; maxW = 88; padX = 12;
+  }
+  const lines = wrapText(label, maxW, fontSize);
+  const avgCharW = fontSize * 0.55;
+  const longestLine = Math.max(...lines.map(l => l.length));
+  return Math.max(rx * 2, Math.ceil(longestLine * avgCharW) + padX * 2);
+}
+
 function wrapText(text, maxWidth, fontSize) {
   const maxChars = 32;
   const words = text.split(' ');
@@ -732,14 +750,27 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
 }
 
 function makeCurve(x1, y1, x2, y2, color, strokeWidth) {
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-  // Quadratic bezier with control point pulled toward midpoint
-  const cpx = (x1 * 0.25 + mx * 0.75);
-  const cpy = (y1 * 0.25 + my * 0.75);
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+  // Perpendicular unit vector for S-curve offset.
+  // Flip for right-to-left lines so the curve always bows outward,
+  // mirroring the right-side behaviour on the left side.
+  const flip = dx < 0 ? -1 : 1;
+  const px = flip * (-dy / dist);
+  const py = flip * ( dx / dist);
+
+  // Intensity proportional to distance; control points at ~35% along the line,
+  // offset perpendicular in opposite directions to create a natural S-curve.
+  const intensity = dist * 0.28;
+  const cp1x = x1 + dx * 0.35 + px * intensity;
+  const cp1y = y1 + dy * 0.35 + py * intensity;
+  const cp2x = x2 - dx * 0.35 - px * intensity;
+  const cp2y = y2 - dy * 0.35 - py * intensity;
 
   const path = svgEl('path', {
-    d: `M ${x1} ${y1} Q ${cpx} ${cpy} ${x2} ${y2}`,
+    d: `M ${x1} ${y1} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${x2} ${y2}`,
     fill: 'none',
     stroke: color,
     'stroke-width': strokeWidth || 2,
@@ -923,13 +954,27 @@ function render() {
     if (!node) return;
     const pos = positions[nodeId];
     if (!pos) return;
+    const branch = node.branch || node.id;
 
     (node.children || []).forEach(childId => {
       const childPos = positions[childId];
       if (!childPos) return;
-      const color = branchColor(node.branch || node.id);
+      const color = branchColor(branch);
       const sw = (node.type === 'branch') ? 2.5 : 1.8;
-      linesG.appendChild(makeCurve(pos.x, pos.y, childPos.x, childPos.y, color, sw));
+
+      const parentW = getNodeBoxW(nodeId);
+      const childW  = getNodeBoxW(childId);
+      let x1, x2;
+      if (branch === 'work') {
+        x1 = pos.x + parentW / 2;
+        x2 = childPos.x - childW / 2;
+      } else {
+        // family and me: left-side rules
+        x1 = pos.x - parentW / 2;
+        x2 = childPos.x + childW / 2;
+      }
+
+      linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw));
       drawEdges(childId);
     });
   }
@@ -940,7 +985,24 @@ function render() {
     const bPos = positions[bid];
     if (!bPos) return;
     const color = branchColor(bid);
-    linesG.appendChild(makeCurve(0, 0, bPos.x, bPos.y, color, 3));
+    const branchW = getNodeBoxW(bid);
+
+    let x1, y1, x2;
+    if (bid === 'work') {
+      x1 = CENTER_RADIUS_X;        // center right border → branch left border
+      y1 = 0;
+      x2 = bPos.x - branchW / 2;
+    } else if (bid === 'family') {
+      x1 = -CENTER_RADIUS_X;       // center left border (same as me)
+      y1 = 0;
+      x2 = bPos.x + branchW / 2;  // family right border
+    } else {
+      x1 = -CENTER_RADIUS_X;       // center left border → branch right border (me)
+      y1 = 0;
+      x2 = bPos.x + branchW / 2;
+    }
+
+    linesG.appendChild(makeCurve(x1, y1, x2, bPos.y, color, 3));
     drawEdges(bid);
   });
 
