@@ -996,13 +996,18 @@ function render() {
       x1 = -CENTER_RADIUS_X;       // center left border (same as me)
       y1 = 0;
       x2 = bPos.x + branchW / 2;  // family right border
+
     } else {
       x1 = -CENTER_RADIUS_X;       // center left border → branch right border (me)
       y1 = 0;
       x2 = bPos.x + branchW / 2;
     }
 
-    linesG.appendChild(makeCurve(x1, y1, x2, bPos.y, color, 3));
+    if (bid === 'family') {
+      linesG.appendChild(makeCurve(x2, bPos.y, x1, y1, color, 3));
+    } else {
+      linesG.appendChild(makeCurve(x1, y1, x2, bPos.y, color, 3));
+    }
     drawEdges(bid);
   });
 
