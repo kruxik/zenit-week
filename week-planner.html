@@ -305,25 +305,25 @@
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const BRANCH_COLORS = {
-  work:   { main: '#4A90D9', light: '#E8F4FD', text: '#1a5c99' },
-  family: { main: '#5CB85C', light: '#EDF7ED', text: '#2d7a2d' },
-  me:     { main: '#9B59B6', light: '#F5EEF8', text: '#6c2d8a' },
+  work:   { main: '#4A90E2', light: '#EAF2FB', text: '#1A5C99' },
+  family: { main: '#7ED321', light: '#F2F9EA', text: '#417505' },
+  me:     { main: '#BD10E0', light: '#F9EAFB', text: '#7A0B91' },
 };
-const CENTER_COLOR  = { main: '#34495e', light: '#ecf0f1', text: '#fff' };
-const DONE_BG               = '#d5d5d5';
-const DONE_UNPLANNED_BG     = '#e5e5e5';
-const DONE_TEXT     = '#444';
-const UNPLANNED_BG  = '#FEF9E7';
-const UNPLANNED_BORDER = '#F39C12';
+const CENTER_COLOR  = { main: '#333333', light: '#FFFFFF', text: '#FFFFFF' };
+const DONE_BG               = '#E0E0E0';
+const DONE_UNPLANNED_BG     = '#EBEBEB';
+const DONE_TEXT     = '#888888';
+const UNPLANNED_BG  = '#FFF9DB';
+const UNPLANNED_BORDER = '#FCC419';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
-const CENTER_RADIUS_X = 88;
-const CENTER_RADIUS_Y = 30;
-const BRANCH_DIST     = 220;
-const ACTIVITY_DIST   = 190;
-const SUBACTIVITY_DIST = 170;
-const BRANCH_ARC      = 50;  // degrees spread for children
-const SUB_ARC         = 40;
+const CENTER_RADIUS_X = 100;
+const CENTER_RADIUS_Y = 35;
+const BRANCH_DIST     = 240;
+const ACTIVITY_DIST   = 200;
+const SUBACTIVITY_DIST = 180;
+const BRANCH_ARC      = 60;  // degrees spread for children
+const SUB_ARC         = 45;
 
 // Branch base angles (degrees): Work upper-right, Family bottom, Me upper-left
 const BRANCH_ANGLES = { work: -30, family: 150, me: 210 };
@@ -609,13 +609,13 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
   let rx, ry, fontSize, maxW, padX, padY;
   if (type === 'center') {
     rx = CENTER_RADIUS_X; ry = CENTER_RADIUS_Y;
-    fontSize = 14; maxW = 150; padX = 18; padY = 12;
+    fontSize = 15; maxW = 180; padX = 22; padY = 14;
   } else if (type === 'branch') {
-    rx = 56; ry = 22;
-    fontSize = 13; maxW = 95; padX = 14; padY = 10;
+    rx = 64; ry = 26;
+    fontSize = 14; maxW = 110; padX = 16; padY = 12;
   } else {
-    rx = 52; ry = 18;
-    fontSize = 12; maxW = 88; padX = 12; padY = 8;
+    rx = 58; ry = 22;
+    fontSize = 13; maxW = 100; padX = 14; padY = 10;
   }
 
   // Determine colors
@@ -628,9 +628,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
   } else {
     // activity
     if (node && node.done && node.unplanned) {
-      bgColor = DONE_UNPLANNED_BG; borderColor = '#bbb'; textColor = DONE_TEXT; fontWeight = 'bold';
+      bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT; fontWeight = 'bold';
     } else if (node && node.done) {
-      bgColor = DONE_BG; borderColor = '#aaa'; textColor = DONE_TEXT; fontWeight = 'bold';
+      bgColor = DONE_BG; borderColor = '#bbb'; textColor = DONE_TEXT; fontWeight = 'bold';
     } else if (node && node.unplanned) {
       bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = '#8a5c00';
     } else {
@@ -650,17 +650,16 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
   const longestLine = Math.max(...lines.map(l => l.length));
   const boxW = Math.max(rx * 2, Math.ceil(longestLine * avgCharW) + padX * 2);
 
-  // Shadow filter
   const filterRef = (type === 'center') ? 'url(#shadow)' : 'url(#shadow-sm)';
 
   const rect = svgEl('rect', {
     class: 'node-rect',
     x: -boxW / 2, y: -boxH / 2,
     width: boxW, height: boxH,
-    rx: (type === 'center') ? 18 : (type === 'branch') ? 14 : 12,
+    rx: boxH / 2,  // Full pill shape
     fill: bgColor,
     stroke: borderColor,
-    'stroke-width': (type === 'activity' && node && (node.done || node.unplanned)) ? 2 : (type === 'center' ? 0 : 1.5),
+    'stroke-width': (type === 'activity' && node && (node.done || node.unplanned)) ? 2.5 : (type === 'center' ? 0 : 2),
     filter: filterRef,
   });
   g.appendChild(rect);
@@ -673,7 +672,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
       'text-anchor': 'middle',
       'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       'font-size': (type === 'center' && i === 0) ? (fontSize + 1) : fontSize,
-      'font-weight': (type === 'branch') ? '600' : fontWeight,
+      'font-weight': (type === 'branch' || (type === 'center' && i === 0)) ? '700' : fontWeight,
       fill: textColor,
       'pointer-events': 'none',
     });
@@ -682,66 +681,35 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
   });
 
   // Done / unplanned badge
-  if (node && node.done && node.unplanned) {
+  if (node && (node.done || node.unplanned)) {
+    const badgeText = (node.done && node.unplanned) ? '⚡✓' : (node.done ? '✓' : '⚡');
     const badge = svgEl('text', {
-      x: boxW / 2 - 4, y: -boxH / 2 + 13,
+      x: boxW / 2 - 12, y: -boxH / 2 + 15,
       'text-anchor': 'end',
-      'font-size': 10,
-      fill: '#666',
+      'font-size': 11,
+      'font-weight': 'bold',
+      fill: node.unplanned ? UNPLANNED_BORDER : '#777',
       'pointer-events': 'none',
     });
-    badge.textContent = '⚡✓';
-    g.appendChild(badge);
-  } else if (node && node.done) {
-    const badge = svgEl('text', {
-      x: boxW / 2 - 4, y: -boxH / 2 + 13,
-      'text-anchor': 'end',
-      'font-size': 10,
-      fill: '#666',
-      'pointer-events': 'none',
-    });
-    badge.textContent = '✓';
-    g.appendChild(badge);
-  } else if (node && node.unplanned) {
-    const badge = svgEl('text', {
-      x: boxW / 2 - 4, y: -boxH / 2 + 13,
-      'text-anchor': 'end',
-      'font-size': 10,
-      fill: UNPLANNED_BORDER,
-      'pointer-events': 'none',
-    });
-    badge.textContent = '⚡';
+    badge.textContent = badgeText;
     g.appendChild(badge);
   }
 
-  // "+" add-child button (hidden, fades in on hover)
+  // "+" add-child button
   if (type !== 'center') {
     const btnColor = BRANCH_COLORS[branch]?.main || '#888';
-    const btnR = 10;
-    const btnX = boxW / 2;  // center on right edge: 50% inside, 50% outside
+    const btnR = 11;
+    // Position on right for 'work' branch, left for others (family, me)
+    const btnX = (branch === 'work') ? (boxW / 2) : (-boxW / 2);
 
     const btnG = svgEl('g', { class: 'add-btn', 'data-parent': id });
+    const circle = svgEl('circle', { cx: btnX, cy: 0, r: btnR, fill: btnColor });
 
-    const circle = svgEl('circle', {
-      cx: btnX, cy: 0, r: btnR,
-      fill: btnColor,
-    });
+    const arm = 5;
+    const hLine = svgEl('line', { x1: btnX - arm, y1: 0, x2: btnX + arm, y2: 0, stroke: '#fff', 'stroke-width': '2.5', 'stroke-linecap': 'round', 'pointer-events': 'none' });
+    const vLine = svgEl('line', { x1: btnX, y1: -arm, x2: btnX, y2: arm, stroke: '#fff', 'stroke-width': '2.5', 'stroke-linecap': 'round', 'pointer-events': 'none' });
 
-    const arm = 4.5;
-    const hLine = svgEl('line', {
-      x1: btnX - arm, y1: 0, x2: btnX + arm, y2: 0,
-      stroke: '#fff', 'stroke-width': '2', 'stroke-linecap': 'round',
-      'pointer-events': 'none',
-    });
-    const vLine = svgEl('line', {
-      x1: btnX, y1: -arm, x2: btnX, y2: arm,
-      stroke: '#fff', 'stroke-width': '2', 'stroke-linecap': 'round',
-      'pointer-events': 'none',
-    });
-
-    btnG.appendChild(circle);
-    btnG.appendChild(hLine);
-    btnG.appendChild(vLine);
+    btnG.appendChild(circle); btnG.appendChild(hLine); btnG.appendChild(vLine);
     g.appendChild(btnG);
   }
 
@@ -751,23 +719,12 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
 
 function makeCurve(x1, y1, x2, y2, color, strokeWidth) {
   const dx = x2 - x1;
-  const dy = y2 - y1;
-  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-
-  // Perpendicular unit vector for S-curve offset.
-  // Flip for right-to-left lines so the curve always bows outward,
-  // mirroring the right-side behaviour on the left side.
-  const flip = dx < 0 ? -1 : 1;
-  const px = flip * (-dy / dist);
-  const py = flip * ( dx / dist);
-
-  // Intensity proportional to distance; control points at ~35% along the line,
-  // offset perpendicular in opposite directions to create a natural S-curve.
-  const intensity = dist * 0.28;
-  const cp1x = x1 + dx * 0.35 + px * intensity;
-  const cp1y = y1 + dy * 0.35 + py * intensity;
-  const cp2x = x2 - dx * 0.35 - px * intensity;
-  const cp2y = y2 - dy * 0.35 - py * intensity;
+  // Miro style: smooth S-curves with horizontal exits
+  // Control points at 50% horizontal distance
+  const cp1x = x1 + dx * 0.5;
+  const cp1y = y1;
+  const cp2x = x2 - dx * 0.5;
+  const cp2y = y2;
 
   const path = svgEl('path', {
     d: `M ${x1} ${y1} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${x2} ${y2}`,
@@ -775,7 +732,7 @@ function makeCurve(x1, y1, x2, y2, color, strokeWidth) {
     stroke: color,
     'stroke-width': strokeWidth || 2,
     'stroke-linecap': 'round',
-    opacity: '0.6',
+    opacity: '0.8',
     'pointer-events': 'none',
   });
   return path;
@@ -949,7 +906,7 @@ function render() {
   }
 
   // Draw all edges
-  function drawEdges(nodeId) {
+  function drawEdges(nodeId, depth) {
     const node = findNode(nodeId);
     if (!node) return;
     const pos = positions[nodeId];
@@ -960,7 +917,11 @@ function render() {
       const childPos = positions[childId];
       if (!childPos) return;
       const color = branchColor(branch);
-      const sw = (node.type === 'branch') ? 2.5 : 1.8;
+      
+      // Tapering stroke width: 4.5 -> 2.5 -> 1.5
+      let sw = 1.5;
+      if (depth === 0) sw = 4.5;
+      else if (depth === 1) sw = 2.5;
 
       const parentW = getNodeBoxW(nodeId);
       const childW  = getNodeBoxW(childId);
@@ -974,14 +935,8 @@ function render() {
         x2 = childPos.x + childW / 2;
       }
 
-      // Family edges are drawn child→parent (same convention as center→Family)
-      // so the S-curve flip direction is consistent across the whole branch.
-      if (branch === 'family') {
-        linesG.appendChild(makeCurve(x2, childPos.y, x1, pos.y, color, sw));
-      } else {
-        linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw));
-      }
-      drawEdges(childId);
+      linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw));
+      drawEdges(childId, depth + 1);
     });
   }
 
@@ -995,26 +950,18 @@ function render() {
 
     let x1, y1, x2;
     if (bid === 'work') {
-      x1 = CENTER_RADIUS_X;        // center right border → branch left border
+      x1 = CENTER_RADIUS_X;
       y1 = 0;
       x2 = bPos.x - branchW / 2;
-    } else if (bid === 'family') {
-      x1 = -CENTER_RADIUS_X;       // center left border (same as me)
-      y1 = 0;
-      x2 = bPos.x + branchW / 2;  // family right border
-
     } else {
-      x1 = -CENTER_RADIUS_X;       // center left border → branch right border (me)
+      x1 = -CENTER_RADIUS_X;
       y1 = 0;
       x2 = bPos.x + branchW / 2;
     }
 
-    if (bid === 'family') {
-      linesG.appendChild(makeCurve(x2, bPos.y, x1, y1, color, 3));
-    } else {
-      linesG.appendChild(makeCurve(x1, y1, x2, bPos.y, color, 3));
-    }
-    drawEdges(bid);
+    // Bold connection from center
+    linesG.appendChild(makeCurve(x1, y1, x2, bPos.y, color, 8));
+    drawEdges(bid, 0);
   });
 
   // Draw center node
