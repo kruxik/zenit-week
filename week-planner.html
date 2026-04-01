@@ -8,8 +8,8 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f4f4f4;
     overflow: hidden;
     height: 100vh;
     width: 100vw;
@@ -26,10 +26,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 20px;
-    background: #fff;
+    padding: 10px 24px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(8px);
     border-bottom: 1px solid #e0e0e0;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     z-index: 10;
     flex-shrink: 0;
   }
@@ -41,91 +42,94 @@
   }
 
   .nav-btn {
-    background: #f0f0f0;
-    border: 1px solid #ddd;
+    background: #fff;
+    border: 1px solid #dcdcdc;
     border-radius: 8px;
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s;
-    color: #333;
+    transition: all 0.2s;
+    color: #444;
   }
 
-  .nav-btn:hover { background: #e0e0e0; }
+  .nav-btn:hover { background: #f8f8f8; border-color: #bbb; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 
   #week-label {
     font-size: 16px;
     font-weight: 600;
-    color: #222;
-    min-width: 200px;
+    color: #333;
+    min-width: 210px;
     text-align: center;
   }
 
   #zoom-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
   }
 
   .zoom-btn {
-    background: #f0f0f0;
-    border: 1px solid #ddd;
+    background: #fff;
+    border: 1px solid #dcdcdc;
     border-radius: 8px;
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s;
-    color: #333;
+    transition: all 0.2s;
+    color: #444;
   }
 
-  .zoom-btn:hover { background: #e0e0e0; }
+  .zoom-btn:hover { background: #f8f8f8; border-color: #bbb; }
 
   #zoom-label {
     font-size: 13px;
+    font-weight: 500;
     color: #666;
-    min-width: 42px;
+    min-width: 45px;
     text-align: center;
   }
 
   .reset-btn {
-    background: #f0f0f0;
-    border: 1px solid #ddd;
+    background: #fff;
+    border: 1px solid #dcdcdc;
     border-radius: 8px;
-    padding: 6px 12px;
+    padding: 8px 14px;
     cursor: pointer;
     font-size: 13px;
+    font-weight: 500;
     color: #555;
-    transition: background 0.15s;
+    transition: all 0.2s;
   }
 
-  .reset-btn:hover { background: #e0e0e0; }
+  .reset-btn:hover { background: #f8f8f8; border-color: #bbb; }
 
   #legend {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 18px;
   }
 
   .legend-item {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 12px;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
     color: #555;
   }
 
   .legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
   }
 
   #canvas-container {
@@ -133,6 +137,9 @@
     overflow: hidden;
     position: relative;
     cursor: grab;
+    background-color: #f9f9f9;
+    background-image: radial-gradient(#e0e0e0 1px, transparent 1px);
+    background-size: 30px 30px;
   }
 
   #canvas-container.panning { cursor: grabbing; }
@@ -147,73 +154,88 @@
   #context-menu {
     position: fixed;
     background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    padding: 6px 0;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    padding: 8px 0;
     z-index: 1000;
-    min-width: 160px;
+    min-width: 180px;
     display: none;
+    animation: fadeIn 0.1s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   #context-menu.visible { display: block; }
 
   .ctx-item {
-    padding: 8px 16px;
+    padding: 10px 20px;
     cursor: pointer;
     font-size: 14px;
-    color: #333;
+    color: #444;
     display: flex;
     align-items: center;
-    gap: 8px;
-    transition: background 0.1s;
+    gap: 10px;
+    transition: background 0.15s;
   }
 
-  .ctx-item:hover { background: #f5f5f5; }
+  .ctx-item:hover { background: #f4f7fb; color: #1a73e8; }
 
-  .ctx-item.danger { color: #e74c3c; }
-  .ctx-item.danger:hover { background: #fef0f0; }
+  .ctx-item.danger { color: #d93025; }
+  .ctx-item.danger:hover { background: #fdeaea; color: #d93025; }
 
   .ctx-separator {
     height: 1px;
-    background: #eee;
-    margin: 4px 0;
+    background: #f0f0f0;
+    margin: 6px 0;
   }
 
   /* Hint */
   #hint {
     position: fixed;
-    bottom: 16px;
+    bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0,0,0,0.55);
+    background: rgba(40, 44, 52, 0.85);
     color: #fff;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 12px;
+    padding: 8px 18px;
+    border-radius: 30px;
+    font-size: 13px;
     pointer-events: none;
-    opacity: 0.85;
+    opacity: 0;
+    transition: opacity 0.3s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   }
 
-  /* SVG node styles via inline attributes, but animations here */
+  body:hover #hint { opacity: 1; }
+
+  /* SVG node styles */
   .node-group { cursor: pointer; }
 
   .node-rect {
-    transition: filter 0.15s;
+    transition: all 0.2s ease;
   }
 
   .node-group:hover .node-rect {
-    filter: brightness(0.93);
+    filter: brightness(0.96);
+    transform: translateY(-1px);
   }
 
   .add-btn {
     opacity: 0;
-    transition: opacity 0.18s ease;
+    transition: opacity 0.2s ease, transform 0.2s ease;
     cursor: pointer;
   }
 
   .node-group:hover .add-btn {
     opacity: 1;
+  }
+  
+  .add-btn:hover {
+    transform: scale(1.15);
   }
 
   /* Inline edit input */
@@ -221,16 +243,16 @@
     position: fixed;
     display: none;
     z-index: 500;
-    border: 2px dashed #4A90D9;
-    border-radius: 12px;
-    padding: 0 12px;
-    background: #E8F4FD;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    text-align: center;
+    border: 2px solid #1a73e8;
+    border-radius: 8px;
+    padding: 4px 12px;
+    background: #fff;
+    font-family: inherit;
+    text-align: left;
     outline: none;
     color: #333;
     box-sizing: border-box;
-    min-width: 60px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
   }
 
   #inline-sizer {
@@ -239,9 +261,10 @@
     left: -9999px;
     visibility: hidden;
     white-space: pre;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: inherit;
     pointer-events: none;
   }
+
 </style>
 </head>
 <body>
@@ -305,28 +328,29 @@
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const BRANCH_COLORS = {
-  work:   { main: '#4A90E2', light: '#EAF2FB', text: '#1A5C99' },
-  family: { main: '#7ED321', light: '#F2F9EA', text: '#417505' },
-  me:     { main: '#BD10E0', light: '#F9EAFB', text: '#7A0B91' },
+  work:   { main: '#F24E1E', light: '#FFF0ED', text: '#D03000' }, // Miro Pinkish-Red
+  family: { main: '#A259FF', light: '#F3EBFF', text: '#7000FF' }, // Miro Purple
+  me:     { main: '#1ABCFE', light: '#E8F8FF', text: '#0070A0' }, // Miro Blue
 };
 const CENTER_COLOR  = { main: '#333333', light: '#FFFFFF', text: '#FFFFFF' };
-const DONE_BG               = '#E0E0E0';
-const DONE_UNPLANNED_BG     = '#EBEBEB';
-const DONE_TEXT     = '#888888';
+const DONE_BG               = '#EBEBEB';
+const DONE_UNPLANNED_BG     = '#F5F5F5';
+const DONE_TEXT     = '#AAAAAA';
 const UNPLANNED_BG  = '#FFF9DB';
 const UNPLANNED_BORDER = '#FCC419';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
-const CENTER_RADIUS_X = 100;
-const CENTER_RADIUS_Y = 35;
-const BRANCH_DIST     = 240;
-const ACTIVITY_DIST   = 200;
-const SUBACTIVITY_DIST = 180;
-const BRANCH_ARC      = 60;  // degrees spread for children
-const SUB_ARC         = 45;
+const DX = 220; // Horizontal distance between levels
+const DY = 44;  // Vertical spacing between siblings
+const CENTER_W = 140;
+const CENTER_H = 48;
 
-// Branch base angles (degrees): Work upper-right, Family bottom, Me upper-left
-const BRANCH_ANGLES = { work: -30, family: 150, me: 210 };
+// Side assignments
+const BRANCH_CONFIG = {
+  work:   { side: 'left' },
+  family: { side: 'right' },
+  me:     { side: 'right' }
+};
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentWeekKey = '';   // 'YYYY-WW'
@@ -510,51 +534,68 @@ function polarToCart(cx, cy, dist, angleDeg) {
 }
 
 function computeLayout() {
-  // Returns { nodeId: {x, y, angle} }
   const positions = {};
-  const cx = 0, cy = 0;
-  positions['center'] = { x: cx, y: cy };
+  const heights = {};
+
+  // Calculate total height of each subtree
+  function calcHeight(nodeId) {
+    const node = findNode(nodeId);
+    if (!node || !node.children || node.children.length === 0) {
+      heights[nodeId] = DY;
+      return DY;
+    }
+    let h = 0;
+    node.children.forEach(cid => {
+      h += calcHeight(cid);
+    });
+    heights[nodeId] = Math.max(h, DY);
+    return heights[nodeId];
+  }
 
   const branchIds = ['work', 'family', 'me'];
+  branchIds.forEach(calcHeight);
 
-  // Recursively lay out children of a node.
-  // depth 1 = direct children of a branch node.
-  function layoutChildren(nodeId, parentX, parentY, parentAngle, depth) {
-    const node = findNode(nodeId);
-    if (!node) return;
-    const children = node.children || [];
-    const n = children.length;
-    if (n === 0) return;
+  // Position center
+  positions['center'] = { x: 0, y: 0, w: CENTER_W, h: CENTER_H };
 
-    let dist, maxSpread, spreadPerChild;
-    if (depth === 1) {
-      dist = ACTIVITY_DIST;    maxSpread = BRANCH_ARC;  spreadPerChild = 20;
-    } else if (depth === 2) {
-      dist = SUBACTIVITY_DIST; maxSpread = SUB_ARC;     spreadPerChild = 18;
-    } else {
-      dist = 150;              maxSpread = 30;           spreadPerChild = 15;
-    }
+  const leftBranches = branchIds.filter(id => BRANCH_CONFIG[id].side === 'left');
+  const rightBranches = branchIds.filter(id => BRANCH_CONFIG[id].side === 'right');
 
-    children.forEach((childId, i) => {
-      let childAngle;
-      if (n === 1) {
-        childAngle = parentAngle;
-      } else {
-        const spread = Math.min(maxSpread, spreadPerChild * n);
-        childAngle = parentAngle - spread / 2 + (spread / (n - 1)) * i;
-      }
-      const cp = polarToCart(parentX, parentY, dist, childAngle);
-      positions[childId] = { x: cp.x, y: cp.y, angle: childAngle };
-      layoutChildren(childId, cp.x, cp.y, childAngle, depth + 1);
+  function layoutSide(branches, side) {
+    const totalH = branches.reduce((acc, bid) => acc + heights[bid], 0);
+    let currentY = -totalH / 2;
+
+    branches.forEach(bid => {
+      const nodeH = heights[bid];
+      const w = getNodeBoxW(bid);
+      const x = (side === 'left' ? -1 : 1) * (CENTER_W / 2 + 100);
+      const y = currentY + nodeH / 2;
+      positions[bid] = { x, y, w, h: 40, side };
+      layoutChildren(bid, x, y, side, w);
+      currentY += nodeH;
     });
   }
 
-  branchIds.forEach(bid => {
-    const angle = BRANCH_ANGLES[bid];
-    const bp = polarToCart(cx, cy, BRANCH_DIST, angle);
-    positions[bid] = { x: bp.x, y: bp.y, angle };
-    layoutChildren(bid, bp.x, bp.y, angle, 1);
-  });
+  function layoutChildren(nodeId, parentX, parentY, side, parentW) {
+    const node = findNode(nodeId);
+    if (!node || !node.children) return;
+
+    const totalH = heights[nodeId];
+    let currentY = parentY - totalH / 2;
+
+    node.children.forEach(cid => {
+      const childH = heights[cid];
+      const w = getNodeBoxW(cid);
+      const x = parentX + (side === 'left' ? -1 : 1) * (DX);
+      const y = currentY + childH / 2;
+      positions[cid] = { x, y, w, h: 32, side };
+      layoutChildren(cid, x, y, side, w);
+      currentY += childH;
+    });
+  }
+
+  layoutSide(leftBranches, 'left');
+  layoutSide(rightBranches, 'right');
 
   return positions;
 }
@@ -569,25 +610,25 @@ function svgEl(tag, attrs) {
 }
 
 function getNodeBoxW(nodeId) {
-  if (nodeId === 'center') return CENTER_RADIUS_X * 2;
+  if (nodeId === 'center') return CENTER_W;
   const node = findNode(nodeId);
-  if (!node) return 104;
+  if (!node) return 100;
   const type = node.type || 'activity';
   const label = node.label || '';
-  let rx, fontSize, maxW, padX;
+  let fontSize, maxW, padX;
   if (type === 'branch') {
-    rx = 56; fontSize = 13; maxW = 95; padX = 14;
+    fontSize = 14; maxW = 110; padX = 16;
   } else {
-    rx = 52; fontSize = 12; maxW = 88; padX = 12;
+    fontSize = 13; maxW = 160; padX = 8;
   }
   const lines = wrapText(label, maxW, fontSize);
-  const avgCharW = fontSize * 0.55;
+  const avgCharW = fontSize * 0.52;
   const longestLine = Math.max(...lines.map(l => l.length));
-  return Math.max(rx * 2, Math.ceil(longestLine * avgCharW) + padX * 2);
+  return Math.ceil(longestLine * avgCharW) + padX * 2;
 }
 
 function wrapText(text, maxWidth, fontSize) {
-  const maxChars = 32;
+  const maxChars = Math.floor(maxWidth / (fontSize * 0.5));
   const words = text.split(' ');
   const lines = [];
   let current = '';
@@ -603,111 +644,116 @@ function wrapText(text, maxWidth, fontSize) {
   return lines;
 }
 
-function makeNodeGroup(id, x, y, label, type, branch, node) {
+function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const g = svgEl('g', { class: 'node-group', 'data-id': id });
+  
+  const isBranch = type === 'branch';
+  const isCenter = type === 'center';
+  const isActivity = type === 'activity';
 
   let rx, ry, fontSize, maxW, padX, padY;
-  if (type === 'center') {
-    rx = CENTER_RADIUS_X; ry = CENTER_RADIUS_Y;
+  if (isCenter) {
+    rx = CENTER_W / 2; ry = CENTER_H / 2;
     fontSize = 15; maxW = 180; padX = 22; padY = 14;
-  } else if (type === 'branch') {
-    rx = 64; ry = 26;
+  } else if (isBranch) {
+    rx = 64; ry = 20;
     fontSize = 14; maxW = 110; padX = 16; padY = 12;
   } else {
-    rx = 58; ry = 22;
-    fontSize = 13; maxW = 100; padX = 14; padY = 10;
+    rx = 58; ry = 16;
+    fontSize = 13; maxW = 160; padX = 8; padY = 6;
   }
 
   // Determine colors
   let bgColor, borderColor, textColor, fontWeight = 'normal';
-  if (type === 'center') {
+  const bc = BRANCH_COLORS[branch] || { main: '#333', light: '#eee', text: '#333' };
+
+  if (isCenter) {
     bgColor = CENTER_COLOR.main; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
-  } else if (type === 'branch') {
-    const bc = BRANCH_COLORS[branch];
-    bgColor = bc.main; borderColor = bc.main; textColor = '#fff';
+  } else if (isBranch) {
+    bgColor = bc.main; borderColor = bc.main; textColor = '#fff'; fontWeight = '600';
   } else {
-    // activity
-    if (node && node.done && node.unplanned) {
-      bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT; fontWeight = 'bold';
-    } else if (node && node.done) {
-      bgColor = DONE_BG; borderColor = '#bbb'; textColor = DONE_TEXT; fontWeight = 'bold';
-    } else if (node && node.unplanned) {
-      bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = '#8a5c00';
+    if (node && node.done) {
+      textColor = DONE_TEXT;
     } else {
-      const bc = BRANCH_COLORS[branch];
-      bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
+      textColor = '#333';
     }
   }
 
-  const lines = (type === 'center')
+  const lines = (isCenter)
     ? label.split('|').map(s => s.trim())
     : wrapText(label, maxW, fontSize);
 
-  const lineH = fontSize * 1.35;
+  const lineH = fontSize * 1.3;
   const totalTextH = lines.length * lineH;
   const boxH = Math.max(ry * 2, totalTextH + padY * 2);
-  const avgCharW = fontSize * 0.55;
+  const avgCharW = fontSize * 0.52;
   const longestLine = Math.max(...lines.map(l => l.length));
   const boxW = Math.max(rx * 2, Math.ceil(longestLine * avgCharW) + padX * 2);
 
-  const filterRef = (type === 'center') ? 'url(#shadow)' : 'url(#shadow-sm)';
-
-  const rect = svgEl('rect', {
-    class: 'node-rect',
-    x: -boxW / 2, y: -boxH / 2,
-    width: boxW, height: boxH,
-    rx: boxH / 2,  // Full pill shape
-    fill: bgColor,
-    stroke: borderColor,
-    'stroke-width': (type === 'activity' && node && (node.done || node.unplanned)) ? 2.5 : (type === 'center' ? 0 : 2),
-    filter: filterRef,
-  });
-  g.appendChild(rect);
+  if (isCenter || isBranch) {
+    const filterRef = isCenter ? 'url(#shadow)' : 'url(#shadow-sm)';
+    const rect = svgEl('rect', {
+      class: 'node-rect',
+      x: -boxW / 2, y: -boxH / 2,
+      width: boxW, height: boxH,
+      rx: boxH / 2,
+      fill: bgColor,
+      stroke: borderColor,
+      'stroke-width': isCenter ? 0 : 2,
+      filter: filterRef,
+    });
+    g.appendChild(rect);
+  } else {
+    // Activity: background rect for interaction (invisible)
+    const rect = svgEl('rect', {
+      class: 'node-rect',
+      x: (side === 'left' ? -boxW : 0), y: -boxH / 2,
+      width: boxW, height: boxH,
+      rx: 4,
+      fill: 'transparent',
+    });
+    g.appendChild(rect);
+  }
 
   // Text
   lines.forEach((line, i) => {
     const textY = -totalTextH / 2 + lineH * i + lineH * 0.75;
+    let textX = 0;
+    let anchor = 'middle';
+    
+    if (isActivity) {
+      anchor = (side === 'left') ? 'end' : 'start';
+      textX = (side === 'left') ? -8 : 8;
+    }
+
     const t = svgEl('text', {
-      x: 0, y: textY,
-      'text-anchor': 'middle',
-      'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      'font-size': (type === 'center' && i === 0) ? (fontSize + 1) : fontSize,
-      'font-weight': (type === 'branch' || (type === 'center' && i === 0)) ? '700' : fontWeight,
+      x: textX, y: textY,
+      'text-anchor': anchor,
+      'font-family': "inherit",
+      'font-size': (isCenter && i === 0) ? (fontSize + 1) : fontSize,
+      'font-weight': (isBranch || (isCenter && i === 0)) ? '700' : fontWeight,
       fill: textColor,
       'pointer-events': 'none',
     });
     t.textContent = line;
+    if (node && node.done && isActivity) {
+      t.setAttribute('text-decoration', 'line-through');
+    }
     g.appendChild(t);
   });
 
-  // Done / unplanned badge
-  if (node && (node.done || node.unplanned)) {
-    const badgeText = (node.done && node.unplanned) ? '⚡✓' : (node.done ? '✓' : '⚡');
-    const badge = svgEl('text', {
-      x: boxW / 2 - 12, y: -boxH / 2 + 15,
-      'text-anchor': 'end',
-      'font-size': 11,
-      'font-weight': 'bold',
-      fill: node.unplanned ? UNPLANNED_BORDER : '#777',
-      'pointer-events': 'none',
-    });
-    badge.textContent = badgeText;
-    g.appendChild(badge);
-  }
-
   // "+" add-child button
-  if (type !== 'center') {
-    const btnColor = BRANCH_COLORS[branch]?.main || '#888';
-    const btnR = 11;
-    // Position on right for 'work' branch, left for others (family, me)
-    const btnX = (branch === 'work') ? (boxW / 2) : (-boxW / 2);
+  if (!isCenter) {
+    const btnColor = bc.main;
+    const btnR = 10;
+    const btnX = (side === 'left') ? -(boxW + 10) : (boxW + 10);
 
     const btnG = svgEl('g', { class: 'add-btn', 'data-parent': id });
     const circle = svgEl('circle', { cx: btnX, cy: 0, r: btnR, fill: btnColor });
 
-    const arm = 5;
-    const hLine = svgEl('line', { x1: btnX - arm, y1: 0, x2: btnX + arm, y2: 0, stroke: '#fff', 'stroke-width': '2.5', 'stroke-linecap': 'round', 'pointer-events': 'none' });
-    const vLine = svgEl('line', { x1: btnX, y1: -arm, x2: btnX, y2: arm, stroke: '#fff', 'stroke-width': '2.5', 'stroke-linecap': 'round', 'pointer-events': 'none' });
+    const arm = 4.5;
+    const hLine = svgEl('line', { x1: btnX - arm, y1: 0, x2: btnX + arm, y2: 0, stroke: '#fff', 'stroke-width': '2', 'stroke-linecap': 'round', 'pointer-events': 'none' });
+    const vLine = svgEl('line', { x1: btnX, y1: -arm, x2: btnX, y2: arm, stroke: '#fff', 'stroke-width': '2', 'stroke-linecap': 'round', 'pointer-events': 'none' });
 
     btnG.appendChild(circle); btnG.appendChild(hLine); btnG.appendChild(vLine);
     g.appendChild(btnG);
@@ -719,19 +765,16 @@ function makeNodeGroup(id, x, y, label, type, branch, node) {
 
 function makeCurve(x1, y1, x2, y2, color, strokeWidth) {
   const dx = x2 - x1;
-  // Miro style: smooth S-curves with horizontal exits
-  // Control points at 50% horizontal distance
-  const cp1x = x1 + dx * 0.5;
-  const cp1y = y1;
-  const cp2x = x2 - dx * 0.5;
-  const cp2y = y2;
+  const cp1x = x1 + dx * 0.45;
+  const cp2x = x1 + dx * 0.55;
 
   const path = svgEl('path', {
-    d: `M ${x1} ${y1} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${x2} ${y2}`,
+    d: `M ${x1} ${y1} C ${cp1x} ${y1} ${cp2x} ${y2} ${x2} ${y2}`,
     fill: 'none',
     stroke: color,
     'stroke-width': strokeWidth || 2,
     'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
     opacity: '0.8',
     'pointer-events': 'none',
   });
@@ -750,6 +793,8 @@ function nodeScreenPos(nodeId) {
   return {
     x: rect.left + panX + pos.x * zoom,
     y: rect.top  + panY + pos.y * zoom,
+    side: pos.side,
+    w: pos.w
   };
 }
 
@@ -757,15 +802,22 @@ function resizeInlineInput() {
   inlineSizer.style.fontSize = inlineInput.style.fontSize;
   inlineSizer.style.fontFamily = inlineInput.style.fontFamily || inlineInput.style.font;
   inlineSizer.textContent = inlineInput.value || ' ';
-  // SVG activity node: rx*2=104px wide, padX=12 each side (24px), border 2px each side (4px) = 28px overhead
-  const pad = 28 * zoom;
-  const minW = 104 * zoom;
-  const newW = Math.max(minW, inlineSizer.offsetWidth + pad);
+  
+  const pad = 30 * zoom;
+  const newW = Math.max(120 * zoom, inlineSizer.offsetWidth + pad);
   inlineInput.style.width = newW + 'px';
-  // Re-center horizontally
+
   if (editState) {
     const sp = nodeScreenPos(editState.nodeId);
-    if (sp) inlineInput.style.left = (sp.x - newW / 2) + 'px';
+    if (sp) {
+      if (sp.side === 'left') {
+        inlineInput.style.left = (sp.x - newW) + 'px';
+      } else if (sp.side === 'right') {
+        inlineInput.style.left = sp.x + 'px';
+      } else {
+        inlineInput.style.left = (sp.x - newW / 2) + 'px';
+      }
+    }
   }
 }
 
@@ -802,23 +854,30 @@ function _openInlineInput(nodeId, isNew) {
   const sp = nodeScreenPos(nodeId);
   if (!sp) { cancelEdit(); return; }
 
-  // Apply branch colors so input looks like the real node
-  const bc = BRANCH_COLORS[node.branch] || { main: '#4A90D9', light: '#E8F4FD', text: '#1a5c99' };
+  const bc = BRANCH_COLORS[node.branch] || { main: '#333', light: '#f4f4f4', text: '#333' };
   inlineInput.style.borderColor  = bc.main;
-  inlineInput.style.background   = bc.light;
-  inlineInput.style.color        = bc.text;
+  inlineInput.style.color        = '#333';
+  inlineInput.style.background   = '#fff';
 
-  const h = 36 * zoom;
-  const fontSize = 12 * zoom;
+  const h = 32 * zoom;
+  const fontSize = 13 * zoom;
 
   inlineInput.value = isNew ? '' : node.label;
   inlineInput.style.fontSize   = fontSize + 'px';
   inlineInput.style.height     = h + 'px';
   inlineInput.style.lineHeight = h + 'px';
   inlineInput.style.top        = (sp.y - h / 2) + 'px';
+  
+  if (sp.side === 'left') {
+    inlineInput.style.textAlign = 'right';
+  } else if (sp.side === 'right') {
+    inlineInput.style.textAlign = 'left';
+  } else {
+    inlineInput.style.textAlign = 'center';
+  }
+
   inlineInput.style.display    = 'block';
 
-  // Size and center horizontally
   resizeInlineInput();
 
   inlineInput.focus();
@@ -884,7 +943,6 @@ inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
   const root = document.getElementById('map-root');
-  // Clear
   while (root.firstChild) root.removeChild(root.firstChild);
 
   const { year, week } = parseWeekKey(currentWeekKey);
@@ -892,15 +950,12 @@ function render() {
 
   const positions = computeLayout();
 
-  // Lines layer (drawn first, behind nodes)
   const linesG = svgEl('g', { id: 'lines-layer' });
   root.appendChild(linesG);
 
-  // Nodes layer
   const nodesG = svgEl('g', { id: 'nodes-layer' });
   root.appendChild(nodesG);
 
-  // Helper: get branch color
   function branchColor(branch) {
     return BRANCH_COLORS[branch]?.main || '#888';
   }
@@ -911,6 +966,7 @@ function render() {
     if (!node) return;
     const pos = positions[nodeId];
     if (!pos) return;
+    const side = pos.side;
     const branch = node.branch || node.id;
 
     (node.children || []).forEach(childId => {
@@ -918,24 +974,35 @@ function render() {
       if (!childPos) return;
       const color = branchColor(branch);
       
-      // Tapering stroke width: 4.5 -> 2.5 -> 1.5
-      let sw = 1.5;
-      if (depth === 0) sw = 4.5;
+      let sw = 1.8;
+      if (depth === 0) sw = 4;
       else if (depth === 1) sw = 2.5;
 
-      const parentW = getNodeBoxW(nodeId);
-      const childW  = getNodeBoxW(childId);
+      // Calculate start and end points
       let x1, x2;
-      if (branch === 'work') {
-        x1 = pos.x + parentW / 2;
-        x2 = childPos.x - childW / 2;
+      if (side === 'left') {
+        x1 = pos.x - pos.w / 2;
+        x2 = childPos.x;
       } else {
-        // family and me: left-side rules
-        x1 = pos.x - parentW / 2;
-        x2 = childPos.x + childW / 2;
+        x1 = pos.x + pos.w / 2;
+        x2 = childPos.x;
       }
 
       linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw));
+      
+      // For activity nodes, we also draw the underline
+      if (findNode(childId).type === 'activity') {
+        const line = svgEl('line', {
+          x1: childPos.x, y1: childPos.y + 11,
+          x2: childPos.x + (side === 'left' ? -childPos.w : childPos.w), y2: childPos.y + 11,
+          stroke: color,
+          'stroke-width': sw,
+          'stroke-linecap': 'round',
+          opacity: 0.8
+        });
+        linesG.appendChild(line);
+      }
+
       drawEdges(childId, depth + 1);
     });
   }
@@ -946,43 +1013,33 @@ function render() {
     const bPos = positions[bid];
     if (!bPos) return;
     const color = branchColor(bid);
-    const branchW = getNodeBoxW(bid);
+    const side = bPos.side;
 
-    let x1, y1, x2;
-    if (bid === 'work') {
-      x1 = CENTER_RADIUS_X;
-      y1 = 0;
-      x2 = bPos.x - branchW / 2;
-    } else {
-      x1 = -CENTER_RADIUS_X;
-      y1 = 0;
-      x2 = bPos.x + branchW / 2;
-    }
+    let x1 = (side === 'left' ? -CENTER_W / 2 : CENTER_W / 2);
+    let x2 = (side === 'left' ? bPos.x + bPos.w / 2 : bPos.x - bPos.w / 2);
 
-    // Bold connection from center
-    linesG.appendChild(makeCurve(x1, y1, x2, bPos.y, color, 8));
+    linesG.appendChild(makeCurve(x1, 0, x2, bPos.y, color, 6));
     drawEdges(bid, 0);
   });
 
   // Draw center node
   const { year: y, week: w } = parseWeekKey(currentWeekKey);
   const centerLabel = formatWeekLabel(y, w);
-  const centerG = makeNodeGroup('center', 0, 0, centerLabel, 'center', null, null);
+  const centerG = makeNodeGroup('center', 0, 0, centerLabel, 'center', null, null, null);
   nodesG.appendChild(centerG);
 
-  // Draw all other nodes (skip nodes currently being edited inline)
+  // Draw all other nodes
   weekData.nodes.forEach(node => {
     if (node._editing) return;
     const pos = positions[node.id];
     if (!pos) return;
     const g = makeNodeGroup(
       node.id, pos.x, pos.y, node.label,
-      node.type, node.branch || node.id, node
+      node.type, node.branch || node.id, node, pos.side
     );
     nodesG.appendChild(g);
   });
 
-  // Attach event listeners after rendering
   attachNodeListeners();
 }
 
