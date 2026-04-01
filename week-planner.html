@@ -651,17 +651,25 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const isCenter = type === 'center';
   const isActivity = type === 'activity';
 
-  let rx, ry, fontSize, maxW, padX, padY;
+  let fontSize, maxW, padX, padY, rx_val;
   if (isCenter) {
-    rx = CENTER_W / 2; ry = CENTER_H / 2;
-    fontSize = 15; maxW = 180; padX = 22; padY = 14;
+    fontSize = 15; maxW = 180; padX = 22; padY = 14; rx_val = CENTER_H / 2;
   } else if (isBranch) {
-    rx = 64; ry = 20;
-    fontSize = 14; maxW = 110; padX = 16; padY = 12;
+    fontSize = 14; maxW = 110; padX = 16; padY = 12; rx_val = 20;
   } else {
-    rx = 58; ry = 16;
-    fontSize = 13; maxW = 160; padX = 8; padY = 6;
+    fontSize = 13; maxW = 160; padX = 14; padY = 10; rx_val = 8;
   }
+
+  const lines = (isCenter)
+    ? label.split('|').map(s => s.trim())
+    : wrapText(label, maxW, fontSize);
+
+  const lineH = fontSize * 1.3;
+  const totalTextH = lines.length * lineH;
+  const boxH = Math.max(isCenter ? CENTER_H : (isBranch ? 40 : 32), totalTextH + padY * 2);
+  const avgCharW = fontSize * 0.52;
+  const longestLine = Math.max(...lines.map(l => l.length));
+  const boxW = Math.max(isCenter ? CENTER_W : (isBranch ? 100 : 80), Math.ceil(longestLine * avgCharW) + padX * 2);
 
   // Determine colors
   let bgColor, borderColor, textColor, fontWeight = 'normal';
@@ -672,63 +680,34 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   } else if (isBranch) {
     bgColor = bc.main; borderColor = bc.main; textColor = '#fff'; fontWeight = '600';
   } else {
+    // Activity
     if (node && node.done) {
-      textColor = DONE_TEXT;
+      bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
     } else {
-      textColor = '#333';
+      bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
     }
   }
 
-  const lines = (isCenter)
-    ? label.split('|').map(s => s.trim())
-    : wrapText(label, maxW, fontSize);
-
-  const lineH = fontSize * 1.3;
-  const totalTextH = lines.length * lineH;
-  const boxH = Math.max(ry * 2, totalTextH + padY * 2);
-  const avgCharW = fontSize * 0.52;
-  const longestLine = Math.max(...lines.map(l => l.length));
-  const boxW = Math.max(rx * 2, Math.ceil(longestLine * avgCharW) + padX * 2);
-
-  if (isCenter || isBranch) {
-    const filterRef = isCenter ? 'url(#shadow)' : 'url(#shadow-sm)';
-    const rect = svgEl('rect', {
-      class: 'node-rect',
-      x: -boxW / 2, y: -boxH / 2,
-      width: boxW, height: boxH,
-      rx: boxH / 2,
-      fill: bgColor,
-      stroke: borderColor,
-      'stroke-width': isCenter ? 0 : 2,
-      filter: filterRef,
-    });
-    g.appendChild(rect);
-  } else {
-    // Activity: background rect for interaction (invisible)
-    const rect = svgEl('rect', {
-      class: 'node-rect',
-      x: (side === 'left' ? -boxW : 0), y: -boxH / 2,
-      width: boxW, height: boxH,
-      rx: 4,
-      fill: 'transparent',
-    });
-    g.appendChild(rect);
-  }
+  const filterRef = (isCenter || isBranch) ? (isCenter ? 'url(#shadow)' : 'url(#shadow-sm)') : 'none';
+  
+  const rect = svgEl('rect', {
+    class: 'node-rect',
+    x: -boxW / 2, y: -boxH / 2,
+    width: boxW, height: boxH,
+    rx: rx_val,
+    fill: bgColor,
+    stroke: borderColor,
+    'stroke-width': isCenter ? 0 : 1.5,
+    filter: filterRef,
+  });
+  g.appendChild(rect);
 
   // Text
   lines.forEach((line, i) => {
     const textY = -totalTextH / 2 + lineH * i + lineH * 0.75;
-    let textX = 0;
-    let anchor = 'middle';
-    
-    if (isActivity) {
-      anchor = (side === 'left') ? 'end' : 'start';
-      textX = (side === 'left') ? -8 : 8;
-    }
-
     const t = svgEl('text', {
-      x: textX, y: textY,
-      'text-anchor': anchor,
+      x: 0, y: textY,
+      'text-anchor': 'middle',
       'font-family': "inherit",
       'font-size': (isCenter && i === 0) ? (fontSize + 1) : fontSize,
       'font-weight': (isBranch || (isCenter && i === 0)) ? '700' : fontWeight,
@@ -746,7 +725,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   if (!isCenter) {
     const btnColor = bc.main;
     const btnR = 10;
-    const btnX = (side === 'left') ? -(boxW + 10) : (boxW + 10);
+    // Position button relative to the side
+    const btnX = (side === 'left') ? -(boxW / 2 + 10) : (boxW / 2 + 10);
 
     const btnG = svgEl('g', { class: 'add-btn', 'data-parent': id });
     const circle = svgEl('circle', { cx: btnX, cy: 0, r: btnR, fill: btnColor });
@@ -949,6 +929,11 @@ function render() {
   document.getElementById('week-label').textContent = formatWeekLabel(year, week);
 
   const positions = computeLayout();
+  
+  // Pre-calculate widths for all nodes to use in line positioning
+  const widths = {};
+  weekData.nodes.forEach(n => { widths[n.id] = getNodeBoxW(n.id); });
+  widths['center'] = CENTER_W;
 
   const linesG = svgEl('g', { id: 'lines-layer' });
   root.appendChild(linesG);
@@ -968,41 +953,30 @@ function render() {
     if (!pos) return;
     const side = pos.side;
     const branch = node.branch || node.id;
+    const nodeW = widths[nodeId];
 
     (node.children || []).forEach(childId => {
       const childPos = positions[childId];
       if (!childPos) return;
+      const childW = widths[childId];
       const color = branchColor(branch);
       
       let sw = 1.8;
-      if (depth === 0) sw = 4;
-      else if (depth === 1) sw = 2.5;
+      if (depth === 0) sw = 3.5;
+      else if (depth === 1) sw = 2.2;
 
-      // Calculate start and end points
       let x1, x2;
       if (side === 'left') {
-        x1 = pos.x - pos.w / 2;
-        x2 = childPos.x;
+        // Parent is to the right of child
+        x1 = pos.x - nodeW / 2;
+        x2 = childPos.x + childW / 2;
       } else {
-        x1 = pos.x + pos.w / 2;
-        x2 = childPos.x;
+        // Parent is to the left of child
+        x1 = pos.x + nodeW / 2;
+        x2 = childPos.x - childW / 2;
       }
 
       linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw));
-      
-      // For activity nodes, we also draw the underline
-      if (findNode(childId).type === 'activity') {
-        const line = svgEl('line', {
-          x1: childPos.x, y1: childPos.y + 11,
-          x2: childPos.x + (side === 'left' ? -childPos.w : childPos.w), y2: childPos.y + 11,
-          stroke: color,
-          'stroke-width': sw,
-          'stroke-linecap': 'round',
-          opacity: 0.8
-        });
-        linesG.appendChild(line);
-      }
-
       drawEdges(childId, depth + 1);
     });
   }
@@ -1014,11 +988,12 @@ function render() {
     if (!bPos) return;
     const color = branchColor(bid);
     const side = bPos.side;
+    const bW = widths[bid];
 
     let x1 = (side === 'left' ? -CENTER_W / 2 : CENTER_W / 2);
-    let x2 = (side === 'left' ? bPos.x + bPos.w / 2 : bPos.x - bPos.w / 2);
+    let x2 = (side === 'left' ? bPos.x + bW / 2 : bPos.x - bW / 2);
 
-    linesG.appendChild(makeCurve(x1, 0, x2, bPos.y, color, 6));
+    linesG.appendChild(makeCurve(x1, 0, x2, bPos.y, color, 5));
     drawEdges(bid, 0);
   });
 
