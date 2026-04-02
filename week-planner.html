@@ -614,7 +614,7 @@ function getNodeBoxW(nodeId) {
   const node = findNode(nodeId);
   if (!node) return 100;
   const type = node.type || 'activity';
-  const label = node.label || '';
+  const label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
   let fontSize, maxW, padX;
   if (type === 'branch') {
     fontSize = 14; maxW = 110; padX = 16;
@@ -623,11 +623,13 @@ function getNodeBoxW(nodeId) {
   }
   const lines = wrapText(label, maxW, fontSize);
   const avgCharW = fontSize * 0.52;
-  const longestLine = Math.max(...lines.map(l => l.length));
-  return Math.ceil(longestLine * avgCharW) + padX * 2;
+  const longestLine = lines.length > 0 ? Math.max(...lines.map(l => l.length)) : 0;
+  const minW = (type === 'branch' ? 100 : 80);
+  return Math.max(minW, Math.ceil(longestLine * avgCharW) + padX * 2);
 }
 
 function wrapText(text, maxWidth, fontSize) {
+  if (!text) return [];
   const maxChars = Math.floor(maxWidth / (fontSize * 0.5));
   const words = text.split(' ');
   const lines = [];
@@ -668,7 +670,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const totalTextH = lines.length * lineH;
   const boxH = Math.max(isCenter ? CENTER_H : (isBranch ? 40 : 32), totalTextH + padY * 2);
   const avgCharW = fontSize * 0.52;
-  const longestLine = Math.max(...lines.map(l => l.length));
+  const longestLine = lines.length > 0 ? Math.max(...lines.map(l => l.length)) : 0;
   const boxW = Math.max(isCenter ? CENTER_W : (isBranch ? 100 : 80), Math.ceil(longestLine * avgCharW) + padX * 2);
 
   // Determine colors
@@ -794,15 +796,10 @@ function resizeInlineInput() {
   if (editState) {
     const sp = nodeScreenPos(editState.nodeId);
     if (sp) {
-      if (sp.side === 'left') {
-        inlineInput.style.left = (sp.x - newW) + 'px';
-      } else if (sp.side === 'right') {
-        inlineInput.style.left = sp.x + 'px';
-      } else {
-        inlineInput.style.left = (sp.x - newW / 2) + 'px';
-      }
+      inlineInput.style.left = (sp.x - newW / 2) + 'px';
     }
   }
+  render();
 }
 
 function startAddNode(parentId) {
@@ -817,7 +814,6 @@ function startAddNode(parentId) {
   };
   weekData.nodes.push(node);
   parent.children.push(id);
-  render();
   _openInlineInput(id, true);
 }
 
@@ -825,7 +821,6 @@ function startRenameNode(nodeId) {
   const node = findNode(nodeId);
   if (!node || node.type === 'branch') return;
   node._editing = true;
-  render();
   _openInlineInput(nodeId, false);
 }
 
@@ -834,6 +829,7 @@ function _openInlineInput(nodeId, isNew) {
   if (!node) return;
 
   editState = { nodeId, isNew, originalLabel: node.label };
+  inlineInput.value = isNew ? '' : node.label;
 
   const sp = nodeScreenPos(nodeId);
   if (!sp) { cancelEdit(); return; }
@@ -842,24 +838,15 @@ function _openInlineInput(nodeId, isNew) {
   inlineInput.style.borderColor  = bc.main;
   inlineInput.style.color        = '#333';
   inlineInput.style.background   = '#fff';
+  inlineInput.style.textAlign    = 'center';
 
   const h = 32 * zoom;
   const fontSize = 13 * zoom;
 
-  inlineInput.value = isNew ? '' : node.label;
   inlineInput.style.fontSize   = fontSize + 'px';
   inlineInput.style.height     = h + 'px';
   inlineInput.style.lineHeight = h + 'px';
   inlineInput.style.top        = (sp.y - h / 2) + 'px';
-  
-  if (sp.side === 'left') {
-    inlineInput.style.textAlign = 'right';
-  } else if (sp.side === 'right') {
-    inlineInput.style.textAlign = 'left';
-  } else {
-    inlineInput.style.textAlign = 'center';
-  }
-
   inlineInput.style.display    = 'block';
 
   resizeInlineInput();
