@@ -493,6 +493,7 @@ const UNPLANNED_BORDER = '#FCC419';
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const DX = 220; // Horizontal distance between levels
 const DY = 44;  // Vertical spacing between siblings
+const BRANCH_GAP = 20; // Vertical gap between main branches
 const CENTER_W = 140;
 const CENTER_H = 48;
 
@@ -756,10 +757,10 @@ function computeLayout() {
   const rightBranches = branchIds.filter(id => BRANCH_CONFIG[id].side === 'right');
 
   function layoutSide(branches, side) {
-    const totalH = branches.reduce((acc, bid) => acc + heights[bid], 0);
+    const totalH = branches.reduce((acc, bid, i) => acc + heights[bid] + (i > 0 ? BRANCH_GAP : 0), 0);
     let currentY = -totalH / 2;
 
-    branches.forEach(bid => {
+    branches.forEach((bid, i) => {
       const nodeH = heights[bid];
       const w = getNodeBoxW(bid);
       const x = (side === 'left' ? -1 : 1) * (CENTER_W / 2 + 100);
@@ -771,7 +772,7 @@ function computeLayout() {
       
       positions[bid] = { x: finalX, y: finalY, w, h: 40, side };
       layoutChildren(bid, finalX, finalY, side, w);
-      currentY += nodeH;
+      currentY += nodeH + BRANCH_GAP;
     });
   }
 
