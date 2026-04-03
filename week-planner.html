@@ -714,6 +714,8 @@ function setStatus(id, status) {
     node.done = false;
     node.unplanned = true;
     delete node._prevDone;
+  } else if (status === 'planned') {
+    node.unplanned = false;
   }
 
   saveWeek(currentWeekKey, weekData);
@@ -890,6 +892,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     // Activity
     if (node && node.done) {
       bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
+    } else if (node && node.unplanned) {
+      bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = bc.text;
     } else {
       bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
     }
@@ -921,7 +925,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       fill: textColor,
       'pointer-events': 'none',
     });
-    t.textContent = line;
+    t.textContent = (node && node.unplanned && isActivity && i === 0) ? '⚡ ' + line : line;
     if (node && node.done && isActivity) {
       t.setAttribute('text-decoration', 'line-through');
     }
@@ -1334,7 +1338,10 @@ document.getElementById('ctx-undone').addEventListener('click', () => {
 });
 
 document.getElementById('ctx-unplanned').addEventListener('click', () => {
-  if (contextTarget) setStatus(contextTarget, 'unplanned');
+  if (contextTarget) {
+    const n = findNode(contextTarget);
+    setStatus(contextTarget, (n && n.unplanned) ? 'planned' : 'unplanned');
+  }
   hideContextMenu();
 });
 
