@@ -192,6 +192,90 @@
     letter-spacing: 0.5px;
   }
 
+  .reset-btn.danger {
+    color: #d93025;
+    border-color: #fce8e6;
+  }
+  
+  .reset-btn.danger:hover {
+    background: #fdeaea;
+    border-color: #d93025;
+  }
+
+  /* Modal */
+  #modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+
+  #modal-overlay.visible {
+    display: flex;
+  }
+
+  .modal {
+    background: #fff;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 360px;
+    width: 90%;
+    text-align: center;
+  }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #333;
+  }
+
+  .modal-text {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .modal-btn {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: 1px solid #dcdcdc;
+    background: #fff;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+
+  .modal-btn.confirm {
+    background: #d93025;
+    color: #fff;
+    border-color: #d93025;
+  }
+
+  .modal-btn.confirm:hover {
+    background: #b9261a;
+  }
+
+  .modal-btn:not(.confirm):hover {
+    background: #f8f8f8;
+    border-color: #bbb;
+  }
+
   /* Context menu */
   #context-menu {
     position: fixed;
@@ -339,6 +423,11 @@
           <div class="settings-label">View</div>
           <button class="reset-btn" id="reset-view" style="width:100%">Reset View</button>
         </div>
+        <div class="ctx-separator"></div>
+        <div class="settings-section">
+          <div class="settings-label">Data Management</div>
+          <button class="reset-btn danger" id="reset-data-btn" style="width:100%">Reset Current Week</button>
+        </div>
       </div>
     </div>
   </div>
@@ -371,6 +460,17 @@
 
 <input id="inline-input" type="text" autocomplete="off" spellcheck="false" />
 <span id="inline-sizer"></span>
+
+<div id="modal-overlay">
+  <div class="modal">
+    <div class="modal-title">Reset week data?</div>
+    <div class="modal-text">This will permanently delete all tasks and branches for the current week. This action cannot be undone.</div>
+    <div class="modal-actions">
+      <button class="modal-btn" id="modal-no">No, Keep Data</button>
+      <button class="modal-btn confirm" id="modal-yes">Yes, Reset</button>
+    </div>
+  </div>
+</div>
 
 <div id="hint">Double-click branch to add · Double-click activity to rename · Right-click for options · Drag to pan · Scroll to zoom</div>
 
@@ -1503,10 +1603,35 @@ document.getElementById('today-btn').addEventListener('click', () => {
 // ─── Settings Dropdown ────────────────────────────────────────────────────────
 const settingsBtn = document.getElementById('settings-btn');
 const settingsDropdown = document.getElementById('settings-dropdown');
+const resetDataBtn = document.getElementById('reset-data-btn');
+const modalOverlay = document.getElementById('modal-overlay');
+const modalNo = document.getElementById('modal-no');
+const modalYes = document.getElementById('modal-yes');
 
 settingsBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   settingsDropdown.classList.toggle('visible');
+});
+
+resetDataBtn.addEventListener('click', () => {
+  modalOverlay.classList.add('visible');
+});
+
+modalNo.addEventListener('click', () => {
+  modalOverlay.classList.remove('visible');
+  settingsDropdown.classList.remove('visible');
+});
+
+modalYes.addEventListener('click', () => {
+  // Clear storage for current week
+  localStorage.removeItem(storageKey(currentWeekKey));
+  // Reload current week data (will load defaults)
+  weekData = loadWeek(currentWeekKey);
+  // Re-render
+  render();
+  // Close everything
+  modalOverlay.classList.remove('visible');
+  settingsDropdown.classList.remove('visible');
 });
 
 document.addEventListener('click', (e) => {
