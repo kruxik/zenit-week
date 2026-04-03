@@ -675,7 +675,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   if (isCenter) {
     bgColor = CENTER_COLOR.main; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
   } else if (isBranch) {
-    bgColor = bc.main; borderColor = bc.main; textColor = '#fff'; fontWeight = '600';
+    bgColor = bc.light; borderColor = bc.main; textColor = bc.text; fontWeight = '600';
   } else {
     // Activity
     if (node && node.done) {
@@ -694,7 +694,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     rx: rx_val,
     fill: bgColor,
     stroke: borderColor,
-    'stroke-width': isCenter ? 0 : 1.5,
+    'stroke-width': isCenter ? 0 : (isBranch ? 4.5 : 1.5),
     filter: filterRef,
   });
   g.appendChild(rect);
