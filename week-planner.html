@@ -797,7 +797,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   return g;
 }
 
-function makeCurve(x1, y1, x2, y2, color, strokeWidth) {
+function makeCurve(x1, y1, x2, y2, color, strokeWidth, fromId, toId) {
   const dx = x2 - x1;
   const cp1x = x1 + dx * 0.45;
   const cp2x = x1 + dx * 0.55;
@@ -811,6 +811,12 @@ function makeCurve(x1, y1, x2, y2, color, strokeWidth) {
     'stroke-linejoin': 'round',
     opacity: '0.8',
     'pointer-events': 'none',
+    'data-from': fromId || '',
+    'data-to': toId || '',
+    'data-x1': x1,
+    'data-y1': y1,
+    'data-x2': x2,
+    'data-y2': y2
   });
   return path;
 }
@@ -1015,7 +1021,7 @@ function render() {
         x2 = childPos.x - childW / 2;
       }
 
-      linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw));
+      linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw, nodeId, childId));
       drawEdges(childId, depth + 1);
     });
   }
@@ -1032,7 +1038,7 @@ function render() {
     let x1 = (side === 'left' ? -CENTER_W / 2 : CENTER_W / 2);
     let x2 = (side === 'left' ? bPos.x + bW / 2 : bPos.x - bW / 2);
 
-    linesG.appendChild(makeCurve(x1, 0, x2, bPos.y, color, 5));
+    linesG.appendChild(makeCurve(x1, 0, x2, bPos.y, color, 5, 'center', bid));
     drawEdges(bid, 0);
   });
 
@@ -1260,6 +1266,7 @@ window.addEventListener('mousemove', (e) => {
     const dx = (e.clientX - dragState.startX) / zoom;
     const dy = (e.clientY - dragState.startY) / zoom;
     
+    // Update nodes
     Object.keys(dragState.initialPositions).forEach(id => {
       const pos = dragState.initialPositions[id];
       const newX = pos.x + dx;
@@ -1267,6 +1274,30 @@ window.addEventListener('mousemove', (e) => {
       const el = document.querySelector(`.node-group[data-id="${id}"]`);
       if (el) {
         el.setAttribute('transform', `translate(${newX},${newY})`);
+      }
+    });
+
+    // Update lines
+    document.querySelectorAll('#lines-layer path').forEach(path => {
+      const fromId = path.getAttribute('data-from');
+      const toId = path.getAttribute('data-to');
+      const isFromDragging = !!dragState.initialPositions[fromId];
+      const isToDragging = !!dragState.initialPositions[toId];
+
+      if (isFromDragging || isToDragging) {
+        const x1 = parseFloat(path.getAttribute('data-x1'));
+        const y1 = parseFloat(path.getAttribute('data-y1'));
+        const x2 = parseFloat(path.getAttribute('data-x2'));
+        const y2 = parseFloat(path.getAttribute('data-y2'));
+
+        let nx1 = x1, ny1 = y1, nx2 = x2, ny2 = y2;
+        if (isFromDragging) { nx1 += dx; ny1 += dy; }
+        if (isToDragging)   { nx2 += dx; ny2 += dy; }
+
+        const ndx = nx2 - nx1;
+        const ncp1x = nx1 + ndx * 0.45;
+        const ncp2x = nx1 + ndx * 0.55;
+        path.setAttribute('d', `M ${nx1} ${ny1} C ${ncp1x} ${ny1} ${ncp2x} ${ny2} ${nx2} ${ny2}`);
       }
     });
     return;
