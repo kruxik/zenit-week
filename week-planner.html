@@ -786,7 +786,9 @@ function computeLayout() {
     node.children.forEach(cid => {
       const childH = heights[cid];
       const w = getNodeBoxW(cid);
-      const x = parentX + (side === 'left' ? -1 : 1) * (DX);
+      const dir = side === 'left' ? -1 : 1;
+      const anchorX = parentX + dir * DX;
+      const x = anchorX + dir * (w / 2);
       const y = currentY + childH / 2;
       
       const child = findNode(cid);
