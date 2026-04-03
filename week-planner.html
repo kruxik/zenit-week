@@ -1058,8 +1058,13 @@ function _openInlineInput(nodeId, isNew) {
   inlineInput.style.background   = '#fff';
   inlineInput.style.textAlign    = 'center';
 
-  const h = 32 * zoom;
-  const fontSize = 13 * zoom;
+  const isBranchNode = node.type === 'branch';
+  const fontSize_base = isBranchNode ? 14 : 13;
+  const padY = isBranchNode ? 12 : 10;
+  const minH = isBranchNode ? 40 : 32;
+  const boxH = Math.max(minH, fontSize_base * 1.3 + padY * 2);
+  const h = boxH * zoom;
+  const fontSize = fontSize_base * zoom;
 
   inlineInput.style.fontSize   = fontSize + 'px';
   inlineInput.style.height     = h + 'px';
