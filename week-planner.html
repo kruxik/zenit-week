@@ -1493,73 +1493,18 @@ function handleNodeDrop(mouseX, mouseY) {
   const svgX = (mouseX - rect.left - panX) / zoom;
   const svgY = (mouseY - rect.top - panY) / zoom;
 
-  // 1. Get positions *without* current node to find new parent
-  const positions = computeLayout();
-  
-  function isDescendant(parentID, targetID) {
-    const p = findNode(parentID);
-    if (!p || !p.children) return false;
-    if (p.children.includes(targetID)) return true;
-    return p.children.some(cid => isDescendant(cid, targetID));
-  }
-
-  let closestId = null;
-  let minDist = Infinity;
-  
-  // Find closest node (potential new parent)
-  Object.keys(positions).forEach(id => {
-    if (id === nodeId || isDescendant(nodeId, id)) return;
-    const pos = positions[id];
-    const d = Math.sqrt((svgX - pos.x)**2 + (svgY - pos.y)**2);
-    if (d < minDist) {
-      minDist = d;
-      closestId = id;
-    }
-  });
-
-  if (closestId) {
-    // Remove from old parent if it exists
-    if (node.parent) {
-      const oldParent = findNode(node.parent);
-      if (oldParent) oldParent.children = oldParent.children.filter(id => id !== nodeId);
-    }
-
-    if (closestId === 'center') {
-      node.parent = null;
-      // If it becomes a branch, we need to decide its side based on drop position
-      if (!BRANCH_CONFIG[nodeId]) {
-        BRANCH_CONFIG[nodeId] = { side: svgX < 0 ? 'left' : 'right' };
-      } else {
-        BRANCH_CONFIG[nodeId].side = svgX < 0 ? 'left' : 'right';
-      }
-      node.branch = nodeId;
-    } else {
-      const newParent = findNode(closestId);
-      node.parent = closestId;
-      node.type = 'activity';
-      node.branch = newParent.branch || newParent.id;
-      
-      if (!newParent.children) newParent.children = [];
-      
-      // Find insertion index based on Y
-      let insertIdx = 0;
-      const siblings = newParent.children;
-      for (let i = 0; i < siblings.length; i++) {
-        if (positions[siblings[i]] && svgY > positions[siblings[i]].y) {
-          insertIdx = i + 1;
-        }
-      }
-      siblings.splice(insertIdx, 0, nodeId);
-    }
-
-    // Recalculate offset to maintain visual drop position
-    node.offX = 0; node.offY = 0;
-    const naturalPositions = computeLayout();
-    const nat = naturalPositions[nodeId];
-    if (nat) {
-      node.offX = svgX - nat.x;
-      node.offY = svgY - nat.y;
-    }
+  // Recalculate offset to maintain visual drop position
+  const oldOffX = node.offX || 0;
+  const oldOffY = node.offY || 0;
+  node.offX = 0; node.offY = 0;
+  const naturalPositions = computeLayout();
+  const nat = naturalPositions[nodeId];
+  if (nat) {
+    node.offX = svgX - nat.x;
+    node.offY = svgY - nat.y;
+  } else {
+    node.offX = oldOffX;
+    node.offY = oldOffY;
   }
 
   saveWeek(currentWeekKey, weekData);
