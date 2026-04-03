@@ -519,22 +519,20 @@ function setStatus(id, status) {
     if (!n) return;
     (n.children || []).forEach(cid => {
       const child = findNode(cid);
-      if (child) {
-        if (newStatus === 'done') {
-          // If already has _prevDone, we don't overwrite it to keep the original state
-          if (child._prevDone === undefined) {
-            child._prevDone = !!child.done;
-          }
+      if (!child) return;
+
+      if (newStatus === 'done') {
+        if (!child.done) {
           child.done = true;
-        } else if (newStatus === 'undone') {
-          if (child._prevDone !== undefined) {
-            child.done = child._prevDone;
-            delete child._prevDone;
-          } else {
-            child.done = false;
-          }
+          child._prevDone = false; // Mark as forced done
+          setDescendants(cid, 'done');
         }
-        setDescendants(cid, newStatus);
+      } else if (newStatus === 'undone') {
+        if (child._prevDone === false) {
+          child.done = false;
+          delete child._prevDone;
+          setDescendants(cid, 'undone');
+        }
       }
     });
   }
@@ -544,10 +542,14 @@ function setStatus(id, status) {
     setDescendants(id, 'done');
   } else if (status === 'undone') {
     node.done = false;
+    // When manually unmarking a node, we should also clear its "forced" state
+    // so it doesn't try to restore anything if its parent is later unmarked.
+    delete node._prevDone;
     setDescendants(id, 'undone');
   } else if (status === 'unplanned') {
     node.done = false;
     node.unplanned = true;
+    delete node._prevDone;
   }
 
   saveWeek(currentWeekKey, weekData);
