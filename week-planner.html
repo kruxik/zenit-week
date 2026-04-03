@@ -1361,34 +1361,41 @@ function handleNodeDrop(mouseX, mouseY) {
   });
 
   if (closestId) {
-    // Remove from old parent
+    // Remove from old parent if it exists
     if (node.parent) {
       const oldParent = findNode(node.parent);
       if (oldParent) oldParent.children = oldParent.children.filter(id => id !== nodeId);
     }
 
-    const newParent = findNode(closestId);
-    node.parent = (closestId === 'center') ? null : closestId;
-    node.branch = (closestId === 'center') ? null : (newParent.branch || newParent.id);
-    
-    // Find insertion index based on Y
-    if (newParent.children) {
+    if (closestId === 'center') {
+      node.parent = null;
+      // If it becomes a branch, we need to decide its side based on drop position
+      if (!BRANCH_CONFIG[nodeId]) {
+        BRANCH_CONFIG[nodeId] = { side: svgX < 0 ? 'left' : 'right' };
+      } else {
+        BRANCH_CONFIG[nodeId].side = svgX < 0 ? 'left' : 'right';
+      }
+      node.branch = nodeId;
+    } else {
+      const newParent = findNode(closestId);
+      node.parent = closestId;
+      node.type = 'activity';
+      node.branch = newParent.branch || newParent.id;
+      
+      if (!newParent.children) newParent.children = [];
+      
+      // Find insertion index based on Y
       let insertIdx = 0;
-      // We need a fresh layout check for children of this parent
       const siblings = newParent.children;
       for (let i = 0; i < siblings.length; i++) {
         if (positions[siblings[i]] && svgY > positions[siblings[i]].y) {
           insertIdx = i + 1;
         }
       }
-      newParent.children.splice(insertIdx, 0, nodeId);
-    } else {
-      newParent.children = [nodeId];
+      siblings.splice(insertIdx, 0, nodeId);
     }
 
-    // Now calculate the "natural" position in the new structure to set the offset
-    // To do this simply, we clear the offset, render once to get natural positions, then set offset.
-    // But we can also just calculate it.
+    // Recalculate offset to maintain visual drop position
     node.offX = 0; node.offY = 0;
     const naturalPositions = computeLayout();
     const nat = naturalPositions[nodeId];
