@@ -747,7 +747,7 @@ function computeLayout() {
     return heights[nodeId];
   }
 
-  const branchIds = ['work', 'family', 'me'];
+  const branchIds = (weekData.nodes || []).filter(n => n.type === 'branch').map(n => n.id);
   branchIds.forEach(calcHeight);
 
   // Position center
@@ -1493,18 +1493,63 @@ function handleNodeDrop(mouseX, mouseY) {
   const svgX = (mouseX - rect.left - panX) / zoom;
   const svgY = (mouseY - rect.top - panY) / zoom;
 
-  // Recalculate offset to maintain visual drop position
-  const oldOffX = node.offX || 0;
-  const oldOffY = node.offY || 0;
+  const positions = computeLayout();
+
+  // 1. Reorder among siblings or change branch side
+  if (node.parent) {
+    const parent = findNode(node.parent);
+    if (parent && parent.children) {
+      parent.children = parent.children.filter(id => id !== nodeId);
+      let insertIdx = 0;
+      for (let i = 0; i < parent.children.length; i++) {
+        const sid = parent.children[i];
+        if (positions[sid] && svgY > positions[sid].y) {
+          insertIdx = i + 1;
+        }
+      }
+      parent.children.splice(insertIdx, 0, nodeId);
+    }
+  } else if (node.type === 'branch') {
+    if (BRANCH_CONFIG[nodeId]) {
+      BRANCH_CONFIG[nodeId].side = svgX < 0 ? 'left' : 'right';
+    }
+    const branches = weekData.nodes.filter(n => n.type === 'branch');
+    const nonBranches = weekData.nodes.filter(n => n.type !== 'branch');
+    const otherBranches = branches.filter(b => b.id !== nodeId);
+    let insertIdx = 0;
+    for (let i = 0; i < otherBranches.length; i++) {
+      const bid = otherBranches[i].id;
+      if (positions[bid] && svgY > positions[bid].y) {
+        insertIdx = i + 1;
+      }
+    }
+    otherBranches.splice(insertIdx, 0, node);
+    weekData.nodes = [...otherBranches, ...nonBranches];
+  }
+
+  // 2. Clear offsets for descendants ONLY (the "rest of the tree")
+  function clearDescendantOffsets(nid) {
+    const n = findNode(nid);
+    if (n && n.children) {
+      n.children.forEach(cid => {
+        const child = findNode(cid);
+        if (child) {
+          child.offX = 0;
+          child.offY = 0;
+          clearDescendantOffsets(cid);
+        }
+      });
+    }
+  }
+  clearDescendantOffsets(nodeId);
+
+  // 3. Keep the moved node itself at the drop position
   node.offX = 0; node.offY = 0;
-  const naturalPositions = computeLayout();
-  const nat = naturalPositions[nodeId];
+  const finalNaturalPositions = computeLayout();
+  const nat = finalNaturalPositions[nodeId];
   if (nat) {
     node.offX = svgX - nat.x;
     node.offY = svgY - nat.y;
-  } else {
-    node.offX = oldOffX;
-    node.offY = oldOffY;
   }
 
   saveWeek(currentWeekKey, weekData);
