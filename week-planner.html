@@ -699,7 +699,6 @@ function setStatus(id, status) {
         }
       } else if (newStatus === 'unplanned') {
         child.unplanned = true;
-        child.done = false;
         setDescendants(cid, 'unplanned');
       } else if (newStatus === 'planned') {
         child.unplanned = false;
@@ -716,9 +715,7 @@ function setStatus(id, status) {
     delete node._prevDone;
     setDescendants(id, 'undone');
   } else if (status === 'unplanned') {
-    node.done = false;
     node.unplanned = true;
-    delete node._prevDone;
     setDescendants(id, 'unplanned');
   } else if (status === 'planned') {
     node.unplanned = false;
@@ -897,7 +894,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     bgColor = bc.light; borderColor = bc.main; textColor = bc.text; fontWeight = '600';
   } else {
     // Activity
-    if (node && node.done) {
+    if (node && node.done && node.unplanned) {
+      bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
+    } else if (node && node.done) {
       bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
     } else if (node && node.unplanned) {
       bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = bc.text;
