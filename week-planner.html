@@ -697,6 +697,13 @@ function setStatus(id, status) {
           delete child._prevDone;
           setDescendants(cid, 'undone');
         }
+      } else if (newStatus === 'unplanned') {
+        child.unplanned = true;
+        child.done = false;
+        setDescendants(cid, 'unplanned');
+      } else if (newStatus === 'planned') {
+        child.unplanned = false;
+        setDescendants(cid, 'planned');
       }
     });
   }
@@ -706,16 +713,16 @@ function setStatus(id, status) {
     setDescendants(id, 'done');
   } else if (status === 'undone') {
     node.done = false;
-    // When manually unmarking a node, we should also clear its "forced" state
-    // so it doesn't try to restore anything if its parent is later unmarked.
     delete node._prevDone;
     setDescendants(id, 'undone');
   } else if (status === 'unplanned') {
     node.done = false;
     node.unplanned = true;
     delete node._prevDone;
+    setDescendants(id, 'unplanned');
   } else if (status === 'planned') {
     node.unplanned = false;
+    setDescendants(id, 'planned');
   }
 
   saveWeek(currentWeekKey, weekData);
