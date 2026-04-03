@@ -363,6 +363,13 @@ let panStartPanY = 0;
 let contextTarget = null;  // node id
 let editState = null;      // { nodeId, isNew, originalLabel }
 
+let dragState = {
+  activeNodeId: null,
+  startX: 0,
+  startY: 0,
+  initialPositions: {}, // { id: {x, y} }
+};
+
 // ─── Week utilities ───────────────────────────────────────────────────────────
 function getISOWeek(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -601,8 +608,13 @@ function computeLayout() {
       const w = getNodeBoxW(bid);
       const x = (side === 'left' ? -1 : 1) * (CENTER_W / 2 + 100);
       const y = currentY + nodeH / 2;
-      positions[bid] = { x, y, w, h: 40, side };
-      layoutChildren(bid, x, y, side, w);
+      
+      const node = findNode(bid);
+      const finalX = x + (node.offX || 0);
+      const finalY = y + (node.offY || 0);
+      
+      positions[bid] = { x: finalX, y: finalY, w, h: 40, side };
+      layoutChildren(bid, finalX, finalY, side, w);
       currentY += nodeH;
     });
   }
@@ -619,8 +631,13 @@ function computeLayout() {
       const w = getNodeBoxW(cid);
       const x = parentX + (side === 'left' ? -1 : 1) * (DX);
       const y = currentY + childH / 2;
-      positions[cid] = { x, y, w, h: 32, side };
-      layoutChildren(cid, x, y, side, w);
+      
+      const child = findNode(cid);
+      const finalX = x + (child.offX || 0);
+      const finalY = y + (child.offY || 0);
+      
+      positions[cid] = { x: finalX, y: finalY, w, h: 32, side };
+      layoutChildren(cid, finalX, finalY, side, w);
       currentY += childH;
     });
   }
@@ -1044,6 +1061,45 @@ function attachNodeListeners() {
   document.querySelectorAll('.node-group').forEach(g => {
     const id = g.getAttribute('data-id');
 
+    g.addEventListener('mousedown', (e) => {
+      if (id === 'center') return;
+      if (e.button !== 0) return;
+      if (e.target.closest('.add-btn')) return;
+      
+      e.stopPropagation();
+      
+      const positions = computeLayout();
+      const idsToDrag = [];
+
+      function collect(nid) {
+        idsToDrag.push(nid);
+        const n = findNode(nid);
+        if (n && n.children) {
+          n.children.forEach(collect);
+        }
+      }
+      collect(id);
+
+      const initialPositions = {};
+      idsToDrag.forEach(idToDrag => {
+        const p = positions[idToDrag];
+        if (p) initialPositions[idToDrag] = { x: p.x, y: p.y };
+        
+        const el = document.querySelector(`.node-group[data-id="${idToDrag}"]`);
+        if (el) {
+          el.style.transition = 'none';
+          el.setAttribute('pointer-events', 'none');
+        }
+      });
+
+      dragState = {
+        activeNodeId: id,
+        startX: e.clientX,
+        startY: e.clientY,
+        initialPositions: initialPositions,
+      };
+    });
+
     g.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       e.preventDefault();
@@ -1200,18 +1256,120 @@ container.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mousemove', (e) => {
+  if (dragState.activeNodeId) {
+    const dx = (e.clientX - dragState.startX) / zoom;
+    const dy = (e.clientY - dragState.startY) / zoom;
+    
+    Object.keys(dragState.initialPositions).forEach(id => {
+      const pos = dragState.initialPositions[id];
+      const newX = pos.x + dx;
+      const newY = pos.y + dy;
+      const el = document.querySelector(`.node-group[data-id="${id}"]`);
+      if (el) {
+        el.setAttribute('transform', `translate(${newX},${newY})`);
+      }
+    });
+    return;
+  }
   if (!isPanning) return;
   panX = panStartPanX + (e.clientX - panStartX);
   panY = panStartPanY + (e.clientY - panStartY);
   applyTransform();
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', (e) => {
+  if (dragState.activeNodeId) {
+    Object.keys(dragState.initialPositions).forEach(id => {
+      const el = document.querySelector(`.node-group[data-id="${id}"]`);
+      if (el) {
+        el.removeAttribute('pointer-events');
+        el.style.transition = '';
+      }
+    });
+    handleNodeDrop(e.clientX, e.clientY);
+    dragState.activeNodeId = null;
+    return;
+  }
   if (isPanning) {
     isPanning = false;
     container.classList.remove('panning');
   }
 });
+
+function handleNodeDrop(mouseX, mouseY) {
+  const nodeId = dragState.activeNodeId;
+  const node = findNode(nodeId);
+  if (!node) return;
+
+  const rect = container.getBoundingClientRect();
+  const svgX = (mouseX - rect.left - panX) / zoom;
+  const svgY = (mouseY - rect.top - panY) / zoom;
+
+  // 1. Get positions *without* current node to find new parent
+  const positions = computeLayout();
+  
+  function isDescendant(parentID, targetID) {
+    const p = findNode(parentID);
+    if (!p || !p.children) return false;
+    if (p.children.includes(targetID)) return true;
+    return p.children.some(cid => isDescendant(cid, targetID));
+  }
+
+  let closestId = null;
+  let minDist = Infinity;
+  
+  // Find closest node (potential new parent)
+  Object.keys(positions).forEach(id => {
+    if (id === nodeId || isDescendant(nodeId, id)) return;
+    const pos = positions[id];
+    const d = Math.sqrt((svgX - pos.x)**2 + (svgY - pos.y)**2);
+    if (d < minDist) {
+      minDist = d;
+      closestId = id;
+    }
+  });
+
+  if (closestId) {
+    // Remove from old parent
+    if (node.parent) {
+      const oldParent = findNode(node.parent);
+      if (oldParent) oldParent.children = oldParent.children.filter(id => id !== nodeId);
+    }
+
+    const newParent = findNode(closestId);
+    node.parent = (closestId === 'center') ? null : closestId;
+    node.branch = (closestId === 'center') ? null : (newParent.branch || newParent.id);
+    
+    // Find insertion index based on Y
+    if (newParent.children) {
+      let insertIdx = 0;
+      // We need a fresh layout check for children of this parent
+      const siblings = newParent.children;
+      for (let i = 0; i < siblings.length; i++) {
+        if (positions[siblings[i]] && svgY > positions[siblings[i]].y) {
+          insertIdx = i + 1;
+        }
+      }
+      newParent.children.splice(insertIdx, 0, nodeId);
+    } else {
+      newParent.children = [nodeId];
+    }
+
+    // Now calculate the "natural" position in the new structure to set the offset
+    // To do this simply, we clear the offset, render once to get natural positions, then set offset.
+    // But we can also just calculate it.
+    node.offX = 0; node.offY = 0;
+    const naturalPositions = computeLayout();
+    const nat = naturalPositions[nodeId];
+    if (nat) {
+      node.offX = svgX - nat.x;
+      node.offY = svgY - nat.y;
+    }
+  }
+
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
 
 document.getElementById('zoom-in').addEventListener('click', () => {
   const svg = document.getElementById('main-svg');
