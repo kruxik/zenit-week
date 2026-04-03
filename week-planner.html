@@ -150,6 +150,48 @@
     display: block;
   }
 
+  /* Settings Dropdown */
+  #settings-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  #settings-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    padding: 12px;
+    z-index: 1000;
+    min-width: 220px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    animation: fadeIn 0.1s ease-out;
+  }
+
+  #settings-dropdown.visible {
+    display: flex;
+  }
+
+  .settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .settings-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
   /* Context menu */
   #context-menu {
     position: fixed;
@@ -279,11 +321,25 @@
       <div class="legend-item"><div class="legend-dot" style="background:#F39C12"></div>Unplanned</div>
       <div class="legend-item"><div class="legend-dot" style="background:#666"></div><b>Done</b></div>
     </div>
-    <div id="zoom-controls">
-      <button class="zoom-btn" id="zoom-out" title="Zoom out">−</button>
-      <div id="zoom-label">100%</div>
-      <button class="zoom-btn" id="zoom-in" title="Zoom in">+</button>
-      <button class="reset-btn" id="reset-view">Reset View</button>
+    <div id="settings-container">
+      <button class="reset-btn" id="settings-btn" style="display:flex; align-items:center; gap:6px;">
+        ⚙ Settings
+      </button>
+      <div id="settings-dropdown">
+        <div class="settings-section">
+          <div class="settings-label">Zoom</div>
+          <div id="zoom-controls">
+            <button class="zoom-btn" id="zoom-out" title="Zoom out">−</button>
+            <div id="zoom-label">100%</div>
+            <button class="zoom-btn" id="zoom-in" title="Zoom in">+</button>
+          </div>
+        </div>
+        <div class="ctx-separator"></div>
+        <div class="settings-section">
+          <div class="settings-label">View</div>
+          <button class="reset-btn" id="reset-view" style="width:100%">Reset View</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1442,6 +1498,21 @@ document.getElementById('next-week').addEventListener('click', () => {
 
 document.getElementById('today-btn').addEventListener('click', () => {
   loadAndRender(todayWeekKey());
+});
+
+// ─── Settings Dropdown ────────────────────────────────────────────────────────
+const settingsBtn = document.getElementById('settings-btn');
+const settingsDropdown = document.getElementById('settings-dropdown');
+
+settingsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  settingsDropdown.classList.toggle('visible');
+});
+
+document.addEventListener('click', (e) => {
+  if (!settingsDropdown.contains(e.target) && e.target !== settingsBtn) {
+    settingsDropdown.classList.remove('visible');
+  }
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
