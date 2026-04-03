@@ -999,9 +999,11 @@ function resizeInlineInput() {
   inlineSizer.style.fontSize = inlineInput.style.fontSize;
   inlineSizer.style.fontFamily = inlineInput.style.fontFamily || inlineInput.style.font;
   inlineSizer.textContent = inlineInput.value || ' ';
-  
-  const pad = 30 * zoom;
-  const newW = Math.max(120 * zoom, inlineSizer.offsetWidth + pad);
+
+  // pad = input's own horizontal padding (12*2) + border (2*2) + 1-char lookahead (~10px)
+  const pad = 36 * zoom;
+  const minW = editState ? editState.initialNodeW : (120 * zoom);
+  const newW = Math.max(minW, inlineSizer.offsetWidth + pad);
   inlineInput.style.width = newW + 'px';
 
   if (editState) {
@@ -1039,7 +1041,8 @@ function _openInlineInput(nodeId, isNew) {
   const node = findNode(nodeId);
   if (!node) return;
 
-  editState = { nodeId, isNew, originalLabel: node.label };
+  const initialNodeW = getNodeBoxW(nodeId) * zoom;
+  editState = { nodeId, isNew, originalLabel: node.label, initialNodeW };
   inlineInput.value = isNew ? '' : node.label;
 
   const sp = nodeScreenPos(nodeId);
