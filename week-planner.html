@@ -820,17 +820,15 @@ function getNodeBoxW(nodeId) {
   if (!node) return 100;
   const type = node.type || 'activity';
   const label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
-  let fontSize, maxW, padX;
+  let fontSize, padX;
   if (type === 'branch') {
-    fontSize = 14; maxW = 110; padX = 16;
+    fontSize = 14; padX = 16;
   } else {
-    fontSize = 13; maxW = 160; padX = 8;
+    fontSize = 13; padX = 8;
   }
-  const lines = wrapText(label, maxW, fontSize);
   const avgCharW = fontSize * 0.52;
-  const longestLine = lines.length > 0 ? Math.max(...lines.map(l => l.length)) : 0;
   const minW = (type === 'branch' ? 100 : 80);
-  return Math.max(minW, Math.ceil(longestLine * avgCharW) + padX * 2);
+  return Math.max(minW, Math.ceil(label.length * avgCharW) + padX * 2);
 }
 
 function wrapText(text, maxWidth, fontSize) {
@@ -869,7 +867,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   const lines = (isCenter)
     ? label.split('|').map(s => s.trim())
-    : wrapText(label, maxW, fontSize);
+    : [label];
 
   const lineH = fontSize * 1.3;
   const totalTextH = lines.length * lineH;
