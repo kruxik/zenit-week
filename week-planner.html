@@ -448,9 +448,9 @@
 </div>
 
 <div id="context-menu">
-  <div class="ctx-item" id="ctx-done">✓ Mark Done</div>
-  <div class="ctx-item" id="ctx-undone">↩ Mark Undone</div>
-  <div class="ctx-item" id="ctx-unplanned">⚡ Mark Unplanned</div>
+  <div class="ctx-item" id="ctx-done">✓ Done</div>
+  <div class="ctx-item" id="ctx-undone">↩ Undone</div>
+  <div class="ctx-item" id="ctx-unplanned">⚡ Unplanned</div>
   <div class="ctx-separator"></div>
   <div class="ctx-item" id="ctx-rename">✏ Rename</div>
   <div class="ctx-item" id="ctx-add-child">＋ Add Sub-task</div>
@@ -1301,6 +1301,8 @@ function showContextMenu(x, y, nodeId) {
   const isDone = node && node.done === true;
   document.getElementById('ctx-done').style.display      = (isBranch || isDone)  ? 'none' : '';
   document.getElementById('ctx-undone').style.display    = (isBranch || !isDone) ? 'none' : '';
+  const isUnplanned = node && node.unplanned === true;
+  document.getElementById('ctx-unplanned').textContent = isUnplanned ? '⚡ Planned' : '⚡ Unplanned';
   document.getElementById('ctx-unplanned').style.display = isBranch ? 'none' : '';
   document.getElementById('ctx-delete').style.display    = isBranch ? 'none' : '';
   document.getElementById('ctx-add-child').style.display = (nodeId === 'center') ? 'none' : '';
