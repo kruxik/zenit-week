@@ -513,9 +513,43 @@ function renameNode(id, label) {
 function setStatus(id, status) {
   const node = findNode(id);
   if (!node) return;
-  if (status === 'done')      { node.done = true; }
-  if (status === 'undone')    { node.done = false; }
-  if (status === 'unplanned') { node.done = false; node.unplanned = true;  }
+
+  function setDescendants(nid, newStatus) {
+    const n = findNode(nid);
+    if (!n) return;
+    (n.children || []).forEach(cid => {
+      const child = findNode(cid);
+      if (child) {
+        if (newStatus === 'done') {
+          // If already has _prevDone, we don't overwrite it to keep the original state
+          if (child._prevDone === undefined) {
+            child._prevDone = !!child.done;
+          }
+          child.done = true;
+        } else if (newStatus === 'undone') {
+          if (child._prevDone !== undefined) {
+            child.done = child._prevDone;
+            delete child._prevDone;
+          } else {
+            child.done = false;
+          }
+        }
+        setDescendants(cid, newStatus);
+      }
+    });
+  }
+
+  if (status === 'done') {
+    node.done = true;
+    setDescendants(id, 'done');
+  } else if (status === 'undone') {
+    node.done = false;
+    setDescendants(id, 'undone');
+  } else if (status === 'unplanned') {
+    node.done = false;
+    node.unplanned = true;
+  }
+
   saveWeek(currentWeekKey, weekData);
   render();
 }
