@@ -42,8 +42,16 @@
     position: relative;
   }
 
-  .nav-spacer {
+  #logo {
     flex: 1;
+    font-size: 18px;
+    font-weight: 800;
+    color: #333;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
   }
 
   #week-nav {
@@ -409,7 +417,7 @@
 
 <div id="app">
   <div id="toolbar">
-    <div class="nav-spacer"></div>
+    <div id="logo">Week Planner</div>
     <div id="week-nav">
       <button class="nav-btn" id="prev-week" title="Previous week">&#8249;</button>
       <div id="week-label">Week 13 | Mar 30 – Apr 5</div>
