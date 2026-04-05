@@ -482,11 +482,11 @@
 
 <div id="modal-overlay">
   <div class="modal">
-    <div class="modal-title">Reset week data?</div>
-    <div class="modal-text">This will permanently delete all tasks and branches for the current week. This action cannot be undone.</div>
+    <div class="modal-title" id="modal-title">Reset week data?</div>
+    <div class="modal-text" id="modal-text">This will permanently delete all tasks and branches for the current week. This action cannot be undone.</div>
     <div class="modal-actions">
-      <button class="modal-btn" id="modal-no">No, Keep Data</button>
-      <button class="modal-btn confirm" id="modal-yes">Yes, Reset</button>
+      <button class="modal-btn" id="modal-cancel-btn">Cancel</button>
+      <button class="modal-btn confirm" id="modal-confirm-btn">Confirm</button>
     </div>
   </div>
 </div>
@@ -583,7 +583,7 @@ function formatWeekLabel(year, week) {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const mStart = `${months[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
   const mEnd   = `${months[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
-  return `Week ${week} | ${mStart} – ${mEnd}`;
+  return `Week ${week} | (${mStart} - ${mEnd})`;
 }
 
 function parseWeekKey(key) {
@@ -1174,7 +1174,9 @@ function render() {
   while (root.firstChild) root.removeChild(root.firstChild);
 
   const { year, week } = parseWeekKey(currentWeekKey);
-  document.getElementById('week-label').textContent = formatWeekLabel(year, week);
+  const label = formatWeekLabel(year, week);
+  const parts = label.split(' | ');
+  document.getElementById('week-label').innerHTML = `<b>${parts[0]}</b> ${parts[1]}`;
 
   const positions = computeLayout();
   
@@ -1396,14 +1398,54 @@ document.getElementById('ctx-add-child').addEventListener('click', () => {
   if (id) startAddNode(id);
 });
 
+// ─── Modals ───────────────────────────────────────────────────────────────────
+const modalOverlay = document.getElementById('modal-overlay');
+const modalTitle   = document.getElementById('modal-title');
+const modalText    = document.getElementById('modal-text');
+const modalCancel  = document.getElementById('modal-cancel-btn');
+const modalConfirm = document.getElementById('modal-confirm-btn');
+
+let modalCallback = null;
+
+function showModal(title, text, confirmLabel, cancelLabel, onConfirm) {
+  modalTitle.textContent = title;
+  modalText.textContent = text;
+  modalConfirm.textContent = confirmLabel || 'Confirm';
+  modalCancel.textContent = cancelLabel || 'Cancel';
+  modalCallback = onConfirm;
+  modalOverlay.classList.add('visible');
+}
+
+function hideModal() {
+  modalOverlay.classList.remove('visible');
+  modalCallback = null;
+}
+
+modalCancel.addEventListener('click', hideModal);
+modalConfirm.addEventListener('click', () => {
+  if (modalCallback) modalCallback();
+  hideModal();
+});
+
 document.getElementById('ctx-delete').addEventListener('click', () => {
   if (!contextTarget) { hideContextMenu(); return; }
-  const node = findNode(contextTarget);
+  const nodeId = contextTarget;
+  const node = findNode(nodeId);
   const hasChildren = node && node.children && node.children.length > 0;
-  if (!hasChildren || confirm('Delete this node and all its sub-tasks?')) {
-    deleteNode(contextTarget);
+  
+  if (!hasChildren) {
+    deleteNode(nodeId);
+    hideContextMenu();
+  } else {
+    hideContextMenu();
+    showModal(
+      'Delete activity?',
+      'This will permanently delete this activity and all its sub-tasks. This action cannot be undone.',
+      'Delete All',
+      'Cancel',
+      () => deleteNode(nodeId)
+    );
   }
-  hideContextMenu();
 });
 
 document.addEventListener('click', (e) => {
@@ -1646,9 +1688,6 @@ document.getElementById('today-btn').addEventListener('click', () => {
 const settingsBtn = document.getElementById('settings-btn');
 const settingsDropdown = document.getElementById('settings-dropdown');
 const resetDataBtn = document.getElementById('reset-data-btn');
-const modalOverlay = document.getElementById('modal-overlay');
-const modalNo = document.getElementById('modal-no');
-const modalYes = document.getElementById('modal-yes');
 
 settingsBtn.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1656,24 +1695,18 @@ settingsBtn.addEventListener('click', (e) => {
 });
 
 resetDataBtn.addEventListener('click', () => {
-  modalOverlay.classList.add('visible');
-});
-
-modalNo.addEventListener('click', () => {
-  modalOverlay.classList.remove('visible');
   settingsDropdown.classList.remove('visible');
-});
-
-modalYes.addEventListener('click', () => {
-  // Clear storage for current week
-  localStorage.removeItem(storageKey(currentWeekKey));
-  // Reload current week data (will load defaults)
-  weekData = loadWeek(currentWeekKey);
-  // Re-render
-  render();
-  // Close everything
-  modalOverlay.classList.remove('visible');
-  settingsDropdown.classList.remove('visible');
+  showModal(
+    'Reset week data?',
+    'This will permanently delete all tasks and branches for the current week. This action cannot be undone.',
+    'Reset Week',
+    'Cancel',
+    () => {
+      localStorage.removeItem(storageKey(currentWeekKey));
+      weekData = loadWeek(currentWeekKey);
+      render();
+    }
+  );
 });
 
 document.addEventListener('click', (e) => {
