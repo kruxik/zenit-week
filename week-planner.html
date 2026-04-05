@@ -3,17 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Week Planner</title>
+<title>Week Planner | Mind Map</title>
 <style>
+  :root {
+    --primary-color: #1a73e8;
+    --bg-color: #f9f9f9;
+    --text-color: #333;
+    --border-color: #e0e0e0;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: #f4f4f4;
+    background-color: var(--bg-color);
+    color: var(--text-color);
     overflow: hidden;
     height: 100vh;
-    width: 100vw;
-    user-select: none;
   }
 
   #app {
@@ -115,23 +121,25 @@
   #legend {
     display: flex;
     align-items: center;
-    gap: 18px;
-    justify-content: center;
+    gap: 12px;
+    margin-right: 18px;
+    padding-right: 18px;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
   }
 
   .legend-item {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
-    color: #555;
+    color: #fff;
   }
 
   .legend-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
   }
 
   #canvas-container {
@@ -329,7 +337,7 @@
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(40, 44, 52, 0.85);
+    background: rgba(40, 44, 52, 0.9);
     color: #fff;
     padding: 8px 18px;
     border-radius: 30px;
@@ -338,6 +346,10 @@
     opacity: 0;
     transition: opacity 0.3s;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    z-index: 100;
   }
 
   body:hover #hint { opacity: 1; }
@@ -363,28 +375,25 @@
     opacity: 1;
   }
 
-  /* Inline edit input */
   #inline-input {
     position: fixed;
+    z-index: 1500;
     display: none;
-    z-index: 500;
     border: 2px solid #1a73e8;
     border-radius: 8px;
-    padding: 4px 12px;
-    background: #fff;
-    font-family: inherit;
-    text-align: left;
+    padding: 0 12px;
     outline: none;
-    color: #333;
-    box-sizing: border-box;
     box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    font-family: inherit;
   }
 
   #inline-sizer {
-    position: fixed;
-    top: -9999px;
-    left: -9999px;
+    position: absolute;
+    top: 0;
+    left: 0;
     visibility: hidden;
+    height: 0;
+    overflow: hidden;
     white-space: pre;
     font-family: inherit;
     pointer-events: none;
@@ -401,13 +410,6 @@
       <div id="week-label">Week 13 | Mar 30 – Apr 5</div>
       <button class="nav-btn" id="next-week" title="Next week">&#8250;</button>
       <button class="reset-btn" id="today-btn">Today</button>
-    </div>
-    <div id="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:#F24E1E"></div>Work</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#A259FF"></div>Family</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#1ABCFE"></div>Me</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#FFF9DB; border: 1px solid #FCC419"></div>Unplanned</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#EBEBEB; border: 1px solid #ccc"></div>Done</div>
     </div>
     <div id="settings-container">
       <button class="reset-btn" id="settings-btn" style="display:flex; align-items:center; gap:6px;">
@@ -476,7 +478,16 @@
   </div>
 </div>
 
-<div id="hint">Right-click for options · Drag canvas to pan · Drag activity to move · Scroll to zoom</div>
+<div id="hint">
+  <div id="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#F24E1E"></div>Work</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#A259FF"></div>Family</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1ABCFE"></div>Me</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#FFF9DB; border: 1px solid #FCC419"></div>Unplanned</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#EBEBEB; border: 1px solid #ccc"></div>Done</div>
+  </div>
+  Right-click for options · Drag canvas to pan · Drag activity to move · Scroll to zoom
+</div>
 
 <script>
 'use strict';
@@ -1230,7 +1241,7 @@ function render() {
   // Draw all other nodes
   weekData.nodes.forEach(node => {
     if (node._editing) return;
-    const pos = positions[node.id];
+    const pos = computeLayout()[node.id];
     if (!pos) return;
     const g = makeNodeGroup(
       node.id, pos.x, pos.y, node.label,
