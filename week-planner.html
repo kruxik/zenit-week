@@ -39,6 +39,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex: 1;
   }
 
   .nav-btn {
@@ -115,6 +116,7 @@
     display: flex;
     align-items: center;
     gap: 18px;
+    justify-content: center;
   }
 
   .legend-item {
@@ -153,7 +155,9 @@
   /* Settings Dropdown */
   #settings-container {
     position: relative;
-    display: inline-block;
+    display: flex;
+    justify-content: flex-end;
+    flex: 1;
   }
 
   #settings-dropdown {
@@ -399,11 +403,11 @@
       <button class="reset-btn" id="today-btn">Today</button>
     </div>
     <div id="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:#4A90D9"></div>Work</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#5CB85C"></div>Family</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#9B59B6"></div>Me</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#F39C12"></div>Unplanned</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#666"></div><b>Done</b></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#F24E1E"></div>Work</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#A259FF"></div>Family</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#1ABCFE"></div>Me</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#FFF9DB; border: 1px solid #FCC419"></div>Unplanned</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#EBEBEB; border: 1px solid #ccc"></div>Done</div>
     </div>
     <div id="settings-container">
       <button class="reset-btn" id="settings-btn" style="display:flex; align-items:center; gap:6px;">
