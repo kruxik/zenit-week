@@ -519,11 +519,39 @@ const UNPLANNED_BG  = '#FFF9DB';
 const UNPLANNED_BORDER = '#FCC419';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
-const DX = 220; // Horizontal distance between levels
+const MIN_HORIZONTAL_GAP = 40; // Minimum horizontal gap between nodes
 const DY = 44;  // Vertical spacing between siblings
 const BRANCH_GAP = 20; // Vertical gap between main branches
-const CENTER_W = 140;
-const CENTER_H = 48;
+
+const NODE_STYLE = {
+  center:   { fontSize: 15, padX: 22, padY: 14, minW: 140, minH: 48, rx: 24,  avgCharW: 0.55 },
+  branch:   { fontSize: 14, padX: 16, padY: 12, minW: 100, minH: 40, rx: 20,  avgCharW: 0.55 },
+  activity: { fontSize: 13, padX: 14, padY: 10, minW: 80,  minH: 32, rx: 8,   avgCharW: 0.55 }
+};
+
+const CENTER_W = NODE_STYLE.center.minW;
+const CENTER_H = NODE_STYLE.center.minH;
+
+function getNodeSize(nodeId) {
+  const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey))) } : findNode(nodeId);
+  if (!node) return { w: 100, h: 32 };
+  
+  const type = node.type || 'activity';
+  const style = NODE_STYLE[type];
+  let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
+  
+  // Center label is special (multiline in rendering, but we use it for width)
+  const lines = (type === 'center') ? label.split('|').map(s => s.trim()) : [label];
+  const longestLine = lines.reduce((max, l) => Math.max(max, l.length), 0);
+  
+  const lineH = style.fontSize * 1.3;
+  const totalTextH = lines.length * lineH;
+  
+  const w = Math.max(style.minW, Math.ceil(longestLine * style.fontSize * style.avgCharW) + style.padX * 2);
+  const h = Math.max(style.minH, totalTextH + style.padY * 2);
+  
+  return { w, h, fontSize: style.fontSize, padX: style.padX, padY: style.padY, rx: style.rx };
+}
 
 // Side assignments
 const BRANCH_CONFIG = {
@@ -796,8 +824,12 @@ function computeLayout() {
 
     branches.forEach((bid, i) => {
       const nodeH = heights[bid];
-      const w = getNodeBoxW(bid);
-      const x = (side === 'left' ? -1 : 1) * (CENTER_W / 2 + 100);
+      const { w } = getNodeSize(bid);
+      const dir = side === 'left' ? -1 : 1;
+      
+      // Fixed base distance from center for root branches
+      const baseDistance = 100;
+      const x = dir * (CENTER_W / 2 + baseDistance + w / 2);
       const y = currentY + nodeH / 2;
       
       const node = findNode(bid);
@@ -819,10 +851,11 @@ function computeLayout() {
 
     node.children.forEach(cid => {
       const childH = heights[cid];
-      const w = getNodeBoxW(cid);
+      const { w } = getNodeSize(cid);
       const dir = side === 'left' ? -1 : 1;
-      const anchorX = parentX + dir * DX;
-      const x = anchorX + dir * (w / 2);
+      
+      // Dynamic spacing: parent edge + gap + child half-width
+      const x = parentX + dir * (parentW / 2 + MIN_HORIZONTAL_GAP + w / 2);
       const y = currentY + childH / 2;
       
       const child = findNode(cid);
@@ -850,41 +883,6 @@ function svgEl(tag, attrs) {
   return el;
 }
 
-function getNodeBoxW(nodeId) {
-  if (nodeId === 'center') return CENTER_W;
-  const node = findNode(nodeId);
-  if (!node) return 100;
-  const type = node.type || 'activity';
-  const label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
-  let fontSize, padX;
-  if (type === 'branch') {
-    fontSize = 14; padX = 16;
-  } else {
-    fontSize = 13; padX = 8;
-  }
-  const avgCharW = fontSize * 0.52;
-  const minW = (type === 'branch' ? 100 : 80);
-  return Math.max(minW, Math.ceil(label.length * avgCharW) + padX * 2);
-}
-
-function wrapText(text, maxWidth, fontSize) {
-  if (!text) return [];
-  const maxChars = Math.floor(maxWidth / (fontSize * 0.5));
-  const words = text.split(' ');
-  const lines = [];
-  let current = '';
-  words.forEach(word => {
-    if ((current + ' ' + word).trim().length <= maxChars) {
-      current = (current + ' ' + word).trim();
-    } else {
-      if (current) lines.push(current);
-      current = word;
-    }
-  });
-  if (current) lines.push(current);
-  return lines;
-}
-
 function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const g = svgEl('g', { class: 'node-group', 'data-id': id });
   
@@ -892,14 +890,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const isCenter = type === 'center';
   const isActivity = type === 'activity';
 
-  let fontSize, maxW, padX, padY, rx_val;
-  if (isCenter) {
-    fontSize = 15; maxW = 180; padX = 22; padY = 14; rx_val = CENTER_H / 2;
-  } else if (isBranch) {
-    fontSize = 14; maxW = 110; padX = 16; padY = 12; rx_val = 20;
-  } else {
-    fontSize = 13; maxW = 160; padX = 14; padY = 10; rx_val = 8;
-  }
+  const { w: boxW, h: boxH, fontSize, rx: rx_val } = getNodeSize(id);
 
   const lines = (isCenter)
     ? label.split('|').map(s => s.trim())
@@ -907,10 +898,6 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   const lineH = fontSize * 1.3;
   const totalTextH = lines.length * lineH;
-  const boxH = Math.max(isCenter ? CENTER_H : (isBranch ? 40 : 32), totalTextH + padY * 2);
-  const avgCharW = fontSize * 0.52;
-  const longestLine = lines.length > 0 ? Math.max(...lines.map(l => l.length)) : 0;
-  const boxW = Math.max(isCenter ? CENTER_W : (isBranch ? 100 : 80), Math.ceil(longestLine * avgCharW) + padX * 2);
 
   // Determine colors
   let bgColor, borderColor, textColor, fontWeight = 'normal';
@@ -1038,9 +1025,13 @@ function resizeInlineInput() {
   inlineSizer.style.fontFamily = inlineInput.style.fontFamily || inlineInput.style.font;
   inlineSizer.textContent = inlineInput.value || ' ';
 
-  // pad = input's own horizontal padding (12*2) + border (2*2) + 1-char lookahead (~10px)
-  const pad = 36 * zoom;
-  const minW = editState ? editState.initialNodeW : (120 * zoom);
+  // pad = input's own horizontal padding (style.padX*2) + border (2*2) + 1-char lookahead (~10px)
+  const node = findNode(editState.nodeId);
+  const type = node ? node.type : 'activity';
+  const style = NODE_STYLE[type];
+  
+  const pad = (style.padX * 2 + 14) * zoom;
+  const minW = editState ? editState.initialNodeW : (style.minW * zoom);
   const newW = Math.max(minW, inlineSizer.offsetWidth + pad);
   inlineInput.style.width = newW + 'px';
 
@@ -1079,7 +1070,8 @@ function _openInlineInput(nodeId, isNew) {
   const node = findNode(nodeId);
   if (!node) return;
 
-  const initialNodeW = getNodeBoxW(nodeId) * zoom;
+  const { w: nodeW, h: nodeH, fontSize: fontSize_base } = getNodeSize(nodeId);
+  const initialNodeW = nodeW * zoom;
   editState = { nodeId, isNew, originalLabel: node.label, initialNodeW };
   inlineInput.value = isNew ? '' : node.label;
 
@@ -1092,17 +1084,12 @@ function _openInlineInput(nodeId, isNew) {
   inlineInput.style.background   = '#fff';
   inlineInput.style.textAlign    = 'center';
 
-  const isBranchNode = node.type === 'branch';
-  const fontSize_base = isBranchNode ? 14 : 13;
-  const padY = isBranchNode ? 12 : 10;
-  const minH = isBranchNode ? 40 : 32;
-  const boxH = Math.max(minH, fontSize_base * 1.3 + padY * 2);
-  const h = boxH * zoom;
+  const h = nodeH * zoom;
   const fontSize = fontSize_base * zoom;
 
   inlineInput.style.fontSize   = fontSize + 'px';
   inlineInput.style.height     = h + 'px';
-  inlineInput.style.lineHeight = h + 'px';
+  inlineInput.style.lineHeight = (h - 4) + 'px'; // Subtract border
   inlineInput.style.top        = (sp.y - h / 2) + 'px';
   inlineInput.style.display    = 'block';
 
@@ -1180,11 +1167,6 @@ function render() {
 
   const positions = computeLayout();
   
-  // Pre-calculate widths for all nodes to use in line positioning
-  const widths = {};
-  weekData.nodes.forEach(n => { widths[n.id] = getNodeBoxW(n.id); });
-  widths['center'] = CENTER_W;
-
   const linesG = svgEl('g', { id: 'lines-layer' });
   root.appendChild(linesG);
 
@@ -1203,12 +1185,12 @@ function render() {
     if (!pos) return;
     const side = pos.side;
     const branch = node.branch || node.id;
-    const nodeW = widths[nodeId];
+    const { w: nodeW } = getNodeSize(nodeId);
 
     (node.children || []).forEach(childId => {
       const childPos = positions[childId];
       if (!childPos) return;
-      const childW = widths[childId];
+      const { w: childW } = getNodeSize(childId);
       const color = branchColor(branch);
       
       let sw = 1.8;
@@ -1238,7 +1220,7 @@ function render() {
     if (!bPos) return;
     const color = branchColor(bid);
     const side = bPos.side;
-    const bW = widths[bid];
+    const { w: bW } = getNodeSize(bid);
 
     let x1 = (side === 'left' ? -CENTER_W / 2 : CENTER_W / 2);
     let x2 = (side === 'left' ? bPos.x + bW / 2 : bPos.x - bW / 2);
@@ -1256,7 +1238,7 @@ function render() {
   // Draw all other nodes
   weekData.nodes.forEach(node => {
     if (node._editing) return;
-    const pos = computeLayout()[node.id];
+    const pos = positions[node.id];
     if (!pos) return;
     const g = makeNodeGroup(
       node.id, pos.x, pos.y, node.label,
