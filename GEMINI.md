@@ -18,6 +18,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
   - Use `'use strict';`.
   - Prefer `const` and `let` over `var`.
   - Use camelCase for function and variable names.
+  - Avoid code duplication; prioritize modularity and reuse.
   - Manipulate SVG elements using `document.createElementNS('http://www.w3.org/2000/svg', tag)`.
 - **CSS**:
   - Use Flexbox for layout.
