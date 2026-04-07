@@ -1674,7 +1674,7 @@ function handleNodeDrop(mouseX, mouseY) {
 
   const positions = computeLayout();
 
-  // 1. Check for rebinding (dropping over another node's "add button" area)
+  // 1. Check for rebinding (dropping over another node's body)
   let targetParentId = null;
   for (const otherId of Object.keys(positions)) {
     if (otherId === nodeId || otherId === 'center') continue;
@@ -1682,13 +1682,13 @@ function handleNodeDrop(mouseX, mouseY) {
     if (getDescendantIds(nodeId).includes(otherId)) continue;
 
     const pos = positions[otherId];
-    const { w, h } = getNodeSize(otherId);
-    
-    // Define "add button" area (roughly near the node's side edges)
-    const btnX = (pos.side === 'left') ? pos.x - w / 2 : pos.x + w / 2;
-    const dist = Math.sqrt(Math.pow(svgX - btnX, 2) + Math.pow(svgY - pos.y, 2));
-    
-    if (dist < 25) { // Threshold for "plus sign" area
+    // Hit test against the node's rectangle
+    if (
+      svgX >= pos.x - pos.w / 2 &&
+      svgX <= pos.x + pos.w / 2 &&
+      svgY >= pos.y - pos.h / 2 &&
+      svgY <= pos.y + pos.h / 2
+    ) {
       targetParentId = otherId;
       break;
     }
