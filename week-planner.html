@@ -373,7 +373,8 @@
     transition: all 0.2s ease;
   }
 
-  .node-group:hover .node-rect {
+  .node-group:hover .node-rect,
+  .node-group.subnode-hover .node-rect {
     filter: brightness(0.96);
   }
 
@@ -1324,6 +1325,32 @@ function render() {
 function attachNodeListeners() {
   document.querySelectorAll('.node-group').forEach(g => {
     const id = g.getAttribute('data-id');
+
+    g.addEventListener('mouseenter', () => {
+      const descendants = [];
+      const collect = (nid) => {
+        const n = (nid === 'center') 
+          ? { children: ['work', 'family', 'me'] } 
+          : findNode(nid);
+        if (n && n.children) {
+          n.children.forEach(cid => {
+            descendants.push(cid);
+            collect(cid);
+          });
+        }
+      };
+      collect(id);
+      descendants.forEach(did => {
+        const el = document.querySelector(`.node-group[data-id="${did}"]`);
+        if (el) el.classList.add('subnode-hover');
+      });
+    });
+
+    g.addEventListener('mouseleave', () => {
+      document.querySelectorAll('.node-group.subnode-hover').forEach(el => {
+        el.classList.remove('subnode-hover');
+      });
+    });
 
     g.addEventListener('mousedown', (e) => {
       if (id === 'center') return;
