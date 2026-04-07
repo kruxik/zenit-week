@@ -393,10 +393,14 @@
     display: none;
     border: 2px solid #1a73e8;
     border-radius: 8px;
-    padding: 0 12px;
+    padding: 8px 12px;
     outline: none;
     box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     font-family: inherit;
+    resize: none;
+    overflow: hidden;
+    white-space: pre;
+    line-height: 1.3;
   }
 
   #inline-sizer {
@@ -408,6 +412,7 @@
     overflow: hidden;
     white-space: pre;
     font-family: inherit;
+    line-height: 1.3;
     pointer-events: none;
   }
 
@@ -477,7 +482,7 @@
   <div class="ctx-item danger" id="ctx-delete">✕ Delete</div>
 </div>
 
-<input id="inline-input" type="text" autocomplete="off" spellcheck="false" />
+<textarea id="inline-input" autocomplete="off" spellcheck="false"></textarea>
 <span id="inline-sizer"></span>
 
 <div id="modal-overlay">
@@ -540,8 +545,7 @@ function getNodeSize(nodeId) {
   const style = NODE_STYLE[type];
   let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
   
-  // Center label is special (multiline in rendering, but we use it for width)
-  const lines = (type === 'center') ? label.split('|').map(s => s.trim()) : [label];
+  const lines = (type === 'center') ? label.split('|').map(s => s.trim()) : label.split('\n');
   const longestLine = lines.reduce((max, l) => Math.max(max, l.length), 0);
   
   const lineH = style.fontSize * 1.3;
@@ -894,7 +898,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   const lines = (isCenter)
     ? label.split('|').map(s => s.trim())
-    : [label];
+    : label.split('\n');
 
   const lineH = fontSize * 1.3;
   const totalTextH = lines.length * lineH;
@@ -1023,22 +1027,31 @@ function nodeScreenPos(nodeId) {
 function resizeInlineInput() {
   inlineSizer.style.fontSize = inlineInput.style.fontSize;
   inlineSizer.style.fontFamily = inlineInput.style.fontFamily || inlineInput.style.font;
-  inlineSizer.textContent = inlineInput.value || ' ';
+  
+  // Add a trailing newline for the sizer if the input ends with one, 
+  // to ensure the sizer height matches the textarea behavior.
+  const val = inlineInput.value;
+  inlineSizer.textContent = val + (val.endsWith('\n') ? ' ' : '');
 
-  // pad = input's own horizontal padding (style.padX*2) + border (2*2) + 1-char lookahead (~10px)
   const node = findNode(editState.nodeId);
   const type = node ? node.type : 'activity';
   const style = NODE_STYLE[type];
   
-  const pad = (style.padX * 2 + 14) * zoom;
+  const padX = (style.padX * 2 + 14) * zoom;
+  const padY = (style.padY * 2) * zoom;
+  
   const minW = editState ? editState.initialNodeW : (style.minW * zoom);
-  const newW = Math.max(minW, inlineSizer.offsetWidth + pad);
+  const newW = Math.max(minW, inlineSizer.offsetWidth + padX);
+  const newH = Math.max(style.minH * zoom, inlineSizer.offsetHeight + padY);
+
   inlineInput.style.width = newW + 'px';
+  inlineInput.style.height = newH + 'px';
 
   if (editState) {
     const sp = nodeScreenPos(editState.nodeId);
     if (sp) {
       inlineInput.style.left = (sp.x - newW / 2) + 'px';
+      inlineInput.style.top = (sp.y - newH / 2) + 'px';
     }
   }
   render();
@@ -1088,9 +1101,6 @@ function _openInlineInput(nodeId, isNew) {
   const fontSize = fontSize_base * zoom;
 
   inlineInput.style.fontSize   = fontSize + 'px';
-  inlineInput.style.height     = h + 'px';
-  inlineInput.style.lineHeight = (h - 4) + 'px'; // Subtract border
-  inlineInput.style.top        = (sp.y - h / 2) + 'px';
   inlineInput.style.display    = 'block';
 
   resizeInlineInput();
@@ -1146,8 +1156,14 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
 }
 
 inlineInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter')  { e.preventDefault(); commitEdit(); }
-  if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+  if (e.key === 'Enter' && !e.shiftKey) { 
+    e.preventDefault(); 
+    commitEdit(); 
+  }
+  if (e.key === 'Escape') { 
+    e.preventDefault(); 
+    cancelEdit(); 
+  }
   e.stopPropagation();
 });
 inlineInput.addEventListener('input', resizeInlineInput);
