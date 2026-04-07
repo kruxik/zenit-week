@@ -1163,7 +1163,7 @@ function _openInlineInput(nodeId, isNew) {
   if (!isNew) inlineInput.select();
 }
 
-function commitEdit() {
+function commitEdit(followUp = 'auto') {
   const label = inlineInput.value.trim();
   inlineInput.style.display = 'none';
 
@@ -1185,8 +1185,9 @@ function commitEdit() {
     
     render();
 
-    // Automatically start adding a "sister-node" if we just finished a new node
-    if (isNew && node.parent) {
+    if (followUp === 'child') {
+      startAddNode(nodeId);
+    } else if (followUp === 'sibling' || (followUp === 'auto' && isNew && node.parent)) {
       startAddNode(node.parent);
     }
   } else {
@@ -1218,14 +1219,19 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
 }
 
 inlineInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { 
-    e.preventDefault(); 
-    commitEdit(); 
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    commitEdit();
   }
-  if (e.key === 'Escape') { 
-    e.preventDefault(); 
-    cancelEdit(); 
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    commitEdit('child');
   }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    cancelEdit();
+  }
+
   e.stopPropagation();
 });
 inlineInput.addEventListener('input', resizeInlineInput);
