@@ -61,8 +61,8 @@
   }
 
   .nav-btn {
-    background: #fff;
-    border: 1px solid #dcdcdc;
+    background: #3c4043;
+    border: none;
     border-radius: 8px;
     width: 36px;
     height: 36px;
@@ -72,10 +72,14 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    color: #444;
+    color: #fff;
   }
 
-  .nav-btn:hover { background: #f8f8f8; border-color: #bbb; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+  .nav-btn:hover { 
+    background: #202124; 
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15); 
+  }
 
   #week-label {
     font-size: 16px;
@@ -117,18 +121,27 @@
   }
 
   .reset-btn {
-    background: #fff;
-    border: 1px solid #dcdcdc;
+    background: #3c4043;
+    border: none;
     border-radius: 8px;
-    padding: 8px 14px;
+    height: 36px;
+    padding: 0 16px;
     cursor: pointer;
     font-size: 13px;
-    font-weight: 500;
-    color: #555;
+    font-weight: 600;
+    color: #fff;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
 
-  .reset-btn:hover { background: #f8f8f8; border-color: #bbb; }
+  .reset-btn:hover { 
+    background: #202124; 
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15); 
+  }
 
   #legend {
     display: flex;
@@ -217,8 +230,9 @@
   }
 
   .reset-btn.danger {
+    background: #fff;
     color: #d93025;
-    border-color: #fce8e6;
+    border: 1px solid #fce8e6;
   }
   
   .reset-btn.danger:hover {
@@ -551,7 +565,7 @@
       <button class="reset-btn" id="today-btn">Today</button>
     </div>
     <div id="settings-container">
-      <button class="reset-btn" id="settings-btn" style="display:flex; align-items:center; gap:6px;">
+      <button class="reset-btn" id="settings-btn">
         ⚙ Settings
       </button>
       <div id="settings-dropdown">
