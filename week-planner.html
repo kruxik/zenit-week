@@ -581,6 +581,7 @@ let panStartPanY = 0;
 
 let contextTarget = null;  // node id
 let editState = null;      // { nodeId, isNew, originalLabel }
+let hoveredNodeId = null;  // Track currently hovered node
 
 let dragState = {
   activeNodeId: null,
@@ -1334,11 +1335,35 @@ function render() {
   attachNodeListeners();
 }
 
+// Global keyboard shortcuts for hovered node
+window.addEventListener('keydown', (e) => {
+  if (editState) return; // Don't interfere with inline editing
+  if (!hoveredNodeId) return;
+
+  const id = hoveredNodeId;
+  const node = (id === 'center') ? { type: 'center' } : findNode(id);
+  if (!node) return;
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (id !== 'center' && node.type !== 'branch') {
+      startRenameNode(id);
+    }
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    startAddNode(id);
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault();
+    confirmDeleteNode(id);
+  }
+});
+
 function attachNodeListeners() {
   document.querySelectorAll('.node-group').forEach(g => {
     const id = g.getAttribute('data-id');
 
     g.addEventListener('mouseenter', () => {
+      hoveredNodeId = id;
       const descendants = [];
       const collect = (nid) => {
         const n = (nid === 'center') 
@@ -1359,6 +1384,7 @@ function attachNodeListeners() {
     });
 
     g.addEventListener('mouseleave', () => {
+      if (hoveredNodeId === id) hoveredNodeId = null;
       document.querySelectorAll('.node-group.subnode-hover').forEach(el => {
         el.classList.remove('subnode-hover');
       });
@@ -1519,17 +1545,14 @@ modalConfirm.addEventListener('click', () => {
   hideModal();
 });
 
-document.getElementById('ctx-delete').addEventListener('click', () => {
-  if (!contextTarget) { hideContextMenu(); return; }
-  const nodeId = contextTarget;
+function confirmDeleteNode(nodeId) {
   const node = findNode(nodeId);
-  const hasChildren = node && node.children && node.children.length > 0;
-  
+  if (!node || node.type === 'center' || node.type === 'branch') return;
+
+  const hasChildren = node.children && node.children.length > 0;
   if (!hasChildren) {
     deleteNode(nodeId);
-    hideContextMenu();
   } else {
-    hideContextMenu();
     showModal(
       'Delete activity?',
       'This will permanently delete this activity and all its sub-tasks. This action cannot be undone.',
@@ -1538,6 +1561,12 @@ document.getElementById('ctx-delete').addEventListener('click', () => {
       () => deleteNode(nodeId)
     );
   }
+}
+
+document.getElementById('ctx-delete').addEventListener('click', () => {
+  if (!contextTarget) { hideContextMenu(); return; }
+  confirmDeleteNode(contextTarget);
+  hideContextMenu();
 });
 
 document.addEventListener('click', (e) => {
