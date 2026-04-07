@@ -799,19 +799,25 @@ function polarToCart(cx, cy, dist, angleDeg) {
 function computeLayout() {
   const positions = {};
   const heights = {};
+  const VERTICAL_GAP = 12; // Vertical gap between siblings
 
   // Calculate total height of each subtree
   function calcHeight(nodeId) {
     const node = findNode(nodeId);
+    const { h: nodeH } = getNodeSize(nodeId);
+    const selfH = nodeH + VERTICAL_GAP;
+    
     if (!node || !node.children || node.children.length === 0) {
-      heights[nodeId] = DY;
-      return DY;
+      heights[nodeId] = selfH;
+      return selfH;
     }
+    
     let h = 0;
     node.children.forEach(cid => {
       h += calcHeight(cid);
     });
-    heights[nodeId] = Math.max(h, DY);
+    
+    heights[nodeId] = Math.max(h, selfH);
     return heights[nodeId];
   }
 
@@ -830,7 +836,7 @@ function computeLayout() {
 
     branches.forEach((bid, i) => {
       const nodeH = heights[bid];
-      const { w } = getNodeSize(bid);
+      const { w, h } = getNodeSize(bid);
       const dir = side === 'left' ? -1 : 1;
       
       // Fixed base distance from center for root branches
@@ -842,7 +848,7 @@ function computeLayout() {
       const finalX = x + (node.offX || 0);
       const finalY = y + (node.offY || 0);
       
-      positions[bid] = { x: finalX, y: finalY, w, h: 40, side };
+      positions[bid] = { x: finalX, y: finalY, w, h, side };
       layoutChildren(bid, finalX, finalY, side, w);
       currentY += nodeH + BRANCH_GAP;
     });
@@ -850,14 +856,14 @@ function computeLayout() {
 
   function layoutChildren(nodeId, parentX, parentY, side, parentW) {
     const node = findNode(nodeId);
-    if (!node || !node.children) return;
+    if (!node || !node.children || node.children.length === 0) return;
 
-    const totalH = heights[nodeId];
-    let currentY = parentY - totalH / 2;
+    const childrenH = node.children.reduce((acc, cid) => acc + heights[cid], 0);
+    let currentY = parentY - childrenH / 2;
 
     node.children.forEach(cid => {
       const childH = heights[cid];
-      const { w } = getNodeSize(cid);
+      const { w, h } = getNodeSize(cid);
       const dir = side === 'left' ? -1 : 1;
       
       // Dynamic spacing: parent edge + gap + child half-width
@@ -868,7 +874,7 @@ function computeLayout() {
       const finalX = x + (child.offX || 0);
       const finalY = y + (child.offY || 0);
       
-      positions[cid] = { x: finalX, y: finalY, w, h: 32, side };
+      positions[cid] = { x: finalX, y: finalY, w, h, side };
       layoutChildren(cid, finalX, finalY, side, w);
       currentY += childH;
     });
