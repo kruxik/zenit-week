@@ -1555,7 +1555,7 @@ function attachNodeListeners() {
 
     // Counter buttons
     g.querySelectorAll('.counter-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         const nid = btn.getAttribute('data-id');
         const dir = btn.classList.contains('plus') ? 1 : -1;
@@ -1583,6 +1583,7 @@ function attachNodeListeners() {
       if (id === 'center') return;
       if (e.button !== 0) return;
       if (e.target.closest('.add-btn')) return;
+      if (e.target.closest('.counter-btn')) return;
       
       e.stopPropagation();
       
