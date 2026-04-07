@@ -1544,6 +1544,18 @@ function updateCounter(id, dir) {
   const newVal = (node.val || 0) + dir;
   if (newVal >= 0 && newVal <= (node.max || 999)) {
     node.val = newVal;
+    
+    // Auto-done logic
+    const isMax = newVal === node.max;
+    node.done = isMax;
+    
+    if (node.parent) {
+      const parent = findNode(node.parent);
+      if (parent) {
+        parent.done = isMax;
+      }
+    }
+
     saveWeek(currentWeekKey, weekData);
     render();
   }
