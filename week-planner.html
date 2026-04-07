@@ -343,28 +343,136 @@
     margin: 6px 0;
   }
 
-  /* Hint */
-  #hint {
+  /* Help System */
+  #help-fab {
     position: fixed;
     bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(40, 44, 52, 0.9);
+    right: 24px;
+    width: 44px;
+    height: 44px;
+    background: #3c4043;
     color: #fff;
-    padding: 8px 18px;
-    border-radius: 30px;
-    font-size: 13px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    white-space: nowrap;
-    z-index: 100;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    transition: transform 0.2s, background 0.2s;
+  }
+  #help-fab:hover {
+    transform: scale(1.1);
+    background: #202124;
   }
 
-  body:hover #hint { opacity: 1; }
+  #help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #help-overlay.visible {
+    display: flex;
+    opacity: 1;
+  }
+
+  #help-panel {
+    background: #fff;
+    width: 380px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #help-overlay.visible #help-panel {
+    transform: translateY(0);
+  }
+
+  #help-header {
+    background: #f8f9fa;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+  }
+  #help-close {
+    cursor: pointer;
+    font-size: 18px;
+    color: #999;
+    transition: color 0.2s;
+  }
+  #help-close:hover { color: #333; }
+
+  #help-content {
+    padding: 24px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .help-section {
+    margin-bottom: 24px;
+  }
+  .help-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #999;
+    margin-bottom: 12px;
+  }
+
+  .help-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #444;
+  }
+
+  kbd {
+    background: #f1f3f4;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #3c4043;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+  }
+
+  #help-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #555;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
 
   /* SVG node styles */
   .node-group { cursor: pointer; }
@@ -498,15 +606,49 @@
   </div>
 </div>
 
-<div id="hint">
-  <div id="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#F24E1E"></div>Work</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#A259FF"></div>Family</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#1ABCFE"></div>Me</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#FFF9DB; border: 1px solid #FCC419"></div>Unplanned</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#EBEBEB; border: 1px solid #ccc"></div>Done</div>
+<div id="help-fab" title="Help & Shortcuts">?</div>
+
+<div id="help-overlay">
+  <div id="help-panel">
+    <div id="help-header">
+      <div style="font-size: 20px; font-weight: 700; color: #1a73e8;">Help & Shortcuts</div>
+      <div id="help-close">✕</div>
+    </div>
+    
+    <div id="help-content">
+      <div class="help-section">
+        <div class="help-section-title">Canvas Navigation</div>
+        <div class="help-row"><span>Drag Background</span> <kbd>Pan</kbd></div>
+        <div class="help-row"><span>Scroll / Pinch</span> <kbd>Zoom</kbd></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">Node Operations (On Hover)</div>
+        <div class="help-row"><span>Rename Node</span> <kbd>Enter</kbd></div>
+        <div class="help-row"><span>Add Sub-task</span> <kbd>Tab</kbd></div>
+        <div class="help-row"><span>Delete Node</span> <kbd>Backspace</kbd></div>
+        <div class="help-row"><span>Quick Options</span> <kbd>Right Click</kbd></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">Rebinding & Organizing</div>
+        <div class="help-row" style="font-size: 12px; line-height: 1.4; color: #666;">
+          Drag a node over another to rebind it as a child. Drag between siblings to reorder.
+        </div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">Legend</div>
+        <div id="help-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#F24E1E"></div>Work</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#A259FF"></div>Family</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1ABCFE"></div>Me</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#FFF9DB; border: 1px solid #FCC419"></div>Unplanned</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#EBEBEB; border: 1px solid #ccc"></div>Done</div>
+        </div>
+      </div>
+    </div>
   </div>
-  Right-click for options · Drag canvas to pan · Drag activity to move · Scroll to zoom
 </div>
 
 <script>
@@ -1844,6 +1986,23 @@ window.addEventListener('load', () => {
   currentWeekKey = todayWeekKey();
   weekData = loadWeek(currentWeekKey);
   render();
+
+  // Help panel listeners
+  const helpFab = document.getElementById('help-fab');
+  const helpOverlay = document.getElementById('help-overlay');
+  const helpClose = document.getElementById('help-close');
+
+  helpFab.addEventListener('click', () => {
+    helpOverlay.classList.add('visible');
+  });
+
+  helpClose.addEventListener('click', () => {
+    helpOverlay.classList.remove('visible');
+  });
+
+  helpOverlay.addEventListener('click', (e) => {
+    if (e.target === helpOverlay) helpOverlay.classList.remove('visible');
+  });
 
   // Small delay to let SVG lay out before computing center
   requestAnimationFrame(() => {
