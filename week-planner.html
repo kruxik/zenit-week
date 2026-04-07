@@ -392,8 +392,6 @@
     z-index: 1500;
     display: none;
     border: 2px solid #1a73e8;
-    border-radius: 8px;
-    padding: 8px 12px;
     outline: none;
     box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     font-family: inherit;
@@ -401,6 +399,9 @@
     overflow: hidden;
     white-space: pre;
     line-height: 1.3;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
   }
 
   #inline-sizer {
@@ -1025,33 +1026,46 @@ function nodeScreenPos(nodeId) {
 }
 
 function resizeInlineInput() {
-  inlineSizer.style.fontSize = inlineInput.style.fontSize;
-  inlineSizer.style.fontFamily = inlineInput.style.fontFamily || inlineInput.style.font;
-  
-  // Add a trailing newline for the sizer if the input ends with one, 
-  // to ensure the sizer height matches the textarea behavior.
-  const val = inlineInput.value;
-  inlineSizer.textContent = val + (val.endsWith('\n') ? ' ' : '');
-
   const node = findNode(editState.nodeId);
-  const type = node ? node.type : 'activity';
-  const style = NODE_STYLE[type];
+  if (!node) return;
   
-  const padX = (style.padX * 2 + 14) * zoom;
-  const padY = (style.padY * 2) * zoom;
-  
-  const minW = editState ? editState.initialNodeW : (style.minW * zoom);
-  const newW = Math.max(minW, inlineSizer.offsetWidth + padX);
-  const newH = Math.max(style.minH * zoom, inlineSizer.offsetHeight + padY);
+  const type = node.type || 'activity';
+  const sw = (type === 'branch' ? 4.5 : 1.5); // stroke width
+  const { w, h, fontSize, padX, padY } = getNodeSize(editState.nodeId);
 
-  inlineInput.style.width = newW + 'px';
-  inlineInput.style.height = newH + 'px';
+  const zoomedSW = sw * zoom;
+  const zoomedW = (w + sw) * zoom; // Account for stroke-width in visual size
+  const zoomedH = (h + sw) * zoom;
+  const zoomedFontSize = fontSize * zoom;
+
+  inlineInput.style.borderWidth = zoomedSW + 'px';
+  inlineInput.style.fontSize = zoomedFontSize + 'px';
+  inlineInput.style.width = zoomedW + 'px';
+  inlineInput.style.height = zoomedH + 'px';
+
+  // Calculate vertical padding to center text exactly as in SVG
+  const val = inlineInput.value;
+  const lines = val.split('\n');
+  const lineH = zoomedFontSize * 1.3;
+  const totalTextH = lines.length * lineH;
+  
+  // Content area inside the border is (zoomedH - 2 * zoomedSW) = h * zoom
+  const contentH = h * zoom;
+  const verticalPadding = (contentH - totalTextH) / 2;
+
+  // Fine-tuned adjustment for SVG vs CSS baseline alignment
+  const topAdj = -0.75 * zoom;
+
+  inlineInput.style.paddingTop = (verticalPadding + topAdj) + 'px';
+  inlineInput.style.paddingBottom = (verticalPadding - topAdj) + 'px';
+  inlineInput.style.paddingLeft = (padX * zoom) + 'px';
+  inlineInput.style.paddingRight = (padX * zoom) + 'px';
 
   if (editState) {
     const sp = nodeScreenPos(editState.nodeId);
     if (sp) {
-      inlineInput.style.left = (sp.x - newW / 2) + 'px';
-      inlineInput.style.top = (sp.y - newH / 2) + 'px';
+      inlineInput.style.left = (sp.x - zoomedW / 2) + 'px';
+      inlineInput.style.top = (sp.y - zoomedH / 2) + 'px';
     }
   }
   render();
@@ -1083,7 +1097,9 @@ function _openInlineInput(nodeId, isNew) {
   const node = findNode(nodeId);
   if (!node) return;
 
-  const { w: nodeW, h: nodeH, fontSize: fontSize_base } = getNodeSize(nodeId);
+  const type = node.type || 'activity';
+  const style = NODE_STYLE[type];
+  const { w: nodeW, h: nodeH, fontSize: fontSize_base, rx } = getNodeSize(nodeId);
   const initialNodeW = nodeW * zoom;
   editState = { nodeId, isNew, originalLabel: node.label, initialNodeW };
   inlineInput.value = isNew ? '' : node.label;
@@ -1092,16 +1108,19 @@ function _openInlineInput(nodeId, isNew) {
   if (!sp) { cancelEdit(); return; }
 
   const bc = BRANCH_COLORS[node.branch] || { main: '#333', light: '#f4f4f4', text: '#333' };
+  
+  // Match node border exactly
+  const borderWidth = (node.type === 'branch' ? 4.5 : 1.5) * zoom;
+  inlineInput.style.borderWidth  = borderWidth + 'px';
   inlineInput.style.borderColor  = bc.main;
-  inlineInput.style.color        = '#333';
+  inlineInput.style.borderRadius = (rx * zoom) + 'px';
+  
+  inlineInput.style.color        = bc.text;
   inlineInput.style.background   = '#fff';
   inlineInput.style.textAlign    = 'center';
+  inlineInput.style.fontWeight   = (node.type === 'branch' ? '600' : 'normal');
 
-  const h = nodeH * zoom;
-  const fontSize = fontSize_base * zoom;
-
-  inlineInput.style.fontSize   = fontSize + 'px';
-  inlineInput.style.display    = 'block';
+  inlineInput.style.display      = 'block';
 
   resizeInlineInput();
 
