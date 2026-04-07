@@ -1175,8 +1175,16 @@ function commitEdit() {
     node.label = label;
     delete node._editing;
     saveWeek(currentWeekKey, weekData);
+    
+    render();
+
+    // Automatically start adding a "sister-node" if we just finished a new node
+    if (isNew && node.parent) {
+      startAddNode(node.parent);
+    }
+  } else {
+    render();
   }
-  render();
 }
 
 function cancelEdit() {
