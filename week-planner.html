@@ -556,7 +556,10 @@ function getNodeSize(nodeId) {
   const w = Math.max(style.minW, Math.ceil(longestLine * style.fontSize * style.avgCharW) + style.padX * 2);
   const h = Math.max(style.minH, totalTextH + style.padY * 2);
   
-  return { w, h, fontSize: style.fontSize, padX: style.padX, padY: style.padY, rx: style.rx };
+  return { 
+    w, h, fontSize: style.fontSize, padX: style.padX, padY: style.padY, rx: style.rx,
+    lines, lineH, totalTextH 
+  };
 }
 
 // Side assignments
@@ -683,6 +686,55 @@ function findNode(id) {
   return weekData.nodes.find(n => n.id === id);
 }
 
+function getDescendantIds(nodeId) {
+  const ids = [];
+  const collect = (id) => {
+    const n = (id === 'center') ? { children: ['work', 'family', 'me'] } : findNode(id);
+    if (n && n.children) {
+      n.children.forEach(cid => {
+        ids.push(cid);
+        collect(cid);
+      });
+    }
+  };
+  collect(nodeId);
+  return ids;
+}
+
+function getNodeVisuals(nodeId) {
+  const node = (nodeId === 'center') ? { type: 'center' } : findNode(nodeId);
+  if (!node) return null;
+
+  const type = node.type || 'activity';
+  const bc = BRANCH_COLORS[node.branch] || { main: '#333', light: '#eee', text: '#333' };
+  const { rx } = NODE_STYLE[type];
+  const sw = (type === 'branch' ? 4.5 : (type === 'center' ? 0 : 2));
+
+  let bgColor, borderColor, textColor, fontWeight = 'normal';
+
+  if (type === 'center') {
+    bgColor = CENTER_COLOR.main; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
+  } else if (type === 'branch') {
+    bgColor = bc.light; borderColor = bc.main; textColor = bc.text; fontWeight = '600';
+  } else {
+    if (node.done && node.unplanned) {
+      bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
+    } else if (node.done) {
+      bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
+    } else if (node.unplanned) {
+      bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = bc.text;
+    } else {
+      bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
+    }
+  }
+
+  return {
+    bgColor, borderColor, textColor, fontWeight, sw,
+    rx: rx,
+    visualRx: rx + sw / 2
+  };
+}
+
 function addNode(parentId, label) {
   const parent = findNode(parentId);
   if (!parent) return;
@@ -704,15 +756,7 @@ function addNode(parentId, label) {
 }
 
 function deleteNode(id) {
-  // Recursively collect all descendants
-  function collect(nid) {
-    const n = findNode(nid);
-    if (!n) return [];
-    let ids = [nid];
-    (n.children || []).forEach(c => ids = ids.concat(collect(c)));
-    return ids;
-  }
-  const toRemove = new Set(collect(id));
+  const toRemove = new Set([id, ...getDescendantIds(id)]);
 
   // Remove from parent's children list
   const node = findNode(id);
@@ -903,35 +947,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const isCenter = type === 'center';
   const isActivity = type === 'activity';
 
-  const { w: boxW, h: boxH, fontSize, rx: rx_val } = getNodeSize(id);
-
-  const lines = (isCenter)
-    ? label.split('|').map(s => s.trim())
-    : label.split('\n');
-
-  const lineH = fontSize * 1.3;
-  const totalTextH = lines.length * lineH;
-
-  // Determine colors
-  let bgColor, borderColor, textColor, fontWeight = 'normal';
-  const bc = BRANCH_COLORS[branch] || { main: '#333', light: '#eee', text: '#333' };
-
-  if (isCenter) {
-    bgColor = CENTER_COLOR.main; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
-  } else if (isBranch) {
-    bgColor = bc.light; borderColor = bc.main; textColor = bc.text; fontWeight = '600';
-  } else {
-    // Activity
-    if (node && node.done && node.unplanned) {
-      bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
-    } else if (node && node.done) {
-      bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
-    } else if (node && node.unplanned) {
-      bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = bc.text;
-    } else {
-      bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
-    }
-  }
+  const { w: boxW, h: boxH, fontSize, lines, lineH, totalTextH } = getNodeSize(id);
+  const { bgColor, borderColor, textColor, fontWeight, sw, rx } = getNodeVisuals(id);
 
   const filterRef = (isCenter || isBranch) ? (isCenter ? 'url(#shadow)' : 'url(#shadow-sm)') : 'none';
   
@@ -939,10 +956,10 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     class: 'node-rect',
     x: -boxW / 2, y: -boxH / 2,
     width: boxW, height: boxH,
-    rx: rx_val,
+    rx: rx,
     fill: bgColor,
     stroke: borderColor,
-    'stroke-width': isCenter ? 0 : (isBranch ? 4.5 : 2),
+    'stroke-width': sw,
     filter: filterRef,
   });
   g.appendChild(rect);
@@ -968,6 +985,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   // "+" add-child button
   if (!isCenter) {
+    const bc = BRANCH_COLORS[branch] || { main: '#333' };
     const btnColor = bc.main;
     const btnR = 10;
     // Position button exactly on the border
@@ -1034,12 +1052,9 @@ function nodeScreenPos(nodeId) {
 }
 
 function resizeInlineInput() {
-  const node = findNode(editState.nodeId);
-  if (!node) return;
-  
-  const type = node.type || 'activity';
-  const sw = (type === 'branch' ? 4.5 : 2); // stroke width
-  const { w, h, fontSize, padX, padY, rx } = getNodeSize(editState.nodeId);
+  const nodeId = editState.nodeId;
+  const { w, h, fontSize, padX, lines, lineH, totalTextH } = getNodeSize(nodeId);
+  const { sw, visualRx } = getNodeVisuals(nodeId);
 
   const zoomedSW = sw * zoom;
   const zoomedW = (w + sw) * zoom; // Account for stroke-width in visual size
@@ -1050,17 +1065,11 @@ function resizeInlineInput() {
   inlineInput.style.fontSize = zoomedFontSize + 'px';
   inlineInput.style.width = zoomedW + 'px';
   inlineInput.style.height = zoomedH + 'px';
-  inlineInput.style.borderRadius = ((rx + sw/2) * zoom) + 'px';
+  inlineInput.style.borderRadius = (visualRx * zoom) + 'px';
 
-  // Calculate vertical padding to center text exactly as in SVG
-  const val = inlineInput.value;
-  const lines = val.split('\n');
-  const lineH = zoomedFontSize * 1.3;
-  const totalTextH = lines.length * lineH;
-  
   // Content area inside the border is (zoomedH - 2 * zoomedSW) = h * zoom
   const contentH = h * zoom;
-  const verticalPadding = (contentH - totalTextH) / 2;
+  const verticalPadding = (contentH - totalTextH * zoom) / 2;
 
   // Fine-tuned adjustment for SVG vs CSS baseline alignment
   const topAdj = -0.75 * zoom;
@@ -1071,7 +1080,7 @@ function resizeInlineInput() {
   inlineInput.style.paddingRight = (padX * zoom) + 'px';
 
   if (editState) {
-    const sp = nodeScreenPos(editState.nodeId);
+    const sp = nodeScreenPos(nodeId);
     if (sp) {
       inlineInput.style.left = (sp.x - zoomedW / 2) + 'px';
       inlineInput.style.top = (sp.y - zoomedH / 2) + 'px';
@@ -1107,8 +1116,9 @@ function _openInlineInput(nodeId, isNew) {
   if (!node) return;
 
   const type = node.type || 'activity';
-  const style = NODE_STYLE[type];
-  const { w: nodeW, h: nodeH, fontSize: fontSize_base, rx } = getNodeSize(nodeId);
+  const { w: nodeW, rx: styleRx } = getNodeSize(nodeId);
+  const { bgColor, borderColor, textColor, fontWeight, sw, visualRx } = getNodeVisuals(nodeId);
+  
   const initialNodeW = nodeW * zoom;
   editState = { nodeId, isNew, originalLabel: node.label, initialNodeW };
   inlineInput.value = isNew ? '' : node.label;
@@ -1116,39 +1126,15 @@ function _openInlineInput(nodeId, isNew) {
   const sp = nodeScreenPos(nodeId);
   if (!sp) { cancelEdit(); return; }
 
-  const bc = BRANCH_COLORS[node.branch] || { main: '#333', light: '#eee', text: '#333' };
-
-  // Determine colors exactly as in makeNodeGroup
-  let bgColor, borderColor, textColor;
-  if (type === 'branch') {
-    bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
-  } else if (type === 'center') {
-    bgColor = CENTER_COLOR.light; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
-  } else {
-    if (node.done && node.unplanned) {
-      bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
-    } else if (node.done) {
-      bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
-    } else if (node.unplanned) {
-      bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = bc.text;
-    } else {
-      bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
-    }
-  }
-
   // Match node border exactly
-  const sw = (type === 'branch' ? 4.5 : 2);
-  const borderWidth = sw * zoom;
-  inlineInput.style.borderWidth  = borderWidth + 'px';
+  inlineInput.style.borderWidth  = (sw * zoom) + 'px';
   inlineInput.style.borderColor  = borderColor;
-  // In SVG, the stroke is centered on the rect boundary.
-  // The outer visual radius is rx + sw/2.
-  inlineInput.style.borderRadius = ((rx + sw/2) * zoom) + 'px';
+  inlineInput.style.borderRadius = (visualRx * zoom) + 'px';
 
   inlineInput.style.color        = textColor;
   inlineInput.style.background   = bgColor;
   inlineInput.style.textAlign    = 'center';
-  inlineInput.style.fontWeight   = (type === 'branch' ? '600' : 'normal');
+  inlineInput.style.fontWeight   = fontWeight;
 
   // Match shadow exactly
   if (type === 'branch' || type === 'center') {
@@ -1364,19 +1350,7 @@ function attachNodeListeners() {
 
     g.addEventListener('mouseenter', () => {
       hoveredNodeId = id;
-      const descendants = [];
-      const collect = (nid) => {
-        const n = (nid === 'center') 
-          ? { children: ['work', 'family', 'me'] } 
-          : findNode(nid);
-        if (n && n.children) {
-          n.children.forEach(cid => {
-            descendants.push(cid);
-            collect(cid);
-          });
-        }
-      };
-      collect(id);
+      const descendants = getDescendantIds(id);
       descendants.forEach(did => {
         const el = document.querySelector(`.node-group[data-id="${did}"]`);
         if (el) el.classList.add('subnode-hover');
@@ -1398,16 +1372,7 @@ function attachNodeListeners() {
       e.stopPropagation();
       
       const positions = computeLayout();
-      const idsToDrag = [];
-
-      function collect(nid) {
-        idsToDrag.push(nid);
-        const n = findNode(nid);
-        if (n && n.children) {
-          n.children.forEach(collect);
-        }
-      }
-      collect(id);
+      const idsToDrag = [id, ...getDescendantIds(id)];
 
       const initialPositions = {};
       idsToDrag.forEach(idToDrag => {
