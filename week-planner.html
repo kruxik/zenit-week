@@ -934,7 +934,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     rx: rx_val,
     fill: bgColor,
     stroke: borderColor,
-    'stroke-width': isCenter ? 0 : (isBranch ? 4.5 : 1.5),
+    'stroke-width': isCenter ? 0 : (isBranch ? 4.5 : 2),
     filter: filterRef,
   });
   g.appendChild(rect);
@@ -1030,8 +1030,8 @@ function resizeInlineInput() {
   if (!node) return;
   
   const type = node.type || 'activity';
-  const sw = (type === 'branch' ? 4.5 : 1.5); // stroke width
-  const { w, h, fontSize, padX, padY } = getNodeSize(editState.nodeId);
+  const sw = (type === 'branch' ? 4.5 : 2); // stroke width
+  const { w, h, fontSize, padX, padY, rx } = getNodeSize(editState.nodeId);
 
   const zoomedSW = sw * zoom;
   const zoomedW = (w + sw) * zoom; // Account for stroke-width in visual size
@@ -1042,6 +1042,7 @@ function resizeInlineInput() {
   inlineInput.style.fontSize = zoomedFontSize + 'px';
   inlineInput.style.width = zoomedW + 'px';
   inlineInput.style.height = zoomedH + 'px';
+  inlineInput.style.borderRadius = ((rx + sw/2) * zoom) + 'px';
 
   // Calculate vertical padding to center text exactly as in SVG
   const val = inlineInput.value;
@@ -1107,19 +1108,46 @@ function _openInlineInput(nodeId, isNew) {
   const sp = nodeScreenPos(nodeId);
   if (!sp) { cancelEdit(); return; }
 
-  const bc = BRANCH_COLORS[node.branch] || { main: '#333', light: '#f4f4f4', text: '#333' };
-  
-  // Match node border exactly
-  const borderWidth = (node.type === 'branch' ? 4.5 : 1.5) * zoom;
-  inlineInput.style.borderWidth  = borderWidth + 'px';
-  inlineInput.style.borderColor  = bc.main;
-  inlineInput.style.borderRadius = (rx * zoom) + 'px';
-  
-  inlineInput.style.color        = bc.text;
-  inlineInput.style.background   = '#fff';
-  inlineInput.style.textAlign    = 'center';
-  inlineInput.style.fontWeight   = (node.type === 'branch' ? '600' : 'normal');
+  const bc = BRANCH_COLORS[node.branch] || { main: '#333', light: '#eee', text: '#333' };
 
+  // Determine colors exactly as in makeNodeGroup
+  let bgColor, borderColor, textColor;
+  if (type === 'branch') {
+    bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
+  } else if (type === 'center') {
+    bgColor = CENTER_COLOR.light; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
+  } else {
+    if (node.done && node.unplanned) {
+      bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
+    } else if (node.done) {
+      bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
+    } else if (node.unplanned) {
+      bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = bc.text;
+    } else {
+      bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
+    }
+  }
+
+  // Match node border exactly
+  const sw = (type === 'branch' ? 4.5 : 2);
+  const borderWidth = sw * zoom;
+  inlineInput.style.borderWidth  = borderWidth + 'px';
+  inlineInput.style.borderColor  = borderColor;
+  // In SVG, the stroke is centered on the rect boundary.
+  // The outer visual radius is rx + sw/2.
+  inlineInput.style.borderRadius = ((rx + sw/2) * zoom) + 'px';
+
+  inlineInput.style.color        = textColor;
+  inlineInput.style.background   = bgColor;
+  inlineInput.style.textAlign    = 'center';
+  inlineInput.style.fontWeight   = (type === 'branch' ? '600' : 'normal');
+
+  // Match shadow exactly
+  if (type === 'branch' || type === 'center') {
+    inlineInput.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
+  } else {
+    inlineInput.style.boxShadow = 'none';
+  }
   inlineInput.style.display      = 'block';
 
   resizeInlineInput();
