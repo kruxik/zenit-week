@@ -676,7 +676,8 @@ const BRANCH_GAP = 20; // Vertical gap between main branches
 const NODE_STYLE = {
   center:   { fontSize: 15, padX: 22, padY: 14, minW: 140, minH: 48, rx: 24,  avgCharW: 0.55 },
   branch:   { fontSize: 14, padX: 16, padY: 12, minW: 100, minH: 40, rx: 20,  avgCharW: 0.55 },
-  activity: { fontSize: 13, padX: 14, padY: 10, minW: 80,  minH: 32, rx: 8,   avgCharW: 0.55 }
+  activity: { fontSize: 13, padX: 14, padY: 10, minW: 80,  minH: 32, rx: 8,   avgCharW: 0.55 },
+  counter:  { fontSize: 14, padX: 30, padY: 8,  minW: 100, minH: 34, rx: 17,  avgCharW: 0.55 }
 };
 
 const CENTER_W = NODE_STYLE.center.minW;
@@ -690,6 +691,10 @@ function getNodeSize(nodeId) {
   const style = NODE_STYLE[type];
   let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
   
+  if (type === 'counter') {
+    label = `${node.val || 0}`;
+  }
+
   const lines = (type === 'center') ? label.split('|').map(s => s.trim()) : label.split('\n');
   const longestLine = lines.reduce((max, l) => Math.max(max, l.length), 0);
   
@@ -1126,8 +1131,27 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     g.appendChild(t);
   });
 
+  // Counter buttons
+  if (type === 'counter') {
+    const btnR = 11;
+    const btnColor = 'rgba(0,0,0,0.08)';
+    
+    // Minus
+    const minusG = svgEl('g', { class: 'counter-btn minus', 'data-id': id, transform: `translate(${-boxW/2 + 15}, 0)` });
+    minusG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: btnR, fill: btnColor, stroke: borderColor, 'stroke-width': 1 }));
+    minusG.appendChild(svgEl('line', { x1: -4, y1: 0, x2: 4, y2: 0, stroke: textColor, 'stroke-width': 2, 'stroke-linecap': 'round' }));
+    g.appendChild(minusG);
+
+    // Plus
+    const plusG = svgEl('g', { class: 'counter-btn plus', 'data-id': id, transform: `translate(${boxW/2 - 15}, 0)` });
+    plusG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: btnR, fill: btnColor, stroke: borderColor, 'stroke-width': 1 }));
+    plusG.appendChild(svgEl('line', { x1: -4, y1: 0, x2: 4, y2: 0, stroke: textColor, 'stroke-width': 2, 'stroke-linecap': 'round' }));
+    plusG.appendChild(svgEl('line', { x1: 0, y1: -4, x2: 0, y2: 4, stroke: textColor, 'stroke-width': 2, 'stroke-linecap': 'round' }));
+    g.appendChild(plusG);
+  }
+
   // "+" add-child button
-  if (!isCenter) {
+  if (!isCenter && type !== 'counter') {
     const bc = BRANCH_COLORS[branch] || { main: '#333' };
     const btnColor = bc.main;
     const btnR = 10;
@@ -1311,6 +1335,33 @@ function commitEdit(followUp = 'auto') {
   if (node) {
     node.label = label;
     delete node._editing;
+    
+    // Counter auto-creation
+    const match = label.match(/(\d+)x/);
+    if (match) {
+      const maxVal = parseInt(match[1], 10);
+      // Check if it already has a counter child
+      const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+      if (counterNode) {
+        counterNode.max = maxVal;
+        if (counterNode.val > maxVal) counterNode.val = maxVal;
+      } else {
+        const counterId = genId();
+        const counterNode = {
+          id: counterId,
+          type: 'counter',
+          branch: node.branch,
+          parent: nodeId,
+          label: '0',
+          val: 0,
+          max: maxVal,
+          children: []
+        };
+        weekData.nodes.push(counterNode);
+        node.children.push(counterId);
+      }
+    }
+
     saveWeek(currentWeekKey, weekData);
     
     render();
@@ -1487,9 +1538,30 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+function updateCounter(id, dir) {
+  const node = findNode(id);
+  if (!node || node.type !== 'counter') return;
+  const newVal = (node.val || 0) + dir;
+  if (newVal >= 0 && newVal <= (node.max || 999)) {
+    node.val = newVal;
+    saveWeek(currentWeekKey, weekData);
+    render();
+  }
+}
+
 function attachNodeListeners() {
   document.querySelectorAll('.node-group').forEach(g => {
     const id = g.getAttribute('data-id');
+
+    // Counter buttons
+    g.querySelectorAll('.counter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nid = btn.getAttribute('data-id');
+        const dir = btn.classList.contains('plus') ? 1 : -1;
+        updateCounter(nid, dir);
+      });
+    });
 
     g.addEventListener('mouseenter', () => {
       hoveredNodeId = id;
