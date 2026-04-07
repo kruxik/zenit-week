@@ -1674,61 +1674,99 @@ function handleNodeDrop(mouseX, mouseY) {
 
   const positions = computeLayout();
 
-  // 1. Reorder among siblings or change branch side
-  if (node.parent) {
-    const parent = findNode(node.parent);
-    if (parent && parent.children) {
-      parent.children = parent.children.filter(id => id !== nodeId);
+  // 1. Check for rebinding (dropping over another node's "add button" area)
+  let targetParentId = null;
+  for (const otherId of Object.keys(positions)) {
+    if (otherId === nodeId || otherId === 'center') continue;
+    // Don't bind to own descendant
+    if (getDescendantIds(nodeId).includes(otherId)) continue;
+
+    const pos = positions[otherId];
+    const { w, h } = getNodeSize(otherId);
+    
+    // Define "add button" area (roughly near the node's side edges)
+    const btnX = (pos.side === 'left') ? pos.x - w / 2 : pos.x + w / 2;
+    const dist = Math.sqrt(Math.pow(svgX - btnX, 2) + Math.pow(svgY - pos.y, 2));
+    
+    if (dist < 25) { // Threshold for "plus sign" area
+      targetParentId = otherId;
+      break;
+    }
+  }
+
+  if (targetParentId) {
+    // REBINDING
+    // Remove from old parent
+    if (node.parent) {
+      const oldParent = findNode(node.parent);
+      if (oldParent) oldParent.children = oldParent.children.filter(id => id !== nodeId);
+    }
+    // Set new parent
+    const newParent = findNode(targetParentId);
+    node.parent = targetParentId;
+    node.branch = newParent.branch || newParent.id;
+    newParent.children.push(nodeId);
+    
+    // Reset offsets for clean snap to new parent
+    node.offX = 0;
+    node.offY = 0;
+  } else {
+    // EXISTING REORDER/PAN LOGIC
+    if (node.parent) {
+      const parent = findNode(node.parent);
+      if (parent && parent.children) {
+        parent.children = parent.children.filter(id => id !== nodeId);
+        let insertIdx = 0;
+        for (let i = 0; i < parent.children.length; i++) {
+          const sid = parent.children[i];
+          if (positions[sid] && svgY > positions[sid].y) {
+            insertIdx = i + 1;
+          }
+        }
+        parent.children.splice(insertIdx, 0, nodeId);
+      }
+    } else if (node.type === 'branch') {
+      if (BRANCH_CONFIG[nodeId]) {
+        BRANCH_CONFIG[nodeId].side = svgX < 0 ? 'left' : 'right';
+      }
+      const branches = weekData.nodes.filter(n => n.type === 'branch');
+      const nonBranches = weekData.nodes.filter(n => n.type !== 'branch');
+      const otherBranches = branches.filter(b => b.id !== nodeId);
       let insertIdx = 0;
-      for (let i = 0; i < parent.children.length; i++) {
-        const sid = parent.children[i];
-        if (positions[sid] && svgY > positions[sid].y) {
+      for (let i = 0; i < otherBranches.length; i++) {
+        const bid = otherBranches[i].id;
+        if (positions[bid] && svgY > positions[bid].y) {
           insertIdx = i + 1;
         }
       }
-      parent.children.splice(insertIdx, 0, nodeId);
+      otherBranches.splice(insertIdx, 0, node);
+      weekData.nodes = [...otherBranches, ...nonBranches];
     }
-  } else if (node.type === 'branch') {
-    if (BRANCH_CONFIG[nodeId]) {
-      BRANCH_CONFIG[nodeId].side = svgX < 0 ? 'left' : 'right';
-    }
-    const branches = weekData.nodes.filter(n => n.type === 'branch');
-    const nonBranches = weekData.nodes.filter(n => n.type !== 'branch');
-    const otherBranches = branches.filter(b => b.id !== nodeId);
-    let insertIdx = 0;
-    for (let i = 0; i < otherBranches.length; i++) {
-      const bid = otherBranches[i].id;
-      if (positions[bid] && svgY > positions[bid].y) {
-        insertIdx = i + 1;
+    
+    // Clear offsets for descendants
+    function clearDescendantOffsets(nid) {
+      const n = findNode(nid);
+      if (n && n.children) {
+        n.children.forEach(cid => {
+          const child = findNode(cid);
+          if (child) {
+            child.offX = 0;
+            child.offY = 0;
+            clearDescendantOffsets(cid);
+          }
+        });
       }
     }
-    otherBranches.splice(insertIdx, 0, node);
-    weekData.nodes = [...otherBranches, ...nonBranches];
-  }
+    clearDescendantOffsets(nodeId);
 
-  // 2. Clear offsets for descendants ONLY (the "rest of the tree")
-  function clearDescendantOffsets(nid) {
-    const n = findNode(nid);
-    if (n && n.children) {
-      n.children.forEach(cid => {
-        const child = findNode(cid);
-        if (child) {
-          child.offX = 0;
-          child.offY = 0;
-          clearDescendantOffsets(cid);
-        }
-      });
+    // Keep the moved node itself at the drop position
+    node.offX = 0; node.offY = 0;
+    const finalNaturalPositions = computeLayout();
+    const nat = finalNaturalPositions[nodeId];
+    if (nat) {
+      node.offX = svgX - nat.x;
+      node.offY = svgY - nat.y;
     }
-  }
-  clearDescendantOffsets(nodeId);
-
-  // 3. Keep the moved node itself at the drop position
-  node.offX = 0; node.offY = 0;
-  const finalNaturalPositions = computeLayout();
-  const nat = finalNaturalPositions[nodeId];
-  if (nat) {
-    node.offX = svgX - nat.x;
-    node.offY = svgY - nat.y;
   }
 
   saveWeek(currentWeekKey, weekData);
