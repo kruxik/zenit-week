@@ -1569,6 +1569,23 @@ function render() {
   });
 
   attachNodeListeners();
+
+  // Update summary panel
+  const leaves = weekData.nodes.filter(n => n.children.length === 0 && n.type !== 'branch');
+  const total = leaves.reduce((acc, n) => {
+    if (n.type === 'counter') return acc + (n.max || 0);
+    return acc + 1;
+  }, 0);
+  const done = leaves.reduce((acc, n) => {
+    if (n.type === 'counter') return acc + (n.val || 0);
+    return acc + (n.done ? 1 : 0);
+  }, 0);
+  
+  const panel = document.getElementById('placeholder-panel');
+  if (panel) {
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    panel.textContent = `Activities Done: ${done} / ${total} (${percent}%)`;
+  }
 }
 
 // Global keyboard shortcuts for hovered node
