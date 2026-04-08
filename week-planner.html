@@ -912,14 +912,8 @@ function isCriticalPriority(nodeId) {
 }
 
 function getEffectivePriority(nodeId) {
-  let curr = findNode(nodeId);
-  while (curr) {
-    if (curr.priority === 'critical') return 'critical';
-    if (curr.priority === 'high') return 'high';
-    if (!curr.parent) break;
-    curr = findNode(curr.parent);
-  }
-  return null;
+  const node = findNode(nodeId);
+  return node ? node.priority : null;
 }
 
 function getPriorityScale(nodeId) {
@@ -1070,6 +1064,18 @@ function setStatus(id, status) {
     });
   }
 
+  function setPriorityDescendants(nid, prio) {
+    const n = findNode(nid);
+    if (!n) return;
+    (n.children || []).forEach(cid => {
+      const child = findNode(cid);
+      if (child) {
+        child.priority = prio;
+        setPriorityDescendants(cid, prio);
+      }
+    });
+  }
+
   if (status === 'done') {
     node.done = true;
     setDescendants(id, 'done');
@@ -1084,11 +1090,16 @@ function setStatus(id, status) {
     node.unplanned = false;
     setDescendants(id, 'planned');
   } else if (status === 'prio-high') {
-    node.priority = (node.priority === 'high') ? null : 'high';
+    const newVal = (node.priority === 'high') ? null : 'high';
+    node.priority = newVal;
+    setPriorityDescendants(id, newVal);
   } else if (status === 'prio-critical') {
-    node.priority = (node.priority === 'critical') ? null : 'critical';
+    const newVal = (node.priority === 'critical') ? null : 'critical';
+    node.priority = newVal;
+    setPriorityDescendants(id, newVal);
   } else if (status === 'prio-normal') {
     node.priority = null;
+    setPriorityDescendants(id, null);
   }
 
   saveWeek(currentWeekKey, weekData);
