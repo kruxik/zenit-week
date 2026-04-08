@@ -748,15 +748,15 @@ function getNodeSize(nodeId) {
 
   const type = node.type || 'activity';
   const style = { ...NODE_STYLE[type] };
-  const isHigh = isHighPriority(nodeId);
-
-  if (isHigh) {
-    style.fontSize *= 1.5;
-    style.padX *= 1.5;
-    style.padY *= 1.5;
-    style.minW *= 1.5;
-    style.minH *= 1.5;
-    style.rx *= 1.5;
+  const scale = getPriorityScale(nodeId);
+  
+  if (scale !== 1.0) {
+    style.fontSize *= scale;
+    style.padX *= scale;
+    style.padY *= scale;
+    style.minW *= scale;
+    style.minH *= scale;
+    style.rx *= scale;
   }
 
   let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');  
@@ -903,13 +903,36 @@ function findNode(id) {
 }
 
 function isHighPriority(nodeId) {
+  return getEffectivePriority(nodeId) === 'high';
+}
+
+function isCriticalPriority(nodeId) {
+  return getEffectivePriority(nodeId) === 'critical';
+}
+
+function getEffectivePriority(nodeId) {
   let curr = findNode(nodeId);
   while (curr) {
-    if (curr.priority === 'high') return true;
+    if (curr.priority === 'critical') return 'critical';
+    if (curr.priority === 'high') return 'high';
     if (!curr.parent) break;
     curr = findNode(curr.parent);
   }
-  return false;
+  return null;
+}
+
+function getPriorityScale(nodeId) {
+  const prio = getEffectivePriority(nodeId);
+  if (prio === 'critical') return 2.0;
+  if (prio === 'high') return 1.5;
+  return 1.0;
+}
+
+function getPriorityWeight(nodeId) {
+  const prio = getEffectivePriority(nodeId);
+  if (prio === 'critical') return 5;
+  if (prio === 'high') return 3;
+  return 1;
 }
 
 function getDescendantIds(nodeId) {
@@ -936,10 +959,10 @@ function getNodeVisuals(nodeId) {
   let { rx } = NODE_STYLE[type];
   let sw = (type === 'branch' ? 4.5 : (type === 'center' ? 0 : 2));
 
-  const isHigh = isHighPriority(nodeId);
-  if (isHigh) {
-    rx *= 1.5;
-    sw *= 1.5;
+  const scale = getPriorityScale(nodeId);
+  if (scale !== 1.0) {
+    rx *= scale;
+    sw *= scale;
   }
 
   let bgColor, borderColor, textColor, fontWeight = 'normal';
@@ -1061,6 +1084,8 @@ function setStatus(id, status) {
     setDescendants(id, 'planned');
   } else if (status === 'prio-high') {
     node.priority = (node.priority === 'high') ? null : 'high';
+  } else if (status === 'prio-critical') {
+    node.priority = (node.priority === 'critical') ? null : 'critical';
   }
 
   saveWeek(currentWeekKey, weekData);
@@ -1603,12 +1628,12 @@ function render() {
   // Update summary panel
   const leaves = weekData.nodes.filter(n => n.children.length === 0 && n.type !== 'branch');
   const total = leaves.reduce((acc, n) => {
-    const weight = isHighPriority(n.id) ? 3 : 1;
+    const weight = getPriorityWeight(n.id);
     if (n.type === 'counter') return acc + (n.max || 0) * weight;
     return acc + weight;
   }, 0);
   const done = leaves.reduce((acc, n) => {
-    const weight = isHighPriority(n.id) ? 3 : 1;
+    const weight = getPriorityWeight(n.id);
     if (n.type === 'counter') return acc + (n.val || 0) * weight;
     return acc + (n.done ? weight : 0);
   }, 0);
@@ -1767,7 +1792,9 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-unplanned').style.display = isBranch ? 'none' : '';
 
   const isHigh = node && node.priority === 'high';
+  const isCritical = node && node.priority === 'critical';
   document.getElementById('ctx-prio-high').textContent = isHigh ? '✓ Priority High' : '🔴 Priority High';
+  document.getElementById('ctx-prio-critical').textContent = isCritical ? '✓ Priority Critical' : '🔥 Priority Critical';
   document.getElementById('ctx-prio-high').style.display = isBranch ? 'none' : '';
   document.getElementById('ctx-prio-critical').style.display = isBranch ? 'none' : '';
 
@@ -1810,6 +1837,11 @@ document.getElementById('ctx-unplanned').addEventListener('click', () => {
 
 document.getElementById('ctx-prio-high').addEventListener('click', () => {
   if (contextTarget) setStatus(contextTarget, 'prio-high');
+  hideContextMenu();
+});
+
+document.getElementById('ctx-prio-critical').addEventListener('click', () => {
+  if (contextTarget) setStatus(contextTarget, 'prio-critical');
   hideContextMenu();
 });
 
