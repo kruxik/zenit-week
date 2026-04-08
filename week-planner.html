@@ -771,6 +771,15 @@ const NODE_STYLE = {
 const CENTER_W = NODE_STYLE.center.minW;
 const CENTER_H = NODE_STYLE.center.minH;
 
+// Precise text measurement using canvas
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+
+function measureText(text, fontSize, fontWeight = 'normal') {
+  ctx.font = `${fontWeight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+  return ctx.measureText(text).width;
+}
+
 function getNodeSize(nodeId) {
   const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey))) } : findNode(nodeId);
   if (!node) return { w: 100, h: 32 };
@@ -794,18 +803,36 @@ function getNodeSize(nodeId) {
   }
 
   const lines = (type === 'center') ? label.split('|').map(s => s.trim()) : label.split('\n');
-  const longestLine = lines.reduce((max, l) => Math.max(max, l.length), 0);
 
-  const lineH = style.fontSize * 1.3;  const totalTextH = lines.length * lineH;
-  
-  const w = Math.max(style.minW, Math.ceil(longestLine * style.fontSize * style.avgCharW) + style.padX * 2);
+  let textW;
+  if (type === 'counter') {
+    const longestLine = lines.reduce((max, l) => Math.max(max, l.length), 0);
+    textW = longestLine * style.fontSize * style.avgCharW;
+  } else {
+    // Measure actual text width using canvas
+    const fontWeight = (type === 'branch' || type === 'center') ? '700' : 'normal';
+    textW = lines.reduce((max, line) => {
+      let l = line;
+      if (type === 'activity' && !editState) {
+        if (node.unplanned) l = '⚡ ' + l;
+        if (node.priority === 'high') l = '🔴 ' + l;
+        if (node.priority === 'critical') l = '🔥 ' + l;
+      }
+      return Math.max(max, measureText(l, style.fontSize, fontWeight));
+    }, 0);
+  }
+
+  const lineH = style.fontSize * 1.3;
+  const totalTextH = lines.length * lineH;
+
+  const w = Math.max(style.minW, Math.ceil(textW) + style.padX * 2);
   const h = Math.max(style.minH, totalTextH + style.padY * 2);
-  
+
   return { 
     w, h, fontSize: style.fontSize, padX: style.padX, padY: style.padY, rx: style.rx,
     lines, lineH, totalTextH 
   };
-}
+  }
 
 // Side assignments
 const BRANCH_CONFIG = {
