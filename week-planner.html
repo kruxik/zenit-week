@@ -699,6 +699,8 @@
         <div class="help-section-title">Activity hotkeys (On Hover)</div>
         <div class="help-row"><span>Rename Node</span> <kbd>Enter</kbd></div>
         <div class="help-row"><span>Add Sub-task</span> <kbd>Tab</kbd></div>
+        <div class="help-row"><span>Toggle Done</span> <kbd>D</kbd></div>
+        <div class="help-row"><span>Toggle Unplanned</span> <kbd>U</kbd></div>
         <div class="help-row"><span>Delete Node</span> <kbd>Backspace</kbd></div>
         <div class="help-row"><span>Quick Options</span> <kbd>Right Click</kbd></div>
       </div>
@@ -1719,6 +1721,16 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'Backspace' || e.key === 'Delete') {
     e.preventDefault();
     confirmDeleteNode(id);
+  } else if (e.key.toLowerCase() === 'd') {
+    if (id !== 'center' && node.type !== 'branch') {
+      e.preventDefault();
+      setStatus(id, node.done ? 'undone' : 'done');
+    }
+  } else if (e.key.toLowerCase() === 'u') {
+    if (id !== 'center' && node.type !== 'branch') {
+      e.preventDefault();
+      setStatus(id, node.unplanned ? 'planned' : 'unplanned');
+    }
   }
 });
 
