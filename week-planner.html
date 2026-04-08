@@ -1655,7 +1655,18 @@ function render() {
   const panel = document.getElementById('placeholder-panel');
   if (panel) {
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    panel.textContent = `Activities Done: ${done} / ${total} (${percent}%)`;
+    
+    let totalColor = '#28a745'; // Green
+    let emoji = '😀';
+    if (total > 140) {
+      totalColor = '#d93025'; // Red
+      emoji = '🤯';
+    } else if (total >= 106) {
+      totalColor = '#f29900'; // Yellow/Orange
+      emoji = '😅';
+    }
+
+    panel.innerHTML = `Activities Done: ${done} (${percent}&nbsp;%) /&nbsp;<span style="color: ${totalColor}; font-weight: 800;">${total}</span>&nbsp;${emoji}`;
   }
 }
 
