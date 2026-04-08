@@ -635,6 +635,9 @@
   <div class="ctx-item" id="ctx-undone">↩ Undone</div>
   <div class="ctx-item" id="ctx-unplanned">⚡ Unplanned</div>
   <div class="ctx-separator"></div>
+  <div class="ctx-item" id="ctx-prio-high">🔴 Priority High</div>
+  <div class="ctx-item" id="ctx-prio-critical">🔥 Priority Critical</div>
+  <div class="ctx-separator"></div>
   <div class="ctx-item" id="ctx-rename">✏ Rename</div>
   <div class="ctx-item" id="ctx-add-child">＋ Add Activity</div>
   <div class="ctx-separator"></div>
@@ -753,9 +756,8 @@ function getNodeSize(nodeId) {
 
   const lines = (type === 'center') ? label.split('|').map(s => s.trim()) : label.split('\n');
   const longestLine = lines.reduce((max, l) => Math.max(max, l.length), 0);
-  
-  const lineH = style.fontSize * 1.3;
-  const totalTextH = lines.length * lineH;
+
+  const lineH = style.fontSize * 1.3;  const totalTextH = lines.length * lineH;
   
   const w = Math.max(style.minW, Math.ceil(longestLine * style.fontSize * style.avgCharW) + style.padX * 2);
   const h = Math.max(style.minH, totalTextH + style.padY * 2);
@@ -1733,6 +1735,10 @@ function showContextMenu(x, y, nodeId) {
   const isUnplanned = node && node.unplanned === true;
   document.getElementById('ctx-unplanned').textContent = isUnplanned ? '⚡ Planned' : '⚡ Unplanned';
   document.getElementById('ctx-unplanned').style.display = isBranch ? 'none' : '';
+
+  document.getElementById('ctx-prio-high').style.display = isBranch ? 'none' : '';
+  document.getElementById('ctx-prio-critical').style.display = isBranch ? 'none' : '';
+
   document.getElementById('ctx-delete').style.display    = isBranch ? 'none' : '';
   document.getElementById('ctx-add-child').style.display = (nodeId === 'center') ? 'none' : '';
 
