@@ -574,6 +574,32 @@
     user-select: none;
   }
 
+  /* Custom Tooltip */
+  #custom-tooltip {
+    position: fixed;
+    background: #3c4043;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 3000;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.15s, transform 0.15s;
+    white-space: nowrap;
+    max-width: 320px;
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  #custom-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
 </style>
 </head>
 <body>
@@ -1658,15 +1684,18 @@ function render() {
     
     let totalColor = '#28a745'; // Green
     let emoji = '😀';
+    let tooltip = "A realistic load — you'll likely finish 80%+.";
     if (total > 140) {
       totalColor = '#d93025'; // Red
       emoji = '🤯';
+      tooltip = "An overload — you'll likely finish under 60%, with burnout risk long-term.";
     } else if (total >= 106) {
       totalColor = '#f29900'; // Yellow/Orange
       emoji = '😅';
+      tooltip = "A stretch load — finishing 80% will be a challenge.";
     }
 
-    panel.innerHTML = `Activities Done: ${done} (${percent}&nbsp;%) /&nbsp;<span style="color: ${totalColor}; font-weight: 800;">${total}</span>&nbsp;${emoji}`;
+    panel.innerHTML = `Activities Done: ${done} (${percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${total}</span>&nbsp;${emoji}</span>`;
   }
 }
 
@@ -2273,11 +2302,29 @@ window.addEventListener('load', () => {
   requestAnimationFrame(() => {
     resetView();
   });
+
+  // Custom tooltip logic
+  const tooltipEl = document.getElementById('custom-tooltip');
+  document.body.addEventListener('mousemove', (e) => {
+    const trigger = e.target.closest('.summary-trigger');
+    if (trigger) {
+      tooltipEl.textContent = trigger.getAttribute('data-tooltip');
+      tooltipEl.classList.add('visible');
+      const rect = trigger.getBoundingClientRect();
+      // Position above the element
+      tooltipEl.style.left = (rect.left + rect.width / 2) + 'px';
+      tooltipEl.style.top = (rect.top - 12) + 'px';
+      tooltipEl.style.transform = 'translate(-50%, -100%)';
+    } else {
+      tooltipEl.classList.remove('visible');
+    }
+  });
 });
 
 window.addEventListener('resize', () => {
   resetView();
 });
 </script>
+<div id="custom-tooltip"></div>
 </body>
 </html>
