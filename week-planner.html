@@ -635,6 +635,7 @@
   <div class="ctx-item" id="ctx-undone">↩ Undone</div>
   <div class="ctx-item" id="ctx-unplanned">⚡ Unplanned</div>
   <div class="ctx-separator"></div>
+  <div class="ctx-item" id="ctx-prio-normal">⚪ Priority Normal</div>
   <div class="ctx-item" id="ctx-prio-high">🔴 Priority High</div>
   <div class="ctx-item" id="ctx-prio-critical">🔥 Priority Critical</div>
   <div class="ctx-separator"></div>
@@ -1086,6 +1087,8 @@ function setStatus(id, status) {
     node.priority = (node.priority === 'high') ? null : 'high';
   } else if (status === 'prio-critical') {
     node.priority = (node.priority === 'critical') ? null : 'critical';
+  } else if (status === 'prio-normal') {
+    node.priority = null;
   }
 
   saveWeek(currentWeekKey, weekData);
@@ -1793,10 +1796,11 @@ function showContextMenu(x, y, nodeId) {
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
-  document.getElementById('ctx-prio-high').textContent = isHigh ? '✓ Priority High' : '🔴 Priority High';
-  document.getElementById('ctx-prio-critical').textContent = isCritical ? '✓ Priority Critical' : '🔥 Priority Critical';
-  document.getElementById('ctx-prio-high').style.display = isBranch ? 'none' : '';
-  document.getElementById('ctx-prio-critical').style.display = isBranch ? 'none' : '';
+  const isNormal = !isHigh && !isCritical;
+
+  document.getElementById('ctx-prio-normal').style.display = (isBranch || isNormal) ? 'none' : '';
+  document.getElementById('ctx-prio-high').style.display   = (isBranch || isHigh)   ? 'none' : '';
+  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCritical) ? 'none' : '';
 
   document.getElementById('ctx-delete').style.display    = isBranch ? 'none' : '';
   document.getElementById('ctx-add-child').style.display = (nodeId === 'center') ? 'none' : '';
@@ -1832,6 +1836,11 @@ document.getElementById('ctx-unplanned').addEventListener('click', () => {
     const n = findNode(contextTarget);
     setStatus(contextTarget, (n && n.unplanned) ? 'planned' : 'unplanned');
   }
+  hideContextMenu();
+});
+
+document.getElementById('ctx-prio-normal').addEventListener('click', () => {
+  if (contextTarget) setStatus(contextTarget, 'prio-normal');
   hideContextMenu();
 });
 
