@@ -745,11 +745,21 @@ const CENTER_H = NODE_STYLE.center.minH;
 function getNodeSize(nodeId) {
   const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey))) } : findNode(nodeId);
   if (!node) return { w: 100, h: 32 };
-  
+
   const type = node.type || 'activity';
-  const style = NODE_STYLE[type];
-  let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
-  
+  const style = { ...NODE_STYLE[type] };
+  const isHigh = isHighPriority(nodeId);
+
+  if (isHigh) {
+    style.fontSize *= 1.5;
+    style.padX *= 1.5;
+    style.padY *= 1.5;
+    style.minW *= 1.5;
+    style.minH *= 1.5;
+    style.rx *= 1.5;
+  }
+
+  let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');  
   if (type === 'counter') {
     label = `${node.val || 0}`;
   }
@@ -892,6 +902,16 @@ function findNode(id) {
   return weekData.nodes.find(n => n.id === id);
 }
 
+function isHighPriority(nodeId) {
+  let curr = findNode(nodeId);
+  while (curr) {
+    if (curr.priority === 'high') return true;
+    if (!curr.parent) break;
+    curr = findNode(curr.parent);
+  }
+  return false;
+}
+
 function getDescendantIds(nodeId) {
   const ids = [];
   const collect = (id) => {
@@ -913,8 +933,14 @@ function getNodeVisuals(nodeId) {
 
   const type = node.type || 'activity';
   const bc = BRANCH_COLORS[node.branch] || { main: '#333', light: '#eee', text: '#333' };
-  const { rx } = NODE_STYLE[type];
-  const sw = (type === 'branch' ? 4.5 : (type === 'center' ? 0 : 2));
+  let { rx } = NODE_STYLE[type];
+  let sw = (type === 'branch' ? 4.5 : (type === 'center' ? 0 : 2));
+
+  const isHigh = isHighPriority(nodeId);
+  if (isHigh) {
+    rx *= 1.5;
+    sw *= 1.5;
+  }
 
   let bgColor, borderColor, textColor, fontWeight = 'normal';
 
@@ -1033,6 +1059,8 @@ function setStatus(id, status) {
   } else if (status === 'planned') {
     node.unplanned = false;
     setDescendants(id, 'planned');
+  } else if (status === 'prio-high') {
+    node.priority = (node.priority === 'high') ? null : 'high';
   }
 
   saveWeek(currentWeekKey, weekData);
@@ -1575,12 +1603,14 @@ function render() {
   // Update summary panel
   const leaves = weekData.nodes.filter(n => n.children.length === 0 && n.type !== 'branch');
   const total = leaves.reduce((acc, n) => {
-    if (n.type === 'counter') return acc + (n.max || 0);
-    return acc + 1;
+    const weight = isHighPriority(n.id) ? 3 : 1;
+    if (n.type === 'counter') return acc + (n.max || 0) * weight;
+    return acc + weight;
   }, 0);
   const done = leaves.reduce((acc, n) => {
-    if (n.type === 'counter') return acc + (n.val || 0);
-    return acc + (n.done ? 1 : 0);
+    const weight = isHighPriority(n.id) ? 3 : 1;
+    if (n.type === 'counter') return acc + (n.val || 0) * weight;
+    return acc + (n.done ? weight : 0);
   }, 0);
   
   const panel = document.getElementById('placeholder-panel');
@@ -1736,6 +1766,8 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-unplanned').textContent = isUnplanned ? '⚡ Planned' : '⚡ Unplanned';
   document.getElementById('ctx-unplanned').style.display = isBranch ? 'none' : '';
 
+  const isHigh = node && node.priority === 'high';
+  document.getElementById('ctx-prio-high').textContent = isHigh ? '✓ Priority High' : '🔴 Priority High';
   document.getElementById('ctx-prio-high').style.display = isBranch ? 'none' : '';
   document.getElementById('ctx-prio-critical').style.display = isBranch ? 'none' : '';
 
@@ -1773,6 +1805,11 @@ document.getElementById('ctx-unplanned').addEventListener('click', () => {
     const n = findNode(contextTarget);
     setStatus(contextTarget, (n && n.unplanned) ? 'planned' : 'unplanned');
   }
+  hideContextMenu();
+});
+
+document.getElementById('ctx-prio-high').addEventListener('click', () => {
+  if (contextTarget) setStatus(contextTarget, 'prio-high');
   hideContextMenu();
 });
 
