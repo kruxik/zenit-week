@@ -551,27 +551,105 @@
     pointer-events: none;
   }
 
-  /* Placeholder Panel */
+  /* Placeholder Panel (Expandable Drawer) */
   #placeholder-panel {
     position: fixed;
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    height: 44px;
+    width: auto;
+    min-width: 300px;
     background: #fff;
     border: 1px solid #e0e0e0;
     border-radius: 22px;
     padding: 0 24px;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
     font-size: 13px;
     font-weight: 600;
     color: #3c4043;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 1000;
-    cursor: default;
+    cursor: pointer;
     user-select: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 44px;
+    overflow: visible; /* Allow chevron to overlap border */
+  }
+
+  #placeholder-panel.expanded {
+    max-height: 200px;
+    border-radius: 16px;
+    padding: 16px 24px;
+    overflow: visible; /* Ensure chevron stays visible when expanded */
+  }
+
+  #summary-header {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  #summary-chevron {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 24px;
+    background: #3c4043;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: transform 0.3s, background 0.2s;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    z-index: 10;
+    padding-bottom: 2px; /* Visual centering for ▲ */
+  }
+
+  #placeholder-panel:hover #summary-chevron {
+    background: #202124;
+  }
+
+  #placeholder-panel.expanded #summary-chevron {
+    transform: translate(-50%, -50%) rotate(180deg);
+    padding-bottom: 0;
+    padding-top: 4px; /* Visual centering for ▼ */
+  }
+
+  #summary-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    padding-top: 12px;
+    border-top: 1px solid #eee;
+    pointer-events: none;
+  }
+
+  #placeholder-panel.expanded #summary-details {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .branch-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .branch-name {
+    font-weight: 700;
+    color: #3c4043;
+    min-width: 60px;
   }
 
   /* Custom Tooltip */
@@ -652,7 +730,26 @@
       </defs>
       <g id="map-root"></g>
     </svg>
-    <div id="placeholder-panel">Placeholder</div>
+    <div id="placeholder-panel">
+      <div id="summary-chevron">▲</div>
+      <div id="summary-header">
+        <span id="summary-main">Activities Done: 0 (0 %) / 0 😀</span>
+      </div>
+      <div id="summary-details">
+        <div class="branch-stat">
+          <span class="branch-name">Family:</span>
+          <span id="stat-family">0 (0 %) / 0</span>
+        </div>
+        <div class="branch-stat">
+          <span class="branch-name">Me:</span>
+          <span id="stat-me">0 (0 %) / 0</span>
+        </div>
+        <div class="branch-stat">
+          <span class="branch-name">Work:</span>
+          <span id="stat-work">0 (0 %) / 0</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1695,37 +1792,52 @@ function render() {
   attachNodeListeners();
 
   // Update summary panel
-  const leaves = weekData.nodes.filter(n => n.children.length === 0 && n.type !== 'branch');
-  const total = leaves.reduce((acc, n) => {
-    const weight = getPriorityWeight(n.id);
-    if (n.type === 'counter') return acc + (n.max || 0) * weight;
-    return acc + weight;
-  }, 0);
-  const done = leaves.reduce((acc, n) => {
-    const weight = getPriorityWeight(n.id);
-    if (n.type === 'counter') return acc + (n.val || 0) * weight;
-    return acc + (n.done ? weight : 0);
-  }, 0);
+  const allNodes = weekData.nodes;
+  const leaves = allNodes.filter(n => n.children.length === 0 && n.type !== 'branch');
   
-  const panel = document.getElementById('placeholder-panel');
-  if (panel) {
+  function getStats(nodes) {
+    const total = nodes.reduce((acc, n) => {
+      const weight = getPriorityWeight(n.id);
+      if (n.type === 'counter') return acc + (n.max || 0) * weight;
+      return acc + weight;
+    }, 0);
+    const done = nodes.reduce((acc, n) => {
+      const weight = getPriorityWeight(n.id);
+      if (n.type === 'counter') return acc + (n.val || 0) * weight;
+      return acc + (n.done ? weight : 0);
+    }, 0);
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    
-    let totalColor = '#28a745'; // Green
+    return { done, total, percent };
+  }
+
+  const global = getStats(leaves);
+  const branchStats = {
+    work:   getStats(leaves.filter(n => n.branch === 'work')),
+    family: getStats(leaves.filter(n => n.branch === 'family')),
+    me:     getStats(leaves.filter(n => n.branch === 'me'))
+  };
+
+  const mainEl = document.getElementById('summary-main');
+  if (mainEl) {
+    let totalColor = '#28a745';
     let emoji = '😀';
     let tooltip = "A realistic load — you'll likely finish 80%+.";
-    if (total > 140) {
-      totalColor = '#d93025'; // Red
-      emoji = '🤯';
+    if (global.total > 140) {
+      totalColor = '#d93025'; emoji = '🤯';
       tooltip = "An overload — you'll likely finish under 60%, with burnout risk long-term.";
-    } else if (total >= 106) {
-      totalColor = '#f29900'; // Yellow/Orange
-      emoji = '😅';
+    } else if (global.total >= 106) {
+      totalColor = '#f29900'; emoji = '😅';
       tooltip = "A stretch load — finishing 80% will be a challenge.";
     }
 
-    panel.innerHTML = `Activities Done: ${done} (${percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${total}</span>&nbsp;${emoji}</span>`;
+    mainEl.innerHTML = `Activities Done: ${global.done} (${global.percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${global.total}</span>&nbsp;${emoji}</span>`;
   }
+
+  ['work', 'family', 'me'].forEach(b => {
+    const s = branchStats[b];
+    const el = document.getElementById(`stat-${b}`);
+    if (el) el.innerHTML = `${s.done} (${s.percent}&nbsp;%) / ${s.total}`;
+  });
 }
 
 // Global keyboard shortcuts for hovered node
@@ -2335,6 +2447,12 @@ window.addEventListener('load', () => {
 
   helpOverlay.addEventListener('click', (e) => {
     if (e.target === helpOverlay) helpOverlay.classList.remove('visible');
+  });
+
+  // Expandable summary panel
+  const summaryPanel = document.getElementById('placeholder-panel');
+  summaryPanel.addEventListener('click', () => {
+    summaryPanel.classList.toggle('expanded');
   });
 
   // Small delay to let SVG lay out before computing center
