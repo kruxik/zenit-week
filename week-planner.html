@@ -647,7 +647,10 @@
   .branch-name {
     font-weight: 700;
     color: #3c4043;
-    min-width: 60px;
+    min-width: 85px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   /* Custom Tooltip */
@@ -735,15 +738,15 @@
       </div>
       <div id="summary-details">
         <div class="branch-stat">
-          <span class="branch-name">Family:</span>
+          <span class="branch-name"><div class="legend-dot" style="background:#A259FF"></div>Family:</span>
           <span id="stat-family">0 (0 %) / 0</span>
         </div>
         <div class="branch-stat">
-          <span class="branch-name">Me:</span>
+          <span class="branch-name"><div class="legend-dot" style="background:#1ABCFE"></div>Me:</span>
           <span id="stat-me">0 (0 %) / 0</span>
         </div>
         <div class="branch-stat">
-          <span class="branch-name">Work:</span>
+          <span class="branch-name"><div class="legend-dot" style="background:#F24E1E"></div>Work:</span>
           <span id="stat-work">0 (0 %) / 0</span>
         </div>
       </div>
