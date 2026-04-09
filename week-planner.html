@@ -58,6 +58,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex: 0 0 auto;
   }
 
   .nav-btn {
@@ -185,12 +186,19 @@
     display: block;
   }
 
-  /* Settings Dropdown */
+  /* Settings & Toolbar Right */
+  #toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    justify-content: flex-end; /* Align items to the right */
+  }
+
   #settings-container {
     position: relative;
     display: flex;
     justify-content: flex-end;
-    flex: 1;
   }
 
   #settings-dropdown {
@@ -705,13 +713,14 @@
       <button class="nav-btn" id="prev-week" title="Previous week">&#8249;</button>
       <div id="week-label">Week 13 | Mar 30 – Apr 5</div>
       <button class="nav-btn" id="next-week" title="Next week">&#8250;</button>
-      <button class="reset-btn" id="today-btn">Today</button>
     </div>
-    <div id="settings-container">
-      <button class="reset-btn" id="settings-btn">
-        ⚙ Settings
-      </button>
-      <div id="settings-dropdown">
+    <div id="toolbar-right">
+      <button class="reset-btn" id="today-btn">Today</button>
+      <div id="settings-container">
+        <button class="reset-btn" id="settings-btn">
+          ⚙ Settings
+        </button>
+        <div id="settings-dropdown">
         <div class="settings-section">
           <div class="settings-label">Zoom</div>
           <div id="zoom-controls">
@@ -733,6 +742,7 @@
       </div>
     </div>
   </div>
+</div>
 
   <div id="canvas-container">
     <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
