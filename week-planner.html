@@ -2010,6 +2010,7 @@ inlineInput.addEventListener('keydown', (e) => {
   e.stopPropagation();
 });
 inlineInput.addEventListener('input', resizeInlineInput);
+inlineInput.addEventListener('blur', () => { if (editState) commitEdit(); });
 // Prevent clicks inside input from bubbling to canvas
 inlineInput.addEventListener('mousedown', (e) => e.stopPropagation());
 inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
