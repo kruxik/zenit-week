@@ -804,6 +804,15 @@
           <stop offset="0%" stop-color="#454545"/>
           <stop offset="100%" stop-color="#252525"/>
         </linearGradient>
+        <filter id="glow-work" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#F24E1E" flood-opacity="0.35"/>
+        </filter>
+        <filter id="glow-family" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#A259FF" flood-opacity="0.35"/>
+        </filter>
+        <filter id="glow-me" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#1ABCFE" flood-opacity="0.35"/>
+        </filter>
       </defs>
       <g id="map-root"></g>
     </svg>
@@ -1649,7 +1658,10 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const { w: boxW, h: boxH, fontSize, lines, lineH, totalTextH } = getNodeSize(id);
   const { bgColor, borderColor, textColor, fontWeight, sw, rx } = getNodeVisuals(id);
 
-  const filterRef = (isCenter || isBranch) ? (isCenter ? 'url(#shadow)' : 'url(#shadow-sm)') : 'none';
+  let filterRef = 'none';
+  if (isCenter) filterRef = 'url(#shadow)';
+  else if (isBranch && branch && BRANCH_COLORS[branch]) filterRef = `url(#glow-${branch})`;
+
   
   let fillAttr = bgColor;
   if (!node?.done && !node?.unplanned) {
