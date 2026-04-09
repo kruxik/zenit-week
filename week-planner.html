@@ -801,6 +801,8 @@
         <div class="help-row"><span>Toggle Done</span> <kbd>D</kbd></div>
         <div class="help-row"><span>Toggle Unplanned</span> <kbd>U</kbd></div>
         <div class="help-row"><span>Quick Options</span> <kbd>Right Click</kbd></div>
+        <div class="help-row"><span>Undo</span> <kbd id="undo-kbd">Ctrl + Z</kbd></div>
+        <div class="help-row"><span>Redo</span> <kbd id="redo-kbd">Ctrl + Shift + Z</kbd></div>
       </div>
 
       <div class="help-section">
@@ -2556,6 +2558,12 @@ window.addEventListener('load', () => {
   currentWeekKey = todayWeekKey();
   weekData = loadWeek(currentWeekKey);
   render();
+
+  // OS detection for help hotkeys
+  const isMac = /Mac|iPhone|iPod|iPad/.test(navigator.platform);
+  const mod = isMac ? '⌘' : 'Ctrl';
+  document.getElementById('undo-kbd').textContent = `${mod} + Z`;
+  document.getElementById('redo-kbd').textContent = isMac ? `${mod} + ⇧ + Z` : `${mod} + Shift + Z`;
 
   // Help panel listeners
   const helpFab = document.getElementById('help-fab');
