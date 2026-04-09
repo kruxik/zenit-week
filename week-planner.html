@@ -676,6 +676,31 @@
     gap: 8px;
   }
 
+  /* Ratio Bar */
+  #ratio-bar {
+    display: flex;
+    height: 18px;
+    width: 100%;
+    border-radius: 9px;
+    overflow: hidden;
+    margin: 8px 0 12px 0;
+    background: #f0f0f0;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  }
+  .ratio-segment {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  }
+
   /* Custom Tooltip */
   #custom-tooltip {
     position: fixed;
@@ -762,6 +787,11 @@
         <span id="summary-main">Activities Done: 0 (0 %) / 0 😀</span>
       </div>
       <div id="summary-details">
+        <div id="ratio-bar">
+          <div id="ratio-work" class="ratio-segment" style="background:#F24E1E">33%</div>
+          <div id="ratio-family" class="ratio-segment" style="background:#A259FF">33%</div>
+          <div id="ratio-me" class="ratio-segment" style="background:#1ABCFE">33%</div>
+        </div>
         <div class="branch-stat">
           <span class="branch-name"><div class="legend-dot" style="background:#A259FF"></div>Family:</span>
           <span id="stat-family">0 (0 %) / 0</span>
@@ -2044,6 +2074,23 @@ function updateSummary() {
     const s = branchStats[b];
     const el = document.getElementById(`stat-${b}`);
     if (el) el.innerHTML = `${s.done} (${s.percent}&nbsp;%) / ${s.total}`;
+  });
+
+  // Update ratio bar
+  const totalItems = branchStats.work.total + branchStats.family.total + branchStats.me.total;
+  const segments = ['work', 'family', 'me'];
+  segments.forEach(b => {
+    const el = document.getElementById(`ratio-${b}`);
+    if (el) {
+      let pct;
+      if (totalItems === 0) {
+        pct = 33.33;
+      } else {
+        pct = (branchStats[b].total / totalItems) * 100;
+      }
+      el.style.width = pct + '%';
+      el.textContent = (pct >= 10) ? Math.round(pct) + '%' : '';
+    }
   });
 }
 
