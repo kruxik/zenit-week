@@ -911,7 +911,7 @@ function getNodeSize(nodeId) {
     const fontWeight = (type === 'branch' || type === 'center') ? '700' : 'normal';
     textW = lines.reduce((max, line) => {
       let l = line;
-      if (type === 'activity' && !editState) {
+      if ((type === 'activity' || type === 'branch') && !editState) {
         if (node.unplanned) l = '⚡ ' + l;
         if (node.priority === 'high') l = '🔴 ' + l;
         if (node.priority === 'critical') l = '🔥 ' + l;
@@ -1117,8 +1117,6 @@ function getNodeVisuals(nodeId) {
 
   if (type === 'center') {
     bgColor = CENTER_COLOR.main; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
-  } else if (type === 'branch') {
-    bgColor = bc.light; borderColor = bc.main; textColor = bc.text; fontWeight = '600';
   } else {
     if (node.done && node.unplanned) {
       bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
@@ -1126,9 +1124,12 @@ function getNodeVisuals(nodeId) {
       bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
     } else if (node.unplanned) {
       bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = bc.text;
+    } else if (type === 'branch') {
+      bgColor = bc.light; borderColor = bc.main; textColor = bc.text; fontWeight = '600';
     } else {
       bgColor = bc.light; borderColor = bc.main; textColor = bc.text;
     }
+    if (type === 'branch') fontWeight = '600';
   }
 
   return {
@@ -1234,21 +1235,24 @@ function setStatus(id, status) {
   if (status === 'done') {
     node.done = true;
     setDescendants(id, 'done');
-    syncDoneUp(id);
+    syncStatusUp(id, 'done');
   } else if (status === 'undone') {
     node.done = false;
     delete node._prevDone;
     setDescendants(id, 'undone');
-    syncDoneUp(id);
+    syncStatusUp(id, 'done');
   } else if (status === 'unplanned') {
     node.unplanned = true;
     setDescendants(id, 'unplanned');
+    syncStatusUp(id, 'unplanned');
     fullRenderNeeded = true;
   } else if (status === 'planned') {
     node.unplanned = false;
     setDescendants(id, 'planned');
+    syncStatusUp(id, 'unplanned');
     fullRenderNeeded = true;
-  } else if (status === 'prio-high') {
+  }
+ else if (status === 'prio-high') {
     const newVal = (node.priority === 'high') ? null : 'high';
     node.priority = newVal;
     setPriorityDescendants(id, newVal);
@@ -1418,8 +1422,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       fill: textColor,
       'pointer-events': 'none',
     });
-    t.textContent = (node && node.unplanned && isActivity && i === 0) ? '⚡ ' + line : line;
-    if (node && node.done && isActivity) {
+    t.textContent = (node && node.unplanned && (isActivity || isBranch) && i === 0) ? '⚡ ' + line : line;
+    if (node && node.done && (isActivity || isBranch)) {
       t.setAttribute('text-decoration', 'line-through');
     }
     g.appendChild(t);
@@ -1715,7 +1719,7 @@ inlineInput.addEventListener('mousedown', (e) => e.stopPropagation());
 inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 
 // ─── Surgical UI Updates ──────────────────────────────────────────────────────
-function syncDoneUp(nodeId) {
+function syncStatusUp(nodeId, prop) {
   const node = findNode(nodeId);
   if (!node || !node.parent || node.parent === 'center') return;
 
@@ -1723,12 +1727,12 @@ function syncDoneUp(nodeId) {
   if (!parent) return;
 
   const siblings = parent.children.map(findNode);
-  const allDone = siblings.every(s => s && s.done);
+  const allTrue = siblings.every(s => s && s[prop]);
 
-  if (parent.done !== allDone) {
-    parent.done = allDone;
-    updateNodeUI(parent.id);
-    syncDoneUp(parent.id);
+  if (parent[prop] !== allTrue) {
+    parent[prop] = allTrue;
+    if (prop === 'done') updateNodeUI(parent.id);
+    syncStatusUp(parent.id, prop);
   }
 }
 
@@ -1953,7 +1957,7 @@ function updateCounter(id, dir) {
     const isMax = newVal === node.max;
     node.done = isMax;
     
-    syncDoneUp(id);
+    syncStatusUp(id, 'done');
 
     saveWeek(currentWeekKey, weekData);
     
