@@ -1726,12 +1726,31 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
 function taperedPathD(x1, y1, x2, y2, swStart, swEnd) {
   const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  // Unit perpendicular to the chord (rotated 90° CCW)
+  const px = -dy / len;
+  const py =  dx / len;
+
   const cp1x = x1 + dx * 0.45;
   const cp2x = x1 + dx * 0.55;
   const hw1 = swStart / 2;
   const hw2 = swEnd / 2;
-  return `M ${x1} ${y1 - hw1} C ${cp1x} ${y1 - hw1} ${cp2x} ${y2 - hw2} ${x2} ${y2 - hw2} ` +
-         `L ${x2} ${y2 + hw2} C ${cp2x} ${y2 + hw2} ${cp1x} ${y1 + hw1} ${x1} ${y1 + hw1} Z`;
+
+  // Top edge (offset in +perp direction, hw1 at start tapering to hw2 at end)
+  const t_x1 = x1   + px * hw1,  t_y1 = y1   + py * hw1;
+  const t_c1x = cp1x + px * hw1, t_c1y = y1   + py * hw1;
+  const t_c2x = cp2x + px * hw2, t_c2y = y2   + py * hw2;
+  const t_x2 = x2   + px * hw2,  t_y2 = y2   + py * hw2;
+
+  // Bottom edge (offset in -perp direction, hw2 at end tapering to hw1 at start)
+  const b_x2 = x2   - px * hw2,  b_y2 = y2   - py * hw2;
+  const b_c2x = cp2x - px * hw2, b_c2y = y2   - py * hw2;
+  const b_c1x = cp1x - px * hw1, b_c1y = y1   - py * hw1;
+  const b_x1 = x1   - px * hw1,  b_y1 = y1   - py * hw1;
+
+  return `M ${t_x1} ${t_y1} C ${t_c1x} ${t_c1y} ${t_c2x} ${t_c2y} ${t_x2} ${t_y2} ` +
+         `L ${b_x2} ${b_y2} C ${b_c2x} ${b_c2y} ${b_c1x} ${b_c1y} ${b_x1} ${b_y1} Z`;
 }
 
 function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId, defsEl) {
