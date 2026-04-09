@@ -951,7 +951,7 @@ const UNPLANNED_BG  = '#FFF9DB';
 const UNPLANNED_BORDER = '#FCC419';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
-const MIN_HORIZONTAL_GAP = 40; // Minimum horizontal gap between nodes
+const MIN_HORIZONTAL_GAP = 200; // Level 2 gap (branch → direct children); Level 3+ = 134
 const DY = 44;  // Vertical spacing between siblings
 const BRANCH_GAP = 20; // Vertical gap between main branches
 
@@ -1539,7 +1539,7 @@ function computeLayout() {
       const { w, h } = getNodeSize(bid);
       const dir = side === 'left' ? -1 : 1;
       
-      const baseDistance = 100;
+      const baseDistance = 300;
       const x = dir * (CENTER_W / 2 + baseDistance + w / 2);
       const y = currentY + nodeH / 2;
       
@@ -1555,17 +1555,17 @@ function computeLayout() {
         return child && (!child._editing || isChildActiveEdit);
       });
       if (activeChildren.length > 0) {
-        layoutChildren(bid, finalX, finalY, side, w);
+        layoutChildren(bid, finalX, finalY, side, w, 0);
       }
       currentY += nodeH + BRANCH_GAP;
     });
   }
 
-  function layoutChildren(nodeId, parentX, parentY, side, parentW) {
+  function layoutChildren(nodeId, parentX, parentY, side, parentW, depth) {
     const node = findNode(nodeId);
     const isActiveEdit = editState && editState.nodeId === nodeId;
     if (!node || (node._editing && !isActiveEdit)) return;
-    
+
     const activeChildren = (node.children || []).filter(cid => {
       const child = findNode(cid);
       const isChildActiveEdit = editState && editState.nodeId === cid;
@@ -1574,6 +1574,8 @@ function computeLayout() {
 
     if (activeChildren.length === 0) return;
 
+    const gap = depth === 0 ? 200 : 134;
+
     const childrenH = activeChildren.reduce((acc, cid) => acc + heights[cid], 0);
     let currentY = parentY - childrenH / 2;
 
@@ -1581,16 +1583,16 @@ function computeLayout() {
       const childH = heights[cid];
       const { w, h } = getNodeSize(cid);
       const dir = side === 'left' ? -1 : 1;
-      
-      const x = parentX + dir * (parentW / 2 + MIN_HORIZONTAL_GAP + w / 2);
+
+      const x = parentX + dir * (parentW / 2 + gap + w / 2);
       const y = currentY + childH / 2;
-      
+
       const child = findNode(cid);
       const finalX = x + (child.offX || 0);
       const finalY = y + (child.offY || 0);
-      
+
       positions[cid] = { x: finalX, y: finalY, w, h, side };
-      layoutChildren(cid, finalX, finalY, side, w);
+      layoutChildren(cid, finalX, finalY, side, w, depth + 1);
       currentY += childH;
     });
   }
