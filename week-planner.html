@@ -1194,9 +1194,10 @@ function getNodeSize(nodeId) {
   } else {
     // Measure actual text width using canvas
     const fontWeight = (type === 'branch' || type === 'center') ? '700' : 'normal';
+    const isThisNodeEditing = editState && editState.nodeId === nodeId;
     textW = lines.reduce((max, line) => {
       let l = line;
-      if ((type === 'activity' || type === 'branch') && !editState) {
+      if ((type === 'activity' || type === 'branch') && !isThisNodeEditing) {
         if (node.unplanned) l = '⚡ ' + l;
         if (node.priority === 'high') l = '🔴 ' + l;
         if (node.priority === 'critical') l = '🔥 ' + l;
@@ -1872,7 +1873,13 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       fill: textColor,
       'pointer-events': 'none',
     });
-    t.textContent = (node && node.unplanned && (isActivity || isBranch) && i === 0) ? '⚡ ' + line : line;
+    let fullLine = line;
+    if (node && (isActivity || isBranch) && i === 0) {
+      if (node.unplanned) fullLine = '⚡ ' + fullLine;
+      if (node.priority === 'high') fullLine = '🔴 ' + fullLine;
+      if (node.priority === 'critical') fullLine = '🔥 ' + fullLine;
+    }
+    t.textContent = fullLine;
     if (node && node.done && (isActivity || isBranch)) {
       t.setAttribute('text-decoration', 'line-through');
     }
