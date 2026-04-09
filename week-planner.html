@@ -475,6 +475,140 @@
   #cp-apply { background: #3c4043; color: #fff; }
   #cp-apply:hover { background: #202124; }
 
+  /* Daily Log */
+  #daily-log-fab {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    width: 44px;
+    height: 44px;
+    background: #3c4043;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    transition: transform 0.2s, background 0.2s;
+    user-select: none;
+  }
+  #daily-log-fab:hover {
+    transform: scale(1.1);
+    background: #202124;
+  }
+
+  #daily-log-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #daily-log-overlay.visible {
+    display: flex;
+    opacity: 1;
+  }
+
+  #daily-log-panel {
+    background: #fff;
+    width: 420px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #daily-log-overlay.visible #daily-log-panel {
+    transform: translateY(0);
+  }
+
+  #daily-log-header {
+    background: #f8f9fa;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+  }
+  #daily-log-close {
+    cursor: pointer;
+    font-size: 18px;
+    color: #999;
+    transition: color 0.2s;
+  }
+  #daily-log-close:hover { color: #333; }
+
+  #daily-log-content {
+    padding: 16px 24px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .daily-log-empty {
+    text-align: center;
+    color: #aaa;
+    font-size: 14px;
+    padding: 32px 0;
+  }
+
+  .daily-log-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+    color: #333;
+  }
+  .daily-log-item:last-child { border-bottom: none; }
+
+  .daily-log-badge {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+  }
+  .daily-log-badge.done {
+    background: #e6f4ea;
+    color: #1e8e3e;
+  }
+  .daily-log-badge.unplanned {
+    background: #fce8e6;
+    color: #c5221f;
+  }
+
+  .daily-log-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .daily-log-time {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #aaa;
+  }
+
+  .daily-log-branch-dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
   /* Help System */
   #help-fab {
     position: fixed;
@@ -962,6 +1096,18 @@
       <button class="modal-btn" id="modal-cancel-btn">Cancel</button>
       <button class="modal-btn confirm" id="modal-confirm-btn">Confirm</button>
     </div>
+  </div>
+</div>
+
+<div id="daily-log-fab" title="Today's Activity">📅</div>
+
+<div id="daily-log-overlay">
+  <div id="daily-log-panel">
+    <div id="daily-log-header">
+      <div style="font-size: 20px; font-weight: 700; color: #3c4043;">Today's Activity</div>
+      <div id="daily-log-close">✕</div>
+    </div>
+    <div id="daily-log-content"></div>
   </div>
 </div>
 
@@ -2464,8 +2610,13 @@ window.addEventListener('keydown', (e) => {
     const help = document.getElementById('help-overlay');
     const status = document.getElementById('placeholder-panel');
     
+    const dailyLog = document.getElementById('daily-log-overlay');
     if (settings && settings.classList.contains('visible')) {
       settings.classList.remove('visible');
+      return;
+    }
+    if (dailyLog && dailyLog.classList.contains('visible')) {
+      dailyLog.classList.remove('visible');
       return;
     }
     if (help && help.classList.contains('visible')) {
@@ -3189,6 +3340,75 @@ window.addEventListener('load', () => {
   const mod = isMac ? '⌘' : 'Ctrl';
   document.getElementById('undo-kbd').textContent = `${mod} + Z`;
   document.getElementById('redo-kbd').textContent = isMac ? `${mod} + ⇧ + Z` : `${mod} + Shift + Z`;
+
+  // Daily log panel
+  function openDailyLog() {
+    const today = new Date().toISOString().slice(0, 10);
+    const entries = [];
+
+    weekData.nodes.forEach(node => {
+      if (node.doneAt && node.doneAt.startsWith(today)) {
+        entries.push({ ts: node.doneAt, type: 'done', node });
+      }
+      if (node.unplannedAt && node.unplannedAt.startsWith(today)) {
+        entries.push({ ts: node.unplannedAt, type: 'unplanned', node });
+      }
+    });
+
+    entries.sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
+
+    const content = document.getElementById('daily-log-content');
+    content.innerHTML = '';
+
+    if (entries.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'daily-log-empty';
+      empty.textContent = 'No activity recorded today.';
+      content.appendChild(empty);
+    } else {
+      entries.forEach(({ ts, type, node }) => {
+        const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#ccc';
+        const timeStr = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const item = document.createElement('div');
+        item.className = 'daily-log-item';
+
+        const dot = document.createElement('div');
+        dot.className = 'daily-log-branch-dot';
+        dot.style.background = branchColor;
+
+        const badge = document.createElement('div');
+        badge.className = `daily-log-badge ${type}`;
+        badge.textContent = type === 'done' ? '✓ Done' : '⚡ Unplanned';
+
+        const label = document.createElement('div');
+        label.className = 'daily-log-label';
+        label.textContent = node.label || '(no label)';
+
+        const time = document.createElement('div');
+        time.className = 'daily-log-time';
+        time.textContent = timeStr;
+
+        item.appendChild(dot);
+        item.appendChild(badge);
+        item.appendChild(label);
+        item.appendChild(time);
+        content.appendChild(item);
+      });
+    }
+
+    document.getElementById('daily-log-overlay').classList.add('visible');
+  }
+
+  const dailyLogFab     = document.getElementById('daily-log-fab');
+  const dailyLogOverlay = document.getElementById('daily-log-overlay');
+  const dailyLogClose   = document.getElementById('daily-log-close');
+
+  dailyLogFab.addEventListener('click', openDailyLog);
+  dailyLogClose.addEventListener('click', () => dailyLogOverlay.classList.remove('visible'));
+  dailyLogOverlay.addEventListener('click', (e) => {
+    if (e.target === dailyLogOverlay) dailyLogOverlay.classList.remove('visible');
+  });
 
   // Help panel listeners
   const helpFab = document.getElementById('help-fab');
