@@ -909,7 +909,7 @@ function measureText(text, fontSize, fontWeight = 'normal') {
 
 function getNodeSize(nodeId) {
   const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey))) } : findNode(nodeId);
-  if (!node) return { w: 100, h: 32 };
+  if (!node) return { w: 0, h: 0 };
 
   const type = node.type || 'activity';
   const style = { ...NODE_STYLE[type] };
@@ -1190,19 +1190,18 @@ function addNode(parentId, label) {
 }
 
 function deleteNode(id) {
+  const node = findNode(id);
+  if (!node || node.type === 'branch') return;
+  
+  takeSnapshot();
   const toRemove = new Set([id, ...getDescendantIds(id)]);
 
   // Remove from parent's children list
-  const node = findNode(id);
-  if (node && node.parent) {
+  if (node.parent) {
     const parent = findNode(node.parent);
     if (parent) parent.children = parent.children.filter(c => c !== id);
-  } else if (node && node.type === 'branch') {
-    // Can't delete branch nodes
-    return;
   }
 
-  takeSnapshot();
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   saveWeek(currentWeekKey, weekData);
   render();
@@ -1590,6 +1589,7 @@ function resizeInlineInput() {
 function startAddNode(parentId) {
   const parent = findNode(parentId);
   if (!parent) return;
+  takeSnapshot();
   const branch = parent.branch || parent.id;
   const id = genId();
   const node = {
@@ -1605,6 +1605,7 @@ function startAddNode(parentId) {
 function startRenameNode(nodeId) {
   const node = findNode(nodeId);
   if (!node || node.type === 'branch') return;
+  takeSnapshot();
   node._editing = true;
   _openInlineInput(nodeId, false);
 }
@@ -1662,7 +1663,6 @@ function commitEdit(followUp = 'auto') {
     return;
   }
 
-  takeSnapshot();
   const node = findNode(nodeId);
   if (node) {
     node.label = label;
@@ -1886,6 +1886,8 @@ function render() {
     (node.children || []).forEach(childId => {
       const childPos = positions[childId];
       if (!childPos) return;
+      const childNode = findNode(childId);
+      if (!childNode) return; // Prevent orphan lines
       const { w: childW } = getNodeSize(childId);
       const color = branchColor(branch);
       
