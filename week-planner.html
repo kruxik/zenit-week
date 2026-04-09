@@ -1583,11 +1583,12 @@ function computeLayout() {
       const childH = heights[cid];
       const { w, h } = getNodeSize(cid);
       const dir = side === 'left' ? -1 : 1;
+      const child = findNode(cid);
 
-      const x = parentX + dir * (parentW / 2 + gap + w / 2);
+      const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
+      const x = parentX + dir * (parentW / 2 + childGap + w / 2);
       const y = currentY + childH / 2;
 
-      const child = findNode(cid);
       const finalX = x + (child.offX || 0);
       const finalY = y + (child.offY || 0);
 
