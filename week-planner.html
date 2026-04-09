@@ -1633,11 +1633,13 @@ function setStatus(id, status) {
     syncStatusUp(id, 'done');
   } else if (status === 'unplanned') {
     node.unplanned = true;
+    node.unplannedAt = new Date().toISOString();
     setDescendants(id, 'unplanned');
     syncStatusUp(id, 'unplanned');
     fullRenderNeeded = true;
   } else if (status === 'planned') {
     node.unplanned = false;
+    delete node.unplannedAt;
     setDescendants(id, 'planned');
     syncStatusUp(id, 'unplanned');
     fullRenderNeeded = true;
