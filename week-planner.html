@@ -841,6 +841,33 @@
 <script>
 'use strict';
 
+// ─── Undo/Redo ────────────────────────────────────────────────────────────────
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO = 100;
+
+function takeSnapshot() {
+  undoStack.push(JSON.stringify(weekData));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = []; 
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(JSON.stringify(weekData));
+  weekData = JSON.parse(undoStack.pop());
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(JSON.stringify(weekData));
+  weekData = JSON.parse(redoStack.pop());
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const BRANCH_COLORS = {
   work:   { main: '#F24E1E', light: '#FFF0ED', text: '#D03000' }, // Miro Pinkish-Red
@@ -1142,6 +1169,7 @@ function getNodeVisuals(nodeId) {
 function addNode(parentId, label) {
   const parent = findNode(parentId);
   if (!parent) return;
+  takeSnapshot();
   const branch = parent.branch || parent.id;
   const node = {
     id: genId(),
@@ -1172,6 +1200,7 @@ function deleteNode(id) {
     return;
   }
 
+  takeSnapshot();
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   saveWeek(currentWeekKey, weekData);
   render();
@@ -1180,6 +1209,7 @@ function deleteNode(id) {
 function renameNode(id, label) {
   const node = findNode(id);
   if (!node || !label.trim()) return;
+  takeSnapshot();
   node.label = label.trim();
   saveWeek(currentWeekKey, weekData);
   render();
@@ -1188,6 +1218,7 @@ function renameNode(id, label) {
 function setStatus(id, status) {
   const node = findNode(id);
   if (!node) return;
+  takeSnapshot();
 
   function setDescendants(nid, newStatus) {
     const n = findNode(nid);
@@ -1629,6 +1660,7 @@ function commitEdit(followUp = 'auto') {
     return;
   }
 
+  takeSnapshot();
   const node = findNode(nodeId);
   if (node) {
     node.label = label;
@@ -1916,6 +1948,24 @@ function render() {
 // Global keyboard shortcuts for hovered node
 window.addEventListener('keydown', (e) => {
   if (editState) return; // Don't interfere with inline editing
+
+  // Undo / Redo
+  const isZ = e.key.toLowerCase() === 'z';
+  const isY = e.key.toLowerCase() === 'y';
+  const isMod = e.metaKey || e.ctrlKey;
+  
+  if (isMod && isZ) {
+    e.preventDefault();
+    if (e.shiftKey) redo();
+    else undo();
+    return;
+  }
+  if (isMod && isY) {
+    e.preventDefault();
+    redo();
+    return;
+  }
+
   if (!hoveredNodeId) return;
 
   const id = hoveredNodeId;
@@ -1951,6 +2001,7 @@ function updateCounter(id, dir) {
   if (!node || node.type !== 'counter') return;
   const newVal = (node.val || 0) + dir;
   if (newVal >= 0 && newVal <= (node.max || 999)) {
+    takeSnapshot();
     node.val = newVal;
     
     // Auto-done logic
@@ -2324,6 +2375,7 @@ function handleNodeDrop(mouseX, mouseY) {
   const nodeId = dragState.activeNodeId;
   const node = findNode(nodeId);
   if (!node) return;
+  takeSnapshot();
 
   const rect = container.getBoundingClientRect();
   const svgX = (mouseX - rect.left - panX) / zoom;
@@ -2450,6 +2502,8 @@ document.getElementById('reset-view').addEventListener('click', resetView);
 function loadAndRender(wk) {
   currentWeekKey = wk;
   weekData = loadWeek(wk);
+  undoStack = [];
+  redoStack = [];
   render();
 }
 
@@ -2483,6 +2537,7 @@ resetDataBtn.addEventListener('click', () => {
     'Reset Week',
     'Cancel',
     () => {
+      takeSnapshot();
       localStorage.removeItem(storageKey(currentWeekKey));
       weekData = loadWeek(currentWeekKey);
       render();
