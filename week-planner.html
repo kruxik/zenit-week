@@ -521,6 +521,21 @@
     opacity: 1;
   }
 
+  .gear-btn {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .gear-btn:hover {
+    opacity: 1;
+  }
+  .gear-bg {
+    transition: fill 0.2s;
+  }
+  .gear-btn:hover .gear-bg {
+    fill: rgba(255,255,255,0.25);
+  }
+
   #inline-input {
     position: fixed;
     z-index: 1500;
@@ -755,6 +770,8 @@
 </div>
 
 <div id="context-menu">
+  <div class="ctx-item" id="ctx-transfer-unfinished">📋 Transfer Unfinished</div>
+  <div class="ctx-separator" id="ctx-transfer-separator"></div>
   <div class="ctx-item" id="ctx-done">✓ Done</div>
   <div class="ctx-item" id="ctx-undone">↩ Undone</div>
   <div class="ctx-item" id="ctx-unplanned">⚡ Unplanned</div>
@@ -1113,6 +1130,67 @@ function loadWeek(wk) {
 
 function saveWeek(wk, data) {
   localStorage.setItem(storageKey(wk), JSON.stringify(data));
+}
+
+function transferUnfinished() {
+  const prevWeekKey = offsetWeek(currentWeekKey, -1);
+  const prevData = loadWeek(prevWeekKey);
+  if (!prevData || !prevData.nodes) return;
+
+  takeSnapshot();
+
+  const candidates = prevData.nodes.filter(n => !n.done && n.type !== 'branch');
+  const oldToNew = new Map();
+  const newNodes = [];
+
+  // 1. Create mapping and new node objects
+  candidates.forEach(c => {
+    const existing = weekData.nodes.find(n => n.prevId === c.id);
+    if (existing) {
+      oldToNew.set(c.id, existing.id);
+    } else {
+      const id = genId();
+      const newNode = { 
+        ...c, 
+        id, 
+        prevId: c.id, 
+        done: false, 
+        unplanned: false, 
+        children: [] 
+      };
+      if (newNode.type === 'counter') newNode.val = 0;
+      newNodes.push(newNode);
+      oldToNew.set(c.id, id);
+    }
+  });
+
+  // 2. Setup hierarchy and add to weekData
+  newNodes.forEach(newNode => {
+    const oldNode = candidates.find(n => n.id === newNode.prevId);
+    const oldParentId = oldNode.parent;
+    
+    let targetParentId;
+    if (['work', 'family', 'me'].includes(oldParentId)) {
+      targetParentId = oldParentId;
+    } else {
+      targetParentId = oldToNew.get(oldParentId);
+    }
+
+    if (targetParentId) {
+      newNode.parent = targetParentId;
+      const parent = (['work', 'family', 'me'].includes(targetParentId)) 
+        ? weekData.nodes.find(n => n.id === targetParentId) 
+        : newNodes.find(n => n.id === targetParentId) || weekData.nodes.find(n => n.id === targetParentId);
+      
+      if (parent && !parent.children.includes(newNode.id)) {
+        parent.children.push(newNode.id);
+      }
+    }
+    weekData.nodes.push(newNode);
+  });
+
+  saveWeek(currentWeekKey, weekData);
+  render();
 }
 
 function defaultWeekData() {
@@ -1515,6 +1593,31 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     filter: filterRef,
   });
   g.appendChild(rect);
+
+  // Gear Icon for center node
+  if (isCenter) {
+    const gearG = svgEl('g', { 
+      class: 'gear-btn',
+      'transform': `translate(${boxW/2 - 20}, ${-boxH/2 + 20})`
+    });
+    const gearCircle = svgEl('circle', { cx: 0, cy: 0, r: 12, fill: 'rgba(255,255,255,0.1)', class: 'gear-bg' });
+    const gearPath = svgEl('path', {
+      d: 'M1.5,1.5v3h1v-1h3v-1h-4ZM2,2v2h2v-2h-2ZM1,1v1.5h1v-0.5h1.5v-1h-2.5ZM0,0v2.5h1v-1.5h1.5v-1h-2.5Z', // Simple placeholder gear
+      fill: '#fff',
+      transform: 'scale(2) translate(-3, -3)',
+      'pointer-events': 'none'
+    });
+    // Let's use a better gear path
+    const gearActualPath = svgEl('path', {
+      d: 'M10.2,6.28l-1.1-0.41a4.9,4.9,0,0,0-0.45-1.1l0.41-1.1a0.4,0.4,0,0,0-0.1-.47L8.06,2.29a0.4,0.4,0,0,0-0.47-.1L6.49,2.6a4.9,4.9,0,0,0-1.1-.45L4.98,1.05a0.4,0.4,0,0,0-.39-0.3H3.4a0.4,0.4,0,0,0-.39.3L2.6,2.15a4.9,4.9,0,0,0-1.1.45L0.4,2.19a0.4,0.4,0,0,0-.47.1L-0.96,3.2a0.4,0.4,0,0,0-.1.47l0.41,1.1a4.9,4.9,0,0,0-.45,1.1L-2.2,6.28a0.4,0.4,0,0,0-.3.39v1.18a0.4,0.4,0,0,0,.3.39l1.1,0.41a4.9,4.9,0,0,0,.45,1.1l-0.41,1.1a0.4,0.4,0,0,0,.1.47L0.4,12.3a0.4,0.4,0,0,0,.47.1l1.1-0.41a4.9,4.9,0,0,0,1.1,0.45l0.41,1.1a0.4,0.4,0,0,0,.39.3H4.59a0.4,0.4,0,0,0,.39-0.3l0.41-1.1a4.9,4.9,0,0,0,1.1-.45l1.1,0.41a0.4,0.4,0,0,0,.47-0.1l0.91-0.91a0.4,0.4,0,0,0,.1-0.47l-0.41-1.1a4.9,4.9,0,0,0,.45-1.1l1.1-0.41a0.4,0.4,0,0,0,.3-0.39V6.67A0.4,0.4,0,0,0,10.2,6.28ZM3.99,9.48a2,2,0,1,1,2-2A2,2,0,0,1,3.99,9.48Z',
+      fill: '#fff',
+      'pointer-events': 'none',
+      'transform': 'translate(-4, -7.5) scale(1.2)'
+    });
+    gearG.appendChild(gearCircle);
+    gearG.appendChild(gearActualPath);
+    g.appendChild(gearG);
+  }
 
   // Text
   lines.forEach((line, i) => {
@@ -2137,6 +2240,15 @@ function attachNodeListeners() {
       });
     });
 
+    // Gear button
+    g.querySelectorAll('.gear-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        showContextMenu(e.clientX, e.clientY, id);
+      });
+    });
+
     g.addEventListener('mouseenter', () => {
       hoveredNodeId = id;
       const descendants = getDescendantIds(id);
@@ -2212,27 +2324,33 @@ const ctxMenu = document.getElementById('context-menu');
 
 function showContextMenu(x, y, nodeId) {
   contextTarget = nodeId;
-  const node = findNode(nodeId);
-  const isBranch = !node || node.type === 'branch';
+  const node = (nodeId === 'center') ? { type: 'center' } : findNode(nodeId);
+  const isBranch = node && node.type === 'branch';
+  const isCenter = nodeId === 'center';
+
+  // Transfer Unfinished (Center only)
+  document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
+  document.getElementById('ctx-transfer-separator').style.display = isCenter ? '' : 'none';
 
   // Show/hide items depending on node type and status
   const isDone = node && node.done === true;
-  document.getElementById('ctx-done').style.display      = (isBranch || isDone)  ? 'none' : '';
-  document.getElementById('ctx-undone').style.display    = (isBranch || !isDone) ? 'none' : '';
+  document.getElementById('ctx-done').style.display      = (isBranch || isCenter || isDone)  ? 'none' : '';
+  document.getElementById('ctx-undone').style.display    = (isBranch || isCenter || !isDone) ? 'none' : '';
   const isUnplanned = node && node.unplanned === true;
   document.getElementById('ctx-unplanned').textContent = isUnplanned ? '⚡ Planned' : '⚡ Unplanned';
-  document.getElementById('ctx-unplanned').style.display = isBranch ? 'none' : '';
+  document.getElementById('ctx-unplanned').style.display = (isBranch || isCenter) ? 'none' : '';
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
   const isNormal = !isHigh && !isCritical;
 
-  document.getElementById('ctx-prio-normal').style.display = (isBranch || isNormal) ? 'none' : '';
-  document.getElementById('ctx-prio-high').style.display   = (isBranch || isHigh)   ? 'none' : '';
-  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCritical) ? 'none' : '';
+  document.getElementById('ctx-prio-normal').style.display = (isBranch || isCenter || isNormal) ? 'none' : '';
+  document.getElementById('ctx-prio-high').style.display   = (isBranch || isCenter || isHigh)   ? 'none' : '';
+  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCenter || isCritical) ? 'none' : '';
 
-  document.getElementById('ctx-delete').style.display    = isBranch ? 'none' : '';
-  document.getElementById('ctx-add-child').style.display = (nodeId === 'center') ? 'none' : '';
+  document.getElementById('ctx-delete').style.display    = (isBranch || isCenter) ? 'none' : '';
+  document.getElementById('ctx-add-child').style.display = (isCenter) ? 'none' : '';
+  document.getElementById('ctx-rename').style.display = (isCenter || isBranch) ? 'none' : '';
 
   // Position within viewport
   const menuW = 170, menuH = 200;
@@ -2249,6 +2367,11 @@ function hideContextMenu() {
   ctxMenu.classList.remove('visible');
   contextTarget = null;
 }
+
+document.getElementById('ctx-transfer-unfinished').addEventListener('click', () => {
+  transferUnfinished();
+  hideContextMenu();
+});
 
 document.getElementById('ctx-done').addEventListener('click', () => {
   if (contextTarget) setStatus(contextTarget, 'done');
