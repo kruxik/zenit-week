@@ -1724,26 +1724,38 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   return g;
 }
 
-function makeCurve(x1, y1, x2, y2, color, strokeWidth, fromId, toId) {
+function taperedPathD(x1, y1, x2, y2, swStart, swEnd) {
   const dx = x2 - x1;
   const cp1x = x1 + dx * 0.45;
   const cp2x = x1 + dx * 0.55;
+  const hw1 = swStart / 2;
+  const hw2 = swEnd / 2;
+  return `M ${x1} ${y1 - hw1} C ${cp1x} ${y1 - hw1} ${cp2x} ${y2 - hw2} ${x2} ${y2 - hw2} ` +
+         `L ${x2} ${y2 + hw2} C ${cp2x} ${y2 + hw2} ${cp1x} ${y1 + hw1} ${x1} ${y1 + hw1} Z`;
+}
+
+function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId, defsEl) {
+  const gradId = `grad-${fromId || 'c'}-${toId || 'c'}`;
+  const grad = svgEl('linearGradient', {
+    id: gradId, gradientUnits: 'userSpaceOnUse',
+    x1: x1, y1: y1, x2: x2, y2: y2
+  });
+  const stop1 = svgEl('stop', { offset: '0%',   'stop-color': colorHex, 'stop-opacity': '0.9' });
+  const stop2 = svgEl('stop', { offset: '100%', 'stop-color': colorHex, 'stop-opacity': '0.4' });
+  grad.appendChild(stop1);
+  grad.appendChild(stop2);
+  defsEl.appendChild(grad);
 
   const path = svgEl('path', {
-    d: `M ${x1} ${y1} C ${cp1x} ${y1} ${cp2x} ${y2} ${x2} ${y2}`,
-    fill: 'none',
-    stroke: color,
-    'stroke-width': strokeWidth || 2,
-    'stroke-linecap': 'round',
-    'stroke-linejoin': 'round',
-    opacity: '0.8',
+    d: taperedPathD(x1, y1, x2, y2, swStart, swEnd),
+    fill: `url(#${gradId})`,
     'pointer-events': 'none',
     'data-from': fromId || '',
-    'data-to': toId || '',
-    'data-x1': x1,
-    'data-y1': y1,
-    'data-x2': x2,
-    'data-y2': y2
+    'data-to':   toId   || '',
+    'data-x1': x1, 'data-y1': y1,
+    'data-x2': x2, 'data-y2': y2,
+    'data-sw-start': swStart,
+    'data-sw-end':   swEnd
   });
   return path;
 }
@@ -2105,7 +2117,10 @@ function render() {
   document.getElementById('week-label').innerHTML = `<b>${parts[0]}</b> ${parts[1]}`;
 
   const positions = computeLayout();
-  
+
+  const defsEl = svgEl('defs', {});
+  root.appendChild(defsEl);
+
   const linesG = svgEl('g', { id: 'lines-layer' });
   root.appendChild(linesG);
 
@@ -2133,23 +2148,22 @@ function render() {
       if (!childNode) return; // Prevent orphan lines
       const { w: childW } = getNodeSize(childId);
       const color = branchColor(branch);
-      
-      let sw = 1.8;
-      if (depth === 0) sw = 3.5;
-      else if (depth === 1) sw = 2.2;
+
+      // Level2 (depth=0): branch→activity; Level3+ (depth≥1): deeper nesting
+      let swStart, swEnd;
+      if (depth === 0) { swStart = 8;   swEnd = 5.3; }
+      else             { swStart = 5.3; swEnd = 3.5; }
 
       let x1, x2;
       if (side === 'left') {
-        // Parent is to the right of child
         x1 = pos.x - nodeW / 2;
         x2 = childPos.x + childW / 2;
       } else {
-        // Parent is to the left of child
         x1 = pos.x + nodeW / 2;
         x2 = childPos.x - childW / 2;
       }
 
-      linesG.appendChild(makeCurve(x1, pos.y, x2, childPos.y, color, sw, nodeId, childId));
+      linesG.appendChild(makeTaperedCurve(x1, pos.y, x2, childPos.y, color, swStart, swEnd, nodeId, childId, defsEl));
       drawEdges(childId, depth + 1);
     });
   }
@@ -2166,7 +2180,7 @@ function render() {
     let x1 = (side === 'left' ? -CENTER_W / 2 : CENTER_W / 2);
     let x2 = (side === 'left' ? bPos.x + bW / 2 : bPos.x - bW / 2);
 
-    linesG.appendChild(makeCurve(x1, 0, x2, bPos.y, color, 5, 'center', bid));
+    linesG.appendChild(makeTaperedCurve(x1, 0, x2, bPos.y, color, 12, 8, 'center', bid, defsEl));
     drawEdges(bid, 0);
   });
 
@@ -2625,15 +2639,20 @@ window.addEventListener('mousemove', (e) => {
         const y1 = parseFloat(path.getAttribute('data-y1'));
         const x2 = parseFloat(path.getAttribute('data-x2'));
         const y2 = parseFloat(path.getAttribute('data-y2'));
+        const swStart = parseFloat(path.getAttribute('data-sw-start'));
+        const swEnd   = parseFloat(path.getAttribute('data-sw-end'));
 
         let nx1 = x1, ny1 = y1, nx2 = x2, ny2 = y2;
         if (isFromDragging) { nx1 += dx; ny1 += dy; }
         if (isToDragging)   { nx2 += dx; ny2 += dy; }
 
-        const ndx = nx2 - nx1;
-        const ncp1x = nx1 + ndx * 0.45;
-        const ncp2x = nx1 + ndx * 0.55;
-        path.setAttribute('d', `M ${nx1} ${ny1} C ${ncp1x} ${ny1} ${ncp2x} ${ny2} ${nx2} ${ny2}`);
+        path.setAttribute('d', taperedPathD(nx1, ny1, nx2, ny2, swStart, swEnd));
+
+        const grad = document.getElementById(`grad-${fromId}-${toId}`);
+        if (grad) {
+          grad.setAttribute('x1', nx1); grad.setAttribute('y1', ny1);
+          grad.setAttribute('x2', nx2); grad.setAttribute('y2', ny2);
+        }
       }
     });
     return;
