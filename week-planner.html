@@ -72,8 +72,8 @@
   }
 
   .nav-btn {
-    background: #3c4043;
-    border: none;
+    background: #fff;
+    border: 1.5px solid rgba(0,0,0,0.12);
     border-radius: 8px;
     width: 36px;
     height: 36px;
@@ -83,13 +83,14 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    color: #fff;
+    color: #3c4043;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
   }
 
-  .nav-btn:hover { 
-    background: #202124; 
+  .nav-btn:hover {
+    background: #f1f3f4;
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15); 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   }
 
   #week-label {
@@ -132,26 +133,27 @@
   }
 
   .reset-btn {
-    background: #3c4043;
-    border: none;
+    background: #fff;
+    border: 1.5px solid rgba(0,0,0,0.12);
     border-radius: 8px;
     height: 36px;
     padding: 0 16px;
     cursor: pointer;
     font-size: 13px;
     font-weight: 600;
-    color: #fff;
+    color: #3c4043;
     transition: all 0.2s;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
   }
 
-  .reset-btn:hover { 
-    background: #202124; 
+  .reset-btn:hover {
+    background: #f1f3f4;
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15); 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   }
 
   #legend {
@@ -472,8 +474,8 @@
   }
   #cp-cancel { background: #f0f0f0; color: #555; }
   #cp-cancel:hover { background: #e0e0e0; }
-  #cp-apply { background: #3c4043; color: #fff; }
-  #cp-apply:hover { background: #202124; }
+  #cp-apply { background: #fff; color: #3c4043; border: 1.5px solid rgba(0,0,0,0.12); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  #cp-apply:hover { background: #f1f3f4; }
 
   /* Daily Log */
   #daily-log-fab {
@@ -482,22 +484,24 @@
     left: 24px;
     width: 44px;
     height: 44px;
-    background: #3c4043;
-    color: #fff;
+    background: #fff;
+    color: #3c4043;
+    border: 1.5px solid rgba(0,0,0,0.12);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 22px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     z-index: 1000;
-    transition: transform 0.2s, background 0.2s;
+    transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
     user-select: none;
   }
   #daily-log-fab:hover {
     transform: scale(1.1);
-    background: #202124;
+    background: #f1f3f4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   }
 
   #daily-log-overlay {
@@ -616,8 +620,9 @@
     right: 24px;
     width: 44px;
     height: 44px;
-    background: #3c4043;
-    color: #fff;
+    background: #fff;
+    color: #3c4043;
+    border: 1.5px solid rgba(0,0,0,0.12);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -625,13 +630,14 @@
     font-weight: 700;
     font-size: 20px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     z-index: 1000;
-    transition: transform 0.2s, background 0.2s;
+    transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
   }
   #help-fab:hover {
     transform: scale(1.1);
-    background: #202124;
+    background: #f1f3f4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   }
 
   #help-overlay {
@@ -866,21 +872,22 @@
     transform: translate(-50%, -50%);
     width: 24px;
     height: 24px;
-    background: #3c4043;
-    color: #fff;
+    background: #fff;
+    color: #3c4043;
+    border: 1.5px solid rgba(0,0,0,0.12);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 14px;
     transition: transform 0.3s, background 0.2s;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
     z-index: 10;
     padding-bottom: 2px; /* Visual centering for ▲ */
   }
 
   #placeholder-panel:hover #summary-chevron {
-    background: #202124;
+    background: #f1f3f4;
   }
 
   #placeholder-panel.expanded #summary-chevron {
