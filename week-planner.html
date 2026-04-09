@@ -2617,6 +2617,7 @@ function zoomAt(cx, cy, factor) {
   panY = cy - (cy - panY) * (newZoom / zoom);
   zoom = newZoom;
   applyTransform();
+  if (editState) resizeInlineInput();
 }
 
 container.addEventListener('wheel', (e) => {
