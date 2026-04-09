@@ -1622,10 +1622,12 @@ function setStatus(id, status) {
 
   if (status === 'done') {
     node.done = true;
+    node.doneAt = new Date().toISOString();
     setDescendants(id, 'done');
     syncStatusUp(id, 'done');
   } else if (status === 'undone') {
     node.done = false;
+    delete node.doneAt;
     delete node._prevDone;
     setDescendants(id, 'undone');
     syncStatusUp(id, 'done');
@@ -2532,6 +2534,8 @@ function updateCounter(id, dir) {
     // Auto-done logic
     const isMax = newVal === node.max;
     node.done = isMax;
+    if (isMax) node.doneAt = new Date().toISOString();
+    else delete node.doneAt;
     
     syncStatusUp(id, 'done');
 
