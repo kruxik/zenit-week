@@ -771,18 +771,18 @@
 
 <div id="context-menu">
   <div class="ctx-item" id="ctx-transfer-unfinished">📋 Transfer Unfinished</div>
-  <div class="ctx-separator" id="ctx-transfer-separator"></div>
+  <div class="ctx-separator" id="ctx-sep-transfer"></div>
   <div class="ctx-item" id="ctx-done">✓ Done</div>
   <div class="ctx-item" id="ctx-undone">↩ Undone</div>
   <div class="ctx-item" id="ctx-unplanned">⚡ Unplanned</div>
-  <div class="ctx-separator"></div>
+  <div class="ctx-separator" id="ctx-sep-1"></div>
   <div class="ctx-item" id="ctx-prio-normal">⚪ Priority Normal</div>
   <div class="ctx-item" id="ctx-prio-high">🔴 Priority High</div>
   <div class="ctx-item" id="ctx-prio-critical">🔥 Priority Critical</div>
-  <div class="ctx-separator"></div>
+  <div class="ctx-separator" id="ctx-sep-2"></div>
   <div class="ctx-item" id="ctx-rename">✏ Rename</div>
   <div class="ctx-item" id="ctx-add-child">＋ Add Activity</div>
-  <div class="ctx-separator"></div>
+  <div class="ctx-separator" id="ctx-sep-3"></div>
   <div class="ctx-item danger" id="ctx-delete">✕ Delete</div>
 </div>
 
@@ -2327,10 +2327,11 @@ function showContextMenu(x, y, nodeId) {
   const node = (nodeId === 'center') ? { type: 'center' } : findNode(nodeId);
   const isBranch = node && node.type === 'branch';
   const isCenter = nodeId === 'center';
+  const isActivity = node && node.type === 'activity';
 
   // Transfer Unfinished (Center only)
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
-  document.getElementById('ctx-transfer-separator').style.display = isCenter ? '' : 'none';
+  document.getElementById('ctx-sep-transfer').style.display = 'none'; // Only used if other items follow
 
   // Show/hide items depending on node type and status
   const isDone = node && node.done === true;
@@ -2351,6 +2352,11 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-delete').style.display    = (isBranch || isCenter) ? 'none' : '';
   document.getElementById('ctx-add-child').style.display = (isCenter) ? 'none' : '';
   document.getElementById('ctx-rename').style.display = (isCenter || isBranch) ? 'none' : '';
+
+  // Handle separators
+  document.getElementById('ctx-sep-1').style.display = (isActivity) ? '' : 'none';
+  document.getElementById('ctx-sep-2').style.display = (isActivity) ? '' : 'none';
+  document.getElementById('ctx-sep-3').style.display = (isActivity) ? '' : 'none';
 
   // Position within viewport
   const menuW = 170, menuH = 200;
