@@ -2036,6 +2036,25 @@ function render() {
 window.addEventListener('keydown', (e) => {
   if (editState) return; // Don't interfere with inline editing
 
+  if (e.key === 'Escape') {
+    const settings = document.getElementById('settings-dropdown');
+    const help = document.getElementById('help-overlay');
+    const status = document.getElementById('placeholder-panel');
+    
+    if (settings && settings.classList.contains('visible')) {
+      settings.classList.remove('visible');
+      return;
+    }
+    if (help && help.classList.contains('visible')) {
+      help.classList.remove('visible');
+      return;
+    }
+    if (status && status.classList.contains('expanded')) {
+      status.classList.remove('expanded');
+      return;
+    }
+  }
+
   // Undo / Redo
   const isZ = e.key.toLowerCase() === 'z';
   const isY = e.key.toLowerCase() === 'y';
