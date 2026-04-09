@@ -59,6 +59,14 @@
     align-items: center;
     gap: 12px;
     flex: 0 0 auto;
+    position: relative;
+  }
+
+  #today-btn {
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
   }
 
   .nav-btn {
@@ -738,9 +746,9 @@
       <button class="nav-btn" id="prev-week" title="Previous week">&#8249;</button>
       <div id="week-label">Week 13 | Mar 30 – Apr 5</div>
       <button class="nav-btn" id="next-week" title="Next week">&#8250;</button>
+      <button class="reset-btn" id="today-btn">Today</button>
     </div>
     <div id="toolbar-right">
-      <button class="reset-btn" id="today-btn">Today</button>
       <div id="settings-container">
         <button class="reset-btn" id="settings-btn">
           ⚙ Settings
