@@ -595,6 +595,10 @@
     background: #fce8e6;
     color: #c5221f;
   }
+  .daily-log-badge.tick {
+    background: #e8f0fe;
+    color: #1a73e8;
+  }
 
   .daily-log-label {
     flex: 1;
@@ -2695,13 +2699,18 @@ function updateCounter(id, dir) {
   if (newVal >= 0 && newVal <= (node.max || 999)) {
     takeSnapshot();
     node.val = newVal;
-    
+
+    // Tick log: push on increment, pop on decrement
+    if (!node.ticks) node.ticks = [];
+    if (dir === 1) node.ticks.push(new Date().toISOString());
+    else if (dir === -1 && node.ticks.length > 0) node.ticks.pop();
+
     // Auto-done logic
     const isMax = newVal === node.max;
     node.done = isMax;
     if (isMax) node.doneAt = new Date().toISOString();
     else delete node.doneAt;
-    
+
     syncStatusUp(id, 'done');
 
     saveWeek(currentWeekKey, weekData);
@@ -3365,6 +3374,14 @@ window.addEventListener('load', () => {
       if (node.unplannedAt && node.unplannedAt.startsWith(today)) {
         entries.push({ ts: node.unplannedAt, type: 'unplanned', node });
       }
+      if (node.type === 'counter' && node.ticks) {
+        const parent = findNode(node.parent);
+        node.ticks.forEach(ts => {
+          if (ts.startsWith(today)) {
+            entries.push({ ts, type: 'tick', node, parent });
+          }
+        });
+      }
     });
 
     entries.sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
@@ -3378,7 +3395,7 @@ window.addEventListener('load', () => {
       empty.textContent = 'No activity recorded today.';
       content.appendChild(empty);
     } else {
-      entries.forEach(({ ts, type, node }) => {
+      entries.forEach(({ ts, type, node, parent }) => {
         const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#ccc';
         const timeStr = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -3391,11 +3408,13 @@ window.addEventListener('load', () => {
 
         const badge = document.createElement('div');
         badge.className = `daily-log-badge ${type}`;
-        badge.textContent = type === 'done' ? '✓ Done' : '⚡ Unplanned';
+        if (type === 'done') badge.textContent = '✓ Done';
+        else if (type === 'unplanned') badge.textContent = '⚡ Unplanned';
+        else badge.textContent = '+1 Progress';
 
         const label = document.createElement('div');
         label.className = 'daily-log-label';
-        label.textContent = node.label || '(no label)';
+        label.textContent = (type === 'tick' ? (parent && parent.label) : node.label) || '(no label)';
 
         const time = document.createElement('div');
         time.className = 'daily-log-time';
