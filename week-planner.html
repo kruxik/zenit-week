@@ -1229,34 +1229,50 @@ function setStatus(id, status) {
     });
   }
 
+  let fullRenderNeeded = false;
+
   if (status === 'done') {
     node.done = true;
     setDescendants(id, 'done');
+    syncDoneUp(id);
   } else if (status === 'undone') {
     node.done = false;
     delete node._prevDone;
     setDescendants(id, 'undone');
+    syncDoneUp(id);
   } else if (status === 'unplanned') {
     node.unplanned = true;
     setDescendants(id, 'unplanned');
+    fullRenderNeeded = true;
   } else if (status === 'planned') {
     node.unplanned = false;
     setDescendants(id, 'planned');
+    fullRenderNeeded = true;
   } else if (status === 'prio-high') {
     const newVal = (node.priority === 'high') ? null : 'high';
     node.priority = newVal;
     setPriorityDescendants(id, newVal);
+    fullRenderNeeded = true;
   } else if (status === 'prio-critical') {
     const newVal = (node.priority === 'critical') ? null : 'critical';
     node.priority = newVal;
     setPriorityDescendants(id, newVal);
+    fullRenderNeeded = true;
   } else if (status === 'prio-normal') {
     node.priority = null;
     setPriorityDescendants(id, null);
+    fullRenderNeeded = true;
   }
 
   saveWeek(currentWeekKey, weekData);
-  render();
+
+  if (fullRenderNeeded) {
+    render();
+  } else {
+    updateNodeUI(id);
+    getDescendantIds(id).forEach(updateNodeUI);
+    updateSummary();
+  }
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -1698,6 +1714,105 @@ inlineInput.addEventListener('input', resizeInlineInput);
 inlineInput.addEventListener('mousedown', (e) => e.stopPropagation());
 inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 
+// ─── Surgical UI Updates ──────────────────────────────────────────────────────
+function syncDoneUp(nodeId) {
+  const node = findNode(nodeId);
+  if (!node || !node.parent || node.parent === 'center') return;
+
+  const parent = findNode(node.parent);
+  if (!parent) return;
+
+  const siblings = parent.children.map(findNode);
+  const allDone = siblings.every(s => s && s.done);
+
+  if (parent.done !== allDone) {
+    parent.done = allDone;
+    updateNodeUI(parent.id);
+    syncDoneUp(parent.id);
+  }
+}
+
+function updateNodeUI(nodeId) {
+  const g = document.querySelector(`.node-group[data-id="${nodeId}"]`);
+  if (!g) return;
+
+  const node = findNode(nodeId);
+  if (!node) return;
+  const type = node.type || 'activity';
+  const { bgColor, borderColor, textColor, sw } = getNodeVisuals(nodeId);
+
+  const rect = g.querySelector('.node-rect');
+  if (rect) {
+    rect.setAttribute('fill', bgColor);
+    rect.setAttribute('stroke', borderColor);
+    rect.setAttribute('stroke-width', sw);
+  }
+
+  const texts = g.querySelectorAll('text');
+  if (type === 'counter') {
+    if (texts[0]) texts[0].textContent = String(node.val || 0);
+    texts.forEach(t => t.setAttribute('fill', textColor));
+  } else {
+    texts.forEach(t => {
+      t.setAttribute('fill', textColor);
+      if (node.done && type === 'activity') {
+        t.setAttribute('text-decoration', 'line-through');
+      } else {
+        t.removeAttribute('text-decoration');
+      }
+    });
+  }
+}
+
+function updateSummary() {
+  const allNodes = weekData.nodes;
+  const leaves = allNodes.filter(n => n.children.length === 0 && n.type !== 'branch');
+  
+  function getStats(nodes) {
+    const total = nodes.reduce((acc, n) => {
+      const weight = getPriorityWeight(n.id);
+      if (n.type === 'counter') return acc + (n.max || 0) * weight;
+      return acc + weight;
+    }, 0);
+    const done = nodes.reduce((acc, n) => {
+      const weight = getPriorityWeight(n.id);
+      if (n.type === 'counter') return acc + (n.val || 0) * weight;
+      return acc + (n.done ? weight : 0);
+    }, 0);
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { done, total, percent };
+  }
+
+  const global = getStats(leaves);
+  const branchStats = {
+    work:   getStats(leaves.filter(n => n.branch === 'work')),
+    family: getStats(leaves.filter(n => n.branch === 'family')),
+    me:     getStats(leaves.filter(n => n.branch === 'me'))
+  };
+
+  const mainEl = document.getElementById('summary-main');
+  if (mainEl) {
+    let totalColor = '#28a745';
+    let emoji = '😀';
+    let tooltip = "A realistic load — you'll likely finish 80%+. ";
+    if (global.total > 140) {
+      totalColor = '#d93025'; emoji = '🤯';
+      tooltip = "An overload — you'll likely finish under 60%, with burnout risk long-term.";
+    } else if (global.total >= 106) {
+      totalColor = '#f29900'; emoji = '😅';
+      tooltip = "A stretch load — finishing 80% will be a challenge.";
+    }
+
+    mainEl.innerHTML = `Activities Done: ${global.done} (${global.percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${global.total}</span>&nbsp;${emoji}</span>`;
+  }
+
+  ['work', 'family', 'me'].forEach(b => {
+    const s = branchStats[b];
+    const el = document.getElementById(`stat-${b}`);
+    if (el) el.innerHTML = `${s.done} (${s.percent}&nbsp;%) / ${s.total}`;
+  });
+}
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
   const root = document.getElementById('map-root');
@@ -1791,54 +1906,7 @@ function render() {
   });
 
   attachNodeListeners();
-
-  // Update summary panel
-  const allNodes = weekData.nodes;
-  const leaves = allNodes.filter(n => n.children.length === 0 && n.type !== 'branch');
-  
-  function getStats(nodes) {
-    const total = nodes.reduce((acc, n) => {
-      const weight = getPriorityWeight(n.id);
-      if (n.type === 'counter') return acc + (n.max || 0) * weight;
-      return acc + weight;
-    }, 0);
-    const done = nodes.reduce((acc, n) => {
-      const weight = getPriorityWeight(n.id);
-      if (n.type === 'counter') return acc + (n.val || 0) * weight;
-      return acc + (n.done ? weight : 0);
-    }, 0);
-    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { done, total, percent };
-  }
-
-  const global = getStats(leaves);
-  const branchStats = {
-    work:   getStats(leaves.filter(n => n.branch === 'work')),
-    family: getStats(leaves.filter(n => n.branch === 'family')),
-    me:     getStats(leaves.filter(n => n.branch === 'me'))
-  };
-
-  const mainEl = document.getElementById('summary-main');
-  if (mainEl) {
-    let totalColor = '#28a745';
-    let emoji = '😀';
-    let tooltip = "A realistic load — you'll likely finish 80%+.";
-    if (global.total > 140) {
-      totalColor = '#d93025'; emoji = '🤯';
-      tooltip = "An overload — you'll likely finish under 60%, with burnout risk long-term.";
-    } else if (global.total >= 106) {
-      totalColor = '#f29900'; emoji = '😅';
-      tooltip = "A stretch load — finishing 80% will be a challenge.";
-    }
-
-    mainEl.innerHTML = `Activities Done: ${global.done} (${global.percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${global.total}</span>&nbsp;${emoji}</span>`;
-  }
-
-  ['work', 'family', 'me'].forEach(b => {
-    const s = branchStats[b];
-    const el = document.getElementById(`stat-${b}`);
-    if (el) el.innerHTML = `${s.done} (${s.percent}&nbsp;%) / ${s.total}`;
-  });
+  updateSummary();
 }
 
 // Global keyboard shortcuts for hovered node
@@ -1885,15 +1953,12 @@ function updateCounter(id, dir) {
     const isMax = newVal === node.max;
     node.done = isMax;
     
-    if (node.parent) {
-      const parent = findNode(node.parent);
-      if (parent) {
-        parent.done = isMax;
-      }
-    }
+    syncDoneUp(id);
 
     saveWeek(currentWeekKey, weekData);
-    render();
+    
+    updateNodeUI(id);
+    updateSummary();
   }
 }
 
