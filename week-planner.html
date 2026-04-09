@@ -67,6 +67,8 @@
     left: calc(100% + 8px);
     top: 50%;
     transform: translateY(-50%);
+    visibility: hidden;
+    transition: background 0.2s, transform 0.2s;
   }
 
   .nav-btn {
@@ -2845,6 +2847,8 @@ function loadAndRender(wk) {
   weekData = loadWeek(wk);
   undoStack = [];
   redoStack = [];
+  document.getElementById('today-btn').style.visibility =
+    currentWeekKey === todayWeekKey() ? 'hidden' : 'visible';
   render();
 }
 
