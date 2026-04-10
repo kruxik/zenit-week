@@ -572,7 +572,7 @@
   .daily-log-item {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     padding: 10px 0;
     border-bottom: 1px solid #f0f0f0;
     font-size: 14px;
@@ -2700,16 +2700,16 @@ function updateCounter(id, dir) {
     takeSnapshot();
     node.val = newVal;
 
-    // Tick log: push on increment, pop on decrement
-    if (!node.ticks) node.ticks = [];
-    if (dir === 1) node.ticks.push(new Date().toISOString());
-    else if (dir === -1 && node.ticks.length > 0) node.ticks.pop();
-
     // Auto-done logic
     const isMax = newVal === node.max;
     node.done = isMax;
     if (isMax) node.doneAt = new Date().toISOString();
     else delete node.doneAt;
+
+    // Tick log: push on increment (skip final — covered by doneAt), pop on decrement
+    if (!node.ticks) node.ticks = [];
+    if (dir === 1 && !isMax) node.ticks.push(new Date().toISOString());
+    else if (dir === -1 && node.ticks.length > 0) node.ticks.pop();
 
     syncStatusUp(id, 'done');
 
@@ -3369,7 +3369,8 @@ window.addEventListener('load', () => {
 
     weekData.nodes.forEach(node => {
       if (node.doneAt && node.doneAt.startsWith(today)) {
-        entries.push({ ts: node.doneAt, type: 'done', node });
+        const doneParent = node.type === 'counter' ? findNode(node.parent) : null;
+        entries.push({ ts: node.doneAt, type: 'done', node, parent: doneParent });
       }
       if (node.unplannedAt && node.unplannedAt.startsWith(today)) {
         entries.push({ ts: node.unplannedAt, type: 'unplanned', node });
@@ -3414,15 +3415,15 @@ window.addEventListener('load', () => {
 
         const label = document.createElement('div');
         label.className = 'daily-log-label';
-        label.textContent = (type === 'tick' ? (parent && parent.label) : node.label) || '(no label)';
+        label.textContent = ((type === 'tick' || type === 'done') && parent ? parent.label : node.label) || '(no label)';
 
         const time = document.createElement('div');
         time.className = 'daily-log-time';
         time.textContent = timeStr;
 
         item.appendChild(dot);
-        item.appendChild(badge);
         item.appendChild(label);
+        item.appendChild(badge);
         item.appendChild(time);
         content.appendChild(item);
       });
