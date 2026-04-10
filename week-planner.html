@@ -3449,7 +3449,9 @@ window.addEventListener('load', () => {
   updateColorDots();
 
   // OS detection for help hotkeys
-  const isMac = /Mac|iPhone|iPod|iPad/.test(navigator.platform);
+  const isMac = navigator.userAgentData?.platform
+    ? navigator.userAgentData.platform === 'macOS'
+    : /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
   const mod = isMac ? '⌘' : 'Ctrl';
   document.getElementById('undo-kbd').textContent = `${mod} + Z`;
   document.getElementById('redo-kbd').textContent = isMac ? `${mod} + ⇧ + Z` : `${mod} + Shift + Z`;
