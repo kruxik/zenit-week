@@ -196,4 +196,32 @@ describe('validateAndRepair', () => {
     const task = data.nodes.find(n => n.id === 'task-1');
     expect(task.parent).toBe('work');
   });
+
+  test('reconstructs a missing branch node', () => {
+    const data = defaultWeekData();
+    data.nodes = data.nodes.filter(n => n.id !== 'work');
+    validateAndRepair(data);
+    expect(data.nodes.find(n => n.id === 'work')).toBeDefined();
+  });
+
+  test('reconstructed missing branch has correct type and empty children', () => {
+    const data = defaultWeekData();
+    data.nodes = data.nodes.filter(n => n.id !== 'family');
+    validateAndRepair(data);
+    const family = data.nodes.find(n => n.id === 'family');
+    expect(family.type).toBe('branch');
+    expect(family.children).toEqual([]);
+  });
+
+  test('children of a missing branch are not silently lost', () => {
+    // If the branch node itself is gone but its children are still in data,
+    // the repair must not garbage-collect those children once the branch is restored.
+    // (Current behaviour GCs them — this test documents the expectation after the fix.)
+    const data = defaultWeekData();
+    data.nodes[0].children = ['task-1'];
+    data.nodes.push({ id: 'task-1', type: 'activity', parent: 'work', label: 'Task', children: [] });
+    data.nodes = data.nodes.filter(n => n.id !== 'work'); // drop the branch
+    validateAndRepair(data);
+    expect(data.nodes.find(n => n.id === 'task-1')).toBeDefined();
+  });
 });

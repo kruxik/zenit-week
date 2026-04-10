@@ -1530,11 +1530,23 @@ function validateAndRepair(data) {
     }
   });
 
-  // 2. Rebuild Parent-Child Symmetry
+  // 2. Reconstruct any missing branch nodes before traversal
+  const defaultBranches = new Map(defaultWeekData().nodes.map(n => [n.id, n]));
+  ['work', 'family', 'me'].forEach(id => {
+    if (!nodeMap.has(id)) {
+      const branch = { ...defaultBranches.get(id) };
+      // Re-attach any surviving nodes that declared this branch as their parent
+      branch.children = data.nodes.filter(n => n.parent === id).map(n => n.id);
+      data.nodes.unshift(branch);
+      nodeMap.set(id, branch);
+    }
+  });
+
+  // 3. Rebuild Parent-Child Symmetry
   // Identify all nodes reachable from the three main branches
-  const reachable = new Set(['work', 'family', 'me']);
+  const reachable = new Set();
   const rootBranches = ['work', 'family', 'me'];
-  
+
   function collect(id, parentId) {
     const n = nodeMap.get(id);
     if (!n) return;
@@ -1546,7 +1558,7 @@ function validateAndRepair(data) {
   }
   rootBranches.forEach(bid => collect(bid, null));
 
-  // 3. Garbage Collection: Remove unreachable nodes
+  // 4. Garbage Collection: Remove unreachable nodes
   data.nodes = data.nodes.filter(n => reachable.has(n.id));
 
   return data;
