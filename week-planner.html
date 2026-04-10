@@ -2443,8 +2443,25 @@ function commitEdit(followUp = 'auto') {
       // Check if it already has a counter child
       const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
       if (counterNode) {
+        const oldMax = counterNode.max;
         counterNode.max = maxVal;
         if (counterNode.val > maxVal) counterNode.val = maxVal;
+        // Trim excess ticks from the bottom up when max is lowered
+        if (maxVal < oldMax && counterNode.ticks && counterNode.ticks.length > maxVal - 1) {
+          counterNode.ticks.splice(maxVal - 1);
+        }
+        // S2: if val no longer reaches new max, reopen counter and parent
+        if (counterNode.val < counterNode.max && counterNode.done) {
+          counterNode.done = false;
+          // The final click was stored as doneAt (not in ticks) — move it to ticks
+          // so the activity log shows it as "+1 Progress" instead of losing it
+          if (counterNode.doneAt) {
+            if (!counterNode.ticks) counterNode.ticks = [];
+            counterNode.ticks.push(counterNode.doneAt);
+            delete counterNode.doneAt;
+          }
+          syncStatusUp(counterNode.id, 'done');
+        }
       } else {
         const counterId = genId();
         const counterNode = {
@@ -2461,6 +2478,19 @@ function commitEdit(followUp = 'auto') {
         weekData.nodes.push(counterNode);
         rebuildNodeMap();
         node.children.push(counterId);
+      }
+    } else {
+      // S1: label no longer has Nx pattern — remove any existing counter child
+      const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+      if (counterNode) {
+        node.children = node.children.filter(id => id !== counterNode.id);
+        weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
+        rebuildNodeMap();
+        if (node.done) {
+          node.done = false;
+          delete node.doneAt;
+        }
+        syncStatusUp(node.id, 'done');
       }
     }
 
