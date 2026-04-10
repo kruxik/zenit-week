@@ -1761,6 +1761,15 @@ function renameNode(id, label) {
   render();
 }
 
+function isLeafActivity(node) {
+  if (!node || node.type === 'branch' || node.type === 'counter') return false;
+  const nonCounterChildren = (node.children || []).filter(cid => {
+    const child = findNode(cid);
+    return child && child.type !== 'counter';
+  });
+  return nonCounterChildren.length === 0;
+}
+
 function setStatus(id, status) {
   const node = findNode(id);
   if (!node) return;
@@ -1778,6 +1787,8 @@ function setStatus(id, status) {
         if (child.type === 'counter') {
           child.val = child.max;
           child.doneAt = new Date().toISOString();
+        } else if (isLeafActivity(child)) {
+          child.doneAt = new Date().toISOString();
         }
         setDescendants(cid, 'done');
       } else if (newStatus === 'undone') {
@@ -1785,13 +1796,17 @@ function setStatus(id, status) {
         if (child.type === 'counter') {
           child.val = Math.max(0, (child.val || 0) - 1);
           delete child.doneAt;
+        } else if (isLeafActivity(child)) {
+          delete child.doneAt;
         }
         setDescendants(cid, 'undone');
       } else if (newStatus === 'unplanned') {
         child.unplanned = true;
+        if (isLeafActivity(child)) child.unplannedAt = new Date().toISOString();
         setDescendants(cid, 'unplanned');
       } else if (newStatus === 'planned') {
         child.unplanned = false;
+        if (isLeafActivity(child)) delete child.unplannedAt;
         setDescendants(cid, 'planned');
       }
     });
@@ -3413,15 +3428,6 @@ window.addEventListener('load', () => {
   document.getElementById('redo-kbd').textContent = isMac ? `${mod} + ⇧ + Z` : `${mod} + Shift + Z`;
 
   // Daily log panel
-  function isLeafActivity(node) {
-    if (node.type === 'branch' || node.type === 'counter') return false;
-    const nonCounterChildren = (node.children || []).filter(cid => {
-      const child = findNode(cid);
-      return child && child.type !== 'counter';
-    });
-    return nonCounterChildren.length === 0;
-  }
-
   function openDailyLog() {
     const today = new Date().toISOString().slice(0, 10);
     const entries = [];
