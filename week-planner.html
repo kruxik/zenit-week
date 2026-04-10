@@ -3328,8 +3328,22 @@ function loadAndRender(wk) {
   redoStack = [];
   document.getElementById('today-btn').style.visibility =
     currentWeekKey === todayWeekKey() ? 'hidden' : 'visible';
+  location.hash = wk;
   render();
 }
+
+window.addEventListener('hashchange', () => {
+  const hashWeek = location.hash.slice(1);
+  if (/^\d{4}-\d{2}$/.test(hashWeek) && hashWeek !== currentWeekKey) {
+    currentWeekKey = hashWeek;
+    weekData = loadWeek(currentWeekKey);
+    undoStack = [];
+    redoStack = [];
+    document.getElementById('today-btn').style.visibility =
+      currentWeekKey === todayWeekKey() ? 'hidden' : 'visible';
+    render();
+  }
+});
 
 document.getElementById('prev-week').addEventListener('click', () => {
   loadAndRender(offsetWeek(currentWeekKey, -1));
@@ -3378,9 +3392,9 @@ document.addEventListener('click', (e) => {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   loadBranchColors();
-  currentWeekKey = todayWeekKey();
-  weekData = loadWeek(currentWeekKey);
-  render();
+  const hashWeek = location.hash.slice(1);
+  const initialWeek = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
+  loadAndRender(initialWeek);
   updateColorDots();
 
   // OS detection for help hotkeys
