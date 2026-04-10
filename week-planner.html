@@ -1436,8 +1436,8 @@ function getNodeSize(nodeId) {
     textW = lines.reduce((max, line, idx) => {
       let lineW = measureText(line, style.fontSize, fontWeight);
       if (idx === 0 && (type === 'activity' || type === 'branch') && !isThisNodeEditing) {
-        const hasIcon = node.unplanned || node.priority === 'high' || node.priority === 'critical';
-        if (hasIcon) lineW += nodeBadgeSize + nodeBadgeGap;
+        if (node.priority === 'high' || node.priority === 'critical') lineW += nodeBadgeSize + nodeBadgeGap;
+        if (node.unplanned) lineW += nodeBadgeSize + nodeBadgeGap;
       }
       return Math.max(max, lineW);
     }, 0);
@@ -2153,27 +2153,40 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       fill: textColor,
       'pointer-events': 'none',
     });
-    const iconName = (node && (isActivity || isBranch) && i === 0)
-      ? (node.unplanned ? 'bolt' : node.priority === 'high' ? 'alert-circle' : node.priority === 'critical' ? 'flame' : null)
-      : null;
     const badgeSize = fontSize;
     const badgeGap  = 4;
-    if (iconName) {
+    const hasPriorityIcon  = node && (isActivity || isBranch) && i === 0
+      && (node.priority === 'high' || node.priority === 'critical');
+    const hasUnplannedIcon = node && (isActivity || isBranch) && i === 0 && node.unplanned;
+
+    if (hasPriorityIcon || hasUnplannedIcon) {
       const textOnlyW = measureText(line, fontSize, fontWeight);
-      // Center [icon + gap + text] as a unit around x=0.
-      // icon center x = -(textOnlyW + badgeGap) / 2
-      const textX    = (badgeSize + badgeGap) / 2;           // text element center (text-anchor:middle)
-      const iconLeft = -(textOnlyW + badgeGap) / 2 - badgeSize / 2; // <use> top-left x
+      const leftW  = hasPriorityIcon  ? badgeSize + badgeGap : 0;
+      const rightW = hasUnplannedIcon ? badgeGap + badgeSize : 0;
+      // Center [priorityIcon?][text][boltIcon?] as a unit around x=0
+      const textX = (leftW - rightW) / 2;
       t.setAttribute('x', textX);
-      const iconEl = svgEl('use', {
-        href: `#icon-${iconName}`,
-        width: badgeSize,
-        height: badgeSize,
-        x: iconLeft,
-        y: textY - badgeSize / 2,
-        style: `color:${textColor}`,
-      });
-      g.appendChild(iconEl);
+
+      if (hasPriorityIcon) {
+        const priorityIcon = node.priority === 'high' ? 'alert-circle' : 'flame';
+        g.appendChild(svgEl('use', {
+          href: `#icon-${priorityIcon}`,
+          width: badgeSize, height: badgeSize,
+          x: textX - textOnlyW / 2 - badgeGap - badgeSize,
+          y: textY - badgeSize / 2 - fontSize * 0.35,
+          style: `color:${textColor};fill:none;stroke:currentColor`,
+        }));
+      }
+
+      if (hasUnplannedIcon) {
+        g.appendChild(svgEl('use', {
+          href: '#icon-bolt',
+          width: badgeSize, height: badgeSize,
+          x: textX + textOnlyW / 2 + badgeGap,
+          y: textY - badgeSize / 2 - fontSize * 0.35,
+          style: `color:${textColor};fill:none;stroke:currentColor`,
+        }));
+      }
     }
     t.textContent = line;
     if (node && node.done && (isActivity || isBranch)) {
