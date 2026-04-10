@@ -1507,6 +1507,9 @@ function validateAndRepair(data) {
     return defaultWeekData();
   }
 
+  // 0. Strip leftover editing flags
+  data.nodes.forEach(n => { delete n._editing; });
+
   const nodeMap = new Map();
   data.nodes.forEach(n => nodeMap.set(n.id, n));
 
