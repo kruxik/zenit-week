@@ -1553,11 +1553,15 @@ function loadWeek(wk) {
     } catch(e) {
       console.warn(`[week-planner] Failed to parse week data for key ${wk} — using defaults:`, e);
     }
-    }
-    return defaultWeekData();
-    }
+  }
+  return defaultWeekData();
+}
 function saveWeek(wk, data) {
-  localStorage.setItem(storageKey(wk), JSON.stringify(data));
+  try {
+    localStorage.setItem(storageKey(wk), JSON.stringify(data));
+  } catch(e) {
+    console.error('[week-planner] Failed to save week data — localStorage may be full:', e);
+  }
 }
 
 function transferUnfinished() {
