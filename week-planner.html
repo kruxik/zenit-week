@@ -1798,7 +1798,7 @@ function addNode(parentId, label) {
     parent: parentId,
     label: label,
     done: false,
-    unplanned: false,
+    unplanned: parent.unplanned || false,
     children: [],
   };
   weekData.nodes.push(node);
@@ -2361,7 +2361,7 @@ function startAddNode(parentId) {
   const id = genId();
   const node = {
     id, type: 'activity', branch, parent: parentId,
-    label: '', done: false, unplanned: false, children: [],
+    label: '', done: false, unplanned: parent.unplanned || false, children: [],
     _editing: true,
   };
   weekData.nodes.push(node);
@@ -2455,6 +2455,7 @@ function commitEdit(followUp = 'auto') {
           label: '0',
           val: 0,
           max: maxVal,
+          unplanned: node.unplanned || false,
           children: []
         };
         weekData.nodes.push(counterNode);
