@@ -2431,8 +2431,14 @@ function syncStatusUp(nodeId, prop) {
   const allTrue = siblings.every(s => s && s[prop]);
 
   if (parent[prop] !== allTrue) {
-    parent[prop] = allTrue;
-    if (prop === 'done') updateNodeUI(parent.id);
+    if (parent.type !== 'branch') {
+      parent[prop] = allTrue;
+      if (prop === 'done') {
+        if (allTrue) parent.doneAt = new Date().toISOString();
+        else delete parent.doneAt;
+        updateNodeUI(parent.id);
+      }
+    }
     syncStatusUp(parent.id, prop);
   }
 }
@@ -3453,9 +3459,7 @@ window.addEventListener('load', () => {
 
     const doneCount       = entries.filter(e => e.type === 'done').length;
     const unplannedCount  = entries.filter(e => e.type === 'unplanned').length;
-    const inProgressCount = weekData.nodes.filter(n =>
-      n.type === 'counter' && !n.done && n.ticks && n.ticks.some(ts => ts.startsWith(today))
-    ).length;
+    const inProgressCount = entries.filter(e => e.type === 'tick').length;
 
     const footer = document.getElementById('daily-log-footer');
     footer.innerHTML = `
