@@ -1502,7 +1502,10 @@ function todayWeekKey() {
 function storageKey(wk) { return `week-planner-${wk}`; }
 
 function validateAndRepair(data) {
-  if (!data || !Array.isArray(data.nodes)) return data;
+  if (!data || !Array.isArray(data.nodes)) {
+    console.error('[week-planner] Corrupted data found in validateAndRepair — resetting to defaults:', data);
+    return defaultWeekData();
+  }
 
   const nodeMap = new Map();
   data.nodes.forEach(n => nodeMap.set(n.id, n));
