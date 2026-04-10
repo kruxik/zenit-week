@@ -1,4 +1,4 @@
-import { getISOWeek, weeksInYear, offsetWeek, weekKey, parseWeekKey } from './setup.js';
+import { getISOWeek, weeksInYear, offsetWeek, weekKey, parseWeekKey, genId } from './setup.js';
 
 describe('getISOWeek', () => {
   test('returns correct week and year for a mid-year date', () => {
@@ -91,5 +91,20 @@ describe('offsetWeek', () => {
 
   test('delta of 0 returns the same key', () => {
     expect(offsetWeek('2026-15', 0)).toBe('2026-15');
+  });
+});
+
+describe('genId', () => {
+  test('starts with "n"', () => {
+    expect(genId().startsWith('n')).toBe(true);
+  });
+
+  test('matches expected format: n + 12 hex characters', () => {
+    expect(genId()).toMatch(/^n[0-9a-f]{12}$/);
+  });
+
+  test('1000 generated IDs are all unique', () => {
+    const ids = Array.from({ length: 1000 }, genId);
+    expect(new Set(ids).size).toBe(1000);
   });
 });
