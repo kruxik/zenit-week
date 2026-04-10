@@ -13,13 +13,40 @@ const match = html.match(/<script>([\s\S]*?)<\/script>/);
 if (!match) throw new Error('Could not extract <script> block from week-planner.html');
 const scriptCode = match[1];
 
+// Reusable stub for DOM elements returned by getElementById / createElement
+function elementStub() {
+  return {
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
+    style: {},
+    contains: () => false,
+    value: '',
+    textContent: '',
+    setAttribute: () => {},
+    getAttribute: () => null,
+    appendChild: () => {},
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+}
+
 // Minimal sandbox — only what the pure functions need.
 // window.addEventListener is stubbed so the 'load' callback never fires.
 const sandbox = {
   crypto: globalThis.crypto,
   console,
   window: { addEventListener: () => {} },
-  document: { getElementById: () => null, createElement: () => ({}) },
+  document: {
+    addEventListener: () => {},
+    getElementById: () => elementStub(),
+    createElement: (tag) => {
+      if (tag === 'canvas') {
+        return { getContext: () => ({ measureText: () => ({ width: 0 }) }) };
+      }
+      return elementStub();
+    },
+  },
   localStorage: { getItem: () => null, setItem: () => {} },
   location: { hash: '' },
   navigator: { userAgentData: null, userAgent: '' },
