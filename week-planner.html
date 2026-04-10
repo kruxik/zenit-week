@@ -917,7 +917,11 @@
     transition: transform 0.3s, background 0.2s, border-color 0.2s;
     box-shadow: 0 2px 6px rgba(0,0,0,0.08);
     z-index: 10;
-    padding-bottom: 2px; /* Visual centering for ▲ */
+    padding-bottom: 2px;
+  }
+
+  #summary-chevron .icon {
+    transform: translateY(1px);
   }
 
   #placeholder-panel:hover #summary-chevron {
@@ -1042,6 +1046,7 @@
   <symbol id="icon-alert-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
   <symbol id="icon-caret-left" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 6l-6 6l6 6v-12"/></symbol>
   <symbol id="icon-caret-right" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 18l6 -6l-6 -6v12"/></symbol>
+  <symbol id="icon-caret-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 14l-6 -6l-6 6h12"/></symbol>
   <symbol id="icon-flame" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.294 -2.333 5.588c0 3.704 3.134 6.706 7 6.706c3.866 0 7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235"/></symbol>
   <symbol id="icon-pencil" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></symbol>
   <symbol id="icon-plus" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14"/><path d="M5 12l14 0"/></symbol>
@@ -1102,7 +1107,7 @@
       <g id="map-root"></g>
     </svg>
     <div id="placeholder-panel">
-      <div id="summary-chevron">▲</div>
+      <div id="summary-chevron"><svg class="icon" aria-hidden="true"><use href="#icon-caret-up"/></svg></div>
       <div id="summary-header">
         <span id="summary-main">Activities Done: 0 (0 %) / 0 😀</span>
       </div>
