@@ -1219,6 +1219,12 @@ let undoStack = [];
 let redoStack = [];
 const MAX_UNDO = 100;
 
+let nodeMap = new Map();
+
+function rebuildNodeMap() {
+  nodeMap = new Map((weekData.nodes || []).map(n => [n.id, n]));
+}
+
 function takeSnapshot() {
   // Deep clone and clean the state before pushing to history
   const clone = JSON.parse(JSON.stringify(weekData));
@@ -1238,6 +1244,7 @@ function undo() {
   redoStack.push(JSON.stringify(weekData));
   const data = JSON.parse(undoStack.pop());
   weekData = validateAndRepair(data);
+  rebuildNodeMap();
   saveWeek(currentWeekKey, weekData);
   render();
 }
@@ -1247,6 +1254,7 @@ function redo() {
   undoStack.push(JSON.stringify(weekData));
   const data = JSON.parse(redoStack.pop());
   weekData = validateAndRepair(data);
+  rebuildNodeMap();
   saveWeek(currentWeekKey, weekData);
   render();
 }
@@ -1620,6 +1628,7 @@ function transferUnfinished() {
     }
     weekData.nodes.push(newNode);
   });
+  rebuildNodeMap();
 
   saveWeek(currentWeekKey, weekData);
   render();
@@ -1640,7 +1649,7 @@ function genId() {
 }
 
 function findNode(id) {
-  return weekData.nodes.find(n => n.id === id);
+  return nodeMap.get(id);
 }
 
 function isHighPriority(nodeId) {
@@ -1742,6 +1751,7 @@ function addNode(parentId, label) {
     children: [],
   };
   weekData.nodes.push(node);
+  rebuildNodeMap();
   parent.children.push(node.id);
   saveWeek(currentWeekKey, weekData);
   render();
@@ -1761,6 +1771,7 @@ function deleteNode(id) {
   }
 
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
+  rebuildNodeMap();
   saveWeek(currentWeekKey, weekData);
   render();
 }
@@ -2278,6 +2289,7 @@ function startAddNode(parentId) {
     _editing: true,
   };
   weekData.nodes.push(node);
+  rebuildNodeMap();
   parent.children.push(id);
   _openInlineInput(id, true);
 }
@@ -2370,6 +2382,7 @@ function commitEdit(followUp = 'auto') {
           children: []
         };
         weekData.nodes.push(counterNode);
+        rebuildNodeMap();
         node.children.push(counterId);
       }
     }
@@ -2405,6 +2418,7 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
       if (parent) parent.children = parent.children.filter(c => c !== nodeId);
     }
     weekData.nodes = weekData.nodes.filter(n => n.id !== nodeId);
+    rebuildNodeMap();
   } else {
     const node = findNode(nodeId);
     if (node) { node.label = originalLabel; delete node._editing; }
@@ -3309,6 +3323,7 @@ function handleNodeDrop(mouseX, mouseY) {
       }
       otherBranches.splice(insertIdx, 0, node);
       weekData.nodes = [...otherBranches, ...nonBranches];
+      rebuildNodeMap();
     }
     
     // Clear offsets for descendants
@@ -3361,6 +3376,7 @@ document.getElementById('reset-view').addEventListener('click', resetView);
 function loadAndRender(wk) {
   currentWeekKey = wk;
   weekData = loadWeek(wk);
+  rebuildNodeMap();
   undoStack = [];
   redoStack = [];
   document.getElementById('today-btn').style.visibility =
@@ -3374,6 +3390,7 @@ window.addEventListener('hashchange', () => {
   if (/^\d{4}-\d{2}$/.test(hashWeek) && hashWeek !== currentWeekKey) {
     currentWeekKey = hashWeek;
     weekData = loadWeek(currentWeekKey);
+    rebuildNodeMap();
     undoStack = [];
     redoStack = [];
     document.getElementById('today-btn').style.visibility =
@@ -3415,6 +3432,7 @@ resetDataBtn.addEventListener('click', () => {
       takeSnapshot();
       localStorage.removeItem(storageKey(currentWeekKey));
       weekData = loadWeek(currentWeekKey);
+      rebuildNodeMap();
       render();
     }
   );
