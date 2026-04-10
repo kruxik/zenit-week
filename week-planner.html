@@ -1777,13 +1777,27 @@ function setStatus(id, status) {
         if (!child.done) {
           child.done = true;
           child._prevDone = false; // Mark as forced done
+          if (child.type === 'counter') {
+            child._prevVal = child.val || 0;
+            child.val = child.max;
+            child.doneAt = new Date().toISOString();
+          }
           setDescendants(cid, 'done');
         }
       } else if (newStatus === 'undone') {
         if (child._prevDone === false) {
           child.done = false;
           delete child._prevDone;
+          if (child.type === 'counter') {
+            child.val = (child._prevVal !== undefined) ? child._prevVal : Math.max(0, (child.val || 0) - 1);
+            delete child._prevVal;
+            delete child.doneAt;
+          }
           setDescendants(cid, 'undone');
+        } else if (child.type === 'counter' && child.done && child._prevDone === undefined) {
+          child.val = Math.max(0, (child.val || 0) - 1);
+          child.done = false;
+          delete child.doneAt;
         }
       } else if (newStatus === 'unplanned') {
         child.unplanned = true;
@@ -1812,12 +1826,14 @@ function setStatus(id, status) {
   if (status === 'done') {
     node.done = true;
     node.doneAt = new Date().toISOString();
+    if (node.type === 'counter') node.val = node.max;
     setDescendants(id, 'done');
     syncStatusUp(id, 'done');
   } else if (status === 'undone') {
     node.done = false;
     delete node.doneAt;
     delete node._prevDone;
+    if (node.type === 'counter') node.val = Math.max(0, (node.val || 0) - 1);
     setDescendants(id, 'undone');
     syncStatusUp(id, 'done');
   } else if (status === 'unplanned') {
@@ -3410,8 +3426,15 @@ window.addEventListener('load', () => {
 
     weekData.nodes.forEach(node => {
       if (node.doneAt && node.doneAt.startsWith(today)) {
-        const doneParent = node.type === 'counter' ? findNode(node.parent) : null;
-        entries.push({ ts: node.doneAt, type: 'done', node, parent: doneParent });
+        if (node.type === 'counter') {
+          const doneParent = findNode(node.parent);
+          const parentAlsoDoneToday = doneParent && doneParent.doneAt && doneParent.doneAt.startsWith(today);
+          if (!parentAlsoDoneToday) {
+            entries.push({ ts: node.doneAt, type: 'done', node, parent: doneParent });
+          }
+        } else {
+          entries.push({ ts: node.doneAt, type: 'done', node, parent: null });
+        }
       }
       if (node.unplannedAt && node.unplannedAt.startsWith(today)) {
         entries.push({ ts: node.unplannedAt, type: 'unplanned', node });
