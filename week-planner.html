@@ -1295,7 +1295,9 @@ function loadBranchColors() {
     ['work', 'family', 'me'].forEach(b => {
       if (saved[b] && saved[b].main) BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
     });
-  } catch(e) {}
+  } catch(e) {
+    console.warn('[week-planner] Failed to load branch colors from localStorage:', e);
+  }
 }
 
 function saveBranchColors() {
@@ -1545,14 +1547,15 @@ function validateAndRepair(data) {
 function loadWeek(wk) {
   const raw = localStorage.getItem(storageKey(wk));
   if (raw) {
-    try { 
+    try {
       const data = JSON.parse(raw);
       return validateAndRepair(data);
-    } catch(e) {}
-  }
-  return defaultWeekData();
-}
-
+    } catch(e) {
+      console.warn(`[week-planner] Failed to parse week data for key ${wk} — using defaults:`, e);
+    }
+    }
+    return defaultWeekData();
+    }
 function saveWeek(wk, data) {
   localStorage.setItem(storageKey(wk), JSON.stringify(data));
 }
