@@ -33,6 +33,25 @@ describe('weeksInYear', () => {
   test('returns 53 for 2026 (53-week year)', () => {
     expect(weeksInYear(2026)).toBe(53);
   });
+
+  test('returns 53 for 2015 (53-week year)', () => {
+    expect(weeksInYear(2015)).toBe(53);
+  });
+
+  // Timezone-safety: weeksInYear internally constructs Date.UTC(year, 11, 28).
+  // In UTC-negative timezones that midnight UTC timestamp reads as Dec 27 locally,
+  // which is week 52 — wrong for 53-week years like 2020.
+  // The fix (noon UTC) ensures Dec 28 is always read as Dec 28 in any timezone.
+  // This test verifies getISOWeek is given a date that is unambiguously Dec 28 UTC.
+  test('getISOWeek on Dec 28 noon UTC of a 53-week year always returns week 53', () => {
+    const dec28Noon = new Date(Date.UTC(2020, 11, 28, 12, 0, 0));
+    expect(getISOWeek(dec28Noon).week).toBe(53);
+  });
+
+  test('getISOWeek on Dec 28 noon UTC of a 52-week year always returns week 52', () => {
+    const dec28Noon = new Date(Date.UTC(2025, 11, 28, 12, 0, 0));
+    expect(getISOWeek(dec28Noon).week).toBe(52);
+  });
 });
 
 describe('weekKey', () => {
