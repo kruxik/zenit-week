@@ -1,4 +1,4 @@
-import { getISOWeek, weeksInYear, offsetWeek, weekKey, parseWeekKey, genId } from './setup.js';
+import { getISOWeek, weeksInYear, offsetWeek, weekKey, parseWeekKey, genId, defaultWeekData, validateAndRepair } from './setup.js';
 
 describe('getISOWeek', () => {
   test('returns correct week and year for a mid-year date', () => {
@@ -106,5 +106,75 @@ describe('genId', () => {
   test('1000 generated IDs are all unique', () => {
     const ids = Array.from({ length: 1000 }, genId);
     expect(new Set(ids).size).toBe(1000);
+  });
+});
+
+describe('defaultWeekData', () => {
+  test('returns exactly three branch nodes', () => {
+    expect(defaultWeekData().nodes).toHaveLength(3);
+  });
+
+  test('branch ids are work, family, me', () => {
+    const ids = defaultWeekData().nodes.map(n => n.id);
+    expect(ids).toEqual(['work', 'family', 'me']);
+  });
+
+  test('every node has type "branch" and an empty children array', () => {
+    defaultWeekData().nodes.forEach(n => {
+      expect(n.type).toBe('branch');
+      expect(n.children).toEqual([]);
+    });
+  });
+});
+
+describe('validateAndRepair', () => {
+  test('null input returns default week data shape', () => {
+    const result = validateAndRepair(null);
+    expect(result.nodes.map(n => n.id)).toEqual(['work', 'family', 'me']);
+  });
+
+  test('object without nodes array returns default week data shape', () => {
+    const result = validateAndRepair({});
+    expect(result.nodes.map(n => n.id)).toEqual(['work', 'family', 'me']);
+  });
+
+  test('strips _editing flag from all nodes', () => {
+    const data = defaultWeekData();
+    data.nodes[0]._editing = true;
+    validateAndRepair(data);
+    expect(data.nodes[0]._editing).toBeUndefined();
+  });
+
+  test('removes dead child references', () => {
+    const data = defaultWeekData();
+    data.nodes[0].children = ['ghost-id'];
+    validateAndRepair(data);
+    expect(data.nodes[0].children).toEqual([]);
+  });
+
+  test('removes orphaned nodes not reachable from any branch', () => {
+    const data = defaultWeekData();
+    data.nodes.push({ id: 'orphan', type: 'activity', parent: null, children: [] });
+    validateAndRepair(data);
+    const ids = data.nodes.map(n => n.id);
+    expect(ids).not.toContain('orphan');
+  });
+
+  test('valid data passes through unchanged', () => {
+    const data = defaultWeekData();
+    data.nodes[0].children = ['task-1'];
+    data.nodes.push({ id: 'task-1', type: 'activity', parent: 'work', label: 'Write tests', children: [] });
+    validateAndRepair(data);
+    const ids = data.nodes.map(n => n.id);
+    expect(ids).toContain('task-1');
+  });
+
+  test('repairs dangling parent ref when parent exists in the tree', () => {
+    const data = defaultWeekData();
+    data.nodes[0].children = ['task-1'];
+    data.nodes.push({ id: 'task-1', type: 'activity', parent: 'WRONG', label: 'Task', children: [] });
+    validateAndRepair(data);
+    const task = data.nodes.find(n => n.id === 'task-1');
+    expect(task.parent).toBe('work');
   });
 });
