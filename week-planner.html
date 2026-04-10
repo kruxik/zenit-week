@@ -3597,7 +3597,16 @@ window.addEventListener('load', () => {
 });
 
 window.addEventListener('resize', () => {
-  resetView();
+  // Only reset if the map origin has drifted fully off-screen
+  const svg = document.getElementById('main-svg');
+  const w = svg.clientWidth || 800;
+  const h = svg.clientHeight || 600;
+  if (panX < 0 || panX > w || panY < 0 || panY > h) {
+    resetView();
+  }
+  if (typeof editState !== 'undefined' && editState) {
+    resizeInlineInput();
+  }
 });
 </script>
 <div id="custom-tooltip"></div>
