@@ -9,7 +9,7 @@ Each item includes enough context for an AI agent (Claude Code, Gemini, etc.) to
 
 ### 1. Add LICENSE file
 **File to create:** `LICENSE`
-**Action:** Create a standard MIT License file. Use the year 2026 and author name "Petr Krůžela" (or update to real author name).
+**Action:** Create a standard MIT License file. Use the year 2026 and author name "Petr Burian" (or update to real author name).
 **Why:** Without a license, the code is legally unusable by others. This is the single most important step for open-source.
 
 ---
