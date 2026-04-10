@@ -1774,31 +1774,19 @@ function setStatus(id, status) {
       if (!child) return;
 
       if (newStatus === 'done') {
-        if (!child.done) {
-          child.done = true;
-          child._prevDone = false; // Mark as forced done
-          if (child.type === 'counter') {
-            child._prevVal = child.val || 0;
-            child.val = child.max;
-            child.doneAt = new Date().toISOString();
-          }
-          setDescendants(cid, 'done');
+        child.done = true;
+        if (child.type === 'counter') {
+          child.val = child.max;
+          child.doneAt = new Date().toISOString();
         }
+        setDescendants(cid, 'done');
       } else if (newStatus === 'undone') {
-        if (child._prevDone === false) {
-          child.done = false;
-          delete child._prevDone;
-          if (child.type === 'counter') {
-            child.val = (child._prevVal !== undefined) ? child._prevVal : Math.max(0, (child.val || 0) - 1);
-            delete child._prevVal;
-            delete child.doneAt;
-          }
-          setDescendants(cid, 'undone');
-        } else if (child.type === 'counter' && child.done && child._prevDone === undefined) {
+        child.done = false;
+        if (child.type === 'counter') {
           child.val = Math.max(0, (child.val || 0) - 1);
-          child.done = false;
           delete child.doneAt;
         }
+        setDescendants(cid, 'undone');
       } else if (newStatus === 'unplanned') {
         child.unplanned = true;
         setDescendants(cid, 'unplanned');
@@ -1832,7 +1820,6 @@ function setStatus(id, status) {
   } else if (status === 'undone') {
     node.done = false;
     delete node.doneAt;
-    delete node._prevDone;
     if (node.type === 'counter') node.val = Math.max(0, (node.val || 0) - 1);
     setDescendants(id, 'undone');
     syncStatusUp(id, 'done');
@@ -3426,25 +3413,20 @@ window.addEventListener('load', () => {
   document.getElementById('redo-kbd').textContent = isMac ? `${mod} + ⇧ + Z` : `${mod} + Shift + Z`;
 
   // Daily log panel
+  function isLeafActivity(node) {
+    if (node.type === 'branch' || node.type === 'counter') return false;
+    const nonCounterChildren = (node.children || []).filter(cid => {
+      const child = findNode(cid);
+      return child && child.type !== 'counter';
+    });
+    return nonCounterChildren.length === 0;
+  }
+
   function openDailyLog() {
     const today = new Date().toISOString().slice(0, 10);
     const entries = [];
 
     weekData.nodes.forEach(node => {
-      if (node.doneAt && node.doneAt.startsWith(today)) {
-        if (node.type === 'counter') {
-          const doneParent = findNode(node.parent);
-          const parentAlsoDoneToday = doneParent && doneParent.doneAt && doneParent.doneAt.startsWith(today);
-          if (!parentAlsoDoneToday) {
-            entries.push({ ts: node.doneAt, type: 'done', node, parent: doneParent });
-          }
-        } else {
-          entries.push({ ts: node.doneAt, type: 'done', node, parent: null });
-        }
-      }
-      if (node.unplannedAt && node.unplannedAt.startsWith(today)) {
-        entries.push({ ts: node.unplannedAt, type: 'unplanned', node });
-      }
       if (node.type === 'counter' && node.ticks) {
         const parent = findNode(node.parent);
         node.ticks.forEach(ts => {
@@ -3452,6 +3434,14 @@ window.addEventListener('load', () => {
             entries.push({ ts, type: 'tick', node, parent });
           }
         });
+        return;
+      }
+      if (!isLeafActivity(node)) return;
+      if (node.doneAt && node.doneAt.startsWith(today)) {
+        entries.push({ ts: node.doneAt, type: 'done', node, parent: null });
+      }
+      if (node.unplannedAt && node.unplannedAt.startsWith(today)) {
+        entries.push({ ts: node.unplannedAt, type: 'unplanned', node });
       }
     });
 
@@ -3496,7 +3486,7 @@ window.addEventListener('load', () => {
 
         const label = document.createElement('div');
         label.className = 'daily-log-label';
-        label.textContent = ((type === 'tick' || type === 'done') && parent ? parent.label : node.label) || '(no label)';
+        label.textContent = (type === 'tick' && parent ? parent.label : node.label) || '(no label)';
 
         const time = document.createElement('div');
         time.className = 'daily-log-time';
