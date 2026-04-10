@@ -2198,15 +2198,17 @@ function taperedPathD(x1, y1, x2, y2, swStart, swEnd) {
 
 function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId, defsEl) {
   const gradId = `grad-${fromId || 'c'}-${toId || 'c'}`;
-  const grad = svgEl('linearGradient', {
-    id: gradId, gradientUnits: 'userSpaceOnUse',
-    x1: x1, y1: y1, x2: x2, y2: y2
-  });
-  const stop1 = svgEl('stop', { offset: '0%',   'stop-color': colorHex, 'stop-opacity': '0.9' });
-  const stop2 = svgEl('stop', { offset: '100%', 'stop-color': colorHex, 'stop-opacity': '0.4' });
-  grad.appendChild(stop1);
-  grad.appendChild(stop2);
-  defsEl.appendChild(grad);
+
+  let grad = defsEl.querySelector(`#${gradId}`);
+  if (!grad) {
+    grad = svgEl('linearGradient', { id: gradId, gradientUnits: 'userSpaceOnUse' });
+    grad.appendChild(svgEl('stop', { offset: '0%', 'stop-color': colorHex, 'stop-opacity': '0.9' }));
+    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': colorHex, 'stop-opacity': '0.4' }));
+    defsEl.appendChild(grad);
+  }
+
+  grad.setAttribute('x1', x1); grad.setAttribute('y1', y1);
+  grad.setAttribute('x2', x2); grad.setAttribute('y2', y2);
 
   const path = svgEl('path', {
     d: taperedPathD(x1, y1, x2, y2, swStart, swEnd),
