@@ -3423,8 +3423,8 @@ window.addEventListener('load', () => {
     const footer = document.getElementById('daily-log-footer');
     footer.innerHTML = `
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">✓ ${doneCount}</span> Done</div>
-      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge unplanned">⚡ ${unplannedCount}</span> Unplanned</div>
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge progress">◑ ${inProgressCount}</span> In Progress</div>
+      <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge unplanned">⚡ ${unplannedCount}</span> Unplanned</div>
     `;
 
     const content = document.getElementById('daily-log-content');
