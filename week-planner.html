@@ -562,6 +562,17 @@
     overflow-y: auto;
   }
 
+  #daily-log-footer {
+    padding: 12px 24px;
+    border-top: 1px solid #eee;
+    font-size: 13px;
+    color: #555;
+  }
+  #daily-log-footer span {
+    font-weight: 700;
+    color: #333;
+  }
+
   .daily-log-empty {
     text-align: center;
     color: #aaa;
@@ -1124,6 +1135,7 @@
       <div id="daily-log-close">✕</div>
     </div>
     <div id="daily-log-content"></div>
+    <div id="daily-log-footer"></div>
   </div>
 </div>
 
@@ -3386,6 +3398,15 @@ window.addEventListener('load', () => {
     });
 
     entries.sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
+
+    const doneCount       = entries.filter(e => e.type === 'done').length;
+    const unplannedCount  = entries.filter(e => e.type === 'unplanned').length;
+    const inProgressCount = weekData.nodes.filter(n =>
+      n.type === 'counter' && !n.done && n.ticks && n.ticks.some(ts => ts.startsWith(today))
+    ).length;
+
+    const footer = document.getElementById('daily-log-footer');
+    footer.innerHTML = `Done: <span>${doneCount}</span>&nbsp;&nbsp;Unplanned: <span>${unplannedCount}</span>&nbsp;&nbsp;In Progress: <span>${inProgressCount}</span>`;
 
     const content = document.getElementById('daily-log-content');
     content.innerHTML = '';
