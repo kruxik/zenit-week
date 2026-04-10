@@ -563,15 +563,30 @@
   }
 
   #daily-log-footer {
-    padding: 12px 24px;
+    padding: 14px 24px;
     border-top: 1px solid #eee;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-radius: 0 0 20px 20px;
+  }
+  .daily-log-footer-stat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     font-size: 13px;
     color: #555;
   }
-  #daily-log-footer span {
+  .daily-log-footer-badge {
+    font-size: 12px;
     font-weight: 700;
-    color: #333;
+    padding: 2px 9px;
+    border-radius: 12px;
   }
+  .daily-log-footer-badge.done     { background: #e6f4ea; color: #1e8e3e; }
+  .daily-log-footer-badge.unplanned{ background: #fce8e6; color: #c5221f; }
+  .daily-log-footer-badge.progress  { background: #e8f0fe; color: #1a73e8; }
 
   .daily-log-empty {
     text-align: center;
@@ -3406,7 +3421,11 @@ window.addEventListener('load', () => {
     ).length;
 
     const footer = document.getElementById('daily-log-footer');
-    footer.innerHTML = `Done: <span>${doneCount}</span>&nbsp;&nbsp;Unplanned: <span>${unplannedCount}</span>&nbsp;&nbsp;In Progress: <span>${inProgressCount}</span>`;
+    footer.innerHTML = `
+      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">✓ ${doneCount}</span> Done</div>
+      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge unplanned">⚡ ${unplannedCount}</span> Unplanned</div>
+      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge progress">◑ ${inProgressCount}</span> In Progress</div>
+    `;
 
     const content = document.getElementById('daily-log-content');
     content.innerHTML = '';
