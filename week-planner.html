@@ -102,35 +102,62 @@
     text-align: center;
   }
 
-  #zoom-controls {
+  #zoom-slider-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 10px;
   }
-
-  .zoom-btn {
-    background: #fff;
-    border: 1px solid #dcdcdc;
-    border-radius: 8px;
-    width: 36px;
-    height: 36px;
-    cursor: pointer;
-    font-size: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    color: #444;
-  }
-
-  .zoom-btn:hover { background: #f8f8f8; border-color: #bbb; }
 
   #zoom-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: #666;
-    min-width: 45px;
-    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #888;
+    letter-spacing: 0.3px;
+  }
+
+  #zoom-track {
+    position: relative;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  #zoom-track-bg {
+    position: absolute;
+    left: 0; right: 0;
+    height: 4px;
+    background: rgba(0,0,0,0.10);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  #zoom-fill {
+    height: 100%;
+    background: #555;
+    border-radius: 2px;
+    width: 0%;
+  }
+
+  #zoom-thumb {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1.5px solid rgba(0,0,0,0.18);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.18);
+    transform: translateX(-50%);
+    top: 50%;
+    margin-top: -9px;
+    pointer-events: none;
+    transition: box-shadow 0.15s;
+  }
+
+  #zoom-track:active #zoom-thumb,
+  #zoom-track.dragging #zoom-thumb {
+    box-shadow: 0 0 0 4px rgba(0,0,0,0.08), 0 1px 5px rgba(0,0,0,0.18);
   }
 
   .reset-btn {
@@ -301,20 +328,21 @@
 
   #settings-dropdown {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 8px);
     right: 0;
-    margin-top: 8px;
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-    padding: 12px;
+    background: rgba(255,255,255,0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0,0,0,0.10);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+    padding: 10px;
     z-index: 1000;
-    min-width: 220px;
+    min-width: 200px;
     display: none;
     flex-direction: column;
-    gap: 12px;
-    animation: fadeIn 0.1s ease-out;
+    gap: 4px;
+    animation: fadeIn 0.12s ease-out;
   }
 
   #settings-dropdown.visible {
@@ -324,15 +352,41 @@
   .settings-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    padding: 4px 2px;
   }
 
   .settings-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    color: #999;
+    color: #aaa;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
+    padding: 0 2px;
+  }
+
+  #reset-view {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #444;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: none;
+  }
+
+  #reset-view:hover {
+    background: rgba(0,0,0,0.05);
+    transform: none;
+    box-shadow: none;
   }
 
   .reset-btn.danger {
@@ -1152,27 +1206,29 @@
     </div>
     <div id="toolbar-right">
       <div id="settings-container">
-        <button class="reset-btn" id="settings-btn">
-          <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg> Settings
+        <button class="nav-btn" id="settings-btn" title="Settings">
+          <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
         </button>
         <div id="settings-dropdown">
-        <div class="settings-section">
-          <div class="settings-label">Zoom</div>
-          <div id="zoom-controls">
-            <button class="zoom-btn" id="zoom-out" title="Zoom out">−</button>
-            <div id="zoom-label">100%</div>
-            <button class="zoom-btn" id="zoom-in" title="Zoom in">+</button>
+          <div class="settings-section">
+            <div id="zoom-slider-header">
+              <div class="settings-label">Zoom</div>
+              <div id="zoom-label">100%</div>
+            </div>
+            <div id="zoom-track">
+              <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
+              <div id="zoom-thumb"></div>
+            </div>
           </div>
-        </div>
-        <div class="ctx-separator"></div>
-        <div class="settings-section">
-          <div class="settings-label">View</div>
-          <button class="reset-btn" id="reset-view" style="width:100%">Reset View</button>
+          <div class="ctx-separator"></div>
+          <div class="settings-section">
+            <div class="settings-label">View</div>
+            <button id="reset-view">Reset View</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
   <div id="canvas-container">
     <div id="view-level-bar">
@@ -3632,11 +3688,18 @@ document.addEventListener('contextmenu', (e) => {
 const container = document.getElementById('canvas-container');
 const mapRoot   = document.getElementById('map-root');
 
+const ZOOM_MIN = 0.2, ZOOM_MAX = 3;
+
 function applyTransform() {
   mapRoot.setAttribute('transform',
     `translate(${panX},${panY}) scale(${zoom})`
   );
   document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
+  const pct = (zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 100;
+  const fill  = document.getElementById('zoom-fill');
+  const thumb = document.getElementById('zoom-thumb');
+  if (fill)  fill.style.width = pct + '%';
+  if (thumb) thumb.style.left = pct + '%';
 }
 
 function resetView() {
@@ -3650,7 +3713,7 @@ function resetView() {
 }
 
 function zoomAt(cx, cy, factor) {
-  const newZoom = Math.max(0.2, Math.min(3, zoom * factor));
+  const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * factor));
   // Adjust pan so the point under cursor stays fixed
   panX = cx - (cx - panX) * (newZoom / zoom);
   panY = cy - (cy - panY) * (newZoom / zoom);
@@ -3877,18 +3940,52 @@ function handleNodeDrop(mouseX, mouseY) {
   render();
 }
 
-document.getElementById('zoom-in').addEventListener('click', () => {
+// ─── Zoom Slider ──────────────────────────────────────────────────────────────
+const zoomTrack = document.getElementById('zoom-track');
+
+function zoomFromClientX(clientX) {
+  const rect = zoomTrack.getBoundingClientRect();
+  const pct  = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const newZoom = ZOOM_MIN + pct * (ZOOM_MAX - ZOOM_MIN);
   const svg = document.getElementById('main-svg');
   const w = svg.clientWidth  || 800;
   const h = svg.clientHeight || 600;
-  zoomAt(w / 2, h / 2, 1.2);
+  zoomAt(w / 2, h / 2, newZoom / zoom);
+}
+
+let zoomDragging = false;
+
+zoomTrack.addEventListener('mousedown', (e) => {
+  e.stopPropagation();
+  zoomDragging = true;
+  zoomTrack.classList.add('dragging');
+  zoomFromClientX(e.clientX);
 });
 
-document.getElementById('zoom-out').addEventListener('click', () => {
-  const svg = document.getElementById('main-svg');
-  const w = svg.clientWidth  || 800;
-  const h = svg.clientHeight || 600;
-  zoomAt(w / 2, h / 2, 1 / 1.2);
+document.addEventListener('mousemove', (e) => {
+  if (!zoomDragging) return;
+  zoomFromClientX(e.clientX);
+});
+
+document.addEventListener('mouseup', () => {
+  if (!zoomDragging) return;
+  zoomDragging = false;
+  zoomTrack.classList.remove('dragging');
+});
+
+zoomTrack.addEventListener('touchstart', (e) => {
+  e.stopPropagation();
+  zoomTrack.classList.add('dragging');
+  zoomFromClientX(e.touches[0].clientX);
+}, { passive: true });
+
+zoomTrack.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  zoomFromClientX(e.touches[0].clientX);
+}, { passive: false });
+
+zoomTrack.addEventListener('touchend', () => {
+  zoomTrack.classList.remove('dragging');
 });
 
 document.getElementById('reset-view').addEventListener('click', resetView);
