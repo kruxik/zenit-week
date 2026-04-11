@@ -113,6 +113,15 @@
     font-weight: 700;
     color: #888;
     letter-spacing: 0.3px;
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 1px 4px;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  #zoom-label:hover {
+    background: rgba(0,0,0,0.07);
+    color: #444;
   }
 
   #zoom-track {
@@ -140,6 +149,30 @@
     width: 0%;
   }
 
+  #zoom-default-marker {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 12px;
+    background: rgba(0,0,0,0.18);
+    border-radius: 1px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: background 0.2s, height 0.2s, box-shadow 0.2s;
+    z-index: 1;
+  }
+
+  #zoom-track.near-default #zoom-default-marker {
+    background: rgba(0,0,0,0.35);
+    height: 14px;
+  }
+
+  #zoom-track.snapped #zoom-default-marker {
+    background: #111;
+    height: 16px;
+    box-shadow: 0 0 6px rgba(0,0,0,0.2);
+  }
+
   #zoom-thumb {
     position: absolute;
     width: 18px;
@@ -152,12 +185,30 @@
     top: 50%;
     margin-top: -9px;
     pointer-events: none;
-    transition: box-shadow 0.15s;
+    transition: box-shadow 0.2s,
+                transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                background 0.2s,
+                border-color 0.2s;
   }
 
   #zoom-track:active #zoom-thumb,
   #zoom-track.dragging #zoom-thumb {
-    box-shadow: 0 0 0 4px rgba(0,0,0,0.08), 0 1px 5px rgba(0,0,0,0.18);
+    box-shadow: 0 0 0 5px rgba(0,0,0,0.07), 0 1px 5px rgba(0,0,0,0.18);
+  }
+
+  #zoom-track.snapped #zoom-thumb {
+    transform: translateX(-50%) scale(1.22);
+    background: #1a1a1a;
+    border-color: transparent;
+    box-shadow: 0 0 0 5px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.3);
+  }
+
+  #zoom-fill {
+    transition: background 0.2s;
+  }
+
+  #zoom-track.snapped #zoom-fill {
+    background: #111;
   }
 
   .reset-btn {
@@ -365,29 +416,6 @@
     padding: 0 2px;
   }
 
-  #reset-view {
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    padding: 7px 10px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #444;
-    cursor: pointer;
-    text-align: left;
-    transition: background 0.15s;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: none;
-  }
-
-  #reset-view:hover {
-    background: rgba(0,0,0,0.05);
-    transform: none;
-    box-shadow: none;
-  }
 
   .reset-btn.danger {
     background: #fff;
@@ -1213,17 +1241,13 @@
           <div class="settings-section">
             <div id="zoom-slider-header">
               <div class="settings-label">Zoom</div>
-              <div id="zoom-label">100%</div>
+              <div id="zoom-label" title="Click to reset view">100%</div>
             </div>
             <div id="zoom-track">
               <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
+              <div id="zoom-default-marker"></div>
               <div id="zoom-thumb"></div>
             </div>
-          </div>
-          <div class="ctx-separator"></div>
-          <div class="settings-section">
-            <div class="settings-label">View</div>
-            <button id="reset-view">Reset View</button>
           </div>
         </div>
       </div>
@@ -3688,7 +3712,7 @@ document.addEventListener('contextmenu', (e) => {
 const container = document.getElementById('canvas-container');
 const mapRoot   = document.getElementById('map-root');
 
-const ZOOM_MIN = 0.2, ZOOM_MAX = 3;
+const ZOOM_MIN = 0.2, ZOOM_MAX = 3, ZOOM_DEFAULT = 0.65;
 
 function applyTransform() {
   mapRoot.setAttribute('transform',
@@ -3700,13 +3724,19 @@ function applyTransform() {
   const thumb = document.getElementById('zoom-thumb');
   if (fill)  fill.style.width = pct + '%';
   if (thumb) thumb.style.left = pct + '%';
+  const trackEl = document.getElementById('zoom-track');
+  if (trackEl) {
+    const diff = Math.abs(zoom - ZOOM_DEFAULT);
+    trackEl.classList.toggle('snapped',      diff < 0.005);
+    trackEl.classList.toggle('near-default', diff >= 0.005 && diff < 0.18);
+  }
 }
 
 function resetView() {
   const svg = document.getElementById('main-svg');
   const w = svg.clientWidth  || svg.getBoundingClientRect().width  || 800;
   const h = svg.clientHeight || svg.getBoundingClientRect().height || 600;
-  zoom = 0.65;
+  zoom = ZOOM_DEFAULT;
   panX = w / 2;
   panY = h / 2;
   applyTransform();
@@ -3946,7 +3976,20 @@ const zoomTrack = document.getElementById('zoom-track');
 function zoomFromClientX(clientX) {
   const rect = zoomTrack.getBoundingClientRect();
   const pct  = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  const newZoom = ZOOM_MIN + pct * (ZOOM_MAX - ZOOM_MIN);
+  let newZoom = ZOOM_MIN + pct * (ZOOM_MAX - ZOOM_MIN);
+
+  // Magnetic snap: pull zone eases toward default, snap zone locks in
+  const PULL_ZONE = 0.22;
+  const SNAP_ZONE = 0.09;
+  const diff = newZoom - ZOOM_DEFAULT;
+  const absDiff = Math.abs(diff);
+  if (absDiff < SNAP_ZONE) {
+    newZoom = ZOOM_DEFAULT;                                   // hard snap
+  } else if (absDiff < PULL_ZONE) {
+    const t = 1 - (absDiff - SNAP_ZONE) / (PULL_ZONE - SNAP_ZONE);
+    newZoom -= diff * t * 0.55;                               // soft pull
+  }
+
   const svg = document.getElementById('main-svg');
   const w = svg.clientWidth  || 800;
   const h = svg.clientHeight || 600;
@@ -3988,7 +4031,7 @@ zoomTrack.addEventListener('touchend', () => {
   zoomTrack.classList.remove('dragging');
 });
 
-document.getElementById('reset-view').addEventListener('click', resetView);
+document.getElementById('zoom-label').addEventListener('click', resetView);
 
 // ─── View Level Bar ────────────────────────────────────────────────────────────
 document.getElementById('view-level-bar').addEventListener('mousedown', e => e.stopPropagation());
@@ -4064,6 +4107,13 @@ window.addEventListener('load', () => {
   const initialWeek = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
   loadAndRender(initialWeek);
   updateColorDots();
+
+  // Position the default-zoom marker on the track
+  const defaultMarker = document.getElementById('zoom-default-marker');
+  if (defaultMarker) {
+    const defaultPct = (ZOOM_DEFAULT - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 100;
+    defaultMarker.style.left = defaultPct + '%';
+  }
 
   // OS detection for help hotkeys
   const isMac = navigator.userAgentData?.platform
