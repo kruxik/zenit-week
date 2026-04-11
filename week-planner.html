@@ -199,7 +199,7 @@
   /* ─── View Level Bar ─────────────────────────────────────────────────────── */
   #view-level-bar {
     position: absolute;
-    right: 16px;
+    right: 24px;
     top: 50%;
     transform: translateY(-50%);
     display: flex;
@@ -208,10 +208,10 @@
     gap: 0;
     background: rgba(255,255,255,0.92);
     backdrop-filter: blur(8px);
-    border: 1.5px solid rgba(0,0,0,0.12);
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
-    padding: 4px;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    padding: 3px;
     z-index: 20;
     user-select: none;
   }
@@ -221,14 +221,14 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    width: 58px;
-    padding: 10px 6px;
-    border-radius: 8px;
+    gap: 3px;
+    width: 36px;
+    padding: 6px 4px;
+    border-radius: 5px;
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
     color: #888;
-    font-size: 10px;
+    font-size: 6px;
     font-weight: 600;
     letter-spacing: 0.03em;
     text-transform: uppercase;
@@ -248,12 +248,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
   }
 
   .view-level-icon .dot-row {
     display: flex;
-    gap: 3px;
+    gap: 2px;
     align-items: center;
   }
 
@@ -263,7 +263,7 @@
   }
 
   .view-level-separator {
-    width: 36px;
+    width: 23px;
     height: 1px;
     background: rgba(0,0,0,0.10);
     margin: 0 auto;
@@ -1179,16 +1179,16 @@
       <div class="view-level-btn active" data-level="full" title="Sand — all nodes visible">
         <div class="view-level-icon">
           <div class="dot-row">
-            <span class="vli-dot" style="width:5px;height:5px"></span>
-            <span class="vli-dot" style="width:5px;height:5px"></span>
-            <span class="vli-dot" style="width:5px;height:5px"></span>
+            <span class="vli-dot" style="width:3px;height:3px"></span>
+            <span class="vli-dot" style="width:3px;height:3px"></span>
+            <span class="vli-dot" style="width:3px;height:3px"></span>
           </div>
           <div class="dot-row">
-            <span class="vli-dot" style="width:6px;height:6px"></span>
-            <span class="vli-dot" style="width:6px;height:6px"></span>
+            <span class="vli-dot" style="width:4px;height:4px"></span>
+            <span class="vli-dot" style="width:4px;height:4px"></span>
           </div>
           <div class="dot-row">
-            <span class="vli-dot" style="width:8px;height:8px"></span>
+            <span class="vli-dot" style="width:5px;height:5px"></span>
           </div>
         </div>
         Sand
@@ -1197,16 +1197,16 @@
       <div class="view-level-btn" data-level="pebbles" title="Pebbles — hide deep sub-tasks">
         <div class="view-level-icon">
           <div class="dot-row">
-            <span class="vli-dot" style="width:5px;height:5px;opacity:0.2"></span>
-            <span class="vli-dot" style="width:5px;height:5px;opacity:0.2"></span>
-            <span class="vli-dot" style="width:5px;height:5px;opacity:0.2"></span>
+            <span class="vli-dot" style="width:3px;height:3px;opacity:0.2"></span>
+            <span class="vli-dot" style="width:3px;height:3px;opacity:0.2"></span>
+            <span class="vli-dot" style="width:3px;height:3px;opacity:0.2"></span>
           </div>
           <div class="dot-row">
-            <span class="vli-dot" style="width:6px;height:6px"></span>
-            <span class="vli-dot" style="width:6px;height:6px"></span>
+            <span class="vli-dot" style="width:4px;height:4px"></span>
+            <span class="vli-dot" style="width:4px;height:4px"></span>
           </div>
           <div class="dot-row">
-            <span class="vli-dot" style="width:8px;height:8px"></span>
+            <span class="vli-dot" style="width:5px;height:5px"></span>
           </div>
         </div>
         Pebbles
@@ -1215,16 +1215,16 @@
       <div class="view-level-btn" data-level="rocks" title="Rocks — show only main branches">
         <div class="view-level-icon">
           <div class="dot-row" style="opacity:0.2">
-            <span class="vli-dot" style="width:5px;height:5px"></span>
-            <span class="vli-dot" style="width:5px;height:5px"></span>
-            <span class="vli-dot" style="width:5px;height:5px"></span>
+            <span class="vli-dot" style="width:3px;height:3px"></span>
+            <span class="vli-dot" style="width:3px;height:3px"></span>
+            <span class="vli-dot" style="width:3px;height:3px"></span>
           </div>
           <div class="dot-row" style="opacity:0.2">
-            <span class="vli-dot" style="width:6px;height:6px"></span>
-            <span class="vli-dot" style="width:6px;height:6px"></span>
+            <span class="vli-dot" style="width:4px;height:4px"></span>
+            <span class="vli-dot" style="width:4px;height:4px"></span>
           </div>
           <div class="dot-row">
-            <span class="vli-dot" style="width:8px;height:8px"></span>
+            <span class="vli-dot" style="width:5px;height:5px"></span>
           </div>
         </div>
         Rocks
