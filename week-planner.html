@@ -1053,6 +1053,7 @@
   <symbol id="icon-trash" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></symbol>
   <symbol id="icon-x" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></symbol>
   <symbol id="icon-circle-half-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 3v18"/><path d="M12 14l7 -7"/><path d="M12 19l8.5 -8.5"/><path d="M12 9l4.5 -4.5"/></symbol>
+  <symbol id="icon-circle-number-0" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M10 10v4a2 2 0 1 0 4 0v-4a2 2 0 1 0 -4 0"/></symbol>
   <symbol id="icon-repeat" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3"/><path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3"/></symbol>
   <symbol id="icon-repeat-off" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 12v-3c0 -1.336 .873 -2.468 2.08 -2.856m3.92 -.144h10m-3 -3l3 3l-3 3"/><path d="M20 12v3a3 3 0 0 1 -.133 .886m-1.99 1.984a3 3 0 0 1 -.877 .13h-13m3 3l-3 -3l3 -3"/><path d="M3 3l18 18"/></symbol>
 </svg>
@@ -1142,6 +1143,7 @@
   <div class="ctx-separator" id="ctx-sep-transfer"></div>
   <div class="ctx-item" id="ctx-done"><svg class="icon" aria-hidden="true"><use href="#icon-circle-check"/></svg> Done</div>
   <div class="ctx-item" id="ctx-undone"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed-check"/></svg> Undone</div>
+  <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> Reset</div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
@@ -3157,9 +3159,10 @@ const ctxMenu = document.getElementById('context-menu');
 function showContextMenu(x, y, nodeId) {
   contextTarget = nodeId;
   const node = (nodeId === 'center') ? { type: 'center' } : findNode(nodeId);
-  const isBranch = node && node.type === 'branch';
-  const isCenter = nodeId === 'center';
+  const isBranch   = node && node.type === 'branch';
+  const isCenter   = nodeId === 'center';
   const isActivity = node && node.type === 'activity';
+  const isCounter  = node && node.type === 'counter';
 
   // Transfer items (Center only)
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
@@ -3168,13 +3171,14 @@ function showContextMenu(x, y, nodeId) {
 
   // Show/hide items depending on node type and status
   const isDone = node && node.done === true;
-  document.getElementById('ctx-done').style.display      = (isBranch || isCenter || isDone)  ? 'none' : '';
-  document.getElementById('ctx-undone').style.display    = (isBranch || isCenter || !isDone) ? 'none' : '';
+  document.getElementById('ctx-done').style.display      = (isBranch || isCenter || isDone)         ? 'none' : '';
+  document.getElementById('ctx-undone').style.display    = (isBranch || isCenter || !isDone)        ? 'none' : '';
+  document.getElementById('ctx-reset').style.display     = isCounter                                ? ''     : 'none';
   const isUnplanned = node && node.unplanned === true;
   document.getElementById('ctx-unplanned').innerHTML = isUnplanned
     ? `${iconSvg('bolt-off')} Planned`
     : `${iconSvg('bolt')} Unplanned`;
-  document.getElementById('ctx-unplanned').style.display = (isBranch || isCenter) ? 'none' : '';
+  document.getElementById('ctx-unplanned').style.display = (isBranch || isCenter || isCounter) ? 'none' : '';
 
   const isReusable = node && node.reusable === true;
   document.getElementById('ctx-reusable').innerHTML = isReusable
@@ -3186,13 +3190,13 @@ function showContextMenu(x, y, nodeId) {
   const isCritical = node && node.priority === 'critical';
   const isNormal = !isHigh && !isCritical;
 
-  document.getElementById('ctx-prio-normal').style.display = (isBranch || isCenter || isNormal) ? 'none' : '';
-  document.getElementById('ctx-prio-high').style.display   = (isBranch || isCenter || isHigh)   ? 'none' : '';
-  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCenter || isCritical) ? 'none' : '';
+  document.getElementById('ctx-prio-normal').style.display   = (isBranch || isCenter || isCounter || isNormal)   ? 'none' : '';
+  document.getElementById('ctx-prio-high').style.display     = (isBranch || isCenter || isCounter || isHigh)     ? 'none' : '';
+  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCenter || isCounter || isCritical) ? 'none' : '';
 
-  document.getElementById('ctx-delete').style.display    = (isBranch || isCenter) ? 'none' : '';
-  document.getElementById('ctx-add-child').style.display = (isCenter) ? 'none' : '';
-  document.getElementById('ctx-rename').style.display = (isCenter || isBranch) ? 'none' : '';
+  document.getElementById('ctx-delete').style.display    = (isBranch || isCenter || isCounter) ? 'none' : '';
+  document.getElementById('ctx-add-child').style.display = (isCenter  || isCounter)            ? 'none' : '';
+  document.getElementById('ctx-rename').style.display    = (isCenter  || isBranch  || isCounter) ? 'none' : '';
 
   // Color change (branch only)
   document.getElementById('ctx-sep-color').style.display    = isBranch ? '' : 'none';
@@ -3292,6 +3296,24 @@ document.getElementById('ctx-done').addEventListener('click', () => {
 
 document.getElementById('ctx-undone').addEventListener('click', () => {
   if (contextTarget) setStatus(contextTarget, 'undone');
+  hideContextMenu();
+});
+
+document.getElementById('ctx-reset').addEventListener('click', () => {
+  if (contextTarget) {
+    const node = findNode(contextTarget);
+    if (node && node.type === 'counter') {
+      takeSnapshot();
+      node.val = 0;
+      node.done = false;
+      delete node.doneAt;
+      node.ticks = [];
+      syncStatusUp(contextTarget, 'done');
+      saveWeek(currentWeekKey, weekData);
+      updateNodeUI(contextTarget);
+      updateSummary();
+    }
+  }
   hideContextMenu();
 });
 
