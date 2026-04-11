@@ -1477,6 +1477,7 @@ let zoom    = 1;
 let panX    = 0;
 let panY    = 0;
 let isPanning = false;
+let panningFromCenter = false;
 let panStartX = 0;
 let panStartY = 0;
 let panStartPanX = 0;
@@ -2955,12 +2956,22 @@ function attachNodeListeners() {
     });
 
     g.addEventListener('mousedown', (e) => {
-      if (id === 'center') return;
       if (e.button !== 0) return;
       if (e.target.closest('.add-btn')) return;
       if (e.target.closest('.counter-btn')) return;
-      
+
       e.stopPropagation();
+
+      if (id === 'center') {
+        isPanning = true;
+        panningFromCenter = true;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panStartPanX = panX;
+        panStartPanY = panY;
+        container.classList.add('panning');
+        return;
+      }
       
       const positions = computeLayout();
       const idsToDrag = [id, ...getDescendantIds(id)];
@@ -3360,6 +3371,15 @@ window.addEventListener('mouseup', (e) => {
   if (isPanning) {
     isPanning = false;
     container.classList.remove('panning');
+    if (panningFromCenter) {
+      panningFromCenter = false;
+      takeSnapshot();
+      weekData.nodes.forEach(n => {
+        if (n.type !== 'center') { n.offX = 0; n.offY = 0; }
+      });
+      saveWeek(currentWeekKey, weekData);
+      render();
+    }
   }
 });
 
