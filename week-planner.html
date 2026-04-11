@@ -1138,6 +1138,7 @@
 
 <div id="context-menu">
   <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> Transfer Unfinished</div>
+  <div class="ctx-item" id="ctx-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Transfer Reusable</div>
   <div class="ctx-separator" id="ctx-sep-transfer"></div>
   <div class="ctx-item" id="ctx-done"><svg class="icon" aria-hidden="true"><use href="#icon-circle-check"/></svg> Done</div>
   <div class="ctx-item" id="ctx-undone"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed-check"/></svg> Undone</div>
@@ -1684,6 +1685,75 @@ function transferUnfinished() {
         ? weekData.nodes.find(n => n.id === targetParentId) 
         : newNodes.find(n => n.id === targetParentId) || weekData.nodes.find(n => n.id === targetParentId);
       
+      if (parent && !parent.children.includes(newNode.id)) {
+        parent.children.push(newNode.id);
+      }
+    }
+    weekData.nodes.push(newNode);
+  });
+  rebuildNodeMap();
+
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
+function transferReusable() {
+  const prevWeekKey = offsetWeek(currentWeekKey, -1);
+  const prevData = loadWeek(prevWeekKey);
+  if (!prevData || !prevData.nodes) return;
+
+  takeSnapshot();
+
+  // Reusable activity nodes + their counter children
+  const reusableIds = new Set(prevData.nodes.filter(n => n.reusable === true).map(n => n.id));
+  const candidates = prevData.nodes.filter(n =>
+    n.reusable === true ||
+    (n.type === 'counter' && reusableIds.has(n.parent))
+  );
+
+  const oldToNew = new Map();
+  const newNodes = [];
+
+  // 1. Create mapping and new node objects
+  candidates.forEach(c => {
+    const existing = weekData.nodes.find(n => n.prevId === c.id);
+    if (existing) {
+      oldToNew.set(c.id, existing.id);
+    } else {
+      const id = genId();
+      const newNode = {
+        ...c,
+        id,
+        prevId: c.id,
+        done: false,
+        unplanned: false,
+        reusable: true,
+        children: [],
+      };
+      if (newNode.type === 'counter') newNode.val = 0;
+      newNodes.push(newNode);
+      oldToNew.set(c.id, id);
+    }
+  });
+
+  // 2. Setup hierarchy and add to weekData
+  newNodes.forEach(newNode => {
+    const oldNode = candidates.find(n => n.id === newNode.prevId);
+    const oldParentId = oldNode.parent;
+
+    let targetParentId;
+    if (['work', 'family', 'me'].includes(oldParentId)) {
+      targetParentId = oldParentId;
+    } else {
+      targetParentId = oldToNew.get(oldParentId);
+    }
+
+    if (targetParentId) {
+      newNode.parent = targetParentId;
+      const parent = (['work', 'family', 'me'].includes(targetParentId))
+        ? weekData.nodes.find(n => n.id === targetParentId)
+        : newNodes.find(n => n.id === targetParentId) || weekData.nodes.find(n => n.id === targetParentId);
+
       if (parent && !parent.children.includes(newNode.id)) {
         parent.children.push(newNode.id);
       }
@@ -3047,9 +3117,10 @@ function showContextMenu(x, y, nodeId) {
   const isCenter = nodeId === 'center';
   const isActivity = node && node.type === 'activity';
 
-  // Transfer Unfinished (Center only)
+  // Transfer items (Center only)
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
-  document.getElementById('ctx-sep-transfer').style.display = 'none'; // Only used if other items follow
+  document.getElementById('ctx-transfer-reusable').style.display  = isCenter ? '' : 'none';
+  document.getElementById('ctx-sep-transfer').style.display       = isCenter ? '' : 'none';
 
   // Show/hide items depending on node type and status
   const isDone = node && node.done === true;
@@ -3162,6 +3233,11 @@ document.getElementById('ctx-change-color').addEventListener('click', () => {
 
 document.getElementById('ctx-transfer-unfinished').addEventListener('click', () => {
   transferUnfinished();
+  hideContextMenu();
+});
+
+document.getElementById('ctx-transfer-reusable').addEventListener('click', () => {
+  transferReusable();
   hideContextMenu();
 });
 
