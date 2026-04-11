@@ -2916,14 +2916,14 @@ function applyViewLevel() {
   // Apply opacity to node groups
   nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
     const depth = getNodeDepth(g.dataset.id);
-    g.style.opacity = depth >= fadeThreshold ? '0.2' : '';
+    g.style.opacity = depth >= fadeThreshold ? '0.15' : '';
   });
 
   // Apply opacity to edges — fade an edge if its child node is faded
   linesLayer.querySelectorAll('path[data-to]').forEach(path => {
     const toId = path.getAttribute('data-to');
     const depth = getNodeDepth(toId);
-    path.style.opacity = depth >= fadeThreshold ? '0.2' : '';
+    path.style.opacity = depth >= fadeThreshold ? '0.15' : '';
   });
 }
 
