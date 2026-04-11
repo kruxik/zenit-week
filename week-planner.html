@@ -1087,11 +1087,6 @@
           <div class="settings-label">View</div>
           <button class="reset-btn" id="reset-view" style="width:100%">Reset View</button>
         </div>
-        <div class="ctx-separator"></div>
-        <div class="settings-section">
-          <div class="settings-label">Data Management</div>
-          <button class="reset-btn danger" id="reset-data-btn" style="width:100%">Reset Current Week</button>
-        </div>
       </div>
     </div>
   </div>
@@ -1141,6 +1136,7 @@
   <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> Transfer Unfinished</div>
   <div class="ctx-item" id="ctx-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Transfer Reusable</div>
   <div class="ctx-separator" id="ctx-sep-transfer"></div>
+  <div class="ctx-item danger" id="ctx-clear-week"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> Clear the Week</div>
   <div class="ctx-item" id="ctx-done"><svg class="icon" aria-hidden="true"><use href="#icon-circle-check"/></svg> Done</div>
   <div class="ctx-item" id="ctx-undone"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed-check"/></svg> Undone</div>
   <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> Reset</div>
@@ -3167,6 +3163,7 @@ function showContextMenu(x, y, nodeId) {
   // Transfer items (Center only)
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
   document.getElementById('ctx-transfer-reusable').style.display  = isCenter ? '' : 'none';
+  document.getElementById('ctx-clear-week').style.display         = isCenter ? '' : 'none';
   document.getElementById('ctx-sep-transfer').style.display       = isCenter ? '' : 'none';
 
   // Show/hide items depending on node type and status
@@ -3287,6 +3284,23 @@ document.getElementById('ctx-transfer-unfinished').addEventListener('click', () 
 document.getElementById('ctx-transfer-reusable').addEventListener('click', () => {
   transferReusable();
   hideContextMenu();
+});
+
+document.getElementById('ctx-clear-week').addEventListener('click', () => {
+  hideContextMenu();
+  showModal(
+    'Reset week data?',
+    'This will permanently delete all tasks and branches for the current week. This action cannot be undone.',
+    'Reset Week',
+    'Cancel',
+    () => {
+      takeSnapshot();
+      localStorage.removeItem(storageKey(currentWeekKey));
+      weekData = loadWeek(currentWeekKey);
+      rebuildNodeMap();
+      render();
+    }
+  );
 });
 
 document.getElementById('ctx-done').addEventListener('click', () => {
@@ -3741,28 +3755,10 @@ document.getElementById('today-btn').addEventListener('click', () => {
 // ─── Settings Dropdown ────────────────────────────────────────────────────────
 const settingsBtn = document.getElementById('settings-btn');
 const settingsDropdown = document.getElementById('settings-dropdown');
-const resetDataBtn = document.getElementById('reset-data-btn');
 
 settingsBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   settingsDropdown.classList.toggle('visible');
-});
-
-resetDataBtn.addEventListener('click', () => {
-  settingsDropdown.classList.remove('visible');
-  showModal(
-    'Reset week data?',
-    'This will permanently delete all tasks and branches for the current week. This action cannot be undone.',
-    'Reset Week',
-    'Cancel',
-    () => {
-      takeSnapshot();
-      localStorage.removeItem(storageKey(currentWeekKey));
-      weekData = loadWeek(currentWeekKey);
-      rebuildNodeMap();
-      render();
-    }
-  );
 });
 
 document.addEventListener('click', (e) => {
