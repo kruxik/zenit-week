@@ -1704,45 +1704,89 @@ function transferReusable() {
 
   takeSnapshot();
 
-  // Reusable activity nodes + their counter children
+  const prevById = new Map(prevData.nodes.map(n => [n.id, n]));
+  const branches = new Set(['work', 'family', 'me']);
+
+  // 1. Collect reusable activity nodes + their counter children
   const reusableIds = new Set(prevData.nodes.filter(n => n.reusable === true).map(n => n.id));
-  const candidates = prevData.nodes.filter(n =>
-    n.reusable === true ||
-    (n.type === 'counter' && reusableIds.has(n.parent))
+  const candidateIds = new Set(prevData.nodes
+    .filter(n => n.reusable === true || (n.type === 'counter' && reusableIds.has(n.parent)))
+    .map(n => n.id)
   );
+
+  // 2. Walk up parent chains to find non-reusable ancestor shells needed
+  //    to bridge the gap between a branch and a reusable subtree.
+  const ancestorIds = new Set();
+  candidateIds.forEach(id => {
+    const node = prevById.get(id);
+    if (!node) return;
+    let parentId = node.parent;
+    while (parentId && !branches.has(parentId) && !candidateIds.has(parentId)) {
+      if (!ancestorIds.has(parentId)) {
+        ancestorIds.add(parentId);
+        // Continue walking up from this ancestor
+        const ancestor = prevById.get(parentId);
+        parentId = ancestor ? ancestor.parent : null;
+      } else {
+        break; // already recorded, chain already walked
+      }
+    }
+  });
+
+  // 3. Build combined ordered list: ancestors (top-down by depth) first, then candidates
+  //    Top-down ordering ensures parents exist in oldToNew before their children are wired.
+  function depthOf(id) {
+    let d = 0;
+    let cur = prevById.get(id);
+    while (cur && !branches.has(cur.parent)) {
+      d++;
+      cur = prevById.get(cur.parent);
+    }
+    return d;
+  }
+  const orderedAncestors = [...ancestorIds].sort((a, b) => depthOf(a) - depthOf(b));
+  const allOldIds = [...orderedAncestors, ...candidateIds];
 
   const oldToNew = new Map();
   const newNodes = [];
 
-  // 1. Create mapping and new node objects
-  candidates.forEach(c => {
-    const existing = weekData.nodes.find(n => n.prevId === c.id);
+  // 4. Create mapping and new node objects
+  allOldIds.forEach(oldId => {
+    const c = prevById.get(oldId);
+    if (!c) return;
+    const isAncestor = ancestorIds.has(oldId);
+
+    const existing = weekData.nodes.find(n => n.prevId === oldId);
     if (existing) {
-      oldToNew.set(c.id, existing.id);
+      oldToNew.set(oldId, existing.id);
     } else {
       const id = genId();
       const newNode = {
         ...c,
         id,
-        prevId: c.id,
+        prevId: oldId,
         done: false,
         unplanned: false,
-        reusable: true,
         children: [],
       };
-      if (newNode.type === 'counter') newNode.val = 0;
+      if (isAncestor) {
+        delete newNode.reusable; // shell — not marked reusable
+      } else {
+        newNode.reusable = true;
+        if (newNode.type === 'counter') newNode.val = 0;
+      }
       newNodes.push(newNode);
-      oldToNew.set(c.id, id);
+      oldToNew.set(oldId, id);
     }
   });
 
-  // 2. Setup hierarchy and add to weekData
+  // 5. Setup hierarchy and add to weekData
   newNodes.forEach(newNode => {
-    const oldNode = candidates.find(n => n.id === newNode.prevId);
+    const oldNode = prevById.get(newNode.prevId);
     const oldParentId = oldNode.parent;
 
     let targetParentId;
-    if (['work', 'family', 'me'].includes(oldParentId)) {
+    if (branches.has(oldParentId)) {
       targetParentId = oldParentId;
     } else {
       targetParentId = oldToNew.get(oldParentId);
@@ -1750,7 +1794,7 @@ function transferReusable() {
 
     if (targetParentId) {
       newNode.parent = targetParentId;
-      const parent = (['work', 'family', 'me'].includes(targetParentId))
+      const parent = branches.has(targetParentId)
         ? weekData.nodes.find(n => n.id === targetParentId)
         : newNodes.find(n => n.id === targetParentId) || weekData.nodes.find(n => n.id === targetParentId);
 
