@@ -2816,8 +2816,12 @@ window.addEventListener('keydown', (e) => {
     const settings = document.getElementById('settings-dropdown');
     const help = document.getElementById('help-overlay');
     const status = document.getElementById('placeholder-panel');
-    
+
     const dailyLog = document.getElementById('daily-log-overlay');
+    if (ctxMenu && ctxMenu.classList.contains('visible')) {
+      hideContextMenu();
+      return;
+    }
     if (settings && settings.classList.contains('visible')) {
       settings.classList.remove('visible');
       return;
