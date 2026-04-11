@@ -196,6 +196,88 @@
 
   #canvas-container.panning { cursor: grabbing; }
 
+  /* ─── View Level Bar ─────────────────────────────────────────────────────── */
+  #view-level-bar {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid rgba(0,0,0,0.12);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    padding: 4px;
+    z-index: 20;
+    user-select: none;
+  }
+
+  .view-level-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 58px;
+    padding: 10px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    color: #888;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .view-level-btn:hover {
+    background: rgba(0,0,0,0.05);
+    color: #444;
+  }
+
+  .view-level-btn.active {
+    background: #333;
+    color: #fff;
+  }
+
+  .view-level-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .view-level-icon .dot-row {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .vli-dot {
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .view-level-separator {
+    width: 36px;
+    height: 1px;
+    background: rgba(0,0,0,0.10);
+    margin: 0 auto;
+  }
+
+  /* Opacity transitions for view level fading */
+  .node-group {
+    transition: opacity 0.3s ease;
+  }
+
+  #lines-layer path {
+    transition: opacity 0.3s ease;
+  }
+
   #main-svg {
     width: 100%;
     height: 100%;
@@ -1093,6 +1175,61 @@
 </div>
 
   <div id="canvas-container">
+    <div id="view-level-bar">
+      <div class="view-level-btn active" data-level="full" title="Full view — all nodes visible">
+        <div class="view-level-icon">
+          <div class="dot-row">
+            <span class="vli-dot" style="width:8px;height:8px"></span>
+          </div>
+          <div class="dot-row">
+            <span class="vli-dot" style="width:6px;height:6px"></span>
+            <span class="vli-dot" style="width:6px;height:6px"></span>
+          </div>
+          <div class="dot-row">
+            <span class="vli-dot" style="width:5px;height:5px"></span>
+            <span class="vli-dot" style="width:5px;height:5px"></span>
+            <span class="vli-dot" style="width:5px;height:5px"></span>
+          </div>
+        </div>
+        Full
+      </div>
+      <div class="view-level-separator"></div>
+      <div class="view-level-btn" data-level="pebbles" title="Pebbles — hide deep sub-tasks">
+        <div class="view-level-icon">
+          <div class="dot-row">
+            <span class="vli-dot" style="width:8px;height:8px"></span>
+          </div>
+          <div class="dot-row">
+            <span class="vli-dot" style="width:6px;height:6px"></span>
+            <span class="vli-dot" style="width:6px;height:6px"></span>
+          </div>
+          <div class="dot-row">
+            <span class="vli-dot" style="width:5px;height:5px;opacity:0.2"></span>
+            <span class="vli-dot" style="width:5px;height:5px;opacity:0.2"></span>
+            <span class="vli-dot" style="width:5px;height:5px;opacity:0.2"></span>
+          </div>
+        </div>
+        Pebbles
+      </div>
+      <div class="view-level-separator"></div>
+      <div class="view-level-btn" data-level="rocks" title="Rocks — show only main branches">
+        <div class="view-level-icon">
+          <div class="dot-row">
+            <span class="vli-dot" style="width:8px;height:8px"></span>
+          </div>
+          <div class="dot-row">
+            <span class="vli-dot" style="width:6px;height:6px"></span>
+            <span class="vli-dot" style="width:6px;height:6px"></span>
+          </div>
+          <div class="dot-row" style="opacity:0.2">
+            <span class="vli-dot" style="width:5px;height:5px"></span>
+            <span class="vli-dot" style="width:5px;height:5px"></span>
+            <span class="vli-dot" style="width:5px;height:5px"></span>
+          </div>
+        </div>
+        Rocks
+      </div>
+    </div>
     <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
@@ -1489,6 +1626,7 @@ let panStartPanY = 0;
 let contextTarget = null;  // node id
 let editState = null;      // { nodeId, isNew, originalLabel }
 let hoveredNodeId = null;  // Track currently hovered node
+let currentViewLevel = 'full'; // 'full' | 'pebbles' | 'rocks'
 
 let dragState = {
   activeNodeId: null,
@@ -2748,6 +2886,47 @@ function updateNodeUI(nodeId) {
   }
 }
 
+function getNodeDepth(nodeId) {
+  if (nodeId === 'center') return 0;
+  const node = findNode(nodeId);
+  if (!node) return 0;
+  if (node.type === 'branch') return 1;
+  // Walk up parent chain
+  let depth = 0;
+  let current = node;
+  while (current && current.type !== 'branch') {
+    depth++;
+    current = findNode(current.parent);
+  }
+  return depth + 1; // +1 for the branch level itself
+}
+
+function applyViewLevel() {
+  const nodesLayer = document.getElementById('nodes-layer');
+  const linesLayer = document.getElementById('lines-layer');
+  if (!nodesLayer || !linesLayer) return;
+
+  // Determine the fade threshold: nodes at depth >= threshold get faded
+  // full: no fading, pebbles: fade depth >= 3, rocks: fade depth >= 2
+  let fadeThreshold;
+  if (currentViewLevel === 'full')    fadeThreshold = Infinity;
+  else if (currentViewLevel === 'pebbles') fadeThreshold = 3;
+  else /* rocks */                    fadeThreshold = 2;
+
+  // Apply opacity to node groups
+  nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
+    const depth = getNodeDepth(g.dataset.id);
+    g.style.opacity = depth >= fadeThreshold ? '0.2' : '';
+  });
+
+  // Apply opacity to edges — fade an edge if its child node is faded
+  linesLayer.querySelectorAll('path[data-to]').forEach(path => {
+    const toId = path.getAttribute('data-to');
+    const depth = getNodeDepth(toId);
+    path.style.opacity = depth >= fadeThreshold ? '0.2' : '';
+  });
+}
+
 function updateSummary() {
   const allNodes = weekData.nodes.filter(n => !n._editing);
   const leaves = allNodes.filter(n => {
@@ -2936,6 +3115,7 @@ function render() {
   });
 
   attachNodeListeners();
+  applyViewLevel();
   updateSummary();
 }
 
@@ -3712,6 +3892,19 @@ document.getElementById('zoom-out').addEventListener('click', () => {
 });
 
 document.getElementById('reset-view').addEventListener('click', resetView);
+
+// ─── View Level Bar ────────────────────────────────────────────────────────────
+document.getElementById('view-level-bar').addEventListener('mousedown', e => e.stopPropagation());
+
+document.querySelectorAll('.view-level-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const level = btn.dataset.level;
+    if (level === currentViewLevel) return;
+    currentViewLevel = level;
+    document.querySelectorAll('.view-level-btn').forEach(b => b.classList.toggle('active', b.dataset.level === level));
+    applyViewLevel();
+  });
+});
 
 // ─── Week navigation ──────────────────────────────────────────────────────────
 function loadAndRender(wk) {
