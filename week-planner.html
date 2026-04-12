@@ -1391,6 +1391,16 @@
   }
 
 </style>
+<!-- Theme init: runs synchronously before first paint to prevent flash of wrong theme -->
+<script>
+  (function() {
+    'use strict';
+    const saved = localStorage.getItem('week-planner-theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefersDark ? 'dark' : 'light');
+    if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
+  })();
+</script>
 </head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -1749,9 +1759,25 @@ function rgbToHex(r, g, b) {
 
 function deriveBranchPalette(hex) {
   const { r, g, b } = hexToRgb(hex);
-  const light = rgbToHex(r * 0.08 + 255 * 0.92, g * 0.08 + 255 * 0.92, b * 0.08 + 255 * 0.92);
-  const text  = rgbToHex(r * 0.70, g * 0.70, b * 0.70);
+  const dark = document.documentElement.dataset.theme === 'dark';
+  let light, text;
+  if (dark) {
+    // Blend toward canvas dark (#1a1a1a = 26) for deep-tinted node backgrounds
+    const bg = 26;
+    light = rgbToHex(r * 0.10 + bg * 0.90, g * 0.10 + bg * 0.90, b * 0.10 + bg * 0.90);
+    // Lighten toward white for readable text on dark backgrounds
+    text  = rgbToHex(r * 0.80 + 255 * 0.20, g * 0.80 + 255 * 0.20, b * 0.80 + 255 * 0.20);
+  } else {
+    light = rgbToHex(r * 0.08 + 255 * 0.92, g * 0.08 + 255 * 0.92, b * 0.08 + 255 * 0.92);
+    text  = rgbToHex(r * 0.70, g * 0.70, b * 0.70);
+  }
   return { main: hex, light, text };
+}
+
+function reloadBranchPalettes() {
+  ['work', 'family', 'me'].forEach(b => {
+    BRANCH_COLORS[b] = deriveBranchPalette(BRANCH_COLORS[b].main);
+  });
 }
 
 function loadBranchColors() {
@@ -1784,18 +1810,46 @@ function updateColorDots() {
   });
 }
 
+function updateSvgFilters() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const flood1 = document.getElementById('shadow-flood');
+  const flood2 = document.getElementById('shadow-sm-flood');
+  if (flood1) flood1.setAttribute('flood-color', dark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.18)');
+  if (flood2) flood2.setAttribute('flood-color', dark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.12)');
+}
+
 function applyBranchColor(branch, hex) {
   BRANCH_COLORS[branch] = deriveBranchPalette(hex);
   saveBranchColors();
   updateColorDots();
   render();
 }
-const CENTER_COLOR  = { main: '#333333', light: '#FFFFFF', text: '#FFFFFF' };
-const DONE_BG               = '#EBEBEB';
-const DONE_UNPLANNED_BG     = '#F5F5F5';
-const DONE_TEXT     = '#AAAAAA';
-const UNPLANNED_BG  = '#FFF9DB';
-const UNPLANNED_BORDER = '#FCC419';
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('week-planner-theme', theme);
+  // Sync toggle UI
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) toggle.setAttribute('aria-checked', theme === 'dark' ? 'true' : 'false');
+  // Re-derive branch palettes for new theme and re-render SVG layer
+  reloadBranchPalettes();
+  updateSvgFilters();
+  render();
+  updateColorDots();
+  updateSummary();
+}
+function getThemeColors() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  return {
+    CENTER_COLOR:      { main: dark ? '#555555' : '#333333', text: '#ffffff' },
+    DONE_BG:           dark ? '#2c2c2c' : '#EBEBEB',
+    DONE_UNPLANNED_BG: dark ? '#222222' : '#F5F5F5',
+    DONE_TEXT:         dark ? '#666666' : '#AAAAAA',
+    DONE_BORDER:       dark ? '#444444' : '#cccccc',
+    UNPLANNED_BG:      dark ? '#332600' : '#FFF9DB',
+    UNPLANNED_BORDER:  dark ? '#CC8800' : '#FCC419',
+  };
+}
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const MIN_HORIZONTAL_GAP = 200; // Level 2 gap (branch → direct children); Level 3+ = 134
@@ -2298,15 +2352,16 @@ function getNodeVisuals(nodeId) {
     sw *= scale;
   }
 
+  const { CENTER_COLOR, DONE_BG, DONE_UNPLANNED_BG, DONE_TEXT, DONE_BORDER, UNPLANNED_BG, UNPLANNED_BORDER } = getThemeColors();
   let bgColor, borderColor, textColor, fontWeight = 'normal';
 
   if (type === 'center') {
     bgColor = CENTER_COLOR.main; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
   } else {
     if (node.done && node.unplanned) {
-      bgColor = DONE_UNPLANNED_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
+      bgColor = DONE_UNPLANNED_BG; borderColor = DONE_BORDER; textColor = DONE_TEXT;
     } else if (node.done) {
-      bgColor = DONE_BG; borderColor = '#ccc'; textColor = DONE_TEXT;
+      bgColor = DONE_BG; borderColor = DONE_BORDER; textColor = DONE_TEXT;
     } else if (node.unplanned) {
       bgColor = UNPLANNED_BG; borderColor = UNPLANNED_BORDER; textColor = bc.text;
     } else if (type === 'branch') {
@@ -3239,14 +3294,15 @@ function updateSummary() {
 
   const mainEl = document.getElementById('summary-main');
   if (mainEl) {
-    let totalColor = '#28a745';
+    const isDarkSummary = document.documentElement.dataset.theme === 'dark';
+    let totalColor = isDarkSummary ? '#2ecc71' : '#28a745';
     let emoji = '😀';
     let tooltip = "A realistic load — you'll likely finish 80%+. ";
     if (global.total > 140) {
-      totalColor = '#d93025'; emoji = '🤯';
+      totalColor = isDarkSummary ? '#ff6b5b' : '#d93025'; emoji = '🤯';
       tooltip = "An overload — you'll likely finish under 60%, with burnout risk long-term.";
     } else if (global.total >= 106) {
-      totalColor = '#f29900'; emoji = '😅';
+      totalColor = isDarkSummary ? '#f5a623' : '#f29900'; emoji = '😅';
       tooltip = "A stretch load — finishing 80% will be a challenge.";
     }
 
@@ -3292,21 +3348,23 @@ function render() {
   const defsEl = svgEl('defs', {});
   root.appendChild(defsEl);
 
-  // Node fill gradients + glow filters (dynamic — reflect current BRANCH_COLORS)
+  // Node fill gradients + glow filters (dynamic — reflect current BRANCH_COLORS + theme)
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const gradTopStop = isDark ? '#1a1a1a' : '#ffffff';
   ['work', 'family', 'me'].forEach(branch => {
     const bc = BRANCH_COLORS[branch];
     const grad = svgEl('linearGradient', { id: `node-grad-${branch}`, x1: '0', y1: '0', x2: '0', y2: '1' });
-    grad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': '#ffffff' }));
-    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': bc.light  }));
+    grad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': gradTopStop }));
+    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': bc.light    }));
     defsEl.appendChild(grad);
     const filt = svgEl('filter', { id: `glow-${branch}`, x: '-40%', y: '-40%', width: '180%', height: '180%' });
-    filt.appendChild(svgEl('feDropShadow', { dx: '0', dy: '0', stdDeviation: '8', 'flood-color': bc.main, 'flood-opacity': '0.35' }));
+    filt.appendChild(svgEl('feDropShadow', { dx: '0', dy: '0', stdDeviation: '8', 'flood-color': bc.main, 'flood-opacity': isDark ? '0.55' : '0.35' }));
     defsEl.appendChild(filt);
   });
-  // Center gradient (static)
+  // Center gradient (theme-aware)
   const centerGrad = svgEl('linearGradient', { id: 'node-grad-center', x1: '0', y1: '0', x2: '0', y2: '1' });
-  centerGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': '#454545' }));
-  centerGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': '#252525' }));
+  centerGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? '#666666' : '#454545' }));
+  centerGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#444444' : '#252525' }));
   defsEl.appendChild(centerGrad);
 
   const linesG = svgEl('g', { id: 'lines-layer' });
@@ -4299,6 +4357,8 @@ document.addEventListener('click', (e) => {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   loadBranchColors();
+  reloadBranchPalettes(); // re-derive light/text variants for current theme
+  updateSvgFilters();
   const hashWeek = location.hash.slice(1);
   const initialWeek = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
   loadAndRender(initialWeek);
