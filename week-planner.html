@@ -694,80 +694,6 @@
   }
 
   /* Modal */
-  #modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--overlay-bg);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-  }
-
-  #modal-overlay.visible {
-    display: flex;
-  }
-
-  .modal {
-    background: var(--bg-surface);
-    padding: 24px;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px var(--shadow-lg);
-    max-width: 360px;
-    width: 90%;
-    text-align: center;
-  }
-
-  .modal-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    color: var(--text-primary);
-  }
-
-  .modal-text {
-    font-size: 14px;
-    color: var(--text-secondary);
-    margin-bottom: 24px;
-    line-height: 1.5;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-
-  .modal-btn {
-    padding: 10px 24px;
-    border-radius: 8px;
-    border: 1px solid var(--border-medium);
-    background: var(--bg-surface);
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 14px;
-    transition: all 0.2s;
-    color: var(--text-primary);
-  }
-
-  .modal-btn.confirm {
-    background: var(--accent-danger);
-    color: #fff;
-    border-color: var(--accent-danger);
-  }
-
-  .modal-btn.confirm:hover {
-    background: var(--accent-danger-dark);
-  }
-
-  .modal-btn:not(.confirm):hover {
-    background: var(--bg-surface-subtle);
-    border-color: var(--border-strong);
-  }
-
   /* Context menu */
   #context-menu {
     position: fixed;
@@ -1675,16 +1601,6 @@
   </div>
 </div>
 
-<div id="modal-overlay">
-  <div class="modal">
-    <div class="modal-title" id="modal-title">Reset week data?</div>
-    <div class="modal-text" id="modal-text">This will permanently delete all tasks and branches for the current week. This action cannot be undone.</div>
-    <div class="modal-actions">
-      <button class="modal-btn" id="modal-cancel-btn">Cancel</button>
-      <button class="modal-btn confirm" id="modal-confirm-btn">Confirm</button>
-    </div>
-  </div>
-</div>
 
 <div id="daily-log-fab" title="Today's Activity"><svg class="icon" aria-hidden="true"><use href="#icon-rosette-discount-check"/></svg></div>
 
@@ -3605,7 +3521,7 @@ window.addEventListener('keydown', (e) => {
     startAddNode(id);
   } else if (e.key === 'Backspace' || e.key === 'Delete') {
     e.preventDefault();
-    confirmDeleteNode(id);
+    deleteNode(id);
   } else if (e.key.toLowerCase() === 'd') {
     if (id !== 'center' && node.type !== 'branch') {
       e.preventDefault();
@@ -3889,19 +3805,11 @@ document.getElementById('ctx-transfer-reusable').addEventListener('click', () =>
 
 document.getElementById('ctx-clear-week').addEventListener('click', () => {
   hideContextMenu();
-  showModal(
-    'Reset week data?',
-    'This will permanently delete all tasks and branches for the current week. This action cannot be undone.',
-    'Reset Week',
-    'Cancel',
-    () => {
-      takeSnapshot();
-      localStorage.removeItem(storageKey(currentWeekKey));
-      weekData = loadWeek(currentWeekKey);
-      rebuildNodeMap();
-      render();
-    }
-  );
+  takeSnapshot();
+  localStorage.removeItem(storageKey(currentWeekKey));
+  weekData = loadWeek(currentWeekKey);
+  rebuildNodeMap();
+  render();
 });
 
 document.getElementById('ctx-done').addEventListener('click', () => {
@@ -3987,56 +3895,9 @@ document.getElementById('ctx-add-child').addEventListener('click', () => {
   if (id) startAddNode(id);
 });
 
-// ─── Modals ───────────────────────────────────────────────────────────────────
-const modalOverlay = document.getElementById('modal-overlay');
-const modalTitle   = document.getElementById('modal-title');
-const modalText    = document.getElementById('modal-text');
-const modalCancel  = document.getElementById('modal-cancel-btn');
-const modalConfirm = document.getElementById('modal-confirm-btn');
-
-let modalCallback = null;
-
-function showModal(title, text, confirmLabel, cancelLabel, onConfirm) {
-  modalTitle.textContent = title;
-  modalText.textContent = text;
-  modalConfirm.textContent = confirmLabel || 'Confirm';
-  modalCancel.textContent = cancelLabel || 'Cancel';
-  modalCallback = onConfirm;
-  modalOverlay.classList.add('visible');
-}
-
-function hideModal() {
-  modalOverlay.classList.remove('visible');
-  modalCallback = null;
-}
-
-modalCancel.addEventListener('click', hideModal);
-modalConfirm.addEventListener('click', () => {
-  if (modalCallback) modalCallback();
-  hideModal();
-});
-
-function confirmDeleteNode(nodeId) {
-  const node = findNode(nodeId);
-  if (!node || node.type === 'center' || node.type === 'branch') return;
-
-  const hasChildren = node.children && node.children.length > 0;
-  if (!hasChildren) {
-    deleteNode(nodeId);
-  } else {
-    showModal(
-      'Delete activity?',
-      'This will permanently delete this activity and all its sub-tasks. This action cannot be undone.',
-      'Delete All',
-      'Cancel',
-      () => deleteNode(nodeId)
-    );
-  }
-}
-
 document.getElementById('ctx-delete').addEventListener('click', () => {
   if (!contextTarget) { hideContextMenu(); return; }
-  confirmDeleteNode(contextTarget);
+  deleteNode(contextTarget);
   hideContextMenu();
 });
 
