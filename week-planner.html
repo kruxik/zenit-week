@@ -3285,6 +3285,9 @@ function updateNodeUI(nodeId) {
   if (type === 'counter') {
     if (texts[0]) texts[0].textContent = String(node.val || 0);
     texts.forEach(t => t.setAttribute('fill', textColor));
+    // Update +/- button line strokes
+    g.querySelectorAll('.counter-btn line').forEach(l => l.setAttribute('stroke', textColor));
+    g.querySelectorAll('.counter-btn circle').forEach(c => c.setAttribute('stroke', borderColor));
   } else {
     texts.forEach(t => {
       t.setAttribute('fill', textColor);
@@ -3293,6 +3296,10 @@ function updateNodeUI(nodeId) {
       } else {
         t.removeAttribute('text-decoration');
       }
+    });
+    // Update inline icon badge colors
+    g.querySelectorAll('use').forEach(u => {
+      u.style.color = textColor;
     });
   }
 }
