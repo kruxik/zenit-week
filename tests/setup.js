@@ -8,9 +8,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const html = readFileSync(resolve(__dirname, '../week-planner.html'), 'utf8');
 
-// Extract the first <script>…</script> block (the app logic)
-const match = html.match(/<script>([\s\S]*?)<\/script>/);
-if (!match) throw new Error('Could not extract <script> block from week-planner.html');
+// Extract the main app <script id="app">…</script> block
+const match = html.match(/<script\s+id="app">([\s\S]*?)<\/script>/);
+if (!match) throw new Error('Could not extract <script id="app"> block from week-planner.html');
 const scriptCode = match[1];
 
 // Reusable stub for DOM elements returned by getElementById / createElement
@@ -40,6 +40,8 @@ const sandbox = {
   document: {
     addEventListener: () => {},
     getElementById: () => elementStub(),
+    querySelectorAll: () => [],
+    documentElement: { dataset: {} },
     createElement: (tag) => {
       if (tag === 'canvas') {
         return { getContext: () => ({ measureText: () => ({ width: 0 }) }) };
