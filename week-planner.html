@@ -611,6 +611,68 @@
     padding: 0 2px;
   }
 
+  .settings-separator {
+    height: 1px;
+    background: var(--border-faint);
+    margin: 2px 0;
+  }
+
+  /* Theme toggle pill */
+  .theme-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 2px;
+  }
+
+  .theme-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+    min-width: 28px;
+  }
+
+  .theme-label.active {
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+
+  .theme-toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--border-default);
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.25s;
+    flex-shrink: 0;
+  }
+
+  .theme-toggle[aria-checked="true"] {
+    background: var(--accent-primary);
+  }
+
+  .theme-toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--bg-surface);
+    box-shadow: 0 1px 4px var(--shadow-lg);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s;
+    pointer-events: none;
+  }
+
+  .theme-toggle[aria-checked="true"] .theme-toggle-thumb {
+    transform: translateX(20px);
+  }
+
 
   .reset-btn.danger {
     background: var(--bg-surface);
@@ -1445,6 +1507,17 @@
         </button>
         <div id="settings-dropdown">
           <div class="settings-section">
+            <div class="settings-label">Appearance</div>
+            <div class="theme-toggle-row">
+              <span class="theme-label active" id="theme-label-light">Light</span>
+              <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" title="Toggle dark mode">
+                <div class="theme-toggle-thumb"></div>
+              </button>
+              <span class="theme-label" id="theme-label-dark">Dark</span>
+            </div>
+          </div>
+          <div class="settings-separator"></div>
+          <div class="settings-section">
             <div id="zoom-slider-header">
               <div class="settings-label">Zoom</div>
               <div id="zoom-label" title="Click to reset view">100%</div>
@@ -1828,15 +1901,13 @@ function applyBranchColor(branch, hex) {
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('week-planner-theme', theme);
-  // Sync toggle UI
-  const toggle = document.getElementById('theme-toggle');
-  if (toggle) toggle.setAttribute('aria-checked', theme === 'dark' ? 'true' : 'false');
   // Re-derive branch palettes for new theme and re-render SVG layer
   reloadBranchPalettes();
   updateSvgFilters();
   render();
   updateColorDots();
   updateSummary();
+  // syncThemeToggleUI() is called by the toggle click handler after applyTheme
 }
 function getThemeColors() {
   const dark = document.documentElement.dataset.theme === 'dark';
@@ -4353,6 +4424,26 @@ document.addEventListener('click', (e) => {
     settingsDropdown.classList.remove('visible');
   }
 });
+
+// ─── Theme Toggle ─────────────────────────────────────────────────────────────
+function syncThemeToggleUI() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const toggle = document.getElementById('theme-toggle');
+  const labelLight = document.getElementById('theme-label-light');
+  const labelDark  = document.getElementById('theme-label-dark');
+  if (toggle)      toggle.setAttribute('aria-checked', dark ? 'true' : 'false');
+  if (labelLight)  labelLight.classList.toggle('active', !dark);
+  if (labelDark)   labelDark.classList.toggle('active', dark);
+}
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  applyTheme(dark ? 'light' : 'dark');
+  syncThemeToggleUI();
+});
+
+// Sync toggle to whatever theme was applied by the pre-paint script
+syncThemeToggleUI();
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
