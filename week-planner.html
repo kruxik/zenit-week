@@ -104,6 +104,10 @@
     --badge-unplanned-text: #E67700;
     --badge-progress-bg: #e8f0fe;
     --badge-progress-text: #1a73e8;
+
+    /* Node state colors (kept in sync with getThemeColors() in JS) */
+    --node-done-bg: #EBEBEB;
+    --node-done-border: #cccccc;
   }
 
   [data-theme="dark"] {
@@ -205,6 +209,10 @@
     --badge-unplanned-text: #ffaa33;
     --badge-progress-bg: #0f1e3a;
     --badge-progress-text: #4da3ff;
+
+    /* Node state colors (kept in sync with getThemeColors() in JS) */
+    --node-done-bg: #2c2c2c;
+    --node-done-border: #444444;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1683,7 +1691,7 @@
 <div id="daily-log-overlay">
   <div id="daily-log-panel">
     <div id="daily-log-header">
-      <div style="font-size: 20px; font-weight: 700; color: #3c4043;">Today's Activity</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">Today's Activity</div>
       <div id="daily-log-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
     </div>
     <div id="daily-log-content"></div>
@@ -1696,7 +1704,7 @@
 <div id="help-overlay">
   <div id="help-panel">
     <div id="help-header">
-      <div style="font-size: 20px; font-weight: 700; color: #3c4043;">Help & Hotkeys</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">Help & Hotkeys</div>
       <div id="help-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
     </div>
     
@@ -1715,21 +1723,21 @@
 
       <div class="help-section">
         <div class="help-section-title">Counters</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: #666;">
+        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
           Add Nx to an activity name (e.g. Pushups 10x) to create a sub-counter.
         </div>
       </div>
 
       <div class="help-section">
         <div class="help-section-title">Activity rebinding & organizing</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: #666;">
+        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);">
           Drag a node over another to rebind it as a child. Drag between siblings to reorder.
         </div>
       </div>
 
       <div class="help-section">
         <div class="help-section-title">Canvas Navigation</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: #666;">
+        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);">
           Drag background to pan. Scroll / pinch to zoom.
         </div>
       </div>
@@ -1740,8 +1748,8 @@
           <div class="legend-item"><div class="legend-dot" data-branch-dot="work"></div>Work</div>
           <div class="legend-item"><div class="legend-dot" data-branch-dot="family"></div>Family</div>
           <div class="legend-item"><div class="legend-dot" data-branch-dot="me"></div>Me</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#FFF9DB; border: 1px solid #FCC419"></div>Unplanned</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#EBEBEB; border: 1px solid #ccc"></div>Done</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--accent-warning-bg); border: 1px solid var(--accent-warning-border)"></div>Unplanned</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--node-done-bg); border: 1px solid var(--node-done-border)"></div>Done</div>
         </div>
       </div>
     </div>
@@ -2413,7 +2421,8 @@ function getNodeVisuals(nodeId) {
   if (!node) return null;
 
   const type = node.type || 'activity';
-  const bc = BRANCH_COLORS[node.branch] || { main: '#333', light: '#eee', text: '#333' };
+  const _isDarkFb = document.documentElement.dataset.theme === 'dark';
+  const bc = BRANCH_COLORS[node.branch] || { main: _isDarkFb ? '#888888' : '#666666', light: _isDarkFb ? '#2a2a2a' : '#eeeeee', text: _isDarkFb ? '#aaaaaa' : '#444444' };
   let { rx } = NODE_STYLE[type];
   let sw = (type === 'branch' ? 4.5 : (type === 'center' ? 0 : 2));
 
@@ -2893,7 +2902,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   // "+" add-child button
   if (!isCenter && type !== 'counter') {
-    const bc = BRANCH_COLORS[branch] || { main: '#333' };
+    const bc = BRANCH_COLORS[branch] || { main: document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666' };
     const btnColor = bc.main;
     const btnR = 10;
     // Position button exactly on the border
@@ -4517,7 +4526,7 @@ window.addEventListener('load', () => {
       content.appendChild(empty);
     } else {
       entries.forEach(({ ts, type, node, parent }) => {
-        const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#ccc';
+        const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
         const timeStr = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         const item = document.createElement('div');
