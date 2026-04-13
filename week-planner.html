@@ -2152,29 +2152,29 @@ function transferUnfinished() {
     }
   });
 
-  // 2. Setup hierarchy and add to weekData
-  newNodes.forEach(newNode => {
-    const oldNode = candidates.find(n => n.id === newNode.prevId);
-    const oldParentId = oldNode.parent;
-    
-    let targetParentId;
-    if (['work', 'family', 'me'].includes(oldParentId)) {
-      targetParentId = oldParentId;
-    } else {
-      targetParentId = oldToNew.get(oldParentId);
-    }
+  // 2. Add new nodes to weekData (children wired below in original order)
+  newNodes.forEach(newNode => weekData.nodes.push(newNode));
 
-    if (targetParentId) {
-      newNode.parent = targetParentId;
-      const parent = (['work', 'family', 'me'].includes(targetParentId)) 
-        ? weekData.nodes.find(n => n.id === targetParentId) 
-        : newNodes.find(n => n.id === targetParentId) || weekData.nodes.find(n => n.id === targetParentId);
-      
-      if (parent && !parent.children.includes(newNode.id)) {
-        parent.children.push(newNode.id);
+  // 3. Wire hierarchy by iterating old parent.children arrays to preserve visual order
+  const branchIds = new Set(['work', 'family', 'me']);
+  prevData.nodes.forEach(oldParent => {
+    if (!oldParent.children?.length) return;
+
+    const targetParent = branchIds.has(oldParent.id)
+      ? weekData.nodes.find(n => n.id === oldParent.id)
+      : weekData.nodes.find(n => n.id === oldToNew.get(oldParent.id));
+    if (!targetParent) return;
+
+    oldParent.children.forEach(oldChildId => {
+      const newChildId = oldToNew.get(oldChildId);
+      if (!newChildId) return;
+      const childNode = weekData.nodes.find(n => n.id === newChildId);
+      if (!childNode) return;
+      childNode.parent = targetParent.id;
+      if (!targetParent.children.includes(newChildId)) {
+        targetParent.children.push(newChildId);
       }
-    }
-    weekData.nodes.push(newNode);
+    });
   });
   rebuildNodeMap();
 
@@ -2265,29 +2265,28 @@ function transferReusable() {
     }
   });
 
-  // 5. Setup hierarchy and add to weekData
-  newNodes.forEach(newNode => {
-    const oldNode = prevById.get(newNode.prevId);
-    const oldParentId = oldNode.parent;
+  // 5. Add new nodes to weekData (children wired below in original order)
+  newNodes.forEach(newNode => weekData.nodes.push(newNode));
 
-    let targetParentId;
-    if (branches.has(oldParentId)) {
-      targetParentId = oldParentId;
-    } else {
-      targetParentId = oldToNew.get(oldParentId);
-    }
+  // 6. Wire hierarchy by iterating old parent.children arrays to preserve visual order
+  prevData.nodes.forEach(oldParent => {
+    if (!oldParent.children?.length) return;
 
-    if (targetParentId) {
-      newNode.parent = targetParentId;
-      const parent = branches.has(targetParentId)
-        ? weekData.nodes.find(n => n.id === targetParentId)
-        : newNodes.find(n => n.id === targetParentId) || weekData.nodes.find(n => n.id === targetParentId);
+    const targetParent = branches.has(oldParent.id)
+      ? weekData.nodes.find(n => n.id === oldParent.id)
+      : weekData.nodes.find(n => n.id === oldToNew.get(oldParent.id));
+    if (!targetParent) return;
 
-      if (parent && !parent.children.includes(newNode.id)) {
-        parent.children.push(newNode.id);
+    oldParent.children.forEach(oldChildId => {
+      const newChildId = oldToNew.get(oldChildId);
+      if (!newChildId) return;
+      const childNode = weekData.nodes.find(n => n.id === newChildId);
+      if (!childNode) return;
+      childNode.parent = targetParent.id;
+      if (!targetParent.children.includes(newChildId)) {
+        targetParent.children.push(newChildId);
       }
-    }
-    weekData.nodes.push(newNode);
+    });
   });
   rebuildNodeMap();
 
