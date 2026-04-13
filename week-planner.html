@@ -3389,8 +3389,8 @@ function render() {
   ['work', 'family', 'me'].forEach(branch => {
     const bc = BRANCH_COLORS[branch];
     const grad = svgEl('linearGradient', { id: `node-grad-${branch}`, x1: '0', y1: '0', x2: '0', y2: '1' });
-    grad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': gradTopStop }));
-    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': bc.light    }));
+    grad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? bc.light    : gradTopStop }));
+    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? gradTopStop : bc.light    }));
     defsEl.appendChild(grad);
     const filt = svgEl('filter', { id: `glow-${branch}`, x: '-40%', y: '-40%', width: '180%', height: '180%' });
     filt.appendChild(svgEl('feDropShadow', { dx: '0', dy: '0', stdDeviation: '8', 'flood-color': bc.main, 'flood-opacity': isDark ? '0.55' : '0.35' }));
