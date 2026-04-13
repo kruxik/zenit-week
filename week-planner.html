@@ -1971,7 +1971,7 @@ const BRANCH_CONFIG = {
 let currentWeekKey = '';   // 'YYYY-WW'
 let weekData = {};          // { nodes: [...] }
 
-let zoom    = 1;
+let zoom    = 0.6;
 let panX    = 0;
 let panY    = 0;
 let isPanning = false;
@@ -3946,14 +3946,16 @@ document.addEventListener('contextmenu', (e) => {
 const container = document.getElementById('canvas-container');
 const mapRoot   = document.getElementById('map-root');
 
-const ZOOM_MIN = 0.2, ZOOM_MAX = 3, ZOOM_DEFAULT = 0.65;
+const ZOOM_MIN = 0.2, ZOOM_MAX = 1.8, ZOOM_DEFAULT = 0.6;
+const LOG_ZOOM_MIN = Math.log(ZOOM_MIN);
+const LOG_ZOOM_MAX = Math.log(ZOOM_MAX);
 
 function applyTransform() {
   mapRoot.setAttribute('transform',
     `translate(${panX},${panY}) scale(${zoom})`
   );
-  document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
-  const pct = (zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 100;
+  document.getElementById('zoom-label').textContent = Math.round(zoom / ZOOM_DEFAULT * 100) + '%';
+  const pct = (Math.log(zoom) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
   const fill  = document.getElementById('zoom-fill');
   const thumb = document.getElementById('zoom-thumb');
   if (fill)  fill.style.width = pct + '%';
@@ -3991,7 +3993,7 @@ container.addEventListener('wheel', (e) => {
   const rect = container.getBoundingClientRect();
   const cx = e.clientX - rect.left;
   const cy = e.clientY - rect.top;
-  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  const factor = e.deltaY < 0 ? 1.05 : (1 / 1.05);
   zoomAt(cx, cy, factor);
 }, { passive: false });
 
@@ -4210,7 +4212,7 @@ const zoomTrack = document.getElementById('zoom-track');
 function zoomFromClientX(clientX) {
   const rect = zoomTrack.getBoundingClientRect();
   const pct  = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  let newZoom = ZOOM_MIN + pct * (ZOOM_MAX - ZOOM_MIN);
+  let newZoom = Math.exp(LOG_ZOOM_MIN + pct * (LOG_ZOOM_MAX - LOG_ZOOM_MIN));
 
   // Magnetic snap: pull zone eases toward default, snap zone locks in
   const PULL_ZONE = 0.22;
@@ -4367,7 +4369,7 @@ window.addEventListener('load', () => {
   // Position the default-zoom marker on the track
   const defaultMarker = document.getElementById('zoom-default-marker');
   if (defaultMarker) {
-    const defaultPct = (ZOOM_DEFAULT - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 100;
+    const defaultPct = (Math.log(ZOOM_DEFAULT) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
     defaultMarker.style.left = defaultPct + '%';
   }
 
