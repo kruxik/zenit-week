@@ -4674,7 +4674,14 @@ window.addEventListener('load', () => {
       const days = parseTodoDays(node.label || '');
       if (!days.has(todayDow)) return;
       const indicatorLabel = (node.label || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
-      collectTodoEntries(node, [indicatorLabel]).forEach(entry => {
+      const nonCounterChildren = (node.children || [])
+        .map(id => findNode(id))
+        .filter(c => c && c.type !== 'counter');
+      const isLeaf = nonCounterChildren.length === 0;
+      const labelParts = isLeaf && node.parent
+        ? [((findNode(node.parent) || {}).label || '').trim(), indicatorLabel]
+        : [indicatorLabel];
+      collectTodoEntries(node, labelParts).forEach(entry => {
         if (!seenLeafIds.has(entry.leafNode.id)) {
           seenLeafIds.add(entry.leafNode.id);
           allEntries.push(entry);
