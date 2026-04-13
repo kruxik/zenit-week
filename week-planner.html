@@ -1876,11 +1876,14 @@ const DY = 44;  // Vertical spacing between siblings
 const BRANCH_GAP = 300; // Vertical gap between main branches
 
 const NODE_STYLE = {
-  center:   { fontSize: 15, padX: 22, padY: 14, minW: 140, minH: 48, rx: 24,  avgCharW: 0.55 },
-  branch:   { fontSize: 14, padX: 16, padY: 12, minW: 100, minH: 40, rx: 20,  avgCharW: 0.55 },
+  center:   { fontSize: 26, padX: 38, padY: 24, minW: 240, minH: 80, rx: 40,  avgCharW: 0.55 },
+  branch:   { fontSize: 22, padX: 25, padY: 19, minW: 160, minH: 64, rx: 32,  avgCharW: 0.55 },
   activity: { fontSize: 13, padX: 14, padY: 10, minW: 80,  minH: 32, rx: 8,   avgCharW: 0.55 },
   counter:  { fontSize: 14, padX: 30, padY: 8,  minW: 80,  minH: 34, rx: 17,  avgCharW: 0.55 }
 };
+
+// Activities that are direct children of a branch node render at 1.33× normal size
+const DEPTH1_ACTIVITY_STYLE = { fontSize: 17, padX: 18, padY: 13, minW: 105, minH: 42, rx: 11 };
 
 const CENTER_W = NODE_STYLE.center.minW;
 const CENTER_H = NODE_STYLE.center.minH;
@@ -1900,6 +1903,12 @@ function getNodeSize(nodeId) {
 
   const type = node.type || 'activity';
   const style = { ...NODE_STYLE[type] };
+
+  // Direct children of a branch are one step below "main node" — render at 1.33× normal
+  if (type === 'activity' && ['work', 'family', 'me'].includes(node.parent)) {
+    Object.assign(style, DEPTH1_ACTIVITY_STYLE);
+  }
+
   const scale = getPriorityScale(nodeId);
   
   if (scale !== 1.0) {
@@ -2736,14 +2745,14 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   // Gear Icon for center node
   if (isCenter) {
-    const gearG = svgEl('g', { 
+    const gearG = svgEl('g', {
       class: 'gear-btn',
-      'transform': `translate(${boxW/2 - 20}, ${-boxH/2 + 20})`
+      'transform': `translate(${boxW/2 - 22}, ${-boxH/2 + 22})`
     });
-    const gearCircle = svgEl('circle', { cx: 0, cy: 0, r: 12, fill: 'rgba(255,255,255,0.1)', class: 'gear-bg' });
+    const gearCircle = svgEl('circle', { cx: 0, cy: 0, r: 14, fill: 'rgba(255,255,255,0.1)', class: 'gear-bg' });
     const gearIcon = svgEl('use', {
       href: '#icon-settings',
-      x: -9, y: -9, width: 18, height: 18,
+      x: -10, y: -10, width: 20, height: 20,
       stroke: textColor, 'stroke-width': 1.5, fill: 'none',
       'pointer-events': 'none',
     });
