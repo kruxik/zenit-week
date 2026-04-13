@@ -4640,31 +4640,61 @@ window.addEventListener('load', () => {
     openTodoPanel();
   }
 
+  // Recursively collect todo entries from an indicator node.
+  // Returns array of { leafNode, label } where label is the full colon-separated path.
+  // labelParts accumulates the path from the indicator down to the current node.
+  function collectTodoEntries(node, labelParts) {
+    const nonCounterChildren = (node.children || [])
+      .map(id => findNode(id))
+      .filter(c => c && c.type !== 'counter');
+
+    if (nonCounterChildren.length === 0) {
+      // This node is a leaf (may still have counter children — ignored)
+      return [{ leafNode: node, label: labelParts.join(': ') }];
+    }
+
+    // Not a leaf — recurse into each non-counter child
+    const entries = [];
+    nonCounterChildren.forEach(child => {
+      const childLabel = (child.label || '').trim();
+      entries.push(...collectTodoEntries(child, [...labelParts, childLabel]));
+    });
+    return entries;
+  }
+
   function openTodoPanel() {
     hoveredTodoNode = null;
     const todayDow = new Date().getDay(); // 0=Sun … 6=Sat
 
-    // Collect matching activity nodes
-    const matched = [];
+    // Find indicator nodes and expand each to leaf entries
+    const allEntries = [];
+    const seenLeafIds = new Set();
     weekData.nodes.forEach(node => {
       if (node.type !== 'activity') return;
       const days = parseTodoDays(node.label || '');
-      if (days.has(todayDow)) matched.push(node);
+      if (!days.has(todayDow)) return;
+      const indicatorLabel = (node.label || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+      collectTodoEntries(node, [indicatorLabel]).forEach(entry => {
+        if (!seenLeafIds.has(entry.leafNode.id)) {
+          seenLeafIds.add(entry.leafNode.id);
+          allEntries.push(entry);
+        }
+      });
     });
 
-    // Apply saved order, append any new nodes at the bottom
+    // Apply saved order by leaf node ID
     const savedOrder = loadTodoOrder();
+    const allLeafIds = allEntries.map(e => e.leafNode.id);
     const orderedIds = [
-      ...savedOrder.filter(id => matched.some(n => n.id === id)),
-      ...matched.filter(n => !savedOrder.includes(n.id)).map(n => n.id),
+      ...savedOrder.filter(id => allLeafIds.includes(id)),
+      ...allLeafIds.filter(id => !savedOrder.includes(id)),
     ];
-    // Prune stale IDs and save back
     saveTodoOrder(orderedIds);
-    const nodes = orderedIds.map(id => matched.find(n => n.id === id));
+    const entries = orderedIds.map(id => allEntries.find(e => e.leafNode.id === id));
 
     // Footer
-    const doneCount  = nodes.filter(n => n.done).length;
-    const totalCount = nodes.length;
+    const doneCount  = entries.filter(e => e.leafNode.done).length;
+    const totalCount = entries.length;
     const footer = document.getElementById('todo-footer');
     footer.innerHTML = `
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> Done</div>
@@ -4676,7 +4706,7 @@ window.addEventListener('load', () => {
     const content = document.getElementById('todo-content');
     content.innerHTML = '';
 
-    if (nodes.length === 0) {
+    if (entries.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'daily-log-empty';
       empty.textContent = 'No tasks scheduled for today.';
@@ -4687,13 +4717,12 @@ window.addEventListener('load', () => {
 
     let dragSrcId = null;
 
-    nodes.forEach(node => {
-      const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
-      const cleanLabel  = (node.label || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+    entries.forEach(({ leafNode, label }) => {
+      const branchColor = (BRANCH_COLORS[leafNode.branch] || {}).main || '#888888';
 
       const item = document.createElement('div');
       item.className = 'daily-log-item';
-      item.dataset.nodeId = node.id;
+      item.dataset.nodeId = leafNode.id;
       item.draggable = true;
 
       // Grip handle
@@ -4709,17 +4738,17 @@ window.addEventListener('load', () => {
       // Label
       const labelEl = document.createElement('div');
       labelEl.className = 'daily-log-label';
-      labelEl.textContent = cleanLabel || '(no label)';
-      if (node.done) labelEl.style.textDecoration = 'line-through';
+      labelEl.textContent = label || '(no label)';
+      if (leafNode.done) labelEl.style.textDecoration = 'line-through';
 
-      item.addEventListener('mouseenter', () => { hoveredTodoNode = node; });
+      item.addEventListener('mouseenter', () => { hoveredTodoNode = leafNode; });
       item.addEventListener('mouseleave', () => { hoveredTodoNode = null; });
 
       item.appendChild(handle);
       item.appendChild(dot);
       item.appendChild(labelEl);
 
-      if (node.done) {
+      if (leafNode.done) {
         // Done badge shown by default; swap for Undone button on hover
         const badge = document.createElement('div');
         badge.className = 'daily-log-badge done';
@@ -4731,7 +4760,7 @@ window.addEventListener('load', () => {
         undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
         undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} Undone`;
         undoneBtn.addEventListener('click', () => {
-          setStatus(node.id, 'undone');
+          setStatus(leafNode.id, 'undone');
           openTodoPanel();
         });
 
@@ -4753,7 +4782,7 @@ window.addEventListener('load', () => {
         doneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
         doneBtn.innerHTML = `${iconSvg('circle-check')} Done`;
         doneBtn.addEventListener('click', () => {
-          setStatus(node.id, 'done');
+          setStatus(leafNode.id, 'done');
           openTodoPanel();
         });
         item.appendChild(doneBtn);
@@ -4761,9 +4790,8 @@ window.addEventListener('load', () => {
 
       // ── Drag-and-drop events ──────────────────────────────────────────────
       item.addEventListener('dragstart', (e) => {
-        dragSrcId = node.id;
+        dragSrcId = leafNode.id;
         e.dataTransfer.effectAllowed = 'move';
-        // Delay so the drag image is captured before the class is applied
         requestAnimationFrame(() => item.classList.add('todo-item-dragging'));
       });
 
@@ -4776,7 +4804,7 @@ window.addEventListener('load', () => {
       });
 
       item.addEventListener('dragover', (e) => {
-        if (!dragSrcId || dragSrcId === node.id) return;
+        if (!dragSrcId || dragSrcId === leafNode.id) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         const rect = item.getBoundingClientRect();
@@ -4792,19 +4820,19 @@ window.addEventListener('load', () => {
       });
 
       item.addEventListener('drop', (e) => {
-        if (!dragSrcId || dragSrcId === node.id) return;
+        if (!dragSrcId || dragSrcId === leafNode.id) return;
         e.preventDefault();
         item.classList.remove('todo-item-drop-above', 'todo-item-drop-below');
 
-        const rect    = item.getBoundingClientRect();
-        const before  = e.clientY < rect.top + rect.height / 2;
+        const rect   = item.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
         const current = loadTodoOrder();
         const fromIdx = current.indexOf(dragSrcId);
-        let   toIdx   = current.indexOf(node.id);
+        let   toIdx   = current.indexOf(leafNode.id);
         if (fromIdx === -1 || toIdx === -1) return;
 
         current.splice(fromIdx, 1);
-        toIdx = current.indexOf(node.id);
+        toIdx = current.indexOf(leafNode.id);
         current.splice(before ? toIdx : toIdx + 1, 0, dragSrcId);
         saveTodoOrder(current);
         openTodoPanel();
