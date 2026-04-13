@@ -3619,6 +3619,11 @@ window.addEventListener('keydown', (e) => {
       dailyLog.classList.remove('visible');
       return;
     }
+    const todoOverlayEl = document.getElementById('todo-overlay');
+    if (todoOverlayEl && todoOverlayEl.classList.contains('visible')) {
+      todoOverlayEl.classList.remove('visible');
+      return;
+    }
     if (help && help.classList.contains('visible')) {
       help.classList.remove('visible');
       return;
