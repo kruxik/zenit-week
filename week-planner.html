@@ -4632,18 +4632,31 @@ window.addEventListener('load', () => {
         dot.className = 'daily-log-branch-dot';
         dot.style.background = branchColor;
 
-        const badge = document.createElement('div');
-        badge.className = `daily-log-badge ${node.done ? 'done' : 'tick'}`;
-        badge.innerHTML = node.done ? `${iconSvg('circle-check')} Done` : `${iconSvg('circle')} Pending`;
-
         const label = document.createElement('div');
         label.className = 'daily-log-label';
         label.textContent = cleanLabel || '(no label)';
         if (node.done) label.style.textDecoration = 'line-through';
 
-        item.appendChild(dot);
-        item.appendChild(label);
-        item.appendChild(badge);
+        if (node.done) {
+          const badge = document.createElement('div');
+          badge.className = 'daily-log-badge done';
+          badge.innerHTML = `${iconSvg('circle-check')} Done`;
+          item.appendChild(dot);
+          item.appendChild(label);
+          item.appendChild(badge);
+        } else {
+          const doneBtn = document.createElement('button');
+          doneBtn.className = 'reset-btn';
+          doneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;';
+          doneBtn.innerHTML = `${iconSvg('circle-check')} Done`;
+          doneBtn.addEventListener('click', () => {
+            setStatus(node.id, 'done');
+            openTodoPanel();
+          });
+          item.appendChild(dot);
+          item.appendChild(label);
+          item.appendChild(doneBtn);
+        }
         content.appendChild(item);
       });
     }
