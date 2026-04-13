@@ -4632,7 +4632,16 @@ window.addEventListener('load', () => {
     localStorage.setItem(getTodoOrderKey(), JSON.stringify(ids));
   }
 
+  let hoveredTodoNode = null;
+
+  function toggleHovered() {
+    if (!hoveredTodoNode) return;
+    setStatus(hoveredTodoNode.id, hoveredTodoNode.done ? 'undone' : 'done');
+    openTodoPanel();
+  }
+
   function openTodoPanel() {
+    hoveredTodoNode = null;
     const todayDow = new Date().getDay(); // 0=Sun … 6=Sat
 
     // Collect matching activity nodes
@@ -4660,6 +4669,7 @@ window.addEventListener('load', () => {
     footer.innerHTML = `
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> Done</div>
       <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge progress">${iconSvg('circle')} ${totalCount}</span> Total</div>
+      <div class="daily-log-footer-stat" style="font-size:12px;color:var(--text-placeholder);gap:4px;">Toggle <kbd>D</kbd></div>
     `;
 
     // Content
@@ -4702,16 +4712,42 @@ window.addEventListener('load', () => {
       labelEl.textContent = cleanLabel || '(no label)';
       if (node.done) labelEl.style.textDecoration = 'line-through';
 
-      // Done badge or button
+      item.addEventListener('mouseenter', () => { hoveredTodoNode = node; });
+      item.addEventListener('mouseleave', () => { hoveredTodoNode = null; });
+
+      item.appendChild(handle);
+      item.appendChild(dot);
+      item.appendChild(labelEl);
+
       if (node.done) {
+        // Done badge shown by default; swap for Undone button on hover
         const badge = document.createElement('div');
         badge.className = 'daily-log-badge done';
+        badge.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
         badge.innerHTML = `${iconSvg('circle-check')} Done`;
-        item.appendChild(handle);
-        item.appendChild(dot);
-        item.appendChild(labelEl);
+
+        const undoneBtn = document.createElement('button');
+        undoneBtn.className = 'reset-btn';
+        undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
+        undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} Undone`;
+        undoneBtn.addEventListener('click', () => {
+          setStatus(node.id, 'undone');
+          openTodoPanel();
+        });
+
+        item.addEventListener('mouseenter', () => {
+          badge.style.display = 'none';
+          undoneBtn.style.display = 'inline-flex';
+        });
+        item.addEventListener('mouseleave', () => {
+          badge.style.display = 'inline-flex';
+          undoneBtn.style.display = 'none';
+        });
+
         item.appendChild(badge);
+        item.appendChild(undoneBtn);
       } else {
+        // Done button always visible
         const doneBtn = document.createElement('button');
         doneBtn.className = 'reset-btn';
         doneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
@@ -4720,9 +4756,6 @@ window.addEventListener('load', () => {
           setStatus(node.id, 'done');
           openTodoPanel();
         });
-        item.appendChild(handle);
-        item.appendChild(dot);
-        item.appendChild(labelEl);
         item.appendChild(doneBtn);
       }
 
@@ -4791,6 +4824,15 @@ window.addEventListener('load', () => {
   todoClose.addEventListener('click', () => todoOverlay.classList.remove('visible'));
   todoOverlay.addEventListener('click', (e) => {
     if (e.target === todoOverlay) todoOverlay.classList.remove('visible');
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!todoOverlay.classList.contains('visible')) return;
+    if (e.key === 'd' || e.key === 'D') {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      toggleHovered();
+    }
   });
 
   // Help panel listeners
