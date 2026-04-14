@@ -2250,6 +2250,19 @@ function loadWeek(wk) {
       console.warn(`[week-planner] Failed to parse week data for key ${wk} — using defaults:`, e);
     }
   }
+  // New week — inherit branch labels from the previous week
+  const prevWk = offsetWeek(wk, -1);
+  const prevRaw = localStorage.getItem(storageKey(prevWk));
+  if (prevRaw) {
+    try {
+      const prevData = JSON.parse(prevRaw);
+      const prevLabels = {};
+      (prevData.nodes || []).filter(n => n.type === 'branch').forEach(n => {
+        prevLabels[n.id] = n.label;
+      });
+      return defaultWeekData(prevLabels);
+    } catch(e) { /* fall through to plain defaults */ }
+  }
   return defaultWeekData();
 }
 function saveWeek(wk, data) {
@@ -2434,12 +2447,13 @@ function transferReusable() {
   render();
 }
 
-function defaultWeekData() {
+function defaultWeekData(prevLabels) {
+  const l = prevLabels || {};
   return {
     nodes: [
-      { id: 'work',   type: 'branch', branch: 'work',   label: 'Work',   children: [] },
-      { id: 'family', type: 'branch', branch: 'family', label: 'Family', children: [] },
-      { id: 'me',     type: 'branch', branch: 'me',     label: 'Me',     children: [] },
+      { id: 'work',   type: 'branch', branch: 'work',   label: l.work   || 'Work',   children: [] },
+      { id: 'family', type: 'branch', branch: 'family', label: l.family || 'Family', children: [] },
+      { id: 'me',     type: 'branch', branch: 'me',     label: l.me     || 'Me',     children: [] },
     ]
   };
 }
@@ -3137,7 +3151,7 @@ function startAddNode(parentId) {
 
 function startRenameNode(nodeId) {
   const node = findNode(nodeId);
-  if (!node || node.type === 'branch') return;
+  if (!node) return;
   takeSnapshot();
   node._editing = true;
   _openInlineInput(nodeId, false);
@@ -3201,8 +3215,8 @@ function commitEdit(followUp = 'auto') {
     node.label = label;
     delete node._editing;
     
-    // Counter auto-creation
-    const match = label.match(/(\d+)x/);
+    // Counter auto-creation (not applicable to branch nodes)
+    const match = node.type !== 'branch' && label.match(/(\d+)x/);
     if (match) {
       const maxVal = parseInt(match[1], 10);
       // Check if it already has a counter child
@@ -3479,6 +3493,16 @@ function updateSummary() {
     const s = branchStats[b];
     const el = document.getElementById(`stat-${b}`);
     if (el) el.innerHTML = `${s.done} (${s.percent}&nbsp;%) / ${s.total}`;
+    // Update the branch name label to reflect any rename
+    const branchNode = weekData.nodes.find(n => n.id === b && n.type === 'branch');
+    if (branchNode) {
+      const nameEl = el && el.closest('.branch-stat')?.querySelector('.branch-name');
+      if (nameEl) {
+        const dot = nameEl.querySelector('.legend-dot');
+        nameEl.textContent = branchNode.label + ':';
+        if (dot) nameEl.prepend(dot);
+      }
+    }
   });
 
   // Update ratio bar
@@ -3815,7 +3839,7 @@ function attachNodeListeners() {
       e.stopPropagation();
       e.preventDefault();
       const node = findNode(id);
-      if (node && node.type === 'activity') startRenameNode(id);
+      if (node && (node.type === 'activity' || node.type === 'branch')) startRenameNode(id);
     });
 
     g.querySelectorAll('.add-btn').forEach(btn => {
@@ -3878,7 +3902,7 @@ function showContextMenu(x, y, nodeId) {
 
   document.getElementById('ctx-delete').style.display    = (isBranch || isCenter || isCounter) ? 'none' : '';
   document.getElementById('ctx-add-child').style.display = (isCenter  || isCounter)            ? 'none' : '';
-  document.getElementById('ctx-rename').style.display    = (isCenter  || isBranch  || isCounter) ? 'none' : '';
+  document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter)            ? 'none' : '';
 
   // Color change (branch only)
   document.getElementById('ctx-sep-color').style.display    = isBranch ? '' : 'none';
@@ -3889,9 +3913,9 @@ function showContextMenu(x, y, nodeId) {
   }
 
   // Handle separators
-  document.getElementById('ctx-sep-1').style.display = (isActivity) ? '' : 'none';
-  document.getElementById('ctx-sep-2').style.display = (isActivity) ? '' : 'none';
-  document.getElementById('ctx-sep-3').style.display = (isActivity) ? '' : 'none';
+  document.getElementById('ctx-sep-1').style.display = (isActivity)            ? '' : 'none';
+  document.getElementById('ctx-sep-2').style.display = (isActivity || isBranch) ? '' : 'none';
+  document.getElementById('ctx-sep-3').style.display = (isActivity)            ? '' : 'none';
 
   // Position within viewport
   const menuW = 170, menuH = 200;
