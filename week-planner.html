@@ -1836,8 +1836,12 @@ function takeSnapshot() {
   });
   const cleanData = validateAndRepair(clone);
 
-  // Include branch colors so undo/redo restores them too
-  const snapshot = { weekData: cleanData, branchColors: JSON.parse(JSON.stringify(BRANCH_COLORS)) };
+  // Include branch colors and config so undo/redo restores them too
+  const snapshot = {
+    weekData:      cleanData,
+    branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
+    branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
+  };
   undoStack.push(JSON.stringify(snapshot));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
   redoStack = [];
@@ -1860,6 +1864,13 @@ function _applySnapshot(raw) {
       });
       saveBranchColors();
     }
+    if (snapshot.branchConfig) {
+      // Restore side assignments; let syncBranchConfig fill in any missing entries
+      Object.keys(BRANCH_CONFIG).forEach(b => { delete BRANCH_CONFIG[b]; });
+      Object.keys(snapshot.branchConfig).forEach(b => {
+        BRANCH_CONFIG[b] = { ...snapshot.branchConfig[b] };
+      });
+    }
   }
   syncBranchConfig();
   rebuildNodeMap();
@@ -1867,15 +1878,23 @@ function _applySnapshot(raw) {
   render();
 }
 
+function _currentSnapshot() {
+  return JSON.stringify({
+    weekData,
+    branchColors: JSON.parse(JSON.stringify(BRANCH_COLORS)),
+    branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
+  });
+}
+
 function undo() {
   if (undoStack.length === 0) return;
-  redoStack.push(JSON.stringify({ weekData, branchColors: JSON.parse(JSON.stringify(BRANCH_COLORS)) }));
+  redoStack.push(_currentSnapshot());
   _applySnapshot(undoStack.pop());
 }
 
 function redo() {
   if (redoStack.length === 0) return;
-  undoStack.push(JSON.stringify({ weekData, branchColors: JSON.parse(JSON.stringify(BRANCH_COLORS)) }));
+  undoStack.push(_currentSnapshot());
   _applySnapshot(redoStack.pop());
 }
 
