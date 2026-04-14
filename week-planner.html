@@ -1816,9 +1816,9 @@
       <div class="help-section">
         <div class="help-section-title">Legend</div>
         <div id="help-legend">
-          <div class="legend-item"><div class="legend-dot" data-branch-dot="work"></div>Work</div>
-          <div class="legend-item"><div class="legend-dot" data-branch-dot="family"></div>Family</div>
-          <div class="legend-item"><div class="legend-dot" data-branch-dot="me"></div>Me</div>
+          <div class="legend-item"><div class="legend-dot" data-branch-dot="work"></div><span data-branch-label="work">Work</span></div>
+          <div class="legend-item"><div class="legend-dot" data-branch-dot="family"></div><span data-branch-label="family">Family</span></div>
+          <div class="legend-item"><div class="legend-dot" data-branch-dot="me"></div><span data-branch-label="me">Me</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--accent-warning-bg); border: 1px solid var(--accent-warning-border)"></div>Unplanned</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--node-done-bg); border: 1px solid var(--node-done-border)"></div>Done</div>
         </div>
@@ -3496,12 +3496,17 @@ function updateSummary() {
     // Update the branch name label to reflect any rename
     const branchNode = weekData.nodes.find(n => n.id === b && n.type === 'branch');
     if (branchNode) {
+      // Summary panel label
       const nameEl = el && el.closest('.branch-stat')?.querySelector('.branch-name');
       if (nameEl) {
         const dot = nameEl.querySelector('.legend-dot');
         nameEl.textContent = branchNode.label + ':';
         if (dot) nameEl.prepend(dot);
       }
+      // Help legend label
+      document.querySelectorAll(`[data-branch-label="${b}"]`).forEach(span => {
+        span.textContent = branchNode.label;
+      });
     }
   });
 
