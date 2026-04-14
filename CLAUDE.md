@@ -11,7 +11,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 - **Icons/Assets**: Native Unicode characters and CSS-based shapes
 
 ## Key Files
-- `week-planner.html`: The entire application (HTML, CSS, and JS) — ~2,910 lines
+- `week-planner.html`: The entire application (HTML, CSS, and JS) — ~5,150 lines
 
 ## Architecture
 
@@ -20,17 +20,24 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 weekData = {
   nodes: [
     { id, type, branch, label, parent, children,
-      done, unplanned, priority, offX, offY, _editing }
+      done, unplanned, priority, reusable, offX, offY, side, _editing,
+      // counter nodes only:
+      val, max,
+      // timestamps:
+      doneAt }
   ]
 }
 ```
 
 Node hierarchy:
 - **center**: Virtual root (week label)
-- **branch**: Three fixed categories — `work`, `family`, `me`
+- **branch**: User-managed categories (default: `work`, `family`, `me`). Can add/delete branches; minimum 1 must remain.
 - **activity**: User-created tasks (may have counter children)
+- **counter**: Auto-created child when activity label matches `Nx` pattern (e.g., "Pushups 10x"); tracks `val`/`max`
 
-Branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE`
+Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` (all customizable via color picker)
+
+`BRANCH_CONFIG` — maps branch id → `{ side: 'left' | 'right' }`, controls radial layout placement
 
 Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `week-planner-2026-14`
 
@@ -38,13 +45,16 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `week-pl
 - Full `render()` on structural changes
 - Surgical `updateNodeUI()` for visual-only updates (avoid full re-render when possible)
 - `updateSummary()` for stats panel refresh
-- `computeLayout()` calculates radial positions using recursive height and priority-based scaling (critical: 2.0x, high: 1.5x, normal: 1.0x)
+- `computeLayout()` calculates radial positions using recursive height and priority-based scaling (critical: 2.0x, high: 1.5x, normal: 1.0x); branches split left/right per `BRANCH_CONFIG`
 
 ### Key Functions
-- `findNode(id)` — linear search through nodes array
+- `findNode(id)` — O(1) lookup via `nodeMap` (a `Map<id, node>`, rebuilt on every structural change)
 - `getDescendantIds(id)` — recursively collects subtree
 - `validateAndRepair()` — garbage collection and orphan cleanup
-- `transferUnfinished()` — cross-week task migration
+- `transferUnfinished()` — copies incomplete activity nodes from previous ISO week to current
+- `transferReusable()` — copies nodes marked `reusable: true` (with counters reset) to current week
+- `addBranch(side)` / `deleteBranch(id)` — dynamic branch management
+- `applyBranchColor(branch, hex)` — updates branch color palette and re-renders
 
 ## Coding Standards & Conventions
 - **Single File Policy**: Keep everything in `week-planner.html` — never split into separate files
@@ -69,6 +79,18 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `week-pl
 
 ## UI/UX Guidelines
 - **Visual Style**: Modern, clean interface with rounded corners, soft shadows, professional color palette
-- **Interactions**: Support both mouse (click/drag) and keyboard shortcuts (Enter to commit, Esc to cancel, Tab to add child, D to toggle done, U to toggle unplanned, Backspace to delete)
+- **Interactions**: Support both mouse (click/drag) and keyboard shortcuts:
+  - `Enter` — rename hovered node
+  - `Tab` — add child to hovered node
+  - `Backspace` / `Delete` — delete hovered node
+  - `D` — toggle done on hovered node
+  - `U` — toggle unplanned on hovered node
+  - `Ctrl/⌘ + Z` — undo
+  - `Ctrl/⌘ + Shift + Z` / `Ctrl/⌘ + Y` — redo
+  - `Esc` — close open panel/menu
+- **Dark mode**: Full light/dark theme with toggle in settings; respects `prefers-color-scheme` on first load; stored in `localStorage` as `week-planner-theme`
 - **Feedback**: Provide visual cues for hover states and active operations (e.g., "panning" cursor, context menu with context-aware options)
 - **Context menus**: Hide options that don't apply to the current node type
+- **Todo panel**: Sidebar listing all incomplete activity nodes across the week; accessible via toolbar button
+- **Daily log panel**: Floating panel showing completed/ticked activities for the day, with timestamps and branch color dots
+- **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week

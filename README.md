@@ -13,11 +13,15 @@ A visually rich, single-file mind-map week planner that runs entirely in your br
 ## ✨ Features
 
 - **Mind Map Interface:** Visualize your week as a branching tree of activities.
-- **Categorized Branches:** Organize tasks into **Work**, **Family**, and **Me** with customizable colors.
+- **Customizable Branches:** Start with **Work**, **Family**, and **Me**; add or delete branches, and change their colors with the built-in color picker.
+- **Priority Levels:** Mark tasks as Normal, High, or Critical — priority scales visual layout spacing and cascades to child nodes.
 - **Dynamic Counters:** Add `Nx` to any task name (e.g., "Pushups 10x") to track progress with a clickable counter.
+- **Reusable Tasks:** Mark tasks as Reusable and carry them forward each week with counters reset.
 - **Drag & Drop:** Easily reorder tasks or rebind them to different parent nodes.
-- **Cross-Week Transfer:** Effortlessly move unfinished tasks from the previous week to the current one.
-- **Daily Log:** View a summary of your completed activities for the day.
+- **Cross-Week Transfer:** Move unfinished tasks from the previous week to the current one; or transfer only Reusable tasks.
+- **Daily Log:** View a summary of completed and ticked activities for the day, with timestamps.
+- **Todo Panel:** Quick sidebar listing all incomplete tasks across the week.
+- **Dark Mode:** Full light/dark theme with automatic detection of system preference.
 - **Undo/Redo:** Full history support with 100 levels of undo.
 - **Privacy First:** Your data never leaves your computer; it stays in your browser's local storage.
 
@@ -29,14 +33,15 @@ Hover over a node and use these hotkeys for rapid editing:
 | :--- | :--- |
 | **Rename** | `Enter` |
 | **Add Child** | `Tab` |
-| **Delete** | `Backspace` |
+| **Delete** | `Backspace` / `Delete` |
 | **Toggle Done** | `D` |
 | **Toggle Unplanned** | `U` |
 | **Quick Options** | `Right Click` |
 | **Undo** | `Ctrl/⌘ + Z` |
-| **Redo** | `Ctrl/⌘ + Shift/⇧ + Z` |
+| **Redo** | `Ctrl/⌘ + Shift + Z` or `Ctrl/⌘ + Y` |
+| **Close Panel / Menu** | `Esc` |
 
-*Note: Navigation shortcuts automatically adapt to your Operating System.*
+*Hover over a node to activate node-specific shortcuts.*
 
 ## 🛠️ Technical Details
 
