@@ -1828,37 +1828,55 @@ function rebuildNodeMap() {
 }
 
 function takeSnapshot() {
-  // Deep clone and clean the state before pushing to history
+  // Deep clone and clean weekData before pushing to history
   const clone = JSON.parse(JSON.stringify(weekData));
   clone.nodes = clone.nodes.filter(n => !n._editing).map(n => {
     delete n._editing;
     return n;
   });
   const cleanData = validateAndRepair(clone);
-  
-  undoStack.push(JSON.stringify(cleanData));
+
+  // Include branch colors so undo/redo restores them too
+  const snapshot = { weekData: cleanData, branchColors: JSON.parse(JSON.stringify(BRANCH_COLORS)) };
+  undoStack.push(JSON.stringify(snapshot));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
-  redoStack = []; 
+  redoStack = [];
+}
+
+function _applySnapshot(raw) {
+  const snapshot = JSON.parse(raw);
+  // Support legacy snapshots that contain only weekData (plain object with nodes array)
+  if (snapshot.nodes) {
+    weekData = validateAndRepair(snapshot);
+  } else {
+    weekData = validateAndRepair(snapshot.weekData);
+    if (snapshot.branchColors) {
+      Object.keys(snapshot.branchColors).forEach(b => {
+        BRANCH_COLORS[b] = deriveBranchPalette(snapshot.branchColors[b].main);
+      });
+      // Remove colors for branches no longer in the snapshot
+      Object.keys(BRANCH_COLORS).forEach(b => {
+        if (!snapshot.branchColors[b]) delete BRANCH_COLORS[b];
+      });
+      saveBranchColors();
+    }
+  }
+  syncBranchConfig();
+  rebuildNodeMap();
+  saveWeek(currentWeekKey, weekData);
+  render();
 }
 
 function undo() {
   if (undoStack.length === 0) return;
-  redoStack.push(JSON.stringify(weekData));
-  const data = JSON.parse(undoStack.pop());
-  weekData = validateAndRepair(data);
-  rebuildNodeMap();
-  saveWeek(currentWeekKey, weekData);
-  render();
+  redoStack.push(JSON.stringify({ weekData, branchColors: JSON.parse(JSON.stringify(BRANCH_COLORS)) }));
+  _applySnapshot(undoStack.pop());
 }
 
 function redo() {
   if (redoStack.length === 0) return;
-  undoStack.push(JSON.stringify(weekData));
-  const data = JSON.parse(redoStack.pop());
-  weekData = validateAndRepair(data);
-  rebuildNodeMap();
-  saveWeek(currentWeekKey, weekData);
-  render();
+  undoStack.push(JSON.stringify({ weekData, branchColors: JSON.parse(JSON.stringify(BRANCH_COLORS)) }));
+  _applySnapshot(redoStack.pop());
 }
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
@@ -1971,6 +1989,7 @@ function updateSvgFilters() {
 }
 
 function applyBranchColor(branch, hex) {
+  takeSnapshot();
   BRANCH_COLORS[branch] = deriveBranchPalette(hex);
   saveBranchColors();
   updateColorDots();
