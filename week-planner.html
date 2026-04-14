@@ -1864,14 +1864,10 @@ function _applySnapshot(raw) {
       });
       saveBranchColors();
     }
-    if (snapshot.branchConfig) {
-      // Restore side assignments; let syncBranchConfig fill in any missing entries
-      Object.keys(BRANCH_CONFIG).forEach(b => { delete BRANCH_CONFIG[b]; });
-      Object.keys(snapshot.branchConfig).forEach(b => {
-        BRANCH_CONFIG[b] = { ...snapshot.branchConfig[b] };
-      });
-    }
   }
+  // Rebuild BRANCH_CONFIG from the restored node data (node.side is now authoritative).
+  // syncBranchConfig reads node.side and overwrites BRANCH_CONFIG fully.
+  Object.keys(BRANCH_CONFIG).forEach(b => { delete BRANCH_CONFIG[b]; });
   syncBranchConfig();
   rebuildNodeMap();
   saveWeek(currentWeekKey, weekData);
@@ -2618,13 +2614,14 @@ function addNode(parentId, label) {
 }
 
 // Sync BRANCH_CONFIG sides from weekData after load or structural changes.
-// Default assignment: first branch → left, rest alternate right/left.
+// Prefer the side stored on the node itself; fall back to index-based default
+// for old data that predates node-level side storage.
 function syncBranchConfig() {
   const branches = weekData.nodes.filter(n => n.type === 'branch');
   branches.forEach((b, i) => {
-    if (!BRANCH_CONFIG[b.id]) {
-      BRANCH_CONFIG[b.id] = { side: i === 0 ? 'left' : 'right' };
-    }
+    const side = b.side || (i === 0 ? 'left' : 'right');
+    if (!b.side) b.side = side; // backfill into node so it persists
+    BRANCH_CONFIG[b.id] = { side };
   });
 }
 
@@ -2637,6 +2634,7 @@ function addBranch(side) {
   const node = {
     id, type: 'branch', branch: id,
     label: 'New Branch',
+    side,
     children: [],
     _editing: true,
   };
@@ -4461,8 +4459,10 @@ function handleNodeDrop(mouseX, mouseY) {
         parent.children.splice(insertIdx, 0, nodeId);
       }
     } else if (node.type === 'branch') {
+      const newSide = svgX < 0 ? 'left' : 'right';
+      node.side = newSide;
       if (BRANCH_CONFIG[nodeId]) {
-        BRANCH_CONFIG[nodeId].side = svgX < 0 ? 'left' : 'right';
+        BRANCH_CONFIG[nodeId].side = newSide;
       }
       const branches = weekData.nodes.filter(n => n.type === 'branch');
       const nonBranches = weekData.nodes.filter(n => n.type !== 'branch');
