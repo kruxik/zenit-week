@@ -1662,23 +1662,7 @@
         <span id="summary-main">Activities Done: 0 (0 %) / 0 😀</span>
       </div>
       <div id="summary-details">
-        <div class="branch-stat">
-          <span class="branch-name"><div class="legend-dot" data-branch-dot="family"></div>Family:</span>
-          <span id="stat-family">0 (0 %) / 0</span>
-        </div>
-        <div class="branch-stat">
-          <span class="branch-name"><div class="legend-dot" data-branch-dot="me"></div>Me:</span>
-          <span id="stat-me">0 (0 %) / 0</span>
-        </div>
-        <div class="branch-stat">
-          <span class="branch-name"><div class="legend-dot" data-branch-dot="work"></div>Work:</span>
-          <span id="stat-work">0 (0 %) / 0</span>
-        </div>
-        <div id="ratio-bar">
-          <div id="ratio-family" class="ratio-segment">33%</div>
-          <div id="ratio-me" class="ratio-segment">33%</div>
-          <div id="ratio-work" class="ratio-segment">34%</div>
-        </div>
+        <div id="ratio-bar"></div>
       </div>
     </div>
   </div>
@@ -1816,9 +1800,6 @@
       <div class="help-section">
         <div class="help-section-title">Legend</div>
         <div id="help-legend">
-          <div class="legend-item"><div class="legend-dot" data-branch-dot="work"></div><span data-branch-label="work">Work</span></div>
-          <div class="legend-item"><div class="legend-dot" data-branch-dot="family"></div><span data-branch-label="family">Family</span></div>
-          <div class="legend-item"><div class="legend-dot" data-branch-dot="me"></div><span data-branch-label="me">Me</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--accent-warning-bg); border: 1px solid var(--accent-warning-border)"></div>Unplanned</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--node-done-bg); border: 1px solid var(--node-done-border)"></div>Done</div>
         </div>
@@ -1887,11 +1868,32 @@ const DEFAULT_BRANCH_COLORS = {
   me:     { main: '#1ABCFE', light: '#E8F8FF', text: '#0070A0' },
 };
 
+// Palette for auto-picking colors on new branches (ordered by distinctiveness)
+const BRANCH_COLOR_PALETTE = [
+  '#F24E1E', '#A259FF', '#1ABCFE',
+  '#0ACF83', '#FF7262', '#FFCD29',
+  '#FF6584', '#4ECDC4', '#FF9F43',
+  '#6C5CE7', '#FD79A8', '#00B894',
+];
+
 let BRANCH_COLORS = {
   work:   { ...DEFAULT_BRANCH_COLORS.work },
   family: { ...DEFAULT_BRANCH_COLORS.family },
   me:     { ...DEFAULT_BRANCH_COLORS.me },
 };
+
+function pickBranchColor() {
+  const used = new Set(Object.values(BRANCH_COLORS).map(c => c.main.toLowerCase()));
+  for (const hex of BRANCH_COLOR_PALETTE) {
+    if (!used.has(hex.toLowerCase())) return hex;
+  }
+  // All palette colors taken — generate a random hue-spread hex color
+  const hue = Math.floor(Math.random() * 360);
+  const s = 0.7, l = 0.5;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => { const k = (n + hue / 30) % 12; return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); };
+  return rgbToHex(Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255));
+}
 
 const COLORS_STORAGE_KEY = 'week-planner-colors';
 
@@ -1927,7 +1929,7 @@ function deriveBranchPalette(hex) {
 }
 
 function reloadBranchPalettes() {
-  ['work', 'family', 'me'].forEach(b => {
+  Object.keys(BRANCH_COLORS).forEach(b => {
     BRANCH_COLORS[b] = deriveBranchPalette(BRANCH_COLORS[b].main);
   });
 }
@@ -1937,7 +1939,7 @@ function loadBranchColors() {
     const raw = localStorage.getItem(COLORS_STORAGE_KEY);
     if (!raw) return;
     const saved = JSON.parse(raw);
-    ['work', 'family', 'me'].forEach(b => {
+    Object.keys(saved).forEach(b => {
       if (saved[b] && saved[b].main) BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
     });
   } catch(e) {
@@ -1947,18 +1949,16 @@ function loadBranchColors() {
 
 function saveBranchColors() {
   const toSave = {};
-  ['work', 'family', 'me'].forEach(b => {
-    if (BRANCH_COLORS[b].main !== DEFAULT_BRANCH_COLORS[b].main) toSave[b] = { main: BRANCH_COLORS[b].main };
+  Object.keys(BRANCH_COLORS).forEach(b => {
+    toSave[b] = { main: BRANCH_COLORS[b].main };
   });
   localStorage.setItem(COLORS_STORAGE_KEY, JSON.stringify(toSave));
 }
 
 function updateColorDots() {
-  ['work', 'family', 'me'].forEach(b => {
+  Object.keys(BRANCH_COLORS).forEach(b => {
     const color = BRANCH_COLORS[b].main;
     document.querySelectorAll(`[data-branch-dot="${b}"]`).forEach(el => { el.style.background = color; });
-    const ratio = document.getElementById(`ratio-${b}`);
-    if (ratio) ratio.style.background = color;
   });
 }
 
@@ -2036,7 +2036,7 @@ function getNodeSize(nodeId) {
   const style = { ...NODE_STYLE[type] };
 
   // Direct children of a branch are one step below "main node" — render at 1.33× normal
-  if (type === 'activity' && ['work', 'family', 'me'].includes(node.parent)) {
+  if (type === 'activity' && findNode(node.parent)?.type === 'branch') {
     Object.assign(style, DEPTH1_ACTIVITY_STYLE);
   }
 
@@ -2091,12 +2091,8 @@ function getNodeSize(nodeId) {
   };
   }
 
-// Side assignments
-const BRANCH_CONFIG = {
-  work:   { side: 'left' },
-  family: { side: 'right' },
-  me:     { side: 'right' }
-};
+// Side assignments — populated dynamically from weekData on load/add
+const BRANCH_CONFIG = {};
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentWeekKey = '';   // 'YYYY-WW'
@@ -2206,22 +2202,22 @@ function validateAndRepair(data) {
     }
   });
 
-  // 2. Reconstruct any missing branch nodes before traversal
-  const defaultBranches = new Map(defaultWeekData().nodes.map(n => [n.id, n]));
-  ['work', 'family', 'me'].forEach(id => {
-    if (!nodeMap.has(id)) {
-      const branch = { ...defaultBranches.get(id) };
-      // Re-attach any surviving nodes that declared this branch as their parent
-      branch.children = data.nodes.filter(n => n.parent === id).map(n => n.id);
+  // 2. Identify all branch nodes as reachability roots
+  const rootBranches = data.nodes.filter(n => n.type === 'branch').map(n => n.id);
+
+  // If no branches survive at all, reconstruct the 3 defaults as a fallback
+  if (rootBranches.length === 0) {
+    defaultWeekData().nodes.forEach(branch => {
+      branch.children = data.nodes.filter(n => n.parent === branch.id).map(n => n.id);
       data.nodes.unshift(branch);
-      nodeMap.set(id, branch);
-    }
-  });
+      nodeMap.set(branch.id, branch);
+      rootBranches.push(branch.id);
+    });
+  }
 
   // 3. Rebuild Parent-Child Symmetry
-  // Identify all nodes reachable from the three main branches
+  // Identify all nodes reachable from branch roots
   const reachable = new Set();
-  const rootBranches = ['work', 'family', 'me'];
 
   function collect(id, parentId) {
     const n = nodeMap.get(id);
@@ -2250,17 +2246,24 @@ function loadWeek(wk) {
       console.warn(`[week-planner] Failed to parse week data for key ${wk} — using defaults:`, e);
     }
   }
-  // New week — inherit branch labels from the previous week
+  // New week — inherit all branch nodes (IDs, labels, colors) from the previous week
   const prevWk = offsetWeek(wk, -1);
   const prevRaw = localStorage.getItem(storageKey(prevWk));
   if (prevRaw) {
     try {
       const prevData = JSON.parse(prevRaw);
-      const prevLabels = {};
-      (prevData.nodes || []).filter(n => n.type === 'branch').forEach(n => {
-        prevLabels[n.id] = n.label;
-      });
-      return defaultWeekData(prevLabels);
+      const prevBranches = (prevData.nodes || []).filter(n => n.type === 'branch');
+      if (prevBranches.length > 0) {
+        // Ensure BRANCH_COLORS has entries for all inherited branch IDs
+        prevBranches.forEach(b => {
+          if (!BRANCH_COLORS[b.id]) {
+            BRANCH_COLORS[b.id] = deriveBranchPalette(
+              (BRANCH_COLORS[b.id] || {}).main || pickBranchColor()
+            );
+          }
+        });
+        return { nodes: prevBranches.map(b => ({ ...b, children: [] })) };
+      }
     } catch(e) { /* fall through to plain defaults */ }
   }
   return defaultWeekData();
@@ -2309,7 +2312,7 @@ function transferUnfinished() {
   newNodes.forEach(newNode => weekData.nodes.push(newNode));
 
   // 3. Wire hierarchy by iterating old parent.children arrays to preserve visual order
-  const branchIds = new Set(['work', 'family', 'me']);
+  const branchIds = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
   prevData.nodes.forEach(oldParent => {
     if (!oldParent.children?.length) return;
 
@@ -2343,7 +2346,7 @@ function transferReusable() {
   takeSnapshot();
 
   const prevById = new Map(prevData.nodes.map(n => [n.id, n]));
-  const branches = new Set(['work', 'family', 'me']);
+  const branches = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
 
   // 1. Collect reusable activity nodes + their counter children
   const reusableIds = new Set(prevData.nodes.filter(n => n.reusable === true).map(n => n.id));
@@ -2497,7 +2500,9 @@ function getPriorityWeight(nodeId) {
 function getDescendantIds(nodeId) {
   const ids = [];
   const collect = (id) => {
-    const n = (id === 'center') ? { children: ['work', 'family', 'me'] } : findNode(id);
+    const n = (id === 'center')
+      ? { children: weekData.nodes.filter(n => n.type === 'branch').map(n => n.id) }
+      : findNode(id);
     if (n && n.children) {
       n.children.forEach(cid => {
         ids.push(cid);
@@ -2574,10 +2579,57 @@ function addNode(parentId, label) {
   render();
 }
 
+// Sync BRANCH_CONFIG sides from weekData after load or structural changes.
+// Default assignment: first branch → left, rest alternate right/left.
+function syncBranchConfig() {
+  const branches = weekData.nodes.filter(n => n.type === 'branch');
+  branches.forEach((b, i) => {
+    if (!BRANCH_CONFIG[b.id]) {
+      BRANCH_CONFIG[b.id] = { side: i === 0 ? 'left' : 'right' };
+    }
+  });
+}
+
+function addBranch(side) {
+  takeSnapshot();
+  const id = genId();
+  const hex = pickBranchColor();
+  BRANCH_COLORS[id] = deriveBranchPalette(hex);
+  BRANCH_CONFIG[id] = { side };
+  const node = {
+    id, type: 'branch', branch: id,
+    label: 'New Branch',
+    children: [],
+    _editing: true,
+  };
+  // Insert among branches, at the end of the branch list
+  const lastBranchIdx = weekData.nodes.reduce((last, n, i) => n.type === 'branch' ? i : last, -1);
+  weekData.nodes.splice(lastBranchIdx + 1, 0, node);
+  rebuildNodeMap();
+  saveBranchColors();
+  saveWeek(currentWeekKey, weekData);
+  _openInlineInput(id, true);
+}
+
+function deleteBranch(id) {
+  const branches = weekData.nodes.filter(n => n.type === 'branch');
+  if (branches.length <= 1) return; // must keep at least one
+  takeSnapshot();
+  const toRemove = new Set([id, ...getDescendantIds(id)]);
+  weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
+  delete BRANCH_COLORS[id];
+  delete BRANCH_CONFIG[id];
+  rebuildNodeMap();
+  saveBranchColors();
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
 function deleteNode(id) {
   const node = findNode(id);
-  if (!node || node.type === 'branch') return;
-  
+  if (!node) return;
+  if (node.type === 'branch') { deleteBranch(id); return; }
+
   takeSnapshot();
   const toRemove = new Set([id, ...getDescendantIds(id)]);
 
@@ -2769,6 +2821,10 @@ function computeLayout() {
   // Position center
   positions['center'] = { x: 0, y: 0, w: CENTER_W, h: CENTER_H };
 
+  // Ensure every branch has a BRANCH_CONFIG entry before layout
+  branchIds.forEach((id, i) => {
+    if (!BRANCH_CONFIG[id]) BRANCH_CONFIG[id] = { side: i === 0 ? 'left' : 'right' };
+  });
   const leftBranches = branchIds.filter(id => BRANCH_CONFIG[id].side === 'left');
   const rightBranches = branchIds.filter(id => BRANCH_CONFIG[id].side === 'right');
 
@@ -2904,6 +2960,17 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     gearG.appendChild(gearCircle);
     gearG.appendChild(gearIcon);
     g.appendChild(gearG);
+
+    // "+ Branch" buttons on left and right edges of center node
+    ['left', 'right'].forEach(side => {
+      const bx = side === 'left' ? -boxW / 2 : boxW / 2;
+      const btnG = svgEl('g', { class: 'add-branch-btn', 'data-side': side, transform: `translate(${bx}, 0)` });
+      btnG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: 11, fill: 'rgba(255,255,255,0.18)', stroke: 'rgba(255,255,255,0.45)', 'stroke-width': '1.5' }));
+      const arm = 4.5;
+      btnG.appendChild(svgEl('line', { x1: -arm, y1: 0, x2: arm, y2: 0, stroke: '#fff', 'stroke-width': '2.5', 'stroke-linecap': 'round', 'pointer-events': 'none' }));
+      btnG.appendChild(svgEl('line', { x1: 0, y1: -arm, x2: 0, y2: arm, stroke: '#fff', 'stroke-width': '2.5', 'stroke-linecap': 'round', 'pointer-events': 'none' }));
+      g.appendChild(btnG);
+    });
   }
 
   // Text
@@ -3303,6 +3370,12 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
       const parent = findNode(node.parent);
       if (parent) parent.children = parent.children.filter(c => c !== nodeId);
     }
+    // If cancelling a new branch, clean up its color and config entries
+    if (node && node.type === 'branch') {
+      delete BRANCH_COLORS[nodeId];
+      delete BRANCH_CONFIG[nodeId];
+      saveBranchColors();
+    }
     weekData.nodes = weekData.nodes.filter(n => n.id !== nodeId);
     rebuildNodeMap();
   } else {
@@ -3466,11 +3539,13 @@ function updateSummary() {
   }
 
   const global = getStats(leaves);
-  const branchStats = {
-    work:   getStats(leaves.filter(n => n.branch === 'work')),
-    family: getStats(leaves.filter(n => n.branch === 'family')),
-    me:     getStats(leaves.filter(n => n.branch === 'me'))
-  };
+
+  // Build per-branch stats from live branch list
+  const liveBranches = weekData.nodes.filter(n => n.type === 'branch');
+  const branchStats = {};
+  liveBranches.forEach(b => {
+    branchStats[b.id] = getStats(leaves.filter(n => n.branch === b.id));
+  });
 
   const mainEl = document.getElementById('summary-main');
   if (mainEl) {
@@ -3489,43 +3564,56 @@ function updateSummary() {
     mainEl.innerHTML = `Activities Done: ${global.done} (${global.percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${global.total}</span>&nbsp;${emoji}</span>`;
   }
 
-  ['work', 'family', 'me'].forEach(b => {
-    const s = branchStats[b];
-    const el = document.getElementById(`stat-${b}`);
-    if (el) el.innerHTML = `${s.done} (${s.percent}&nbsp;%) / ${s.total}`;
-    // Update the branch name label to reflect any rename
-    const branchNode = weekData.nodes.find(n => n.id === b && n.type === 'branch');
-    if (branchNode) {
-      // Summary panel label
-      const nameEl = el && el.closest('.branch-stat')?.querySelector('.branch-name');
-      if (nameEl) {
-        const dot = nameEl.querySelector('.legend-dot');
-        nameEl.textContent = branchNode.label + ':';
-        if (dot) nameEl.prepend(dot);
-      }
-      // Help legend label
-      document.querySelectorAll(`[data-branch-label="${b}"]`).forEach(span => {
-        span.textContent = branchNode.label;
+  // Rebuild branch stat rows dynamically
+  const detailsEl = document.getElementById('summary-details');
+  if (detailsEl) {
+    // Remove existing branch-stat rows; keep ratio-bar
+    detailsEl.querySelectorAll('.branch-stat').forEach(el => el.remove());
+    const ratioBar = document.getElementById('ratio-bar');
+
+    liveBranches.forEach(b => {
+      const s = branchStats[b.id];
+      const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
+      const row = document.createElement('div');
+      row.className = 'branch-stat';
+      row.innerHTML = `<span class="branch-name"><div class="legend-dot" style="background:${color}" data-branch-dot="${b.id}"></div>${b.label}:</span><span id="stat-${b.id}">${s.done} (${s.percent}&nbsp;%) / ${s.total}</span>`;
+      detailsEl.insertBefore(row, ratioBar);
+    });
+
+    // Rebuild ratio bar segments
+    if (ratioBar) {
+      ratioBar.innerHTML = '';
+      const totalItems = liveBranches.reduce((acc, b) => acc + branchStats[b.id].total, 0);
+      liveBranches.forEach(b => {
+        const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
+        const pct = totalItems === 0
+          ? (100 / liveBranches.length)
+          : (branchStats[b.id].total / totalItems) * 100;
+        const seg = document.createElement('div');
+        seg.className = 'ratio-segment';
+        seg.id = `ratio-${b.id}`;
+        seg.style.background = color;
+        seg.style.width = pct + '%';
+        seg.textContent = (pct >= 10) ? Math.round(pct) + '%' : '';
+        ratioBar.appendChild(seg);
       });
     }
-  });
+  }
 
-  // Update ratio bar
-  const totalItems = branchStats.work.total + branchStats.family.total + branchStats.me.total;
-  const segments = ['work', 'family', 'me'];
-  segments.forEach(b => {
-    const el = document.getElementById(`ratio-${b}`);
-    if (el) {
-      let pct;
-      if (totalItems === 0) {
-        pct = 33.33;
-      } else {
-        pct = (branchStats[b].total / totalItems) * 100;
-      }
-      el.style.width = pct + '%';
-      el.textContent = (pct >= 10) ? Math.round(pct) + '%' : '';
-    }
-  });
+  // Rebuild help-legend branch items
+  const helpLegend = document.getElementById('help-legend');
+  if (helpLegend) {
+    helpLegend.querySelectorAll('.legend-item[data-branch-item]').forEach(el => el.remove());
+    const firstNonBranch = helpLegend.querySelector('.legend-item:not([data-branch-item])');
+    liveBranches.forEach(b => {
+      const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.dataset.branchItem = b.id;
+      item.innerHTML = `<div class="legend-dot" style="background:${color}" data-branch-dot="${b.id}"></div><span data-branch-label="${b.id}">${b.label}</span>`;
+      helpLegend.insertBefore(item, firstNonBranch);
+    });
+  }
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -3546,7 +3634,7 @@ function render() {
   // Node fill gradients + glow filters (dynamic — reflect current BRANCH_COLORS + theme)
   const isDark = document.documentElement.dataset.theme === 'dark';
   const gradTopStop = isDark ? '#1a1a1a' : '#ffffff';
-  ['work', 'family', 'me'].forEach(branch => {
+  Object.keys(BRANCH_COLORS).forEach(branch => {
     const bc = BRANCH_COLORS[branch];
     const grad = svgEl('linearGradient', { id: `node-grad-${branch}`, x1: '0', y1: '0', x2: '0', y2: '1' });
     grad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? bc.light    : gradTopStop }));
@@ -3610,7 +3698,7 @@ function render() {
   }
 
   // Draw center → branch edges
-  const branchIds = ['work', 'family', 'me'];
+  const branchIds = weekData.nodes.filter(n => n.type === 'branch').map(n => n.id);
   branchIds.forEach(bid => {
     const bPos = positions[bid];
     if (!bPos) return;
@@ -3717,6 +3805,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     startAddNode(id);
   } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    if (node.type === 'branch' && weekData.nodes.filter(n => n.type === 'branch').length <= 1) return;
     e.preventDefault();
     deleteNode(id);
   } else if (e.key.toLowerCase() === 'd') {
@@ -3802,6 +3891,7 @@ function attachNodeListeners() {
     g.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
       if (e.target.closest('.add-btn')) return;
+      if (e.target.closest('.add-branch-btn')) return;
       if (e.target.closest('.counter-btn')) return;
 
       e.stopPropagation();
@@ -3855,6 +3945,14 @@ function attachNodeListeners() {
       });
     });
 
+    g.querySelectorAll('.add-branch-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        addBranch(btn.getAttribute('data-side'));
+      });
+    });
+
     g.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -3905,7 +4003,8 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-prio-high').style.display     = (isBranch || isCenter || isCounter || isHigh)     ? 'none' : '';
   document.getElementById('ctx-prio-critical').style.display = (isBranch || isCenter || isCounter || isCritical) ? 'none' : '';
 
-  document.getElementById('ctx-delete').style.display    = (isBranch || isCenter || isCounter) ? 'none' : '';
+  const canDeleteBranch = isBranch && weekData.nodes.filter(n => n.type === 'branch').length > 1;
+  document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
   document.getElementById('ctx-add-child').style.display = (isCenter  || isCounter)            ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter)            ? 'none' : '';
 
@@ -3918,9 +4017,9 @@ function showContextMenu(x, y, nodeId) {
   }
 
   // Handle separators
-  document.getElementById('ctx-sep-1').style.display = (isActivity)            ? '' : 'none';
-  document.getElementById('ctx-sep-2').style.display = (isActivity || isBranch) ? '' : 'none';
-  document.getElementById('ctx-sep-3').style.display = (isActivity)            ? '' : 'none';
+  document.getElementById('ctx-sep-1').style.display = (isActivity)                        ? '' : 'none';
+  document.getElementById('ctx-sep-2').style.display = (isActivity || isBranch)            ? '' : 'none';
+  document.getElementById('ctx-sep-3').style.display = (isActivity || canDeleteBranch)     ? '' : 'none';
 
   // Position within viewport
   const menuW = 170, menuH = 200;
@@ -4006,6 +4105,7 @@ document.getElementById('ctx-clear-week').addEventListener('click', () => {
   localStorage.removeItem(storageKey(currentWeekKey));
   weekData = loadWeek(currentWeekKey);
   rebuildNodeMap();
+  syncBranchConfig();
   render();
 });
 
@@ -4452,6 +4552,7 @@ function loadAndRender(wk) {
   currentWeekKey = wk;
   weekData = loadWeek(wk);
   rebuildNodeMap();
+  syncBranchConfig();
   undoStack = [];
   redoStack = [];
   document.getElementById('today-btn').style.visibility =
@@ -4466,6 +4567,7 @@ window.addEventListener('hashchange', () => {
     currentWeekKey = hashWeek;
     weekData = loadWeek(currentWeekKey);
     rebuildNodeMap();
+    syncBranchConfig();
     undoStack = [];
     redoStack = [];
     document.getElementById('today-btn').style.visibility =
