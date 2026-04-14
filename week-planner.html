@@ -3205,37 +3205,51 @@ function nodeScreenPos(nodeId) {
 
 function resizeInlineInput() {
   const nodeId = editState.nodeId;
-  const { w, h, fontSize, padX, lines, lineH, totalTextH } = getNodeSize(nodeId);
+  const { w, h, fontSize, padX, lineH, totalTextH } = getNodeSize(nodeId);
   const { sw, visualRx } = getNodeVisuals(nodeId);
 
-  const zoomedSW = sw * zoom;
-  const zoomedW = (w + sw) * zoom; // Account for stroke-width in visual size
-  const zoomedH = (h + sw) * zoom;
-  const zoomedFontSize = fontSize * zoom;
+  // Measure at the exact CSS pixel font size the input uses — avoids the
+  // non-linear scaling error between unzoomed measurement × zoom and actual
+  // browser text rendering at the zoomed size.
+  inlineSizer.style.fontSize = (fontSize * zoom) + 'px';
+  inlineSizer.style.fontWeight = inlineInput.style.fontWeight;
+  const longestLine = inlineInput.value.split('\n').reduce(
+    (max, l) => l.length > max.length ? l : max, ''
+  );
+  inlineSizer.textContent = longestLine;
+  // Everything below is in CSS pixels (not logical/unzoomed).
+  const sizerPx    = inlineSizer.scrollWidth + 1; // +1 for caret cursor only
+  const svgTotalW  = (w + sw) * zoom;                          // what the SVG node will be
+  const sizerTotalW = sizerPx + 2 * padX * zoom + sw * zoom;  // minimum to fit CSS text
 
-  inlineInput.style.borderWidth = zoomedSW + 'px';
-  inlineInput.style.fontSize = zoomedFontSize + 'px';
-  inlineInput.style.width = zoomedW + 'px';
-  inlineInput.style.height = zoomedH + 'px';
+  // Use SVG width by default (input matches node exactly); expand only when CSS
+  // measurement says the text would overflow the SVG-sized content area.
+  const totalW = Math.ceil(Math.max(svgTotalW, sizerTotalW));
+  const totalH = Math.ceil((h + sw) * zoom);
+
+  inlineInput.style.borderWidth = (sw / 2 * zoom) + 'px';
+  inlineInput.style.fontSize = (fontSize * zoom) + 'px';
+  inlineInput.style.width = totalW + 'px';
+  inlineInput.style.height = totalH + 'px';
   inlineInput.style.borderRadius = (visualRx * zoom) + 'px';
 
-  // Content area inside the border is (zoomedH - 2 * zoomedSW) = h * zoom
+  // Vertical padding — content height excludes border under border-box
   const contentH = h * zoom;
   const verticalPadding = (contentH - totalTextH * zoom) / 2;
 
   // Fine-tuned adjustment for SVG vs CSS baseline alignment
   const topAdj = -0.75 * zoom;
 
-  inlineInput.style.paddingTop = (verticalPadding + topAdj) + 'px';
+  inlineInput.style.paddingTop    = (verticalPadding + topAdj) + 'px';
   inlineInput.style.paddingBottom = (verticalPadding - topAdj) + 'px';
-  inlineInput.style.paddingLeft = (padX * zoom) + 'px';
-  inlineInput.style.paddingRight = (padX * zoom) + 'px';
+  inlineInput.style.paddingLeft   = (padX * zoom) + 'px';
+  inlineInput.style.paddingRight  = (padX * zoom) + 'px';
 
   if (editState) {
     const sp = nodeScreenPos(nodeId);
     if (sp) {
-      inlineInput.style.left = (sp.x - zoomedW / 2) + 'px';
-      inlineInput.style.top = (sp.y - zoomedH / 2) + 'px';
+      inlineInput.style.left = (sp.x - totalW / 2) + 'px';
+      inlineInput.style.top  = (sp.y - totalH / 2) + 'px';
     }
   }
   render();
