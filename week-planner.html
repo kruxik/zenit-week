@@ -2984,12 +2984,12 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   if (isCenter) {
     const gearG = svgEl('g', {
       class: 'gear-btn',
-      'transform': `translate(${boxW/2 - 22}, ${-boxH/2 + 22})`
+      'transform': `translate(${boxW/2 - 42}, ${-boxH/2 + 32})`
     });
-    const gearCircle = svgEl('circle', { cx: 0, cy: 0, r: 14, fill: 'rgba(255,255,255,0.1)', class: 'gear-bg' });
+    const gearCircle = svgEl('circle', { cx: 0, cy: 0, r: 21, fill: 'rgba(255,255,255,0.1)', class: 'gear-bg' });
     const gearIcon = svgEl('use', {
       href: '#icon-settings',
-      x: -10, y: -10, width: 20, height: 20,
+      x: -15, y: -15, width: 30, height: 30,
       stroke: textColor, 'stroke-width': 1.5, fill: 'none',
       'pointer-events': 'none',
     });
