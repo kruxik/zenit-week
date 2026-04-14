@@ -3710,7 +3710,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Enter') {
     e.preventDefault();
-    if (id !== 'center' && node.type !== 'branch') {
+    if (id !== 'center') {
       startRenameNode(id);
     }
   } else if (e.key === 'Tab') {
