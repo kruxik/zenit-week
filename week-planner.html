@@ -857,6 +857,34 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.3);
   }
 
+  #cp-hex-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-input);
+    border-radius: 8px;
+    padding: 7px 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #cp-hex-prefix {
+    color: var(--text-subtle);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: monospace;
+  }
+  #cp-hex {
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-family: monospace;
+    width: 100%;
+    outline: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+  }
+
   #cp-buttons {
     display: flex;
     gap: 8px;
@@ -1722,6 +1750,10 @@
   <div id="cp-title" data-i18n="colorPicker.title">Branch color</div>
   <canvas id="cp-sb-canvas" width="160" height="120"></canvas>
   <input type="range" id="cp-hue-slider" min="0" max="359" step="1">
+  <div id="cp-hex-row">
+    <span id="cp-hex-prefix">#</span>
+    <input type="text" id="cp-hex" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
+  </div>
   <div id="cp-buttons">
     <button id="cp-cancel" data-i18n="colorPicker.cancel">Cancel</button>
     <button id="cp-apply" data-i18n="colorPicker.apply">Apply</button>
@@ -4577,6 +4609,7 @@ const cpSbCanvas  = document.getElementById('cp-sb-canvas');
 const cpHueSlider = document.getElementById('cp-hue-slider');
 const cpCtx       = cpSbCanvas.getContext('2d');
 let cpH = 0, cpS = 100, cpV = 100;
+const cpHex = document.getElementById('cp-hex');
 
 function hsvToHex(h, s, v) {
   s /= 100; v /= 100;
@@ -4627,6 +4660,8 @@ function drawSBCanvas() {
   cpCtx.strokeStyle = cpV > 50 ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)';
   cpCtx.lineWidth = 2;
   cpCtx.stroke();
+  // Sync hex input
+  cpHex.value = hsvToHex(cpH, cpS, cpV).slice(1).toUpperCase();
 }
 
 function updateSBFromEvent(e) {
@@ -4644,6 +4679,24 @@ document.addEventListener('mouseup',     ()  => { cpSbDragging = false; });
 cpHueSlider.addEventListener('input', () => {
   cpH = Number(cpHueSlider.value);
   drawSBCanvas();
+});
+
+cpHex.addEventListener('input', () => {
+  const val = cpHex.value.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+  cpHex.value = val;
+  if (val.length === 6) {
+    const hsv = hexToHsv('#' + val);
+    cpH = hsv.h; cpS = hsv.s; cpV = hsv.v;
+    cpHueSlider.value = Math.round(cpH);
+    drawSBCanvas();
+  }
+});
+
+cpHex.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && colorPickerBranch && cpHex.value.length === 6) {
+    applyBranchColor(colorPickerBranch, hsvToHex(cpH, cpS, cpV));
+    closeColorPicker();
+  }
 });
 
 function openColorPicker(branch, x, y) {
