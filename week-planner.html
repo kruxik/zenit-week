@@ -4728,6 +4728,10 @@ document.addEventListener('mousedown', (e) => {
   if (colorPickerBranch && !cpSbDragging && !cpPanel.contains(e.target)) closeColorPicker();
 });
 
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && colorPickerBranch) closeColorPicker();
+});
+
 document.getElementById('ctx-change-color').addEventListener('click', () => {
   const node = findNode(contextTarget);
   const branch = node?.branch || contextTarget;
