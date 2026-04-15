@@ -2771,6 +2771,7 @@ function addBranch(side) {
   saveBranchColors();
   saveWeek(currentWeekKey, weekData);
   _openInlineInput(id, true);
+  smoothPanToRevealNode(id);
 }
 
 function deleteBranch(id) {
@@ -3381,6 +3382,48 @@ function resizeInlineInput() {
   render();
 }
 
+function smoothPanToRevealNode(nodeId) {
+  const positions = computeLayout();
+  const pos = positions[nodeId];
+  if (!pos) return;
+
+  const rect = container.getBoundingClientRect();
+  const cW = rect.width, cH = rect.height;
+  const margin = 80;
+
+  const nodeScreenX = panX + pos.x * zoom;
+  const nodeScreenY = panY + pos.y * zoom;
+
+  if (nodeScreenX > margin && nodeScreenX < cW - margin &&
+      nodeScreenY > margin && nodeScreenY < cH - margin) return;
+
+  const targetPanX = cW / 2 - pos.x * zoom;
+  const targetPanY = cH / 2 - pos.y * zoom;
+  const startX = panX, startY = panY;
+  const duration = 350;
+  const startTime = performance.now();
+
+  function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+
+  function step(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const e = ease(t);
+    panX = startX + (targetPanX - startX) * e;
+    panY = startY + (targetPanY - startY) * e;
+    applyTransform();
+
+    if (editState && editState.nodeId === nodeId) {
+      const iW = inlineInput.offsetWidth;
+      const iH = inlineInput.offsetHeight;
+      inlineInput.style.left = (rect.left + panX + pos.x * zoom - iW / 2) + 'px';
+      inlineInput.style.top  = (rect.top  + panY + pos.y * zoom - iH / 2) + 'px';
+    }
+
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
 function startAddNode(parentId) {
   const parent = findNode(parentId);
   if (!parent) return;
@@ -3396,6 +3439,7 @@ function startAddNode(parentId) {
   rebuildNodeMap();
   parent.children.push(id);
   _openInlineInput(id, true);
+  smoothPanToRevealNode(id);
 }
 
 function startRenameNode(nodeId) {
