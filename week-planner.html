@@ -2447,7 +2447,7 @@ function formatWeekLabelHTML(year, week) {
   const months = MONTH_NAMES.en;
   const mStart = `${months[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
   const mEnd   = `${months[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
-  return `<b>${t('week.word')} ${week}</b> | (${mStart} - ${mEnd})`;
+  return `<b>${t('week.word')} ${week}</b> (${mStart} - ${mEnd})`;
 }
 
 function parseWeekKey(key) {
