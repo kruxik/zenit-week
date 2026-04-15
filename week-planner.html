@@ -1678,6 +1678,7 @@
   <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> Reset</div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
+  <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> Next week</div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
   <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> Priority Normal</div>
   <div class="ctx-item" id="ctx-prio-high"><svg class="icon" aria-hidden="true"><use href="#icon-alert-circle"/></svg> Priority High</div>
@@ -1837,10 +1838,13 @@ function takeSnapshot() {
   const cleanData = validateAndRepair(clone);
 
   // Include branch colors and config so undo/redo restores them too
+  const nextKey = offsetWeek(currentWeekKey, +1);
   const snapshot = {
     weekData:      cleanData,
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
+    nextWeekKey:   nextKey,
+    nextWeekRaw:   localStorage.getItem(storageKey(nextKey)),
   };
   undoStack.push(JSON.stringify(snapshot));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
@@ -1871,14 +1875,28 @@ function _applySnapshot(raw) {
   syncBranchConfig();
   rebuildNodeMap();
   saveWeek(currentWeekKey, weekData);
+
+  // Restore next week's state if the snapshot captured it
+  if (snapshot.nextWeekKey) {
+    const sk = storageKey(snapshot.nextWeekKey);
+    if (snapshot.nextWeekRaw === null) {
+      localStorage.removeItem(sk);
+    } else {
+      localStorage.setItem(sk, snapshot.nextWeekRaw);
+    }
+  }
+
   render();
 }
 
 function _currentSnapshot() {
+  const nextKey = offsetWeek(currentWeekKey, +1);
   return JSON.stringify({
     weekData,
-    branchColors: JSON.parse(JSON.stringify(BRANCH_COLORS)),
+    branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
+    nextWeekKey:   nextKey,
+    nextWeekRaw:   localStorage.getItem(storageKey(nextKey)),
   });
 }
 
@@ -2480,6 +2498,114 @@ function transferReusable() {
   });
   rebuildNodeMap();
 
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
+function moveNodeToNextWeek(nodeId) {
+  const node = findNode(nodeId);
+  if (!node || node.type !== 'activity') return;
+
+  takeSnapshot();
+
+  const nextKey = offsetWeek(currentWeekKey, +1);
+  const nextData = loadWeek(nextKey);
+  const nextById = new Map(nextData.nodes.map(n => [n.id, n]));
+
+  // 1. Ensure the branch exists in next week (same id)
+  const branchId = node.branch;
+  if (!nextById.has(branchId)) {
+    const branchNode = findNode(branchId);
+    if (branchNode) {
+      const branchCopy = { ...branchNode, children: [] };
+      nextData.nodes.push(branchCopy);
+      nextById.set(branchId, branchCopy);
+    }
+  }
+
+  // 2. Collect activity ancestors between branch and node (top-down order)
+  const ancestorChain = [];
+  let cur = findNode(node.parent);
+  while (cur && cur.type === 'activity') {
+    ancestorChain.unshift(cur);
+    cur = findNode(cur.parent);
+  }
+
+  // 3. Build oldToNew map; create missing ancestor shells in next week
+  const oldToNew = new Map();
+  oldToNew.set(branchId, branchId);
+
+  ancestorChain.forEach(ancestor => {
+    if (nextById.has(ancestor.id)) {
+      oldToNew.set(ancestor.id, ancestor.id);
+    } else {
+      const newId = genId();
+      const shell = {
+        ...ancestor,
+        id: newId,
+        children: [],
+        parent: oldToNew.get(ancestor.parent) || ancestor.parent,
+      };
+      nextData.nodes.push(shell);
+      nextById.set(newId, shell);
+      oldToNew.set(ancestor.id, newId);
+      const parentInNext = nextById.get(shell.parent);
+      if (parentInNext && !parentInNext.children.includes(newId)) {
+        parentInNext.children.push(newId);
+      }
+    }
+  });
+
+  // 4. Assign new ids to full subtree (node + descendants)
+  const subtreeIds = [nodeId, ...getDescendantIds(nodeId)];
+  const subtreeNodes = subtreeIds.map(id => findNode(id)).filter(Boolean);
+  subtreeNodes.forEach(n => oldToNew.set(n.id, genId()));
+
+  // Copy subtree into nextData with wired parent/children
+  subtreeNodes.forEach(n => {
+    const newId = oldToNew.get(n.id);
+    const newNode = {
+      ...n,
+      id: newId,
+      parent: oldToNew.get(n.parent) || n.parent,
+      children: n.children.map(cid => oldToNew.get(cid)).filter(Boolean),
+    };
+    nextData.nodes.push(newNode);
+    nextById.set(newId, newNode);
+  });
+
+  // Wire node into its parent in next week
+  const nodeParentIdInNext = oldToNew.get(node.parent) || node.parent;
+  const parentInNext = nextById.get(nodeParentIdInNext);
+  const nodeNewId = oldToNew.get(nodeId);
+  if (parentInNext && !parentInNext.children.includes(nodeNewId)) {
+    parentInNext.children.push(nodeNewId);
+  }
+
+  // 5. Remove subtree from current week
+  const toRemove = new Set(subtreeIds);
+  const originalParentId = node.parent;
+  const originalParent = findNode(originalParentId);
+  if (originalParent) {
+    originalParent.children = originalParent.children.filter(c => !toRemove.has(c));
+  }
+  weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
+  rebuildNodeMap();
+
+  // 6. Prune now-empty activity ancestors in current week
+  let pruneTarget = findNode(originalParentId);
+  while (pruneTarget && pruneTarget.type === 'activity' && pruneTarget.children.length === 0) {
+    const pruneParentId = pruneTarget.parent;
+    const pruneParent = findNode(pruneParentId);
+    if (pruneParent) {
+      pruneParent.children = pruneParent.children.filter(c => c !== pruneTarget.id);
+    }
+    weekData.nodes = weekData.nodes.filter(n => n.id !== pruneTarget.id);
+    rebuildNodeMap();
+    pruneTarget = findNode(pruneParentId);
+  }
+
+  saveWeek(nextKey, nextData);
   saveWeek(currentWeekKey, weekData);
   render();
 }
@@ -4049,7 +4175,8 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-reusable').innerHTML = isReusable
     ? `${iconSvg('repeat-off')} Disposable`
     : `${iconSvg('repeat')} Reusable`;
-  document.getElementById('ctx-reusable').style.display = isActivity ? '' : 'none';
+  document.getElementById('ctx-reusable').style.display       = isActivity ? '' : 'none';
+  document.getElementById('ctx-move-next-week').style.display = isActivity ? '' : 'none';
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
@@ -4152,6 +4279,11 @@ document.getElementById('ctx-transfer-unfinished').addEventListener('click', () 
 
 document.getElementById('ctx-transfer-reusable').addEventListener('click', () => {
   transferReusable();
+  hideContextMenu();
+});
+
+document.getElementById('ctx-move-next-week').addEventListener('click', () => {
+  moveNodeToNextWeek(contextTarget);
   hideContextMenu();
 });
 
