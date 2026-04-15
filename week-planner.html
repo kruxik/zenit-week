@@ -656,6 +656,19 @@
     margin: 2px 0;
   }
 
+  #lang-select {
+    width: 100%;
+    padding: 5px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+  }
+  #lang-select:focus { border-color: var(--border-hover); }
+
   /* Theme toggle pill */
   .theme-toggle-row {
     display: flex;
@@ -1554,39 +1567,47 @@
   <div id="toolbar">
     <div id="logo">Week Planner</div>
     <div id="week-nav">
-      <button class="reset-btn" id="todo-btn">TODO</button>
-      <button class="nav-btn" id="prev-week" title="Previous week"><svg class="icon" aria-hidden="true"><use href="#icon-caret-left"/></svg></button>
+      <button class="reset-btn" id="todo-btn" data-i18n="toolbar.todo">TODO</button>
+      <button class="nav-btn" id="prev-week" data-i18n-title="toolbar.prevWeek" title="Previous week"><svg class="icon" aria-hidden="true"><use href="#icon-caret-left"/></svg></button>
       <div id="week-label">Week 13 | Mar 30 – Apr 5</div>
-      <button class="nav-btn" id="next-week" title="Next week"><svg class="icon" aria-hidden="true"><use href="#icon-caret-right"/></svg></button>
-      <button class="reset-btn" id="today-btn">Today</button>
+      <button class="nav-btn" id="next-week" data-i18n-title="toolbar.nextWeek" title="Next week"><svg class="icon" aria-hidden="true"><use href="#icon-caret-right"/></svg></button>
+      <button class="reset-btn" id="today-btn" data-i18n="toolbar.today">Today</button>
     </div>
     <div id="toolbar-right">
       <div id="settings-container">
-        <button class="nav-btn" id="settings-btn" title="Settings">
+        <button class="nav-btn" id="settings-btn" data-i18n-title="toolbar.settings" title="Settings">
           <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
         </button>
         <div id="settings-dropdown">
           <div class="settings-section">
-            <div class="settings-label">Appearance</div>
+            <div class="settings-label" data-i18n="settings.appearance">Appearance</div>
             <div class="theme-toggle-row">
-              <span class="theme-label active" id="theme-label-light">Light</span>
-              <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" title="Toggle dark mode">
+              <span class="theme-label active" id="theme-label-light" data-i18n="settings.light">Light</span>
+              <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" data-i18n-title="settings.toggleDark" title="Toggle dark mode">
                 <div class="theme-toggle-thumb"></div>
               </button>
-              <span class="theme-label" id="theme-label-dark">Dark</span>
+              <span class="theme-label" id="theme-label-dark" data-i18n="settings.dark">Dark</span>
             </div>
           </div>
           <div class="settings-separator"></div>
           <div class="settings-section">
             <div id="zoom-slider-header">
-              <div class="settings-label">Zoom</div>
-              <div id="zoom-label" title="Click to reset view">100%</div>
+              <div class="settings-label" data-i18n="settings.zoom">Zoom</div>
+              <div id="zoom-label" data-i18n-title="settings.resetView" title="Click to reset view">100%</div>
             </div>
             <div id="zoom-track">
               <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
               <div id="zoom-default-marker"></div>
               <div id="zoom-thumb"></div>
             </div>
+          </div>
+          <div class="settings-separator"></div>
+          <div class="settings-section">
+            <div class="settings-label" data-i18n="settings.language">Language</div>
+            <select id="lang-select">
+              <option value="en">English</option>
+              <option value="cs">Čeština</option>
+            </select>
           </div>
         </div>
       </div>
@@ -1595,7 +1616,7 @@
 
   <div id="canvas-container">
     <div id="view-level-bar">
-      <div class="view-level-btn active" data-level="full" title="Sand — all nodes visible">
+      <div class="view-level-btn active" data-level="full" data-i18n-title="view.sandTitle" title="Sand — all nodes visible">
         <div class="view-level-icon">
           <div class="dot-row">
             <span class="vli-dot" style="width:3px;height:3px"></span>
@@ -1610,10 +1631,10 @@
             <span class="vli-dot" style="width:5px;height:5px"></span>
           </div>
         </div>
-        Sand
+        <span data-i18n="view.sand">Sand</span>
       </div>
       <div class="view-level-separator"></div>
-      <div class="view-level-btn" data-level="pebbles" title="Pebbles — hide deep sub-tasks">
+      <div class="view-level-btn" data-level="pebbles" data-i18n-title="view.pebblesTitle" title="Pebbles — hide deep sub-tasks">
         <div class="view-level-icon">
           <div class="dot-row">
             <span class="vli-dot" style="width:3px;height:3px;opacity:0.2"></span>
@@ -1628,10 +1649,10 @@
             <span class="vli-dot" style="width:5px;height:5px"></span>
           </div>
         </div>
-        Pebbles
+        <span data-i18n="view.pebbles">Pebbles</span>
       </div>
       <div class="view-level-separator"></div>
-      <div class="view-level-btn" data-level="rocks" title="Rocks — show only main branches">
+      <div class="view-level-btn" data-level="rocks" data-i18n-title="view.rocksTitle" title="Rocks — show only main branches">
         <div class="view-level-icon">
           <div class="dot-row" style="opacity:0.2">
             <span class="vli-dot" style="width:3px;height:3px"></span>
@@ -1646,7 +1667,7 @@
             <span class="vli-dot" style="width:5px;height:5px"></span>
           </div>
         </div>
-        Rocks
+        <span data-i18n="view.rocks">Rocks</span>
       </div>
     </div>
     <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
@@ -1673,42 +1694,42 @@
 </div>
 
 <div id="context-menu">
-  <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> Transfer Unfinished</div>
-  <div class="ctx-item" id="ctx-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Transfer Reusable</div>
+  <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.transferUnfinished">Transfer Unfinished</span></div>
+  <div class="ctx-item" id="ctx-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> <span data-i18n="menu.transferReusable">Transfer Reusable</span></div>
   <div class="ctx-separator" id="ctx-sep-transfer"></div>
-  <div class="ctx-item danger" id="ctx-clear-week"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> Clear the Week</div>
-  <div class="ctx-item" id="ctx-done"><svg class="icon" aria-hidden="true"><use href="#icon-circle-check"/></svg> Done</div>
-  <div class="ctx-item" id="ctx-undone"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed-check"/></svg> Undone</div>
-  <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> Reset</div>
+  <div class="ctx-item danger" id="ctx-clear-week"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.clearWeek">Clear the Week</span></div>
+  <div class="ctx-item" id="ctx-done"><svg class="icon" aria-hidden="true"><use href="#icon-circle-check"/></svg> <span data-i18n="menu.done">Done</span></div>
+  <div class="ctx-item" id="ctx-undone"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed-check"/></svg> <span data-i18n="menu.undone">Undone</span></div>
+  <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> <span data-i18n="menu.reset">Reset</span></div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
-  <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> Next week</div>
+  <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.nextWeek">Next week</span></div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
-  <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> Priority Normal</div>
-  <div class="ctx-item" id="ctx-prio-high"><svg class="icon" aria-hidden="true"><use href="#icon-alert-circle"/></svg> Priority High</div>
-  <div class="ctx-item" id="ctx-prio-critical"><svg class="icon" aria-hidden="true"><use href="#icon-flame"/></svg> Priority Critical</div>
+  <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> <span data-i18n="menu.prioNormal">Priority Normal</span></div>
+  <div class="ctx-item" id="ctx-prio-high"><svg class="icon" aria-hidden="true"><use href="#icon-alert-circle"/></svg> <span data-i18n="menu.prioHigh">Priority High</span></div>
+  <div class="ctx-item" id="ctx-prio-critical"><svg class="icon" aria-hidden="true"><use href="#icon-flame"/></svg> <span data-i18n="menu.prioCritical">Priority Critical</span></div>
   <div class="ctx-separator" id="ctx-sep-2"></div>
-  <div class="ctx-item" id="ctx-rename"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"/></svg> Rename</div>
-  <div class="ctx-item" id="ctx-add-child"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg> Add Activity</div>
+  <div class="ctx-item" id="ctx-rename"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"/></svg> <span data-i18n="menu.rename">Rename</span></div>
+  <div class="ctx-item" id="ctx-add-child"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg> <span data-i18n="menu.addActivity">Add Activity</span></div>
   <div class="ctx-separator" id="ctx-sep-color"></div>
-  <div class="ctx-item" id="ctx-change-color"><span id="ctx-color-swatch"></span> Change color</div>
+  <div class="ctx-item" id="ctx-change-color"><span id="ctx-color-swatch"></span> <span data-i18n="menu.changeColor">Change color</span></div>
   <div class="ctx-separator" id="ctx-sep-3"></div>
-  <div class="ctx-item danger" id="ctx-delete"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> Delete</div>
+  <div class="ctx-item danger" id="ctx-delete"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.delete">Delete</span></div>
 </div>
 
 <textarea id="inline-input" autocomplete="off" spellcheck="false"></textarea>
 <span id="inline-sizer"></span>
 
 <div id="color-picker-panel">
-  <div id="cp-title">Branch color</div>
+  <div id="cp-title" data-i18n="colorPicker.title">Branch color</div>
   <input type="color" id="cp-wheel">
   <div id="cp-hex-row">
     <span id="cp-hex-prefix">#</span>
     <input type="text" id="cp-hex" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
   </div>
   <div id="cp-buttons">
-    <button id="cp-cancel">Cancel</button>
-    <button id="cp-apply">Apply</button>
+    <button id="cp-cancel" data-i18n="colorPicker.cancel">Cancel</button>
+    <button id="cp-apply" data-i18n="colorPicker.apply">Apply</button>
   </div>
 </div>
 
@@ -1716,7 +1737,7 @@
 <div id="todo-overlay">
   <div id="todo-panel">
     <div id="todo-header">
-      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">Today's TODO</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="todo.title">Today's TODO</div>
       <div id="todo-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
     </div>
     <div id="todo-content"></div>
@@ -1724,12 +1745,12 @@
   </div>
 </div>
 
-<div id="daily-log-fab" title="Today's Activity"><svg class="icon" aria-hidden="true"><use href="#icon-rosette-discount-check"/></svg></div>
+<div id="daily-log-fab" data-i18n-title="dailyLog.fab" title="Today's Activity"><svg class="icon" aria-hidden="true"><use href="#icon-rosette-discount-check"/></svg></div>
 
 <div id="daily-log-overlay">
   <div id="daily-log-panel">
     <div id="daily-log-header">
-      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">Today's Activity</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="dailyLog.title">Today's Activity</div>
       <div id="daily-log-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
     </div>
     <div id="daily-log-content"></div>
@@ -1737,76 +1758,66 @@
   </div>
 </div>
 
-<div id="help-fab" title="Help & Hotkeys"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"/></svg></div>
+<div id="help-fab" data-i18n-title="help.fab" title="Help & Hotkeys"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"/></svg></div>
 
 <div id="help-overlay">
   <div id="help-panel">
     <div id="help-header">
-      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">Help & Hotkeys</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="help.title">Help & Hotkeys</div>
       <div id="help-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
     </div>
     
     <div id="help-content">
       <div class="help-section">
-        <div class="help-section-title">Activity hotkeys (On Hover)</div>
-        <div class="help-row"><span>Rename</span> <kbd>Enter</kbd></div>
-        <div class="help-row"><span>Add</span> <kbd>Tab</kbd></div>
-        <div class="help-row"><span>Delete</span> <kbd>Backspace</kbd></div>
-        <div class="help-row"><span>Toggle Done</span> <kbd>D</kbd></div>
-        <div class="help-row"><span>Toggle Unplanned</span> <kbd>U</kbd></div>
-        <div class="help-row"><span>Quick Options</span> <kbd>Right Click</kbd></div>
-        <div class="help-row"><span>Undo</span> <kbd id="undo-kbd">Ctrl + Z</kbd></div>
-        <div class="help-row"><span>Redo</span> <kbd id="redo-kbd">Ctrl + Shift + Z</kbd></div>
+        <div class="help-section-title" data-i18n="help.hotkeysTitle">Activity hotkeys (On Hover)</div>
+        <div class="help-row"><span data-i18n="help.rename">Rename</span> <kbd>Enter</kbd></div>
+        <div class="help-row"><span data-i18n="help.add">Add</span> <kbd>Tab</kbd></div>
+        <div class="help-row"><span data-i18n="help.delete">Delete</span> <kbd>Backspace</kbd></div>
+        <div class="help-row"><span data-i18n="help.toggleDone">Toggle Done</span> <kbd>D</kbd></div>
+        <div class="help-row"><span data-i18n="help.toggleUnplanned">Toggle Unplanned</span> <kbd>U</kbd></div>
+        <div class="help-row"><span data-i18n="help.quickOptions">Quick Options</span> <kbd>Right Click</kbd></div>
+        <div class="help-row"><span data-i18n="help.undo">Undo</span> <kbd id="undo-kbd">Ctrl + Z</kbd></div>
+        <div class="help-row"><span data-i18n="help.redo">Redo</span> <kbd id="redo-kbd">Ctrl + Shift + Z</kbd></div>
       </div>
 
       <div class="help-section">
-        <div class="help-section-title">Day indicators (TODO list)</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
-          Add (day) to any activity name to schedule it for that weekday in the TODO list.
-        </div>
+        <div class="help-section-title" data-i18n="help.dayIndicatorsTitle">Day indicators (TODO list)</div>
+        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.dayIndicatorsDesc">Add (day) to any activity name to schedule it for that weekday in the TODO list.</div>
         <div class="help-row" style="margin-top: 8px;">
-          <span style="color: var(--text-dim); font-size: 13px;">Czech</span>
+          <span style="color: var(--text-dim); font-size: 13px;" data-i18n="help.czech">Czech</span>
           <span style="font-size: 13px; color: var(--text-secondary);">
             <kbd>po</kbd> <kbd>út</kbd> <kbd>st</kbd> <kbd>čt</kbd> <kbd>pá</kbd> <kbd>so</kbd> <kbd>ne</kbd>
           </span>
         </div>
         <div class="help-row">
-          <span style="color: var(--text-dim); font-size: 13px;">English</span>
+          <span style="color: var(--text-dim); font-size: 13px;" data-i18n="help.english">English</span>
           <span style="font-size: 13px; color: var(--text-secondary);">
             <kbd>mo</kbd> <kbd>tu</kbd> <kbd>we</kbd> <kbd>th</kbd> <kbd>fr</kbd> <kbd>sa</kbd> <kbd>su</kbd>
           </span>
         </div>
-        <div class="help-row" style="margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
-          Multiple days: (po, we, fr) — spaces or commas both work.
-        </div>
+        <div class="help-row" style="margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.multipleDays">Multiple days: (po, we, fr) — spaces or commas both work.</div>
       </div>
 
       <div class="help-section">
-        <div class="help-section-title">Counters</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
-          Add Nx to an activity name (e.g. Pushups 10x) to create a sub-counter.
-        </div>
+        <div class="help-section-title" data-i18n="help.countersTitle">Counters</div>
+        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.countersDesc">Add Nx to an activity name (e.g. Pushups 10x) to create a sub-counter.</div>
       </div>
 
       <div class="help-section">
-        <div class="help-section-title">Activity rebinding & organizing</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);">
-          Drag a node over another to rebind it as a child. Drag between siblings to reorder.
-        </div>
+        <div class="help-section-title" data-i18n="help.rebindTitle">Activity rebinding &amp; organizing</div>
+        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.rebindDesc">Drag a node over another to rebind it as a child. Drag between siblings to reorder.</div>
       </div>
 
       <div class="help-section">
-        <div class="help-section-title">Canvas Navigation</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);">
-          Drag background to pan. Scroll / pinch to zoom.
-        </div>
+        <div class="help-section-title" data-i18n="help.navTitle">Canvas Navigation</div>
+        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.navDesc">Drag background to pan. Scroll / pinch to zoom.</div>
       </div>
 
       <div class="help-section">
-        <div class="help-section-title">Legend</div>
+        <div class="help-section-title" data-i18n="help.legendTitle">Legend</div>
         <div id="help-legend">
-          <div class="legend-item"><div class="legend-dot" style="background:var(--accent-warning-bg); border: 1px solid var(--accent-warning-border)"></div>Unplanned</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--node-done-bg); border: 1px solid var(--node-done-border)"></div>Done</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--accent-warning-bg); border: 1px solid var(--accent-warning-border)"></div><span data-i18n="help.unplanned">Unplanned</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--node-done-bg); border: 1px solid var(--node-done-border)"></div><span data-i18n="help.done">Done</span></div>
         </div>
       </div>
     </div>
@@ -2153,6 +2164,7 @@ const BRANCH_CONFIG = {};
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentWeekKey = '';   // 'YYYY-WW'
 let weekData = {};          // { nodes: [...] }
+let currentLang = 'en';
 
 let zoom    = 0.6;
 let panX    = 0;
@@ -2199,12 +2211,243 @@ function getWeekBounds(year, week) {
   return { monday, sunday };
 }
 
+// ─── i18n ─────────────────────────────────────────────────────────────────────
+const MONTH_NAMES = {
+  en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+  cs: ['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec'],
+};
+
+const TRANSLATIONS = {
+  en: {
+    'toolbar.todo':               'TODO',
+    'toolbar.today':              'Today',
+    'toolbar.prevWeek':           'Previous week',
+    'toolbar.nextWeek':           'Next week',
+    'toolbar.settings':           'Settings',
+    'week.word':                  'Week',
+    'settings.appearance':        'Appearance',
+    'settings.light':             'Light',
+    'settings.dark':              'Dark',
+    'settings.toggleDark':        'Toggle dark mode',
+    'settings.zoom':              'Zoom',
+    'settings.resetView':         'Click to reset view',
+    'settings.language':          'Language',
+    'view.sand':                  'Sand',
+    'view.pebbles':               'Pebbles',
+    'view.rocks':                 'Rocks',
+    'view.sandTitle':             'Sand — all nodes visible',
+    'view.pebblesTitle':          'Pebbles — hide deep sub-tasks',
+    'view.rocksTitle':            'Rocks — show only main branches',
+    'menu.transferUnfinished':    'Transfer Unfinished',
+    'menu.transferReusable':      'Transfer Reusable',
+    'menu.clearWeek':             'Clear the Week',
+    'menu.done':                  'Done',
+    'menu.undone':                'Undone',
+    'menu.reset':                 'Reset',
+    'menu.unplanned':             'Unplanned',
+    'menu.planned':               'Planned',
+    'menu.reusable':              'Reusable',
+    'menu.disposable':            'Disposable',
+    'menu.nextWeek':              'Next week',
+    'menu.prioNormal':            'Priority Normal',
+    'menu.prioHigh':              'Priority High',
+    'menu.prioCritical':          'Priority Critical',
+    'menu.rename':                'Rename',
+    'menu.addActivity':           'Add Activity',
+    'menu.changeColor':           'Change color',
+    'menu.delete':                'Delete',
+    'colorPicker.title':          'Branch color',
+    'colorPicker.cancel':         'Cancel',
+    'colorPicker.apply':          'Apply',
+    'summary.activitiesDone':     'Activities Done',
+    'summary.tooltipNormal':      "A realistic load — you'll likely finish 80%+.",
+    'summary.tooltipStretch':     "A stretch load — finishing 80% will be a challenge.",
+    'summary.tooltipOverload':    "An overload — you'll likely finish under 60%, with burnout risk long-term.",
+    'todo.title':                 "Today's TODO",
+    'todo.done':                  'Done',
+    'todo.total':                 'Total',
+    'todo.toggle':                'Toggle',
+    'todo.empty':                 'No tasks scheduled for today.',
+    'dailyLog.title':             "Today's Activity",
+    'dailyLog.fab':               "Today's Activity",
+    'dailyLog.done':              'Done',
+    'dailyLog.inProgress':        'In Progress',
+    'dailyLog.unplanned':         'Unplanned',
+    'dailyLog.progress':          '+1 Progress',
+    'dailyLog.empty':             'No activity recorded today.',
+    'help.title':                 'Help & Hotkeys',
+    'help.fab':                   'Help & Hotkeys',
+    'help.hotkeysTitle':          'Activity hotkeys (On Hover)',
+    'help.rename':                'Rename',
+    'help.add':                   'Add',
+    'help.delete':                'Delete',
+    'help.toggleDone':            'Toggle Done',
+    'help.toggleUnplanned':       'Toggle Unplanned',
+    'help.quickOptions':          'Quick Options',
+    'help.undo':                  'Undo',
+    'help.redo':                  'Redo',
+    'help.dayIndicatorsTitle':    'Day indicators (TODO list)',
+    'help.dayIndicatorsDesc':     'Add (day) to any activity name to schedule it for that weekday in the TODO list.',
+    'help.czech':                 'Czech',
+    'help.english':               'English',
+    'help.multipleDays':          'Multiple days: (po, we, fr) — spaces or commas both work.',
+    'help.countersTitle':         'Counters',
+    'help.countersDesc':          'Add Nx to an activity name (e.g. Pushups 10x) to create a sub-counter.',
+    'help.rebindTitle':           'Activity rebinding & organizing',
+    'help.rebindDesc':            'Drag a node over another to rebind it as a child. Drag between siblings to reorder.',
+    'help.navTitle':              'Canvas Navigation',
+    'help.navDesc':               'Drag background to pan. Scroll / pinch to zoom.',
+    'help.legendTitle':           'Legend',
+    'help.unplanned':             'Unplanned',
+    'help.done':                  'Done',
+  },
+  cs: {
+    'toolbar.todo':               'Úkoly',
+    'toolbar.today':              'Dnes',
+    'toolbar.prevWeek':           'Předchozí týden',
+    'toolbar.nextWeek':           'Příští týden',
+    'toolbar.settings':           'Nastavení',
+    'week.word':                  'Týden',
+    'settings.appearance':        'Vzhled',
+    'settings.light':             'Světlý',
+    'settings.dark':              'Tmavý',
+    'settings.toggleDark':        'Přepnout tmavý režim',
+    'settings.zoom':              'Přiblížení',
+    'settings.resetView':         'Kliknutím resetovat pohled',
+    'settings.language':          'Jazyk',
+    'view.sand':                  'Písek',
+    'view.pebbles':               'Oblázky',
+    'view.rocks':                 'Kameny',
+    'view.sandTitle':             'Písek — vše viditelné',
+    'view.pebblesTitle':          'Oblázky — skryje hluboké podúkoly',
+    'view.rocksTitle':            'Kameny — zobrazí jen hlavní větve',
+    'menu.transferUnfinished':    'Přenést nedokončené',
+    'menu.transferReusable':      'Přenést opakované',
+    'menu.clearWeek':             'Vymazat týden',
+    'menu.done':                  'Hotovo',
+    'menu.undone':                'Nehotovo',
+    'menu.reset':                 'Resetovat',
+    'menu.unplanned':             'Neplánované',
+    'menu.planned':               'Plánované',
+    'menu.reusable':              'Opakované',
+    'menu.disposable':            'Jednorázové',
+    'menu.nextWeek':              'Příští týden',
+    'menu.prioNormal':            'Priorita Normální',
+    'menu.prioHigh':              'Priorita Vysoká',
+    'menu.prioCritical':          'Priorita Kritická',
+    'menu.rename':                'Přejmenovat',
+    'menu.addActivity':           'Přidat aktivitu',
+    'menu.changeColor':           'Změnit barvu',
+    'menu.delete':                'Smazat',
+    'colorPicker.title':          'Barva větve',
+    'colorPicker.cancel':         'Zrušit',
+    'colorPicker.apply':          'Použít',
+    'summary.activitiesDone':     'Splněné aktivity',
+    'summary.tooltipNormal':      'Realistická zátěž — pravděpodobně dokončíte 80 % a více.',
+    'summary.tooltipStretch':     'Náročná zátěž — dokončit 80 % bude výzva.',
+    'summary.tooltipOverload':    'Přetížení — pravděpodobně dokončíte méně než 60 %, hrozí vyhoření.',
+    'todo.title':                 'Dnešní úkoly',
+    'todo.done':                  'Hotovo',
+    'todo.total':                 'Celkem',
+    'todo.toggle':                'Přepnout',
+    'todo.empty':                 'Dnes žádné naplánované úkoly.',
+    'dailyLog.title':             'Dnešní aktivita',
+    'dailyLog.fab':               'Dnešní aktivita',
+    'dailyLog.done':              'Hotovo',
+    'dailyLog.inProgress':        'Probíhá',
+    'dailyLog.unplanned':         'Neplánované',
+    'dailyLog.progress':          '+1 Pokrok',
+    'dailyLog.empty':             'Dnes žádná zaznamenaná aktivita.',
+    'help.title':                 'Nápověda & klávesové zkratky',
+    'help.fab':                   'Nápověda & klávesové zkratky',
+    'help.hotkeysTitle':          'Klávesové zkratky aktivit (při najetí)',
+    'help.rename':                'Přejmenovat',
+    'help.add':                   'Přidat',
+    'help.delete':                'Smazat',
+    'help.toggleDone':            'Přepnout hotovo',
+    'help.toggleUnplanned':       'Přepnout neplánované',
+    'help.quickOptions':          'Rychlé možnosti',
+    'help.undo':                  'Zpět',
+    'help.redo':                  'Znovu',
+    'help.dayIndicatorsTitle':    'Denní indikátory (seznam úkolů)',
+    'help.dayIndicatorsDesc':     'Přidejte (den) k názvu aktivity pro zařazení do seznamu úkolů daného dne.',
+    'help.czech':                 'Česky',
+    'help.english':               'Anglicky',
+    'help.multipleDays':          'Více dní: (po, we, fr) — mezery i čárky fungují.',
+    'help.countersTitle':         'Počítadla',
+    'help.countersDesc':          'Přidejte Nx k názvu aktivity (např. Kliky 10x) pro vytvoření počítadla.',
+    'help.rebindTitle':           'Přesouvání aktivit',
+    'help.rebindDesc':            'Přetáhněte uzel na jiný pro přeřazení jako podúkol. Přetáhněte mezi sourozenci pro změnu pořadí.',
+    'help.navTitle':              'Navigace na plátně',
+    'help.navDesc':               'Přetáhněte pozadí pro posouvání. Scroll / pinch pro zoom.',
+    'help.legendTitle':           'Legenda',
+    'help.unplanned':             'Neplánované',
+    'help.done':                  'Hotovo',
+  },
+};
+
+function t(key, vars = {}) {
+  const msg = TRANSLATIONS[currentLang]?.[key] ?? TRANSLATIONS.en[key] ?? key;
+  return msg.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+}
+
+function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  const sel = document.getElementById('lang-select');
+  if (sel) sel.value = currentLang;
+  // Week label is regenerated by render(); summary by updateSummary().
+  // If called outside render (language switch), update both here.
+  const wlEl = document.getElementById('week-label');
+  if (wlEl && currentWeekKey) {
+    const { year, week } = parseWeekKey(currentWeekKey);
+    wlEl.innerHTML = formatWeekLabelHTML(year, week);
+  }
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('week-planner-lang', lang);
+  applyTranslations();
+  render();
+}
+
 function formatWeekLabel(year, week) {
   const { monday, sunday } = getWeekBounds(year, week);
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if (currentLang === 'cs') {
+    const months = MONTH_NAMES.cs;
+    const d1 = monday.getUTCDate(), m1 = months[monday.getUTCMonth()];
+    const d2 = sunday.getUTCDate(), m2 = months[sunday.getUTCMonth()];
+    const range = (m1 === m2)
+      ? `${d1}. - ${d2}. ${m1}`
+      : `${d1}. ${m1} - ${d2}. ${m2}`;
+    return `${t('week.word')} ${week} (${range})`;
+  }
+  const months = MONTH_NAMES.en;
   const mStart = `${months[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
   const mEnd   = `${months[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
-  return `Week ${week} | (${mStart} - ${mEnd})`;
+  return `${t('week.word')} ${week} | (${mStart} - ${mEnd})`;
+}
+
+function formatWeekLabelHTML(year, week) {
+  const { monday, sunday } = getWeekBounds(year, week);
+  if (currentLang === 'cs') {
+    const months = MONTH_NAMES.cs;
+    const d1 = monday.getUTCDate(), m1 = months[monday.getUTCMonth()];
+    const d2 = sunday.getUTCDate(), m2 = months[sunday.getUTCMonth()];
+    const range = (m1 === m2)
+      ? `${d1}. - ${d2}. ${m1}`
+      : `${d1}. ${m1} - ${d2}. ${m2}`;
+    return `<b>${t('week.word')} ${week}</b> (${range})`;
+  }
+  const months = MONTH_NAMES.en;
+  const mStart = `${months[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
+  const mEnd   = `${months[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
+  return `<b>${t('week.word')} ${week}</b> | (${mStart} - ${mEnd})`;
 }
 
 function parseWeekKey(key) {
@@ -2258,20 +2501,22 @@ function validateAndRepair(data) {
     }
   });
 
-  // 2. Identify all branch nodes as reachability roots
+  // 2. Reconstruct any missing default branches (individually, not just when all are gone)
+  defaultWeekData().nodes.forEach(template => {
+    if (!nodeMap.has(template.id)) {
+      const orphanChildren = data.nodes
+        .filter(n => n.parent === template.id)
+        .map(n => n.id);
+      const restored = Object.assign({}, template, { children: orphanChildren });
+      data.nodes.unshift(restored);
+      nodeMap.set(restored.id, restored);
+    }
+  });
+
+  // 3a. Identify all branch nodes as reachability roots
   const rootBranches = data.nodes.filter(n => n.type === 'branch').map(n => n.id);
 
-  // If no branches survive at all, reconstruct the 3 defaults as a fallback
-  if (rootBranches.length === 0) {
-    defaultWeekData().nodes.forEach(branch => {
-      branch.children = data.nodes.filter(n => n.parent === branch.id).map(n => n.id);
-      data.nodes.unshift(branch);
-      nodeMap.set(branch.id, branch);
-      rootBranches.push(branch.id);
-    });
-  }
-
-  // 3. Rebuild Parent-Child Symmetry
+  // 3b. Rebuild Parent-Child Symmetry
   // Identify all nodes reachable from branch roots
   const reachable = new Set();
 
@@ -2286,7 +2531,7 @@ function validateAndRepair(data) {
   }
   rootBranches.forEach(bid => collect(bid, null));
 
-  // 4. Garbage Collection: Remove unreachable nodes
+  // 4. Garbage collection: remove unreachable nodes
   data.nodes = data.nodes.filter(n => reachable.has(n.id));
 
   return data;
@@ -3782,16 +4027,16 @@ function updateSummary() {
     const isDarkSummary = document.documentElement.dataset.theme === 'dark';
     let totalColor = isDarkSummary ? '#2ecc71' : '#28a745';
     let emoji = '😀';
-    let tooltip = "A realistic load — you'll likely finish 80%+. ";
+    let tooltip = t('summary.tooltipNormal');
     if (global.total > 140) {
       totalColor = isDarkSummary ? '#ff6b5b' : '#d93025'; emoji = '🤯';
-      tooltip = "An overload — you'll likely finish under 60%, with burnout risk long-term.";
+      tooltip = t('summary.tooltipOverload');
     } else if (global.total >= 106) {
       totalColor = isDarkSummary ? '#f5a623' : '#f29900'; emoji = '😅';
-      tooltip = "A stretch load — finishing 80% will be a challenge.";
+      tooltip = t('summary.tooltipStretch');
     }
 
-    mainEl.innerHTML = `Activities Done: ${global.done} (${global.percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${global.total}</span>&nbsp;${emoji}</span>`;
+    mainEl.innerHTML = `${t('summary.activitiesDone')}: ${global.done} (${global.percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${global.total}</span>&nbsp;${emoji}</span>`;
   }
 
   // Rebuild branch stat rows dynamically
@@ -3852,9 +4097,7 @@ function render() {
   while (root.firstChild) root.removeChild(root.firstChild);
 
   const { year, week } = parseWeekKey(currentWeekKey);
-  const label = formatWeekLabel(year, week);
-  const parts = label.split(' | ');
-  document.getElementById('week-label').innerHTML = `<b>${parts[0]}</b> ${parts[1]}`;
+  document.getElementById('week-label').innerHTML = formatWeekLabelHTML(year, week);
 
   const positions = computeLayout();
 
@@ -4216,14 +4459,14 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-reset').style.display     = isCounter                                ? ''     : 'none';
   const isUnplanned = node && node.unplanned === true;
   document.getElementById('ctx-unplanned').innerHTML = isUnplanned
-    ? `${iconSvg('bolt-off')} Planned`
-    : `${iconSvg('bolt')} Unplanned`;
+    ? `${iconSvg('bolt-off')} ${t('menu.planned')}`
+    : `${iconSvg('bolt')} ${t('menu.unplanned')}`;
   document.getElementById('ctx-unplanned').style.display = (isBranch || isCenter || isCounter) ? 'none' : '';
 
   const isReusable = node && node.reusable === true;
   document.getElementById('ctx-reusable').innerHTML = isReusable
-    ? `${iconSvg('repeat-off')} Disposable`
-    : `${iconSvg('repeat')} Reusable`;
+    ? `${iconSvg('repeat-off')} ${t('menu.disposable')}`
+    : `${iconSvg('repeat')} ${t('menu.reusable')}`;
   document.getElementById('ctx-reusable').style.display       = isActivity ? '' : 'none';
   document.getElementById('ctx-move-next-week').style.display = isActivity ? '' : 'none';
 
@@ -4862,14 +5105,21 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 // Sync toggle to whatever theme was applied by the pre-paint script
 syncThemeToggleUI();
 
+// ─── Lang select ──────────────────────────────────────────────────────────────
+document.getElementById('lang-select').addEventListener('change', e => {
+  setLanguage(e.target.value);
+});
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
+  currentLang = localStorage.getItem('week-planner-lang') || 'en';
   loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   updateSvgFilters();
   const hashWeek = location.hash.slice(1);
   const initialWeek = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
   loadAndRender(initialWeek);
+  applyTranslations();
   updateColorDots();
 
   // Position the default-zoom marker on the track
@@ -4919,9 +5169,9 @@ window.addEventListener('load', () => {
 
     const footer = document.getElementById('daily-log-footer');
     footer.innerHTML = `
-      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> Done</div>
-      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge progress">${iconSvg('circle-half-2')} ${inProgressCount}</span> In Progress</div>
-      <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge unplanned">${iconSvg('bolt')} ${unplannedCount}</span> Unplanned</div>
+      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> ${t('dailyLog.done')}</div>
+      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge progress">${iconSvg('circle-half-2')} ${inProgressCount}</span> ${t('dailyLog.inProgress')}</div>
+      <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge unplanned">${iconSvg('bolt')} ${unplannedCount}</span> ${t('dailyLog.unplanned')}</div>
     `;
 
     const content = document.getElementById('daily-log-content');
@@ -4930,7 +5180,7 @@ window.addEventListener('load', () => {
     if (entries.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'daily-log-empty';
-      empty.textContent = 'No activity recorded today.';
+      empty.textContent = t('dailyLog.empty');
       content.appendChild(empty);
     } else {
       entries.forEach(({ ts, type, node, parent }) => {
@@ -4946,9 +5196,9 @@ window.addEventListener('load', () => {
 
         const badge = document.createElement('div');
         badge.className = `daily-log-badge ${type}`;
-        if (type === 'done') badge.innerHTML = `${iconSvg('circle-check')} Done`;
-        else if (type === 'unplanned') badge.innerHTML = `${iconSvg('bolt')} Unplanned`;
-        else badge.textContent = '+1 Progress';
+        if (type === 'done') badge.innerHTML = `${iconSvg('circle-check')} ${t('dailyLog.done')}`;
+        else if (type === 'unplanned') badge.innerHTML = `${iconSvg('bolt')} ${t('dailyLog.unplanned')}`;
+        else badge.textContent = t('dailyLog.progress');
 
         const label = document.createElement('div');
         label.className = 'daily-log-label';
@@ -5101,9 +5351,9 @@ window.addEventListener('load', () => {
     const totalCount = entries.length;
     const footer = document.getElementById('todo-footer');
     footer.innerHTML = `
-      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> Done</div>
-      <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge progress">${iconSvg('circle')} ${totalCount}</span> Total</div>
-      <div class="daily-log-footer-stat" style="font-size:12px;color:var(--text-placeholder);gap:4px;">Toggle <kbd>D</kbd></div>
+      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> ${t('todo.done')}</div>
+      <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge progress">${iconSvg('circle')} ${totalCount}</span> ${t('todo.total')}</div>
+      <div class="daily-log-footer-stat" style="font-size:12px;color:var(--text-placeholder);gap:4px;">${t('todo.toggle')} <kbd>D</kbd></div>
     `;
 
     // Content
@@ -5113,7 +5363,7 @@ window.addEventListener('load', () => {
     if (entries.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'daily-log-empty';
-      empty.textContent = 'No tasks scheduled for today.';
+      empty.textContent = t('todo.empty');
       content.appendChild(empty);
       document.getElementById('todo-overlay').classList.add('visible');
       return;
