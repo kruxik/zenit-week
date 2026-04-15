@@ -2095,6 +2095,45 @@ function measureText(text, fontSize, fontWeight = 'normal') {
   return ctx.measureText(text).width;
 }
 
+// Map each canonical weekday index (0=Sun … 6=Sat) to its accepted tokens
+const TODO_DAY_TOKENS = {
+  1: ['mo', 'po'],
+  2: ['tu', 'ut', 'út'],
+  3: ['we', 'st'],
+  4: ['th', 'ct', 'čt'],
+  5: ['fr', 'pa', 'pá'],
+  6: ['sa', 'so'],
+  0: ['su', 'ne'],
+};
+// Reverse map: token → weekday index
+const TODO_TOKEN_MAP = {};
+Object.entries(TODO_DAY_TOKENS).forEach(([day, tokens]) => {
+  tokens.forEach(tok => { TODO_TOKEN_MAP[tok] = Number(day); });
+});
+// Daily indicator tokens (EN + CS + CS without diacritics), case-insensitive
+const TODO_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
+
+// Returns the Set of weekday indices (0–6) declared in a label's (…) groups.
+// A group is recognised when every token is a known day abbr, or it's a daily indicator.
+function parseTodoDays(label) {
+  const days = new Set();
+  const groups = label.match(/\(([^)]+)\)/g);
+  if (!groups) return days;
+  groups.forEach(group => {
+    const inner = group.slice(1, -1).trim();
+    const tokens = inner.split(/[\s,]+/).map(tok => tok.toLowerCase()).filter(Boolean);
+    if (tokens.length === 0) return;
+    if (tokens.length === 1 && TODO_DAILY_TOKENS.has(tokens[0])) {
+      for (let d = 0; d <= 6; d++) days.add(d);
+      return;
+    }
+    if (tokens.every(tok => tok in TODO_TOKEN_MAP)) {
+      tokens.forEach(tok => days.add(TODO_TOKEN_MAP[tok]));
+    }
+  });
+  return days;
+}
+
 function getNodeSize(nodeId) {
   const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey))) } : findNode(nodeId);
   if (!node) return { w: 0, h: 0 };
@@ -2266,6 +2305,7 @@ const TRANSLATIONS = {
     'todo.title':                 "Today's TODO",
     'todo.done':                  'Done',
     'todo.undone':                'Undone',
+    'todo.inProgress':            'In Progress',
     'todo.noLabel':               '(no label)',
     'todo.total':                 'Total',
     'todo.toggle':                'Toggle',
@@ -2351,6 +2391,7 @@ const TRANSLATIONS = {
     'todo.title':                 'Dnešní úkoly',
     'todo.done':                  'Hotovo',
     'todo.undone':                'Nesplněno',
+    'todo.inProgress':            'Rozpracováno',
     'todo.noLabel':               '(bez názvu)',
     'todo.total':                 'Celkem',
     'todo.toggle':                'Přepnout',
@@ -3088,6 +3129,11 @@ function isLeafActivity(node) {
   return nonCounterChildren.length === 0;
 }
 
+function getCounterChild(node) {
+  if (!node) return null;
+  return (node.children || []).map(findNode).find(n => n && n.type === 'counter') || null;
+}
+
 function setStatus(id, status) {
   const node = findNode(id);
   if (!node) return;
@@ -3771,10 +3817,13 @@ function commitEdit(followUp = 'auto') {
     delete node._editing;
     
     // Counter auto-creation (not applicable to branch nodes)
-    const match = node.type !== 'branch' && label.match(/(\d+)x/);
-    const hasDailyIndicator = !match && node.type !== 'branch' && /\((?:daily|denně|denne)\)/i.test(label);
-    if (match || hasDailyIndicator) {
-      const maxVal = match ? parseInt(match[1], 10) : 7;
+    // max = max(Nx value, number of day indicators) — whichever is higher wins
+    const nxMatch = node.type !== 'branch' && label.match(/(\d+)x/);
+    const nxVal   = nxMatch ? parseInt(nxMatch[1], 10) : 0;
+    const dayCount = node.type !== 'branch' ? parseTodoDays(label).size : 0;
+    const counterMax = Math.max(nxVal, dayCount);
+    if (counterMax > 0) {
+      const maxVal = counterMax;
       // Check if it already has a counter child
       const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
       if (counterNode) {
@@ -3815,7 +3864,7 @@ function commitEdit(followUp = 'auto') {
         node.children.push(counterId);
       }
     } else {
-      // S1: label no longer has Nx or daily indicator — remove any existing counter child
+      // S1: no Nx and no day indicators — remove any existing counter child
       const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
       if (counterNode) {
         node.children = node.children.filter(id => id !== counterNode.id);
@@ -5243,46 +5292,6 @@ window.addEventListener('load', () => {
     if (e.target === dailyLogOverlay) dailyLogOverlay.classList.remove('visible');
   });
 
-  // Map each canonical weekday index (0=Sun … 6=Sat) to its accepted tokens
-  const TODO_DAY_TOKENS = {
-    1: ['mo', 'po'],
-    2: ['tu', 'ut', 'út'],
-    3: ['we', 'st'],
-    4: ['th', 'ct', 'čt'],
-    5: ['fr', 'pa', 'pá'],
-    6: ['sa', 'so'],
-    0: ['su', 'ne'],
-  };
-  // Reverse map: token → weekday index
-  const TODO_TOKEN_MAP = {};
-  Object.entries(TODO_DAY_TOKENS).forEach(([day, tokens]) => {
-    tokens.forEach(t => { TODO_TOKEN_MAP[t] = Number(day); });
-  });
-  // Daily indicator tokens (EN + CS + CS without diacritics), case-insensitive
-  const TODO_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
-
-  // Returns the set of weekday indices (0–6) declared in a label's (…) groups.
-  // A group is only recognised when every space/comma-delimited token is a known day,
-  // or the group is a daily indicator (matches all 7 days).
-  function parseTodoDays(label) {
-    const days = new Set();
-    const groups = label.match(/\(([^)]+)\)/g);
-    if (!groups) return days;
-    groups.forEach(group => {
-      const inner = group.slice(1, -1).trim();
-      const tokens = inner.split(/[\s,]+/).map(t => t.toLowerCase()).filter(Boolean);
-      if (tokens.length === 0) return;
-      if (tokens.length === 1 && TODO_DAILY_TOKENS.has(tokens[0])) {
-        for (let d = 0; d <= 6; d++) days.add(d);
-        return;
-      }
-      if (tokens.every(t => t in TODO_TOKEN_MAP)) {
-        tokens.forEach(t => days.add(TODO_TOKEN_MAP[t]));
-      }
-    });
-    return days;
-  }
-
   function getTodoOrderKey() {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -5304,7 +5313,14 @@ window.addEventListener('load', () => {
 
   function toggleHovered() {
     if (!hoveredTodoNode) return;
-    setStatus(hoveredTodoNode.id, hoveredTodoNode.done ? 'undone' : 'done');
+    const cc = getCounterChild(hoveredTodoNode);
+    if (cc && !cc.done) {
+      const today = new Date().toISOString().slice(0, 10);
+      const incrementedToday = !!(cc.ticks && cc.ticks.some(ts => ts.startsWith(today)));
+      updateCounter(cc.id, incrementedToday ? -1 : +1);
+    } else {
+      setStatus(hoveredTodoNode.id, hoveredTodoNode.done ? 'undone' : 'done');
+    }
     openTodoPanel();
   }
 
@@ -5368,12 +5384,14 @@ window.addEventListener('load', () => {
     const entries = orderedIds.map(id => allEntries.find(e => e.leafNode.id === id));
 
     // Footer
-    const doneCount  = entries.filter(e => e.leafNode.done).length;
-    const totalCount = entries.length;
+    const doneCount     = entries.filter(e => e.leafNode.done).length;
+    const progressCount = entries.filter(e => { const cc = getCounterChild(e.leafNode); return cc && cc.val > 0 && !cc.done; }).length;
+    const totalCount    = entries.length;
     const footer = document.getElementById('todo-footer');
     footer.innerHTML = `
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> ${t('todo.done')}</div>
-      <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge progress">${iconSvg('circle')} ${totalCount}</span> ${t('todo.total')}</div>
+      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge progress">${iconSvg('circle-half-2')} ${progressCount}</span> ${t('todo.inProgress')}</div>
+      <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge">${iconSvg('circle')} ${totalCount}</span> ${t('todo.total')}</div>
       <div class="daily-log-footer-stat" style="font-size:12px;color:var(--text-placeholder);gap:4px;">${t('todo.toggle')} <kbd>D</kbd></div>
     `;
 
@@ -5423,8 +5441,63 @@ window.addEventListener('load', () => {
       item.appendChild(dot);
       item.appendChild(labelEl);
 
-      if (leafNode.done) {
-        // Done badge shown by default; swap for Undone button on hover
+      const counterChild = getCounterChild(leafNode);
+
+      if (counterChild && !counterChild.done) {
+        // Counter in progress — check if already incremented today
+        const today = new Date().toISOString().slice(0, 10);
+        const incrementedToday = !!(counterChild.ticks && counterChild.ticks.some(ts => ts.startsWith(today)));
+
+        if (incrementedToday) {
+          // Fulfilled today — strikethrough label, blue badge, hover reveals −1
+          labelEl.style.textDecoration = 'line-through';
+
+          const badge = document.createElement('div');
+          badge.className = 'daily-log-badge tick';
+          badge.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
+          badge.innerHTML = `${iconSvg('circle-half-2')} ${t('dailyLog.progress')}`;
+
+          const revokeBtn = document.createElement('button');
+          revokeBtn.className = 'reset-btn';
+          revokeBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
+          revokeBtn.innerHTML = `${iconSvg('circle-minus')} -1`;
+          revokeBtn.addEventListener('click', () => {
+            updateCounter(counterChild.id, -1);
+            openTodoPanel();
+          });
+
+          item.addEventListener('mouseenter', () => {
+            badge.style.display = 'none';
+            revokeBtn.style.display = 'inline-flex';
+          });
+          item.addEventListener('mouseleave', () => {
+            badge.style.display = 'inline-flex';
+            revokeBtn.style.display = 'none';
+          });
+
+          item.appendChild(badge);
+          item.appendChild(revokeBtn);
+        } else {
+          // Not yet incremented today — show val/max pill and +1 button
+          const pill = document.createElement('div');
+          pill.className = 'daily-log-badge tick';
+          pill.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
+          pill.innerHTML = `${iconSvg('circle-half-2')} ${counterChild.val}&thinsp;/&thinsp;${counterChild.max}`;
+
+          const plusBtn = document.createElement('button');
+          plusBtn.className = 'reset-btn';
+          plusBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
+          plusBtn.innerHTML = `${iconSvg('circle-plus')} +1`;
+          plusBtn.addEventListener('click', () => {
+            updateCounter(counterChild.id, +1);
+            openTodoPanel();
+          });
+
+          item.appendChild(pill);
+          item.appendChild(plusBtn);
+        }
+      } else if (leafNode.done) {
+        // Done — badge shown by default; swap for Undone button on hover
         const badge = document.createElement('div');
         badge.className = 'daily-log-badge done';
         badge.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
@@ -5451,7 +5524,7 @@ window.addEventListener('load', () => {
         item.appendChild(badge);
         item.appendChild(undoneBtn);
       } else {
-        // Done button always visible
+        // No counter — plain Done button
         const doneBtn = document.createElement('button');
         doneBtn.className = 'reset-btn';
         doneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
