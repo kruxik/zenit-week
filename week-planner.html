@@ -2265,6 +2265,8 @@ const TRANSLATIONS = {
     'summary.tooltipOverload':    "An overload — you'll likely finish under 60%, with burnout risk long-term.",
     'todo.title':                 "Today's TODO",
     'todo.done':                  'Done',
+    'todo.undone':                'Undone',
+    'todo.noLabel':               '(no label)',
     'todo.total':                 'Total',
     'todo.toggle':                'Toggle',
     'todo.empty':                 'No tasks scheduled for today.',
@@ -2348,6 +2350,8 @@ const TRANSLATIONS = {
     'summary.tooltipOverload':    'Přetížení — pravděpodobně dokončíte méně než 60 %, hrozí vyhoření.',
     'todo.title':                 'Dnešní úkoly',
     'todo.done':                  'Hotovo',
+    'todo.undone':                'Nesplněno',
+    'todo.noLabel':               '(bez názvu)',
     'todo.total':                 'Celkem',
     'todo.toggle':                'Přepnout',
     'todo.empty':                 'Dnes žádné naplánované úkoly.',
@@ -5392,7 +5396,7 @@ window.addEventListener('load', () => {
       // Label
       const labelEl = document.createElement('div');
       labelEl.className = 'daily-log-label';
-      labelEl.textContent = label || '(no label)';
+      labelEl.textContent = label || t('todo.noLabel');
       if (leafNode.done) labelEl.style.textDecoration = 'line-through';
 
       item.addEventListener('mouseenter', () => { hoveredTodoNode = leafNode; });
@@ -5407,12 +5411,12 @@ window.addEventListener('load', () => {
         const badge = document.createElement('div');
         badge.className = 'daily-log-badge done';
         badge.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
-        badge.innerHTML = `${iconSvg('circle-check')} Done`;
+        badge.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
 
         const undoneBtn = document.createElement('button');
         undoneBtn.className = 'reset-btn';
         undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
-        undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} Undone`;
+        undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
         undoneBtn.addEventListener('click', () => {
           setStatus(leafNode.id, 'undone');
           openTodoPanel();
@@ -5434,7 +5438,7 @@ window.addEventListener('load', () => {
         const doneBtn = document.createElement('button');
         doneBtn.className = 'reset-btn';
         doneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
-        doneBtn.innerHTML = `${iconSvg('circle-check')} Done`;
+        doneBtn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
         doneBtn.addEventListener('click', () => {
           setStatus(leafNode.id, 'done');
           openTodoPanel();
