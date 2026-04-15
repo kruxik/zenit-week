@@ -3821,7 +3821,7 @@ function commitEdit(followUp = 'auto') {
     const nxMatch = node.type !== 'branch' && label.match(/(\d+)x/);
     const nxVal   = nxMatch ? parseInt(nxMatch[1], 10) : 0;
     const dayCount = node.type !== 'branch' ? parseTodoDays(label).size : 0;
-    const counterMax = Math.max(nxVal, dayCount >= 2 ? dayCount : 0);
+    const counterMax = Math.max(nxVal >= 2 ? nxVal : 0, dayCount >= 2 ? dayCount : 0);
     if (counterMax > 0) {
       const maxVal = counterMax;
       // Check if it already has a counter child
