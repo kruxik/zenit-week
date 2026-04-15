@@ -5327,10 +5327,18 @@ window.addEventListener('load', () => {
   // Recursively collect todo entries from an indicator node.
   // Returns array of { leafNode, label } where label is the full colon-separated path.
   // labelParts accumulates the path from the indicator down to the current node.
-  function collectTodoEntries(node, labelParts) {
+  // todayDow: today's day-of-week (0=Sun…6=Sat) — children with their own day indicators
+  // are skipped unless those indicators include today.
+  function collectTodoEntries(node, labelParts, todayDow) {
     const nonCounterChildren = (node.children || [])
       .map(id => findNode(id))
-      .filter(c => c && c.type !== 'counter');
+      .filter(c => {
+        if (!c || c.type === 'counter') return false;
+        const childDays = parseTodoDays(c.label || '');
+        // Child has own day indicators → only include if today matches
+        if (childDays.size > 0) return childDays.has(todayDow);
+        return true;
+      });
 
     if (nonCounterChildren.length === 0) {
       // This node is a leaf (may still have counter children — ignored)
@@ -5340,8 +5348,8 @@ window.addEventListener('load', () => {
     // Not a leaf — recurse into each non-counter child
     const entries = [];
     nonCounterChildren.forEach(child => {
-      const childLabel = (child.label || '').trim();
-      entries.push(...collectTodoEntries(child, [...labelParts, childLabel]));
+      const childLabel = (child.label || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+      entries.push(...collectTodoEntries(child, [...labelParts, childLabel], todayDow));
     });
     return entries;
   }
@@ -5365,7 +5373,7 @@ window.addEventListener('load', () => {
       const labelParts = isLeaf && node.parent
         ? [((findNode(node.parent) || {}).label || '').trim(), indicatorLabel]
         : [indicatorLabel];
-      collectTodoEntries(node, labelParts).forEach(entry => {
+      collectTodoEntries(node, labelParts, todayDow).forEach(entry => {
         if (!seenLeafIds.has(entry.leafNode.id)) {
           seenLeafIds.add(entry.leafNode.id);
           allEntries.push(entry);
