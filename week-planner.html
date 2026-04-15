@@ -1279,6 +1279,10 @@
     filter: brightness(0.88);
   }
 
+  .node-group[data-id="center"]:hover .node-rect {
+    filter: none;
+  }
+
   .add-btn {
     opacity: 0;
     transition: opacity 0.15s ease;
@@ -4100,6 +4104,7 @@ function attachNodeListeners() {
 
     g.addEventListener('mouseenter', () => {
       hoveredNodeId = id;
+      if (id === 'center') return;
       const descendants = getDescendantIds(id);
       descendants.forEach(did => {
         const el = document.querySelector(`.node-group[data-id="${did}"]`);
