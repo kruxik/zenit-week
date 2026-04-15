@@ -4583,7 +4583,7 @@ function showContextMenu(x, y, nodeId) {
 
   // Handle separators
   document.getElementById('ctx-sep-1').style.display = (isActivity)                        ? '' : 'none';
-  document.getElementById('ctx-sep-2').style.display = (isActivity || isBranch)            ? '' : 'none';
+  document.getElementById('ctx-sep-2').style.display = isActivity                           ? '' : 'none';
   document.getElementById('ctx-sep-3').style.display = (isActivity || canDeleteBranch) ? '' : 'none';
 
   // Position within viewport
