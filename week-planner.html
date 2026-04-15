@@ -5553,7 +5553,7 @@ window.addEventListener('load', () => {
       const labelEl = document.createElement('div');
       labelEl.className = 'daily-log-label';
       labelEl.textContent = label || t('todo.noLabel');
-      if (leafNode.done) labelEl.style.textDecoration = 'line-through';
+      if (leafNode.done) { labelEl.style.textDecoration = 'line-through'; labelEl.style.opacity = '0.5'; }
 
       item.addEventListener('mouseenter', () => { hoveredTodoNode = leafNode; });
       item.addEventListener('mouseleave', () => { hoveredTodoNode = null; });
@@ -5572,6 +5572,7 @@ window.addEventListener('load', () => {
         if (incrementedToday) {
           // Fulfilled today — strikethrough label, blue badge, hover reveals −1
           labelEl.style.textDecoration = 'line-through';
+          labelEl.style.opacity = '0.5';
 
           const badge = document.createElement('div');
           badge.className = 'daily-log-badge tick';
