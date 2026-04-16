@@ -5536,6 +5536,7 @@ window.addEventListener('load', () => {
         // Timestamp
         const timeEl = document.createElement('div');
         timeEl.className = 'daily-log-time';
+        timeEl.style.cssText = 'height:28px;line-height:28px;flex-shrink:0;';
         const ts = doneTimestamp(leafNode);
         if (ts) {
           const d = new Date(ts);
