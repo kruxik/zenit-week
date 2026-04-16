@@ -5320,9 +5320,18 @@ window.addEventListener('load', () => {
       });
     });
 
-    // Split into pending and done
-    const pendingAllEntries = allEntries.filter(e => !e.leafNode.done);
-    const doneEntries       = allEntries.filter(e => e.leafNode.done);
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Split into pending and done.
+    // Counter items incremented today count as done (once-per-day logic).
+    const isDoneToday = (leafNode) => {
+      if (leafNode.done) return true;
+      const cc = getCounterChild(leafNode);
+      return !!(cc && !cc.done && cc.ticks && cc.ticks.some(ts => ts.startsWith(today)));
+    };
+
+    const pendingAllEntries = allEntries.filter(e => !isDoneToday(e.leafNode));
+    const doneEntries       = allEntries.filter(e =>  isDoneToday(e.leafNode));
 
     // Apply saved order to pending only
     const savedOrder    = loadTodoOrder();
@@ -5334,11 +5343,19 @@ window.addEventListener('load', () => {
     saveTodoOrder(orderedIds);
     const pendingEntries = orderedIds.map(id => pendingAllEntries.find(e => e.leafNode.id === id));
 
-    // Sort done entries: those with doneAt first (ascending), then undated
-    const today = new Date().toISOString().slice(0, 10);
+    // Sort done entries by effective completion timestamp ascending
+    const doneTimestamp = (leafNode) => {
+      if (leafNode.doneAt) return leafNode.doneAt;
+      const cc = getCounterChild(leafNode);
+      if (cc && cc.ticks) {
+        const todayTick = cc.ticks.filter(ts => ts.startsWith(today)).sort().pop();
+        if (todayTick) return todayTick;
+      }
+      return '';
+    };
     doneEntries.sort((a, b) => {
-      const ta = a.leafNode.doneAt || '';
-      const tb = b.leafNode.doneAt || '';
+      const ta = doneTimestamp(a.leafNode);
+      const tb = doneTimestamp(b.leafNode);
       if (ta && tb) return ta < tb ? -1 : ta > tb ? 1 : 0;
       if (ta) return -1;
       if (tb) return 1;
@@ -5347,7 +5364,7 @@ window.addEventListener('load', () => {
 
     // Footer
     const doneCount     = doneEntries.length;
-    const progressCount = pendingEntries.filter(e => { const cc = getCounterChild(e.leafNode); return cc && cc.val > 0 && !cc.done; }).length;
+    const progressCount = pendingEntries.filter(e => { const cc = getCounterChild(e.leafNode); return cc && cc.val > 0 && !cc.done && !cc.ticks?.some(ts => ts.startsWith(today)); }).length;
     const totalCount    = allEntries.length;
     const footer = document.getElementById('todo-footer');
     footer.innerHTML = `
@@ -5406,58 +5423,23 @@ window.addEventListener('load', () => {
       const counterChild = getCounterChild(leafNode);
 
       if (counterChild && !counterChild.done) {
-        // Counter in progress — check if already incremented today
-        const incrementedToday = !!(counterChild.ticks && counterChild.ticks.some(ts => ts.startsWith(today)));
+        // Counter not yet incremented today — show val/max pill and +1 button
+        const pill = document.createElement('div');
+        pill.className = 'daily-log-badge tick';
+        pill.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
+        pill.innerHTML = `${iconSvg('circle-half-2')} ${counterChild.val}&thinsp;/&thinsp;${counterChild.max}`;
 
-        if (incrementedToday) {
-          // Fulfilled today — strikethrough label, blue badge, hover reveals −1
-          labelEl.style.textDecoration = 'line-through';
-          labelEl.style.opacity = '0.5';
+        const plusBtn = document.createElement('button');
+        plusBtn.className = 'reset-btn';
+        plusBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
+        plusBtn.innerHTML = `${iconSvg('circle-plus')} +1`;
+        plusBtn.addEventListener('click', () => {
+          updateCounter(counterChild.id, +1);
+          openTodoPanel();
+        });
 
-          const badge = document.createElement('div');
-          badge.className = 'daily-log-badge tick';
-          badge.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
-          badge.innerHTML = `${iconSvg('circle-half-2')} +1`;
-
-          const revokeBtn = document.createElement('button');
-          revokeBtn.className = 'reset-btn';
-          revokeBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
-          revokeBtn.innerHTML = `${iconSvg('circle-minus')} -1`;
-          revokeBtn.addEventListener('click', () => {
-            updateCounter(counterChild.id, -1);
-            openTodoPanel();
-          });
-
-          item.addEventListener('mouseenter', () => {
-            badge.style.display = 'none';
-            revokeBtn.style.display = 'inline-flex';
-          });
-          item.addEventListener('mouseleave', () => {
-            badge.style.display = 'inline-flex';
-            revokeBtn.style.display = 'none';
-          });
-
-          item.appendChild(badge);
-          item.appendChild(revokeBtn);
-        } else {
-          // Not yet incremented today — show val/max pill and +1 button
-          const pill = document.createElement('div');
-          pill.className = 'daily-log-badge tick';
-          pill.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
-          pill.innerHTML = `${iconSvg('circle-half-2')} ${counterChild.val}&thinsp;/&thinsp;${counterChild.max}`;
-
-          const plusBtn = document.createElement('button');
-          plusBtn.className = 'reset-btn';
-          plusBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
-          plusBtn.innerHTML = `${iconSvg('circle-plus')} +1`;
-          plusBtn.addEventListener('click', () => {
-            updateCounter(counterChild.id, +1);
-            openTodoPanel();
-          });
-
-          item.appendChild(pill);
-          item.appendChild(plusBtn);
-        }
+        item.appendChild(pill);
+        item.appendChild(plusBtn);
       } else {
         // No counter — plain Done button
         const doneBtn = document.createElement('button');
@@ -5554,20 +5536,26 @@ window.addEventListener('load', () => {
         // Timestamp
         const timeEl = document.createElement('div');
         timeEl.className = 'daily-log-time';
-        if (leafNode.doneAt) {
-          const d = new Date(leafNode.doneAt);
-          timeEl.textContent = leafNode.doneAt.startsWith(today)
+        const ts = doneTimestamp(leafNode);
+        if (ts) {
+          const d = new Date(ts);
+          timeEl.textContent = ts.startsWith(today)
             ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
         }
 
-        // Undone button revealed on hover
+        // Undo button revealed on hover — for counter items: revoke −1; for done: undone
+        const cc = getCounterChild(leafNode);
+        const isCounterDoneToday = !!(cc && !cc.done && cc.ticks && cc.ticks.some(t => t.startsWith(today)));
         const undoneBtn = document.createElement('button');
         undoneBtn.className = 'reset-btn';
         undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
-        undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
+        undoneBtn.innerHTML = isCounterDoneToday
+          ? `${iconSvg('circle-minus')} -1`
+          : `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
         undoneBtn.addEventListener('click', () => {
-          setStatus(leafNode.id, 'undone');
+          if (isCounterDoneToday) updateCounter(cc.id, -1);
+          else setStatus(leafNode.id, 'undone');
           openTodoPanel();
         });
 
