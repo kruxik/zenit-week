@@ -898,7 +898,7 @@
   #cp-apply { background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end)); color: var(--text-button); border: 1.5px solid var(--border-subtle); box-shadow: 0 2px 6px var(--shadow-sm); }
   #cp-apply:hover { background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end)); border-color: var(--border-hover); }
 
-  /* TODO Panel */
+  /* Today Panel */
   #todo-overlay {
     position: fixed;
     top: 0;
@@ -1711,7 +1711,7 @@
 <div id="todo-overlay">
   <div id="todo-panel">
     <div id="todo-header">
-      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="todo.title">Today's TODO</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="todo.title">Today's Activities</div>
       <div id="todo-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
     </div>
     <div id="todo-content"></div>
@@ -1745,8 +1745,8 @@
       </div>
 
       <div class="help-section">
-        <div class="help-section-title" data-i18n="help.dayIndicatorsTitle">Day indicators (TODO list)</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.dayIndicatorsDesc">Add (day) to any activity name to schedule it for that weekday in the TODO list.</div>
+        <div class="help-section-title" data-i18n="help.dayIndicatorsTitle">Day indicators (daily list)</div>
+        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.dayIndicatorsDesc">Add (day) to any activity name to schedule it for that weekday in the daily list.</div>
         <div id="help-days-cs" class="help-row" style="margin-top: 8px;">
           <span style="font-size: 13px; color: var(--text-secondary);">
             <kbd>po</kbd> <kbd>út</kbd> <kbd>st</kbd> <kbd>čt</kbd> <kbd>pá</kbd> <kbd>so</kbd> <kbd>ne</kbd>
@@ -2078,7 +2078,7 @@ function measureText(text, fontSize, fontWeight = 'normal') {
 }
 
 // Map each canonical weekday index (0=Sun … 6=Sat) to its accepted tokens
-const TODO_DAY_TOKENS = {
+const SCHED_DAY_TOKENS = {
   1: ['mo', 'po'],
   2: ['tu', 'ut', 'út'],
   3: ['we', 'st'],
@@ -2088,12 +2088,12 @@ const TODO_DAY_TOKENS = {
   0: ['su', 'ne'],
 };
 // Reverse map: token → weekday index
-const TODO_TOKEN_MAP = {};
-Object.entries(TODO_DAY_TOKENS).forEach(([day, tokens]) => {
-  tokens.forEach(tok => { TODO_TOKEN_MAP[tok] = Number(day); });
+const SCHED_TOKEN_MAP = {};
+Object.entries(SCHED_DAY_TOKENS).forEach(([day, tokens]) => {
+  tokens.forEach(tok => { SCHED_TOKEN_MAP[tok] = Number(day); });
 });
 // Daily indicator tokens (EN + CS + CS without diacritics), case-insensitive
-const TODO_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
+const SCHED_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
 
 // Returns the Set of weekday indices (0–6) declared in a label's (…) groups.
 // A group is recognised when every token is a known day abbr, or it's a daily indicator.
@@ -2105,12 +2105,12 @@ function parseTodoDays(label) {
     const inner = group.slice(1, -1).trim();
     const tokens = inner.split(/[\s,]+/).map(tok => tok.toLowerCase()).filter(Boolean);
     if (tokens.length === 0) return;
-    if (tokens.length === 1 && TODO_DAILY_TOKENS.has(tokens[0])) {
+    if (tokens.length === 1 && SCHED_DAILY_TOKENS.has(tokens[0])) {
       for (let d = 0; d <= 6; d++) days.add(d);
       return;
     }
-    if (tokens.every(tok => tok in TODO_TOKEN_MAP)) {
-      tokens.forEach(tok => days.add(TODO_TOKEN_MAP[tok]));
+    if (tokens.every(tok => tok in SCHED_TOKEN_MAP)) {
+      tokens.forEach(tok => days.add(SCHED_TOKEN_MAP[tok]));
     }
   });
   return days;
@@ -2303,8 +2303,8 @@ const TRANSLATIONS = {
     'help.quickOptions':          'Quick Options',
     'help.undo':                  'Undo',
     'help.redo':                  'Redo',
-    'help.dayIndicatorsTitle':    'Day indicators (TODO list)',
-    'help.dayIndicatorsDesc':     'Add (day) to any activity name to schedule it for that weekday in the TODO list.',
+    'help.dayIndicatorsTitle':    'Day indicators (daily list)',
+    'help.dayIndicatorsDesc':     'Add (day) to any activity name to schedule it for that weekday in the daily list.',
     'help.czech':                 'Czech',
     'help.english':               'English',
     'help.multipleDays':          'Multiple days: (mo, we, fr) — spaces or commas both work.',
