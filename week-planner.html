@@ -298,14 +298,7 @@
     transition: background 0.2s, transform 0.2s;
   }
 
-  #todo-btn {
-    position: absolute;
-    right: calc(100% + 8px);
-    top: 50%;
-    transform: translateY(-50%);
-  }
-
-  .nav-btn {
+.nav-btn {
     background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end));
     border: 1.5px solid var(--border-subtle);
     border-radius: 8px;
@@ -1090,6 +1083,33 @@
   }
 
   /* Help System */
+  #today-fab {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end));
+    color: var(--text-button);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px var(--shadow-sm);
+    z-index: 1000;
+    transition: transform 0.2s, background 0.2s, box-shadow 0.2s, border-color 0.2s;
+    user-select: none;
+  }
+  #today-fab:hover {
+    transform: scale(1.1);
+    background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end));
+    border-color: var(--border-hover);
+    box-shadow: 0 4px 14px var(--shadow-md);
+  }
+
   #help-fab {
     position: fixed;
     bottom: 24px;
@@ -1521,7 +1541,6 @@
   <div id="toolbar">
     <div id="logo">Week Planner</div>
     <div id="week-nav">
-      <button class="reset-btn" id="todo-btn" data-i18n="toolbar.todo">TODO</button>
       <button class="nav-btn" id="prev-week" data-i18n-title="toolbar.prevWeek" title="Previous week"><svg class="icon" aria-hidden="true"><use href="#icon-caret-left"/></svg></button>
       <div id="week-label">Week 13 | Mar 30 – Apr 5</div>
       <button class="nav-btn" id="next-week" data-i18n-title="toolbar.nextWeek" title="Next week"><svg class="icon" aria-hidden="true"><use href="#icon-caret-right"/></svg></button>
@@ -1700,6 +1719,8 @@
   </div>
 </div>
 
+
+<div id="today-fab" data-i18n-title="toolbar.todo" title="Today's Activities"><svg class="icon" aria-hidden="true"><use href="#icon-rosette-discount-check"/></svg></div>
 
 <div id="help-fab" data-i18n-title="help.fab" title="Help & Hotkeys"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"/></svg></div>
 
@@ -2201,7 +2222,7 @@ const MONTH_NAMES = {
 
 const TRANSLATIONS = {
   en: {
-    'toolbar.todo':               'Daily',
+    'toolbar.todo':               "Today's Activities",
     'toolbar.today':              'Today',
     'toolbar.prevWeek':           'Previous week',
     'toolbar.nextWeek':           'Next week',
@@ -2245,7 +2266,7 @@ const TRANSLATIONS = {
     'summary.tooltipNormal':      "A realistic load — you'll likely finish 80%+.",
     'summary.tooltipStretch':     "A stretch load — finishing 80% will be a challenge.",
     'summary.tooltipOverload':    "An overload — you'll likely finish under 60%, with burnout risk long-term.",
-    'todo.title':                 "Today's Overview",
+    'todo.title':                 "Today's Activities",
     'todo.done':                  'Done',
     'todo.undone':                'Undone',
     'todo.inProgress':            'In Progress',
@@ -2280,7 +2301,7 @@ const TRANSLATIONS = {
     'help.done':                  'Done',
   },
   cs: {
-    'toolbar.todo':               'Přehled',
+    'toolbar.todo':               'Dnešní aktivity',
     'toolbar.today':              'Dnes',
     'toolbar.prevWeek':           'Předchozí týden',
     'toolbar.nextWeek':           'Příští týden',
@@ -2324,7 +2345,7 @@ const TRANSLATIONS = {
     'summary.tooltipNormal':      'Realistická zátěž — pravděpodobně dokončíte 80 % a více.',
     'summary.tooltipStretch':     'Náročná zátěž — dokončit 80 % bude výzva.',
     'summary.tooltipOverload':    'Přetížení — pravděpodobně dokončíte méně než 60 %, hrozí vyhoření.',
-    'todo.title':                 'Přehled dne',
+    'todo.title':                 'Dnešní aktivity',
     'todo.done':                  'Hotovo',
     'todo.undone':                'Nesplněno',
     'todo.inProgress':            'Rozpracováno',
@@ -5569,11 +5590,11 @@ window.addEventListener('load', () => {
     document.getElementById('todo-overlay').classList.add('visible');
   }
 
-  const todoBtn     = document.getElementById('todo-btn');
+  const todayFab    = document.getElementById('today-fab');
   const todoOverlay = document.getElementById('todo-overlay');
   const todoClose   = document.getElementById('todo-close');
 
-  todoBtn.addEventListener('click', openTodoPanel);
+  todayFab.addEventListener('click', openTodoPanel);
   todoClose.addEventListener('click', () => todoOverlay.classList.remove('visible'));
   todoOverlay.addEventListener('click', (e) => {
     if (e.target === todoOverlay) todoOverlay.classList.remove('visible');
