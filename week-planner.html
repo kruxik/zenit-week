@@ -271,13 +271,9 @@
 
   #logo {
     flex: 1;
-    font-size: 18px;
-    font-weight: 800;
     color: var(--text-primary);
-    letter-spacing: -0.02em;
     display: flex;
     align-items: center;
-    gap: 8px;
     user-select: none;
   }
 
@@ -1539,7 +1535,18 @@
 
 <div id="app">
   <div id="toolbar">
-    <div id="logo">Zenit Week</div>
+    <div id="logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="156" height="34" aria-label="Zenit Week" role="img">
+        <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="currentColor">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="currentColor"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="700" fill="currentColor">it</text>
+        <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="currentColor"> Week</text>
+      </svg>
+    </div>
     <div id="week-nav">
       <button class="nav-btn" id="prev-week" data-i18n-title="toolbar.prevWeek" title="Previous week"><svg class="icon" aria-hidden="true"><use href="#icon-caret-left"/></svg></button>
       <div id="week-label">Week 13 | Mar 30 – Apr 5</div>
