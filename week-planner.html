@@ -5281,6 +5281,23 @@ window.addEventListener('load', () => {
     openTodoPanel();
   }
 
+  // Strip scheduling tokens from a label for display purposes.
+  // Removes only parenthetical groups that are recognised day indicators (e.g. (we), (th, fr), (daily))
+  // and the counter suffix Nx (e.g. 5x, 10x). Other parentheticals like (kvalita 85%+) are kept.
+  function stripDisplayTokens(label) {
+    if (!label) return '';
+    let result = label.replace(/\s*\([^)]+\)\s*/g, match => {
+      const inner = match.replace(/^\s*\(|\)\s*$/g, '').trim();
+      const tokens = inner.split(/[\s,]+/).map(t => t.toLowerCase()).filter(Boolean);
+      if (tokens.length === 0) return match;
+      if (tokens.length === 1 && SCHED_DAILY_TOKENS.has(tokens[0])) return ' ';
+      if (tokens.every(t => t in SCHED_TOKEN_MAP)) return ' ';
+      return match; // not a day indicator — keep it
+    });
+    result = result.replace(/\s*\b\d+x\b/g, '');
+    return result.trim();
+  }
+
   // Recursively collect todo entries from an indicator node.
   // Returns array of { leafNode, label } where label is the full colon-separated path.
   // labelParts accumulates the path from the indicator down to the current node.
@@ -5305,7 +5322,7 @@ window.addEventListener('load', () => {
     // Not a leaf — recurse into each non-counter child
     const entries = [];
     nonCounterChildren.forEach(child => {
-      const childLabel = (child.label || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+      const childLabel = stripDisplayTokens(child.label);
       entries.push(...collectTodoEntries(child, [...labelParts, childLabel], todayDow));
     });
     return entries;
@@ -5322,13 +5339,13 @@ window.addEventListener('load', () => {
       if (node.type !== 'activity') return;
       const days = parseTodoDays(node.label || '');
       if (!days.has(todayDow)) return;
-      const indicatorLabel = (node.label || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+      const indicatorLabel = stripDisplayTokens(node.label);
       const nonCounterChildren = (node.children || [])
         .map(id => findNode(id))
         .filter(c => c && c.type !== 'counter');
       const isLeaf = nonCounterChildren.length === 0;
       const labelParts = isLeaf && node.parent
-        ? [((findNode(node.parent) || {}).label || '').trim(), indicatorLabel]
+        ? [stripDisplayTokens((findNode(node.parent) || {}).label), indicatorLabel]
         : [indicatorLabel];
       collectTodoEntries(node, labelParts, todayDow).forEach(entry => {
         if (!seenLeafIds.has(entry.leafNode.id)) {
@@ -5361,8 +5378,8 @@ window.addEventListener('load', () => {
       doneSeen.add(node.id);
       const parent = findNode(node.parent);
       const label = (parent && parent.type !== 'center' && parent.type !== 'branch')
-        ? `${(parent.label || '').trim()}: ${(node.label || '').trim()}`
-        : (node.label || '').trim();
+        ? `${stripDisplayTokens(parent.label)}: ${stripDisplayTokens(node.label)}`
+        : stripDisplayTokens(node.label);
       doneEntries.push({ leafNode: node, label });
     });
 
