@@ -5343,13 +5343,28 @@ window.addEventListener('load', () => {
     // Split into pending and done.
     // Counter items incremented today count as done (once-per-day logic).
     const isDoneToday = (leafNode) => {
-      if (leafNode.done) return true;
+      if (leafNode.doneAt && leafNode.doneAt.startsWith(today)) return true;
       const cc = getCounterChild(leafNode);
-      return !!(cc && !cc.done && cc.ticks && cc.ticks.some(ts => ts.startsWith(today)));
+      return !!(cc && cc.ticks && cc.ticks.some(ts => ts.startsWith(today)));
     };
 
     const pendingAllEntries = allEntries.filter(e => !isDoneToday(e.leafNode));
-    const doneEntries       = allEntries.filter(e =>  isDoneToday(e.leafNode));
+
+    // Done section: ALL leaf activities completed today, regardless of day-of-week indicator
+    const doneSeen = new Set(allEntries.filter(e => isDoneToday(e.leafNode)).map(e => e.leafNode.id));
+    const doneEntries = allEntries.filter(e => isDoneToday(e.leafNode));
+
+    weekData.nodes.forEach(node => {
+      if (doneSeen.has(node.id)) return;
+      if (!isLeafActivity(node)) return;
+      if (!isDoneToday(node)) return;
+      doneSeen.add(node.id);
+      const parent = findNode(node.parent);
+      const label = (parent && parent.type !== 'center' && parent.type !== 'branch')
+        ? `${(parent.label || '').trim()}: ${(node.label || '').trim()}`
+        : (node.label || '').trim();
+      doneEntries.push({ leafNode: node, label });
+    });
 
     // Apply saved order to pending only
     const savedOrder    = loadTodoOrder();
