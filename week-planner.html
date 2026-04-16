@@ -5544,9 +5544,18 @@ window.addEventListener('load', () => {
             : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
         }
 
-        // Undo button revealed on hover — for counter items: revoke −1; for done: undone
+        // Counter progress pill + undo button
         const cc = getCounterChild(leafNode);
         const isCounterDoneToday = !!(cc && !cc.done && cc.ticks && cc.ticks.some(t => t.startsWith(today)));
+
+        let pill = null;
+        if (isCounterDoneToday) {
+          pill = document.createElement('div');
+          pill.className = 'daily-log-badge tick';
+          pill.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
+          pill.innerHTML = `${iconSvg('circle-half-2')} ${cc.val}&thinsp;/&thinsp;${cc.max}`;
+        }
+
         const undoneBtn = document.createElement('button');
         undoneBtn.className = 'reset-btn';
         undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
@@ -5560,11 +5569,13 @@ window.addEventListener('load', () => {
         });
 
         item.addEventListener('mouseenter', () => {
+          if (pill) pill.style.display = 'none';
           timeEl.style.display = 'none';
           undoneBtn.style.display = 'inline-flex';
           hoveredTodoNode = leafNode;
         });
         item.addEventListener('mouseleave', () => {
+          if (pill) pill.style.display = 'inline-flex';
           timeEl.style.display = '';
           undoneBtn.style.display = 'none';
           hoveredTodoNode = null;
@@ -5572,6 +5583,7 @@ window.addEventListener('load', () => {
 
         item.appendChild(dot);
         item.appendChild(labelEl);
+        if (pill) item.appendChild(pill);
         item.appendChild(timeEl);
         item.appendChild(undoneBtn);
         content.appendChild(item);
