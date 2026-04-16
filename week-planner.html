@@ -5432,7 +5432,7 @@ window.addEventListener('load', () => {
         const plusBtn = document.createElement('button');
         plusBtn.className = 'reset-btn';
         plusBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
-        plusBtn.innerHTML = `${iconSvg('circle-plus')} +1`;
+        plusBtn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
         plusBtn.addEventListener('click', () => {
           updateCounter(counterChild.id, +1);
           openTodoPanel();
@@ -5560,9 +5560,7 @@ window.addEventListener('load', () => {
         const undoneBtn = document.createElement('button');
         undoneBtn.className = 'reset-btn';
         undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
-        undoneBtn.innerHTML = isCounterDoneToday
-          ? `${iconSvg('circle-minus')} -1`
-          : `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
+        undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
         undoneBtn.addEventListener('click', () => {
           if (isCounterDoneToday) updateCounter(cc.id, -1);
           else setStatus(leafNode.id, 'undone');
