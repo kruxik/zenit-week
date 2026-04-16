@@ -5526,6 +5526,9 @@ window.addEventListener('load', () => {
 
     // ── Done section ──────────────────────────────────────────────────────────
     if (doneEntries.length > 0) {
+      const lastPending = content.lastElementChild;
+      if (lastPending) lastPending.style.borderBottom = 'none';
+
       const divider = document.createElement('div');
       divider.className = 'today-done-divider';
       divider.textContent = t('todo.done');
