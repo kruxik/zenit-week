@@ -994,98 +994,26 @@
     box-shadow: 0 2px 0 0 #1ABCFE;
   }
 
-  /* Daily Log */
-  #daily-log-fab {
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    width: 44px;
-    height: 44px;
-    background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end));
-    color: var(--text-button);
-    border: 1.5px solid var(--border-subtle);
-    border-radius: 50%;
+  /* Today Panel — done section divider */
+  .today-done-divider {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    cursor: pointer;
-    box-shadow: 0 2px 8px var(--shadow-sm);
-    z-index: 1000;
-    transition: transform 0.2s, background 0.2s, box-shadow 0.2s, border-color 0.2s;
-    user-select: none;
-  }
-  #daily-log-fab:hover {
-    transform: scale(1.1);
-    background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end));
-    border-color: var(--border-hover);
-    box-shadow: 0 4px 14px var(--shadow-md);
-  }
-
-  #daily-log-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--overlay-sm);
-    backdrop-filter: blur(4px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  #daily-log-overlay.visible {
-    display: flex;
-    opacity: 1;
-  }
-
-  #daily-log-panel {
-    background: var(--bg-surface);
-    width: 504px;
-    border-radius: 20px;
-    box-shadow: 0 20px 60px var(--shadow-xl);
-    overflow: hidden;
-    transform: translateY(20px);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  }
-  #daily-log-overlay.visible #daily-log-panel {
-    transform: translateY(0);
-  }
-
-  #daily-log-header {
-    background: var(--bg-surface-subtle);
-    padding: 20px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border-soft);
-  }
-  #daily-log-close {
-    cursor: pointer;
-    font-size: 18px;
+    gap: 10px;
+    margin: 14px 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: var(--text-placeholder);
-    transition: color 0.2s;
   }
-  #daily-log-close:hover { color: var(--text-primary); }
+  .today-done-divider::before,
+  .today-done-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-faint);
+  }
 
-  #daily-log-content {
-    padding: 16px 24px;
-    max-height: 70vh;
-    overflow-y: auto;
-  }
-
-  #daily-log-footer {
-    padding: 14px 24px;
-    border-top: 1px solid var(--border-soft);
-    background: var(--bg-surface-subtle);
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    border-radius: 0 0 20px 20px;
-  }
   .daily-log-footer-stat {
     display: flex;
     align-items: center;
@@ -1772,18 +1700,6 @@
   </div>
 </div>
 
-<div id="daily-log-fab" data-i18n-title="dailyLog.fab" title="Today's Activity"><svg class="icon" aria-hidden="true"><use href="#icon-rosette-discount-check"/></svg></div>
-
-<div id="daily-log-overlay">
-  <div id="daily-log-panel">
-    <div id="daily-log-header">
-      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="dailyLog.title">Today's Activity</div>
-      <div id="daily-log-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
-    </div>
-    <div id="daily-log-content"></div>
-    <div id="daily-log-footer"></div>
-  </div>
-</div>
 
 <div id="help-fab" data-i18n-title="help.fab" title="Help & Hotkeys"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"/></svg></div>
 
@@ -2285,7 +2201,7 @@ const MONTH_NAMES = {
 
 const TRANSLATIONS = {
   en: {
-    'toolbar.todo':               'TODO',
+    'toolbar.todo':               'Daily',
     'toolbar.today':              'Today',
     'toolbar.prevWeek':           'Previous week',
     'toolbar.nextWeek':           'Next week',
@@ -2329,7 +2245,7 @@ const TRANSLATIONS = {
     'summary.tooltipNormal':      "A realistic load — you'll likely finish 80%+.",
     'summary.tooltipStretch':     "A stretch load — finishing 80% will be a challenge.",
     'summary.tooltipOverload':    "An overload — you'll likely finish under 60%, with burnout risk long-term.",
-    'todo.title':                 "Today's TODO",
+    'todo.title':                 "Today's Overview",
     'todo.done':                  'Done',
     'todo.undone':                'Undone',
     'todo.inProgress':            'In Progress',
@@ -2337,13 +2253,6 @@ const TRANSLATIONS = {
     'todo.total':                 'Total',
     'todo.toggle':                'Toggle',
     'todo.empty':                 'No tasks scheduled for today.',
-    'dailyLog.title':             "Today's Activity",
-    'dailyLog.fab':               "Today's Activity",
-    'dailyLog.done':              'Done',
-    'dailyLog.inProgress':        'In Progress',
-    'dailyLog.unplanned':         'Unplanned',
-    'dailyLog.progress':          '+1 Progress',
-    'dailyLog.empty':             'No activity recorded today.',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
     'help.hotkeysTitle':          'Activity hotkeys (On Hover)',
@@ -2371,7 +2280,7 @@ const TRANSLATIONS = {
     'help.done':                  'Done',
   },
   cs: {
-    'toolbar.todo':               'Úkoly',
+    'toolbar.todo':               'Přehled',
     'toolbar.today':              'Dnes',
     'toolbar.prevWeek':           'Předchozí týden',
     'toolbar.nextWeek':           'Příští týden',
@@ -2415,7 +2324,7 @@ const TRANSLATIONS = {
     'summary.tooltipNormal':      'Realistická zátěž — pravděpodobně dokončíte 80 % a více.',
     'summary.tooltipStretch':     'Náročná zátěž — dokončit 80 % bude výzva.',
     'summary.tooltipOverload':    'Přetížení — pravděpodobně dokončíte méně než 60 %, hrozí vyhoření.',
-    'todo.title':                 'Dnešní úkoly',
+    'todo.title':                 'Přehled dne',
     'todo.done':                  'Hotovo',
     'todo.undone':                'Nesplněno',
     'todo.inProgress':            'Rozpracováno',
@@ -2423,13 +2332,6 @@ const TRANSLATIONS = {
     'todo.total':                 'Celkem',
     'todo.toggle':                'Přepnout',
     'todo.empty':                 'Dnes žádné naplánované úkoly.',
-    'dailyLog.title':             'Dnešní aktivita',
-    'dailyLog.fab':               'Dnešní aktivita',
-    'dailyLog.done':              'Hotovo',
-    'dailyLog.inProgress':        'Probíhá',
-    'dailyLog.unplanned':         'Neplánované',
-    'dailyLog.progress':          '+1 Pokrok',
-    'dailyLog.empty':             'Dnes žádná zaznamenaná aktivita.',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
     'help.hotkeysTitle':          'Klávesové zkratky aktivit (při najetí)',
@@ -4308,17 +4210,12 @@ window.addEventListener('keydown', (e) => {
     const help = document.getElementById('help-overlay');
     const status = document.getElementById('placeholder-panel');
 
-    const dailyLog = document.getElementById('daily-log-overlay');
     if (ctxMenu && ctxMenu.classList.contains('visible')) {
       hideContextMenu();
       return;
     }
     if (settings && settings.classList.contains('visible')) {
       settings.classList.remove('visible');
-      return;
-    }
-    if (dailyLog && dailyLog.classList.contains('visible')) {
-      dailyLog.classList.remove('visible');
       return;
     }
     const todoOverlayEl = document.getElementById('todo-overlay');
@@ -5313,98 +5210,6 @@ window.addEventListener('load', () => {
   document.getElementById('undo-kbd').textContent = `${mod} + Z`;
   document.getElementById('redo-kbd').textContent = isMac ? `${mod} + ⇧ + Z` : `${mod} + Shift + Z`;
 
-  // Daily log panel
-  function openDailyLog() {
-    const today = new Date().toISOString().slice(0, 10);
-    const entries = [];
-
-    weekData.nodes.forEach(node => {
-      if (node.type === 'counter' && node.ticks) {
-        const parent = findNode(node.parent);
-        node.ticks.forEach(ts => {
-          if (ts.startsWith(today)) {
-            entries.push({ ts, type: 'tick', node, parent });
-          }
-        });
-        return;
-      }
-      if (!isLeafActivity(node)) return;
-      if (node.doneAt && node.doneAt.startsWith(today)) {
-        entries.push({ ts: node.doneAt, type: 'done', node, parent: null });
-      }
-      if (node.unplannedAt && node.unplannedAt.startsWith(today)) {
-        entries.push({ ts: node.unplannedAt, type: 'unplanned', node });
-      }
-    });
-
-    entries.sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
-
-    const doneCount       = entries.filter(e => e.type === 'done').length;
-    const unplannedCount  = entries.filter(e => e.type === 'unplanned').length;
-    const inProgressCount = entries.filter(e => e.type === 'tick').length;
-
-    const footer = document.getElementById('daily-log-footer');
-    footer.innerHTML = `
-      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> ${t('dailyLog.done')}</div>
-      <div class="daily-log-footer-stat"><span class="daily-log-footer-badge progress">${iconSvg('circle-half-2')} ${inProgressCount}</span> ${t('dailyLog.inProgress')}</div>
-      <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge unplanned">${iconSvg('bolt')} ${unplannedCount}</span> ${t('dailyLog.unplanned')}</div>
-    `;
-
-    const content = document.getElementById('daily-log-content');
-    content.innerHTML = '';
-
-    if (entries.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'daily-log-empty';
-      empty.textContent = t('dailyLog.empty');
-      content.appendChild(empty);
-    } else {
-      entries.forEach(({ ts, type, node, parent }) => {
-        const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
-        const timeStr = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        const item = document.createElement('div');
-        item.className = 'daily-log-item';
-
-        const dot = document.createElement('div');
-        dot.className = 'daily-log-branch-dot';
-        dot.style.background = branchColor;
-
-        const badge = document.createElement('div');
-        badge.className = `daily-log-badge ${type}`;
-        if (type === 'done') badge.innerHTML = `${iconSvg('circle-check')} ${t('dailyLog.done')}`;
-        else if (type === 'unplanned') badge.innerHTML = `${iconSvg('bolt')} ${t('dailyLog.unplanned')}`;
-        else badge.textContent = t('dailyLog.progress');
-
-        const label = document.createElement('div');
-        label.className = 'daily-log-label';
-        label.textContent = (type === 'tick' && parent ? parent.label : node.label) || '(no label)';
-
-        const time = document.createElement('div');
-        time.className = 'daily-log-time';
-        time.textContent = timeStr;
-
-        item.appendChild(dot);
-        item.appendChild(label);
-        item.appendChild(badge);
-        item.appendChild(time);
-        content.appendChild(item);
-      });
-    }
-
-    document.getElementById('daily-log-overlay').classList.add('visible');
-  }
-
-  const dailyLogFab     = document.getElementById('daily-log-fab');
-  const dailyLogOverlay = document.getElementById('daily-log-overlay');
-  const dailyLogClose   = document.getElementById('daily-log-close');
-
-  dailyLogFab.addEventListener('click', openDailyLog);
-  dailyLogClose.addEventListener('click', () => dailyLogOverlay.classList.remove('visible'));
-  dailyLogOverlay.addEventListener('click', (e) => {
-    if (e.target === dailyLogOverlay) dailyLogOverlay.classList.remove('visible');
-  });
-
   function getTodoOrderKey() {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -5494,20 +5299,35 @@ window.addEventListener('load', () => {
       });
     });
 
-    // Apply saved order by leaf node ID
-    const savedOrder = loadTodoOrder();
-    const allLeafIds = allEntries.map(e => e.leafNode.id);
-    const orderedIds = [
-      ...savedOrder.filter(id => allLeafIds.includes(id)),
-      ...allLeafIds.filter(id => !savedOrder.includes(id)),
+    // Split into pending and done
+    const pendingAllEntries = allEntries.filter(e => !e.leafNode.done);
+    const doneEntries       = allEntries.filter(e => e.leafNode.done);
+
+    // Apply saved order to pending only
+    const savedOrder    = loadTodoOrder();
+    const pendingIds    = pendingAllEntries.map(e => e.leafNode.id);
+    const orderedIds    = [
+      ...savedOrder.filter(id => pendingIds.includes(id)),
+      ...pendingIds.filter(id => !savedOrder.includes(id)),
     ];
     saveTodoOrder(orderedIds);
-    const entries = orderedIds.map(id => allEntries.find(e => e.leafNode.id === id));
+    const pendingEntries = orderedIds.map(id => pendingAllEntries.find(e => e.leafNode.id === id));
+
+    // Sort done entries: those with doneAt first (ascending), then undated
+    const today = new Date().toISOString().slice(0, 10);
+    doneEntries.sort((a, b) => {
+      const ta = a.leafNode.doneAt || '';
+      const tb = b.leafNode.doneAt || '';
+      if (ta && tb) return ta < tb ? -1 : ta > tb ? 1 : 0;
+      if (ta) return -1;
+      if (tb) return 1;
+      return 0;
+    });
 
     // Footer
-    const doneCount     = entries.filter(e => e.leafNode.done).length;
-    const progressCount = entries.filter(e => { const cc = getCounterChild(e.leafNode); return cc && cc.val > 0 && !cc.done; }).length;
-    const totalCount    = entries.length;
+    const doneCount     = doneEntries.length;
+    const progressCount = pendingEntries.filter(e => { const cc = getCounterChild(e.leafNode); return cc && cc.val > 0 && !cc.done; }).length;
+    const totalCount    = allEntries.length;
     const footer = document.getElementById('todo-footer');
     footer.innerHTML = `
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> ${t('todo.done')}</div>
@@ -5520,7 +5340,7 @@ window.addEventListener('load', () => {
     const content = document.getElementById('todo-content');
     content.innerHTML = '';
 
-    if (entries.length === 0) {
+    if (allEntries.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'daily-log-empty';
       empty.textContent = t('todo.empty');
@@ -5529,9 +5349,10 @@ window.addEventListener('load', () => {
       return;
     }
 
+    // ── Pending section ───────────────────────────────────────────────────────
     let dragSrcId = null;
 
-    entries.forEach(({ leafNode, label }) => {
+    pendingEntries.forEach(({ leafNode, label }) => {
       const branchColor = (BRANCH_COLORS[leafNode.branch] || {}).main || '#888888';
 
       const item = document.createElement('div');
@@ -5553,7 +5374,6 @@ window.addEventListener('load', () => {
       const labelEl = document.createElement('div');
       labelEl.className = 'daily-log-label';
       labelEl.textContent = label || t('todo.noLabel');
-      if (leafNode.done) { labelEl.style.textDecoration = 'line-through'; labelEl.style.opacity = '0.5'; }
 
       item.addEventListener('mouseenter', () => { hoveredTodoNode = leafNode; });
       item.addEventListener('mouseleave', () => { hoveredTodoNode = null; });
@@ -5566,7 +5386,6 @@ window.addEventListener('load', () => {
 
       if (counterChild && !counterChild.done) {
         // Counter in progress — check if already incremented today
-        const today = new Date().toISOString().slice(0, 10);
         const incrementedToday = !!(counterChild.ticks && counterChild.ticks.some(ts => ts.startsWith(today)));
 
         if (incrementedToday) {
@@ -5577,7 +5396,7 @@ window.addEventListener('load', () => {
           const badge = document.createElement('div');
           badge.className = 'daily-log-badge tick';
           badge.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
-          badge.innerHTML = `${iconSvg('circle-half-2')} ${t('dailyLog.progress')}`;
+          badge.innerHTML = `${iconSvg('circle-half-2')} +1`;
 
           const revokeBtn = document.createElement('button');
           revokeBtn.className = 'reset-btn';
@@ -5618,33 +5437,6 @@ window.addEventListener('load', () => {
           item.appendChild(pill);
           item.appendChild(plusBtn);
         }
-      } else if (leafNode.done) {
-        // Done — badge shown by default; swap for Undone button on hover
-        const badge = document.createElement('div');
-        badge.className = 'daily-log-badge done';
-        badge.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
-        badge.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
-
-        const undoneBtn = document.createElement('button');
-        undoneBtn.className = 'reset-btn';
-        undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
-        undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
-        undoneBtn.addEventListener('click', () => {
-          setStatus(leafNode.id, 'undone');
-          openTodoPanel();
-        });
-
-        item.addEventListener('mouseenter', () => {
-          badge.style.display = 'none';
-          undoneBtn.style.display = 'inline-flex';
-        });
-        item.addEventListener('mouseleave', () => {
-          badge.style.display = 'inline-flex';
-          undoneBtn.style.display = 'none';
-        });
-
-        item.appendChild(badge);
-        item.appendChild(undoneBtn);
       } else {
         // No counter — plain Done button
         const doneBtn = document.createElement('button');
@@ -5658,7 +5450,7 @@ window.addEventListener('load', () => {
         item.appendChild(doneBtn);
       }
 
-      // ── Drag-and-drop events ──────────────────────────────────────────────
+      // ── Drag-and-drop events ────────────────────────────────────────────────
       item.addEventListener('dragstart', (e) => {
         dragSrcId = leafNode.id;
         e.dataTransfer.effectAllowed = 'move';
@@ -5667,7 +5459,7 @@ window.addEventListener('load', () => {
 
       item.addEventListener('dragend', () => {
         item.classList.remove('todo-item-dragging');
-        content.querySelectorAll('.daily-log-item').forEach(el => {
+        content.querySelectorAll('.daily-log-item[draggable]').forEach(el => {
           el.classList.remove('todo-item-drop-above', 'todo-item-drop-below');
         });
         dragSrcId = null;
@@ -5679,7 +5471,7 @@ window.addEventListener('load', () => {
         e.dataTransfer.dropEffect = 'move';
         const rect = item.getBoundingClientRect();
         const mid  = rect.top + rect.height / 2;
-        content.querySelectorAll('.daily-log-item').forEach(el => {
+        content.querySelectorAll('.daily-log-item[draggable]').forEach(el => {
           el.classList.remove('todo-item-drop-above', 'todo-item-drop-below');
         });
         item.classList.add(e.clientY < mid ? 'todo-item-drop-above' : 'todo-item-drop-below');
@@ -5710,6 +5502,69 @@ window.addEventListener('load', () => {
 
       content.appendChild(item);
     });
+
+    // ── Done section ──────────────────────────────────────────────────────────
+    if (doneEntries.length > 0) {
+      const divider = document.createElement('div');
+      divider.className = 'today-done-divider';
+      divider.textContent = t('todo.done');
+      content.appendChild(divider);
+
+      doneEntries.forEach(({ leafNode, label }) => {
+        const branchColor = (BRANCH_COLORS[leafNode.branch] || {}).main || '#888888';
+
+        const item = document.createElement('div');
+        item.className = 'daily-log-item';
+
+        // Branch dot
+        const dot = document.createElement('div');
+        dot.className = 'daily-log-branch-dot';
+        dot.style.background = branchColor;
+
+        // Label
+        const labelEl = document.createElement('div');
+        labelEl.className = 'daily-log-label';
+        labelEl.textContent = label || t('todo.noLabel');
+        labelEl.style.opacity = '0.6';
+
+        // Timestamp
+        const timeEl = document.createElement('div');
+        timeEl.className = 'daily-log-time';
+        if (leafNode.doneAt) {
+          const d = new Date(leafNode.doneAt);
+          timeEl.textContent = leafNode.doneAt.startsWith(today)
+            ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+
+        // Undone button revealed on hover
+        const undoneBtn = document.createElement('button');
+        undoneBtn.className = 'reset-btn';
+        undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;display:none;align-items:center;gap:6px;';
+        undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
+        undoneBtn.addEventListener('click', () => {
+          setStatus(leafNode.id, 'undone');
+          openTodoPanel();
+        });
+
+        item.addEventListener('mouseenter', () => {
+          timeEl.style.display = 'none';
+          undoneBtn.style.display = 'inline-flex';
+          hoveredTodoNode = leafNode;
+        });
+        item.addEventListener('mouseleave', () => {
+          timeEl.style.display = '';
+          undoneBtn.style.display = 'none';
+          hoveredTodoNode = null;
+        });
+
+        item.appendChild(dot);
+        item.appendChild(labelEl);
+        item.appendChild(timeEl);
+        item.appendChild(undoneBtn);
+        content.appendChild(item);
+      });
+    }
 
     document.getElementById('todo-overlay').classList.add('visible');
   }
