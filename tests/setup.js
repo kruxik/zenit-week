@@ -39,7 +39,20 @@ const sandbox = {
   window: { addEventListener: () => {} },
   document: {
     addEventListener: () => {},
-    getElementById: () => elementStub(),
+    getElementById: (id) => {
+      if (id === 'cp-sb-canvas') {
+        const grad = { addColorStop: () => {} };
+        const ctx2d = {
+          fillStyle: '',
+          fillRect: () => {},
+          createLinearGradient: () => grad,
+          arc: () => {}, beginPath: () => {}, stroke: () => {},
+          strokeStyle: '', lineWidth: 0,
+        };
+        return { ...elementStub(), getContext: () => ctx2d, width: 160, height: 120 };
+      }
+      return elementStub();
+    },
     querySelectorAll: () => [],
     documentElement: { dataset: {} },
     createElement: (tag) => {
