@@ -5475,11 +5475,14 @@ window.addEventListener('load', () => {
 
     // Footer
     const doneCount      = doneEntries.length;
-    const allEntryIds    = new Set(allEntries.map(e => e.leafNode.id));
+    const pendingCount   = pendingEntries.length;
+    // Unplanned: leaf activities marked unplanned today that are either done today or still undone
     const unplannedCount = weekData.nodes.filter(n =>
-      n.unplanned && n.unplannedAt && n.unplannedAt.startsWith(today) && !allEntryIds.has(n.id)
+      isLeafActivity(n) &&
+      n.unplanned && n.unplannedAt && n.unplannedAt.startsWith(today) &&
+      (isDoneToday(n) || !n.done)
     ).length;
-    const totalCount     = allEntries.length + unplannedCount;
+    const totalCount     = doneCount + pendingCount;
     const footer = document.getElementById('todo-footer');
     footer.innerHTML = `
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> ${t('todo.done')}</div>
