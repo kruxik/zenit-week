@@ -1816,14 +1816,18 @@ function takeSnapshot() {
   });
   const cleanData = validateAndRepair(clone);
 
-  // Include branch colors and config so undo/redo restores them too
+  // Include branch colors, config and today's todo order so undo/redo restores them too
   const nextKey = offsetWeek(currentWeekKey, +1);
+  const _d = new Date();
+  const todoOrderKey = `week-planner-todo-order-${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
   const snapshot = {
     weekData:      cleanData,
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
     nextWeekKey:   nextKey,
     nextWeekRaw:   localStorage.getItem(storageKey(nextKey)),
+    todoOrderKey,
+    todoOrderRaw:  localStorage.getItem(todoOrderKey),
   };
   undoStack.push(JSON.stringify(snapshot));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
@@ -1865,17 +1869,31 @@ function _applySnapshot(raw) {
     }
   }
 
+  // Restore today's todo sort order if the snapshot captured it
+  if (snapshot.todoOrderKey) {
+    if (snapshot.todoOrderRaw === null) {
+      localStorage.removeItem(snapshot.todoOrderKey);
+    } else {
+      localStorage.setItem(snapshot.todoOrderKey, snapshot.todoOrderRaw);
+    }
+  }
+
   render();
+  window.dispatchEvent(new CustomEvent('snapshotApplied'));
 }
 
 function _currentSnapshot() {
   const nextKey = offsetWeek(currentWeekKey, +1);
+  const _d = new Date();
+  const todoOrderKey = `week-planner-todo-order-${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
   return JSON.stringify({
     weekData,
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
     nextWeekKey:   nextKey,
     nextWeekRaw:   localStorage.getItem(storageKey(nextKey)),
+    todoOrderKey,
+    todoOrderRaw:  localStorage.getItem(todoOrderKey),
   });
 }
 
@@ -5499,6 +5517,7 @@ window.addEventListener('load', () => {
         let   toIdx   = current.indexOf(leafNode.id);
         if (fromIdx === -1 || toIdx === -1) return;
 
+        takeSnapshot();
         current.splice(fromIdx, 1);
         toIdx = current.indexOf(leafNode.id);
         current.splice(before ? toIdx : toIdx + 1, 0, dragSrcId);
@@ -5600,6 +5619,10 @@ window.addEventListener('load', () => {
   const todoClose   = document.getElementById('todo-close');
 
   todayFab.addEventListener('click', openTodoPanel);
+  window.addEventListener('snapshotApplied', () => {
+    const overlay = document.getElementById('todo-overlay');
+    if (overlay && overlay.classList.contains('visible')) openTodoPanel();
+  });
   todoClose.addEventListener('click', () => todoOverlay.classList.remove('visible'));
   todoOverlay.addEventListener('click', (e) => {
     if (e.target === todoOverlay) todoOverlay.classList.remove('visible');
