@@ -4,6 +4,60 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Zenit Week</title>
+<link rel="icon" type="image/svg+xml" id="favicon-svg">
+<link rel="icon" type="image/png" sizes="32x32" id="favicon-32">
+<link rel="icon" type="image/png" sizes="16x16" id="favicon-16">
+<link rel="apple-touch-icon" sizes="180x180" id="favicon-180">
+<script>
+(function () {
+  // SVG favicon with prefers-color-scheme support (Chrome, Firefox, Edge)
+  const svgFav = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    + '<style>.r{fill:%231a1a2e}@media (prefers-color-scheme:dark){.r{fill:%23f0f0f0}}</style>'
+    + '<path d="M18,32C32,32,32,14,42,14" fill="none" stroke="%23A259FF" stroke-width="3.5" stroke-linecap="round"/>'
+    + '<path d="M18,32C32,32,32,50,42,50" fill="none" stroke="%231ABCFE" stroke-width="3.5" stroke-linecap="round"/>'
+    + '<circle cx="12" cy="32" r="8" class="r"/>'
+    + '<circle cx="48" cy="14" r="6" fill="%23A259FF"/>'
+    + '<circle cx="48" cy="50" r="6" fill="%231ABCFE"/>'
+    + '</svg>';
+  document.getElementById('favicon-svg').href = 'data:image/svg+xml,' + svgFav;
+
+  // Canvas-rendered PNG favicons for Safari / Apple Touch Icon
+  function drawBrandmark(ctx, size, rootFill) {
+    const s = size / 64;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 3.5 * s;
+    ctx.strokeStyle = '#A259FF';
+    ctx.beginPath(); ctx.moveTo(18*s, 32*s); ctx.bezierCurveTo(32*s, 32*s, 32*s, 14*s, 42*s, 14*s); ctx.stroke();
+    ctx.strokeStyle = '#1ABCFE';
+    ctx.beginPath(); ctx.moveTo(18*s, 32*s); ctx.bezierCurveTo(32*s, 32*s, 32*s, 50*s, 42*s, 50*s); ctx.stroke();
+    ctx.fillStyle = rootFill;
+    ctx.beginPath(); ctx.arc(12*s, 32*s, 7*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#A259FF';
+    ctx.beginPath(); ctx.arc(48*s, 14*s, 5*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1ABCFE';
+    ctx.beginPath(); ctx.arc(48*s, 50*s, 5*s, 0, Math.PI*2); ctx.fill();
+  }
+
+  function makePng(size, bg, rootFill) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    if (bg) {
+      ctx.fillStyle = bg;
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(0, 0, size, size, size * 0.22); ctx.fill(); }
+      else { ctx.fillRect(0, 0, size, size); }
+    }
+    drawBrandmark(ctx, size, rootFill);
+    return c.toDataURL('image/png');
+  }
+
+  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const rootFill = dark ? '#f0f0f0' : '#1a1a2e';
+  document.getElementById('favicon-16').href  = makePng(16,  null,      rootFill);
+  document.getElementById('favicon-32').href  = makePng(32,  null,      rootFill);
+  document.getElementById('favicon-180').href = makePng(180, '#181825', '#f0f0f0');
+})();
+</script>
 <style>
   :root {
     /* Backgrounds */
