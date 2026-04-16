@@ -1,4 +1,4 @@
-# Week Planner - Claude Instructions
+# Zenit Week - Claude Instructions
 
 ## Project Overview
 A visually rich, single-file web application for planning weeks using a Mind Map interface. It uses SVG for rendering and `localStorage` for data persistence.

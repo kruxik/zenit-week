@@ -1,6 +1,6 @@
-# Contributing to Week Planner
+# Contributing to Zenit Week
 
-Thank you for your interest in contributing to Week Planner! This project aims to stay simple, portable, and visually rich.
+Thank you for your interest in contributing to Zenit Week! This project aims to stay simple, portable, and visually rich.
 
 ## 🚀 How to Run
 

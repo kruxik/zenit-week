@@ -1,7 +1,7 @@
 # Google Drive Sync — Implementation TODO
 
 **Author:** Petr Burian  
-**Goal:** Allow users to sign in with Google and sync their week-planner data to their own Google Drive — no backend required.  
+**Goal:** Allow users to sign in with Google and sync their Zenit Week data to their own Google Drive — no backend required.  
 **Architecture:** 100% client-side. The app stores all week data in a single JSON file named `gravitas-map-data.json` inside the user's Google Drive `appDataFolder` — a hidden, app-specific folder that is not visible in the user's Drive UI.
 
 ---
@@ -84,7 +84,7 @@ The token client's callback should handle both success (proceed to load data) an
 
 ### TASK-10 — Save data to Drive
 
-**What:** Implement a save-to-Drive function that collects all week-planner entries from `localStorage` (identifiable by their `week-planner-` key prefix) and uploads them as a single JSON object to the Drive file. The upload should happen asynchronously and non-blocking — it should not interrupt the user's interaction. Set the sync status to "syncing" during upload and back to "connected" on success. On error, set the error state.
+**What:** Implement a save-to-Drive function that collects all Zenit Week entries from `localStorage` (identifiable by their `week-planner-` key prefix) and uploads them as a single JSON object to the Drive file. The upload should happen asynchronously and non-blocking — it should not interrupt the user's interaction. Set the sync status to "syncing" during upload and back to "connected" on success. On error, set the error state.
 
 Integrate this into the existing `saveWeek()` function: after writing to `localStorage`, trigger a Drive sync if the user is connected.
 

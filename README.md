@@ -1,4 +1,4 @@
-# Week Planner
+# Zenit Week
 
 A visually rich, single-file mind-map week planner that runs entirely in your browser. No server, no database, no complex setup—just one HTML file.
 

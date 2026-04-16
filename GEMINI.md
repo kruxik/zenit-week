@@ -1,4 +1,4 @@
-# Week Planner - Gemini Instructions
+# Zenit Week - Gemini Instructions
 
 ## Project Overview
 A visually rich, single-file web application for planning weeks using a Mind Map interface. It uses SVG for rendering and `localStorage` for data persistence.

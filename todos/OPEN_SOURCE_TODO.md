@@ -17,7 +17,7 @@ Each item includes enough context for an AI agent (Claude Code, Gemini, etc.) to
 ### 2. Add README.md
 **File to create:** `README.md`
 **Action:** Write a README covering:
-- What the app is (mind-map week planner, runs in browser, no server needed)
+- What the app is (Zenit Week — mind-map week planner, runs in browser, no server needed)
 - Screenshot or GIF (add a placeholder `<!-- add screenshot here -->` comment)
 - Quick start: "Download `week-planner.html` and open in any modern browser"
 - Feature list: branches (Work/Family/Me), priorities, counters, drag-and-drop, undo/redo, daily log, cross-week transfer
@@ -314,10 +314,10 @@ Adjust the JS extraction approach as needed for the actual CI environment.
 **Action:**
 ```json
 {
-  "name": "week-planner",
+  "name": "zenit-week",
   "version": "1.0.0",
-  "description": "A mind-map week planner that runs in your browser with no server required.",
-  "homepage": "https://github.com/YOUR_USERNAME/week-planner",
+  "description": "Zenit Week — a mind-map week planner that runs in your browser with no server required.",
+  "homepage": "https://github.com/YOUR_USERNAME/zenit-week",
   "license": "MIT",
   "scripts": {
     "validate": "html-validate week-planner.html"
