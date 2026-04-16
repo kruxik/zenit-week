@@ -5441,6 +5441,14 @@ window.addEventListener('load', () => {
       item.appendChild(dot);
       item.appendChild(labelEl);
 
+      if (leafNode.unplanned) {
+        const bolt = document.createElement('div');
+        bolt.className = 'daily-log-badge unplanned';
+        bolt.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
+        bolt.innerHTML = iconSvg('bolt');
+        item.appendChild(bolt);
+      }
+
       const counterChild = getCounterChild(leafNode);
 
       if (counterChild && !counterChild.done) {
@@ -5604,6 +5612,13 @@ window.addEventListener('load', () => {
 
         item.appendChild(dot);
         item.appendChild(labelEl);
+        if (leafNode.unplanned) {
+          const bolt = document.createElement('div');
+          bolt.className = 'daily-log-badge unplanned';
+          bolt.style.cssText = 'height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;';
+          bolt.innerHTML = iconSvg('bolt');
+          item.appendChild(bolt);
+        }
         if (pill) item.appendChild(pill);
         item.appendChild(timeEl);
         item.appendChild(undoneBtn);
