@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zenit Week — Brand Manual</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #1a1a2e;
+      --midnight:   #181825;
+      --cloud:      #f0f0f0;
+      --canvas:     #ffffff;
+      --page:       #f2f2f5;
+      --border:     #e4e4e8;
+      --muted:      #888898;
+      --purple:     #A259FF;
+      --blue:       #1ABCFE;
+      --red-dont:   #ff3b30;
+      --sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    html { font-size: 16px; scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--page);
+      color: var(--ink);
+      line-height: 1.6;
+    }
+
+    /* ── Layout ── */
+    .page { max-width: 960px; margin: 0 auto; padding: 0 32px 80px; }
+
+    section {
+      background: var(--canvas);
+      border-radius: 16px;
+      padding: 56px 64px;
+      margin-bottom: 24px;
+    }
+
+    section.dark {
+      background: var(--midnight);
+      color: var(--cloud);
+    }
+
+    /* ── Cover ── */
+    #cover {
+      background: var(--canvas);
+      border-radius: 16px;
+      padding: 80px 64px 64px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 48px;
+    }
+
+    /* ── Typography ── */
+    .section-number {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--purple);
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 24px;
+    }
+
+    section.dark .section-title { color: var(--cloud); }
+
+    .section-subtitle {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      margin-top: 40px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    section.dark .section-subtitle {
+      color: #555570;
+      border-color: #2a2a3a;
+    }
+
+    p {
+      font-size: 15px;
+      color: #44445a;
+      line-height: 1.7;
+      max-width: 640px;
+    }
+
+    section.dark p { color: #9090a8; }
+
+    /* ── Logo display ── */
+    .logo-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      border-radius: 12px;
+      background: var(--canvas);
+      border: 1px solid var(--border);
+    }
+
+    .logo-display.on-dark {
+      background: var(--midnight);
+      border-color: #2a2a3a;
+    }
+
+    .logo-display.on-grey {
+      background: #f2f2f5;
+      border-color: var(--border);
+    }
+
+    /* ── Grid layouts ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+
+    /* ── Color swatches ── */
+    .swatch {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .swatch-color {
+      height: 80px;
+    }
+
+    .swatch-info {
+      padding: 14px 16px;
+      background: var(--canvas);
+    }
+
+    .swatch-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+
+    .swatch-hex {
+      font-size: 12px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .swatch-values {
+      font-size: 10.5px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: #aaa;
+      line-height: 1.6;
+    }
+
+    /* ── Anatomy ── */
+    .anatomy-label {
+      font-size: 11px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      fill: var(--muted);
+    }
+
+    /* ── Don'ts ── */
+    .donts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    .dont-item {
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      overflow: hidden;
+    }
+
+    .dont-display {
+      padding: 24px 16px;
+      background: #fafafa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    .dont-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 20px;
+      height: 20px;
+      background: var(--red-dont);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .dont-caption {
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    /* ── Type specimen ── */
+    .type-row {
+      display: flex;
+      align-items: baseline;
+      gap: 24px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .type-row:last-child { border-bottom: none; }
+
+    .type-label {
+      font-size: 11px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: var(--muted);
+      min-width: 140px;
+    }
+
+    .type-specimen {
+      font-family: var(--sans);
+      color: var(--ink);
+    }
+
+    /* ── Clearspace ── */
+    .clearspace-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px;
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    /* ── Usage backgrounds ── */
+    .bg-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .bg-item {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .bg-display {
+      padding: 36px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bg-caption {
+      padding: 12px 16px;
+      background: var(--canvas);
+      border-top: 1px solid var(--border);
+    }
+
+    .bg-caption-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+
+    .bg-caption-note {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── Cover meta ── */
+    .cover-meta {
+      display: flex;
+      gap: 48px;
+    }
+
+    .cover-meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cover-meta-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .cover-meta-value {
+      font-size: 14px;
+      color: var(--ink);
+    }
+
+    /* ── Divider ── */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    /* ── Logo SVG shorthand ── */
+    .logo-svg-font {
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══ COVER ══════════════════════════════════════════════════════════════ -->
+  <div id="cover">
+
+    <div class="logo-display" style="background:#ffffff; border:none; padding:48px 0 32px;">
+      <!-- Primary logo, large -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="540" height="115">
+        <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+        <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+      </svg>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:24px;">
+      <div>
+        <div style="font-size:32px; font-weight:700; letter-spacing:-0.03em; color:var(--ink); margin-bottom:6px;">Brand Manual</div>
+        <div style="font-size:15px; color:var(--muted);">Visual identity guidelines for Zenit Week</div>
+      </div>
+      <div class="cover-meta">
+        <div class="cover-meta-item">
+          <span class="cover-meta-label">Version</span>
+          <span class="cover-meta-value">1.0</span>
+        </div>
+        <div class="cover-meta-item">
+          <span class="cover-meta-label">Updated</span>
+          <span class="cover-meta-value">April 2026</span>
+        </div>
+        <div class="cover-meta-item">
+          <span class="cover-meta-label">Format</span>
+          <span class="cover-meta-value">SVG / HTML</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══ 1. INTRODUCTION ════════════════════════════════════════════════════ -->
+  <section>
+    <div class="section-number">01</div>
+    <div class="section-title">Introduction</div>
+
+    <p>
+      Zenit Week is a visual week planner built on the Jar of Life principle — protect your big rocks first,
+      then let the rest fill in. The brand reflects this philosophy: intentional, calm, and action-oriented.
+      Not a task manager. Not a calendar. A tool for people who plan with purpose.
+    </p>
+
+    <br>
+
+    <p>
+      The logotype encodes three meanings in one word: <strong>Zenith</strong> (where you want to be),
+      <strong>Zen</strong> (the mental clarity you achieve by planning well), and <strong>it</strong>
+      (the act of doing). The mind-map symbol between them is not decoration — it is the product,
+      rendered as a letterform.
+    </p>
+
+    <div class="section-subtitle">Brand values</div>
+
+    <div class="grid-3" style="gap:24px; margin-top:0;">
+      <div>
+        <div style="font-weight:600; font-size:14px; margin-bottom:6px;">Intentional</div>
+        <p style="font-size:13px;">Every element earns its place. Nothing decorative.</p>
+      </div>
+      <div>
+        <div style="font-weight:600; font-size:14px; margin-bottom:6px;">Calm</div>
+        <p style="font-size:13px;">Zen is the outcome. The visual language should feel it.</p>
+      </div>
+      <div>
+        <div style="font-weight:600; font-size:14px; margin-bottom:6px;">Structural</div>
+        <p style="font-size:13px;">Radial, organised, clear. Like the mind map itself.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ══ 2. LOGO ANATOMY ════════════════════════════════════════════════════ -->
+  <section>
+    <div class="section-number">02</div>
+    <div class="section-title">Logo Anatomy</div>
+
+    <p>
+      The logotype has four components. Each is load-bearing — none may be removed, reordered, or substituted.
+    </p>
+
+    <!-- Anatomy diagram -->
+    <div style="padding: 48px 0 32px; display:flex; justify-content:center;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 140" width="640" height="214">
+
+        <!-- The logo, centered -->
+        <g transform="translate(100, 50)">
+          <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+          <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+          <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+          <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+          <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+          <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+        </g>
+
+        <!-- ① Zen label -->
+        <line x1="120" y1="110" x2="124" y2="92" stroke="#ddd" stroke-width="1"/>
+        <text x="80" y="122" font-family="system-ui,sans-serif" font-size="10" fill="#888898">① "Zen"</text>
+        <text x="60" y="134" font-family="system-ui,sans-serif" font-size="9" fill="#aaa">Weight 300 · Light</text>
+
+        <!-- ② Symbol label -->
+        <line x1="183" y1="48" x2="183" y2="30" stroke="#ddd" stroke-width="1"/>
+        <text x="162" y="22" font-family="system-ui,sans-serif" font-size="10" fill="#888898">② Brandmark</text>
+        <text x="156" y="13" font-family="system-ui,sans-serif" font-size="9" fill="#aaa">Mind-map symbol</text>
+
+        <!-- ③ it label -->
+        <line x1="202" y1="110" x2="200" y2="92" stroke="#ddd" stroke-width="1"/>
+        <text x="188" y="122" font-family="system-ui,sans-serif" font-size="10" fill="#888898">③ "it"</text>
+        <text x="176" y="134" font-family="system-ui,sans-serif" font-size="9" fill="#aaa">Weight 700 · Bold</text>
+
+        <!-- ④ Week label -->
+        <line x1="265" y1="110" x2="258" y2="92" stroke="#ddd" stroke-width="1"/>
+        <text x="248" y="122" font-family="system-ui,sans-serif" font-size="10" fill="#888898">④ "Week"</text>
+        <text x="234" y="134" font-family="system-ui,sans-serif" font-size="9" fill="#aaa">Weight 300 · Light</text>
+
+      </svg>
+    </div>
+
+    <div class="section-subtitle">Component descriptions</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+      <div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:4px; color:var(--ink);">① "Zen" — Light text</div>
+        <p style="font-size:13px;">Weight 300. Sets the meditative, intentional tone. The contrast with "it" (bold) is the visual pun made tangible.</p>
+      </div>
+      <div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:4px; color:var(--ink);">② Brandmark — Mind-map symbol</div>
+        <p style="font-size:13px;">Root node (parent) connected via bezier curves to two child nodes. Upper child in brand purple, lower in brand blue. This <em>is</em> the product in symbol form.</p>
+      </div>
+      <div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:4px; color:var(--ink);">③ "it" — Bold text</div>
+        <p style="font-size:13px;">Weight 700. Signals action — doing, completing, getting things done. The weight contrast with "Zen" encodes the brand tension: calm meets action.</p>
+      </div>
+      <div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:4px; color:var(--ink);">④ "Week" — Light text</div>
+        <p style="font-size:13px;">Weight 300. Anchors the time horizon. Makes the product category immediately clear — this is a weekly planning tool.</p>
+      </div>
+    </div>
+
+    <div class="section-subtitle">Symbol anatomy</div>
+
+    <div style="display:flex; gap:48px; align-items:center; flex-wrap:wrap;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" width="240" height="160">
+        <path d="M 32,40 C 52,40 52,18 62,18" fill="none" stroke="#A259FF" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M 32,40 C 52,40 52,62 62,62" fill="none" stroke="#1ABCFE" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="24" cy="40" r="8" fill="#1a1a2e"/>
+        <circle cx="70" cy="18" r="6" fill="#A259FF"/>
+        <circle cx="70" cy="62" r="6" fill="#1ABCFE"/>
+
+        <!-- Labels -->
+        <text x="2" y="44" font-family="system-ui,sans-serif" font-size="7" fill="#aaa">Root</text>
+        <text x="79" y="15" font-family="system-ui,sans-serif" font-size="7" fill="#A259FF">Child A</text>
+        <text x="79" y="66" font-family="system-ui,sans-serif" font-size="7" fill="#1ABCFE">Child B</text>
+        <text x="38" y="28" font-family="system-ui,sans-serif" font-size="7" fill="#aaa">Bezier</text>
+        <text x="38" y="58" font-family="system-ui,sans-serif" font-size="7" fill="#aaa">Bezier</text>
+      </svg>
+
+      <div style="flex:1; min-width:240px; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-size:13px; color:#44445a; line-height:1.6;">
+          <strong style="color:var(--ink);">Root node</strong> — Parent. Connects "Zen" to the branching structure. Rendered in the primary text colour (dark or light depending on background).
+        </div>
+        <div style="font-size:13px; color:#44445a; line-height:1.6;">
+          <strong style="color:#A259FF;">Child A (purple)</strong> — Upper branch. Aligned to cap-height of adjacent letters. Always #A259FF — never recoloured.
+        </div>
+        <div style="font-size:13px; color:#44445a; line-height:1.6;">
+          <strong style="color:#1ABCFE;">Child B (blue)</strong> — Lower branch. Aligned to baseline of adjacent letters. Always #1ABCFE — never recoloured.
+        </div>
+        <div style="font-size:13px; color:#44445a; line-height:1.6;">
+          <strong style="color:var(--ink);">Bezier curves</strong> — Cubic, forking from the same point on the root's right edge. Mirror the exact curve style used in the Zenit Week mind-map interface.
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ══ 3. LOGO VARIATIONS ═════════════════════════════════════════════════ -->
+  <section>
+    <div class="section-number">03</div>
+    <div class="section-title">Logo Variations</div>
+
+    <p>Three approved forms. Use the fullest form the context allows.</p>
+
+    <div class="section-subtitle">Full logotype — Primary</div>
+    <div class="logo-display">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="432" height="92">
+        <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+        <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+      </svg>
+    </div>
+    <p style="font-size:12px; color:var(--muted); margin-top:10px;">
+      Use this form whenever space permits. Preferred for app toolbar, marketing, and all primary contexts.
+    </p>
+
+    <div class="section-subtitle">Compact logotype — Secondary</div>
+    <div class="logo-display">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 46" width="236" height="92">
+        <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+      </svg>
+    </div>
+    <p style="font-size:12px; color:var(--muted); margin-top:10px;">
+      "Zenit" without "Week". Use in constrained horizontal spaces where the time horizon is already contextually clear.
+    </p>
+
+    <div class="section-subtitle">Brandmark — Icon only</div>
+    <div class="logo-display" style="gap:40px;">
+      <!-- Large -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="96" height="96">
+        <path d="M 18,32 C 32,32 32,14 42,14" fill="none" stroke="#A259FF" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M 18,32 C 32,32 32,50 42,50" fill="none" stroke="#1ABCFE" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="12" cy="32" r="7" fill="#1a1a2e"/>
+        <circle cx="48" cy="14" r="5" fill="#A259FF"/>
+        <circle cx="48" cy="50" r="5" fill="#1ABCFE"/>
+      </svg>
+      <!-- Medium -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+        <path d="M 18,32 C 32,32 32,14 42,14" fill="none" stroke="#A259FF" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M 18,32 C 32,32 32,50 42,50" fill="none" stroke="#1ABCFE" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="12" cy="32" r="7" fill="#1a1a2e"/>
+        <circle cx="48" cy="14" r="5" fill="#A259FF"/>
+        <circle cx="48" cy="50" r="5" fill="#1ABCFE"/>
+      </svg>
+      <!-- Small -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="40" height="40">
+        <path d="M 18,32 C 32,32 32,14 42,14" fill="none" stroke="#A259FF" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M 18,32 C 32,32 32,50 42,50" fill="none" stroke="#1ABCFE" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="12" cy="32" r="7" fill="#1a1a2e"/>
+        <circle cx="48" cy="14" r="5" fill="#A259FF"/>
+        <circle cx="48" cy="50" r="5" fill="#1ABCFE"/>
+      </svg>
+      <!-- Tiny -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="24" height="24">
+        <path d="M 18,32 C 32,32 32,14 42,14" fill="none" stroke="#A259FF" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M 18,32 C 32,32 32,50 42,50" fill="none" stroke="#1ABCFE" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="12" cy="32" r="7" fill="#1a1a2e"/>
+        <circle cx="48" cy="14" r="5" fill="#A259FF"/>
+        <circle cx="48" cy="50" r="5" fill="#1ABCFE"/>
+      </svg>
+    </div>
+    <p style="font-size:12px; color:var(--muted); margin-top:10px;">
+      Standalone symbol for favicon, app icon, avatar, or any square/constrained context. Never use the brandmark in place of the full logotype where space allows.
+    </p>
+  </section>
+
+
+  <!-- ══ 4. COLOUR PALETTE ══════════════════════════════════════════════════ -->
+  <section>
+    <div class="section-number">04</div>
+    <div class="section-title">Colour Palette</div>
+
+    <p>The palette uses two accent colours drawn directly from the app's branch system — purple for creativity and growth, blue for clarity and self. All other colours are neutral anchors.</p>
+
+    <div class="section-subtitle">Brand colours</div>
+
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="swatch">
+        <div class="swatch-color" style="background:#A259FF;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Branch Purple</div>
+          <div class="swatch-hex">#A259FF</div>
+          <div class="swatch-values">
+            RGB 162 · 89 · 255<br>
+            HSL 270° · 100% · 67%<br>
+            CMYK 36 · 65 · 0 · 0
+          </div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#1ABCFE;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Branch Blue</div>
+          <div class="swatch-hex">#1ABCFE</div>
+          <div class="swatch-values">
+            RGB 26 · 188 · 254<br>
+            HSL 199° · 99% · 55%<br>
+            CMYK 90 · 26 · 0 · 0
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-subtitle">Neutral colours</div>
+
+    <div class="grid-4">
+      <div class="swatch">
+        <div class="swatch-color" style="background:#1a1a2e;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Ink</div>
+          <div class="swatch-hex">#1a1a2e</div>
+          <div class="swatch-values">
+            RGB 26 · 26 · 46<br>
+            CMYK 43 · 43 · 0 · 82
+          </div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#181825; border-bottom:1px solid #2a2a3a;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Midnight</div>
+          <div class="swatch-hex">#181825</div>
+          <div class="swatch-values">
+            RGB 24 · 24 · 37<br>
+            CMYK 35 · 35 · 0 · 85
+          </div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#f0f0f0; border-bottom:1px solid var(--border);"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Cloud</div>
+          <div class="swatch-hex">#f0f0f0</div>
+          <div class="swatch-values">
+            RGB 240 · 240 · 240<br>
+            CMYK 0 · 0 · 0 · 6
+          </div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#ffffff; border-bottom:1px solid var(--border);"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Canvas</div>
+          <div class="swatch-hex">#ffffff</div>
+          <div class="swatch-values">
+            RGB 255 · 255 · 255<br>
+            CMYK 0 · 0 · 0 · 0
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-subtitle">Usage rules</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+      <div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:6px; color:var(--purple);">Branch Purple #A259FF</div>
+        <p style="font-size:13px;">Used exclusively for the upper child node and its bezier branch in the brandmark. Never used for text.</p>
+      </div>
+      <div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:6px; color:var(--blue);">Branch Blue #1ABCFE</div>
+        <p style="font-size:13px;">Used exclusively for the lower child node and its bezier branch in the brandmark. Never used for text.</p>
+      </div>
+      <div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Ink #1a1a2e</div>
+        <p style="font-size:13px;">All logotype text and the root node on light backgrounds. The darkest tone in the system.</p>
+      </div>
+      <div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Cloud #f0f0f0</div>
+        <p style="font-size:13px;">All logotype text and the root node on dark backgrounds.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ══ 5. TYPOGRAPHY ══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="section-number">05</div>
+    <div class="section-title">Typography</div>
+
+    <p>
+      The logotype uses the system UI font stack — no custom typeface is required or embedded.
+      This ensures the logo renders natively on every platform: SF Pro on macOS/iOS,
+      Segoe UI on Windows, Roboto on Android.
+    </p>
+
+    <div class="section-subtitle">Font stack</div>
+
+    <div style="background:#fafafa; border:1px solid var(--border); border-radius:10px; padding:20px 24px; font-family:'SF Mono','Fira Code','Consolas',monospace; font-size:13px; color:#44445a; line-height:1.8;">
+      system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif
+    </div>
+
+    <div class="section-subtitle">Weight usage</div>
+
+    <div style="border: 1px solid var(--border); border-radius:10px; overflow:hidden;">
+      <div class="type-row" style="padding:20px 24px; border-bottom:1px solid var(--border);">
+        <div class="type-label">300 · Light</div>
+        <div class="type-specimen" style="font-size:28px; font-weight:300;">Zen Week</div>
+        <div style="font-size:12px; color:var(--muted); margin-left:auto;">"Zen" and "Week" in the logotype</div>
+      </div>
+      <div class="type-row" style="padding:20px 24px; border-bottom:1px solid var(--border);">
+        <div class="type-label">400 · Regular</div>
+        <div class="type-specimen" style="font-size:28px; font-weight:400;">Body text</div>
+        <div style="font-size:12px; color:var(--muted); margin-left:auto;">UI copy, labels</div>
+      </div>
+      <div class="type-row" style="padding:20px 24px; border-bottom:1px solid var(--border);">
+        <div class="type-label">600 · Semibold</div>
+        <div class="type-specimen" style="font-size:28px; font-weight:600;">Section titles</div>
+        <div style="font-size:12px; color:var(--muted); margin-left:auto;">Headings, emphasis</div>
+      </div>
+      <div class="type-row" style="padding:20px 24px;">
+        <div class="type-label">700 · Bold</div>
+        <div class="type-specimen" style="font-size:28px; font-weight:700;">it</div>
+        <div style="font-size:12px; color:var(--muted); margin-left:auto;">"it" in the logotype only</div>
+      </div>
+    </div>
+
+    <div class="section-subtitle">The weight contrast rule</div>
+    <p>
+      The contrast between weight 300 ("Zen", "Week") and weight 700 ("it") is a core brand element —
+      it makes the Zen/it pun visible typographically. This contrast must be preserved.
+      Do not use a single weight throughout the logotype.
+    </p>
+  </section>
+
+
+  <!-- ══ 6. CLEAR SPACE & MINIMUM SIZE ═════════════════════════════════════ -->
+  <section>
+    <div class="section-number">06</div>
+    <div class="section-title">Clear Space &amp; Minimum Size</div>
+
+    <p>
+      Clear space protects the logo from visual interference. The unit <strong>x</strong> is defined as the
+      cap-height of the logotype at any given size (the height of the "Z").
+    </p>
+
+    <div class="section-subtitle">Clear space — minimum 1× on all sides</div>
+
+    <div class="clearspace-diagram">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 140" width="560" height="230">
+        <!-- Clear space box (dashed) -->
+        <rect x="40" y="20" width="260" height="100" fill="none" stroke="#A259FF" stroke-width="1"
+          stroke-dasharray="4 3" opacity="0.5"/>
+
+        <!-- x markers -->
+        <!-- Top -->
+        <line x1="160" y1="20" x2="160" y2="36" stroke="#A259FF" stroke-width="1" opacity="0.6"/>
+        <text x="165" y="32" font-family="system-ui,sans-serif" font-size="10" fill="#A259FF" opacity="0.8">x</text>
+        <!-- Bottom -->
+        <line x1="160" y1="104" x2="160" y2="120" stroke="#A259FF" stroke-width="1" opacity="0.6"/>
+        <text x="165" y="116" font-family="system-ui,sans-serif" font-size="10" fill="#A259FF" opacity="0.8">x</text>
+        <!-- Left -->
+        <line x1="40" y1="70" x2="84" y2="70" stroke="#A259FF" stroke-width="1" opacity="0.6"/>
+        <text x="58" y="64" font-family="system-ui,sans-serif" font-size="10" fill="#A259FF" opacity="0.8">x</text>
+        <!-- Right -->
+        <line x1="256" y1="70" x2="300" y2="70" stroke="#A259FF" stroke-width="1" opacity="0.6"/>
+        <text x="270" y="64" font-family="system-ui,sans-serif" font-size="10" fill="#A259FF" opacity="0.8">x</text>
+
+        <!-- Logo -->
+        <g transform="translate(84, 36) scale(0.8)">
+          <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+          <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+          <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+          <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+          <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+          <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="section-subtitle">Minimum sizes</div>
+
+    <div class="grid-3">
+      <div style="border:1px solid var(--border); border-radius:10px; padding:20px; text-align:center;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="160" height="34" style="display:block; margin:0 auto 12px;">
+          <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+          <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+          <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+          <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+          <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+          <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+        </svg>
+        <div style="font-size:12px; font-weight:600; color:var(--ink);">Full logotype</div>
+        <div style="font-size:11px; color:var(--muted);">Min. 160px wide</div>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:10px; padding:20px; text-align:center;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 46" width="88" height="34" style="display:block; margin:0 auto 12px;">
+          <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+          <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+          <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+          <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+          <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+            font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+        </svg>
+        <div style="font-size:12px; font-weight:600; color:var(--ink);">Compact logotype</div>
+        <div style="font-size:11px; color:var(--muted);">Min. 88px wide</div>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:10px; padding:20px; text-align:center;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32" style="display:block; margin:0 auto 12px;">
+          <path d="M 18,32 C 32,32 32,14 42,14" fill="none" stroke="#A259FF" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M 18,32 C 32,32 32,50 42,50" fill="none" stroke="#1ABCFE" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="12" cy="32" r="7" fill="#1a1a2e"/>
+          <circle cx="48" cy="14" r="5" fill="#A259FF"/>
+          <circle cx="48" cy="50" r="5" fill="#1ABCFE"/>
+        </svg>
+        <div style="font-size:12px; font-weight:600; color:var(--ink);">Brandmark</div>
+        <div style="font-size:11px; color:var(--muted);">Min. 24px × 24px</div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ══ 7. LOGO ON BACKGROUNDS ════════════════════════════════════════════ -->
+  <section>
+    <div class="section-number">07</div>
+    <div class="section-title">Logo on Backgrounds</div>
+
+    <p>Four approved background contexts. Use the correct logo variant for each.</p>
+
+    <div class="section-subtitle">Approved backgrounds</div>
+
+    <div class="bg-grid">
+
+      <div class="bg-item">
+        <div class="bg-display" style="background:#ffffff;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="260" height="56">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+            <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+            <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+            <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+            <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+            <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+          </svg>
+        </div>
+        <div class="bg-caption">
+          <div class="bg-caption-title">White — #ffffff</div>
+          <div class="bg-caption-note">Primary. Preferred in all contexts.</div>
+        </div>
+      </div>
+
+      <div class="bg-item">
+        <div class="bg-display" style="background:#f2f2f5;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="260" height="56">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+            <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+            <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+            <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+            <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+            <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+          </svg>
+        </div>
+        <div class="bg-caption">
+          <div class="bg-caption-title">Light grey — #f2f2f5</div>
+          <div class="bg-caption-note">Approved. Use dark (Ink) logo version.</div>
+        </div>
+      </div>
+
+      <div class="bg-item">
+        <div class="bg-display" style="background:#181825;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="260" height="56">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#f0f0f0">Zen</text>
+            <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="57" cy="26" r="4.5" fill="#f0f0f0"/>
+            <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+            <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+            <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="700" fill="#f0f0f0">it</text>
+            <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#f0f0f0"> Week</text>
+          </svg>
+        </div>
+        <div class="bg-caption">
+          <div class="bg-caption-title">Midnight — #181825</div>
+          <div class="bg-caption-note">Approved. Use Cloud (#f0f0f0) logo version.</div>
+        </div>
+      </div>
+
+      <div class="bg-item">
+        <div class="bg-display" style="background:#1a1a2e;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="260" height="56">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#f0f0f0">Zen</text>
+            <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="57" cy="26" r="4.5" fill="#f0f0f0"/>
+            <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+            <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+            <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="700" fill="#f0f0f0">it</text>
+            <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#f0f0f0"> Week</text>
+          </svg>
+        </div>
+        <div class="bg-caption">
+          <div class="bg-caption-title">Ink — #1a1a2e</div>
+          <div class="bg-caption-note">Approved. Use Cloud (#f0f0f0) logo version.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:16px; padding:16px 20px; background:#fff8f0; border:1px solid #ffe0b0; border-radius:10px; font-size:13px; color:#7a5200;">
+      <strong>Note:</strong> Do not place the logo on saturated colour backgrounds (photography, gradients, or brand accent colours). If unavoidable, place a white or dark pill/container behind the logo first.
+    </div>
+  </section>
+
+
+  <!-- ══ 8. MISUSE ══════════════════════════════════════════════════════════ -->
+  <section>
+    <div class="section-number">08</div>
+    <div class="section-title">Misuse</div>
+
+    <p>These examples show what must never be done with the Zenit Week logo.</p>
+
+    <div class="section-subtitle" style="margin-top:32px;">Do not</div>
+
+    <div class="donts-grid">
+
+      <!-- ① Stretch -->
+      <div class="dont-item">
+        <div class="dont-display">
+          <div class="dont-badge">✕</div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="200" height="42" style="transform:scaleX(1.35); transform-origin:center;">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+            <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+            <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+            <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+            <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+            <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+          </svg>
+        </div>
+        <div class="dont-caption">Do not stretch or distort proportions</div>
+      </div>
+
+      <!-- ② Wrong weight -->
+      <div class="dont-item">
+        <div class="dont-display">
+          <div class="dont-badge">✕</div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="200" height="42">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="700" fill="#1a1a2e">Zen</text>
+            <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+            <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+            <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+            <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e">it</text>
+            <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+          </svg>
+        </div>
+        <div class="dont-caption">Do not alter the font weight contrast (Zen must be light, it must be bold)</div>
+      </div>
+
+      <!-- ③ Recolour symbol -->
+      <div class="dont-item">
+        <div class="dont-display">
+          <div class="dont-badge">✕</div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="200" height="42">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+            <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#888" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#888" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+            <circle cx="77" cy="16" r="3.5" fill="#888"/>
+            <circle cx="77" cy="36" r="3.5" fill="#888"/>
+            <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+            <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+          </svg>
+        </div>
+        <div class="dont-caption">Do not recolour the brandmark nodes or branches</div>
+      </div>
+
+      <!-- ④ Remove symbol -->
+      <div class="dont-item">
+        <div class="dont-display">
+          <div class="dont-badge">✕</div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 46" width="160" height="42">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e">Zenit Week</text>
+          </svg>
+        </div>
+        <div class="dont-caption">Do not remove the brandmark symbol from the logotype</div>
+      </div>
+
+      <!-- ⑤ Rotate -->
+      <div class="dont-item">
+        <div class="dont-display">
+          <div class="dont-badge">✕</div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="180" height="38" style="transform:rotate(-12deg);">
+            <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+            <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+            <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+            <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+            <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+            <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+              font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+          </svg>
+        </div>
+        <div class="dont-caption">Do not rotate or tilt the logo</div>
+      </div>
+
+      <!-- ⑥ Add effects -->
+      <div class="dont-item">
+        <div class="dont-display">
+          <div class="dont-badge">✕</div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="200" height="42">
+            <defs>
+              <filter id="shadow-dont">
+                <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#A259FF" flood-opacity="0.6"/>
+              </filter>
+            </defs>
+            <g filter="url(#shadow-dont)">
+              <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+                font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+              <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+              <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+              <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+              <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+              <text x="84" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+                font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+              <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+                font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+            </g>
+          </svg>
+        </div>
+        <div class="dont-caption">Do not add shadows, glows, outlines, or visual effects</div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══ 9. FILE FORMATS ════════════════════════════════════════════════════ -->
+  <section>
+    <div class="section-number">09</div>
+    <div class="section-title">File Formats &amp; Usage</div>
+
+    <p>
+      The Zenit Week logo is defined in SVG. Because it uses only system fonts and geometric primitives,
+      it requires no external assets and renders identically across all modern browsers and platforms.
+    </p>
+
+    <div class="section-subtitle">Format guide</div>
+
+    <div style="border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+      <div style="display:grid; grid-template-columns:1fr 2fr 2fr; gap:0;">
+        <div style="padding:12px 16px; font-size:11px; font-weight:600; color:var(--muted); background:#fafafa; border-bottom:1px solid var(--border);">Format</div>
+        <div style="padding:12px 16px; font-size:11px; font-weight:600; color:var(--muted); background:#fafafa; border-bottom:1px solid var(--border);">When to use</div>
+        <div style="padding:12px 16px; font-size:11px; font-weight:600; color:var(--muted); background:#fafafa; border-bottom:1px solid var(--border);">Notes</div>
+
+        <div style="padding:14px 16px; font-size:13px; font-weight:600; border-bottom:1px solid var(--border);">SVG</div>
+        <div style="padding:14px 16px; font-size:13px; border-bottom:1px solid var(--border); color:#44445a;">Web, app UI, print-ready documents</div>
+        <div style="padding:14px 16px; font-size:13px; border-bottom:1px solid var(--border); color:#44445a;">Preferred. Resolution-independent. Inline in HTML or as external file.</div>
+
+        <div style="padding:14px 16px; font-size:13px; font-weight:600; border-bottom:1px solid var(--border);">PNG</div>
+        <div style="padding:14px 16px; font-size:13px; border-bottom:1px solid var(--border); color:#44445a;">Social media, email, platforms that block SVG</div>
+        <div style="padding:14px 16px; font-size:13px; border-bottom:1px solid var(--border); color:#44445a;">Export at 2× minimum (e.g. 800px for a 400px display size). Transparent background.</div>
+
+        <div style="padding:14px 16px; font-size:13px; font-weight:600; border-bottom:1px solid var(--border);">ICO / PNG</div>
+        <div style="padding:14px 16px; font-size:13px; border-bottom:1px solid var(--border); color:#44445a;">Favicon</div>
+        <div style="padding:14px 16px; font-size:13px; border-bottom:1px solid var(--border); color:#44445a;">Use brandmark only at 32×32 and 16×16. Full logotype does not scale to favicon size.</div>
+
+        <div style="padding:14px 16px; font-size:13px; font-weight:600;">PDF</div>
+        <div style="padding:14px 16px; font-size:13px; color:#44445a;">Print, presentations</div>
+        <div style="padding:14px 16px; font-size:13px; color:#44445a;">Export from SVG source. No rasterisation required.</div>
+      </div>
+    </div>
+
+    <div class="section-subtitle">Primary source</div>
+    <p>
+      The canonical logo source is <code style="font-family:'SF Mono','Fira Code','Consolas',monospace; font-size:13px; background:#f4f4f6; padding:2px 6px; border-radius:4px;">docs/logo-preview.html</code> in the Zenit Week repository.
+      All variants (light, dark, full, compact, brandmark) are defined there in SVG.
+      Any exported format should be regenerated from this source.
+    </p>
+  </section>
+
+
+  <!-- ══ FOOTER ════════════════════════════════════════════════════════════ -->
+  <div style="text-align:center; padding:32px 0; font-size:12px; color:#aaa; letter-spacing:0.05em;">
+    Zenit Week Brand Manual · Version 1.0 · April 2026
+    <br>
+    <span style="color:#ccc;">Questions? Refer to the repository or contact the product team.</span>
+  </div>
+
+</div>
+</body>
+</html>

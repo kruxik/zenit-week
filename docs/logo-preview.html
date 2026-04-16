@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zenit Week — Logo Preview</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      background: #d0d0d8;
+      padding: 64px 32px;
+      font-family: system-ui, sans-serif;
+    }
+    .row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      width: 100%;
+      max-width: 720px;
+    }
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 40px;
+      gap: 40px;
+    }
+    .panel-light { background: #ffffff; border-radius: 20px 0 0 20px; }
+    .panel-dark  { background: #181825; border-radius: 0 20px 20px 0; }
+    .label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+    .label-light { color: #999; }
+    .label-dark  { color: #555; }
+    .size-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .size-label {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .size-label-light { color: #bbb; }
+    .size-label-dark  { color: #444; }
+  </style>
+</head>
+<body>
+
+<!--
+  Symbol geometry (font-size=28, baseline=y=34):
+    cap-height top  = y=14  (≈ 0.72 × 28 below baseline, top of Z/W)
+    baseline        = y=34  (bottom of W)
+    root cy         = y=24  (midpoint between cap top and baseline)
+
+  Root node:       cx=57  cy=24  r=4.5
+  Upper child:     cx=77  cy=14  r=3.5   ← aligns with top of Z
+  Lower child:     cx=77  cy=34  r=3.5   ← aligns with bottom of W
+
+  Bezier branches (both fork from the right edge of root at x=61.5, y=24):
+    Upper: M 61.5,24  C 70,24  70,14  73.5,14   stroke=#A259FF
+    Lower: M 61.5,24  C 70,24  70,34  73.5,34   stroke=#1ABCFE
+
+  "it" text starts at x=84 (child right edge 80.5 + 3.5 gap)
+-->
+
+<div class="row">
+
+  <!-- ── LIGHT ── -->
+  <div class="panel panel-light">
+    <span class="label label-light">Light</span>
+
+    <!-- Full (2×) -->
+    <div class="size-group">
+      <span class="size-label size-label-light">Full</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="432" height="92">
+        <text x="2" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+
+        <!-- bezier branches — drawn first so circles sit on top -->
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <!-- root node -->
+        <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+        <!-- child nodes -->
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+
+        <text x="84" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+        <text x="108" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+      </svg>
+    </div>
+
+    <!-- Medium (1×) -->
+    <div class="size-group">
+      <span class="size-label size-label-light">Medium (toolbar)</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="216" height="46">
+        <text x="2" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+        <text x="108" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+      </svg>
+    </div>
+
+    <!-- Small / Icon (no "Week") -->
+    <div class="size-group">
+      <span class="size-label size-label-light">Small / Icon</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 46" width="118" height="46">
+        <text x="2" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── DARK ── -->
+  <div class="panel panel-dark">
+    <span class="label label-dark">Dark</span>
+
+    <!-- Full (2×) -->
+    <div class="size-group">
+      <span class="size-label size-label-dark">Full</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="432" height="92">
+        <text x="2" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#f0f0f0">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="#f0f0f0"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#f0f0f0">it</text>
+        <text x="108" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#f0f0f0"> Week</text>
+      </svg>
+    </div>
+
+    <!-- Medium (1×) -->
+    <div class="size-group">
+      <span class="size-label size-label-dark">Medium (toolbar)</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 46" width="216" height="46">
+        <text x="2" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#f0f0f0">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="#f0f0f0"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#f0f0f0">it</text>
+        <text x="108" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#f0f0f0"> Week</text>
+      </svg>
+    </div>
+
+    <!-- Small / Icon -->
+    <div class="size-group">
+      <span class="size-label size-label-dark">Small / Icon</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 46" width="118" height="46">
+        <text x="2" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="300" fill="#f0f0f0">Zen</text>
+        <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="57" cy="26" r="4.5" fill="#f0f0f0"/>
+        <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+        <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+        <text x="84" y="36"
+          font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+          font-size="28" font-weight="700" fill="#f0f0f0">it</text>
+      </svg>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
