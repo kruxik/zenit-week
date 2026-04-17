@@ -12,7 +12,7 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
-1. Open 'week-planner.html'
+1. Open 'zenit-week.html'
 2. Click on '...'
 3. Scroll down to '....'
 4. See error

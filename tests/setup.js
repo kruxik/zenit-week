@@ -6,11 +6,11 @@ import { dirname } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const html = readFileSync(resolve(__dirname, '../week-planner.html'), 'utf8');
+const html = readFileSync(resolve(__dirname, '../zenit-week.html'), 'utf8');
 
 // Extract the main app <script id="app">…</script> block
 const match = html.match(/<script\s+id="app">([\s\S]*?)<\/script>/);
-if (!match) throw new Error('Could not extract <script id="app"> block from week-planner.html');
+if (!match) throw new Error('Could not extract <script id="app"> block from zenit-week.html');
 const scriptCode = match[1];
 
 // Reusable stub for DOM elements returned by getElementById / createElement

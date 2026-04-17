@@ -11,7 +11,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 - **Icons/Assets**: Native Unicode characters and CSS-based shapes.
 
 ## Key Files
-- `week-planner.html`: The entire application (HTML, CSS, and JS) — ~5,150 lines.
+- `zenit-week.html`: The entire application (HTML, CSS, and JS) — ~5,150 lines.
 
 ## Architecture
 
@@ -35,7 +35,7 @@ Node types:
 
 `BRANCH_CONFIG` — maps `branchId → { side: 'left' | 'right' }`; controls radial placement.
 
-Week key format: `YYYY-WW`, stored as `week-planner-YYYY-WW` in `localStorage`.
+Week key format: `YYYY-WW`, stored as `zenit-week-YYYY-WW` in `localStorage`.
 
 Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` — all customizable via color picker.
 
@@ -51,7 +51,7 @@ Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` — all cu
 - `updateSummary()` — refreshes stats panel
 
 ## Coding Standards & Conventions
-- **Single File Policy**: Maintain the entire application within `week-planner.html`.
+- **Single File Policy**: Maintain the entire application within `zenit-week.html`.
 - **JavaScript**:
   - Use `'use strict';`.
   - Prefer `const` and `let` over `var`.
@@ -65,8 +65,8 @@ Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` — all cu
   - Keep styles scoped within the `<style>` tag in the header.
 
 ## Workflows
-- **Running**: Open `week-planner.html` directly in any modern web browser.
-- **Development**: Edit `week-planner.html` and refresh the browser.
+- **Running**: Open `zenit-week.html` directly in any modern web browser.
+- **Development**: Edit `zenit-week.html` and refresh the browser.
 - **Testing**: Manual verification in the browser. Ensure drag-and-drop, zooming, undo/redo, and data persistence work across refreshes.
 
 ## UI/UX Guidelines

@@ -1,6 +1,6 @@
 # Open-Source Readiness TODO
 
-This file tracks all changes needed before open-sourcing `week-planner.html`.
+This file tracks all changes needed before open-sourcing `zenit-week.html`.
 Each item includes enough context for an AI agent (Claude Code, Gemini, etc.) to implement it without reading any other file first.
 
 ---
@@ -19,10 +19,10 @@ Each item includes enough context for an AI agent (Claude Code, Gemini, etc.) to
 **Action:** Write a README covering:
 - What the app is (Zenit Week — mind-map week planner, runs in browser, no server needed)
 - Screenshot or GIF (add a placeholder `<!-- add screenshot here -->` comment)
-- Quick start: "Download `week-planner.html` and open in any modern browser"
+- Quick start: "Download `zenit-week.html` and open in any modern browser"
 - Feature list: branches (Work/Family/Me), priorities, counters, drag-and-drop, undo/redo, daily log, cross-week transfer
 - Keyboard shortcuts table (copy from the in-app Help panel)
-- Data storage: explain localStorage, key format `week-planner-YYYY-WW`
+- Data storage: explain localStorage, key format `zenit-week-YYYY-WW`
 - Browser support: modern browsers with ES6+ support
 - Contributing section linking to CONTRIBUTING.md
 **Why:** First thing any GitHub visitor looks for.
@@ -30,7 +30,7 @@ Each item includes enough context for an AI agent (Claude Code, Gemini, etc.) to
 ---
 
 ### 3. Fix silent `catch` blocks — error swallowing
-**File:** `week-planner.html`
+**File:** `zenit-week.html`
 
 **Fix 1 — `loadBranchColors()` around line 1290:**
 ```js
@@ -39,7 +39,7 @@ Each item includes enough context for an AI agent (Claude Code, Gemini, etc.) to
 
 // AFTER:
 } catch(e) {
-  console.warn('[week-planner] Failed to load branch colors from localStorage:', e);
+  console.warn('[zenit-week] Failed to load branch colors from localStorage:', e);
 }
 ```
 
@@ -50,7 +50,7 @@ Each item includes enough context for an AI agent (Claude Code, Gemini, etc.) to
 
 // AFTER:
 } catch(e) {
-  console.warn('[week-planner] Failed to parse week data for key', wk, '— using defaults:', e);
+  console.warn('[zenit-week] Failed to parse week data for key', wk, '— using defaults:', e);
 }
 ```
 **Why:** Silent failures make debugging impossible for users and contributors.
@@ -58,7 +58,7 @@ Each item includes enough context for an AI agent (Claude Code, Gemini, etc.) to
 ---
 
 ### 4. Fix `validateAndRepair()` returning invalid data
-**File:** `week-planner.html`, function `validateAndRepair()` around line 1504.
+**File:** `zenit-week.html`, function `validateAndRepair()` around line 1504.
 
 **Fix:**
 ```js
@@ -79,7 +79,7 @@ data.nodes.forEach(n => { delete n._editing; });
 ---
 
 ### 5. Fix `window resize` resetting zoom/pan
-**File:** `week-planner.html`, around line 3568.
+**File:** `zenit-week.html`, around line 3568.
 
 **Fix:** Replace the unconditional reset with a bounds check. Only reset if the center of the map has drifted entirely off screen:
 ```js
@@ -105,7 +105,7 @@ window.addEventListener('resize', () => {
 ---
 
 ### 6. Handle `localStorage` quota errors in `saveWeek()`
-**File:** `week-planner.html`, function `saveWeek()` around line 1550.
+**File:** `zenit-week.html`, function `saveWeek()` around line 1550.
 
 **Fix:**
 ```js
@@ -119,7 +119,7 @@ function saveWeek(wk, data) {
   try {
     localStorage.setItem(storageKey(wk), JSON.stringify(data));
   } catch(e) {
-    console.error('[week-planner] Failed to save week data — localStorage may be full:', e);
+    console.error('[zenit-week] Failed to save week data — localStorage may be full:', e);
     // Optionally show a user-facing warning here
   }
 }
@@ -131,7 +131,7 @@ function saveWeek(wk, data) {
 ## 🟠 Performance — Fix before or shortly after launch
 
 ### 7. Replace `findNode()` O(n) linear scan with a Map
-**File:** `week-planner.html`
+**File:** `zenit-week.html`
 
 **Action:** After `weekData` is assigned (in `loadAndRender`, `undo`, `redo`, and anywhere `weekData` is mutated), rebuild a `nodeMap`:
 ```js
@@ -151,7 +151,7 @@ Call `rebuildNodeMap()` after every assignment to `weekData` and after `weekData
 ---
 
 ### 8. Remove `render()` call from `resizeInlineInput()`
-**File:** `week-planner.html`, function `resizeInlineInput()` around line 2253.
+**File:** `zenit-week.html`, function `resizeInlineInput()` around line 2253.
 
 **Fix:** Delete the line `render();` at the end of `resizeInlineInput()`.
 The inline input already overlays the node visually — a full SVG re-render on every keystroke is unnecessary and causes jank with many nodes.
@@ -160,7 +160,7 @@ The inline input already overlays the node visually — a full SVG re-render on 
 ---
 
 ### 9. Cache SVG `<linearGradient>` elements instead of recreating on every render
-**File:** `week-planner.html`, function `makeTaperedCurve()` around line 2175.
+**File:** `zenit-week.html`, function `makeTaperedCurve()` around line 2175.
 
 **Action:** In `makeTaperedCurve`, before creating a new gradient, check if one with the same `gradId` already exists in `defsEl`. If it does, just update its `x1/y1/x2/y2` attributes instead of appending a new element:
 ```js
@@ -185,7 +185,7 @@ function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId
 ## 🟡 Correctness Bugs
 
 ### 10. Remove dead code — unused `gearPath` element
-**File:** `week-planner.html`, function `makeNodeGroup()` around line 2058.
+**File:** `zenit-week.html`, function `makeNodeGroup()` around line 2058.
 
 **Action:** Delete these lines (the simple placeholder gear that is created but never appended):
 ```js
@@ -201,7 +201,7 @@ Only `gearActualPath` is used. `gearPath` is a dead variable.
 ---
 
 ### 11. Fix deprecated `navigator.platform`
-**File:** `week-planner.html`, inside `window.addEventListener('load', ...)` around line 3425.
+**File:** `zenit-week.html`, inside `window.addEventListener('load', ...)` around line 3425.
 
 **Fix:**
 ```js
@@ -218,7 +218,7 @@ const isMac = navigator.userAgentData?.platform
 ---
 
 ### 12. Improve `genId()` entropy
-**File:** `week-planner.html`, function `genId()` around line 1625.
+**File:** `zenit-week.html`, function `genId()` around line 1625.
 
 **Fix:**
 ```js
@@ -238,7 +238,7 @@ function genId() {
 ---
 
 ### 13. Fix hardcoded branch colors in HTML template bypassing the color system
-**File:** `week-planner.html`, around lines 1077–1089.
+**File:** `zenit-week.html`, around lines 1077–1089.
 
 **Action:** The legend dots in the summary panel use hardcoded `style="background:#A259FF"` etc. These are never updated when a user changes branch colors. They already have `data-branch-dot` attributes — the `updateColorDots()` function handles them correctly, but the inline `style` overrides it.
 
@@ -267,7 +267,7 @@ dist/
 **File to create:** `CONTRIBUTING.md`
 **Action:** Write a short contributing guide covering:
 - How to run the project (open HTML in browser, no build step)
-- Single-file policy: all code stays in `week-planner.html`
+- Single-file policy: all code stays in `zenit-week.html`
 - Code style: `'use strict'`, `const`/`let`, camelCase functions, kebab-case CSS
 - How to test: manual testing in browser, checklist of features to verify
 - How to submit a PR: branch naming, PR description expectations
@@ -287,9 +287,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check HTML is valid
-        run: npx --yes html-validate week-planner.html
+        run: npx --yes html-validate zenit-week.html
       - name: Check JS has no syntax errors
-        run: node --check <(grep -ozP '(?s)(?<=<script>).*(?=</script>)' week-planner.html)
+        run: node --check <(grep -ozP '(?s)(?<=<script>).*(?=</script>)' zenit-week.html)
 ```
 Adjust the JS extraction approach as needed for the actual CI environment.
 
@@ -320,7 +320,7 @@ Adjust the JS extraction approach as needed for the actual CI environment.
   "homepage": "https://github.com/YOUR_USERNAME/zenit-week",
   "license": "MIT",
   "scripts": {
-    "validate": "html-validate week-planner.html"
+    "validate": "html-validate zenit-week.html"
   },
   "devDependencies": {
     "html-validate": "^9.0.0"

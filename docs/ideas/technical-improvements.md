@@ -40,4 +40,4 @@ This document tracks identified technical improvements for the Zenit Week applic
 ## 6. Maintenance
 **Issue:** The single-file constraint is helpful for distribution but difficult for development.
 **Recommendations:**
-- Consider a build step that allows developing in separate files while still outputting a single `week-planner.html` for the user.
+- Consider a build step that allows developing in separate files while still outputting a single `zenit-week.html` for the user.

@@ -11,7 +11,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 - **Icons/Assets**: Native Unicode characters and CSS-based shapes
 
 ## Key Files
-- `week-planner.html`: The entire application (HTML, CSS, and JS) — ~5,150 lines
+- `zenit-week.html`: The entire application (HTML, CSS, and JS) — ~5,150 lines
 
 ## Architecture
 
@@ -39,7 +39,7 @@ Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` (all custo
 
 `BRANCH_CONFIG` — maps branch id → `{ side: 'left' | 'right' }`, controls radial layout placement
 
-Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `week-planner-2026-14`
+Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-week-2026-14`
 
 ### Rendering
 - Full `render()` on structural changes
@@ -57,7 +57,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `week-pl
 - `applyBranchColor(branch, hex)` — updates branch color palette and re-renders
 
 ## Coding Standards & Conventions
-- **Single File Policy**: Keep everything in `week-planner.html` — never split into separate files
+- **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files
 - **JavaScript**:
   - Always use `'use strict';`
   - Prefer `const` and `let` over `var`
@@ -73,8 +73,8 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `week-pl
   - Counter nodes auto-mark done when reaching max value
 
 ## Workflows
-- **Running**: Open `week-planner.html` directly in any modern browser — no server needed
-- **Development**: Edit `week-planner.html`, refresh browser to test
+- **Running**: Open `zenit-week.html` directly in any modern browser — no server needed
+- **Development**: Edit `zenit-week.html`, refresh browser to test
 - **Testing**: Manual verification in browser — check drag-and-drop, zoom/pan, undo/redo, and localStorage persistence across refreshes
 
 ## UI/UX Guidelines
@@ -88,7 +88,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `week-pl
   - `Ctrl/⌘ + Z` — undo
   - `Ctrl/⌘ + Shift + Z` / `Ctrl/⌘ + Y` — redo
   - `Esc` — close open panel/menu
-- **Dark mode**: Full light/dark theme with toggle in settings; respects `prefers-color-scheme` on first load; stored in `localStorage` as `week-planner-theme`
+- **Dark mode**: Full light/dark theme with toggle in settings; respects `prefers-color-scheme` on first load; stored in `localStorage` as `zenit-week-theme`
 - **Feedback**: Provide visual cues for hover states and active operations (e.g., "panning" cursor, context menu with context-aware options)
 - **Context menus**: Hide options that don't apply to the current node type
 - **Todo panel**: Sidebar listing all incomplete activity nodes across the week; accessible via toolbar button

@@ -6,7 +6,7 @@ A visually rich, single-file mind-map week planner that runs entirely in your br
 
 ## 🚀 Quick Start
 
-1. Download `week-planner.html`.
+1. Download `zenit-week.html`.
 2. Open it in any modern web browser (Chrome, Firefox, Safari, Edge).
 3. Start planning! Your data is automatically saved to your browser's `localStorage`.
 
@@ -47,7 +47,7 @@ Hover over a node and use these hotkeys for rapid editing:
 
 - **Architecture:** Single-file application (HTML5, CSS3, Vanilla JS).
 - **Graphics:** Inline SVG for smooth, scalable mind map rendering.
-- **Storage:** Uses `localStorage` with keys formatted as `week-planner-YYYY-WW`.
+- **Storage:** Uses `localStorage` with keys formatted as `zenit-week-YYYY-WW`.
 - **Requirements:** Any modern browser with ES6+ support.
 
 ## 🤝 Contributing

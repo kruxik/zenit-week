@@ -12,7 +12,7 @@ Deploy to GitHub Pages first, then implement the TODO plan in order.
 The `todos/GOOGLE_DRIVE_SYNC_TODO.md` plan is solid architecture. The only gap is the `file://` blocker — Google Identity Services rejects non-HTTP origins, so OAuth cannot work until the app is served over HTTP.
 
 **Fastest path to working sync:**
-1. Deploy `week-planner.html` to GitHub Pages (5 min) → establishes an HTTP origin (rename to `zenit-week.html` when ready)
+1. Deploy `zenit-week.html` to GitHub Pages (5 min) → establishes an HTTP origin (rename to `zenit-week.html` when ready)
 2. Do TASK-01 (Google Cloud Console, register that domain as OAuth origin)
 3. Implement TASK-02 through TASK-16 in order — the plan is complete, no redesign needed
 
