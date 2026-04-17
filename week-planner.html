@@ -1220,6 +1220,56 @@
     transform: translateY(0);
   }
 
+  #import-confirm-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: var(--overlay-sm);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  #import-confirm-overlay.visible {
+    display: flex;
+    opacity: 1;
+  }
+  #import-confirm-dialog {
+    background: var(--bg-surface);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px var(--shadow-xl);
+    padding: 24px;
+    width: 360px;
+    max-width: calc(100vw - 40px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transform: translateY(12px);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #import-confirm-overlay.visible #import-confirm-dialog {
+    transform: translateY(0);
+  }
+  #import-confirm-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  #import-confirm-body {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  #import-confirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
   #help-header {
     background: var(--bg-surface-subtle);
     padding: 20px 24px;
@@ -1643,6 +1693,16 @@
               <span class="theme-label" id="theme-label-dark" data-i18n="settings.dark">Dark</span>
             </div>
           </div>
+          <div class="settings-separator"></div>
+          <div class="settings-section">
+            <div class="settings-label" data-i18n="settings.data">Data</div>
+            <div style="display:flex;gap:6px;">
+              <button class="reset-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
+              <button class="reset-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
+              <input type="file" id="import-file-input" accept=".json" style="display:none;">
+            </div>
+            <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file — could not import.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1780,6 +1840,17 @@
   </div>
 </div>
 
+
+<div id="import-confirm-overlay">
+  <div id="import-confirm-dialog">
+    <div id="import-confirm-title" data-i18n="settings.importConfirmTitle">Overwrite all data?</div>
+    <div id="import-confirm-body" data-i18n="settings.importConfirmBody">This will replace all your current weeks, branches, and settings with the imported file. This cannot be undone.</div>
+    <div id="import-confirm-actions">
+      <button class="reset-btn" id="import-confirm-cancel" data-i18n="settings.importConfirmCancel">Cancel</button>
+      <button class="reset-btn danger" id="import-confirm-ok" data-i18n="settings.importConfirmOk">Yes, import</button>
+    </div>
+  </div>
+</div>
 
 <div id="today-fab" data-i18n-title="toolbar.todo" title="Today's Activities"><svg class="icon" aria-hidden="true"><use href="#icon-rosette-discount-check"/></svg></div>
 
@@ -2314,6 +2385,14 @@ const TRANSLATIONS = {
     'settings.zoom':              'Zoom',
     'settings.resetView':         'Click to reset view',
     'settings.language':          'Language',
+    'settings.data':              'Data',
+    'settings.exportData':        'Export',
+    'settings.importData':        'Import',
+    'settings.importConfirmTitle':'Overwrite all data?',
+    'settings.importConfirmBody': 'This will replace all your current weeks, branches, and settings with the imported file. This cannot be undone.',
+    'settings.importConfirmOk':   'Yes, import',
+    'settings.importConfirmCancel':'Cancel',
+    'settings.importError':       'Invalid file — could not import.',
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
     'view.rocks':                 'Rocks',
@@ -2393,6 +2472,14 @@ const TRANSLATIONS = {
     'settings.zoom':              'Přiblížení',
     'settings.resetView':         'Kliknutím resetovat pohled',
     'settings.language':          'Jazyk',
+    'settings.data':              'Data',
+    'settings.exportData':        'Exportovat',
+    'settings.importData':        'Importovat',
+    'settings.importConfirmTitle':'Přepsat všechna data?',
+    'settings.importConfirmBody': 'Tato akce nahradí všechny vaše týdny, větve a nastavení souborem z importu. Nelze vrátit zpět.',
+    'settings.importConfirmOk':   'Ano, importovat',
+    'settings.importConfirmCancel':'Zrušit',
+    'settings.importError':       'Neplatný soubor — import se nezdařil.',
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
     'view.rocks':                 'Kameny',
@@ -2658,6 +2745,54 @@ function saveWeek(wk, data) {
   } catch(e) {
     console.error('[week-planner] Failed to save week data — localStorage may be full:', e);
   }
+}
+
+function exportAllData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('week-planner-')) {
+      data[key] = localStorage.getItem(key);
+    }
+  }
+  const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data }, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `zenit-week-${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importAllData(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed.version || !parsed.data || typeof parsed.data !== 'object') throw new Error('Invalid format');
+      // Remove existing week-planner-* keys first
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('week-planner-')) keysToRemove.push(key);
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      // Write imported keys
+      Object.entries(parsed.data).forEach(([key, value]) => {
+        if (key.startsWith('week-planner-')) localStorage.setItem(key, value);
+      });
+      location.reload();
+    } catch (err) {
+      const errEl = document.getElementById('import-error');
+      if (errEl) { errEl.style.display = ''; }
+      console.error('[week-planner] Import failed:', err);
+    }
+  };
+  reader.readAsText(file);
 }
 
 function transferUnfinished() {
@@ -5282,6 +5417,55 @@ syncThemeToggleUI();
 document.getElementById('lang-select').addEventListener('change', e => {
   setLanguage(e.target.value);
 });
+
+// ─── Export / Import ──────────────────────────────────────────────────────────
+document.getElementById('export-data-btn').addEventListener('click', () => {
+  exportAllData();
+});
+
+(function() {
+  const importBtn    = document.getElementById('import-data-btn');
+  const fileInput    = document.getElementById('import-file-input');
+  const overlay      = document.getElementById('import-confirm-overlay');
+  const cancelBtn    = document.getElementById('import-confirm-cancel');
+  const confirmBtn   = document.getElementById('import-confirm-ok');
+  const errorEl      = document.getElementById('import-error');
+  let pendingFile    = null;
+
+  importBtn.addEventListener('click', () => {
+    errorEl.style.display = 'none';
+    fileInput.value = '';
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    pendingFile = file;
+    overlay.style.display = 'flex';
+    // Force reflow so transition fires
+    overlay.getBoundingClientRect();
+    overlay.classList.add('visible');
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    overlay.classList.remove('visible');
+    pendingFile = null;
+    fileInput.value = '';
+    setTimeout(() => { overlay.style.display = 'none'; }, 200);
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) cancelBtn.click();
+  });
+
+  confirmBtn.addEventListener('click', () => {
+    overlay.classList.remove('visible');
+    setTimeout(() => { overlay.style.display = 'none'; }, 200);
+    if (pendingFile) importAllData(pendingFile);
+    pendingFile = null;
+  });
+})();
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
