@@ -5636,7 +5636,13 @@ window.addEventListener('load', () => {
       return !!(cc && cc.ticks && cc.ticks.some(ts => ts.startsWith(today)));
     };
 
-    const pendingAllEntries = allEntries.filter(e => !isDoneToday(e.leafNode));
+    const isDoneEarlier = (leafNode) => {
+      if (leafNode.done && !isDoneToday(leafNode)) return true;
+      const cc = getCounterChild(leafNode);
+      return !!(cc && cc.done && !isDoneToday(leafNode));
+    };
+
+    const pendingAllEntries = allEntries.filter(e => !isDoneToday(e.leafNode) && !isDoneEarlier(e.leafNode));
 
     // Done section: ALL leaf activities completed today, regardless of day-of-week indicator
     const doneSeen = new Set(allEntries.filter(e => isDoneToday(e.leafNode)).map(e => e.leafNode.id));
