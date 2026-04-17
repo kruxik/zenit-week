@@ -1598,11 +1598,29 @@
   }
 
 </style>
+<!-- Key migration: rename week-planner-* → zenit-week-* once, before any reads -->
+<script>
+  (function() {
+    'use strict';
+    if (!localStorage.getItem('zenit-week-migrated')) {
+      const toMigrate = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('week-planner-')) toMigrate.push(k);
+      }
+      toMigrate.forEach(function(k) {
+        localStorage.setItem('zenit-week-' + k.slice('week-planner-'.length), localStorage.getItem(k));
+        localStorage.removeItem(k);
+      });
+      localStorage.setItem('zenit-week-migrated', '1');
+    }
+  })();
+</script>
 <!-- Theme init: runs synchronously before first paint to prevent flash of wrong theme -->
 <script>
   (function() {
     'use strict';
-    const saved = localStorage.getItem('week-planner-theme');
+    const saved = localStorage.getItem('zenit-week-theme');
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const theme = saved || (prefersDark ? 'dark' : 'light');
     if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
@@ -1951,7 +1969,7 @@ function takeSnapshot() {
   // Include branch colors, config and today's todo order so undo/redo restores them too
   const nextKey = offsetWeek(currentWeekKey, +1);
   const _d = new Date();
-  const todoOrderKey = `week-planner-todo-order-${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
+  const todoOrderKey = `zenit-week-todo-order-${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
   const snapshot = {
     weekData:      cleanData,
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
@@ -2017,7 +2035,7 @@ function _applySnapshot(raw) {
 function _currentSnapshot() {
   const nextKey = offsetWeek(currentWeekKey, +1);
   const _d = new Date();
-  const todoOrderKey = `week-planner-todo-order-${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
+  const todoOrderKey = `zenit-week-todo-order-${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
   return JSON.stringify({
     weekData,
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
@@ -2075,7 +2093,7 @@ function pickBranchColor() {
   return rgbToHex(Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255));
 }
 
-const COLORS_STORAGE_KEY = 'week-planner-colors';
+const COLORS_STORAGE_KEY = 'zenit-week-colors';
 
 function hexToRgb(hex) {
   return {
@@ -2123,7 +2141,7 @@ function loadBranchColors() {
       if (saved[b] && saved[b].main) BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
     });
   } catch(e) {
-    console.warn('[week-planner] Failed to load branch colors from localStorage:', e);
+    console.warn('[zenit-week] Failed to load branch colors from localStorage:', e);
   }
 }
 
@@ -2160,7 +2178,7 @@ function applyBranchColor(branch, hex) {
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  localStorage.setItem('week-planner-theme', theme);
+  localStorage.setItem('zenit-week-theme', theme);
   // Re-derive branch palettes for new theme and re-render SVG layer
   reloadBranchPalettes();
   updateSvgFilters();
@@ -2581,7 +2599,7 @@ function applyTranslations() {
 
 function setLanguage(lang) {
   currentLang = lang;
-  localStorage.setItem('week-planner-lang', lang);
+  localStorage.setItem('zenit-week-lang', lang);
   applyTranslations();
   render();
 }
@@ -2650,11 +2668,11 @@ function todayWeekKey() {
 }
 
 // ─── Data management ──────────────────────────────────────────────────────────
-function storageKey(wk) { return `week-planner-${wk}`; }
+function storageKey(wk) { return `zenit-week-${wk}`; }
 
 function validateAndRepair(data) {
   if (!data || !Array.isArray(data.nodes)) {
-    console.error('[week-planner] Corrupted data found in validateAndRepair — resetting to defaults:', data);
+    console.error('[zenit-week] Corrupted data found in validateAndRepair — resetting to defaults:', data);
     return defaultWeekData();
   }
 
@@ -2714,7 +2732,7 @@ function loadWeek(wk) {
       const data = JSON.parse(raw);
       return validateAndRepair(data);
     } catch(e) {
-      console.warn(`[week-planner] Failed to parse week data for key ${wk} — using defaults:`, e);
+      console.warn(`[zenit-week] Failed to parse week data for key ${wk} — using defaults:`, e);
     }
   }
   // New week — inherit all branch nodes (IDs, labels, colors) from the previous week
@@ -2743,7 +2761,7 @@ function saveWeek(wk, data) {
   try {
     localStorage.setItem(storageKey(wk), JSON.stringify(data));
   } catch(e) {
-    console.error('[week-planner] Failed to save week data — localStorage may be full:', e);
+    console.error('[zenit-week] Failed to save week data — localStorage may be full:', e);
   }
 }
 
@@ -2751,7 +2769,7 @@ function exportAllData() {
   const data = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('week-planner-')) {
+    if (key && key.startsWith('zenit-week-')) {
       data[key] = localStorage.getItem(key);
     }
   }
@@ -2768,28 +2786,36 @@ function exportAllData() {
   URL.revokeObjectURL(url);
 }
 
+// Normalize a key from either old (week-planner-*) or new (zenit-week-*) prefix to zenit-week-*
+function normalizeImportKey(key) {
+  if (key.startsWith('week-planner-')) return 'zenit-week-' + key.slice('week-planner-'.length);
+  if (key.startsWith('zenit-week-')) return key;
+  return null;
+}
+
 function importAllData(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const parsed = JSON.parse(e.target.result);
       if (!parsed.version || !parsed.data || typeof parsed.data !== 'object') throw new Error('Invalid format');
-      // Remove existing week-planner-* keys first
+      // Remove existing zenit-week-* keys first
       const keysToRemove = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('week-planner-')) keysToRemove.push(key);
+        if (key && key.startsWith('zenit-week-')) keysToRemove.push(key);
       }
       keysToRemove.forEach(k => localStorage.removeItem(k));
-      // Write imported keys
+      // Write imported keys, normalizing old week-planner-* prefix if present
       Object.entries(parsed.data).forEach(([key, value]) => {
-        if (key.startsWith('week-planner-')) localStorage.setItem(key, value);
+        const normalized = normalizeImportKey(key);
+        if (normalized) localStorage.setItem(normalized, value);
       });
       location.reload();
     } catch (err) {
       const errEl = document.getElementById('import-error');
       if (errEl) { errEl.style.display = ''; }
-      console.error('[week-planner] Import failed:', err);
+      console.error('[zenit-week] Import failed:', err);
     }
   };
   reader.readAsText(file);
@@ -5469,7 +5495,7 @@ document.getElementById('export-data-btn').addEventListener('click', () => {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
-  currentLang = localStorage.getItem('week-planner-lang') || 'en';
+  currentLang = localStorage.getItem('zenit-week-lang') || 'en';
   loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   updateSvgFilters();
@@ -5499,7 +5525,7 @@ window.addEventListener('load', () => {
     const yyyy = d.getFullYear();
     const mm   = String(d.getMonth() + 1).padStart(2, '0');
     const dd   = String(d.getDate()).padStart(2, '0');
-    return `week-planner-todo-order-${yyyy}-${mm}-${dd}`;
+    return `zenit-week-todo-order-${yyyy}-${mm}-${dd}`;
   }
 
   function loadTodoOrder() {
