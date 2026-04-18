@@ -2439,6 +2439,8 @@ let panStartX = 0;
 let panStartY = 0;
 let panStartPanX = 0;
 let panStartPanY = 0;
+const activePointers = new Map(); // pointerId → {x, y} — for pinch-to-zoom
+let pinchLastDist = null;
 
 let contextTarget = null;  // node id
 let editState = null;      // { nodeId, isNew, originalLabel }
@@ -4237,7 +4239,7 @@ inlineInput.addEventListener('keydown', (e) => {
 inlineInput.addEventListener('input', resizeInlineInput);
 inlineInput.addEventListener('blur', () => { if (editState) commitEdit(); });
 // Prevent clicks inside input from bubbling to canvas
-inlineInput.addEventListener('mousedown', (e) => e.stopPropagation());
+inlineInput.addEventListener('pointerdown', (e) => e.stopPropagation());
 inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 
 // ─── Surgical UI Updates ──────────────────────────────────────────────────────
@@ -4683,7 +4685,7 @@ function attachNodeListeners() {
 
     // Counter buttons
     g.querySelectorAll('.counter-btn').forEach(btn => {
-      btn.addEventListener('mousedown', (e) => {
+      btn.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         const nid = btn.getAttribute('data-id');
         const dir = btn.classList.contains('plus') ? 1 : -1;
@@ -4717,12 +4719,13 @@ function attachNodeListeners() {
       });
     });
 
-    g.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
+    g.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (e.target.closest('.add-btn')) return;
       if (e.target.closest('.add-branch-btn')) return;
       if (e.target.closest('.counter-btn')) return;
 
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       e.stopPropagation();
 
       if (id === 'center') {
@@ -4735,7 +4738,9 @@ function attachNodeListeners() {
         container.classList.add('panning');
         return;
       }
-      
+
+      if (e.pointerType === 'touch') return; // touch = navigate only, no drag
+
       const positions = computeLayout();
       const idsToDrag = [id, ...getDescendantIds(id)];
 
@@ -4743,7 +4748,7 @@ function attachNodeListeners() {
       idsToDrag.forEach(idToDrag => {
         const p = positions[idToDrag];
         if (p) initialPositions[idToDrag] = { x: p.x, y: p.y };
-        
+
         const el = document.querySelector(`.node-group[data-id="${idToDrag}"]`);
         if (el) {
           el.style.transition = 'none';
@@ -4938,9 +4943,9 @@ function updateSBFromEvent(e) {
 }
 
 let cpSbDragging = false;
-cpSbCanvas.addEventListener('mousedown', (e) => { cpSbDragging = true; updateSBFromEvent(e); e.preventDefault(); });
-document.addEventListener('mousemove',   (e) => { if (cpSbDragging) updateSBFromEvent(e); });
-document.addEventListener('mouseup',     ()  => { cpSbDragging = false; });
+cpSbCanvas.addEventListener('pointerdown', (e) => { cpSbDragging = true; cpSbCanvas.setPointerCapture(e.pointerId); updateSBFromEvent(e); e.preventDefault(); });
+cpSbCanvas.addEventListener('pointermove',   (e) => { if (cpSbDragging) updateSBFromEvent(e); });
+cpSbCanvas.addEventListener('pointerup',     ()  => { cpSbDragging = false; });
 
 cpHueSlider.addEventListener('input', () => {
   cpH = Number(cpHueSlider.value);
@@ -4990,7 +4995,7 @@ document.getElementById('cp-apply').addEventListener('click', () => {
 
 document.getElementById('cp-cancel').addEventListener('click', closeColorPicker);
 
-document.addEventListener('mousedown', (e) => {
+document.addEventListener('pointerdown', (e) => {
   if (colorPickerBranch && !cpSbDragging && !cpPanel.contains(e.target)) closeColorPicker();
 });
 
@@ -5041,7 +5046,7 @@ bpInput.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeBaselinePanel();
 });
 
-document.addEventListener('mousedown', (e) => {
+document.addEventListener('pointerdown', (e) => {
   if (bpPanel.classList.contains('visible') && !bpPanel.contains(e.target)) closeBaselinePanel();
 });
 
@@ -5229,12 +5234,23 @@ container.addEventListener('wheel', (e) => {
   zoomAt(cx, cy, factor);
 }, { passive: false });
 
-container.addEventListener('mousedown', (e) => {
+container.addEventListener('pointerdown', (e) => {
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  // Two-finger pinch: cancel any pan and record initial distance
+  if (activePointers.size >= 2) {
+    isPanning = false;
+    container.classList.remove('panning');
+    const pts = [...activePointers.values()];
+    pinchLastDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    return;
+  }
+
   // Commit edit if clicking outside the input
   if (editState && e.target !== inlineInput) commitEdit();
   // Only pan on background (not nodes)
   if (e.target.closest('.node-group')) return;
-  if (e.button !== 0) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
   if (editState) return;
   isPanning = true;
   panStartX = e.clientX;
@@ -5244,11 +5260,31 @@ container.addEventListener('mousedown', (e) => {
   container.classList.add('panning');
 });
 
-window.addEventListener('mousemove', (e) => {
+window.addEventListener('pointermove', (e) => {
+  // Update stored pointer position for pinch tracking
+  if (activePointers.has(e.pointerId)) {
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  }
+
+  // Pinch-to-zoom: two active pointers → compute distance delta
+  if (activePointers.size >= 2) {
+    const pts = [...activePointers.values()];
+    const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    if (pinchLastDist !== null && dist > 0) {
+      const factor = dist / pinchLastDist;
+      const rect = container.getBoundingClientRect();
+      const midX = (pts[0].x + pts[1].x) / 2 - rect.left;
+      const midY = (pts[0].y + pts[1].y) / 2 - rect.top;
+      zoomAt(midX, midY, factor);
+    }
+    pinchLastDist = dist;
+    return;
+  }
+
   if (dragState.activeNodeId) {
     const dx = (e.clientX - dragState.startX) / zoom;
     const dy = (e.clientY - dragState.startY) / zoom;
-    
+
     // Update nodes
     Object.keys(dragState.initialPositions).forEach(id => {
       const pos = dragState.initialPositions[id];
@@ -5296,7 +5332,13 @@ window.addEventListener('mousemove', (e) => {
   applyTransform();
 });
 
-window.addEventListener('mouseup', (e) => {
+function endPointer(e) {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) pinchLastDist = null;
+}
+
+window.addEventListener('pointerup', (e) => {
+  endPointer(e);
   if (dragState.activeNodeId) {
     Object.keys(dragState.initialPositions).forEach(id => {
       const el = document.querySelector(`.node-group[data-id="${id}"]`);
@@ -5324,6 +5366,13 @@ window.addEventListener('mouseup', (e) => {
       }
     }
   }
+});
+
+window.addEventListener('pointercancel', (e) => {
+  endPointer(e);
+  dragState.activeNodeId = null;
+  isPanning = false;
+  container.classList.remove('panning');
 });
 
 function handleNodeDrop(mouseX, mouseY) {
@@ -5466,45 +5515,30 @@ function zoomFromClientX(clientX) {
   zoomAt(w / 2, h / 2, newZoom / zoom);
 }
 
-let zoomDragging = false;
-
-zoomTrack.addEventListener('mousedown', (e) => {
+zoomTrack.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
-  zoomDragging = true;
+  zoomTrack.setPointerCapture(e.pointerId);
   zoomTrack.classList.add('dragging');
   zoomFromClientX(e.clientX);
 });
 
-document.addEventListener('mousemove', (e) => {
-  if (!zoomDragging) return;
+zoomTrack.addEventListener('pointermove', (e) => {
+  if (!zoomTrack.classList.contains('dragging')) return;
   zoomFromClientX(e.clientX);
 });
 
-document.addEventListener('mouseup', () => {
-  if (!zoomDragging) return;
-  zoomDragging = false;
+zoomTrack.addEventListener('pointerup', () => {
   zoomTrack.classList.remove('dragging');
 });
 
-zoomTrack.addEventListener('touchstart', (e) => {
-  e.stopPropagation();
-  zoomTrack.classList.add('dragging');
-  zoomFromClientX(e.touches[0].clientX);
-}, { passive: true });
-
-zoomTrack.addEventListener('touchmove', (e) => {
-  e.preventDefault();
-  zoomFromClientX(e.touches[0].clientX);
-}, { passive: false });
-
-zoomTrack.addEventListener('touchend', () => {
+zoomTrack.addEventListener('pointercancel', () => {
   zoomTrack.classList.remove('dragging');
 });
 
 document.getElementById('zoom-label').addEventListener('click', resetView);
 
 // ─── View Level Bar ────────────────────────────────────────────────────────────
-document.getElementById('view-level-bar').addEventListener('mousedown', e => e.stopPropagation());
+document.getElementById('view-level-bar').addEventListener('pointerdown', e => e.stopPropagation());
 
 document.querySelectorAll('.view-level-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -6147,7 +6181,7 @@ window.addEventListener('load', () => {
 
   // Custom tooltip logic
   const tooltipEl = document.getElementById('custom-tooltip');
-  document.body.addEventListener('mousemove', (e) => {
+  document.body.addEventListener('pointermove', (e) => {
     const trigger = e.target.closest('.summary-trigger');
     if (trigger) {
       tooltipEl.textContent = trigger.getAttribute('data-tooltip');
