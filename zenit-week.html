@@ -948,6 +948,85 @@
   #cp-apply { background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end)); color: var(--text-button); border: 1.5px solid var(--border-subtle); box-shadow: 0 2px 6px var(--shadow-sm); }
   #cp-apply:hover { background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end)); border-color: var(--border-hover); }
 
+  #baseline-panel {
+    display: none;
+    position: fixed;
+    z-index: 1001;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
+    padding: 16px;
+    width: 192px;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    animation: fadeIn 0.1s ease-out;
+  }
+  #baseline-panel.visible { display: flex; }
+
+  #bp-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-placeholder);
+    align-self: flex-start;
+  }
+
+  #bp-input-row {
+    display: flex;
+    align-items: center;
+    background: var(--bg-input);
+    border-radius: 8px;
+    padding: 7px 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  #bp-input {
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    font-weight: 700;
+    width: 100%;
+    outline: none;
+    color: var(--text-primary);
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+  #bp-input::-webkit-outer-spin-button,
+  #bp-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  #bp-hint {
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    line-height: 1.4;
+    align-self: stretch;
+  }
+
+  #bp-buttons {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+
+  #bp-cancel, #bp-apply {
+    flex: 1;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #bp-cancel { background: var(--bg-muted); color: var(--text-faint); }
+  #bp-cancel:hover { background: var(--border-default); }
+  #bp-apply { background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end)); color: var(--text-button); border: 1.5px solid var(--border-subtle); box-shadow: 0 2px 6px var(--shadow-sm); }
+  #bp-apply:hover { background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end)); border-color: var(--border-hover); }
+
   /* Today Panel */
   #todo-overlay {
     position: fixed;
@@ -1808,6 +1887,7 @@
 <div id="context-menu">
   <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.transferUnfinished">Transfer Unfinished</span></div>
   <div class="ctx-item" id="ctx-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> <span data-i18n="menu.transferReusable">Transfer Reusable</span></div>
+  <div class="ctx-item" id="ctx-set-baseline"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg> <span data-i18n="menu.setBaseline">Set Effort Baseline</span></div>
   <div class="ctx-separator" id="ctx-sep-transfer"></div>
   <div class="ctx-item danger" id="ctx-clear-week"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.clearWeek">Clear the Week</span></div>
   <div class="ctx-item" id="ctx-done"><svg class="icon" aria-hidden="true"><use href="#icon-circle-check"/></svg> <span data-i18n="menu.done">Done</span></div>
@@ -1831,6 +1911,18 @@
 
 <textarea id="inline-input" autocomplete="off" spellcheck="false"></textarea>
 <span id="inline-sizer"></span>
+
+<div id="baseline-panel">
+  <div id="bp-title" data-i18n="baseline.title">Activity Baseline</div>
+  <div id="bp-input-row">
+    <input type="number" id="bp-input" min="1" max="999" step="1" value="105">
+  </div>
+  <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
+  <div id="bp-buttons">
+    <button id="bp-cancel" data-i18n="baseline.cancel">Cancel</button>
+    <button id="bp-apply" data-i18n="baseline.apply">Apply</button>
+  </div>
+</div>
 
 <div id="color-picker-panel">
   <div id="cp-title" data-i18n="colorPicker.title">Branch color</div>
@@ -2434,7 +2526,12 @@ const TRANSLATIONS = {
     'menu.rename':                'Rename',
     'menu.addActivity':           'Add Activity',
     'menu.changeColor':           'Change color',
+    'menu.setBaseline':           'Set Effort Baseline',
     'menu.delete':                'Delete',
+    'baseline.title':             'Activity Baseline',
+    'baseline.hint':              'Activities per week considered a safe load.',
+    'baseline.cancel':            'Cancel',
+    'baseline.apply':             'Apply',
     'colorPicker.title':          'Branch color',
     'colorPicker.cancel':         'Cancel',
     'colorPicker.apply':          'Apply',
@@ -2521,7 +2618,12 @@ const TRANSLATIONS = {
     'menu.rename':                'Přejmenovat',
     'menu.addActivity':           'Přidat aktivitu',
     'menu.changeColor':           'Změnit barvu',
+    'menu.setBaseline':           'Nastavit základní zátěž',
     'menu.delete':                'Smazat',
+    'baseline.title':             'Základní zátěž',
+    'baseline.hint':              'Aktivity za týden považované za bezpečnou zátěž.',
+    'baseline.cancel':            'Zrušit',
+    'baseline.apply':             'Použít',
     'colorPicker.title':          'Barva větve',
     'colorPicker.cancel':         'Zrušit',
     'colorPicker.apply':          'Použít',
@@ -2751,7 +2853,9 @@ function loadWeek(wk) {
             );
           }
         });
-        return { nodes: prevBranches.map(b => ({ ...b, children: [] })) };
+        const newWeek = { nodes: prevBranches.map(b => ({ ...b, children: [] })) };
+        if (prevData.baseline) newWeek.baseline = prevData.baseline;
+        return newWeek;
       }
     } catch(e) { /* fall through to plain defaults */ }
   }
@@ -4278,13 +4382,15 @@ function updateSummary() {
   const mainEl = document.getElementById('summary-main');
   if (mainEl) {
     const isDarkSummary = document.documentElement.dataset.theme === 'dark';
+    const wBaseline = weekData.baseline || 105;
+    const wOverload = Math.floor(wBaseline * 1.33);
     let totalColor = isDarkSummary ? '#2ecc71' : '#28a745';
     let emoji = '😀';
     let tooltip = t('summary.tooltipNormal');
-    if (global.total > 140) {
+    if (global.total > wOverload) {
       totalColor = isDarkSummary ? '#ff6b5b' : '#d93025'; emoji = '🤯';
       tooltip = t('summary.tooltipOverload');
-    } else if (global.total >= 106) {
+    } else if (global.total >= wBaseline + 1) {
       totalColor = isDarkSummary ? '#f5a623' : '#f29900'; emoji = '😅';
       tooltip = t('summary.tooltipStretch');
     }
@@ -4698,6 +4804,7 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
   document.getElementById('ctx-transfer-reusable').style.display  = isCenter ? '' : 'none';
   document.getElementById('ctx-clear-week').style.display         = isCenter ? '' : 'none';
+  document.getElementById('ctx-set-baseline').style.display       = isCenter ? '' : 'none';
   document.getElementById('ctx-sep-transfer').style.display       = isCenter ? '' : 'none';
 
   // Show/hide items depending on node type and status
@@ -4896,6 +5003,51 @@ document.getElementById('ctx-change-color').addEventListener('click', () => {
   const rect = ctxMenu.getBoundingClientRect();
   hideContextMenu();
   openColorPicker(branch, rect.right + 4, rect.top);
+});
+
+// ─── Baseline panel ───────────────────────────────────────────────────────────
+const bpPanel = document.getElementById('baseline-panel');
+const bpInput = document.getElementById('bp-input');
+
+function openBaselinePanel(x, y) {
+  bpInput.value = weekData.baseline || 105;
+  bpPanel.classList.add('visible');
+  const pw = 208, ph = 180;
+  bpPanel.style.left = Math.min(x, window.innerWidth  - pw - 8) + 'px';
+  bpPanel.style.top  = Math.min(y, window.innerHeight - ph - 8) + 'px';
+  setTimeout(() => { bpInput.focus(); bpInput.select(); }, 30);
+}
+
+function closeBaselinePanel() {
+  bpPanel.classList.remove('visible');
+}
+
+document.getElementById('bp-apply').addEventListener('click', () => {
+  const val = parseInt(bpInput.value, 10);
+  if (!isNaN(val) && val >= 1) {
+    takeSnapshot();
+    weekData.baseline = val;
+    saveWeek(currentWeekKey, weekData);
+    updateSummary();
+  }
+  closeBaselinePanel();
+});
+
+document.getElementById('bp-cancel').addEventListener('click', closeBaselinePanel);
+
+bpInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('bp-apply').click();
+  if (e.key === 'Escape') closeBaselinePanel();
+});
+
+document.addEventListener('mousedown', (e) => {
+  if (bpPanel.classList.contains('visible') && !bpPanel.contains(e.target)) closeBaselinePanel();
+});
+
+document.getElementById('ctx-set-baseline').addEventListener('click', () => {
+  const rect = ctxMenu.getBoundingClientRect();
+  hideContextMenu();
+  openBaselinePanel(rect.right + 4, rect.top);
 });
 
 document.getElementById('ctx-transfer-unfinished').addEventListener('click', () => {
