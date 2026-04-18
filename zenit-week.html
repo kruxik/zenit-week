@@ -5526,6 +5526,7 @@ window.addEventListener('pointerup', (e) => {
 
 window.addEventListener('pointercancel', (e) => {
   endPointer(e);
+  touchTapId = null;
   dragState.activeNodeId = null;
   isPanning = false;
   container.classList.remove('panning');
