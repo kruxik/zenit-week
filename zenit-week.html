@@ -295,18 +295,25 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  html {
+    overflow: hidden;
+    height: 100%;
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg-page);
     color: var(--text-primary);
     overflow: hidden;
     height: 100vh;
+    height: 100dvh;
   }
 
   #app {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
   }
 
   #toolbar {
@@ -542,6 +549,7 @@
     overflow: hidden;
     position: relative;
     cursor: grab;
+    touch-action: none;
     background-color: var(--bg-canvas);
     background-image:
       radial-gradient(var(--grid-dot-strong) 1.2px, transparent 1.2px),
