@@ -649,6 +649,7 @@
 
   /* Google Drive Sync UI */
   #sync-container {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -709,6 +710,98 @@
   @keyframes sync-pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.35; }
+  }
+
+  #sync-avatar-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+    background: transparent;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: none;
+  }
+
+  #sync-avatar-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.28);
+  }
+
+  #sync-avatar-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+  }
+
+  #sync-avatar-initials {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.5px;
+  }
+
+  #sync-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--settings-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
+    padding: 12px 14px;
+    z-index: 1001;
+    min-width: 220px;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    animation: fadeIn 0.12s ease-out;
+  }
+
+  #sync-dropdown.visible { display: flex; }
+
+  #sync-dropdown-email {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    word-break: break-all;
+  }
+
+  #sync-dropdown-last-sync {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  #sync-dropdown-signout {
+    margin-top: 2px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  #sync-dropdown-signout:hover {
+    background: var(--bg-surface-subtle);
+    border-color: var(--border-hover);
   }
 
   /* Settings & Toolbar Right */
@@ -2002,7 +2095,18 @@
           </svg>
           <span id="sync-btn-label">Sign in</span>
         </button>
+        <button id="sync-avatar-btn" aria-label="Sync options" aria-haspopup="true">
+          <img id="sync-avatar-img" src="" alt="" />
+          <div id="sync-avatar-initials"></div>
+        </button>
         <div id="sync-dot" data-status="disconnected" title="Not connected to Google Drive"></div>
+        <div id="sync-dropdown" role="menu">
+          <div id="sync-dropdown-email"></div>
+          <div class="settings-separator"></div>
+          <div id="sync-dropdown-last-sync">Last sync: —</div>
+          <div class="settings-separator"></div>
+          <button id="sync-dropdown-signout">Sign out of Google Drive</button>
+        </div>
       </div>
       <div id="settings-container">
         <button class="nav-btn" id="settings-btn" data-i18n-title="toolbar.settings" title="Settings">
@@ -2717,6 +2821,87 @@ let tokenRenewalTimer = null;
 let _gapiInitialized = false;   // true after first loadGapiAndSync completes setup
 let _silentAttempt = false;     // true when requestAccessToken was called silently
 let _isFirstConnection = false; // true when this browser has never synced with Drive before
+let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
+let googleUserEmail = '';
+let googleUserPhoto = '';
+let googleUserInitials = '';
+let googleUserInitialsColor = '';
+
+const AVATAR_PALETTE = ['#4285F4','#EA4335','#FBBC04','#34A853','#9C27B0','#FF5722','#00BCD4','#795548'];
+
+function hashColor(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
+}
+
+function getInitials(name) {
+  const parts = name.trim().split(/\s+/);
+  return parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase();
+}
+
+function formatSyncTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function updateDropdownSyncTime() {
+  const el = document.getElementById('sync-dropdown-last-sync');
+  if (el) el.textContent = `Last sync: ${formatSyncTime(lastSyncedAt)}`;
+}
+
+function showSignedInAvatar(user) {
+  googleUserEmail = user?.emailAddress || '';
+  googleUserPhoto = user?.photoLink   || '';
+  googleUserInitials = getInitials(user?.displayName || googleUserEmail || '?');
+  googleUserInitialsColor = hashColor(googleUserEmail || googleUserInitials);
+
+  const btn       = document.getElementById('sync-btn');
+  const avatarBtn = document.getElementById('sync-avatar-btn');
+  const img       = document.getElementById('sync-avatar-img');
+  const initials  = document.getElementById('sync-avatar-initials');
+  const emailEl   = document.getElementById('sync-dropdown-email');
+
+  if (btn) btn.style.display = 'none';
+
+  if (googleUserPhoto) {
+    img.src = googleUserPhoto;
+    img.style.display = 'block';
+    initials.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    initials.textContent = googleUserInitials;
+    initials.style.background = googleUserInitialsColor;
+    initials.style.display = 'flex';
+  }
+
+  if (emailEl) emailEl.textContent = googleUserEmail;
+  if (avatarBtn) avatarBtn.style.display = 'flex';
+  updateDropdownSyncTime();
+}
+
+function showSignedOutButton(label = 'Sign in') {
+  const btn       = document.getElementById('sync-btn');
+  const avatarBtn = document.getElementById('sync-avatar-btn');
+  const dropdown  = document.getElementById('sync-dropdown');
+
+  if (dropdown) dropdown.classList.remove('visible');
+  if (avatarBtn) avatarBtn.style.display = 'none';
+  if (btn) { btn.style.display = ''; }
+  const labelEl = document.getElementById('sync-btn-label');
+  if (labelEl) labelEl.textContent = label;
+
+  googleUserEmail = '';
+  googleUserPhoto = '';
+  googleUserInitials = '';
+  googleUserInitialsColor = '';
+  lastSyncedAt = null;
+}
 
 // Called by GIS library when it finishes loading (async)
 window.onGoogleLibraryLoad = function() { initGoogleAuth(); };
@@ -2754,7 +2939,6 @@ function handleTokenResponse(tokenResponse) {
     googleTokenClient.requestAccessToken({ prompt: 'none' });
   }, 55 * 60 * 1000);
 
-  document.getElementById('sync-btn-label').textContent = 'Sign out';
   setSyncStatus('connected', 'Connected to Google Drive');
 
   if (!_gapiInitialized) {
@@ -2774,7 +2958,7 @@ function handleTokenError(error) {
     if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
     googleAccessToken = null;
     _gapiInitialized = false;
-    document.getElementById('sync-btn-label').textContent = 'Reconnect';
+    showSignedOutButton('Reconnect');
     setSyncStatus('error', 'Google session expired — click to reconnect');
     return;
   }
@@ -2807,7 +2991,7 @@ function signOut() {
   lastSyncedHash.clear();
   etagCache.clear();
   localStorage.removeItem('zenit-week-had-google-session');
-  document.getElementById('sync-btn-label').textContent = 'Sign in';
+  showSignedOutButton('Sign in');
   setSyncStatus('disconnected');
   if (token && window.google?.accounts?.oauth2) {
     google.accounts.oauth2.revoke(token, () => {});
@@ -2840,18 +3024,14 @@ function loadGapiAndSync() {
       await gapi.client.init({});
       gapi.client.setToken({ access_token: googleAccessToken });
 
-      // Fetch user display name via Drive about (works with drive.appdata scope)
+      // Fetch user info via Drive about (works with drive.appdata scope)
       const aboutResp = await gapi.client.request({
         path: 'https://www.googleapis.com/drive/v3/about',
-        params: { fields: 'user(displayName,emailAddress)' },
+        params: { fields: 'user(displayName,emailAddress,photoLink)' },
       });
       const user = aboutResp.result?.user;
-      const label = user?.displayName || user?.emailAddress || null;
-      if (label) {
-        document.getElementById('sync-btn-label').textContent = label;
-      }
-
-      setSyncStatus('connected', `Synced with Google Drive${label ? ' (' + label + ')' : ''}`);
+      showSignedInAvatar(user);
+      setSyncStatus('connected', 'Synced with Google Drive');
       await initDriveSync(); // TASK-09 — list all files + 3-phase seed
     } catch (err) {
       console.error('[Drive] GAPI init error:', err);
@@ -2941,6 +3121,8 @@ async function syncWeekFromDrive(wKey) {
 
       // Update hash so next syncWeekToDrive skips a redundant upload
       lastSyncedHash.set(wKey, fnv1a32(merged));
+      lastSyncedAt = Date.now();
+      updateDropdownSyncTime();
       return;
 
     } catch (err) {
@@ -3184,6 +3366,8 @@ async function syncWeekToDrive(wKey) {
       }
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       lastSyncedHash.set(wKey, hash);
+      lastSyncedAt = Date.now();
+      updateDropdownSyncTime();
       setSyncStatus('connected', 'Synced with Google Drive');
       return;
     } catch (err) {
@@ -6406,18 +6590,8 @@ document.getElementById('today-btn').addEventListener('click', () => {
   loadAndRender(todayWeekKey());
 });
 
-// ─── Google Drive Sync Button ─────────────────────────────────────────────────
+// ─── Google Drive Sync Button (signed-out state only) ────────────────────────
 document.getElementById('sync-btn').addEventListener('click', () => {
-  if (googleAccessToken) {
-    showAppConfirm({
-      title: 'Sign out of Google Drive?',
-      body: 'Your data stays saved locally. You can sign back in at any time.',
-      okLabel: 'Sign out',
-      danger: true,
-      onConfirm: signOut,
-    });
-    return;
-  }
   if (!googleTokenClient) {
     const label = document.getElementById('sync-btn-label');
     const prev = label.textContent;
@@ -6427,6 +6601,30 @@ document.getElementById('sync-btn').addEventListener('click', () => {
   }
   googleTokenClient.requestAccessToken({ prompt: 'consent' });
 });
+
+// ─── Avatar button + sync dropdown ───────────────────────────────────────────
+(function () {
+  const avatarBtn  = document.getElementById('sync-avatar-btn');
+  const dropdown   = document.getElementById('sync-dropdown');
+  const signoutBtn = document.getElementById('sync-dropdown-signout');
+
+  avatarBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('visible');
+    if (dropdown.classList.contains('visible')) updateDropdownSyncTime();
+  });
+
+  signoutBtn.addEventListener('click', () => {
+    dropdown.classList.remove('visible');
+    signOut();
+  });
+
+  // Close dropdown on outside click or Escape
+  document.addEventListener('click', () => dropdown.classList.remove('visible'));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') dropdown.classList.remove('visible');
+  });
+})();
 
 // Flush pending sync when tab hides; pull on tab restore (TASK-10 / TASK-11)
 document.addEventListener('visibilitychange', () => {
