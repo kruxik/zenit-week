@@ -2812,7 +2812,7 @@ function loadGapiAndSync() {
       }
 
       setSyncStatus('connected', `Synced with Google Drive${label ? ' (' + label + ')' : ''}`);
-      await syncWeekFromDrive(currentWeekKey); // TASK-11 — pulls current week
+      await initDriveSync(); // TASK-09 — list all files + 3-phase seed
     } catch (err) {
       console.error('[Drive] GAPI init error:', err);
       setSyncStatus('error', 'Google Drive init failed — try signing in again');
@@ -2823,6 +2823,197 @@ function loadGapiAndSync() {
 // TASK-11 stub — full implementation added in TASK-11
 async function syncWeekFromDrive(wKey) { // eslint-disable-line no-unused-vars
   // Intentionally empty until TASK-11 is implemented
+}
+
+// ─── TASK-09: Find or create per-week Drive file ──────────────────────────────
+
+// Exponential backoff with jitter; retries on 429/503, up to 5 attempts
+async function driveApiRequest(config) {
+  const MAX_RETRIES = 5;
+  let delay = 1000;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await gapi.client.request(config);
+    } catch (err) {
+      const status = err?.status ?? err?.result?.error?.code;
+      if ((status === 429 || status === 503) && attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+        delay *= 2;
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+// Returns Drive file ID for a week key, creating the file if absent
+async function getDriveFileId(wKey) {
+  if (driveFileIdCache.has(wKey)) return driveFileIdCache.get(wKey);
+
+  const filename = `zenit-week-${wKey}.json`;
+
+  // Search for existing file in appDataFolder
+  const searchResp = await driveApiRequest({
+    path: 'https://www.googleapis.com/drive/v3/files',
+    method: 'GET',
+    params: {
+      spaces: 'appDataFolder',
+      q: `name = '${filename}'`,
+      fields: 'files(id)',
+    },
+  });
+
+  const files = searchResp.result?.files ?? [];
+  if (files.length > 0) {
+    driveFileIdCache.set(wKey, files[0].id);
+    return files[0].id;
+  }
+
+  // File not found — create empty placeholder
+  const createResp = await driveApiRequest({
+    path: 'https://www.googleapis.com/drive/v3/files',
+    method: 'POST',
+    params: { fields: 'id' },
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: filename, parents: ['appDataFolder'] }),
+  });
+
+  const fileId = createResp.result?.id;
+  driveFileIdCache.set(wKey, fileId);
+  return fileId;
+}
+
+// Lists all zenit-week-*.json files in appDataFolder, populates driveFileIdCache
+async function listAllDriveWeekFiles() {
+  const found = [];
+  let pageToken = null;
+  do {
+    const params = {
+      spaces: 'appDataFolder',
+      q: "name contains 'zenit-week-' and name contains '.json'",
+      fields: 'nextPageToken,files(id,name)',
+      pageSize: 100,
+    };
+    if (pageToken) params.pageToken = pageToken;
+    const resp = await driveApiRequest({
+      path: 'https://www.googleapis.com/drive/v3/files',
+      method: 'GET',
+      params,
+    });
+    for (const f of resp.result?.files ?? []) {
+      const m = f.name.match(/^zenit-week-(\d{4}-\d{2})\.json$/);
+      if (m) { driveFileIdCache.set(m[1], f.id); found.push(m[1]); }
+    }
+    pageToken = resp.result?.nextPageToken ?? null;
+  } while (pageToken);
+  return found;
+}
+
+// 3-phase seed after first sign-in:
+//   Phase 1 — current ±1 week, sequential (blocks spinner)
+//   Phase 2 — ±12 weeks, up to 5 concurrent background requests
+//   Phase 3 — remaining keys already in cache, pulled lazily on navigation
+async function seedLocalStorageFromDrive(driveWeekKeys) {
+  const driveSet = new Set(driveWeekKeys);
+  const todayKey = todayWeekKey();
+
+  // Phase 1
+  const immediateKeys = [todayKey, offsetWeek(todayKey, -1), offsetWeek(todayKey, +1)]
+    .filter(k => driveSet.has(k));
+  for (const k of immediateKeys) await syncWeekFromDrive(k);
+
+  // Phase 2
+  const immediateSet = new Set(immediateKeys);
+  const batchKeys = [];
+  for (let i = -12; i <= 12; i++) {
+    const k = offsetWeek(todayKey, i);
+    if (!immediateSet.has(k) && driveSet.has(k)) batchKeys.push(k);
+  }
+  const CONCURRENCY = 5;
+  for (let i = 0; i < batchKeys.length; i += CONCURRENCY) {
+    await Promise.all(batchKeys.slice(i, i + CONCURRENCY).map(k => syncWeekFromDrive(k)));
+  }
+
+  // Phase 3 — lazy; all remaining keys already in driveFileIdCache
+  const batchSet = new Set(batchKeys);
+  const lazyCount = driveWeekKeys.filter(k => !immediateSet.has(k) && !batchSet.has(k)).length;
+  if (lazyCount > 0) console.log(`[Drive] ${lazyCount} older week(s) available lazily`);
+}
+
+// Entry point called by loadGapiAndSync after GAPI is initialized
+async function initDriveSync() {
+  try {
+    const driveWeekKeys = await listAllDriveWeekFiles();
+    await seedLocalStorageFromDrive(driveWeekKeys);
+  } catch (err) {
+    console.error('[Drive] initDriveSync error:', err);
+    setSyncStatus('error', 'Drive init failed — check your connection');
+  }
+}
+
+// ─── TASK-10: Save current week to Drive ─────────────────────────────────────
+
+function fnv1a32(str) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+  }
+  return hash;
+}
+
+async function syncWeekToDrive(wKey) {
+  if (!googleAccessToken) return;
+  const json = localStorage.getItem(storageKey(wKey));
+  if (!json) return;
+
+  const hash = fnv1a32(json);
+  if (lastSyncedHash.get(wKey) === hash) return; // no change since last upload
+
+  setSyncStatus('syncing', 'Syncing with Google Drive…');
+  const MAX_RETRIES = 5;
+  let delay = 1000;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const fileId = await getDriveFileId(wKey);
+      const resp = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${googleAccessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: json,
+        }
+      );
+      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+        delay *= 2;
+        continue;
+      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      lastSyncedHash.set(wKey, hash);
+      setSyncStatus('connected', 'Synced with Google Drive');
+      return;
+    } catch (err) {
+      if (attempt >= MAX_RETRIES) {
+        console.error('[Drive] syncWeekToDrive error:', err);
+        setSyncStatus('error', 'Sync failed — changes saved locally');
+        return;
+      }
+    }
+  }
+}
+
+// Resets the 30-second debounce timer; called from saveWeek()
+function scheduleDriveSync(wKey) {
+  if (!googleAccessToken) return;
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
+    syncDebounceTimer = null;
+    syncWeekToDrive(wKey);
+  }, 30000);
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -3271,11 +3462,13 @@ function loadWeek(wk) {
   return defaultWeekData();
 }
 function saveWeek(wk, data) {
+  data.savedAt = Date.now(); // TASK-14: timestamp for conflict resolution
   try {
     localStorage.setItem(storageKey(wk), JSON.stringify(data));
   } catch(e) {
     console.error('[zenit-week] Failed to save week data — localStorage may be full:', e);
   }
+  scheduleDriveSync(wk); // TASK-10: debounced upload
 }
 
 function exportAllData() {
@@ -6043,6 +6236,23 @@ document.getElementById('sync-btn').addEventListener('click', () => {
     return;
   }
   googleTokenClient.requestAccessToken({ prompt: 'consent' });
+});
+
+// Flush pending sync when tab hides; pull on tab restore (TASK-10 / TASK-11)
+document.addEventListener('visibilitychange', () => {
+  if (!googleAccessToken) return;
+  if (document.visibilityState === 'hidden') {
+    if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
+    syncWeekToDrive(currentWeekKey);
+  } else {
+    syncWeekFromDrive(currentWeekKey); // pull before next edit
+  }
+});
+
+// Secondary best-effort flush on tab close (desktop only; not relied upon as sole mechanism)
+window.addEventListener('beforeunload', () => {
+  if (!googleAccessToken) return;
+  syncWeekToDrive(currentWeekKey);
 });
 
 // ─── Generic Confirm Dialog ───────────────────────────────────────────────────
