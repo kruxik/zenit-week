@@ -5887,6 +5887,19 @@ document.getElementById('today-btn').addEventListener('click', () => {
   loadAndRender(todayWeekKey());
 });
 
+// ─── Google Drive Sync Button ─────────────────────────────────────────────────
+document.getElementById('sync-btn').addEventListener('click', () => {
+  if (googleAccessToken) {
+    if (confirm('Sign out of Google Drive sync?')) signOut();
+    return;
+  }
+  if (!googleTokenClient) {
+    alert('Google sign-in is loading — please try again in a moment.');
+    return;
+  }
+  googleTokenClient.requestAccessToken({ prompt: 'consent' });
+});
+
 // ─── Settings Dropdown ────────────────────────────────────────────────────────
 const settingsBtn = document.getElementById('settings-btn');
 const settingsDropdown = document.getElementById('settings-dropdown');
