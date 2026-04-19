@@ -2,7 +2,7 @@
 
 **Author:** Petr Burian  
 **Goal:** Allow users to sign in with Google and sync their Zenit Week data to their own Google Drive — no backend required.  
-**Architecture:** 100% client-side. The app stores all week data in a single JSON file named `gravitas-map-data.json` inside the user's Google Drive `appDataFolder` — a hidden, app-specific folder that is not visible in the user's Drive UI.
+**Architecture:** 100% client-side. The app stores all week data in a single JSON file named `zenit-week-data.json` inside the user's Google Drive `appDataFolder` — a hidden, app-specific folder that is not visible in the user's Drive UI.
 
 ---
 
@@ -13,10 +13,10 @@
 **What:** Register the app in Google Cloud Console to obtain an OAuth 2.0 Client ID. This is a one-time manual step done by the developer, not by an AI agent.
 
 **Steps:**
-1. Go to https://console.cloud.google.com and create a new project named `gravitas-map`.
+1. Go to https://console.cloud.google.com and create a new project named `zenit-week`.
 2. Enable the **Google Drive API** for the project.
 3. Create an **OAuth 2.0 Client ID** credential of type "Web application".
-4. Add the following as Authorized JavaScript origins: `http://localhost` (for local development) and the production domain once known (e.g. `https://gravitasmap.app`).
+4. Add the following as Authorized JavaScript origins: `http://localhost` (for local development) and `https://zenitweek.com` (production on Vercel).
 5. Copy the generated Client ID string (format: `xxxx.apps.googleusercontent.com`).
 6. Store the Client ID as a named constant near the top of the application's JavaScript, alongside other global configuration values.
 
@@ -76,23 +76,36 @@ The token client's callback should handle both success (proceed to load data) an
 
 ---
 
-### TASK-09 — Find or create the Drive data file
+### TASK-09 — Find or create a per-week Drive file
 
-**What:** Implement a helper that returns the Drive file ID for `gravitas-map-data.json` stored in `appDataFolder`. On first run the file won't exist yet, so the helper must first search for it and, if not found, create it. The file ID should be cached in memory so subsequent saves do not repeat the search. Use the Google Drive API v3.
+**What:** Each week is stored as a separate file in `appDataFolder`, named after its localStorage key (e.g. `zenit-week-2026-14.json`). Implement a helper `getDriveFileId(weekKey)` that returns the Drive file ID for a given week. On first access the file won't exist yet — search for it and, if not found, create it with empty content. Cache file IDs in a `Map<weekKey, fileId>` in memory so subsequent reads/writes skip the search. Use the Google Drive API v3.
 
----
-
-### TASK-10 — Save data to Drive
-
-**What:** Implement a save-to-Drive function that collects all Zenit Week entries from `localStorage` (identifiable by their `week-planner-` key prefix) and uploads them as a single JSON object to the Drive file. The upload should happen asynchronously and non-blocking — it should not interrupt the user's interaction. Set the sync status to "syncing" during upload and back to "connected" on success. On error, set the error state.
-
-Integrate this into the existing `saveWeek()` function: after writing to `localStorage`, trigger a Drive sync if the user is connected.
+**On first sign-in on a new device:** list all files in `appDataFolder` matching the `zenit-week-*.json` pattern and populate the cache map in one batch, then download them all to seed localStorage (see TASK-11).
 
 ---
 
-### TASK-11 — Load data from Drive
+### TASK-10 — Save current week to Drive
 
-**What:** Implement a load-from-Drive function that downloads the JSON file from Drive and merges its contents into `localStorage`. This should be called immediately after sign-in to bring the local state up to date. For each week key found in the Drive data, apply the conflict resolution logic from TASK-13. After merging, re-render the current week view to reflect any newly loaded data. Handle errors gracefully by setting the error state.
+**What:** Implement a `syncWeekToDrive(weekKey)` function that uploads a single week's data to its corresponding Drive file. The upload is asynchronous and non-blocking. Set sync status to "syncing" during upload, "connected" on success, "error" on failure.
+
+**Change detection — skip unnecessary uploads:** Before uploading, compute a hash of the current week's JSON string (a simple `JSON.stringify` checksum is sufficient — no crypto needed, e.g. sum char codes or use a 32-bit FNV hash). Compare to `lastSyncedHash` stored in a `Map<weekKey, hash>` in memory. If identical, skip the upload — data hasn't changed since last sync. Update `lastSyncedHash` after a successful upload.
+
+**Trigger strategy:**
+- Reset a 30-second debounce timer on each `saveWeek()` call. When it fires, run the hash check and upload if dirty. Rapid edits collapse into a single API call.
+- Flush immediately (bypass debounce) on `visibilitychange → hidden` and `beforeunload`.
+- On `visibilitychange → visible`, pull before pushing — see TASK-11.
+
+---
+
+### TASK-11 — Load week data from Drive
+
+**What:** Implement a `syncWeekFromDrive(weekKey)` function that downloads a single week's Drive file and merges it into localStorage using the conflict resolution logic from TASK-13. After merging, re-render the current week view if the loaded week is the one currently displayed. Handle errors gracefully by setting the error state.
+
+**Change detection — skip unnecessary downloads:** Store the Drive file's `ETag` (returned in the API response headers) in a `Map<weekKey, etag>` in memory. On subsequent pulls, send `If-None-Match: <etag>` in the request. Drive returns `304 Not Modified` if nothing changed — skip the merge entirely, zero bytes transferred.
+
+**When to call:**
+- `visibilitychange → visible`: pull current week only.
+- Immediately after sign-in: pull current week, then in the background download all other week files found in `appDataFolder` (first-time device setup — see TASK-09).
 
 ---
 
@@ -116,13 +129,19 @@ Integrate this into the existing `saveWeek()` function: after writing to `localS
 
 ### TASK-15 — Silent session restore on app load
 
-**What:** Google access tokens expire after 1 hour. Implement silent token refresh so returning users are not shown a sign-in popup unless truly necessary. The approach: when a user signs in successfully, store a small flag in `localStorage` (e.g. `gravitas-had-google-session`) to indicate a previous session existed. On app load, if this flag is present, attempt a silent token request (no user-visible prompt). If the silent request succeeds, resume sync normally. If it fails (user revoked access, etc.), clear the flag and show the disconnected state. Remove the flag on explicit sign-out.
+**What:** Google access tokens expire after 1 hour, but GIS can renew them silently as long as the user is logged into Google in their browser (which is almost always true). The goal is seamless, long-lived sync — no visible re-login unless truly necessary.
+
+**Token renewal during active session:** After a successful sign-in, schedule a silent `requestAccessToken()` call every 55 minutes. If the user's Google session is still active, this completes without any popup and the new token replaces the old one transparently.
+
+**Session restore on app load:** Store a flag `zenit-week-had-google-session` in `localStorage` when the user signs in. On app load, if the flag is present, attempt a silent `requestAccessToken()` immediately. If it succeeds, resume sync normally. If it fails (user logged out of Google, revoked access), clear the flag and show a "Reconnect to Google Drive" prompt — do not show an automatic popup.
+
+Remove the flag and cancel the renewal timer on explicit sign-out.
 
 ---
 
 ### TASK-16 — Privacy notice
 
-**What:** Users should clearly understand where their data is stored. Add a tooltip to the sign-in button explaining that data is stored only in the user's own Google Drive and that Gravitas Map never sees or stores it. When the README is written, include a short "Privacy" section stating that sync uses `appDataFolder` (visible only to this app), there is no backend server, and data is transmitted only between the user's browser and their own Google account.
+**What:** Users should clearly understand where their data is stored. Add a tooltip to the sign-in button explaining that data is stored only in the user's own Google Drive and that Zenit Week never sees or stores it. When the README is written, include a short "Privacy" section stating that sync uses `appDataFolder` (visible only to this app), there is no backend server, and data is transmitted only between the user's browser and their own Google account.
 
 ---
 
@@ -133,7 +152,7 @@ Before shipping the sync feature, verify all of the following manually:
 - [ ] Clicking "Sign in" opens the Google OAuth popup and grants a token
 - [ ] After sign-in, the status dot turns green and the button shows the user's name
 - [ ] Saving a week triggers a sync; the dot briefly turns amber then back to green
-- [ ] The Drive file `gravitas-map-data.json` is created in `appDataFolder` with correct data
+- [ ] The Drive file `zenit-week-YYYY-WW.json` is created in `appDataFolder` with correct data for the current week
 - [ ] Opening the app on a second browser or device and signing in loads the same data
 - [ ] Editing on device A and saving, then refreshing device B shows device A's changes
 - [ ] Clicking the signed-in button and confirming sign-out resets the dot to grey
@@ -174,6 +193,11 @@ Before shipping the sync feature, verify all of the following manually:
 
 - **No backend required.** The app communicates directly with Google Drive API from the browser using the user's own OAuth token.
 - **`appDataFolder` scope** means the file is invisible to the user in Drive — it won't clutter their storage. Only this app can access it.
-- **Single file strategy:** All weeks are serialized into one JSON blob. This keeps API calls to 1 read + 1 write per sync, minimizing quota usage and complexity.
+- **Per-week file strategy:** Each week is a separate Drive file (`zenit-week-YYYY-WW.json`) in `appDataFolder`, matching the localStorage key structure. Normal use only touches the current week — 1 read + 1 write per sync session. First sign-in on a new device downloads all week files in one batch.
+- **Debounced writes + hash check:** Drive sync is not triggered on every `saveWeek()` — a 30-second debounce timer collapses rapid edits into a single upload. Before uploading, a hash of the JSON is compared to `lastSyncedHash` — if identical, upload is skipped entirely. Tab-hide and browser close flush immediately via `visibilitychange` and `beforeunload`.
+- **ETag-based pull:** Pulls send `If-None-Match` with the stored ETag. Drive returns `304 Not Modified` if nothing changed — zero bytes downloaded.
+- **Tab visibility sync:** Uses the Page Visibility API — pulls from Drive when the user returns to the tab (`visibilitychange → visible`), pushes immediately when they leave (`visibilitychange → hidden`) or close the browser (`beforeunload`). Provides cross-device consistency without polling.
+- **GIS token model:** Access tokens expire after 1 hour but renew silently every 55 minutes as long as the user is logged into Google in their browser. The reconnect prompt only appears when the Google session itself is gone (logged out, revoked access).
 - **Google Drive API free tier** allows effectively unlimited requests for a small open-source app.
+- **JSON export/import** is already implemented in the app as a fallback for users without Google accounts.
 - **iCloud / CloudKit JS** can be added later as TASK-18 using the same pattern, toggled via a "Sync provider" selector in settings.

@@ -28,11 +28,12 @@ The `todos/GOOGLE_DRIVE_SYNC_TODO.md` plan is solid architecture. The only gap i
 
 ## Not Doing (and Why)
 - **Backend/server** — unnecessary; the plan correctly avoids it
-- **Per-week Drive files** — single JSON blob is right; 1 read + 1 write per sync minimizes quota and complexity
+- **Single blob Drive file** — per-week files chosen instead; only current week is synced during normal use, matching the localStorage structure exactly
 - **CRDT conflict resolution** — last-write-wins is sufficient for personal planning data
+- **Per-operation Drive sync** — debounced (4s) + tab-hide flush is the right strategy; syncing every `saveWeek()` would hammer the API
 - **Dropbox/iCloud now** — already noted as TASK-18 future work
 
 ## Open Questions
-- Deploy to GitHub Pages or use localhost for development?
+- ~~Deploy to GitHub Pages or use localhost for development?~~ App is hosted on Vercel at https://zenitweek.com — use that as the OAuth origin.
 - Google account ready to create the Cloud project?
-- JSON export/import fallback for users without Google accounts?
+- ~~JSON export/import fallback for users without Google accounts?~~ Already implemented.
