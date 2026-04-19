@@ -88,3 +88,4 @@ Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` — all cu
   - **Daily log panel** — floating panel showing completed/ticked activities for today with timestamps.
   - **Summary panel** — expandable drawer showing per-branch done/total stats.
 - **Reusable tasks**: Activity nodes can be marked `reusable`; "Transfer Reusable" copies them (counters reset) to the next week.
+- **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern.

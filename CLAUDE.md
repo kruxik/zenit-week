@@ -94,3 +94,4 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - **Todo panel**: Sidebar listing all incomplete activity nodes across the week; accessible via toolbar button
 - **Daily log panel**: Floating panel showing completed/ticked activities for the day, with timestamps and branch color dots
 - **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week
+- **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern
