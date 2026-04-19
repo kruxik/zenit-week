@@ -2563,6 +2563,17 @@ const BRANCH_CONFIG = {};
 
 // ─── Google Drive Sync ────────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID = '458902252486-kh8ptv2b2b2q1echn99soes191smr56p.apps.googleusercontent.com';
+const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+
+// Sync status: 'disconnected' | 'connected' | 'syncing' | 'error'
+let syncStatus = 'disconnected';
+let googleTokenClient = null;   // GIS token client instance
+let googleAccessToken = null;   // current OAuth access token string
+let driveFileIdCache = new Map(); // weekKey → Drive file ID
+let lastSyncedHash = new Map();   // weekKey → FNV-1a hash of last uploaded JSON
+let etagCache = new Map();        // weekKey → ETag from last Drive pull
+let syncDebounceTimer = null;
+let tokenRenewalTimer = null;
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentWeekKey = '';   // 'YYYY-WW'
