@@ -1521,6 +1521,57 @@
     margin-top: 4px;
   }
 
+  /* Generic confirm dialog — reuses overlay/dialog/actions pattern */
+  #app-confirm-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: var(--overlay-sm);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  #app-confirm-overlay.visible {
+    display: flex;
+    opacity: 1;
+  }
+  #app-confirm-dialog {
+    background: var(--bg-surface);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px var(--shadow-xl);
+    padding: 24px;
+    width: 360px;
+    max-width: calc(100vw - 40px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transform: translateY(12px);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #app-confirm-overlay.visible #app-confirm-dialog {
+    transform: translateY(0);
+  }
+  #app-confirm-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  #app-confirm-body {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  #app-confirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
   #help-header {
     background: var(--bg-surface-subtle);
     padding: 20px 24px;
@@ -2149,6 +2200,17 @@
 </div>
 
 
+<div id="app-confirm-overlay">
+  <div id="app-confirm-dialog">
+    <div id="app-confirm-title"></div>
+    <div id="app-confirm-body"></div>
+    <div id="app-confirm-actions">
+      <button class="reset-btn" id="app-confirm-cancel">Cancel</button>
+      <button class="reset-btn" id="app-confirm-ok">OK</button>
+    </div>
+  </div>
+</div>
+
 <div id="import-confirm-overlay">
   <div id="import-confirm-dialog">
     <div id="import-confirm-title" data-i18n="settings.importConfirmTitle">Overwrite all data?</div>
@@ -2671,13 +2733,14 @@ function initGoogleAuth() {
 }
 
 function handleTokenResponse(tokenResponse) {
-  // Completed in TASK-08: load GAPI client and initiate first Drive sync
   if (tokenResponse.error) {
     handleTokenError(tokenResponse);
     return;
   }
   googleAccessToken = tokenResponse.access_token;
-  loadGapiAndSync(); // defined in TASK-08
+  document.getElementById('sync-btn-label').textContent = 'Sign out';
+  setSyncStatus('connected', 'Connected to Google Drive');
+  if (typeof loadGapiAndSync === 'function') loadGapiAndSync(); // TASK-08
 }
 
 function handleTokenError(error) {
@@ -2687,6 +2750,28 @@ function handleTokenError(error) {
 
 function attemptSilentRestore() {
   // Completed in TASK-15; placeholder so initGoogleAuth() can call it safely
+}
+
+function signOut() {
+  if (tokenRenewalTimer) {
+    clearInterval(tokenRenewalTimer);
+    tokenRenewalTimer = null;
+  }
+  if (syncDebounceTimer) {
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = null;
+  }
+  const token = googleAccessToken;
+  googleAccessToken = null;
+  driveFileIdCache.clear();
+  lastSyncedHash.clear();
+  etagCache.clear();
+  localStorage.removeItem('zenit-week-had-google-session');
+  document.getElementById('sync-btn-label').textContent = 'Sign in';
+  setSyncStatus('disconnected');
+  if (token && window.google?.accounts?.oauth2) {
+    google.accounts.oauth2.revoke(token, () => {});
+  }
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -5890,15 +5975,58 @@ document.getElementById('today-btn').addEventListener('click', () => {
 // ─── Google Drive Sync Button ─────────────────────────────────────────────────
 document.getElementById('sync-btn').addEventListener('click', () => {
   if (googleAccessToken) {
-    if (confirm('Sign out of Google Drive sync?')) signOut();
+    showAppConfirm({
+      title: 'Sign out of Google Drive?',
+      body: 'Your data stays saved locally. You can sign back in at any time.',
+      okLabel: 'Sign out',
+      danger: true,
+      onConfirm: signOut,
+    });
     return;
   }
   if (!googleTokenClient) {
-    alert('Google sign-in is loading — please try again in a moment.');
+    const label = document.getElementById('sync-btn-label');
+    const prev = label.textContent;
+    label.textContent = 'Loading…';
+    setTimeout(() => { label.textContent = prev; }, 1500);
     return;
   }
   googleTokenClient.requestAccessToken({ prompt: 'consent' });
 });
+
+// ─── Generic Confirm Dialog ───────────────────────────────────────────────────
+(function() {
+  const overlay    = document.getElementById('app-confirm-overlay');
+  const titleEl    = document.getElementById('app-confirm-title');
+  const bodyEl     = document.getElementById('app-confirm-body');
+  const cancelBtn  = document.getElementById('app-confirm-cancel');
+  const okBtn      = document.getElementById('app-confirm-ok');
+  let _onConfirm   = null;
+
+  function closeAppConfirm() {
+    overlay.classList.remove('visible');
+  }
+
+  window.showAppConfirm = function({ title, body, okLabel = 'OK', danger = false, onConfirm }) {
+    titleEl.textContent  = title;
+    bodyEl.textContent   = body;
+    okBtn.textContent    = okLabel;
+    okBtn.classList.toggle('danger', danger);
+    _onConfirm = onConfirm;
+    overlay.classList.add('visible');
+    okBtn.focus();
+  };
+
+  cancelBtn.addEventListener('click', closeAppConfirm);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAppConfirm(); });
+  okBtn.addEventListener('click', () => {
+    closeAppConfirm();
+    if (_onConfirm) _onConfirm();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('visible')) closeAppConfirm();
+  });
+})();
 
 // ─── Settings Dropdown ────────────────────────────────────────────────────────
 const settingsBtn = document.getElementById('settings-btn');
