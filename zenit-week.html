@@ -3008,7 +3008,15 @@ async function getDriveFileId(wKey) {
   return fileId;
 }
 
-// Lists all zenit-week-*.json files in appDataFolder, populates driveFileIdCache
+// Returns absolute week distance between two week keys (approximate, good enough for sorting)
+function weekProximity(wKey, refKey) {
+  const { year: ay, week: aw } = parseWeekKey(wKey);
+  const { year: ry, week: rw } = parseWeekKey(refKey);
+  return Math.abs((ay * 53 + aw) - (ry * 53 + rw));
+}
+
+// Lists all zenit-week-*.json files in appDataFolder; returns [{wKey, savedAt}]
+// Also populates driveFileIdCache. Uses appProperties.savedAt to avoid content downloads.
 async function listAllDriveWeekFiles() {
   const found = [];
   let pageToken = null;
@@ -3016,7 +3024,7 @@ async function listAllDriveWeekFiles() {
     const params = {
       spaces: 'appDataFolder',
       q: "name contains 'zenit-week-' and name contains '.json'",
-      fields: 'nextPageToken,files(id,name)',
+      fields: 'nextPageToken,files(id,name,appProperties)',
       pageSize: 100,
     };
     if (pageToken) params.pageToken = pageToken;
@@ -3027,49 +3035,82 @@ async function listAllDriveWeekFiles() {
     });
     for (const f of resp.result?.files ?? []) {
       const m = f.name.match(/^zenit-week-(\d{4}-\d{2})\.json$/);
-      if (m) { driveFileIdCache.set(m[1], f.id); found.push(m[1]); }
+      if (m) {
+        const wKey = m[1];
+        driveFileIdCache.set(wKey, f.id);
+        found.push({ wKey, savedAt: parseInt(f.appProperties?.savedAt ?? '0', 10) });
+      }
     }
     pageToken = resp.result?.nextPageToken ?? null;
   } while (pageToken);
   return found;
 }
 
-// 3-phase seed after first sign-in:
-//   Phase 1 — current ±1 week, sequential (blocks spinner)
-//   Phase 2 — ±12 weeks, up to 5 concurrent background requests
-//   Phase 3 — remaining keys already in cache, pulled lazily on navigation
-async function seedLocalStorageFromDrive(driveWeekKeys) {
-  const driveSet = new Set(driveWeekKeys);
-  const todayKey = todayWeekKey();
-
-  // Phase 1
-  const immediateKeys = [todayKey, offsetWeek(todayKey, -1), offsetWeek(todayKey, +1)]
-    .filter(k => driveSet.has(k));
-  for (const k of immediateKeys) await syncWeekFromDrive(k);
-
-  // Phase 2
-  const immediateSet = new Set(immediateKeys);
-  const batchKeys = [];
-  for (let i = -12; i <= 12; i++) {
-    const k = offsetWeek(todayKey, i);
-    if (!immediateSet.has(k) && driveSet.has(k)) batchKeys.push(k);
-  }
-  const CONCURRENCY = 5;
-  for (let i = 0; i < batchKeys.length; i += CONCURRENCY) {
-    await Promise.all(batchKeys.slice(i, i + CONCURRENCY).map(k => syncWeekFromDrive(k)));
-  }
-
-  // Phase 3 — lazy; all remaining keys already in driveFileIdCache
-  const batchSet = new Set(batchKeys);
-  const lazyCount = driveWeekKeys.filter(k => !immediateSet.has(k) && !batchSet.has(k)).length;
-  if (lazyCount > 0) console.log(`[Drive] ${lazyCount} older week(s) available lazily`);
-}
-
-// Entry point called by loadGapiAndSync after GAPI is initialized
+// Bidirectional reconciliation on every sign-in:
+//   Step 1 — list Drive files with savedAt metadata (1–2 API calls total)
+//   Step 2 — scan localStorage savedAt timestamps (zero API calls)
+//   Step 3 — classify every week into download / upload / skip
+//   Step 4a — process current ±1 week first, sequentially
+//   Step 4b — process rest sorted by proximity to today, 5 concurrent, downloads before uploads
 async function initDriveSync() {
   try {
-    const driveWeekKeys = await listAllDriveWeekFiles();
-    await seedLocalStorageFromDrive(driveWeekKeys);
+    // Step 1
+    const driveWeeks = await listAllDriveWeekFiles();
+    const driveMap = new Map(driveWeeks.map(({ wKey, savedAt }) => [wKey, savedAt]));
+
+    // Step 2
+    const localMap = new Map();
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const m = key?.match(/^zenit-week-(\d{4}-\d{2})$/);
+      if (!m) continue;
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        localMap.set(m[1], typeof data.savedAt === 'number' ? data.savedAt : 0);
+      } catch { localMap.set(m[1], 0); }
+    }
+
+    // Step 3
+    const toDownload = [];
+    const toUpload = [];
+    for (const wKey of new Set([...driveMap.keys(), ...localMap.keys()])) {
+      const driveTs = driveMap.has(wKey) ? driveMap.get(wKey) : -1;
+      const localTs = localMap.has(wKey) ? localMap.get(wKey) : -1;
+      if      (localTs === -1)       toDownload.push(wKey); // Drive-only
+      else if (driveTs === -1)       toUpload.push(wKey);   // local-only
+      else if (driveTs > localTs)    toDownload.push(wKey); // Drive newer
+      else if (localTs > driveTs)    toUpload.push(wKey);   // local newer
+      // identical → skip
+    }
+
+    // Step 4a — priority: current ±1 week, sequential
+    const todayKey = todayWeekKey();
+    const prioritySet = new Set([todayKey, offsetWeek(todayKey, -1), offsetWeek(todayKey, +1)]);
+    for (const k of prioritySet) {
+      if (toDownload.includes(k)) await syncWeekFromDrive(k);
+      else if (toUpload.includes(k)) await syncWeekToDrive(k);
+    }
+    setSyncStatus('connected', 'Synced with Google Drive');
+
+    // Step 4b — rest sorted by proximity, downloads first then uploads, 5 concurrent
+    const byProximity = arr => arr
+      .filter(k => !prioritySet.has(k))
+      .sort((a, b) => weekProximity(a, todayKey) - weekProximity(b, todayKey));
+
+    const restAll = [
+      ...byProximity(toDownload).map(k => ({ k, isDownload: true })),
+      ...byProximity(toUpload).map(k => ({ k, isDownload: false })),
+    ];
+    const CONCURRENCY = 5;
+    for (let i = 0; i < restAll.length; i += CONCURRENCY) {
+      await Promise.all(
+        restAll.slice(i, i + CONCURRENCY).map(({ k, isDownload }) =>
+          isDownload ? syncWeekFromDrive(k) : syncWeekToDrive(k)
+        )
+      );
+    }
+    if (restAll.length > 0) setSyncStatus('connected', 'Synced with Google Drive');
+
   } catch (err) {
     console.error('[Drive] initDriveSync error:', err);
     setSyncStatus('error', 'Drive init failed — check your connection');
@@ -3096,20 +3137,30 @@ async function syncWeekToDrive(wKey) {
   if (lastSyncedHash.get(wKey) === hash) return; // no change since last upload
 
   setSyncStatus('syncing', 'Syncing with Google Drive…');
+
+  let savedAt = 0;
+  try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
+
   const MAX_RETRIES = 5;
   let delay = 1000;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const fileId = await getDriveFileId(wKey);
+
+      // Multipart upload: metadata (appProperties.savedAt) + content in one request
+      const boundary = 'ZenitWeek_' + Date.now();
+      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt) } });
+      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
+
       const resp = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
         {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${googleAccessToken}`,
-            'Content-Type': 'application/json',
+            'Content-Type': `multipart/related; boundary=${boundary}`,
           },
-          body: json,
+          body,
         }
       );
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
