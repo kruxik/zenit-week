@@ -1811,6 +1811,8 @@
     if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
   })();
 </script>
+<script async defer src="https://accounts.google.com/gsi/client"></script>
+<script async defer src="https://apis.google.com/js/api.js"></script>
 </head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -2558,6 +2560,9 @@ function getNodeSize(nodeId) {
 
 // Side assignments — populated dynamically from weekData on load/add
 const BRANCH_CONFIG = {};
+
+// ─── Google Drive Sync ────────────────────────────────────────────────────────
+const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentWeekKey = '';   // 'YYYY-WW'
