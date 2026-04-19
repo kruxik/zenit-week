@@ -95,3 +95,6 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - **Daily log panel**: Floating panel showing completed/ticked activities for the day, with timestamps and branch color dots
 - **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week
 - **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern
+
+## Workflow Rules
+- **After every implementation**: summarize the change as a one-liner git commit message, then ask the user "Should I add and commit?"
