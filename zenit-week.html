@@ -2714,6 +2714,8 @@ let lastSyncedHash = new Map();   // weekKey → FNV-1a hash of last uploaded JS
 let etagCache = new Map();        // weekKey → ETag from last Drive pull
 let syncDebounceTimer = null;
 let tokenRenewalTimer = null;
+let _gapiInitialized = false;   // true after first loadGapiAndSync completes setup
+let _silentAttempt = false;     // true when requestAccessToken was called silently
 
 // Called by GIS library when it finishes loading (async)
 window.onGoogleLibraryLoad = function() { initGoogleAuth(); };
@@ -2737,19 +2739,52 @@ function handleTokenResponse(tokenResponse) {
     handleTokenError(tokenResponse);
     return;
   }
+  _silentAttempt = false;
   googleAccessToken = tokenResponse.access_token;
+
+  // Persist session flag so next app load can attempt silent restore
+  localStorage.setItem('zenit-week-had-google-session', '1');
+
+  // Schedule silent token renewal every 55 min (tokens expire at 60 min)
+  if (tokenRenewalTimer) clearInterval(tokenRenewalTimer);
+  tokenRenewalTimer = setInterval(() => {
+    _silentAttempt = true;
+    googleTokenClient.requestAccessToken({ prompt: 'none' });
+  }, 55 * 60 * 1000);
+
   document.getElementById('sync-btn-label').textContent = 'Sign out';
   setSyncStatus('connected', 'Connected to Google Drive');
-  if (typeof loadGapiAndSync === 'function') loadGapiAndSync(); // TASK-08
+
+  if (!_gapiInitialized) {
+    _gapiInitialized = true;
+    loadGapiAndSync(); // TASK-08 — init GAPI + full Drive seed (first sign-in only)
+  } else {
+    // Token renewal: GAPI already initialized, just update the token
+    if (window.gapi?.client) gapi.client.setToken({ access_token: googleAccessToken });
+  }
 }
 
 function handleTokenError(error) {
-  console.warn('Google auth error:', error);
+  if (_silentAttempt) {
+    // Silent restore or renewal failed — Google session gone
+    _silentAttempt = false;
+    localStorage.removeItem('zenit-week-had-google-session');
+    if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
+    googleAccessToken = null;
+    _gapiInitialized = false;
+    document.getElementById('sync-btn-label').textContent = 'Reconnect';
+    setSyncStatus('error', 'Google session expired — click to reconnect');
+    return;
+  }
+  console.warn('[Drive] Auth error:', error);
   setSyncStatus('error', 'Sign-in failed — check your connection and try again');
 }
 
+// ─── TASK-15: Silent session restore on app load ──────────────────────────────
 function attemptSilentRestore() {
-  // Completed in TASK-15; placeholder so initGoogleAuth() can call it safely
+  if (!localStorage.getItem('zenit-week-had-google-session')) return;
+  _silentAttempt = true;
+  googleTokenClient.requestAccessToken({ prompt: 'none' });
 }
 
 function signOut() {
@@ -2763,6 +2798,8 @@ function signOut() {
   }
   const token = googleAccessToken;
   googleAccessToken = null;
+  _gapiInitialized = false;
+  _silentAttempt = false;
   driveFileIdCache.clear();
   lastSyncedHash.clear();
   etagCache.clear();
