@@ -2716,6 +2716,7 @@ let syncDebounceTimer = null;
 let tokenRenewalTimer = null;
 let _gapiInitialized = false;   // true after first loadGapiAndSync completes setup
 let _silentAttempt = false;     // true when requestAccessToken was called silently
+let _isFirstConnection = false; // true when this browser has never synced with Drive before
 
 // Called by GIS library when it finishes loading (async)
 window.onGoogleLibraryLoad = function() { initGoogleAuth(); };
@@ -2742,7 +2743,8 @@ function handleTokenResponse(tokenResponse) {
   _silentAttempt = false;
   googleAccessToken = tokenResponse.access_token;
 
-  // Persist session flag so next app load can attempt silent restore
+  // Capture first-connection state before setting the flag
+  _isFirstConnection = !localStorage.getItem('zenit-week-had-google-session');
   localStorage.setItem('zenit-week-had-google-session', '1');
 
   // Schedule silent token renewal every 55 min (tokens expire at 60 min)
@@ -2800,6 +2802,7 @@ function signOut() {
   googleAccessToken = null;
   _gapiInitialized = false;
   _silentAttempt = false;
+  _isFirstConnection = false;
   driveFileIdCache.clear();
   lastSyncedHash.clear();
   etagCache.clear();
@@ -3070,27 +3073,38 @@ async function initDriveSync() {
       } catch { localMap.set(m[1], 0); }
     }
 
-    // Step 3
+    // Step 3 — classify every week
+    // First-time connection: Drive wins any conflict (both sides have data) so the user's
+    // established Drive history is never silently overwritten by a fresh local session.
+    // Undo remains available in-memory if the user wants to recover local changes.
     const toDownload = [];
     const toUpload = [];
     for (const wKey of new Set([...driveMap.keys(), ...localMap.keys()])) {
       const driveTs = driveMap.has(wKey) ? driveMap.get(wKey) : -1;
       const localTs = localMap.has(wKey) ? localMap.get(wKey) : -1;
-      if      (localTs === -1)       toDownload.push(wKey); // Drive-only
-      else if (driveTs === -1)       toUpload.push(wKey);   // local-only
-      else if (driveTs > localTs)    toDownload.push(wKey); // Drive newer
-      else if (localTs > driveTs)    toUpload.push(wKey);   // local newer
-      // identical → skip
+      if      (localTs === -1)                        toDownload.push(wKey); // Drive-only
+      else if (driveTs === -1)                        toUpload.push(wKey);   // local-only
+      else if (driveTs === localTs)                   { /* identical — skip */ }
+      else if (_isFirstConnection)                    toDownload.push(wKey); // first connection: Drive always wins
+      else if (driveTs > localTs)                     toDownload.push(wKey); // Drive newer
+      else                                            toUpload.push(wKey);   // local newer
     }
 
     // Step 4a — priority: current ±1 week, sequential
     const todayKey = todayWeekKey();
     const prioritySet = new Set([todayKey, offsetWeek(todayKey, -1), offsetWeek(todayKey, +1)]);
+    const firstConnectionConflict = _isFirstConnection && toDownload.some(k => prioritySet.has(k));
     for (const k of prioritySet) {
       if (toDownload.includes(k)) await syncWeekFromDrive(k);
       else if (toUpload.includes(k)) await syncWeekToDrive(k);
     }
-    setSyncStatus('connected', 'Synced with Google Drive');
+
+    if (firstConnectionConflict) {
+      setSyncStatus('connected', 'Drive data loaded — undo available if you had local changes');
+      setTimeout(() => setSyncStatus('connected', 'Synced with Google Drive'), 6000);
+    } else {
+      setSyncStatus('connected', 'Synced with Google Drive');
+    }
 
     // Step 4b — rest sorted by proximity, downloads first then uploads, 5 concurrent
     const byProximity = arr => arr
