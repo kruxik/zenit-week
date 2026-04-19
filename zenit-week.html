@@ -2774,6 +2774,57 @@ function signOut() {
   }
 }
 
+// ─── TASK-12: Sync status helper ──────────────────────────────────────────────
+function setSyncStatus(status, message) {
+  syncStatus = status;
+  const dot = document.getElementById('sync-dot');
+  if (!dot) return;
+  dot.dataset.status = status;
+  dot.title = message || ({
+    disconnected: 'Not connected to Google Drive',
+    connected:    'Synced with Google Drive',
+    syncing:      'Syncing with Google Drive…',
+    error:        'Sync error',
+  }[status] ?? '');
+}
+
+// ─── TASK-08: Load GAPI client and initiate first sync ────────────────────────
+function loadGapiAndSync() {
+  if (!window.gapi) {
+    // GAPI script not yet executed — retry shortly
+    setTimeout(loadGapiAndSync, 300);
+    return;
+  }
+  gapi.load('client', async () => {
+    try {
+      await gapi.client.init({});
+      gapi.client.setToken({ access_token: googleAccessToken });
+
+      // Fetch user display name via Drive about (works with drive.appdata scope)
+      const aboutResp = await gapi.client.request({
+        path: 'https://www.googleapis.com/drive/v3/about',
+        params: { fields: 'user(displayName,emailAddress)' },
+      });
+      const user = aboutResp.result?.user;
+      const label = user?.displayName || user?.emailAddress || null;
+      if (label) {
+        document.getElementById('sync-btn-label').textContent = label;
+      }
+
+      setSyncStatus('connected', `Synced with Google Drive${label ? ' (' + label + ')' : ''}`);
+      await syncWeekFromDrive(currentWeekKey); // TASK-11 — pulls current week
+    } catch (err) {
+      console.error('[Drive] GAPI init error:', err);
+      setSyncStatus('error', 'Google Drive init failed — try signing in again');
+    }
+  });
+}
+
+// TASK-11 stub — full implementation added in TASK-11
+async function syncWeekFromDrive(wKey) { // eslint-disable-line no-unused-vars
+  // Intentionally empty until TASK-11 is implemented
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentWeekKey = '';   // 'YYYY-WW'
 let weekData = {};          // { nodes: [...] }
