@@ -2653,6 +2653,42 @@ let etagCache = new Map();        // weekKey → ETag from last Drive pull
 let syncDebounceTimer = null;
 let tokenRenewalTimer = null;
 
+// Called by GIS library when it finishes loading (async)
+window.onGoogleLibraryLoad = function() { initGoogleAuth(); };
+
+function initGoogleAuth() {
+  if (googleTokenClient) return; // already initialized
+  if (!window.google?.accounts?.oauth2) return; // GIS not ready yet
+
+  googleTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: GOOGLE_DRIVE_SCOPE,
+    callback: handleTokenResponse,
+    error_callback: handleTokenError,
+  });
+
+  attemptSilentRestore(); // TASK-15: silent re-auth if user was previously signed in
+}
+
+function handleTokenResponse(tokenResponse) {
+  // Completed in TASK-08: load GAPI client and initiate first Drive sync
+  if (tokenResponse.error) {
+    handleTokenError(tokenResponse);
+    return;
+  }
+  googleAccessToken = tokenResponse.access_token;
+  loadGapiAndSync(); // defined in TASK-08
+}
+
+function handleTokenError(error) {
+  console.warn('Google auth error:', error);
+  setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+}
+
+function attemptSilentRestore() {
+  // Completed in TASK-15; placeholder so initGoogleAuth() can call it safely
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentWeekKey = '';   // 'YYYY-WW'
 let weekData = {};          // { nodes: [...] }
@@ -6049,6 +6085,7 @@ window.addEventListener('load', () => {
   loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   updateSvgFilters();
+  initGoogleAuth(); // no-op if GIS not yet loaded; onGoogleLibraryLoad handles that case
   const hashWeek = location.hash.slice(1);
   const initialWeek = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
   loadAndRender(initialWeek);
