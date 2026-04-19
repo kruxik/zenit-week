@@ -1827,11 +1827,11 @@
     left: 50%;
     transform: translateX(-50%);
     width: auto;
-    min-width: 300px;
+    min-width: 260px;
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: 22px;
-    padding: 0 24px;
+    padding: 0 14px;
     display: flex;
     flex-direction: column;
     font-size: 13px;
@@ -1849,7 +1849,7 @@
   #placeholder-panel.expanded {
     max-height: 200px;
     border-radius: 16px;
-    padding: 16px 24px;
+    padding: 16px 14px;
     overflow: visible; /* Ensure chevron stays visible when expanded */
   }
 
@@ -1859,6 +1859,12 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+  }
+
+  #summary-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   #summary-chevron {
@@ -5370,7 +5376,7 @@ function updateSummary() {
       tooltip = t('summary.tooltipStretch');
     }
 
-    mainEl.innerHTML = `${t('summary.activitiesDone')}: ${global.done} (${global.percent}&nbsp;%) /&nbsp;<span class="summary-trigger" data-tooltip="${tooltip}" style="cursor: help;"><span style="color: ${totalColor}; font-weight: 800;">${global.total}</span>&nbsp;${emoji}</span>`;
+    mainEl.innerHTML = `<span class="daily-log-footer-badge done">${global.done}</span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.done')}</span><span class="daily-log-footer-badge" style="background:var(--bg-muted);color:${totalColor}" data-tooltip="${tooltip}">${global.total}</span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.total')}</span>`;
   }
 
   // Rebuild branch stat rows dynamically
