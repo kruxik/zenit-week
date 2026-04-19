@@ -3284,19 +3284,18 @@ function moveNodeToNextWeek(nodeId) {
     if (nextById.has(ancestor.id)) {
       oldToNew.set(ancestor.id, ancestor.id);
     } else {
-      const newId = genId();
       const shell = {
         ...ancestor,
-        id: newId,
+        id: ancestor.id,
         children: [],
         parent: oldToNew.get(ancestor.parent) || ancestor.parent,
       };
       nextData.nodes.push(shell);
-      nextById.set(newId, shell);
-      oldToNew.set(ancestor.id, newId);
+      nextById.set(ancestor.id, shell);
+      oldToNew.set(ancestor.id, ancestor.id);
       const parentInNext = nextById.get(shell.parent);
-      if (parentInNext && !parentInNext.children.includes(newId)) {
-        parentInNext.children.push(newId);
+      if (parentInNext && !parentInNext.children.includes(ancestor.id)) {
+        parentInNext.children.push(ancestor.id);
       }
     }
   });
