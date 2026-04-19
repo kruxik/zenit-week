@@ -2820,9 +2820,97 @@ function loadGapiAndSync() {
   });
 }
 
-// TASK-11 stub — full implementation added in TASK-11
-async function syncWeekFromDrive(wKey) { // eslint-disable-line no-unused-vars
-  // Intentionally empty until TASK-11 is implemented
+// ─── TASK-13: Conflict resolution — last-write-wins per week ─────────────────
+// Returns whichever JSON string has the newer savedAt; falls back to local
+// on parse errors, missing timestamps, or empty remote content.
+function resolveWeekConflict(localJson, remoteJson) {
+  try {
+    const remote = JSON.parse(remoteJson);
+    if (!localJson) return remoteJson;
+    const local = JSON.parse(localJson);
+    const localTs  = typeof local.savedAt  === 'number' ? local.savedAt  : 0;
+    const remoteTs = typeof remote.savedAt === 'number' ? remote.savedAt : 0;
+    if (localTs === 0 && remoteTs === 0) return localJson; // no timestamps — keep local
+    return remoteTs > localTs ? remoteJson : localJson;
+  } catch (e) {
+    console.warn('[Drive] resolveWeekConflict parse error — keeping local:', e);
+    return localJson;
+  }
+}
+
+// ─── TASK-11: Load week data from Drive ───────────────────────────────────────
+async function syncWeekFromDrive(wKey) {
+  if (!googleAccessToken) return;
+
+  let fileId;
+  try {
+    fileId = await getDriveFileId(wKey);
+  } catch (err) {
+    console.error('[Drive] syncWeekFromDrive: getDriveFileId error:', err);
+    setSyncStatus('error', 'Sync failed — could not locate Drive file');
+    return;
+  }
+
+  const MAX_RETRIES = 5;
+  let delay = 1000;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const headers = { 'Authorization': `Bearer ${googleAccessToken}` };
+      const etag = etagCache.get(wKey);
+      if (etag) headers['If-None-Match'] = etag;
+
+      const resp = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        { method: 'GET', headers }
+      );
+
+      if (resp.status === 304) return; // not modified — skip merge
+
+      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+        delay *= 2;
+        continue;
+      }
+
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      const newEtag = resp.headers.get('ETag') || resp.headers.get('etag');
+      if (newEtag) etagCache.set(wKey, newEtag);
+
+      const remoteJson = (await resp.text()).trim();
+      if (!remoteJson) return; // empty file — nothing to merge
+
+      // TASK-13: keep whichever version has the newer savedAt
+      const localJson = localStorage.getItem(storageKey(wKey));
+      const merged = resolveWeekConflict(localJson, remoteJson);
+
+      if (merged !== localJson) {
+        // Remote is newer — write directly to localStorage (no Drive upload triggered)
+        try {
+          localStorage.setItem(storageKey(wKey), merged);
+        } catch (e) {
+          console.error('[Drive] Failed to write remote data to localStorage:', e);
+        }
+        // Refresh the current view if this is the displayed week
+        if (wKey === currentWeekKey) {
+          weekData = JSON.parse(merged);
+          rebuildNodeMap();
+          render();
+        }
+      }
+
+      // Update hash so next syncWeekToDrive skips a redundant upload
+      lastSyncedHash.set(wKey, fnv1a32(merged));
+      return;
+
+    } catch (err) {
+      if (attempt >= MAX_RETRIES) {
+        console.error('[Drive] syncWeekFromDrive error:', err);
+        setSyncStatus('error', 'Sync failed — using local data');
+        return;
+      }
+    }
+  }
 }
 
 // ─── TASK-09: Find or create per-week Drive file ──────────────────────────────
