@@ -30,7 +30,7 @@ The `todos/GOOGLE_DRIVE_SYNC_TODO.md` plan is solid architecture. The only gap i
 - **Backend/server** — unnecessary; the plan correctly avoids it
 - **Single blob Drive file** — per-week files chosen instead; only current week is synced during normal use, matching the localStorage structure exactly
 - **CRDT conflict resolution** — last-write-wins is sufficient for personal planning data
-- **Per-operation Drive sync** — debounced (4s) + tab-hide flush is the right strategy; syncing every `saveWeek()` would hammer the API
+- **Per-operation Drive sync** — debounced (30s) + tab-hide flush is the right strategy; syncing every `saveWeek()` would hammer the API
 - **Dropbox/iCloud now** — already noted as TASK-18 future work
 
 ## Open Questions

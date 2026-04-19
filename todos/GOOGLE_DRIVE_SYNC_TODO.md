@@ -80,7 +80,12 @@ The token client's callback should handle both success (proceed to load data) an
 
 **What:** Each week is stored as a separate file in `appDataFolder`, named after its localStorage key (e.g. `zenit-week-2026-14.json`). Implement a helper `getDriveFileId(weekKey)` that returns the Drive file ID for a given week. On first access the file won't exist yet — search for it and, if not found, create it with empty content. Cache file IDs in a `Map<weekKey, fileId>` in memory so subsequent reads/writes skip the search. Use the Google Drive API v3.
 
-**On first sign-in on a new device:** list all files in `appDataFolder` matching the `zenit-week-*.json` pattern and populate the cache map in one batch, then download them all to seed localStorage (see TASK-11).
+**On first sign-in on a new device:** list all files in `appDataFolder` matching the `zenit-week-*.json` pattern and populate the file ID cache map. Then seed localStorage in three phases (see TASK-11):
+1. **Immediate** — current week, previous week, next week (3 files, sequential, blocks UI spinner until done)
+2. **Background batch** — nearest ±12 weeks beyond the immediate set, max 5 concurrent requests
+3. **Lazy** — all remaining older weeks downloaded on demand when the user navigates to them
+
+**Rate-limit handling:** All Drive API calls in this task must use exponential backoff with jitter on `429 Too Many Requests` and `503 Service Unavailable` responses. Retry up to 5 times; base delay 1s, doubled each attempt, plus random jitter of 0–500ms. After 5 failed attempts, set the error sync state and stop retrying.
 
 ---
 
@@ -88,12 +93,14 @@ The token client's callback should handle both success (proceed to load data) an
 
 **What:** Implement a `syncWeekToDrive(weekKey)` function that uploads a single week's data to its corresponding Drive file. The upload is asynchronous and non-blocking. Set sync status to "syncing" during upload, "connected" on success, "error" on failure.
 
-**Change detection — skip unnecessary uploads:** Before uploading, compute a hash of the current week's JSON string (a simple `JSON.stringify` checksum is sufficient — no crypto needed, e.g. sum char codes or use a 32-bit FNV hash). Compare to `lastSyncedHash` stored in a `Map<weekKey, hash>` in memory. If identical, skip the upload — data hasn't changed since last sync. Update `lastSyncedHash` after a successful upload.
+**Change detection — skip unnecessary uploads:** Before uploading, compute an FNV-1a 32-bit hash of the current week's JSON string. Compare to `lastSyncedHash` stored in a `Map<weekKey, hash>` in memory. If identical, skip the upload — data hasn't changed since last sync. Update `lastSyncedHash` after a successful upload.
 
 **Trigger strategy:**
 - Reset a 30-second debounce timer on each `saveWeek()` call. When it fires, run the hash check and upload if dirty. Rapid edits collapse into a single API call.
-- Flush immediately (bypass debounce) on `visibilitychange → hidden` and `beforeunload`.
+- Flush immediately (bypass debounce) on `visibilitychange → hidden` (primary — fires reliably on mobile, tab switch, and bfcache entry) and `beforeunload` (secondary, best-effort — unreliable on mobile and disqualifies the page from bfcache on desktop; do not rely on it as the sole flush mechanism).
 - On `visibilitychange → visible`, pull before pushing — see TASK-11.
+
+**Rate-limit handling:** On `429` or `503` responses, retry with exponential backoff with jitter (same parameters as TASK-09). After 5 failed attempts, set the error sync state and surface a tooltip message indicating sync failed.
 
 ---
 
@@ -105,7 +112,9 @@ The token client's callback should handle both success (proceed to load data) an
 
 **When to call:**
 - `visibilitychange → visible`: pull current week only.
-- Immediately after sign-in: pull current week, then in the background download all other week files found in `appDataFolder` (first-time device setup — see TASK-09).
+- Immediately after sign-in: follow the three-phase download sequence from TASK-09 (immediate → background batch → lazy).
+
+**Rate-limit handling:** On `429` or `503` responses, retry with exponential backoff with jitter (same parameters as TASK-09). On persistent failure, keep the local version and set the error sync state.
 
 ---
 
@@ -194,7 +203,7 @@ Before shipping the sync feature, verify all of the following manually:
 - **No backend required.** The app communicates directly with Google Drive API from the browser using the user's own OAuth token.
 - **`appDataFolder` scope** means the file is invisible to the user in Drive — it won't clutter their storage. Only this app can access it.
 - **Per-week file strategy:** Each week is a separate Drive file (`zenit-week-YYYY-WW.json`) in `appDataFolder`, matching the localStorage key structure. Normal use only touches the current week — 1 read + 1 write per sync session. First sign-in on a new device downloads all week files in one batch.
-- **Debounced writes + hash check:** Drive sync is not triggered on every `saveWeek()` — a 30-second debounce timer collapses rapid edits into a single upload. Before uploading, a hash of the JSON is compared to `lastSyncedHash` — if identical, upload is skipped entirely. Tab-hide and browser close flush immediately via `visibilitychange` and `beforeunload`.
+- **Debounced writes + hash check:** Drive sync is not triggered on every `saveWeek()` — a 30-second debounce timer collapses rapid edits into a single upload. Before uploading, an FNV-1a 32-bit hash of the JSON is compared to `lastSyncedHash` — if identical, upload is skipped entirely. `visibilitychange → hidden` is the primary flush on tab/app switch (reliable on all platforms including mobile). `beforeunload` is a secondary best-effort flush for desktop tab close only — do not rely on it as the sole mechanism.
 - **ETag-based pull:** Pulls send `If-None-Match` with the stored ETag. Drive returns `304 Not Modified` if nothing changed — zero bytes downloaded.
 - **Tab visibility sync:** Uses the Page Visibility API — pulls from Drive when the user returns to the tab (`visibilitychange → visible`), pushes immediately when they leave (`visibilitychange → hidden`) or close the browser (`beforeunload`). Provides cross-device consistency without polling.
 - **GIS token model:** Access tokens expire after 1 hour but renew silently every 55 minutes as long as the user is logged into Google in their browser. The reconnect prompt only appears when the Google session itself is gone (logged out, revoked access).
