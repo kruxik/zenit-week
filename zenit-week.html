@@ -2091,7 +2091,7 @@
           <span id="sync-btn-label">Sign in</span>
         </button>
         <button id="sync-avatar-btn" aria-label="Sync options" aria-haspopup="true">
-          <img id="sync-avatar-img" src="" alt="" />
+          <img id="sync-avatar-img" src="" alt="" referrerpolicy="no-referrer" />
           <div id="sync-avatar-initials"></div>
         </button>
         <div id="sync-dot" data-status="disconnected" title="Not connected to Google Drive"></div>
@@ -2906,6 +2906,12 @@ function showSignedInAvatar(user) {
   if (btn) btn.style.display = 'none';
 
   if (googleUserPhoto) {
+    img.onerror = () => {
+      img.style.display = 'none';
+      initials.textContent = googleUserInitials;
+      initials.style.background = googleUserInitialsColor;
+      initials.style.display = 'flex';
+    };
     img.src = googleUserPhoto;
     img.style.display = 'block';
     initials.style.display = 'none';
