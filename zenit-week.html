@@ -3755,13 +3755,14 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   stopDrivePoll();
   // Adopt the remote reset token so we don't loop
   localStorage.setItem('zenit-week-reset-token', remoteResetToken);
-  // Wipe all local week data (keep non-week keys like theme, lang, auth state)
-  const weekKeys = [];
+  // Wipe all user-data keys — keep only auth state and the new reset token
+  const AUTH_KEYS = new Set(['zenit-week-had-google-session', 'zenit-week-migrated', 'zenit-week-reset-token']);
+  const keysToWipe = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key?.match(/^zenit-week-\d{4}-\d{2}$/)) weekKeys.push(key);
+    if (key?.startsWith('zenit-week-') && !AUTH_KEYS.has(key)) keysToWipe.push(key);
   }
-  weekKeys.forEach(k => localStorage.removeItem(k));
+  keysToWipe.forEach(k => localStorage.removeItem(k));
   // Clear sync caches so initDriveSync fetches fresh
   driveFileIdCache.clear();
   lastSyncedHash.clear();
@@ -4302,11 +4303,16 @@ function importAllData(file) {
       undoStack = [];
       redoStack = [];
       currentLang = localStorage.getItem('zenit-week-lang') || 'en';
+      // Apply imported theme to DOM (standalone key is in localStorage but DOM needs explicit update)
+      const importedTheme = localStorage.getItem('zenit-week-theme') || 'light';
+      document.documentElement.dataset.theme = importedTheme === 'dark' ? 'dark' : '';
       loadBranchColors();
       reloadBranchPalettes();
       updateSvgFilters();
       updateColorDots();
       applyTranslations();
+      // Write current theme + lang into the colors file so forcePushAllToDrive carries them to Drive
+      saveBranchColors();
       loadAndRender(todayWeekKey());
     } catch (err) {
       const errEl = document.getElementById('import-error');
@@ -7393,6 +7399,13 @@ window.addEventListener('load', () => {
   currentLang = localStorage.getItem('zenit-week-lang') || 'en';
   loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
+  // One-time bootstrap: if stored colors file is missing theme/lang, write them now
+  // so the next Drive sync carries them to other devices.
+  try {
+    const colorsRaw = localStorage.getItem(COLORS_STORAGE_KEY);
+    const colorsObj = colorsRaw ? JSON.parse(colorsRaw) : null;
+    if (!colorsObj || !colorsObj.theme || !colorsObj.lang) saveBranchColors();
+  } catch { saveBranchColors(); }
   updateSvgFilters();
   initGoogleAuth(); // no-op if GIS not yet loaded; onGoogleLibraryLoad handles that case
   const hashWeek = location.hash.slice(1);
