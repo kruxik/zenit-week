@@ -4767,6 +4767,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   });
   g.appendChild(rect);
 
+  const isDarkTheme = document.documentElement.dataset.theme === 'dark';
+  const btnSymbolColor = isDarkTheme ? '#1a1a1a' : '#ffffff';
+
   // Gear Icon for center node
   if (isCenter) {
     const gearG = svgEl('g', {
@@ -4806,7 +4809,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
         href: `#icon-${icon}`,
         x: -weekNavIconH / 2, y: -weekNavIconH / 2,
         width: weekNavIconH, height: weekNavIconH,
-        stroke: '#fff', 'stroke-width': 1.5, fill: 'none',
+        stroke: btnSymbolColor, 'stroke-width': 1.5, fill: 'none',
         'pointer-events': 'none',
       }));
       g.appendChild(btnG);
@@ -4821,8 +4824,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       const bx = side === 'left' ? -boxW / 2 : boxW / 2;
       const btnG = svgEl('g', { class: 'add-btn add-branch-btn', 'data-side': side, transform: `translate(${bx}, 0)` });
       btnG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: centerBtnR, fill: centerBtnColor }));
-      btnG.appendChild(svgEl('line', { x1: -centerArm, y1: 0, x2: centerArm, y2: 0, stroke: '#fff', 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
-      btnG.appendChild(svgEl('line', { x1: 0, y1: -centerArm, x2: 0, y2: centerArm, stroke: '#fff', 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
+      btnG.appendChild(svgEl('line', { x1: -centerArm, y1: 0, x2: centerArm, y2: 0, stroke: btnSymbolColor, 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
+      btnG.appendChild(svgEl('line', { x1: 0, y1: -centerArm, x2: 0, y2: centerArm, stroke: btnSymbolColor, 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
       g.appendChild(btnG);
     });
   }
@@ -4933,8 +4936,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
     const arm = 4.5 * btnScale;
     const plusSW = (2.5 * btnScale).toFixed(1);
-    const hLine = svgEl('line', { x1: -arm, y1: 0, x2: arm, y2: 0, stroke: '#fff', 'stroke-width': plusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' });
-    const vLine = svgEl('line', { x1: 0, y1: -arm, x2: 0, y2: arm, stroke: '#fff', 'stroke-width': plusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' });
+    const hLine = svgEl('line', { x1: -arm, y1: 0, x2: arm, y2: 0, stroke: btnSymbolColor, 'stroke-width': plusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' });
+    const vLine = svgEl('line', { x1: 0, y1: -arm, x2: 0, y2: arm, stroke: btnSymbolColor, 'stroke-width': plusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' });
 
     btnG.appendChild(circle); btnG.appendChild(hLine); btnG.appendChild(vLine);
     g.appendChild(btnG);
