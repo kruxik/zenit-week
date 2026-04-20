@@ -3793,6 +3793,7 @@ function applyTranslations() {
 }
 
 function setLanguage(lang) {
+  takeSnapshot();
   currentLang = lang;
   localStorage.setItem('zenit-week-lang', lang);
   applyTranslations();
