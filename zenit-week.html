@@ -3269,8 +3269,8 @@ function weekProximity(wKey, refKey) {
   return Math.abs((ay * 53 + aw) - (ry * 53 + rw));
 }
 
-// Lists all zenit-week-*.json files in appDataFolder; returns [{wKey, savedAt}]
-// Also populates driveFileIdCache. Uses appProperties.savedAt to avoid content downloads.
+// Lists all zenit-week-*.json files in appDataFolder; returns [{wKey, savedAt, contentHash}]
+// Also populates driveFileIdCache. Uses appProperties to avoid content downloads.
 async function listAllDriveWeekFiles() {
   const found = [];
   let pageToken = null;
@@ -3292,7 +3292,11 @@ async function listAllDriveWeekFiles() {
       if (m) {
         const wKey = m[1];
         driveFileIdCache.set(wKey, f.id);
-        found.push({ wKey, savedAt: parseInt(f.appProperties?.savedAt ?? '0', 10) });
+        found.push({
+          wKey,
+          savedAt:     parseInt(f.appProperties?.savedAt ?? '0', 10),
+          contentHash: f.appProperties?.contentHash ?? null,
+        });
       }
     }
     pageToken = resp.result?.nextPageToken ?? null;
@@ -3301,73 +3305,76 @@ async function listAllDriveWeekFiles() {
 }
 
 // Bidirectional reconciliation on every sign-in:
-//   Step 1 — list Drive files with savedAt metadata (1–2 API calls total)
-//   Step 2 — scan localStorage savedAt timestamps (zero API calls)
-//   Step 3 — classify every week into download / upload / skip
+//   Step 1 — list Drive files with metadata (1–2 API calls, no content downloads)
+//   Step 2 — scan localStorage content hashes (zero API calls)
+//   Step 3 — classify every week: drive-only / local-only / conflict / skip
 //   Step 4a — process current ±1 week first, sequentially
-//   Step 4b — process rest sorted by proximity to today, 5 concurrent, downloads before uploads
+//   Step 4b — process rest sorted by proximity to today, 5 concurrent
 async function initDriveSync() {
   try {
     // Sync global colors (not week-specific)
     await syncColorsFromDrive();
     await syncColorsToDrive();
 
-    // Step 1
+    // Step 1 — Drive metadata only (no content downloads)
     const driveWeeks = await listAllDriveWeekFiles();
-    const driveMap = new Map(driveWeeks.map(({ wKey, savedAt }) => [wKey, savedAt]));
+    const driveMap = new Map(driveWeeks.map(({ wKey, savedAt, contentHash }) => [wKey, { savedAt, contentHash }]));
 
-    // Step 2
+    // Step 2 — local content hashes (zero API calls)
     const localMap = new Map();
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       const m = key?.match(/^zenit-week-(\d{4}-\d{2})$/);
       if (!m) continue;
-      try {
-        const data = JSON.parse(localStorage.getItem(key));
-        localMap.set(m[1], typeof data.savedAt === 'number' ? data.savedAt : 0);
-      } catch { localMap.set(m[1], 0); }
+      const raw = localStorage.getItem(key);
+      localMap.set(m[1], raw ? fnv1a32(raw) : null);
     }
 
     // Step 3 — classify every week
-    // First-time connection: Drive wins any conflict (both sides have data) so the user's
-    // established Drive history is never silently overwritten by a fresh local session.
-    // Undo remains available in-memory if the user wants to recover local changes.
-    const toDownload = [];
-    const toUpload = [];
+    // CRDT merge handles all conflicts — no special first-connection behaviour needed.
+    // drive-only  → download (syncWeekFromDrive)
+    // local-only  → upload  (syncWeekToDrive, which pulls first then pushes)
+    // same hash   → skip    (content identical)
+    // diff hash   → merge   (syncWeekFromDrive: CRDT merge + conditional re-upload)
+    const toMerge  = []; // drive-only or hash mismatch
+    const toUpload = []; // local-only
     for (const wKey of new Set([...driveMap.keys(), ...localMap.keys()])) {
-      const driveTs = driveMap.has(wKey) ? driveMap.get(wKey) : -1;
-      const localTs = localMap.has(wKey) ? localMap.get(wKey) : -1;
-      if      (localTs === -1)                        toDownload.push(wKey); // Drive-only
-      else if (driveTs === -1)                        toUpload.push(wKey);   // local-only
-      else if (driveTs === localTs)                   { /* identical — skip */ }
-      else if (_isFirstConnection)                    toDownload.push(wKey); // first connection: Drive always wins
-      else if (driveTs > localTs)                     toDownload.push(wKey); // Drive newer
-      else                                            toUpload.push(wKey);   // local newer
+      const driveEntry  = driveMap.get(wKey);
+      const localHash   = localMap.get(wKey) ?? null;
+      if (!localHash) {
+        toMerge.push(wKey);  // Drive-only — download into local
+      } else if (!driveEntry) {
+        toUpload.push(wKey); // local-only — push to Drive
+      } else if (driveEntry.contentHash && String(localHash) === driveEntry.contentHash) {
+        lastSyncedHash.set(wKey, localHash); // identical — mark synced, skip transfer
+      } else {
+        toMerge.push(wKey);  // hash mismatch — CRDT merge resolves it
+      }
     }
 
     // Step 4a — priority: current ±1 week, sequential
     const todayKey = todayWeekKey();
     const prioritySet = new Set([todayKey, offsetWeek(todayKey, -1), offsetWeek(todayKey, +1)]);
-    const firstConnectionConflict = _isFirstConnection && toDownload.some(k => prioritySet.has(k));
+    const hadConflict = _isFirstConnection && [...toMerge, ...toUpload].some(k => prioritySet.has(k));
     for (const k of prioritySet) {
-      if (toDownload.includes(k)) await syncWeekFromDrive(k);
+      if (toMerge.includes(k))  await syncWeekFromDrive(k);
       else if (toUpload.includes(k)) await syncWeekToDrive(k);
     }
 
-    if (firstConnectionConflict) {
+    if (hadConflict) {
       setSyncStatus('connected', 'Drive data loaded — undo available if you had local changes');
       setTimeout(() => setSyncStatus('connected', 'Synced with Google Drive'), 6000);
     } else {
       setSyncStatus('connected', 'Synced with Google Drive');
     }
 
-    // Step 4b — rest sorted by proximity, downloads first then uploads, 5 concurrent
+    // Step 4b — rest sorted by proximity, merges first then uploads, 5 concurrent
     const byProximity = arr => arr
       .filter(k => !prioritySet.has(k))
       .sort((a, b) => weekProximity(a, todayKey) - weekProximity(b, todayKey));
 
     const restAll = [
-      ...byProximity(toDownload).map(k => ({ k, isDownload: true })),
+      ...byProximity(toMerge).map(k => ({ k, isDownload: true })),
       ...byProximity(toUpload).map(k => ({ k, isDownload: false })),
     ];
     const CONCURRENCY = 5;
