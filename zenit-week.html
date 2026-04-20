@@ -4137,7 +4137,16 @@ function importAllData(file) {
         const normalized = normalizeImportKey(key);
         if (normalized) localStorage.setItem(normalized, value);
       });
-      location.reload();
+      // Re-initialize in-place — preserves Google auth session
+      undoStack = [];
+      redoStack = [];
+      currentLang = localStorage.getItem('zenit-week-lang') || 'en';
+      loadBranchColors();
+      reloadBranchPalettes();
+      updateSvgFilters();
+      updateColorDots();
+      applyTranslations();
+      loadAndRender(todayWeekKey());
     } catch (err) {
       const errEl = document.getElementById('import-error');
       if (errEl) { errEl.style.display = ''; }
