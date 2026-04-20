@@ -2680,6 +2680,7 @@ function applyBranchColor(branch, hex) {
 }
 
 function applyTheme(theme) {
+  takeSnapshot();
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('zenit-week-theme', theme);
   // Re-derive branch palettes for new theme and re-render SVG layer
