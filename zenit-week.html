@@ -2855,6 +2855,8 @@ let _gapiInitialized = false;   // true after first loadGapiAndSync completes se
 let _silentAttempt = false;     // true when requestAccessToken was called silently
 let _isFirstConnection = false; // true when this browser has never synced with Drive before
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
+let _pollTimer = null;          // setInterval handle for 30s background metadata poll
+const POLL_INTERVAL_MS = 30_000;
 let googleUserEmail = '';
 let googleUserPhoto = '';
 let googleUserInitials = '';
@@ -3007,6 +3009,7 @@ function attemptSilentRestore() {
 }
 
 function signOut() {
+  stopDrivePoll();
   if (tokenRenewalTimer) {
     clearInterval(tokenRenewalTimer);
     tokenRenewalTimer = null;
@@ -3071,6 +3074,7 @@ function loadGapiAndSync() {
       showSignedInAvatar(user);
       setSyncStatus('connected', 'Synced with Google Drive');
       await initDriveSync(); // TASK-09 — list all files + 3-phase seed
+      startDrivePoll(currentWeekKey);
     } catch (err) {
       console.error('[Drive] GAPI init error:', err);
       setSyncStatus('error', 'Google Drive init failed — try signing in again');
@@ -3491,7 +3495,7 @@ async function syncColorsToDrive() {
     try {
       const fileId = await getDriveFileId('colors');
       const boundary = 'ZenitWeek_' + Date.now();
-      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt) } });
+      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
       const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
       const resp = await fetch(
         `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
@@ -3557,6 +3561,49 @@ function scheduleColorsSync() {
     colorsSyncDebounceTimer = null;
     syncColorsToDrive();
   }, 10000);
+}
+
+// ─── Background poll: cheap metadata-only check every 30s ────────────────────
+async function pollDriveMeta(wKey) {
+  if (!googleAccessToken) return;
+  const fileId = driveFileIdCache.get(wKey);
+  if (!fileId) return; // file not yet created — nothing to poll
+  try {
+    const resp = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`,
+      { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
+    );
+    if (!resp.ok) return;
+    const { appProperties } = await resp.json();
+    const remoteHash = appProperties?.contentHash;
+    if (remoteHash && remoteHash !== String(lastSyncedHash.get(wKey))) {
+      await syncWeekFromDrive(wKey); // hash changed — download + CRDT merge
+    }
+    // Also poll colors
+    const colorsId = driveFileIdCache.get('colors');
+    if (colorsId) {
+      const cResp = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${colorsId}?fields=appProperties`,
+        { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
+      );
+      if (cResp.ok) {
+        const { appProperties: cProps } = await cResp.json();
+        const remoteColorsHash = cProps?.contentHash;
+        if (remoteColorsHash && remoteColorsHash !== colorsSyncedHash) {
+          await syncColorsFromDrive();
+        }
+      }
+    }
+  } catch { /* silent — next poll will retry */ }
+}
+
+function startDrivePoll(wKey) {
+  stopDrivePoll();
+  _pollTimer = setInterval(() => pollDriveMeta(wKey), POLL_INTERVAL_MS);
+}
+
+function stopDrivePoll() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -6839,6 +6886,7 @@ function loadAndRender(wk) {
   syncBranchConfig();
   location.hash = wk;
   render();
+  if (googleAccessToken) startDrivePoll(wk);
 }
 
 window.addEventListener('hashchange', () => {
@@ -6850,6 +6898,7 @@ window.addEventListener('hashchange', () => {
     rebuildNodeMap();
     syncBranchConfig();
     render();
+    if (googleAccessToken) startDrivePoll(currentWeekKey);
   }
 });
 
@@ -6890,10 +6939,11 @@ document.getElementById('sync-btn').addEventListener('click', () => {
   });
 })();
 
-// Flush pending sync when tab hides; pull on tab restore (TASK-10 / TASK-11)
+// Flush pending sync when tab hides; pull + restart poll on tab restore
 document.addEventListener('visibilitychange', () => {
   if (!googleAccessToken) return;
   if (document.visibilityState === 'hidden') {
+    stopDrivePoll();
     if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
     if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
     syncWeekToDrive(currentWeekKey);
@@ -6901,11 +6951,13 @@ document.addEventListener('visibilitychange', () => {
   } else {
     syncWeekFromDrive(currentWeekKey); // pull before next edit
     syncColorsFromDrive();
+    startDrivePoll(currentWeekKey);   // restart 30s poll
   }
 });
 
 // Secondary best-effort flush on tab close (desktop only; not relied upon as sole mechanism)
 window.addEventListener('beforeunload', () => {
+  stopDrivePoll();
   if (!googleAccessToken) return;
   syncWeekToDrive(currentWeekKey);
   syncColorsToDrive();
