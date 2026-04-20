@@ -3517,8 +3517,8 @@ async function syncWeekToDrive(wKey) {
 
 // Raw multipart PATCH for colors — no hash guard, no pull. Returns true on success.
 async function _uploadColorsToDrive(resetToken) {
-  const json = localStorage.getItem(COLORS_STORAGE_KEY);
-  if (!json) return true;
+  // Use stored colors if available, otherwise a minimal stub so resetToken always reaches Drive.
+  const json = localStorage.getItem(COLORS_STORAGE_KEY) || JSON.stringify({ savedAt: Date.now() });
   const hash = fnv1a32(json);
   let savedAt = 0;
   try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
@@ -3707,23 +3707,11 @@ function scheduleColorsSync() {
   }, 10000);
 }
 
-// ─── Background poll: cheap metadata-only check every 30s ────────────────────
+// ─── Background poll: cheap metadata-only check every 10s ────────────────────
 async function pollDriveMeta(wKey) {
   if (!googleAccessToken) return;
-  const fileId = driveFileIdCache.get(wKey);
-  if (!fileId) return; // file not yet created — nothing to poll
   try {
-    const resp = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`,
-      { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
-    );
-    if (!resp.ok) return;
-    const { appProperties } = await resp.json();
-    const remoteHash = appProperties?.contentHash;
-    if (remoteHash && remoteHash !== String(lastSyncedHash.get(wKey))) {
-      await syncWeekFromDrive(wKey); // hash changed — download + CRDT merge
-    }
-    // Also poll colors — check resetToken first, then contentHash
+    // Colors / reset-token check runs unconditionally — not gated on week file existence.
     const colorsId = driveFileIdCache.get('colors');
     if (colorsId) {
       const cResp = await fetch(
@@ -3744,6 +3732,20 @@ async function pollDriveMeta(wKey) {
           await syncColorsFromDrive();
         }
       }
+    }
+
+    // Week file hash check — skip if file not yet in Drive
+    const fileId = driveFileIdCache.get(wKey);
+    if (!fileId) return;
+    const resp = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`,
+      { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
+    );
+    if (!resp.ok) return;
+    const { appProperties } = await resp.json();
+    const remoteHash = appProperties?.contentHash;
+    if (remoteHash && remoteHash !== String(lastSyncedHash.get(wKey))) {
+      await syncWeekFromDrive(wKey); // hash changed — download + CRDT merge
     }
   } catch { /* silent — next poll will retry */ }
 }
@@ -3767,6 +3769,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   colorsSyncedHash = null;
   setSyncStatus('syncing', 'New data detected — resyncing from Drive…');
   await initDriveSync();
+  startDrivePoll(currentWeekKey);
 }
 
 function startDrivePoll(wKey) {
