@@ -3508,7 +3508,7 @@ async function syncWeekToDrive(wKey) {
 }
 
 // Raw multipart PATCH for colors — no hash guard, no pull. Returns true on success.
-async function _uploadColorsToDrive() {
+async function _uploadColorsToDrive(resetToken) {
   const json = localStorage.getItem(COLORS_STORAGE_KEY);
   if (!json) return true;
   const hash = fnv1a32(json);
@@ -3520,7 +3520,9 @@ async function _uploadColorsToDrive() {
     try {
       const fileId = await getDriveFileId('colors');
       const boundary = 'ZenitWeek_' + Date.now();
-      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
+      const appProps = { savedAt: String(savedAt), contentHash: String(hash) };
+      if (resetToken) appProps.resetToken = resetToken;
+      const meta = JSON.stringify({ appProperties: appProps });
       const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
       const resp = await fetch(
         `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
@@ -3578,8 +3580,10 @@ async function forcePushAllToDrive() {
     if (results.some(r => !r)) allOk = false;
   }
 
-  // Upload colors
-  const colorsOk = await _uploadColorsToDrive();
+  // Upload colors last — resetToken in appProperties is the authoritative reset signal.
+  // Other browsers detect mismatch only after all weeks are already in Drive.
+  const resetToken = localStorage.getItem('zenit-week-reset-token') || '';
+  const colorsOk = await _uploadColorsToDrive(resetToken);
   if (!colorsOk) allOk = false;
 
   if (allOk) {
@@ -3701,7 +3705,7 @@ async function pollDriveMeta(wKey) {
     if (remoteHash && remoteHash !== String(lastSyncedHash.get(wKey))) {
       await syncWeekFromDrive(wKey); // hash changed — download + CRDT merge
     }
-    // Also poll colors
+    // Also poll colors — check resetToken first, then contentHash
     const colorsId = driveFileIdCache.get('colors');
     if (colorsId) {
       const cResp = await fetch(
@@ -3710,6 +3714,13 @@ async function pollDriveMeta(wKey) {
       );
       if (cResp.ok) {
         const { appProperties: cProps } = await cResp.json();
+        const remoteResetToken = cProps?.resetToken;
+        const localResetToken = localStorage.getItem('zenit-week-reset-token') || '';
+        if (remoteResetToken && remoteResetToken !== localResetToken) {
+          // Remote was force-pushed after an import — local data is obsolete, full resync
+          await _handleResetTokenMismatch(remoteResetToken);
+          return; // stop current poll cycle — initDriveSync takes over
+        }
         const remoteColorsHash = cProps?.contentHash;
         if (remoteColorsHash && remoteColorsHash !== colorsSyncedHash) {
           await syncColorsFromDrive();
@@ -3717,6 +3728,27 @@ async function pollDriveMeta(wKey) {
       }
     }
   } catch { /* silent — next poll will retry */ }
+}
+
+// Called when poll detects a resetToken mismatch — wipe local weeks and resync everything from Drive.
+async function _handleResetTokenMismatch(remoteResetToken) {
+  stopDrivePoll();
+  // Adopt the remote reset token so we don't loop
+  localStorage.setItem('zenit-week-reset-token', remoteResetToken);
+  // Wipe all local week data (keep non-week keys like theme, lang, auth state)
+  const weekKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.match(/^zenit-week-\d{4}-\d{2}$/)) weekKeys.push(key);
+  }
+  weekKeys.forEach(k => localStorage.removeItem(k));
+  // Clear sync caches so initDriveSync fetches fresh
+  driveFileIdCache.clear();
+  lastSyncedHash.clear();
+  etagCache.clear();
+  colorsSyncedHash = null;
+  setSyncStatus('syncing', 'New data detected — resyncing from Drive…');
+  await initDriveSync();
 }
 
 function startDrivePoll(wKey) {
@@ -4237,6 +4269,9 @@ function importAllData(file) {
         const normalized = normalizeImportKey(key);
         if (normalized) localStorage.setItem(normalized, value);
       });
+      // Generate a new reset token — other browsers that see a different token will wipe and resync.
+      // Token is set before import-pending so forcePushAllToDrive can read it.
+      localStorage.setItem('zenit-week-reset-token', crypto.randomUUID());
       // Mark import pending — Drive will be force-pushed on next sign-in or immediately if signed in
       localStorage.setItem('zenit-week-import-pending', '1');
       // Re-initialize in-place — preserves Google auth session
