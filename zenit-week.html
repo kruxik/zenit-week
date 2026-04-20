@@ -2441,6 +2441,7 @@ function takeSnapshot() {
   const _d = new Date();
   const todoOrderKey = `zenit-week-todo-order-${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
   const snapshot = {
+    weekKey:       currentWeekKey,
     weekData:      cleanData,
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
@@ -2448,6 +2449,8 @@ function takeSnapshot() {
     nextWeekRaw:   localStorage.getItem(storageKey(nextKey)),
     todoOrderKey,
     todoOrderRaw:  localStorage.getItem(todoOrderKey),
+    theme:         localStorage.getItem('zenit-week-theme'),
+    lang:          localStorage.getItem('zenit-week-lang'),
   };
   undoStack.push(JSON.stringify(snapshot));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
@@ -2507,6 +2510,7 @@ function _currentSnapshot() {
   const _d = new Date();
   const todoOrderKey = `zenit-week-todo-order-${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
   return JSON.stringify({
+    weekKey:       currentWeekKey,
     weekData,
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
@@ -2514,6 +2518,8 @@ function _currentSnapshot() {
     nextWeekRaw:   localStorage.getItem(storageKey(nextKey)),
     todoOrderKey,
     todoOrderRaw:  localStorage.getItem(todoOrderKey),
+    theme:         localStorage.getItem('zenit-week-theme'),
+    lang:          localStorage.getItem('zenit-week-lang'),
   });
 }
 
