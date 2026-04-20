@@ -3922,12 +3922,22 @@ function validateAndRepair(data) {
   return data;
 }
 
+function migrateCrdt(data) {
+  if (!Array.isArray(data.tombstones)) data.tombstones = [];
+  if (typeof data.crdtVersion !== 'number') data.crdtVersion = 0;
+  const fallbackTs = typeof data.savedAt === 'number' ? data.savedAt : 0;
+  (data.nodes || []).forEach(n => {
+    if (typeof n._ts !== 'number') n._ts = fallbackTs;
+  });
+  return data;
+}
+
 function loadWeek(wk) {
   const raw = localStorage.getItem(storageKey(wk));
   if (raw) {
     try {
       const data = JSON.parse(raw);
-      return validateAndRepair(data);
+      return migrateCrdt(validateAndRepair(data));
     } catch(e) {
       console.warn(`[zenit-week] Failed to parse week data for key ${wk} — using defaults:`, e);
     }
@@ -3957,13 +3967,15 @@ function loadWeek(wk) {
   return defaultWeekData();
 }
 function saveWeek(wk, data) {
-  data.savedAt = Date.now(); // TASK-14: timestamp for conflict resolution
+  data.savedAt = Date.now();
+  data.crdtVersion = (data.crdtVersion || 0) + 1;
+  if (!Array.isArray(data.tombstones)) data.tombstones = [];
   try {
     localStorage.setItem(storageKey(wk), JSON.stringify(data));
   } catch(e) {
     console.error('[zenit-week] Failed to save week data — localStorage may be full:', e);
   }
-  scheduleDriveSync(wk); // TASK-10: debounced upload
+  scheduleDriveSync(wk);
 }
 
 function exportAllData() {
@@ -4307,10 +4319,12 @@ function defaultWeekData(prevLabels) {
   const l = prevLabels || {};
   return {
     nodes: [
-      { id: 'work',   type: 'branch', branch: 'work',   label: l.work   || 'Work',   children: [] },
-      { id: 'family', type: 'branch', branch: 'family', label: l.family || 'Family', children: [] },
-      { id: 'me',     type: 'branch', branch: 'me',     label: l.me     || 'Me',     children: [] },
-    ]
+      { id: 'work',   type: 'branch', branch: 'work',   label: l.work   || 'Work',   children: [], _ts: 0 },
+      { id: 'family', type: 'branch', branch: 'family', label: l.family || 'Family', children: [], _ts: 0 },
+      { id: 'me',     type: 'branch', branch: 'me',     label: l.me     || 'Me',     children: [], _ts: 0 },
+    ],
+    tombstones: [],
+    crdtVersion: 0,
   };
 }
 
