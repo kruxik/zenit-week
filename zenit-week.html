@@ -2652,6 +2652,8 @@ function saveBranchColors() {
   Object.keys(BRANCH_COLORS).forEach(b => {
     toSave[b] = { main: BRANCH_COLORS[b].main };
   });
+  toSave.theme = localStorage.getItem('zenit-week-theme') || 'light';
+  toSave.lang  = currentLang || 'en';
   localStorage.setItem(COLORS_STORAGE_KEY, JSON.stringify(toSave));
   scheduleColorsSync();
 }
@@ -2689,6 +2691,7 @@ function applyTheme(theme) {
   render();
   updateColorDots();
   updateSummary();
+  saveBranchColors(); // propagate theme change to Drive via colors file
   // syncThemeToggleUI() is called by the toggle click handler after applyTheme
 }
 function getThemeColors() {
@@ -3122,11 +3125,16 @@ function mergeWeekData(local, remote) {
     });
 
     // 5. validateAndRepair handles orphan GC and missing default branches
+    // baseline: remote wins (LWW by savedAt — remote is the more recently saved side)
+    const mergedBaseline = (remote.savedAt||0) >= (local.savedAt||0)
+      ? (remote.baseline ?? local.baseline)
+      : (local.baseline ?? remote.baseline);
     const merged = validateAndRepair({
       nodes: sorted,
       tombstones: Array.from(tombstones),
       savedAt: Math.max(local.savedAt||0, remote.savedAt||0),
       crdtVersion: Math.max(local.crdtVersion||0, remote.crdtVersion||0) + 1,
+      ...(mergedBaseline !== undefined && { baseline: mergedBaseline }),
     });
 
     return migrateCrdt(merged);
@@ -3668,6 +3676,16 @@ async function syncColorsFromDrive() {
     if (remoteSavedAt > localSavedAt) {
       localStorage.setItem(COLORS_STORAGE_KEY, remoteJson);
       loadBranchColors();
+      // Apply theme and lang bundled in colors file
+      if (remoteData.theme) {
+        localStorage.setItem('zenit-week-theme', remoteData.theme);
+        document.documentElement.dataset.theme = remoteData.theme === 'dark' ? 'dark' : '';
+      }
+      if (remoteData.lang && remoteData.lang !== currentLang) {
+        currentLang = remoteData.lang;
+        localStorage.setItem('zenit-week-lang', remoteData.lang);
+        applyTranslations();
+      }
       updateColorDots();
       updateSvgFilters();
       render();
@@ -4043,6 +4061,7 @@ function setLanguage(lang) {
   localStorage.setItem('zenit-week-lang', lang);
   applyTranslations();
   render();
+  saveBranchColors(); // propagate lang change to Drive via colors file
 }
 
 function formatWeekLabel(year, week) {
@@ -4171,8 +4190,10 @@ function migrateCrdt(data) {
   if (!Array.isArray(data.tombstones)) data.tombstones = [];
   if (typeof data.crdtVersion !== 'number') data.crdtVersion = 0;
   const fallbackTs = typeof data.savedAt === 'number' ? data.savedAt : 0;
-  (data.nodes || []).forEach(n => {
-    if (typeof n._ts !== 'number') n._ts = fallbackTs;
+  (data.nodes || []).forEach((n, i) => {
+    // Use fallbackTs + index so migrated nodes have unique, deterministic _ts values.
+    // This makes mergeWeekData's sort stable and preserves original insertion order.
+    if (typeof n._ts !== 'number') n._ts = fallbackTs + i;
   });
   return data;
 }
