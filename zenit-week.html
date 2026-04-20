@@ -4052,13 +4052,14 @@ function transferUnfinished() {
       oldToNew.set(c.id, existing.id);
     } else {
       const id = genId();
-      const newNode = { 
-        ...c, 
-        id, 
-        prevId: c.id, 
-        done: false, 
-        unplanned: false, 
-        children: [] 
+      const newNode = {
+        ...c,
+        id,
+        prevId: c.id,
+        done: false,
+        unplanned: false,
+        children: [],
+        _ts: Date.now(),
       };
       if (newNode.type === 'counter') newNode.val = 0;
       newNodes.push(newNode);
@@ -4167,6 +4168,7 @@ function transferReusable() {
         done: false,
         unplanned: false,
         children: [],
+        _ts: Date.now(),
       };
       if (isAncestor) {
         delete newNode.reusable; // shell — not marked reusable
@@ -4274,6 +4276,7 @@ function moveNodeToNextWeek(nodeId) {
       id: newId,
       parent: oldToNew.get(n.parent) || n.parent,
       children: n.children.map(cid => oldToNew.get(cid)).filter(Boolean),
+      _ts: Date.now(),
     };
     nextData.nodes.push(newNode);
     nextById.set(newId, newNode);
@@ -4293,7 +4296,9 @@ function moveNodeToNextWeek(nodeId) {
   const originalParent = findNode(originalParentId);
   if (originalParent) {
     originalParent.children = originalParent.children.filter(c => !toRemove.has(c));
+    touchNode(originalParentId);
   }
+  tombstoneNodes([...toRemove]);
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
 
@@ -4302,8 +4307,10 @@ function moveNodeToNextWeek(nodeId) {
   while (pruneTarget && pruneTarget.type === 'activity' && pruneTarget.children.length === 0) {
     const pruneParentId = pruneTarget.parent;
     const pruneParent = findNode(pruneParentId);
+    tombstoneNodes([pruneTarget.id]);
     if (pruneParent) {
       pruneParent.children = pruneParent.children.filter(c => c !== pruneTarget.id);
+      touchNode(pruneParentId);
     }
     weekData.nodes = weekData.nodes.filter(n => n.id !== pruneTarget.id);
     rebuildNodeMap();
@@ -4335,6 +4342,18 @@ function genId() {
 
 function findNode(id) {
   return nodeMap.get(id);
+}
+
+function touchNode(id) {
+  const node = findNode(id);
+  if (node) node._ts = Date.now();
+}
+
+function tombstoneNodes(ids) {
+  if (!Array.isArray(weekData.tombstones)) weekData.tombstones = [];
+  for (const id of ids) {
+    if (!weekData.tombstones.includes(id)) weekData.tombstones.push(id);
+  }
 }
 
 function isHighPriority(nodeId) {
@@ -4438,10 +4457,12 @@ function addNode(parentId, label) {
     done: false,
     unplanned: parent.unplanned || false,
     children: [],
+    _ts: Date.now(),
   };
   weekData.nodes.push(node);
   rebuildNodeMap();
   parent.children.push(node.id);
+  touchNode(parentId);
   saveWeek(currentWeekKey, weekData);
   render();
 }
@@ -4470,6 +4491,7 @@ function addBranch(side) {
     side,
     children: [],
     _editing: true,
+    _ts: Date.now(),
   };
   // Insert among branches, at the end of the branch list
   const lastBranchIdx = weekData.nodes.reduce((last, n, i) => n.type === 'branch' ? i : last, -1);
@@ -4486,6 +4508,7 @@ function deleteBranch(id) {
   if (branches.length <= 1) return; // must keep at least one
   takeSnapshot();
   const toRemove = new Set([id, ...getDescendantIds(id)]);
+  tombstoneNodes([...toRemove]);
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   delete BRANCH_COLORS[id];
   delete BRANCH_CONFIG[id];
@@ -4502,11 +4525,15 @@ function deleteNode(id) {
 
   takeSnapshot();
   const toRemove = new Set([id, ...getDescendantIds(id)]);
+  tombstoneNodes([...toRemove]);
 
   // Remove from parent's children list
   if (node.parent) {
     const parent = findNode(node.parent);
-    if (parent) parent.children = parent.children.filter(c => c !== id);
+    if (parent) {
+      parent.children = parent.children.filter(c => c !== id);
+      touchNode(node.parent);
+    }
   }
 
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
@@ -4520,6 +4547,7 @@ function renameNode(id, label) {
   if (!node || !label.trim()) return;
   takeSnapshot();
   node.label = label.trim();
+  touchNode(id);
   saveWeek(currentWeekKey, weekData);
   render();
 }
@@ -4549,6 +4577,7 @@ function setStatus(id, status) {
     (n.children || []).forEach(cid => {
       const child = findNode(cid);
       if (!child) return;
+      touchNode(cid);
 
       if (newStatus === 'done') {
         child.done = true;
@@ -4587,6 +4616,7 @@ function setStatus(id, status) {
       const child = findNode(cid);
       if (child) {
         child.priority = prio;
+        touchNode(cid);
         setPriorityDescendants(cid, prio);
       }
     });
@@ -4598,39 +4628,45 @@ function setStatus(id, status) {
     node.done = true;
     node.doneAt = new Date().toISOString();
     if (node.type === 'counter') node.val = node.max;
+    touchNode(id);
     setDescendants(id, 'done');
     syncStatusUp(id, 'done');
   } else if (status === 'undone') {
     node.done = false;
     delete node.doneAt;
     if (node.type === 'counter') node.val = Math.max(0, (node.val || 0) - 1);
+    touchNode(id);
     setDescendants(id, 'undone');
     syncStatusUp(id, 'done');
   } else if (status === 'unplanned') {
     node.unplanned = true;
     node.unplannedAt = new Date().toISOString();
+    touchNode(id);
     setDescendants(id, 'unplanned');
     syncStatusUp(id, 'unplanned');
     fullRenderNeeded = true;
   } else if (status === 'planned') {
     node.unplanned = false;
     delete node.unplannedAt;
+    touchNode(id);
     setDescendants(id, 'planned');
     syncStatusUp(id, 'unplanned');
     fullRenderNeeded = true;
-  }
- else if (status === 'prio-high') {
+  } else if (status === 'prio-high') {
     const newVal = (node.priority === 'high') ? null : 'high';
     node.priority = newVal;
+    touchNode(id);
     setPriorityDescendants(id, newVal);
     fullRenderNeeded = true;
   } else if (status === 'prio-critical') {
     const newVal = (node.priority === 'critical') ? null : 'critical';
     node.priority = newVal;
+    touchNode(id);
     setPriorityDescendants(id, newVal);
     fullRenderNeeded = true;
   } else if (status === 'prio-normal') {
     node.priority = null;
+    touchNode(id);
     setPriorityDescendants(id, null);
     fullRenderNeeded = true;
   }
@@ -5177,6 +5213,7 @@ function startAddNode(parentId) {
     id, type: 'activity', branch, parent: parentId,
     label: '', done: false, unplanned: parent.unplanned || false, children: [],
     _editing: true,
+    _ts: Date.now(),
   };
   weekData.nodes.push(node);
   rebuildNodeMap();
@@ -5250,7 +5287,8 @@ function commitEdit(followUp = 'auto') {
   if (node) {
     node.label = label;
     delete node._editing;
-    
+    touchNode(nodeId);
+
     // Counter auto-creation (not applicable to branch nodes)
     // max = max(Nx value, number of day indicators) — whichever is higher wins
     const nxMatch = node.type !== 'branch' && label.match(/(\d+)x/);
@@ -5269,6 +5307,7 @@ function commitEdit(followUp = 'auto') {
         if (maxVal < oldMax && counterNode.ticks && counterNode.ticks.length > maxVal - 1) {
           counterNode.ticks.splice(maxVal - 1);
         }
+        touchNode(counterNode.id);
         // S2: if val no longer reaches new max, reopen counter and parent
         if (counterNode.val < counterNode.max && counterNode.done) {
           counterNode.done = false;
@@ -5292,19 +5331,23 @@ function commitEdit(followUp = 'auto') {
           val: 0,
           max: maxVal,
           unplanned: node.unplanned || false,
-          children: []
+          children: [],
+          _ts: Date.now(),
         };
         weekData.nodes.push(counterNode);
         rebuildNodeMap();
         node.children.push(counterId);
+        touchNode(nodeId);
       }
     } else {
       // S1: no Nx and no day indicators — remove any existing counter child
       const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
       if (counterNode) {
+        tombstoneNodes([counterNode.id]);
         node.children = node.children.filter(id => id !== counterNode.id);
         weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
         rebuildNodeMap();
+        touchNode(nodeId);
         if (node.done) {
           node.done = false;
           delete node.doneAt;
@@ -5394,6 +5437,7 @@ function syncStatusUp(nodeId, prop) {
   if (parent[prop] !== allTrue) {
     if (parent.type !== 'branch') {
       parent[prop] = allTrue;
+      touchNode(parent.id);
       if (prop === 'done') {
         if (allTrue) parent.doneAt = new Date().toISOString();
         else delete parent.doneAt;
@@ -5805,6 +5849,7 @@ function updateCounter(id, dir) {
     if (dir === 1 && !isMax) node.ticks.push(new Date().toISOString());
     else if (dir === -1 && node.ticks.length > 0) node.ticks.pop();
 
+    touchNode(id);
     syncStatusUp(id, 'done');
 
     saveWeek(currentWeekKey, weekData);
@@ -6263,6 +6308,7 @@ document.getElementById('ctx-reset').addEventListener('click', () => {
       node.done = false;
       delete node.doneAt;
       node.ticks = [];
+      touchNode(contextTarget);
       syncStatusUp(contextTarget, 'done');
       saveWeek(currentWeekKey, weekData);
       updateNodeUI(contextTarget);
@@ -6290,6 +6336,7 @@ document.getElementById('ctx-reusable').addEventListener('click', () => {
         const node = findNode(id);
         if (!node || node.type === 'counter') return;
         node.reusable = newVal;
+        touchNode(id);
         (node.children || []).forEach(setReusable);
       }
       setReusable(contextTarget);
@@ -6539,7 +6586,7 @@ window.addEventListener('pointerup', (e) => {
       if (panX !== panStartPanX || panY !== panStartPanY) {
         takeSnapshot();
         weekData.nodes.forEach(n => {
-          if (n.type !== 'center') { n.offX = 0; n.offY = 0; }
+          if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchNode(n.id); }
         });
         saveWeek(currentWeekKey, weekData);
         render();
@@ -6593,17 +6640,22 @@ function handleNodeDrop(mouseX, mouseY) {
     // Remove from old parent
     if (node.parent) {
       const oldParent = findNode(node.parent);
-      if (oldParent) oldParent.children = oldParent.children.filter(id => id !== nodeId);
+      if (oldParent) {
+        oldParent.children = oldParent.children.filter(id => id !== nodeId);
+        touchNode(node.parent);
+      }
     }
     // Set new parent
     const newParent = findNode(targetParentId);
     node.parent = targetParentId;
     node.branch = newParent.branch || newParent.id;
     newParent.children.push(nodeId);
-    
+    touchNode(targetParentId);
+
     // Reset offsets for clean snap to new parent
     node.offX = 0;
     node.offY = 0;
+    touchNode(nodeId);
   } else {
     // EXISTING REORDER/PAN LOGIC
     if (node.parent) {
@@ -6618,6 +6670,7 @@ function handleNodeDrop(mouseX, mouseY) {
           }
         }
         parent.children.splice(insertIdx, 0, nodeId);
+        touchNode(node.parent);
       }
     } else if (node.type === 'branch') {
       const newSide = svgX < 0 ? 'left' : 'right';
@@ -6638,8 +6691,9 @@ function handleNodeDrop(mouseX, mouseY) {
       otherBranches.splice(insertIdx, 0, node);
       weekData.nodes = [...otherBranches, ...nonBranches];
       rebuildNodeMap();
+      touchNode(nodeId);
     }
-    
+
     // Clear offsets for descendants
     function clearDescendantOffsets(nid) {
       const n = findNode(nid);
@@ -6649,6 +6703,7 @@ function handleNodeDrop(mouseX, mouseY) {
           if (child) {
             child.offX = 0;
             child.offY = 0;
+            touchNode(cid);
             clearDescendantOffsets(cid);
           }
         });
@@ -6664,6 +6719,7 @@ function handleNodeDrop(mouseX, mouseY) {
       node.offX = svgX - nat.x;
       node.offY = svgY - nat.y;
     }
+    touchNode(nodeId);
   }
 
   saveWeek(currentWeekKey, weekData);
