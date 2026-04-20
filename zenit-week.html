@@ -2420,6 +2420,7 @@ function iconSvg(name) {
 let undoStack = [];
 let redoStack = [];
 const MAX_UNDO = 100;
+let _applyingSnapshot = false;
 
 let nodeMap = new Map();
 
@@ -2459,6 +2460,15 @@ function takeSnapshot() {
 
 function _applySnapshot(raw) {
   const snapshot = JSON.parse(raw);
+
+  // Switch to the week this snapshot was taken on, without clearing the stacks
+  if (snapshot.weekKey && snapshot.weekKey !== currentWeekKey) {
+    _applyingSnapshot = true;
+    currentWeekKey = snapshot.weekKey;
+    location.hash = snapshot.weekKey;
+    _applyingSnapshot = false;
+  }
+
   // Support legacy snapshots that contain only weekData (plain object with nodes array)
   if (snapshot.nodes) {
     weekData = validateAndRepair(snapshot);
@@ -2499,6 +2509,22 @@ function _applySnapshot(raw) {
     } else {
       localStorage.setItem(snapshot.todoOrderKey, snapshot.todoOrderRaw);
     }
+  }
+
+  // Restore theme if snapshot captured it
+  if (snapshot.theme !== undefined) {
+    const t = snapshot.theme || 'light';
+    localStorage.setItem('zenit-week-theme', t);
+    document.documentElement.dataset.theme = t === 'dark' ? 'dark' : '';
+    reloadBranchPalettes();
+    updateSvgFilters();
+  }
+
+  // Restore language if snapshot captured it
+  if (snapshot.lang !== undefined && snapshot.lang) {
+    localStorage.setItem('zenit-week-lang', snapshot.lang);
+    currentLang = snapshot.lang;
+    applyTranslations();
   }
 
   render();
@@ -6695,21 +6721,18 @@ function loadAndRender(wk) {
   weekData = loadWeek(wk);
   rebuildNodeMap();
   syncBranchConfig();
-  undoStack = [];
-  redoStack = [];
   location.hash = wk;
   render();
 }
 
 window.addEventListener('hashchange', () => {
+  if (_applyingSnapshot) return;
   const hashWeek = location.hash.slice(1);
   if (/^\d{4}-\d{2}$/.test(hashWeek) && hashWeek !== currentWeekKey) {
     currentWeekKey = hashWeek;
     weekData = loadWeek(currentWeekKey);
     rebuildNodeMap();
     syncBranchConfig();
-    undoStack = [];
-    redoStack = [];
     render();
   }
 });
