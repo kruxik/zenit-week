@@ -2857,6 +2857,7 @@ let _isFirstConnection = false; // true when this browser has never synced with 
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
 let _pollTimer = null;          // setInterval handle for 30s background metadata poll
 const POLL_INTERVAL_MS = 30_000;
+let pendingRemoteMerge = null;  // { wKey, mergedData, mergedJson, mergedHash, scheduleUpload }
 let googleUserEmail = '';
 let googleUserPhoto = '';
 let googleUserInitials = '';
@@ -3125,6 +3126,40 @@ function mergeWeekData(local, remote) {
   }
 }
 
+// Apply a CRDT-merged result — defer if user is mid-edit on the current week.
+function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload) {
+  if (editState && wKey === currentWeekKey) {
+    // User is editing a node — queue and apply when they finish
+    pendingRemoteMerge = { wKey, mergedData, mergedJson, mergedHash, scheduleUpload };
+    return;
+  }
+  _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+}
+
+function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload) {
+  try {
+    localStorage.setItem(storageKey(wKey), mergedJson);
+  } catch (e) {
+    console.error('[Drive] Failed to write merged data to localStorage:', e);
+  }
+  if (wKey === currentWeekKey) {
+    weekData = mergedData;
+    rebuildNodeMap();
+    render();
+  }
+  lastSyncedHash.set(wKey, mergedHash);
+  lastSyncedAt = Date.now();
+  updateDropdownSyncTime();
+  if (scheduleUpload) scheduleDriveSync(wKey);
+}
+
+function _flushPendingMerge() {
+  if (!pendingRemoteMerge) return;
+  const { wKey, mergedData, mergedJson, mergedHash, scheduleUpload } = pendingRemoteMerge;
+  pendingRemoteMerge = null;
+  _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+}
+
 // ─── TASK-11: Load week data from Drive ───────────────────────────────────────
 async function syncWeekFromDrive(wKey) {
   if (!googleAccessToken) return;
@@ -3173,29 +3208,10 @@ async function syncWeekFromDrive(wKey) {
       const remoteData = migrateCrdt(JSON.parse(remoteJson));
       const mergedData = mergeWeekData(localData, remoteData);
       const mergedJson = JSON.stringify(mergedData);
-
-      try {
-        localStorage.setItem(storageKey(wKey), mergedJson);
-      } catch (e) {
-        console.error('[Drive] Failed to write merged data to localStorage:', e);
-      }
-
-      // Refresh the current view if this is the displayed week
-      if (wKey === currentWeekKey) {
-        weekData = mergedData;
-        rebuildNodeMap();
-        render();
-      }
-
       const mergedHash = fnv1a32(mergedJson);
-      lastSyncedHash.set(wKey, mergedHash);
-      lastSyncedAt = Date.now();
-      updateDropdownSyncTime();
+      const scheduleUpload = mergedHash !== fnv1a32(remoteJson);
 
-      // If merged result differs from remote, we have newer local nodes — upload
-      if (mergedHash !== fnv1a32(remoteJson)) {
-        scheduleDriveSync(wKey);
-      }
+      applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
       return;
 
     } catch (err) {
@@ -5448,7 +5464,7 @@ function commitEdit(followUp = 'auto') {
     }
 
     saveWeek(currentWeekKey, weekData);
-    
+    _flushPendingMerge();
     render();
 
     if (followUp === 'child') {
@@ -5489,6 +5505,7 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
     const node = findNode(nodeId);
     if (node) { node.label = originalLabel; delete node._editing; }
   }
+  _flushPendingMerge();
   render();
 }
 
