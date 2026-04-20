@@ -2625,11 +2625,12 @@ function loadBranchColors() {
 }
 
 function saveBranchColors() {
-  const toSave = {};
+  const toSave = { savedAt: Date.now() };
   Object.keys(BRANCH_COLORS).forEach(b => {
     toSave[b] = { main: BRANCH_COLORS[b].main };
   });
   localStorage.setItem(COLORS_STORAGE_KEY, JSON.stringify(toSave));
+  scheduleColorsSync();
 }
 
 function updateColorDots() {
@@ -2823,6 +2824,8 @@ let driveFileIdCache = new Map(); // weekKey → Drive file ID
 let lastSyncedHash = new Map();   // weekKey → FNV-1a hash of last uploaded JSON
 let etagCache = new Map();        // weekKey → ETag from last Drive pull
 let syncDebounceTimer = null;
+let colorsSyncDebounceTimer = null;
+let colorsSyncedHash = null;
 let tokenRenewalTimer = null;
 let _gapiInitialized = false;   // true after first loadGapiAndSync completes setup
 let _silentAttempt = false;     // true when requestAccessToken was called silently
@@ -2988,6 +2991,11 @@ function signOut() {
     clearTimeout(syncDebounceTimer);
     syncDebounceTimer = null;
   }
+  if (colorsSyncDebounceTimer) {
+    clearTimeout(colorsSyncDebounceTimer);
+    colorsSyncDebounceTimer = null;
+  }
+  colorsSyncedHash = null;
   const token = googleAccessToken;
   googleAccessToken = null;
   _gapiInitialized = false;
@@ -3245,6 +3253,10 @@ async function listAllDriveWeekFiles() {
 //   Step 4b — process rest sorted by proximity to today, 5 concurrent, downloads before uploads
 async function initDriveSync() {
   try {
+    // Sync global colors (not week-specific)
+    await syncColorsFromDrive();
+    await syncColorsToDrive();
+
     // Step 1
     const driveWeeks = await listAllDriveWeekFiles();
     const driveMap = new Map(driveWeeks.map(({ wKey, savedAt }) => [wKey, savedAt]));
@@ -3386,14 +3398,97 @@ async function syncWeekToDrive(wKey) {
   }
 }
 
-// Resets the 30-second debounce timer; called from saveWeek()
+// Resets the 10-second debounce timer; called from saveWeek()
 function scheduleDriveSync(wKey) {
   if (!googleAccessToken) return;
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
   syncDebounceTimer = setTimeout(() => {
     syncDebounceTimer = null;
     syncWeekToDrive(wKey);
-  }, 30000);
+  }, 10000);
+}
+
+async function syncColorsToDrive() {
+  if (!googleAccessToken) return;
+  const json = localStorage.getItem(COLORS_STORAGE_KEY);
+  if (!json) return;
+  const hash = fnv1a32(json);
+  if (colorsSyncedHash === hash) return;
+  setSyncStatus('syncing', 'Syncing with Google Drive…');
+  let savedAt = 0;
+  try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
+  const MAX_RETRIES = 3;
+  let delay = 1000;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const fileId = await getDriveFileId('colors');
+      const boundary = 'ZenitWeek_' + Date.now();
+      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt) } });
+      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
+      const resp = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        { method: 'PATCH', headers: { 'Authorization': `Bearer ${googleAccessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+      );
+      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+        delay *= 2;
+        continue;
+      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      colorsSyncedHash = hash;
+      lastSyncedAt = Date.now();
+      updateDropdownSyncTime();
+      setSyncStatus('connected', 'Synced with Google Drive');
+      return;
+    } catch (err) {
+      if (attempt >= MAX_RETRIES) {
+        console.error('[Drive] syncColorsToDrive error:', err);
+        setSyncStatus('error', 'Sync failed — changes saved locally');
+        return;
+      }
+    }
+  }
+}
+
+async function syncColorsFromDrive() {
+  if (!googleAccessToken) return;
+  try {
+    const fileId = await getDriveFileId('colors');
+    const resp = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
+    );
+    if (resp.status === 404) return;
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const remoteJson = await resp.text();
+    if (!remoteJson.trim()) return;
+    const remoteData = JSON.parse(remoteJson);
+    const remoteSavedAt = remoteData.savedAt ?? 0;
+    const localJson = localStorage.getItem(COLORS_STORAGE_KEY);
+    let localSavedAt = 0;
+    if (localJson) { try { localSavedAt = JSON.parse(localJson).savedAt ?? 0; } catch { /* ignore */ } }
+    if (remoteSavedAt > localSavedAt) {
+      localStorage.setItem(COLORS_STORAGE_KEY, remoteJson);
+      loadBranchColors();
+      updateColorDots();
+      updateSvgFilters();
+      render();
+      colorsSyncedHash = fnv1a32(remoteJson);
+      lastSyncedAt = Date.now();
+      updateDropdownSyncTime();
+    }
+  } catch (err) {
+    console.error('[Drive] syncColorsFromDrive error:', err);
+  }
+}
+
+function scheduleColorsSync() {
+  if (!googleAccessToken) return;
+  if (colorsSyncDebounceTimer) clearTimeout(colorsSyncDebounceTimer);
+  colorsSyncDebounceTimer = setTimeout(() => {
+    colorsSyncDebounceTimer = null;
+    syncColorsToDrive();
+  }, 10000);
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -6637,9 +6732,12 @@ document.addEventListener('visibilitychange', () => {
   if (!googleAccessToken) return;
   if (document.visibilityState === 'hidden') {
     if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
+    if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
     syncWeekToDrive(currentWeekKey);
+    syncColorsToDrive();
   } else {
     syncWeekFromDrive(currentWeekKey); // pull before next edit
+    syncColorsFromDrive();
   }
 });
 
@@ -6647,6 +6745,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('beforeunload', () => {
   if (!googleAccessToken) return;
   syncWeekToDrive(currentWeekKey);
+  syncColorsToDrive();
 });
 
 // ─── Generic Confirm Dialog ───────────────────────────────────────────────────
