@@ -2989,6 +2989,10 @@ function handleTokenResponse(tokenResponse) {
   } else {
     // Token renewal: GAPI already initialized, just update the token
     if (window.gapi?.client) gapi.client.setToken({ access_token: googleAccessToken });
+    // If an import happened while signed out, force-push on token renewal
+    if (localStorage.getItem('zenit-week-import-pending')) {
+      forcePushAllToDrive();
+    }
   }
 }
 
@@ -3337,6 +3341,11 @@ async function listAllDriveWeekFiles() {
 //   Step 4a — process current ±1 week first, sequentially
 //   Step 4b — process rest sorted by proximity to today, 5 concurrent
 async function initDriveSync() {
+  // If an import is pending, bypass normal reconciliation — local is source of truth
+  if (localStorage.getItem('zenit-week-import-pending')) {
+    await forcePushAllToDrive();
+    return;
+  }
   try {
     // Sync global colors (not week-specific)
     await syncColorsFromDrive();
@@ -3430,22 +3439,9 @@ function fnv1a32(str) {
   return hash;
 }
 
-async function syncWeekToDrive(wKey) {
-  if (!googleAccessToken) return;
-
-  // Pull-merge-push: fetch Drive content first, CRDT-merge, then upload.
-  // This ensures we never overwrite concurrent changes from another device.
-  await syncWeekFromDrive(wKey);
-
-  // Re-read local after merge (syncWeekFromDrive may have updated it)
-  const json = localStorage.getItem(storageKey(wKey));
-  if (!json) return;
-
+// Raw multipart PATCH to Drive — no pull, no merge. Returns true on success.
+async function _uploadWeekToDrive(wKey, json) {
   const hash = fnv1a32(json);
-  if (lastSyncedHash.get(wKey) === hash) return; // no change after merge — skip upload
-
-  setSyncStatus('syncing', 'Syncing with Google Drive…');
-
   let savedAt = 0;
   try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
 
@@ -3454,12 +3450,9 @@ async function syncWeekToDrive(wKey) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const fileId = await getDriveFileId(wKey);
-
-      // Multipart upload: metadata (appProperties.savedAt + contentHash) + content
       const boundary = 'ZenitWeek_' + Date.now();
       const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
       const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-
       const resp = await fetch(
         `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
         {
@@ -3480,16 +3473,123 @@ async function syncWeekToDrive(wKey) {
       lastSyncedHash.set(wKey, hash);
       lastSyncedAt = Date.now();
       updateDropdownSyncTime();
-      setSyncStatus('connected', 'Synced with Google Drive');
-      return;
+      return true;
     } catch (err) {
       if (attempt >= MAX_RETRIES) {
-        console.error('[Drive] syncWeekToDrive error:', err);
-        setSyncStatus('error', 'Sync failed — changes saved locally');
-        return;
+        console.error(`[Drive] _uploadWeekToDrive(${wKey}) error:`, err);
+        return false;
       }
     }
   }
+  return false;
+}
+
+async function syncWeekToDrive(wKey) {
+  if (!googleAccessToken) return;
+
+  // Pull-merge-push: fetch Drive content first, CRDT-merge, then upload.
+  // This ensures we never overwrite concurrent changes from another device.
+  await syncWeekFromDrive(wKey);
+
+  // Re-read local after merge (syncWeekFromDrive may have updated it)
+  const json = localStorage.getItem(storageKey(wKey));
+  if (!json) return;
+
+  const hash = fnv1a32(json);
+  if (lastSyncedHash.get(wKey) === hash) return; // no change after merge — skip upload
+
+  setSyncStatus('syncing', 'Syncing with Google Drive…');
+  const ok = await _uploadWeekToDrive(wKey, json);
+  if (ok) {
+    setSyncStatus('connected', 'Synced with Google Drive');
+  } else {
+    setSyncStatus('error', 'Sync failed — changes saved locally');
+  }
+}
+
+// Raw multipart PATCH for colors — no hash guard, no pull. Returns true on success.
+async function _uploadColorsToDrive() {
+  const json = localStorage.getItem(COLORS_STORAGE_KEY);
+  if (!json) return true;
+  const hash = fnv1a32(json);
+  let savedAt = 0;
+  try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
+  const MAX_RETRIES = 3;
+  let delay = 1000;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const fileId = await getDriveFileId('colors');
+      const boundary = 'ZenitWeek_' + Date.now();
+      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
+      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
+      const resp = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        { method: 'PATCH', headers: { 'Authorization': `Bearer ${googleAccessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+      );
+      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+        delay *= 2;
+        continue;
+      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      colorsSyncedHash = hash;
+      return true;
+    } catch (err) {
+      if (attempt >= MAX_RETRIES) {
+        console.error('[Drive] _uploadColorsToDrive error:', err);
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
+// Force-push all local weeks to Drive without pulling first.
+// Used after import to make local data the unconditional source of truth.
+// The import-pending flag is cleared only when every upload succeeds.
+async function forcePushAllToDrive() {
+  if (!googleAccessToken) return;
+
+  stopDrivePoll();
+  driveFileIdCache.clear();
+  lastSyncedHash.clear();
+  etagCache.clear();
+  colorsSyncedHash = null;
+
+  setSyncStatus('syncing', 'Uploading imported data to Drive…');
+
+  // Collect all local week keys
+  const weekKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const m = key?.match(/^zenit-week-(\d{4}-\d{2})$/);
+    if (m) weekKeys.push(m[1]);
+  }
+
+  // Upload all weeks (5 concurrent) and track failures
+  let allOk = true;
+  const CONCURRENCY = 5;
+  for (let i = 0; i < weekKeys.length; i += CONCURRENCY) {
+    const batch = weekKeys.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(batch.map(wKey => {
+      const json = localStorage.getItem(storageKey(wKey));
+      return json ? _uploadWeekToDrive(wKey, json) : Promise.resolve(true);
+    }));
+    if (results.some(r => !r)) allOk = false;
+  }
+
+  // Upload colors
+  const colorsOk = await _uploadColorsToDrive();
+  if (!colorsOk) allOk = false;
+
+  if (allOk) {
+    localStorage.removeItem('zenit-week-import-pending');
+    setSyncStatus('connected', 'Imported data synced to Drive');
+  } else {
+    setSyncStatus('error', 'Import sync incomplete — will retry on next sign-in');
+  }
+
+  startDrivePoll(currentWeekKey);
 }
 
 // Resets the 10-second debounce timer; called from saveWeek()
@@ -4137,6 +4237,8 @@ function importAllData(file) {
         const normalized = normalizeImportKey(key);
         if (normalized) localStorage.setItem(normalized, value);
       });
+      // Mark import pending — Drive will be force-pushed on next sign-in or immediately if signed in
+      localStorage.setItem('zenit-week-import-pending', '1');
       // Re-initialize in-place — preserves Google auth session
       undoStack = [];
       redoStack = [];
@@ -6918,7 +7020,13 @@ function loadAndRender(wk) {
   syncBranchConfig();
   location.hash = wk;
   render();
-  if (googleAccessToken) startDrivePoll(wk);
+  if (googleAccessToken) {
+    if (localStorage.getItem('zenit-week-import-pending')) {
+      forcePushAllToDrive();
+    } else {
+      startDrivePoll(wk);
+    }
+  }
 }
 
 window.addEventListener('hashchange', () => {
