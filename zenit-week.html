@@ -3145,16 +3145,19 @@ function mergeWeekData(local, remote) {
     });
 
     // 5. validateAndRepair handles orphan GC and missing default branches
-    // baseline: remote wins (LWW by savedAt — remote is the more recently saved side)
-    const mergedBaseline = (remote.savedAt||0) >= (local.savedAt||0)
-      ? (remote.baseline ?? local.baseline)
-      : (local.baseline ?? remote.baseline);
+    // baseline + todoOrder: winner (higher savedAt) takes precedence per field.
+    const winnerSide = (remote.savedAt||0) >= (local.savedAt||0) ? remote : local;
+    const loserSide  = (remote.savedAt||0) >= (local.savedAt||0) ? local  : remote;
+    const mergedBaseline = winnerSide.baseline ?? loserSide.baseline;
+    // todoOrder: per-date arrays — winner's dates override loser's, loser fills any missing dates.
+    const mergedTodoOrder = { ...(loserSide.todoOrder || {}), ...(winnerSide.todoOrder || {}) };
     const merged = validateAndRepair({
       nodes: sorted,
       tombstones: Array.from(tombstones),
       savedAt: Math.max(local.savedAt||0, remote.savedAt||0),
       crdtVersion: Math.max(local.crdtVersion||0, remote.crdtVersion||0) + 1,
       ...(mergedBaseline !== undefined && { baseline: mergedBaseline }),
+      todoOrder: mergedTodoOrder,
     });
 
     return migrateCrdt(merged);
