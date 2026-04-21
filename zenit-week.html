@@ -3185,7 +3185,10 @@ function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUp
     rebuildNodeMap();
     render();
   }
-  lastSyncedHash.set(wKey, mergedHash);
+  // Only mark as synced when merged == remote (nothing to push).
+  // When scheduleUpload is true, keep lastSyncedHash at its pre-merge value so
+  // syncWeekToDrive sees hash(localStorage) != lastSyncedHash and uploads.
+  if (!scheduleUpload) lastSyncedHash.set(wKey, mergedHash);
   lastSyncedAt = Date.now();
   updateDropdownSyncTime();
   if (scheduleUpload) scheduleDriveSync(wKey);
