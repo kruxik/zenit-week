@@ -5784,6 +5784,29 @@ inlineInput.addEventListener('blur', () => { if (editState) commitEdit(); });
 inlineInput.addEventListener('pointerdown', (e) => e.stopPropagation());
 inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 
+// On mobile, re-pan when soft keyboard opens and shrinks the visible viewport
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    if (!editState) return;
+    const vv = window.visualViewport;
+    const positions = computeLayout();
+    const pos = positions[editState.nodeId];
+    if (!pos) return;
+
+    const rect = container.getBoundingClientRect();
+    // Place node at 38% from top of visible area (comfortably above keyboard)
+    const targetScreenY = vv.offsetTop + vv.height * 0.38;
+    panY = targetScreenY - rect.top - pos.y * zoom;
+    applyTransform();
+
+    // Keep inline input overlay locked over node
+    const iW = inlineInput.offsetWidth;
+    const iH = inlineInput.offsetHeight;
+    inlineInput.style.left = (rect.left + panX + pos.x * zoom - iW / 2) + 'px';
+    inlineInput.style.top  = (rect.top  + panY + pos.y * zoom - iH / 2) + 'px';
+  });
+}
+
 // ─── Surgical UI Updates ──────────────────────────────────────────────────────
 function syncStatusUp(nodeId, prop) {
   const node = findNode(nodeId);
