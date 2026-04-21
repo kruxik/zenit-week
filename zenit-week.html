@@ -3805,7 +3805,8 @@ const activePointers = new Map(); // pointerId → {x, y} — for pinch-to-zoom
 let pinchLastDist = null;
 
 let contextTarget = null;  // node id
-let editState = null;      // { nodeId, isNew, originalLabel }
+let editState = null;           // { nodeId, isNew, originalLabel }
+let _editJustCommitted = false; // true for 600ms after commit, guards resize handler
 let hoveredNodeId = null;  // Track currently hovered node
 let currentViewLevel = 'full'; // 'full' | 'pebbles' | 'rocks'
 
@@ -5591,6 +5592,9 @@ function commitEdit(followUp = 'auto') {
   if (!editState) return;
   const { nodeId, isNew, originalLabel } = editState;
   editState = null;
+  // Keyboard dismissal fires resize after editState clears; guard for 600ms
+  _editJustCommitted = true;
+  setTimeout(() => { _editJustCommitted = false; }, 600);
 
   if (!label) {
     // Empty label → treat as cancel
@@ -7959,7 +7963,7 @@ window.addEventListener('resize', () => {
   const svg = document.getElementById('main-svg');
   const w = svg.clientWidth || 800;
   const h = svg.clientHeight || 600;
-  if (!editState && (panX < -w || panX > 2 * w || panY < -h || panY > 2 * h)) {
+  if (!editState && !_editJustCommitted && (panX < -w || panX > 2 * w || panY < -h || panY > 2 * h)) {
     resetView();
   }
   if (typeof editState !== 'undefined' && editState) {
