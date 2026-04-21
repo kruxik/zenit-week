@@ -4695,8 +4695,13 @@ function defaultWeekData(prevLabels) {
 }
 
 function genId() {
-  const uuid = crypto.randomUUID().replace(/-/g, '');
-  return 'n' + uuid.slice(0, 12);
+  if (crypto.randomUUID) {
+    return 'n' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+  }
+  // Fallback for non-secure contexts (plain HTTP)
+  const arr = new Uint8Array(6);
+  crypto.getRandomValues(arr);
+  return 'n' + Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function findNode(id) {
