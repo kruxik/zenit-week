@@ -5520,6 +5520,8 @@ function resizeInlineInput() {
   render();
 }
 
+let _panAnimCancelled = false;
+
 function smoothPanToRevealNode(nodeId) {
   const positions = computeLayout();
   const pos = positions[nodeId];
@@ -5540,10 +5542,12 @@ function smoothPanToRevealNode(nodeId) {
   const startX = panX, startY = panY;
   const duration = 350;
   const startTime = performance.now();
+  _panAnimCancelled = false;
 
   function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
 
   function step(now) {
+    if (_panAnimCancelled) return;
     const t = Math.min((now - startTime) / duration, 1);
     const e = ease(t);
     panX = startX + (targetPanX - startX) * e;
@@ -5627,6 +5631,10 @@ function _openInlineInput(nodeId, isNew) {
 
   inlineInput.focus();
   if (!isNew) inlineInput.select();
+
+  // Fallback for devices where visualViewport.resize fires unreliably:
+  // re-pan after a short delay once the keyboard has had time to open.
+  setTimeout(_panEditNodeToVisibleArea, 350);
 }
 
 function commitEdit(followUp = 'auto') {
@@ -5784,26 +5792,37 @@ inlineInput.addEventListener('blur', () => { if (editState) commitEdit(); });
 inlineInput.addEventListener('pointerdown', (e) => e.stopPropagation());
 inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 
-// On mobile, re-pan when soft keyboard opens and shrinks the visible viewport
+// On mobile, re-pan when soft keyboard opens and shrinks the visible viewport.
+// Debounced on a 50ms trailing window so we always act on the final stable
+// viewport height regardless of how long the keyboard animation takes.
+function _panEditNodeToVisibleArea() {
+  if (!editState || !window.visualViewport) return;
+  const vv = window.visualViewport;
+  // Only act when keyboard is actually open (viewport shrunk by ≥25%)
+  if (vv.height >= window.innerHeight * 0.75) return;
+  const positions = computeLayout();
+  const pos = positions[editState.nodeId];
+  if (!pos) return;
+
+  _panAnimCancelled = true; // stop any in-flight smoothPan animation
+  const rect = container.getBoundingClientRect();
+  // Place node at 38% from top of visible area (comfortably above keyboard)
+  const targetScreenY = vv.offsetTop + vv.height * 0.38;
+  panY = targetScreenY - rect.top - pos.y * zoom;
+  applyTransform();
+
+  const iW = inlineInput.offsetWidth;
+  const iH = inlineInput.offsetHeight;
+  inlineInput.style.left = (rect.left + panX + pos.x * zoom - iW / 2) + 'px';
+  inlineInput.style.top  = (rect.top  + panY + pos.y * zoom - iH / 2) + 'px';
+}
+
 if (window.visualViewport) {
+  let _vpResizeTimer = null;
   window.visualViewport.addEventListener('resize', () => {
     if (!editState) return;
-    const vv = window.visualViewport;
-    const positions = computeLayout();
-    const pos = positions[editState.nodeId];
-    if (!pos) return;
-
-    const rect = container.getBoundingClientRect();
-    // Place node at 38% from top of visible area (comfortably above keyboard)
-    const targetScreenY = vv.offsetTop + vv.height * 0.38;
-    panY = targetScreenY - rect.top - pos.y * zoom;
-    applyTransform();
-
-    // Keep inline input overlay locked over node
-    const iW = inlineInput.offsetWidth;
-    const iH = inlineInput.offsetHeight;
-    inlineInput.style.left = (rect.left + panX + pos.x * zoom - iW / 2) + 'px';
-    inlineInput.style.top  = (rect.top  + panY + pos.y * zoom - iH / 2) + 'px';
+    clearTimeout(_vpResizeTimer);
+    _vpResizeTimer = setTimeout(_panEditNodeToVisibleArea, 50);
   });
 }
 
