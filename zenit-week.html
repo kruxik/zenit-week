@@ -6786,32 +6786,29 @@ function resetView() {
   const w = svg.clientWidth  || svg.getBoundingClientRect().width  || 800;
   const h = svg.clientHeight || svg.getBoundingClientRect().height || 600;
 
-  if (isMobile) {
-    // Fit all nodes into the viewport with padding
-    const positions = computeLayout();
-    const nodes = Object.values(positions);
-    if (nodes.length > 1) {
-      const pad = 60;
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      nodes.forEach(p => {
-        const hw = (p.w || 80) / 2;
-        const hh = (p.h || 36) / 2;
-        minX = Math.min(minX, p.x - hw);
-        maxX = Math.max(maxX, p.x + hw);
-        minY = Math.min(minY, p.y - hh);
-        maxY = Math.max(maxY, p.y + hh);
-      });
-      const fitZoom = Math.min(
-        (w - pad * 2) / (maxX - minX),
-        (h - pad * 2) / (maxY - minY),
-        ZOOM_MAX
-      );
-      zoom = Math.max(ZOOM_MIN, fitZoom);
-      panX = w / 2 - ((minX + maxX) / 2) * zoom;
-      panY = h / 2 - ((minY + maxY) / 2) * zoom;
-      applyTransform();
-      return;
-    }
+  const positions = computeLayout();
+  const nodes = Object.values(positions);
+  if (nodes.length > 1) {
+    const pad = 60;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(p => {
+      const hw = (p.w || 80) / 2;
+      const hh = (p.h || 36) / 2;
+      minX = Math.min(minX, p.x - hw);
+      maxX = Math.max(maxX, p.x + hw);
+      minY = Math.min(minY, p.y - hh);
+      maxY = Math.max(maxY, p.y + hh);
+    });
+    const fitZoom = Math.min(
+      (w - pad * 2) / (maxX - minX),
+      (h - pad * 2) / (maxY - minY),
+      ZOOM_MAX
+    );
+    zoom = Math.max(ZOOM_MIN, fitZoom);
+    panX = w / 2 - ((minX + maxX) / 2) * zoom;
+    panY = h / 2 - ((minY + maxY) / 2) * zoom;
+    applyTransform();
+    return;
   }
 
   zoom = ZOOM_DEFAULT;
