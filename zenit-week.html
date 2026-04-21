@@ -6477,15 +6477,23 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-sep-2').style.display = isActivity                           ? '' : 'none';
   document.getElementById('ctx-sep-3').style.display = (isActivity || canDeleteBranch) ? '' : 'none';
 
-  // Position within viewport
-  const menuW = 170, menuH = 200;
-  const vw = window.innerWidth, vh = window.innerHeight;
-  const mx = Math.min(x, vw - menuW - 8);
-  const my = Math.min(y, vh - menuH - 8);
-
-  ctxMenu.style.left = mx + 'px';
-  ctxMenu.style.top  = my + 'px';
+  // Measure actual menu size, then position by quadrant so it always opens
+  // toward the center of the screen — never clips any edge.
+  ctxMenu.style.visibility = 'hidden';
+  ctxMenu.style.left = '0';
+  ctxMenu.style.top  = '0';
   ctxMenu.classList.add('visible');
+
+  const menuW = ctxMenu.offsetWidth;
+  const menuH = ctxMenu.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const pad = 8;
+  const mx = x < vw / 2 ? x : x - menuW;
+  const my = y < vh / 2 ? y : y - menuH;
+
+  ctxMenu.style.left = Math.max(pad, Math.min(mx, vw - menuW - pad)) + 'px';
+  ctxMenu.style.top  = Math.max(pad, Math.min(my, vh - menuH - pad)) + 'px';
+  ctxMenu.style.visibility = '';
 }
 
 function hideContextMenu() {
