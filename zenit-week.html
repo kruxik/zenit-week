@@ -8058,7 +8058,7 @@ window.addEventListener('resize', () => {
   const svg = document.getElementById('main-svg');
   const w = svg.clientWidth || 800;
   const h = svg.clientHeight || 600;
-  if (!editState && (panX < 0 || panX > w || panY < 0 || panY > h)) {
+  if (!editState && (panX < -w || panX > 2 * w || panY < -h || panY > 2 * h)) {
     resetView();
   }
   if (typeof editState !== 'undefined' && editState) {
