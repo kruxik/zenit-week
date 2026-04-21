@@ -3114,13 +3114,33 @@ function mergeWeekData(local, remote) {
     // 3. Remove tombstoned nodes
     for (const id of tombstones) byId.delete(id);
 
-    // 4. Rebuild children from parent refs (merge may leave children arrays stale).
-    //    Sort by _ts ascending to approximate original insertion order.
-    const sorted = Array.from(byId.values()).sort((a, b) => (a._ts||0) - (b._ts||0));
-    sorted.forEach(n => { n.children = []; });
+    // 4. Preserve node ordering and children ordering from the winning side (LWW by savedAt).
+    //    _ts order was used before but it equals "last touched", not "user-placed position",
+    //    so drag-reordered nodes always sort to the end after merge — destroying user layout.
+    const winnerNodes = (remote.savedAt||0) >= (local.savedAt||0) ? (remote.nodes||[]) : (local.nodes||[]);
+    const loserNodes  = (remote.savedAt||0) >= (local.savedAt||0) ? (local.nodes||[])  : (remote.nodes||[]);
+    const mergedIds = new Set(byId.keys());
+
+    const sorted = [];
+    const seenInSort = new Set();
+    for (const n of winnerNodes) {
+      if (mergedIds.has(n.id) && !seenInSort.has(n.id)) { sorted.push(byId.get(n.id)); seenInSort.add(n.id); }
+    }
+    for (const n of loserNodes) {
+      if (mergedIds.has(n.id) && !seenInSort.has(n.id)) { sorted.push(byId.get(n.id)); seenInSort.add(n.id); }
+    }
+
+    // Repair children arrays: use winner's ordering, filter tombstoned, append truly new nodes.
+    const winnerById = new Map(winnerNodes.map(n => [n.id, n]));
     sorted.forEach(n => {
-      if (n.parent && byId.has(n.parent)) {
-        byId.get(n.parent).children.push(n.id);
+      const winner = winnerById.get(n.id);
+      if (winner?.children) {
+        const base = winner.children.filter(cid => mergedIds.has(cid));
+        const baseSet = new Set(base);
+        const extra = sorted.filter(c => c.parent === n.id && !baseSet.has(c.id)).map(c => c.id);
+        n.children = [...base, ...extra];
+      } else {
+        n.children = sorted.filter(c => c.parent === n.id).map(c => c.id);
       }
     });
 
