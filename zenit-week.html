@@ -3167,11 +3167,11 @@ function mergeWeekData(local, remote) {
   }
 }
 
-// Apply a CRDT-merged result — defer if user is mid-edit on the current week.
-function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload) {
-  if (editState && wKey === currentWeekKey) {
-    // User is editing a node — queue and apply when they finish
-    pendingRemoteMerge = { wKey, mergedData, mergedJson, mergedHash, scheduleUpload };
+// Apply a CRDT-merged result — defer if any atomic operation is in progress.
+function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData) {
+  if (isAtomicOpActive() && wKey === currentWeekKey) {
+    // Atomic op in progress — store remote data for re-merge once the op finishes
+    pendingRemoteMerge = { wKey, remoteData };
     return;
   }
   _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
@@ -3199,9 +3199,38 @@ function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUp
 
 function _flushPendingMerge() {
   if (!pendingRemoteMerge) return;
-  const { wKey, mergedData, mergedJson, mergedHash, scheduleUpload } = pendingRemoteMerge;
+  const { wKey, remoteData } = pendingRemoteMerge;
   pendingRemoteMerge = null;
+  // Re-merge against current local state so any just-committed changes are included
+  const localJson = localStorage.getItem(storageKey(wKey));
+  const localData = localJson ? JSON.parse(localJson) : { nodes: [] };
+  const mergedData = mergeWeekData(localData, remoteData);
+  const mergedJson = JSON.stringify(mergedData);
+  const mergedHash = fnv1a32(mergedJson);
+  const scheduleUpload = mergedHash !== fnv1a32(JSON.stringify(remoteData));
   _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+}
+
+function beginAtomicOp() {
+  _atomicOpsDepth++;
+}
+
+function endAtomicOp() {
+  if (_atomicOpsDepth > 0) _atomicOpsDepth--;
+  if (_atomicOpsDepth === 0) _flushPendingSync();
+}
+
+function isAtomicOpActive() {
+  return _atomicOpsDepth > 0;
+}
+
+function _flushPendingSync() {
+  _flushPendingMerge();
+  if (_pendingUploadKey) {
+    const wk = _pendingUploadKey;
+    _pendingUploadKey = null;
+    scheduleDriveSync(wk);
+  }
 }
 
 // ─── TASK-11: Load week data from Drive ───────────────────────────────────────
@@ -3255,7 +3284,7 @@ async function syncWeekFromDrive(wKey) {
       const mergedHash = fnv1a32(mergedJson);
       const scheduleUpload = mergedHash !== fnv1a32(remoteJson);
 
-      applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+      applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
       return;
 
     } catch (err) {
@@ -3633,6 +3662,10 @@ async function forcePushAllToDrive() {
 // Resets the 10-second debounce timer; called from saveWeek()
 function scheduleDriveSync(wKey) {
   if (!googleAccessToken) return;
+  if (isAtomicOpActive()) {
+    _pendingUploadKey = wKey;
+    return;
+  }
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
   syncDebounceTimer = setTimeout(() => {
     syncDebounceTimer = null;
@@ -3833,6 +3866,9 @@ let contextTarget = null;  // node id
 let editState = null;      // { nodeId, isNew, originalLabel }
 let hoveredNodeId = null;  // Track currently hovered node
 let currentViewLevel = 'full'; // 'full' | 'pebbles' | 'rocks'
+
+let _atomicOpsDepth = 0;    // nesting counter; Drive sync deferred while > 0
+let _pendingUploadKey = null; // wKey deferred by an active atomic op
 
 let dragState = {
   activeNodeId: null,
@@ -4355,6 +4391,7 @@ function transferUnfinished() {
   const prevData = loadWeek(prevWeekKey);
   if (!prevData || !prevData.nodes) return;
 
+  beginAtomicOp();
   takeSnapshot();
 
   const candidates = prevData.nodes.filter(n => !n.done && n.type !== 'branch');
@@ -4410,6 +4447,7 @@ function transferUnfinished() {
   rebuildNodeMap();
 
   saveWeek(currentWeekKey, weekData);
+  endAtomicOp();
   render();
 }
 
@@ -4417,6 +4455,8 @@ function transferReusable() {
   const prevWeekKey = offsetWeek(currentWeekKey, -1);
   const prevData = loadWeek(prevWeekKey);
   if (!prevData || !prevData.nodes) return;
+
+  beginAtomicOp();
 
   takeSnapshot();
 
@@ -4523,6 +4563,7 @@ function transferReusable() {
   rebuildNodeMap();
 
   saveWeek(currentWeekKey, weekData);
+  endAtomicOp();
   render();
 }
 
@@ -4530,6 +4571,7 @@ function moveNodeToNextWeek(nodeId) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
 
+  beginAtomicOp();
   takeSnapshot();
 
   const nextKey = offsetWeek(currentWeekKey, +1);
@@ -4635,6 +4677,7 @@ function moveNodeToNextWeek(nodeId) {
 
   saveWeek(nextKey, nextData);
   saveWeek(currentWeekKey, weekData);
+  endAtomicOp();
   render();
 }
 
@@ -5550,6 +5593,7 @@ function _openInlineInput(nodeId, isNew) {
   const node = findNode(nodeId);
   if (!node) return;
 
+  beginAtomicOp();
   const type = node.type || 'activity';
   const { w: nodeW, rx: styleRx } = getNodeSize(nodeId);
   const { bgColor, borderColor, textColor, fontWeight, sw, visualRx } = getNodeVisuals(nodeId);
@@ -5673,7 +5717,7 @@ function commitEdit(followUp = 'auto') {
     }
 
     saveWeek(currentWeekKey, weekData);
-    _flushPendingMerge();
+    endAtomicOp();
     render();
 
     if (followUp === 'child') {
@@ -5714,7 +5758,7 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
     const node = findNode(nodeId);
     if (node) { node.label = originalLabel; delete node._editing; }
   }
-  _flushPendingMerge();
+  endAtomicOp();
   render();
 }
 
@@ -6271,6 +6315,7 @@ function attachNodeListeners() {
         }
       });
 
+      beginAtomicOp();
       dragState = {
         activeNodeId: id,
         startX: e.clientX,
@@ -6536,6 +6581,7 @@ const bpPanel = document.getElementById('baseline-panel');
 const bpInput = document.getElementById('bp-input');
 
 function openBaselinePanel(x, y) {
+  beginAtomicOp();
   bpInput.value = weekData.baseline || 105;
   bpPanel.classList.add('visible');
   const pw = 208, ph = 180;
@@ -6546,6 +6592,7 @@ function openBaselinePanel(x, y) {
 
 function closeBaselinePanel() {
   bpPanel.classList.remove('visible');
+  endAtomicOp();
 }
 
 document.getElementById('bp-apply').addEventListener('click', () => {
@@ -6893,6 +6940,7 @@ window.addEventListener('pointerup', (e) => {
     });
     handleNodeDrop(e.clientX, e.clientY);
     dragState.activeNodeId = null;
+    endAtomicOp();
     return;
   }
   if (isPanning) {
@@ -6915,6 +6963,7 @@ window.addEventListener('pointerup', (e) => {
 window.addEventListener('pointercancel', (e) => {
   endPointer(e);
   touchTapId = null;
+  if (dragState.activeNodeId) endAtomicOp();
   dragState.activeNodeId = null;
   isPanning = false;
   container.classList.remove('panning');
@@ -7743,6 +7792,7 @@ window.addEventListener('load', () => {
       item.addEventListener('dragstart', (e) => {
         dragSrcId = leafNode.id;
         e.dataTransfer.effectAllowed = 'move';
+        beginAtomicOp();
         requestAnimationFrame(() => item.classList.add('todo-item-dragging'));
       });
 
@@ -7752,6 +7802,7 @@ window.addEventListener('load', () => {
           el.classList.remove('todo-item-drop-above', 'todo-item-drop-below');
         });
         dragSrcId = null;
+        endAtomicOp();
       });
 
       item.addEventListener('dragover', (e) => {
