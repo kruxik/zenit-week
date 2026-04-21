@@ -8053,7 +8053,7 @@ window.addEventListener('resize', () => {
   const svg = document.getElementById('main-svg');
   const w = svg.clientWidth || 800;
   const h = svg.clientHeight || 600;
-  if (panX < 0 || panX > w || panY < 0 || panY > h) {
+  if (!editState && (panX < 0 || panX > w || panY < 0 || panY > h)) {
     resetView();
   }
   if (typeof editState !== 'undefined' && editState) {
