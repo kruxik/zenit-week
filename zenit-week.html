@@ -555,6 +555,30 @@
     user-select: none;
   }
 
+  @media (pointer: coarse) {
+    #view-level-bar { display: none; }
+  }
+
+  #view-level-toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 20px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    box-shadow: 0 4px 16px var(--shadow-md);
+    z-index: 300;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  #view-level-toast.visible { opacity: 1; }
+
   .view-level-btn {
     display: flex;
     flex-direction: column;
@@ -2154,6 +2178,8 @@
     </div>
   </div>
 </div>
+
+<div id="view-level-toast"></div>
 
 <div id="context-menu">
   <div class="ctx-item" id="ctx-current-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.currentWeek">Current Week</span></div>
@@ -6247,7 +6273,13 @@ function attachNodeListeners() {
         return;
       }
 
-      if (e.pointerType === 'touch') return; // touch = navigate only, no drag
+      if (e.pointerType === 'touch') {
+        const node = findNode(id);
+        if (node && node.type === 'branch') {
+          window.dispatchEvent(new CustomEvent('branchSwipeStart', { detail: { x: e.clientX, y: e.clientY, side: node.side || 'right' } }));
+        }
+        return; // touch = navigate only, no drag
+      }
 
       const positions = computeLayout();
       const idsToDrag = [id, ...getDescendantIds(id)];
@@ -7124,6 +7156,45 @@ document.querySelectorAll('.view-level-btn').forEach(btn => {
     document.querySelectorAll('.view-level-btn').forEach(b => b.classList.toggle('active', b.dataset.level === level));
     applyViewLevel();
   });
+});
+
+// ─── Branch swipe → cycle view level (mobile) ─────────────────────────────────
+const VIEW_LEVELS = ['full', 'pebbles', 'rocks'];
+const VIEW_LEVEL_LABELS = { full: 'Sand', pebbles: 'Pebbles', rocks: 'Rocks' };
+let _swipeState = null;
+let _toastTimer = null;
+const _toast = document.getElementById('view-level-toast');
+
+function _setViewLevel(level) {
+  currentViewLevel = level;
+  document.querySelectorAll('.view-level-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.level === level)
+  );
+  applyViewLevel();
+  _toast.textContent = VIEW_LEVEL_LABELS[level];
+  _toast.classList.add('visible');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => _toast.classList.remove('visible'), 1200);
+}
+
+window.addEventListener('branchSwipeStart', (e) => {
+  _swipeState = { startX: e.detail.x, startY: e.detail.y, side: e.detail.side };
+});
+
+window.addEventListener('pointerup', (e) => {
+  if (!_swipeState) return;
+  let dx = e.clientX - _swipeState.startX;
+  const dy = e.clientY - _swipeState.startY;
+  const side = _swipeState.side;
+  _swipeState = null;
+  if (Math.abs(dx) < 40 || Math.abs(dy) > 30) return;
+  // Mirror dx for left-side branches: swipe toward root = less detail
+  if (side === 'left') dx = -dx;
+  const idx = VIEW_LEVELS.indexOf(currentViewLevel);
+  const next = dx < 0
+    ? VIEW_LEVELS[Math.min(idx + 1, VIEW_LEVELS.length - 1)]
+    : VIEW_LEVELS[Math.max(idx - 1, 0)];
+  if (next !== currentViewLevel) _setViewLevel(next);
 });
 
 // ─── Week navigation ──────────────────────────────────────────────────────────
