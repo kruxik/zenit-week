@@ -7646,7 +7646,7 @@ window.addEventListener('load', () => {
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge done">${iconSvg('circle-check')} ${doneCount}</span> ${t('todo.done')}</div>
       <div class="daily-log-footer-stat"><span class="daily-log-footer-badge unplanned">${iconSvg('bolt')} ${unplannedCount}</span> ${t('todo.unplanned')}</div>
       <div class="daily-log-footer-stat" style="margin-left: auto;"><span class="daily-log-footer-badge">${iconSvg('circle')} ${totalCount}</span> ${t('todo.total')}</div>
-      <div class="daily-log-footer-stat" style="font-size:12px;color:var(--text-placeholder);gap:4px;">${t('todo.toggle')} <kbd>D</kbd></div>
+      ${isMobile ? '' : `<div class="daily-log-footer-stat" style="font-size:12px;color:var(--text-placeholder);gap:4px;">${t('todo.toggle')} <kbd>D</kbd></div>`}
     `;
 
     // Content
