@@ -6804,7 +6804,10 @@ document.addEventListener('contextmenu', (e) => {
 const container = document.getElementById('canvas-container');
 const mapRoot   = document.getElementById('map-root');
 
-const ZOOM_MIN = 0.2, ZOOM_MAX = 1.8, ZOOM_DEFAULT = 0.6;
+const isMobile = navigator.maxTouchPoints > 0;
+const ZOOM_MIN = isMobile ? 0.06 : 0.2;
+const ZOOM_MAX = isMobile ? 1.2 : 1.8;
+const ZOOM_DEFAULT = 0.6;
 const LOG_ZOOM_MIN = Math.log(ZOOM_MIN);
 const LOG_ZOOM_MAX = Math.log(ZOOM_MAX);
 
@@ -6830,6 +6833,35 @@ function resetView() {
   const svg = document.getElementById('main-svg');
   const w = svg.clientWidth  || svg.getBoundingClientRect().width  || 800;
   const h = svg.clientHeight || svg.getBoundingClientRect().height || 600;
+
+  if (isMobile) {
+    // Fit all nodes into the viewport with padding
+    const positions = computeLayout();
+    const nodes = Object.values(positions);
+    if (nodes.length > 1) {
+      const pad = 60;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      nodes.forEach(p => {
+        const hw = (p.w || 80) / 2;
+        const hh = (p.h || 36) / 2;
+        minX = Math.min(minX, p.x - hw);
+        maxX = Math.max(maxX, p.x + hw);
+        minY = Math.min(minY, p.y - hh);
+        maxY = Math.max(maxY, p.y + hh);
+      });
+      const fitZoom = Math.min(
+        (w - pad * 2) / (maxX - minX),
+        (h - pad * 2) / (maxY - minY),
+        ZOOM_MAX
+      );
+      zoom = Math.max(ZOOM_MIN, fitZoom);
+      panX = w / 2 - ((minX + maxX) / 2) * zoom;
+      panY = h / 2 - ((minY + maxY) / 2) * zoom;
+      applyTransform();
+      return;
+    }
+  }
+
   zoom = ZOOM_DEFAULT;
   panX = w / 2;
   panY = h / 2;
