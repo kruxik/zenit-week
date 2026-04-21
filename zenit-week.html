@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#ffffff">
 <title>Zenit Week</title>
 <link rel="icon" type="image/svg+xml" id="favicon-svg">
 <link rel="icon" type="image/png" sizes="32x32" id="favicon-32">
@@ -2018,6 +2019,7 @@
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const theme = saved || (prefersDark ? 'dark' : 'light');
     if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
+    document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#111111' : '#ffffff';
   })();
 </script>
 <script async defer src="https://accounts.google.com/gsi/client"></script>
@@ -2681,10 +2683,16 @@ function applyBranchColor(branch, hex) {
   render();
 }
 
+function updateThemeColor() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.querySelector('meta[name="theme-color"]').content = dark ? '#111111' : '#ffffff';
+}
+
 function applyTheme(theme) {
   takeSnapshot();
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('zenit-week-theme', theme);
+  updateThemeColor();
   // Re-derive branch palettes for new theme and re-render SVG layer
   reloadBranchPalettes();
   updateSvgFilters();
