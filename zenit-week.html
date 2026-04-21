@@ -3695,12 +3695,13 @@ async function syncColorsFromDrive() {
     if (localJson) { try { localSavedAt = JSON.parse(localJson).savedAt ?? 0; } catch { /* ignore */ } }
     if (remoteSavedAt > localSavedAt) {
       localStorage.setItem(COLORS_STORAGE_KEY, remoteJson);
-      loadBranchColors();
-      // Apply theme and lang bundled in colors file
+      // Apply theme to DOM before loading colors — deriveBranchPalette reads the DOM theme.
       if (remoteData.theme) {
         localStorage.setItem('zenit-week-theme', remoteData.theme);
         document.documentElement.dataset.theme = remoteData.theme === 'dark' ? 'dark' : '';
       }
+      loadBranchColors();    // now derives palettes against the correct theme
+      reloadBranchPalettes(); // ensure light/text variants are re-derived for new theme
       if (remoteData.lang && remoteData.lang !== currentLang) {
         currentLang = remoteData.lang;
         localStorage.setItem('zenit-week-lang', remoteData.lang);
