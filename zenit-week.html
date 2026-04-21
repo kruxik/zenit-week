@@ -5897,7 +5897,7 @@ function updateSummary() {
       tooltip = t('summary.tooltipStretch');
     }
 
-    mainEl.innerHTML = `<span class="daily-log-footer-badge done">${global.done}</span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.done')}</span><span class="daily-log-footer-badge" style="background:var(--bg-muted);color:${totalColor}" data-tooltip="${tooltip}">${global.total}</span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.total')}</span>`;
+    mainEl.innerHTML = `<span class="daily-log-footer-badge done">${global.done} <span style="font-weight:400">(${global.percent}&nbsp;%)</span></span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.done')}</span><span class="daily-log-footer-badge" style="background:var(--bg-muted);color:${totalColor}" data-tooltip="${tooltip}">${global.total}</span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.total')}</span>`;
   }
 
   // Rebuild branch stat rows dynamically
