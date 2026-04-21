@@ -6799,10 +6799,11 @@ function resetView() {
       minY = Math.min(minY, p.y - hh);
       maxY = Math.max(maxY, p.y + hh);
     });
+    const zoomCap = isMobile ? ZOOM_MAX : ZOOM_DEFAULT;
     const fitZoom = Math.min(
       (w - pad * 2) / (maxX - minX),
       (h - pad * 2) / (maxY - minY),
-      ZOOM_MAX
+      zoomCap
     );
     zoom = Math.max(ZOOM_MIN, fitZoom);
     panX = w / 2 - ((minX + maxX) / 2) * zoom;
