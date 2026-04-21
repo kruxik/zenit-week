@@ -7462,12 +7462,21 @@ window.addEventListener('load', () => {
   }
 
   function loadTodoOrder() {
+    const today = new Date().toISOString().slice(0, 10);
+    const fromWeekData = (weekData.todoOrder || {})[today];
+    if (Array.isArray(fromWeekData)) return [...fromWeekData];
+    // Fall back to legacy localStorage key for data exported before this fix
     try { return JSON.parse(localStorage.getItem(getTodoOrderKey())) || []; }
     catch { return []; }
   }
 
   function saveTodoOrder(ids) {
-    localStorage.setItem(getTodoOrderKey(), JSON.stringify(ids));
+    const today = new Date().toISOString().slice(0, 10);
+    const existing = JSON.stringify((weekData.todoOrder || {})[today] || []);
+    if (existing === JSON.stringify(ids)) return; // no change — skip save
+    if (!weekData.todoOrder) weekData.todoOrder = {};
+    weekData.todoOrder[today] = ids;
+    saveWeek(currentWeekKey, weekData); // persists to localStorage + schedules Drive sync
   }
 
   let hoveredTodoNode = null;
