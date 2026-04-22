@@ -343,6 +343,7 @@
     display: flex;
     align-items: center;
     user-select: none;
+    cursor: pointer;
   }
 
   .nav-btn {
@@ -7167,6 +7168,7 @@ zoomTrack.addEventListener('pointercancel', () => {
 });
 
 document.getElementById('zoom-label').addEventListener('click', resetView);
+document.getElementById('logo').addEventListener('click', resetView);
 
 // ─── View Level Bar ────────────────────────────────────────────────────────────
 document.getElementById('view-level-bar').addEventListener('pointerdown', e => e.stopPropagation());
