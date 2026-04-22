@@ -109,34 +109,51 @@
 
     .hero-questions {
       list-style: none;
-      margin: 36px auto;
+      margin: 44px auto;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
       max-width: 560px;
+      align-items: flex-start;
     }
 
     .hero-questions li {
-      font-size: clamp(17px, 2.4vw, 20px);
-      color: var(--muted);
-      padding: 14px 20px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      text-align: left;
-      position: relative;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      font-size: clamp(14px, 2vw, 16px);
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 11px;
+      border: 1.5px solid;
+      line-height: 1.3;
+      white-space: nowrap;
     }
 
-    .hero-questions li::before {
-      content: "×";
-      position: absolute;
-      right: 18px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 18px;
-      color: #e0e0e0;
-      font-weight: 300;
+    .hero-questions li:nth-child(1) {
+      background: linear-gradient(to bottom, #ffffff, #ede0ff);
+      border-color: #8F37FF;
+      color: #6010c8;
+      box-shadow: 0 0 18px rgba(143,55,255,0.32);
+      margin-left: 8px;
+    }
+    .hero-questions li:nth-child(2) {
+      background: linear-gradient(to bottom, #ffffff, #e0ffe2);
+      border-color: #19C82A;
+      color: #0a7a14;
+      box-shadow: 0 0 18px rgba(25,200,42,0.32);
+      margin-left: 72px;
+    }
+    .hero-questions li:nth-child(3) {
+      background: linear-gradient(to bottom, #ffffff, #e0f6ff);
+      border-color: #1ABCFE;
+      color: #0070a0;
+      box-shadow: 0 0 18px rgba(26,188,254,0.32);
+      margin-left: 28px;
+    }
+    .hero-questions li:nth-child(4) {
+      background: linear-gradient(to bottom, #ffffff, #ffe8e0);
+      border-color: #F83800;
+      color: #b82000;
+      box-shadow: 0 0 18px rgba(248,56,0,0.32);
+      margin-left: 90px;
     }
 
     .hero-answer {
@@ -408,10 +425,10 @@
   </h1>
 
   <ul class="hero-questions" aria-label="Common things we neglect">
-    <li>Learning something new — that course, that book, that skill?</li>
-    <li>Being truly present with your family, without thinking about work?</li>
-    <li>Taking care of your body and your mind?</li>
-    <li>Working on something that's actually moving you forward?</li>
+    <li>Learning AI — even just 10 minutes a day?</li>
+    <li>Being fully present with your family?</li>
+    <li>Taking care of your mind and body?</li>
+    <li>Building something that moves you forward?</li>
   </ul>
 
   <p class="hero-answer">Probably not.</p>
