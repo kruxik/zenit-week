@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Zenit Week helps you plan your week around what matters most — not what's just urgent. Visual mind map. No signup. Free.">
+  <meta name="theme-color" content="#ffffff">
+  <title>Zenit Week — Plan what matters</title>
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Zenit Week — Plan what matters">
+  <meta property="og:description" content="Stop filling your week with sand. Put the big rocks in first.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://zenitweek.com/">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:       #1a1a2e;
+      --cloud:     #f9f9f9;
+      --surface:   #ffffff;
+      --muted:     #6b6b80;
+      --border:    #e8e8ee;
+      --work:      #F24E1E;
+      --family:    #A259FF;
+      --me:        #1ABCFE;
+      --work-lt:   #FFF0ED;
+      --family-lt: #F3EBFF;
+      --me-lt:     #E8F8FF;
+      --radius:    14px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--cloud);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Nav ──────────────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(249,249,249,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+      color: var(--ink);
+    }
+
+    .nav-cta {
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+    .nav-cta:hover { opacity: 0.82; }
+
+    /* ── Hero ─────────────────────────────────────────────────────── */
+    .hero {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 96px 24px 72px;
+      text-align: center;
+    }
+
+    .hero-eyebrow {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    .hero-hook {
+      font-size: clamp(32px, 6vw, 56px);
+      font-weight: 300;
+      line-height: 1.18;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 12px;
+    }
+
+    .hero-hook strong {
+      font-weight: 700;
+    }
+
+    .hero-questions {
+      list-style: none;
+      margin: 36px auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-width: 560px;
+    }
+
+    .hero-questions li {
+      font-size: clamp(17px, 2.4vw, 20px);
+      color: var(--muted);
+      padding: 14px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-align: left;
+      position: relative;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .hero-questions li::before {
+      content: "×";
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      color: #e0e0e0;
+      font-weight: 300;
+    }
+
+    .hero-answer {
+      font-size: clamp(22px, 3.5vw, 32px);
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 10px;
+    }
+
+    .hero-sub {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 40px;
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      padding: 16px 36px;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      transition: transform 0.15s, opacity 0.15s;
+      box-shadow: 0 4px 20px rgba(26,26,46,0.18);
+    }
+    .cta-btn:hover { transform: translateY(-2px); opacity: 0.9; }
+
+    .cta-note {
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ── Divider ──────────────────────────────────────────────────── */
+    .section-divider {
+      width: 48px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--family), var(--me));
+      border-radius: 2px;
+      margin: 0 auto 32px;
+    }
+
+    /* ── Why section ──────────────────────────────────────────────── */
+    .why {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .why-inner {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .why h2 {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 20px;
+    }
+
+    .why p {
+      font-size: 17px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    /* Jar SVG */
+    .jar-wrap {
+      margin: 44px auto 0;
+      max-width: 440px;
+    }
+
+    /* ── App preview ──────────────────────────────────────────────── */
+    .preview {
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .preview-inner {
+      max-width: 840px;
+      margin: 0 auto;
+    }
+
+    .preview h2 {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .preview > .preview-inner > p {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 52px;
+    }
+
+    /* Mind map SVG card */
+    .mindmap-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 8px 40px rgba(26,26,46,0.08);
+      padding: 40px 24px 36px;
+      margin-bottom: 52px;
+      overflow: hidden;
+    }
+
+    /* Benefits */
+    .benefits {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      text-align: left;
+    }
+
+    .benefit {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    .benefit-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      font-size: 20px;
+    }
+
+    .benefit h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .benefit p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── Ritual section ───────────────────────────────────────────── */
+    .ritual {
+      background: var(--ink);
+      color: #fff;
+      padding: 88px 24px;
+      text-align: center;
+    }
+
+    .ritual-inner {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .ritual h2 {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 300;
+      line-height: 1.22;
+      margin-bottom: 20px;
+    }
+
+    .ritual h2 strong { font-weight: 700; }
+
+    .ritual p {
+      font-size: 17px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 40px;
+      line-height: 1.7;
+    }
+
+    .cta-btn-light {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      color: var(--ink);
+      text-decoration: none;
+      padding: 16px 36px;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 700;
+      transition: transform 0.15s, opacity 0.15s;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    }
+    .cta-btn-light:hover { transform: translateY(-2px); opacity: 0.92; }
+
+    .ritual-note {
+      margin-top: 16px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    footer p {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    footer a {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    footer a:hover { color: var(--ink); }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 540px) {
+      .hero { padding: 64px 20px 56px; }
+      .why, .preview, .ritual { padding: 60px 20px; }
+      .mindmap-card { padding: 24px 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────── -->
+<nav>
+  <a href="/" class="nav-logo" aria-label="Zenit Week home">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 3 118 46" width="87" height="34" aria-hidden="true">
+      <text x="2" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+      <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+      <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+      <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+      <text x="84" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+    </svg>
+  </a>
+  <a href="/app" class="nav-cta">Open app →</a>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <span class="hero-eyebrow">Visual week planner</span>
+
+  <h1 class="hero-hook">
+    Do you have enough time<br>for things that <strong>matter</strong>?
+  </h1>
+
+  <ul class="hero-questions" aria-label="Common things we neglect">
+    <li>Learning something new — that course, that book, that skill?</li>
+    <li>Being truly present with your family, without thinking about work?</li>
+    <li>Taking care of your body and your mind?</li>
+    <li>Working on something that's actually moving you forward?</li>
+  </ul>
+
+  <p class="hero-answer">Probably not.</p>
+  <p class="hero-sub">Not because you're lazy. Because your week fills up before you decide what goes in.</p>
+
+  <a href="/app" class="cta-btn">
+    Try Zenit Week — it's free
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <p class="cta-note">No sign-up. Runs in your browser. Your data stays with you.</p>
+</section>
+
+<!-- ── Why ──────────────────────────────────────────────────────────── -->
+<section class="why">
+  <div class="why-inner">
+    <p class="section-label">The problem</p>
+    <div class="section-divider"></div>
+    <h2>You're putting sand in first</h2>
+    <p>
+      There's a classic demonstration: fill a jar with sand first, then try to fit in the big rocks — family, health, growth, meaningful work. They don't fit. But reverse it — rocks first — and the sand settles around them naturally.
+    </p>
+    <p>
+      Most of us plan our weeks like the first jar. Emails, meetings, and small tasks flood in. By Thursday, there's no room left for what we actually care about.
+    </p>
+
+    <!-- Jar illustration -->
+    <div class="jar-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 300" width="100%" aria-label="Jar of life illustration — big rocks surrounded by sand">
+
+        <!-- Left jar: sand first (bad) -->
+        <g transform="translate(30, 20)">
+          <!-- Jar body -->
+          <rect x="30" y="40" width="120" height="200" rx="12" fill="#f5f5f5" stroke="#ddd" stroke-width="1.5"/>
+          <!-- Jar lid -->
+          <rect x="22" y="28" width="136" height="18" rx="6" fill="#e8e8e8" stroke="#ddd" stroke-width="1"/>
+
+          <!-- Sand fill (lots) -->
+          <rect x="31" y="100" width="118" height="139" rx="0 0 12 12" fill="#f5e6c8" opacity="0.9"/>
+          <!-- Sand texture dots -->
+          <circle cx="60" cy="140" r="3" fill="#e8d5a0" opacity="0.7"/>
+          <circle cx="85" cy="155" r="2.5" fill="#e8d5a0" opacity="0.7"/>
+          <circle cx="110" cy="130" r="3.5" fill="#e8d5a0" opacity="0.7"/>
+          <circle cx="70" cy="168" r="2" fill="#e8d5a0" opacity="0.7"/>
+          <circle cx="120" cy="160" r="2.5" fill="#e8d5a0" opacity="0.7"/>
+          <circle cx="50" cy="185" r="3" fill="#e8d5a0" opacity="0.7"/>
+          <circle cx="95" cy="195" r="2" fill="#e8d5a0" opacity="0.7"/>
+          <circle cx="130" cy="185" r="3" fill="#e8d5a0" opacity="0.7"/>
+
+          <!-- Small rocks (on top of sand, barely fitting) -->
+          <ellipse cx="65" cy="102" rx="22" ry="14" fill="#F24E1E" opacity="0.35"/>
+          <ellipse cx="110" cy="102" rx="22" ry="14" fill="#A259FF" opacity="0.35"/>
+          <ellipse cx="88" cy="90" rx="22" ry="14" fill="#1ABCFE" opacity="0.35"/>
+
+          <!-- Label -->
+          <text x="90" y="268" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#999" font-weight="500">Sand first</text>
+          <text x="90" y="284" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="11" fill="#bbb">Things that matter don't fit</text>
+        </g>
+
+        <!-- Arrow -->
+        <g transform="translate(198, 130)">
+          <path d="M0 10 L28 10" stroke="#ddd" stroke-width="2" stroke-linecap="round"/>
+          <path d="M20 4 L28 10 L20 16" stroke="#ddd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </g>
+
+        <!-- Right jar: rocks first (good) -->
+        <g transform="translate(240, 20)">
+          <!-- Jar body -->
+          <rect x="30" y="40" width="120" height="200" rx="12" fill="#f5f5f5" stroke="#ddd" stroke-width="1.5"/>
+          <!-- Jar lid -->
+          <rect x="22" y="28" width="136" height="18" rx="6" fill="#e8e8e8" stroke="#ddd" stroke-width="1"/>
+
+          <!-- Big rocks -->
+          <ellipse cx="70" cy="185" rx="30" ry="18" fill="#F24E1E" opacity="0.85"/>
+          <ellipse cx="115" cy="178" rx="28" ry="20" fill="#A259FF" opacity="0.85"/>
+          <ellipse cx="85" cy="152" rx="32" ry="19" fill="#1ABCFE" opacity="0.85"/>
+
+          <!-- Sand fills gaps between rocks -->
+          <rect x="31" y="193" width="118" height="46" rx="0" fill="#f5e6c8" opacity="0.6"/>
+          <!-- Sand in gaps -->
+          <ellipse cx="90" cy="207" rx="58" ry="8" fill="#f5e6c8" opacity="0.5"/>
+
+          <!-- Sand texture -->
+          <circle cx="55" cy="210" r="2.5" fill="#e8d5a0" opacity="0.6"/>
+          <circle cx="75" cy="218" r="2" fill="#e8d5a0" opacity="0.6"/>
+          <circle cx="110" cy="212" r="3" fill="#e8d5a0" opacity="0.6"/>
+          <circle cx="130" cy="220" r="2" fill="#e8d5a0" opacity="0.6"/>
+
+          <!-- Label -->
+          <text x="90" y="268" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#1a1a2e" font-weight="600">Rocks first</text>
+          <text x="90" y="284" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="11" fill="#888">Everything important fits</text>
+
+          <!-- Checkmark glow -->
+          <circle cx="148" cy="60" r="14" fill="#e8f8e8"/>
+          <path d="M141 60 L146 65 L155 55" stroke="#2d9e4f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </g>
+
+        <!-- Rock legend -->
+        <g transform="translate(30, 295)">
+          <circle cx="8" cy="6" r="6" fill="#F24E1E" opacity="0.85"/>
+          <text x="18" y="10" font-family="-apple-system,sans-serif" font-size="11" fill="#888">Work</text>
+          <circle cx="68" cy="6" r="6" fill="#A259FF" opacity="0.85"/>
+          <text x="78" y="10" font-family="-apple-system,sans-serif" font-size="11" fill="#888">Family</text>
+          <circle cx="136" cy="6" r="6" fill="#1ABCFE" opacity="0.85"/>
+          <text x="146" y="10" font-family="-apple-system,sans-serif" font-size="11" fill="#888">Me</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ── App Preview ────────────────────────────────────────────────────── -->
+<section class="preview">
+  <div class="preview-inner">
+    <p class="section-label">The solution</p>
+    <div class="section-divider"></div>
+    <h2>Your week, as a mind map</h2>
+    <p>Plan visually. Start with your biggest rocks. See balance — or imbalance — at a glance.</p>
+
+    <!-- Mind map SVG illustration -->
+    <div class="mindmap-card">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" width="100%" aria-label="Zenit Week mind map — week branches into Work, Family, and Me categories with activities">
+
+        <defs>
+          <linearGradient id="grad-work" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#F24E1E;stop-opacity:0.15"/>
+            <stop offset="100%" style="stop-color:#F24E1E;stop-opacity:0.05"/>
+          </linearGradient>
+          <linearGradient id="grad-family" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#A259FF;stop-opacity:0.15"/>
+            <stop offset="100%" style="stop-color:#A259FF;stop-opacity:0.05"/>
+          </linearGradient>
+          <linearGradient id="grad-me" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#1ABCFE;stop-opacity:0.15"/>
+            <stop offset="100%" style="stop-color:#1ABCFE;stop-opacity:0.05"/>
+          </linearGradient>
+          <filter id="soft-shadow">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#1a1a2e" flood-opacity="0.08"/>
+          </filter>
+        </defs>
+
+        <!-- ── Center node ── -->
+        <g filter="url(#soft-shadow)">
+          <rect x="300" y="138" width="160" height="52" rx="16" fill="#1a1a2e"/>
+        </g>
+        <text x="380" y="159" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="11" fill="rgba(255,255,255,0.55)" font-weight="500">Week 17</text>
+        <text x="380" y="178" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="14" fill="#fff" font-weight="300">Zen<tspan font-weight="700">it</tspan> Week</text>
+
+        <!-- ══ LEFT SIDE: Work branch ══ -->
+
+        <!-- Connector: center → Work -->
+        <path d="M300,164 C240,164 230,90 180,90" fill="none" stroke="#F24E1E" stroke-width="2.5" stroke-opacity="0.35" stroke-linecap="round"/>
+        <!-- Work branch node -->
+        <rect x="80" y="68" width="100" height="44" rx="12" fill="#F24E1E" filter="url(#soft-shadow)"/>
+        <text x="130" y="95" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="14" fill="#fff" font-weight="600">Work</text>
+
+        <!-- Work activities -->
+        <!-- AI Course -->
+        <path d="M80,90 C50,90 44,55 24,55" fill="none" stroke="#F24E1E" stroke-width="1.6" stroke-opacity="0.25" stroke-linecap="round"/>
+        <rect x="-72" y="38" width="96" height="34" rx="9" fill="#FFF0ED" stroke="#F24E1E" stroke-width="1" stroke-opacity="0.4"/>
+        <text x="-24" y="59" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#D03000" font-weight="500">AI Course</text>
+
+        <!-- Q2 Report -->
+        <path d="M80,90 C50,90 44,90 24,90" fill="none" stroke="#F24E1E" stroke-width="1.6" stroke-opacity="0.25" stroke-linecap="round"/>
+        <rect x="-72" y="73" width="96" height="34" rx="9" fill="#FFF0ED" stroke="#F24E1E" stroke-width="1" stroke-opacity="0.4"/>
+        <text x="-24" y="94" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#D03000" font-weight="500">Q2 Report</text>
+
+        <!-- Team 1:1s — done -->
+        <path d="M80,90 C50,90 44,126 24,126" fill="none" stroke="#F24E1E" stroke-width="1.6" stroke-opacity="0.25" stroke-linecap="round"/>
+        <rect x="-72" y="109" width="96" height="34" rx="9" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+        <text x="-24" y="130" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#aaa" font-weight="500" text-decoration="line-through">Team 1:1s</text>
+        <circle cx="14" cy="126" r="7" fill="#2d9e4f" opacity="0.9"/>
+        <path d="M10 126 L13 129 L18 122" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+        <!-- ══ LEFT SIDE: Family branch ══ -->
+
+        <!-- Connector: center → Family -->
+        <path d="M300,175 C240,175 230,255 180,255" fill="none" stroke="#A259FF" stroke-width="2.5" stroke-opacity="0.35" stroke-linecap="round"/>
+        <!-- Family branch node -->
+        <rect x="80" y="233" width="100" height="44" rx="12" fill="#A259FF" filter="url(#soft-shadow)"/>
+        <text x="130" y="260" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="14" fill="#fff" font-weight="600">Family</text>
+
+        <!-- Family activities -->
+        <!-- Dinner together -->
+        <path d="M80,255 C50,255 44,220 24,220" fill="none" stroke="#A259FF" stroke-width="1.6" stroke-opacity="0.25" stroke-linecap="round"/>
+        <rect x="-90" y="203" width="114" height="34" rx="9" fill="#F3EBFF" stroke="#A259FF" stroke-width="1" stroke-opacity="0.4"/>
+        <text x="-33" y="224" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#7000FF" font-weight="500">Dinner together</text>
+
+        <!-- Weekend hike -->
+        <path d="M80,255 C50,255 44,255 24,255" fill="none" stroke="#A259FF" stroke-width="1.6" stroke-opacity="0.25" stroke-linecap="round"/>
+        <rect x="-90" y="238" width="114" height="34" rx="9" fill="#F3EBFF" stroke="#A259FF" stroke-width="1" stroke-opacity="0.4"/>
+        <text x="-33" y="259" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#7000FF" font-weight="500">Weekend hike</text>
+
+        <!-- ══ RIGHT SIDE: Me branch ══ -->
+
+        <!-- Connector: center → Me -->
+        <path d="M460,164 C530,164 540,90 590,90" fill="none" stroke="#1ABCFE" stroke-width="2.5" stroke-opacity="0.35" stroke-linecap="round"/>
+        <!-- Me branch node -->
+        <rect x="590" y="68" width="100" height="44" rx="12" fill="#1ABCFE" filter="url(#soft-shadow)"/>
+        <text x="640" y="95" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="14" fill="#fff" font-weight="600">Me</text>
+
+        <!-- Me activities -->
+        <!-- Running 3x -->
+        <path d="M690,90 C720,90 726,55 746,55" fill="none" stroke="#1ABCFE" stroke-width="1.6" stroke-opacity="0.25" stroke-linecap="round"/>
+        <rect x="746" y="38" width="100" height="34" rx="9" fill="#E8F8FF" stroke="#1ABCFE" stroke-width="1" stroke-opacity="0.4"/>
+        <text x="796" y="56" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#0070A0" font-weight="500">Running</text>
+        <!-- counter -->
+        <rect x="800" y="46" width="38" height="18" rx="6" fill="#1ABCFE" opacity="0.15"/>
+        <text x="819" y="59" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="10" fill="#0070A0" font-weight="700">1 / 3×</text>
+
+        <!-- Meditation -->
+        <path d="M690,90 C720,90 726,90 746,90" fill="none" stroke="#1ABCFE" stroke-width="1.6" stroke-opacity="0.25" stroke-linecap="round"/>
+        <rect x="746" y="73" width="100" height="34" rx="9" fill="#E8F8FF" stroke="#1ABCFE" stroke-width="1" stroke-opacity="0.4"/>
+        <text x="796" y="94" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#0070A0" font-weight="500">Meditation</text>
+
+        <!-- Read — done -->
+        <path d="M690,90 C720,90 726,126 746,126" fill="none" stroke="#1ABCFE" stroke-width="1.6" stroke-opacity="0.25" stroke-linecap="round"/>
+        <rect x="746" y="109" width="100" height="34" rx="9" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+        <text x="796" y="130" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" fill="#aaa" font-weight="500" text-decoration="line-through">Read 30 min</text>
+        <circle cx="836" cy="126" r="7" fill="#2d9e4f" opacity="0.9"/>
+        <path d="M832 126 L835 129 L840 122" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+        <!-- ══ RIGHT SIDE: Growth branch (lower) ══ -->
+
+        <!-- Connector: center → Growth -->
+        <path d="M460,175 C530,175 540,255 590,255" fill="none" stroke="#F24E1E" stroke-width="2" stroke-opacity="0.2" stroke-linecap="round" stroke-dasharray="5,4"/>
+        <!-- Growth branch node -->
+        <rect x="590" y="233" width="100" height="44" rx="12" fill="#F24E1E" opacity="0.25" stroke="#F24E1E" stroke-width="1.5" stroke-opacity="0.4"/>
+        <text x="640" y="260" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="14" fill="#D03000" font-weight="600" opacity="0.7">Growth</text>
+        <!-- + add button hint -->
+        <circle cx="700" cy="255" r="12" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+        <text x="700" y="260" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="16" fill="#bbb">+</text>
+
+      </svg>
+    </div>
+
+    <!-- Benefits -->
+    <div class="benefits">
+      <div class="benefit">
+        <div class="benefit-icon" style="background: var(--work-lt);">🪨</div>
+        <h3>Rocks first, always</h3>
+        <p>Plan from the most important things down. See every branch of your life in one view.</p>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon" style="background: var(--family-lt);">⚖️</div>
+        <h3>See your balance</h3>
+        <p>Are you all work and no self? The visual map makes imbalance impossible to ignore.</p>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon" style="background: var(--me-lt);">🔒</div>
+        <h3>Fully private</h3>
+        <p>Your data lives in your browser — no accounts, no servers, no tracking. Ever.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Ritual ─────────────────────────────────────────────────────────── -->
+<section class="ritual">
+  <div class="ritual-inner">
+    <h2><strong>10 minutes on Sunday.</strong><br>The rest of the week, you know what matters.</h2>
+    <p>Not another productivity system. Not another app to manage. Just a weekly ritual that puts the big rocks in before the sand has a chance to fill the jar.</p>
+    <a href="/app" class="cta-btn-light">
+      Start this week →
+    </a>
+    <p class="ritual-note">No sign-up · Runs in your browser · Free forever</p>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────── -->
+<footer>
+  <a href="/" class="nav-logo" aria-label="Zenit Week">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 3 118 46" width="65" height="26" aria-hidden="true">
+      <text x="2" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+      <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+      <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+      <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+      <text x="84" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+    </svg>
+  </a>
+  <p>© 2026 Zenit Week · MIT License</p>
+  <a href="/app">Open the app →</a>
+</footer>
+
+</body>
+</html>
