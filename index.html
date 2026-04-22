@@ -324,6 +324,10 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 24px;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
     }
 
     .benefit-icon {
@@ -333,9 +337,11 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 14px;
+      flex-shrink: 0;
       font-size: 20px;
     }
+
+    .benefit-body { flex: 1; }
 
     .benefit h3 {
       font-size: 15px;
@@ -767,18 +773,24 @@
     <div class="benefits">
       <div class="benefit">
         <div class="benefit-icon" style="background: var(--work-lt);">🪨</div>
-        <h3>Rocks first, always</h3>
-        <p>Plan from the most important things down. See every branch of your life in one view.</p>
+        <div class="benefit-body">
+          <h3>Rocks first, always</h3>
+          <p>Plan from the most important things down. See every branch of your life in one view.</p>
+        </div>
       </div>
       <div class="benefit">
         <div class="benefit-icon" style="background: var(--family-lt);">⚖️</div>
-        <h3>See your balance</h3>
-        <p>Are you all work and no self? The visual map makes imbalance impossible to ignore.</p>
+        <div class="benefit-body">
+          <h3>See your balance</h3>
+          <p>Are you all work and no self? The visual map makes imbalance impossible to ignore.</p>
+        </div>
       </div>
       <div class="benefit">
         <div class="benefit-icon" style="background: var(--me-lt);">🔒</div>
-        <h3>Fully private</h3>
-        <p>Your data lives in your browser or your own Google Drive. No servers, no tracking. Ever.</p>
+        <div class="benefit-body">
+          <h3>Fully private</h3>
+          <p>Your data lives in your browser or your own Google Drive. No servers, no tracking.</p>
+        </div>
       </div>
     </div>
   </div>
