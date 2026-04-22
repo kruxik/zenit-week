@@ -114,7 +114,7 @@
       flex-direction: column;
       gap: 12px;
       max-width: 560px;
-      align-items: flex-start;
+      align-items: center;
     }
 
     .hero-questions li {
@@ -125,35 +125,47 @@
       border: 1.5px solid;
       line-height: 1.3;
       white-space: nowrap;
+      position: relative;
+      overflow: visible;
     }
+
+    .branch-svg {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      overflow: visible;
+      pointer-events: none;
+    }
+    .branch-left  { right: calc(100% - 1px); }
+    .branch-right { left:  calc(100% - 1px); }
 
     .hero-questions li:nth-child(1) {
       background: linear-gradient(to bottom, #ffffff, #ede0ff);
       border-color: #8F37FF;
       color: #6010c8;
       box-shadow: 0 0 18px rgba(143,55,255,0.32);
-      margin-left: 8px;
+      margin-left: -60px;
     }
     .hero-questions li:nth-child(2) {
       background: linear-gradient(to bottom, #ffffff, #e0ffe2);
       border-color: #19C82A;
       color: #0a7a14;
       box-shadow: 0 0 18px rgba(25,200,42,0.32);
-      margin-left: 72px;
+      margin-left: 60px;
     }
     .hero-questions li:nth-child(3) {
       background: linear-gradient(to bottom, #ffffff, #e0f6ff);
       border-color: #1ABCFE;
       color: #0070a0;
       box-shadow: 0 0 18px rgba(26,188,254,0.32);
-      margin-left: 28px;
+      margin-left: 20px;
     }
     .hero-questions li:nth-child(4) {
       background: linear-gradient(to bottom, #ffffff, #ffe8e0);
       border-color: #F83800;
       color: #b82000;
       box-shadow: 0 0 18px rgba(248,56,0,0.32);
-      margin-left: 90px;
+      margin-left: -30px;
     }
 
     .hero-answer {
@@ -425,10 +437,54 @@
   </h1>
 
   <ul class="hero-questions" aria-label="Common things we neglect">
-    <li>Learning AI — even just 10 minutes a day?</li>
-    <li>Being fully present with your family?</li>
-    <li>Taking care of your mind and body?</li>
-    <li>Building something that moves you forward?</li>
+    <li>
+      <svg class="branch-svg branch-left" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
+        <defs>
+          <linearGradient id="bl1" x1="70" y1="20" x2="0" y2="20" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#8F37FF" stop-opacity="0.7"/>
+            <stop offset="100%" stop-color="#8F37FF" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M 70 20 C 48 20 28 14 0 22" fill="none" stroke="url(#bl1)" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      Learning AI — even just 10 minutes a day?
+    </li>
+    <li>
+      <svg class="branch-svg branch-right" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
+        <defs>
+          <linearGradient id="bl2" x1="0" y1="20" x2="70" y2="20" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#19C82A" stop-opacity="0.7"/>
+            <stop offset="100%" stop-color="#19C82A" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M 0 20 C 22 20 48 14 70 22" fill="none" stroke="url(#bl2)" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      Being fully present with your family?
+    </li>
+    <li>
+      <svg class="branch-svg branch-right" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
+        <defs>
+          <linearGradient id="bl3" x1="0" y1="20" x2="70" y2="20" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#1ABCFE" stop-opacity="0.7"/>
+            <stop offset="100%" stop-color="#1ABCFE" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M 0 20 C 22 20 48 26 70 18" fill="none" stroke="url(#bl3)" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      Taking care of your mind and body?
+    </li>
+    <li>
+      <svg class="branch-svg branch-left" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
+        <defs>
+          <linearGradient id="bl4" x1="70" y1="20" x2="0" y2="20" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#F83800" stop-opacity="0.7"/>
+            <stop offset="100%" stop-color="#F83800" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M 70 20 C 48 20 28 26 0 18" fill="none" stroke="url(#bl4)" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      Building something that moves you forward?
+    </li>
   </ul>
 
   <p class="hero-answer">Probably not.</p>
