@@ -71,7 +71,7 @@
     --bg-muted: #f0f0f0;
 
     /* Toolbar / panel backdrops */
-    --toolbar-bg: rgba(255,255,255,0.9);
+    --toolbar-bg: rgba(255,255,255,0.5);
     --view-bar-bg: rgba(255,255,255,0.92);
     --settings-bg: rgba(255,255,255,0.96);
 
@@ -86,7 +86,7 @@
     --text-button: #3c4043;
 
     /* Borders */
-    --border-default: #e0e0e0;
+    --border-default: #e8e8ee;
     --border-subtle: rgba(0,0,0,0.12);
     --border-hover: rgba(0,0,0,0.28);
     --border-soft: #eeeeee;
@@ -176,7 +176,7 @@
     --bg-muted: #2a2a2a;
 
     /* Toolbar / panel backdrops */
-    --toolbar-bg: rgba(20,20,20,0.92);
+    --toolbar-bg: rgba(20,20,20,0.5);
     --view-bar-bg: rgba(28,28,28,0.95);
     --settings-bg: rgba(28,28,28,0.98);
 
@@ -315,6 +315,7 @@
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
+    position: relative;
   }
 
   #toolbar {
@@ -324,11 +325,13 @@
     padding: 10px 24px;
     background: var(--toolbar-bg);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border-default);
-    box-shadow: 0 2px 10px var(--shadow-xs);
     z-index: 10;
-    flex-shrink: 0;
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
   }
 
   #logo {
@@ -521,9 +524,12 @@
   }
 
   #canvas-container {
-    flex: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     overflow: hidden;
-    position: relative;
     cursor: grab;
     touch-action: none;
     background-color: var(--bg-canvas);
