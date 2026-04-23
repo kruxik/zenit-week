@@ -4485,11 +4485,13 @@ function transferReusable() {
         children: [],
         _ts: Date.now(),
       };
+      delete newNode.doneAt;
+      delete newNode.unplannedAt;
       if (isAncestor) {
         delete newNode.reusable; // shell — not marked reusable
       } else {
         newNode.reusable = true;
-        if (newNode.type === 'counter') newNode.val = 0;
+        if (newNode.type === 'counter') { newNode.val = 0; newNode.ticks = []; }
       }
       newNodes.push(newNode);
       oldToNew.set(oldId, id);
@@ -7655,7 +7657,7 @@ window.addEventListener('load', () => {
 
     // Sort done entries by effective completion timestamp ascending
     const doneTimestamp = (leafNode) => {
-      if (leafNode.doneAt) return leafNode.doneAt;
+      if (leafNode.doneAt && leafNode.doneAt.startsWith(today)) return leafNode.doneAt;
       const cc = getCounterChild(leafNode);
       if (cc && cc.ticks) {
         const todayTick = cc.ticks.filter(ts => ts.startsWith(today)).sort().pop();
