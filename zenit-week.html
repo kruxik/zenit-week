@@ -655,6 +655,7 @@
     width: 100%;
     height: 100%;
     display: block;
+    user-select: none;
   }
 
   /* Google Drive Sync UI */
@@ -1702,6 +1703,10 @@
     filter: none;
   }
 
+  .dragging-active .node-group:hover .node-rect {
+    filter: none;
+  }
+
   .add-btn {
     opacity: 0;
     transition: opacity 0.15s ease;
@@ -1710,6 +1715,10 @@
 
   .node-group:hover .add-btn {
     opacity: 1;
+  }
+
+  .dragging-active .node-group:hover .add-btn {
+    opacity: 0;
   }
 
   @media (pointer: coarse) {
@@ -6915,6 +6924,7 @@ window.addEventListener('pointermove', (e) => {
       });
       beginAtomicOp();
       dragState = { activeNodeId: id, startX: originX, startY: originY, initialPositions };
+      document.getElementById('main-svg').classList.add('dragging-active');
     }
   }
 
@@ -6986,6 +6996,7 @@ window.addEventListener('pointerup', (e) => {
         el.style.transition = '';
       }
     });
+    document.getElementById('main-svg').classList.remove('dragging-active');
     handleNodeDrop(e.clientX, e.clientY);
     dragState.activeNodeId = null;
     endAtomicOp();
@@ -7011,7 +7022,10 @@ window.addEventListener('pointerup', (e) => {
 window.addEventListener('pointercancel', (e) => {
   endPointer(e);
   pendingDrag = null;
-  if (dragState.activeNodeId) endAtomicOp();
+  if (dragState.activeNodeId) {
+    document.getElementById('main-svg').classList.remove('dragging-active');
+    endAtomicOp();
+  }
   dragState.activeNodeId = null;
   isPanning = false;
   container.classList.remove('panning');
