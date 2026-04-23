@@ -5821,6 +5821,9 @@ function syncStatusUp(nodeId, prop) {
         if (allTrue) parent.doneAt = new Date().toISOString();
         else delete parent.doneAt;
         updateNodeUI(parent.id);
+      } else if (prop === 'unplanned') {
+        if (allTrue) parent.unplannedAt = new Date().toISOString();
+        else delete parent.unplannedAt;
       }
     }
     syncStatusUp(parent.id, prop);
