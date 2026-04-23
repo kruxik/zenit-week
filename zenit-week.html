@@ -3836,6 +3836,8 @@ let dragState = {
   initialPositions: {}, // { id: {x, y} }
 };
 
+let pendingDrag = null; // { id, startX, startY } — drag not yet activated
+
 // ─── Week utilities ───────────────────────────────────────────────────────────
 function getISOWeek(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -6321,28 +6323,7 @@ function attachNodeListeners() {
         return; // touch = navigate only, no drag
       }
 
-      const positions = computeLayout();
-      const idsToDrag = [id, ...getDescendantIds(id)];
-
-      const initialPositions = {};
-      idsToDrag.forEach(idToDrag => {
-        const p = positions[idToDrag];
-        if (p) initialPositions[idToDrag] = { x: p.x, y: p.y };
-
-        const el = document.querySelector(`.node-group[data-id="${idToDrag}"]`);
-        if (el) {
-          el.style.transition = 'none';
-          el.setAttribute('pointer-events', 'none');
-        }
-      });
-
-      beginAtomicOp();
-      dragState = {
-        activeNodeId: id,
-        startX: e.clientX,
-        startY: e.clientY,
-        initialPositions: initialPositions,
-      };
+      pendingDrag = { id, startX: e.clientX, startY: e.clientY };
     });
 
     g.addEventListener('dblclick', (e) => {
@@ -6914,6 +6895,29 @@ window.addEventListener('pointermove', (e) => {
     return;
   }
 
+  if (pendingDrag && !dragState.activeNodeId) {
+    const dx = e.clientX - pendingDrag.startX;
+    const dy = e.clientY - pendingDrag.startY;
+    if (Math.hypot(dx, dy) > 5) {
+      const { id, startX: originX, startY: originY } = pendingDrag;
+      pendingDrag = null;
+      const positions = computeLayout();
+      const idsToDrag = [id, ...getDescendantIds(id)];
+      const initialPositions = {};
+      idsToDrag.forEach(idToDrag => {
+        const p = positions[idToDrag];
+        if (p) initialPositions[idToDrag] = { x: p.x, y: p.y };
+        const el = document.querySelector(`.node-group[data-id="${idToDrag}"]`);
+        if (el) {
+          el.style.transition = 'none';
+          el.setAttribute('pointer-events', 'none');
+        }
+      });
+      beginAtomicOp();
+      dragState = { activeNodeId: id, startX: originX, startY: originY, initialPositions };
+    }
+  }
+
   if (dragState.activeNodeId) {
     const dx = (e.clientX - dragState.startX) / zoom;
     const dy = (e.clientY - dragState.startY) / zoom;
@@ -6972,7 +6976,7 @@ function endPointer(e) {
 
 window.addEventListener('pointerup', (e) => {
   endPointer(e);
-
+  pendingDrag = null;
 
   if (dragState.activeNodeId) {
     Object.keys(dragState.initialPositions).forEach(id => {
@@ -7006,6 +7010,7 @@ window.addEventListener('pointerup', (e) => {
 
 window.addEventListener('pointercancel', (e) => {
   endPointer(e);
+  pendingDrag = null;
   if (dragState.activeNodeId) endAtomicOp();
   dragState.activeNodeId = null;
   isPanning = false;
