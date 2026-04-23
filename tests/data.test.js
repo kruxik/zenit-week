@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { getISOWeek, weeksInYear, offsetWeek, weekKey, parseWeekKey, genId, defaultWeekData, validateAndRepair } from './setup.js';
 
 describe('getISOWeek', () => {
@@ -148,12 +149,18 @@ describe('defaultWeekData', () => {
 
 describe('validateAndRepair', () => {
   test('null input returns default week data shape', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = validateAndRepair(null);
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
     expect(result.nodes.map(n => n.id)).toEqual(['work', 'family', 'me']);
   });
 
   test('object without nodes array returns default week data shape', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = validateAndRepair({});
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
     expect(result.nodes.map(n => n.id)).toEqual(['work', 'family', 'me']);
   });
 

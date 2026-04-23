@@ -23,11 +23,21 @@ function elementStub() {
     contains: () => false,
     value: '',
     textContent: '',
+    innerHTML: '',
     setAttribute: () => {},
     getAttribute: () => null,
     appendChild: () => {},
+    removeChild: () => {},
+    insertBefore: () => {},
     querySelector: () => null,
     querySelectorAll: () => [],
+    focus: () => {},
+    select: () => {},
+    scrollWidth: 0,
+    offsetWidth: 0,
+    offsetHeight: 0,
+    getBoundingClientRect: () => ({ x: 0, y: 0, width: 800, height: 600, top: 0, left: 0, right: 800, bottom: 600 }),
+    dataset: {},
   };
 }
 
@@ -53,24 +63,40 @@ const sandbox = {
       }
       return elementStub();
     },
+    querySelector: () => null,
     querySelectorAll: () => [],
     documentElement: { dataset: {} },
     createElement: (tag) => {
       if (tag === 'canvas') {
-        return { getContext: () => ({ measureText: () => ({ width: 0 }) }) };
+        return { getContext: () => ({ measureText: () => ({ width: 0 }), font: '' }) };
       }
       return elementStub();
     },
+    createElementNS: (_ns, _tag) => elementStub(),
+    body: elementStub(),
   },
   localStorage: { getItem: () => null, setItem: () => {} },
   location: { hash: '' },
   navigator: { userAgentData: null, userAgent: '' },
+  performance: { now: () => 0 },
+  requestAnimationFrame: () => {},
   setTimeout,
   clearTimeout,
+  // Test state bridge — populated by the appended accessor snippet below
+  _state: {},
 };
 
 vm.createContext(sandbox);
-vm.runInContext(scriptCode, sandbox);
+
+// Append state accessors so tests can read/write let-scoped app variables
+const stateAccessors = `
+_state.get       = function() { return weekData; };
+_state.set       = function(v) { weekData = v; rebuildNodeMap(); };
+_state.setWeekKey = function(k) { currentWeekKey = k; };
+_state.reset     = function() { undoStack = []; redoStack = []; };
+`;
+
+vm.runInContext(scriptCode + stateAccessors, sandbox);
 
 // Re-export the pure utility functions for use in tests
 export const {
@@ -82,4 +108,16 @@ export const {
   genId,
   defaultWeekData,
   validateAndRepair,
+  // Status-propagation functions
+  addNode,
+  startAddNode,
+  cancelEdit,
+  deleteNode,
+  setStatus,
+  syncStatusUp,
+  findNode,
+  rebuildNodeMap,
+  isLeafActivity,
+  getDescendantIds,
+  _state,
 } = sandbox;
