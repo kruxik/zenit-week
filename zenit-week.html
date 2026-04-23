@@ -4786,6 +4786,7 @@ function addNode(parentId, label) {
   rebuildNodeMap();
   parent.children.push(node.id);
   touchNode(parentId);
+  syncStatusUp(node.id, 'done');
   saveWeek(currentWeekKey, weekData);
   render();
 }
@@ -5545,6 +5546,7 @@ function startAddNode(parentId) {
   weekData.nodes.push(node);
   rebuildNodeMap();
   parent.children.push(id);
+  syncStatusUp(id, 'done');
   _openInlineInput(id, true);
   smoothPanToRevealNode(id);
 }
@@ -5720,6 +5722,10 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
     if (node && node.parent) {
       const parent = findNode(node.parent);
       if (parent) parent.children = parent.children.filter(c => c !== nodeId);
+    }
+    // Re-sync parent done status before node is purged from nodeMap
+    if (node && node.parent && node.parent !== 'center') {
+      syncStatusUp(nodeId, 'done');
     }
     // If cancelling a new branch, clean up its color and config entries
     if (node && node.type === 'branch') {
