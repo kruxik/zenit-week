@@ -4921,7 +4921,8 @@ function setStatus(id, status) {
       } else if (newStatus === 'undone') {
         child.done = false;
         if (child.type === 'counter') {
-          child.val = Math.max(0, (child.val || 0) - 1);
+          child.val = 0;
+          child.ticks = [];
           delete child.doneAt;
         } else if (isLeafActivity(child)) {
           delete child.doneAt;
