@@ -4913,20 +4913,16 @@ function setStatus(id, status) {
         child.done = true;
         if (child.type === 'counter') {
           child.val = child.max;
-          child.doneAt = new Date().toISOString();
-        } else if (isLeafActivity(child)) {
-          child.doneAt = new Date().toISOString();
         }
+        child.doneAt = new Date().toISOString();
         setDescendants(cid, 'done');
       } else if (newStatus === 'undone') {
         child.done = false;
         if (child.type === 'counter') {
           child.val = 0;
           child.ticks = [];
-          delete child.doneAt;
-        } else if (isLeafActivity(child)) {
-          delete child.doneAt;
         }
+        delete child.doneAt;
         setDescendants(cid, 'undone');
       } else if (newStatus === 'unplanned') {
         child.unplanned = true;
