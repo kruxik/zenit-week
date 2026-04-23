@@ -4860,6 +4860,12 @@ function deleteNode(id) {
     }
   }
 
+  // Re-sync parent done/unplanned before node is purged from nodeMap
+  if (node.parent && node.parent !== 'center') {
+    syncStatusUp(id, 'done');
+    syncStatusUp(id, 'unplanned');
+  }
+
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
   saveWeek(currentWeekKey, weekData);
