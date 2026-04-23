@@ -7052,12 +7052,22 @@ function handleNodeDrop(mouseX, mouseY) {
         touchNode(node.parent);
       }
     }
+    // Re-sync old parent (node.parent still points to old parent here)
+    if (node.parent && node.parent !== 'center') {
+      syncStatusUp(nodeId, 'done');
+      syncStatusUp(nodeId, 'unplanned');
+    }
     // Set new parent
     const newParent = findNode(targetParentId);
     node.parent = targetParentId;
     node.branch = newParent.branch || newParent.id;
     newParent.children.push(nodeId);
     touchNode(targetParentId);
+    // Re-sync new parent (node.parent now points to new parent)
+    if (targetParentId !== 'center') {
+      syncStatusUp(nodeId, 'done');
+      syncStatusUp(nodeId, 'unplanned');
+    }
 
     // Reset offsets for clean snap to new parent
     node.offX = 0;
