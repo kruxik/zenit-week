@@ -5,14 +5,19 @@ Thank you for your interest in contributing to Zenit Week! This project aims to 
 ## 🚀 How to Run
 
 1.  Clone the repository.
-2.  Open `zenit-week.html` in any modern web browser.
-3.  That's it! There is no build step, no `npm install` required, and no server to run.
+2.  Open `zenit-week.html` in any modern web browser — no server required.
+3.  To run the test suite and HTML validator, install dev dependencies first:
+    ```sh
+    npm install
+    npm test            # runs vitest
+    npm run validate    # runs html-validate
+    ```
 
 ## 📜 Principles
 
 - **Single-File Policy:** The entire application must remain within `zenit-week.html`. This ensures the tool remains a "portable utility" that anyone can download and use instantly.
 - **Vanilla Only:** No external frameworks (React, Vue, Tailwind, etc.). Use standard HTML5, CSS3, and ES6+ JavaScript.
-- **Privacy:** Never add features that send user data to a remote server. Everything must stay in `localStorage`.
+- **Privacy:** Zenit Week has no servers and stores nothing itself. User data must stay on the user's device (localStorage) or in their own Google Drive — never on our infrastructure.
 
 ## 🛠️ Development Workflow
 
@@ -22,6 +27,12 @@ Thank you for your interest in contributing to Zenit Week! This project aims to 
     - Zoom and pan are smooth.
     - Data persists after a refresh.
     - No console errors.
+
+    If you touched core data logic, also run the automated suite:
+    ```sh
+    npm test
+    npm run validate
+    ```
 3.  **Code Style:**
     - Use `'use strict';`.
     - Prefer `const` and `let` over `var`.

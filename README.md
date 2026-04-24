@@ -23,7 +23,8 @@ A visually rich, single-file mind-map week planner that runs entirely in your br
 - **Todo Panel:** Quick sidebar listing all incomplete tasks across the week.
 - **Dark Mode:** Full light/dark theme with automatic detection of system preference.
 - **Undo/Redo:** Full history support with 100 levels of undo.
-- **Privacy First:** Your data never leaves your computer; it stays in your browser's local storage.
+- **Google Drive Sync:** Optionally sign in with Google to sync your data across devices — stored only in your own Google Drive.
+- **Privacy First:** Zenit Week has no servers and stores nothing itself. Your data lives on your device (localStorage) or in your own Google Drive — it never touches our infrastructure.
 
 ## ⌨️ Keyboard Shortcuts
 
