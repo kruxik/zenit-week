@@ -11,7 +11,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 - **Icons/Assets**: Native Unicode characters and CSS-based shapes.
 
 ## Key Files
-- `zenit-week.html`: The entire application (HTML, CSS, and JS) — ~5,150 lines.
+- `zenit-week.html`: The entire application (HTML, CSS, and JS) — ~8,034 lines.
 
 ## Architecture
 
@@ -21,8 +21,12 @@ weekData = {
   nodes: [
     { id, type, branch, label, parent, children,
       done, unplanned, priority, reusable, offX, offY, side,
-      // counter nodes: val, max
-      // timestamps: doneAt }
+      // counter nodes:
+      val, max, ticks,       // ticks: ISO timestamp per increment (drives daily log)
+      // timestamps:
+      doneAt,                // set when marked done
+      unplannedAt,           // set when marked unplanned
+      _ts }                  // epoch ms — Drive merge conflict resolution
   ]
 }
 ```
@@ -50,6 +54,18 @@ Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` — all cu
 - `updateNodeUI()` — surgical update for visual-only changes
 - `updateSummary()` — refreshes stats panel
 
+### Key Functions
+- `findNode(id)` — O(1) lookup via `nodeMap` (`Map<id, node>`, rebuilt on every structural change)
+- `genId()` — generates a node ID; prefer over `crypto.randomUUID()` directly (has HTTP fallback)
+- `getDescendantIds(id)` — recursively collects subtree IDs
+- `validateAndRepair()` — garbage collection and orphan cleanup
+- `transferUnfinished()` — copies incomplete activity nodes from previous ISO week to current
+- `transferReusable()` — copies nodes marked `reusable: true` (counters reset) to current week
+- `moveNodeToNextWeek(nodeId)` — moves a single node (and subtree) to the next ISO week
+- `addBranch(side)` / `deleteBranch(id)` — dynamic branch management
+- `applyBranchColor(branch, hex)` — updates branch color palette and re-renders
+- `syncStatusUp(nodeId, prop)` — propagates done/unplanned status up the tree after a child changes
+
 ## Coding Standards & Conventions
 - **Single File Policy**: Maintain the entire application within `zenit-week.html`.
 - **JavaScript**:
@@ -58,7 +74,7 @@ Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` — all cu
   - Use camelCase for function and variable names.
   - Avoid code duplication; prioritize modularity and reuse.
   - Create SVG elements using `document.createElementNS('http://www.w3.org/2000/svg', tag)`.
-  - Use `crypto.randomUUID()` for ID generation.
+  - Use `genId()` for ID generation — it calls `crypto.randomUUID()` with a `crypto.getRandomValues` fallback for plain-HTTP contexts.
 - **CSS**:
   - Use Flexbox for layout.
   - Follow kebab-case for IDs and classes.
@@ -67,7 +83,12 @@ Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` — all cu
 ## Workflows
 - **Running**: Open `zenit-week.html` directly in any modern web browser.
 - **Development**: Edit `zenit-week.html` and refresh the browser.
-- **Testing**: Manual verification in the browser. Ensure drag-and-drop, zooming, undo/redo, and data persistence work across refreshes.
+- **Testing**: Manual verification in the browser. Ensure drag-and-drop, zooming, undo/redo, and data persistence work across refreshes. For data-logic changes also run the automated suite:
+  ```sh
+  npm install       # only needed once
+  npm test          # vitest
+  npm run validate  # html-validate
+  ```
 
 ## UI/UX Guidelines
 - **Visual Style**: Modern, clean interface with rounded corners, soft shadows, and a professional color palette.
@@ -86,8 +107,10 @@ Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` — all cu
 - **Panels**:
   - **Todo panel** — lists all incomplete activity nodes; accessible from toolbar.
   - **Daily log panel** — floating panel showing completed/ticked activities for today with timestamps.
-  - **Summary panel** — expandable drawer showing per-branch done/total stats.
+  - **Summary panel** — expandable drawer showing per-branch done/total stats and a global completion percentage.
 - **Reusable tasks**: Activity nodes can be marked `reusable`; "Transfer Reusable" copies them (counters reset) to the next week.
+- **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive — Zenit Week has no servers and never stores user data itself.
+- **Internationalization**: English and Czech UI supported; `t(key)` helper reads from `TRANSLATIONS[currentLang]`; language persisted as `zenit-week-lang` in `localStorage` and synced via Drive.
 - **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern.
 
 ## Workflow Rules

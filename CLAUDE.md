@@ -11,7 +11,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 - **Icons/Assets**: Native Unicode characters and CSS-based shapes
 
 ## Key Files
-- `zenit-week.html`: The entire application (HTML, CSS, and JS) — ~5,150 lines
+- `zenit-week.html`: The entire application (HTML, CSS, and JS) — ~8,034 lines
 
 ## Architecture
 
@@ -22,9 +22,11 @@ weekData = {
     { id, type, branch, label, parent, children,
       done, unplanned, priority, reusable, offX, offY, side, _editing,
       // counter nodes only:
-      val, max,
+      val, max, ticks,       // ticks: ISO timestamp per increment (drives daily log)
       // timestamps:
-      doneAt }
+      doneAt,                // set when marked done
+      unplannedAt,           // set when marked unplanned
+      _ts }                  // epoch ms — Drive merge conflict resolution
   ]
 }
 ```
@@ -49,12 +51,15 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 
 ### Key Functions
 - `findNode(id)` — O(1) lookup via `nodeMap` (a `Map<id, node>`, rebuilt on every structural change)
+- `genId()` — generates a node ID using `crypto.randomUUID()` with a `crypto.getRandomValues` fallback for plain-HTTP contexts; always call this, never `crypto.randomUUID()` directly
 - `getDescendantIds(id)` — recursively collects subtree
 - `validateAndRepair()` — garbage collection and orphan cleanup
 - `transferUnfinished()` — copies incomplete activity nodes from previous ISO week to current
 - `transferReusable()` — copies nodes marked `reusable: true` (with counters reset) to current week
+- `moveNodeToNextWeek(nodeId)` — moves a single node (and subtree) to the next ISO week
 - `addBranch(side)` / `deleteBranch(id)` — dynamic branch management
 - `applyBranchColor(branch, hex)` — updates branch color palette and re-renders
+- `syncStatusUp(nodeId, prop)` — propagates done/unplanned status up the tree after a child changes
 
 ## Coding Standards & Conventions
 - **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files
@@ -75,7 +80,12 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 ## Workflows
 - **Running**: Open `zenit-week.html` directly in any modern browser — no server needed
 - **Development**: Edit `zenit-week.html`, refresh browser to test
-- **Testing**: Manual verification in browser — check drag-and-drop, zoom/pan, undo/redo, and localStorage persistence across refreshes
+- **Testing**: Manual verification in browser — check drag-and-drop, zoom/pan, undo/redo, and localStorage persistence across refreshes. For data-logic changes also run the automated suite:
+  ```sh
+  npm install       # only needed once
+  npm test          # vitest
+  npm run validate  # html-validate
+  ```
 
 ## UI/UX Guidelines
 - **Visual Style**: Modern, clean interface with rounded corners, soft shadows, professional color palette
@@ -93,7 +103,10 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - **Context menus**: Hide options that don't apply to the current node type
 - **Todo panel**: Sidebar listing all incomplete activity nodes across the week; accessible via toolbar button
 - **Daily log panel**: Floating panel showing completed/ticked activities for the day, with timestamps and branch color dots
+- **Summary panel**: Expandable drawer showing per-branch done/total stats and a global completion percentage
 - **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week
+- **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive — Zenit Week has no servers and never stores user data itself
+- **Internationalization**: English and Czech UI supported; `t(key)` helper reads from `TRANSLATIONS[currentLang]`; language persisted as `zenit-week-lang` in `localStorage` and synced via Drive
 - **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern
 
 ## Workflow Rules
