@@ -1,7 +1,8 @@
 {
-  "cleanUrls": true,
   "rewrites": [
-    { "source": "/app",     "destination": "/zenit-week.html" },
-    { "source": "/app/(.*)", "destination": "/zenit-week.html" }
+    { "source": "/app",      "destination": "/zenit-week.html" },
+    { "source": "/app/(.*)", "destination": "/zenit-week.html" },
+    { "source": "/privacy",  "destination": "/privacy.html" },
+    { "source": "/terms",    "destination": "/terms.html" }
   ]
 }
