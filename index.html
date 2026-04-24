@@ -295,7 +295,8 @@
       margin-bottom: 14px;
     }
 
-    .preview > .preview-inner > p {
+    .preview > .preview-inner > p,
+    .features > .features-inner > p {
       font-size: 17px;
       color: var(--muted);
       margin-bottom: 52px;
@@ -354,6 +355,37 @@
       font-size: 14px;
       color: var(--muted);
       line-height: 1.6;
+    }
+
+    /* ── Features section ─────────────────────────────────────────── */
+    .features {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .features-inner {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .features h2 {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 700;
+      margin-bottom: 48px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      text-align: left;
+    }
+
+    @media (max-width: 540px) {
+      .features-grid { grid-template-columns: 1fr; }
     }
 
     /* ── Ritual section ───────────────────────────────────────────── */
@@ -433,7 +465,7 @@
     /* ── Responsive ───────────────────────────────────────────────── */
     @media (max-width: 540px) {
       .hero { padding: 28px 20px 56px; }
-      .why, .preview, .ritual { padding: 60px 20px; }
+      .why, .preview, .features, .ritual { padding: 60px 20px; }
       .mindmap-card { padding: 24px 12px; }
       .hero-questions { max-width: 100%; gap: 8px; }
       .hero-questions li {
@@ -793,6 +825,82 @@
           <p>Your data lives in your browser or your own Google Drive. No servers, no tracking.</p>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ──────────────────────────────────────────────────────── -->
+<section class="features">
+  <div class="features-inner">
+    <p class="section-label">Key features</p>
+    <div class="section-divider"></div>
+    <h2>Own your week</h2>
+    <div class="features-grid">
+
+      <div class="benefit">
+        <div class="benefit-icon" style="background:#E8F8FF;">🗺️</div>
+        <div class="benefit-body">
+          <h3>Visual map</h3>
+          <p>Your week as a branching tree. Workload and balance readable at a glance.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="background:#FFF0ED;">🎯</div>
+        <div class="benefit-body">
+          <h3>Priorities</h3>
+          <p>Normal, High, Critical — set and see what really matters the most.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="background:#F3EBFF;">🔁</div>
+        <div class="benefit-body">
+          <h3>Week transfer</h3>
+          <p>Carry unfinished or reusable tasks to the next week in one action.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="background:#E8FFF4;">🔢</div>
+        <div class="benefit-body">
+          <h3>Counters</h3>
+          <p>Type <strong>2×</strong> or <strong>(tu, th)</strong> in any activity to get a counter.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="background:#EEF4FF;">☁️</div>
+        <div class="benefit-body">
+          <h3>Device sync</h3>
+          <p>Optional cross-device sync. Data stays in your own Drive — no servers.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="background:#F3EBFF;">✅</div>
+        <div class="benefit-body">
+          <h3>Daily log</h3>
+          <p>Plan for today and see what you have already achieved — in one panel.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="background:#F5F5F7;">⌨️</div>
+        <div class="benefit-body">
+          <h3>Hotkeys</h3>
+          <p>Optimize your planning on desktop with a handful of hotkeys.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="background:#EDFCF2;">📱</div>
+        <div class="benefit-body">
+          <h3>Mobile optimised</h3>
+          <p>Fully responsive — plan and review your week from any device.</p>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
