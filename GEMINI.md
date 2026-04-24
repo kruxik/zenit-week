@@ -11,7 +11,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 - **Icons/Assets**: Native Unicode characters and CSS-based shapes.
 
 ## Key Files
-- `zenit-week.html`: The entire application (HTML, CSS, and JS) — ~8,034 lines.
+- `zenit-week.html`: The entire application (HTML, CSS, and JS).
 
 ## Architecture
 
