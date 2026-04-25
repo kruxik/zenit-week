@@ -69,6 +69,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
   - Use camelCase for function and variable names
   - Avoid code duplication; prioritize modularity and reuse
   - Create SVG elements with `document.createElementNS('http://www.w3.org/2000/svg', tag)`
+  - **Never use `innerHTML`, `outerHTML`, or `insertAdjacentHTML` with any user-controlled string** (node labels, branch names, or any data that originates from `weekData` or external sources such as Google Drive). Use `textContent`, `createTextNode()`, or explicit DOM construction (`createElement` + property assignment) instead. The only acceptable use of `innerHTML` is with fully static, constant strings that are entirely defined in code and never contain user data (e.g. calls to `iconSvg()`). Violating this rule opens XSS attack vectors — Drive sync means untrusted data can arrive even in a local-file context.
 - **CSS**:
   - Use Flexbox for layout
   - Use kebab-case for IDs and class names
