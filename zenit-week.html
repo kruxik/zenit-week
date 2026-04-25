@@ -5990,7 +5990,22 @@ function updateSummary() {
       const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
       const row = document.createElement('div');
       row.className = 'branch-stat';
-      row.innerHTML = `<span class="branch-name"><div class="legend-dot" style="background:${color}" data-branch-dot="${b.id}"></div>${b.label}:</span><span id="stat-${b.id}">${s.done} (${s.percent}&nbsp;%) / ${s.total}</span>`;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'branch-name';
+      const dot = document.createElement('div');
+      dot.className = 'legend-dot';
+      dot.style.background = color;
+      dot.dataset.branchDot = b.id;
+      nameSpan.appendChild(dot);
+      nameSpan.appendChild(document.createTextNode(b.label + ':'));
+
+      const statSpan = document.createElement('span');
+      statSpan.id = 'stat-' + b.id;
+      statSpan.textContent = `${s.done} (${s.percent} %) / ${s.total}`;
+
+      row.appendChild(nameSpan);
+      row.appendChild(statSpan);
       detailsEl.insertBefore(row, ratioBar);
     });
 
@@ -6024,7 +6039,15 @@ function updateSummary() {
       const item = document.createElement('div');
       item.className = 'legend-item';
       item.dataset.branchItem = b.id;
-      item.innerHTML = `<div class="legend-dot" style="background:${color}" data-branch-dot="${b.id}"></div><span data-branch-label="${b.id}">${b.label}</span>`;
+      const legendDot = document.createElement('div');
+      legendDot.className = 'legend-dot';
+      legendDot.style.background = color;
+      legendDot.dataset.branchDot = b.id;
+      const legendLabel = document.createElement('span');
+      legendLabel.dataset.branchLabel = b.id;
+      legendLabel.textContent = b.label;
+      item.appendChild(legendDot);
+      item.appendChild(legendLabel);
       helpLegend.insertBefore(item, firstNonBranch);
     });
   }
