@@ -2,6 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src  'unsafe-inline' https://accounts.google.com https://apis.google.com https://ssl.gstatic.com;
+  connect-src https://*.googleapis.com https://accounts.google.com;
+  img-src     data: https://*.googleusercontent.com;
+  style-src   'unsafe-inline';
+  base-uri    'none';
+  object-src  'none';
+  frame-src   https://accounts.google.com https://content.googleapis.com;
+  form-action 'none';
+">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#ffffff">
 <title>Zenit Week</title>
