@@ -4177,6 +4177,25 @@ function validateAndRepair(data) {
   // 0. Strip leftover editing flags
   data.nodes.forEach(n => { delete n._editing; });
 
+  // 0a. Sanitize string and enum fields — defense-in-depth against tampered Drive data
+  const VALID_TYPES      = new Set(['center', 'branch', 'activity', 'counter']);
+  const VALID_PRIORITIES = new Set(['normal', 'high', 'critical']);
+  const VALID_SIDES      = new Set(['left', 'right']);
+  data.nodes.forEach(n => {
+    if (typeof n.label === 'string') {
+      n.label = n.label.slice(0, 200);
+    } else {
+      n.label = '';
+    }
+    if (!VALID_TYPES.has(n.type))          n.type     = 'activity';
+    if (n.priority && !VALID_PRIORITIES.has(n.priority)) n.priority = 'normal';
+    if (n.side     && !VALID_SIDES.has(n.side))          n.side     = 'right';
+    if (n.type === 'counter') {
+      n.val = typeof n.val === 'number' && isFinite(n.val) ? Math.max(0, Math.floor(n.val)) : 0;
+      n.max = typeof n.max === 'number' && isFinite(n.max) ? Math.max(1, Math.floor(n.max)) : 1;
+    }
+  });
+
   const nodeMap = new Map();
   data.nodes.forEach(n => nodeMap.set(n.id, n));
 

@@ -66,6 +66,7 @@ const sandbox = {
     querySelector: () => null,
     querySelectorAll: () => [],
     documentElement: { dataset: {} },
+    createTextNode: (text) => ({ nodeType: 3, textContent: text }),
     createElement: (tag) => {
       if (tag === 'canvas') {
         return { getContext: () => ({ measureText: () => ({ width: 0 }), font: '' }) };
