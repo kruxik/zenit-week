@@ -6862,7 +6862,7 @@ function resetView() {
   const positions = computeLayout();
   const nodes = Object.values(positions);
   if (nodes.length > 1) {
-    const pad = 60;
+    const pad = isMobile ? 20 : 60;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     nodes.forEach(p => {
       const hw = (p.w || 80) / 2;
