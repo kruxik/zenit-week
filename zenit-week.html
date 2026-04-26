@@ -6974,6 +6974,7 @@ window.addEventListener('pointermove', (e) => {
         if (el) {
           el.style.transition = 'none';
           el.setAttribute('pointer-events', 'none');
+          document.getElementById('nodes-layer').appendChild(el);
         }
       });
       beginAtomicOp();
