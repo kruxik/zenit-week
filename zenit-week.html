@@ -6119,6 +6119,9 @@ function render() {
   const nodesG = svgEl('g', { id: 'nodes-layer' });
   root.appendChild(nodesG);
 
+  const topLinesG = svgEl('g', { id: 'top-lines-layer' });
+  root.appendChild(topLinesG);
+
   function branchColor(branch) {
     return BRANCH_COLORS[branch]?.main || '#888';
   }
@@ -6977,6 +6980,14 @@ window.addEventListener('pointermove', (e) => {
           document.getElementById('nodes-layer').appendChild(el);
         }
       });
+      const topLines = document.getElementById('top-lines-layer');
+      document.querySelectorAll('#lines-layer path').forEach(path => {
+        const fromId = path.getAttribute('data-from');
+        const toId = path.getAttribute('data-to');
+        if (initialPositions[fromId] || initialPositions[toId]) {
+          topLines.appendChild(path);
+        }
+      });
       beginAtomicOp();
       dragState = { activeNodeId: id, startX: originX, startY: originY, initialPositions };
       document.getElementById('main-svg').classList.add('dragging-active');
@@ -6999,7 +7010,7 @@ window.addEventListener('pointermove', (e) => {
     });
 
     // Update lines
-    document.querySelectorAll('#lines-layer path').forEach(path => {
+    document.querySelectorAll('#lines-layer path, #top-lines-layer path').forEach(path => {
       const fromId = path.getAttribute('data-from');
       const toId = path.getAttribute('data-to');
       const isFromDragging = !!dragState.initialPositions[fromId];
