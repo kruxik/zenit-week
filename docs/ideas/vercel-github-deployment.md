@@ -25,7 +25,7 @@ release day   → git tag v1.2.3 → GitHub Action → vercel --prod
 | Environment | URL | Trigger | Purpose |
 |---|---|---|---|
 | Local dev | `http://localhost:3000` | `vercel dev` | Day-to-day development |
-| Staging | `https://zenit-week-git-main-kruxik.vercel.app` | Push to `main` | QA, OAuth testing |
+| Staging | `https://zenit-week-git-main-kruxiks-projects.vercel.app` | Push to `main` | QA, OAuth testing |
 | Production | `https://zenitweek.com` | `git tag vX.Y.Z` | Live users |
 
 ## Components to Implement
