@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'none';
-  script-src  'unsafe-inline' https://accounts.google.com https://apis.google.com https://ssl.gstatic.com;
-  connect-src https://*.googleapis.com https://accounts.google.com;
+  script-src  'unsafe-inline' https://accounts.google.com https://apis.google.com https://ssl.gstatic.com https://vercel.live;
+  connect-src 'self' https://*.googleapis.com https://accounts.google.com;
   img-src     data: https://*.googleusercontent.com;
   style-src   'unsafe-inline';
   base-uri    'none';
