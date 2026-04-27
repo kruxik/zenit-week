@@ -2130,6 +2130,15 @@
           </div>
           <div class="settings-separator"></div>
           <div class="settings-section">
+            <div class="theme-toggle-row">
+              <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
+              <button class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change">
+                <div class="theme-toggle-thumb"></div>
+              </button>
+            </div>
+          </div>
+          <div class="settings-separator"></div>
+          <div class="settings-section">
             <div class="settings-label" data-i18n="settings.data">Data</div>
             <div style="display:flex;gap:6px;">
               <button class="reset-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
@@ -3828,6 +3837,7 @@ function stopDrivePoll() {
 let currentWeekKey = '';   // 'YYYY-WW'
 let weekData = {};          // { nodes: [...] }
 let currentLang = 'en';
+let autoLayout = localStorage.getItem('zenit-week-autolayout') !== 'false';
 
 let zoom    = 0.6;
 let panX    = 0;
@@ -3912,6 +3922,8 @@ const TRANSLATIONS = {
     'settings.importConfirmOk':   'Yes, import',
     'settings.importConfirmCancel':'Cancel',
     'settings.importError':       'Invalid file — could not import.',
+    'settings.autoLayout':        'Auto layout',
+    'settings.autoLayoutTitle':   'Automatically reset layout after each change',
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
     'view.rocks':                 'Rocks',
@@ -4006,6 +4018,8 @@ const TRANSLATIONS = {
     'settings.importConfirmOk':   'Ano, importovat',
     'settings.importConfirmCancel':'Zrušit',
     'settings.importError':       'Neplatný soubor — import se nezdařil.',
+    'settings.autoLayout':        'Automatické rozvržení',
+    'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
     'view.rocks':                 'Kameny',
@@ -4450,6 +4464,7 @@ function transferUnfinished() {
   saveWeek(currentWeekKey, weekData);
   endAtomicOp();
   render();
+  applyAutoLayout();
 }
 
 function transferReusable() {
@@ -4568,6 +4583,7 @@ function transferReusable() {
   saveWeek(currentWeekKey, weekData);
   endAtomicOp();
   render();
+  applyAutoLayout();
 }
 
 function moveNodeToNextWeek(nodeId) {
@@ -4682,6 +4698,7 @@ function moveNodeToNextWeek(nodeId) {
   saveWeek(currentWeekKey, weekData);
   endAtomicOp();
   render();
+  applyAutoLayout();
 }
 
 function defaultWeekData(prevLabels) {
@@ -4833,6 +4850,7 @@ function addNode(parentId, label) {
   syncStatusUp(node.id, 'done');
   saveWeek(currentWeekKey, weekData);
   render();
+  applyAutoLayout();
 }
 
 // Sync BRANCH_CONFIG sides from weekData after load or structural changes.
@@ -4884,6 +4902,7 @@ function deleteBranch(id) {
   saveBranchColors();
   saveWeek(currentWeekKey, weekData);
   render();
+  applyAutoLayout();
 }
 
 function deleteNode(id) {
@@ -4914,6 +4933,7 @@ function deleteNode(id) {
   rebuildNodeMap();
   saveWeek(currentWeekKey, weekData);
   render();
+  applyAutoLayout();
 }
 
 function renameNode(id, label) {
@@ -4924,6 +4944,7 @@ function renameNode(id, label) {
   touchNode(id);
   saveWeek(currentWeekKey, weekData);
   render();
+  applyAutoLayout();
 }
 
 function isLeafActivity(node) {
@@ -6898,6 +6919,15 @@ function resetView() {
   applyTransform();
 }
 
+function applyAutoLayout() {
+  if (!autoLayout) return;
+  weekData.nodes.forEach(n => {
+    if (n.type !== 'center') { n.offX = 0; n.offY = 0; }
+  });
+  saveWeek(currentWeekKey, weekData);
+  render();
+}
+
 function zoomAt(cx, cy, factor) {
   const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * factor));
   // Adjust pan so the point under cursor stays fixed
@@ -7231,6 +7261,7 @@ function handleNodeDrop(mouseX, mouseY) {
 
   saveWeek(currentWeekKey, weekData);
   render();
+  applyAutoLayout();
 }
 
 // ─── Zoom Slider ──────────────────────────────────────────────────────────────
@@ -7494,6 +7525,20 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 
 // Sync toggle to whatever theme was applied by the pre-paint script
 syncThemeToggleUI();
+
+function syncAutoLayoutToggleUI() {
+  const toggle = document.getElementById('autolayout-toggle');
+  if (toggle) toggle.setAttribute('aria-checked', autoLayout ? 'true' : 'false');
+}
+
+document.getElementById('autolayout-toggle').addEventListener('click', () => {
+  autoLayout = !autoLayout;
+  localStorage.setItem('zenit-week-autolayout', autoLayout ? 'true' : 'false');
+  syncAutoLayoutToggleUI();
+  if (autoLayout) applyAutoLayout();
+});
+
+syncAutoLayoutToggleUI();
 
 // ─── Lang select ──────────────────────────────────────────────────────────────
 document.getElementById('lang-select').addEventListener('change', e => {
