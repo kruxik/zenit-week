@@ -5087,12 +5087,14 @@ function computeLayout() {
       heights[nodeId] = selfH;
       return selfH;
     }
-    
+
     let h = 0;
-    activeChildren.forEach(cid => {
+    const isBranch = node.type === 'branch';
+    activeChildren.forEach((cid, i) => {
       h += calcHeight(cid);
+      if (isBranch && i < activeChildren.length - 1) h += VERTICAL_GAP * 2;
     });
-    
+
     heights[nodeId] = Math.max(h, selfH);
     return heights[nodeId];
   }
@@ -5159,7 +5161,7 @@ function computeLayout() {
     const childrenH = activeChildren.reduce((acc, cid) => acc + heights[cid], 0);
     let currentY = parentY - childrenH / 2;
 
-    activeChildren.forEach(cid => {
+    activeChildren.forEach((cid, i) => {
       const childH = heights[cid];
       const { w, h } = getNodeSize(cid);
       const dir = side === 'left' ? -1 : 1;
@@ -5175,6 +5177,7 @@ function computeLayout() {
       positions[cid] = { x: finalX, y: finalY, w, h, side };
       layoutChildren(cid, finalX, finalY, side, w, depth + 1);
       currentY += childH;
+      if (depth === 0 && i < activeChildren.length - 1) currentY += VERTICAL_GAP * 2;
     });
   }
 
