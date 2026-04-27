@@ -2395,6 +2395,16 @@
 <script id="app">
 'use strict';
 
+// ─── OAuth popup callback — relay code to opener and halt all initialization ──
+const IS_OAUTH_POPUP = (() => {
+  if (!window.opener) return false;
+  const code = new URLSearchParams(location.search).get('code');
+  if (!code) return false;
+  try { window.opener.postMessage({ type: 'zenit-oauth', code }, location.origin); } catch {}
+  window.close();
+  return true;
+})();
+
 // ─── Icon helper ──────────────────────────────────────────────────────────────
 function iconSvg(name) {
   return `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"/></svg>`;
@@ -2846,8 +2856,9 @@ let colorsSyncedHash = null;
 let tokenRenewalTimer = null;
 let _gapiInitialized = false;     // true after first loadGapiAndSync completes setup
 let _isFirstConnection = false;   // true when this browser has never synced with Drive before
-let _currentPKCEVerifier = null;  // PKCE code_verifier for the in-progress auth code exchange
-let _currentRedirectUri  = null;  // redirect_uri used in the in-progress auth code exchange
+let _currentPKCEVerifier   = null; // PKCE code_verifier for the in-progress auth code exchange
+let _currentRedirectUri    = null; // redirect_uri used in the in-progress auth code exchange
+let _pendingOAuthHandler   = null; // active postMessage listener for OAuth popup callback
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
 let _pollTimer = null;          // setInterval handle for 30s background metadata poll
 const POLL_INTERVAL_MS = 10_000;
@@ -3046,6 +3057,11 @@ async function startSignIn() {
     code_challenge_method: 'S256',
   });
 
+  if (_pendingOAuthHandler) {
+    window.removeEventListener('message', _pendingOAuthHandler);
+    _pendingOAuthHandler = null;
+  }
+
   const popup = window.open(
     `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
     'Google Sign In',
@@ -3056,18 +3072,14 @@ async function startSignIn() {
     return;
   }
 
-  const origin = window.location.origin;
-  const poll = setInterval(() => {
-    try {
-      if (popup.closed) { clearInterval(poll); return; }
-      if (popup.location.href.startsWith(origin)) {
-        clearInterval(poll);
-        const code = new URL(popup.location.href).searchParams.get('code');
-        popup.close();
-        if (code) handleAuthCode({ code });
-      }
-    } catch { /* cross-origin while on Google's domain — keep polling */ }
-  }, 200);
+  _pendingOAuthHandler = function(event) {
+    if (event.origin !== location.origin) return;
+    if (event.data?.type !== 'zenit-oauth') return;
+    window.removeEventListener('message', _pendingOAuthHandler);
+    _pendingOAuthHandler = null;
+    if (event.data.code) handleAuthCode({ code: event.data.code });
+  };
+  window.addEventListener('message', _pendingOAuthHandler);
 }
 
 async function handleAuthCode(response) {
@@ -7679,6 +7691,7 @@ document.getElementById('export-data-btn').addEventListener('click', () => {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
+  if (IS_OAUTH_POPUP) return;
   currentLang = localStorage.getItem('zenit-week-lang') || 'en';
   loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
