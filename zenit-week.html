@@ -3154,6 +3154,7 @@ function signOut() {
 
 // ─── TASK-12: Sync status helper ──────────────────────────────────────────────
 function setSyncStatus(status, message) {
+  if (status === 'error' && syncStatus === 'disconnected') return;
   syncStatus = status;
   const dot = document.getElementById('sync-dot');
   if (!dot) return;
