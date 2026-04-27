@@ -2988,6 +2988,14 @@ function getStoredAuth() {
 async function attemptSilentRestore() {
   const stored = getStoredAuth();
   if (!stored?.refresh_token) return;
+  // Show avatar immediately with cached user info — no visible flash on reload
+  if (stored.email) {
+    showSignedInAvatar({
+      emailAddress: stored.email,
+      displayName:  stored.displayName  || '',
+      photoLink:    stored.photoLink    || '',
+    });
+  }
   const ok = await silentRefresh(stored.refresh_token);
   if (!ok) {
     localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
@@ -3186,6 +3194,14 @@ function loadGapiAndSync() {
       });
       const user = aboutResp.result?.user;
       showSignedInAvatar(user);
+      // Cache user info so avatar renders instantly on next page load
+      const storedAuth = getStoredAuth();
+      if (storedAuth) {
+        storedAuth.email       = user?.emailAddress || '';
+        storedAuth.displayName = user?.displayName  || '';
+        storedAuth.photoLink   = user?.photoLink    || '';
+        localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(storedAuth));
+      }
       setSyncStatus('connected', 'Synced with Google Drive');
       await initDriveSync(); // TASK-09 — list all files + 3-phase seed
       startDrivePoll(currentWeekKey);
