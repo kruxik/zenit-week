@@ -1,0 +1,24 @@
+name: Deploy to Production
+
+# Triggers on version tags — e.g. git tag v1.2.3 && git push origin v1.2.3
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+jobs:
+  deploy:
+    name: Deploy to zenitweek.com
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: npm ci && npm test
+
+      - name: Deploy to Vercel (production)
+        run: npx vercel --prod --yes
+        env:
+          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
