@@ -3121,6 +3121,7 @@ function signOut() {
   googleAccessToken = null;
   _gapiInitialized  = false;
   _isFirstConnection = false;
+  if (window.gapi?.client) gapi.client.setToken(null);
   driveFileIdCache.clear();
   lastSyncedHash.clear();
   etagCache.clear();
