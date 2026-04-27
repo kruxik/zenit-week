@@ -2831,12 +2831,12 @@ function getNodeSize(nodeId) {
 const BRANCH_CONFIG = {};
 
 // ─── Google Drive Sync ────────────────────────────────────────────────────────
-const GOOGLE_CLIENT_ID = '458902252486-kh8ptv2b2b2q1echn99soes191smr56p.apps.googleusercontent.com';
-const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const GOOGLE_CLIENT_ID    = '458902252486-kh8ptv2b2b2q1echn99soes191smr56p.apps.googleusercontent.com';
+const GOOGLE_DRIVE_SCOPE  = 'https://www.googleapis.com/auth/drive.appdata';
+const GOOGLE_AUTH_STORAGE_KEY = 'zenit-week-google-auth';
 
 // Sync status: 'disconnected' | 'connected' | 'syncing' | 'error'
 let syncStatus = 'disconnected';
-let googleTokenClient = null;   // GIS token client instance
 let googleAccessToken = null;   // current OAuth access token string
 let driveFileIdCache = new Map(); // weekKey → Drive file ID
 let lastSyncedHash = new Map();   // weekKey → FNV-1a hash of last uploaded JSON
@@ -2845,9 +2845,10 @@ let syncDebounceTimer = null;
 let colorsSyncDebounceTimer = null;
 let colorsSyncedHash = null;
 let tokenRenewalTimer = null;
-let _gapiInitialized = false;   // true after first loadGapiAndSync completes setup
-let _silentAttempt = false;     // true when requestAccessToken was called silently
-let _isFirstConnection = false; // true when this browser has never synced with Drive before
+let _gapiInitialized = false;     // true after first loadGapiAndSync completes setup
+let _isFirstConnection = false;   // true when this browser has never synced with Drive before
+let _currentPKCEVerifier = null;  // PKCE code_verifier for the in-progress auth code exchange
+let _currentRedirectUri  = null;  // redirect_uri used in the in-progress auth code exchange
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
 let _pollTimer = null;          // setInterval handle for 30s background metadata poll
 const POLL_INTERVAL_MS = 10_000;
@@ -2943,74 +2944,166 @@ function showSignedOutButton(label = 'Sign in') {
 window.onGoogleLibraryLoad = function() { initGoogleAuth(); };
 
 function initGoogleAuth() {
-  if (googleTokenClient) return; // already initialized
-  if (!window.google?.accounts?.oauth2) return; // GIS not ready yet
-
-  googleTokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: GOOGLE_DRIVE_SCOPE,
-    callback: handleTokenResponse,
-    error_callback: handleTokenError,
-  });
-
-  attemptSilentRestore(); // TASK-15: silent re-auth if user was previously signed in
+  if (!window.google?.accounts?.oauth2) return;
+  // Migration: remove legacy flag replaced by GOOGLE_AUTH_STORAGE_KEY
+  localStorage.removeItem('zenit-week-had-google-session');
+  attemptSilentRestore();
 }
 
-function handleTokenResponse(tokenResponse) {
-  if (tokenResponse.error) {
-    handleTokenError(tokenResponse);
-    return;
-  }
-  _silentAttempt = false;
-  googleAccessToken = tokenResponse.access_token;
+// ─── PKCE helpers ─────────────────────────────────────────────────────────────
+async function generatePKCE() {
+  const array    = crypto.getRandomValues(new Uint8Array(32));
+  const verifier = btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const hash      = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return { verifier, challenge };
+}
 
-  // Capture first-connection state before setting the flag
-  _isFirstConnection = !localStorage.getItem('zenit-week-had-google-session');
-  localStorage.setItem('zenit-week-had-google-session', '1');
+async function exchangeToken(params) {
+  const resp = await fetch('/api/token', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(params),
+  });
+  return resp.json();
+}
+
+function getStoredAuth() {
+  try { return JSON.parse(localStorage.getItem(GOOGLE_AUTH_STORAGE_KEY)); } catch { return null; }
+}
+
+// ─── Silent session restore on app load ───────────────────────────────────────
+async function attemptSilentRestore() {
+  const stored = getStoredAuth();
+  if (!stored?.refresh_token) return;
+  const ok = await silentRefresh(stored.refresh_token);
+  if (!ok) {
+    localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+    showSignedOutButton('Reconnect');
+    setSyncStatus('error', 'Google session expired — click to reconnect');
+  }
+}
+
+async function silentRefresh(refreshToken) {
+  try {
+    const tokens = await exchangeToken({
+      refresh_token: refreshToken,
+      client_id:     GOOGLE_CLIENT_ID,
+      grant_type:    'refresh_token',
+    });
+    if (tokens.error) return false;
+    await onTokensReceived(tokens.access_token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Called after every successful token acquisition (code exchange or refresh) ─
+async function onTokensReceived(accessToken) {
+  googleAccessToken = accessToken;
 
   // Schedule silent token renewal every 55 min (tokens expire at 60 min)
   if (tokenRenewalTimer) clearInterval(tokenRenewalTimer);
-  tokenRenewalTimer = setInterval(() => {
-    _silentAttempt = true;
-    googleTokenClient.requestAccessToken({ prompt: 'none' });
+  tokenRenewalTimer = setInterval(async () => {
+    const stored = getStoredAuth();
+    if (!stored?.refresh_token) return;
+    const ok = await silentRefresh(stored.refresh_token);
+    if (!ok) {
+      localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+      if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
+      googleAccessToken = null;
+      _gapiInitialized  = false;
+      showSignedOutButton('Reconnect');
+      setSyncStatus('error', 'Google session expired — click to reconnect');
+    }
   }, 55 * 60 * 1000);
 
   setSyncStatus('connected', 'Connected to Google Drive');
 
   if (!_gapiInitialized) {
     _gapiInitialized = true;
-    loadGapiAndSync(); // TASK-08 — init GAPI + full Drive seed (first sign-in only)
+    loadGapiAndSync(); // init GAPI + full Drive seed (first sign-in only)
   } else {
     // Token renewal: GAPI already initialized, just update the token
     if (window.gapi?.client) gapi.client.setToken({ access_token: googleAccessToken });
     // If an import happened while signed out, force-push on token renewal
-    if (localStorage.getItem('zenit-week-import-pending')) {
-      forcePushAllToDrive();
-    }
+    if (localStorage.getItem('zenit-week-import-pending')) forcePushAllToDrive();
   }
 }
 
-function handleTokenError(error) {
-  if (_silentAttempt) {
-    // Silent restore or renewal failed — Google session gone
-    _silentAttempt = false;
-    localStorage.removeItem('zenit-week-had-google-session');
-    if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
-    googleAccessToken = null;
-    _gapiInitialized = false;
-    showSignedOutButton('Reconnect');
-    setSyncStatus('error', 'Google session expired — click to reconnect');
+// ─── Interactive sign-in: manual popup with PKCE, no GIS code client ──────────
+async function startSignIn() {
+  const { verifier, challenge } = await generatePKCE();
+  _currentPKCEVerifier = verifier;
+  _currentRedirectUri  = window.location.origin + window.location.pathname;
+
+  const params = new URLSearchParams({
+    client_id:             GOOGLE_CLIENT_ID,
+    redirect_uri:          _currentRedirectUri,
+    response_type:         'code',
+    scope:                 GOOGLE_DRIVE_SCOPE,
+    access_type:           'offline',
+    prompt:                'consent',
+    code_challenge:        challenge,
+    code_challenge_method: 'S256',
+  });
+
+  const popup = window.open(
+    `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
+    'Google Sign In',
+    'width=500,height=620,left=200,top=100'
+  );
+  if (!popup) {
+    setSyncStatus('error', 'Sign-in popup was blocked — allow popups for this page');
     return;
   }
-  console.warn('[Drive] Auth error:', error);
-  setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+
+  const origin = window.location.origin;
+  const poll = setInterval(() => {
+    try {
+      if (popup.closed) { clearInterval(poll); return; }
+      if (popup.location.href.startsWith(origin)) {
+        clearInterval(poll);
+        const code = new URL(popup.location.href).searchParams.get('code');
+        popup.close();
+        if (code) handleAuthCode({ code });
+      }
+    } catch { /* cross-origin while on Google's domain — keep polling */ }
+  }, 200);
 }
 
-// ─── TASK-15: Silent session restore on app load ──────────────────────────────
-function attemptSilentRestore() {
-  if (!localStorage.getItem('zenit-week-had-google-session')) return;
-  _silentAttempt = true;
-  googleTokenClient.requestAccessToken({ prompt: 'none' });
+async function handleAuthCode(response) {
+  if (response.error) {
+    if (response.error !== 'access_denied') {
+      console.warn('[Drive] Auth error:', response);
+      setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+    }
+    return;
+  }
+  try {
+    const tokens = await exchangeToken({
+      code:          response.code,
+      client_id:     GOOGLE_CLIENT_ID,
+      code_verifier: _currentPKCEVerifier,
+      grant_type:    'authorization_code',
+      redirect_uri:  _currentRedirectUri,
+    });
+    _currentPKCEVerifier = null;
+    if (tokens.error) {
+      console.warn('[Drive] Token exchange error:', tokens);
+      setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+      return;
+    }
+    _isFirstConnection = !getStoredAuth();
+    localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify({ refresh_token: tokens.refresh_token }));
+    await onTokensReceived(tokens.access_token);
+  } catch (err) {
+    console.error('[Drive] Token exchange failed:', err);
+    setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+  }
 }
 
 function signOut() {
@@ -3028,20 +3121,23 @@ function signOut() {
     colorsSyncDebounceTimer = null;
   }
   colorsSyncedHash = null;
-  const token = googleAccessToken;
+  const stored = getStoredAuth();
+  const token  = googleAccessToken;
   googleAccessToken = null;
-  _gapiInitialized = false;
-  _silentAttempt = false;
+  _gapiInitialized  = false;
   _isFirstConnection = false;
   driveFileIdCache.clear();
   lastSyncedHash.clear();
   etagCache.clear();
-  localStorage.removeItem('zenit-week-had-google-session');
+  localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
   showSignedOutButton('Sign in');
   setSyncStatus('disconnected');
-  if (token && window.google?.accounts?.oauth2) {
-    google.accounts.oauth2.revoke(token, () => {});
-  }
+  const revokeToken = t => t && fetch(
+    `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(t)}`,
+    { method: 'POST' }
+  ).catch(() => {});
+  revokeToken(token);
+  revokeToken(stored?.refresh_token);
 }
 
 // ─── TASK-12: Sync status helper ──────────────────────────────────────────────
@@ -3807,7 +3903,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   // Adopt the remote reset token so we don't loop
   localStorage.setItem('zenit-week-reset-token', remoteResetToken);
   // Wipe all user-data keys — keep only auth state and the new reset token
-  const AUTH_KEYS = new Set(['zenit-week-had-google-session', 'zenit-week-migrated', 'zenit-week-reset-token']);
+  const AUTH_KEYS = new Set([GOOGLE_AUTH_STORAGE_KEY, 'zenit-week-migrated', 'zenit-week-reset-token']);
   const keysToWipe = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -7397,16 +7493,7 @@ window.addEventListener('hashchange', () => {
 
 
 // ─── Google Drive Sync Button (signed-out state only) ────────────────────────
-document.getElementById('sync-btn').addEventListener('click', () => {
-  if (!googleTokenClient) {
-    const label = document.getElementById('sync-btn-label');
-    const prev = label.textContent;
-    label.textContent = 'Loading…';
-    setTimeout(() => { label.textContent = prev; }, 1500);
-    return;
-  }
-  googleTokenClient.requestAccessToken({ prompt: 'consent' });
-});
+document.getElementById('sync-btn').addEventListener('click', () => { startSignIn(); });
 
 // ─── Avatar button + sync dropdown ───────────────────────────────────────────
 (function () {
