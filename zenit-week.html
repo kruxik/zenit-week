@@ -762,7 +762,7 @@
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
-    display: block;
+    display: none;
   }
 
   #sync-avatar-initials {
@@ -2092,9 +2092,21 @@
           <span id="sync-btn-label">Sign in</span>
         </button>
         <button id="sync-avatar-btn" aria-label="Sync options" aria-haspopup="true">
-          <img id="sync-avatar-img" src="" alt="" referrerpolicy="no-referrer" />
+          <img id="sync-avatar-img" alt="" referrerpolicy="no-referrer" />
           <div id="sync-avatar-initials"></div>
         </button>
+        <script>
+          (function() {
+            try {
+              var a = JSON.parse(localStorage.getItem('zenit-week-google-auth') || 'null');
+              if (a && a.photoLink) {
+                var img = document.getElementById('sync-avatar-img');
+                img.src = a.photoLink;
+                img.style.display = 'block';
+              }
+            } catch(e) {}
+          })();
+        </script>
         <div id="sync-dropdown" role="menu">
           <div id="sync-dropdown-email"></div>
           <div class="settings-separator"></div>
