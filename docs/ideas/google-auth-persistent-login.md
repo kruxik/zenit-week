@@ -82,6 +82,15 @@ This eliminates all three problems:
 - **One Tap** — returns identity JWT, not Drive access token; wrong tool
 - **Token age wiping** — unnecessary; let Google's own revocation handle it
 
-## Open Questions
+## Flag Migration: `zenit-week-had-google-session` → `zenit-week-google-auth`
 
-- `initCodeClient` replaces `initTokenClient` — confirm `zenit-week-had-google-session` is the only flag to migrate (no other code branches on it beyond silent-restore trigger).
+The old flag has exactly 4 roles, all of which transfer cleanly:
+
+| Role | Old | New |
+|---|---|---|
+| Gate for silent restore on page load | flag present? | `refresh_token` field exists in object? |
+| `_isFirstConnection` derivation (conflict resolution) | flag absent at first token response | object absent at first successful code exchange |
+| Cleared on silent failure + explicit sign-out | `removeItem(flag)` | `removeItem('zenit-week-google-auth')` |
+| Preserved during data wipe (`_handleResetTokenMismatch`) | included in `AUTH_KEYS` | swap name in `AUTH_KEYS` |
+
+**Migration note:** Existing users have the old flag but no `zenit-week-google-auth`. On first load after the upgrade they'll see the Sign In button and must click it once. After that they're set permanently. This is unavoidable — the old flow never captured a refresh token.
