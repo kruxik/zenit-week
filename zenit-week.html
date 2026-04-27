@@ -678,7 +678,7 @@
   }
 
   #sync-btn {
-    display: inline-flex;
+    display: none;
     align-items: center;
     gap: 7px;
     height: 36px;
@@ -748,6 +748,9 @@
     transition: transform 0.15s, box-shadow 0.15s;
     display: none;
   }
+
+  html:not(.zw-has-session) #sync-btn { display: inline-flex; }
+  html.zw-has-session #sync-avatar-btn { display: flex; }
 
   #sync-avatar-btn:hover {
     transform: scale(1.08);
@@ -2010,6 +2013,15 @@
   })();
 </script>
 <script async defer src="https://apis.google.com/js/api.js"></script>
+<!-- Auth init: runs synchronously before first paint to prevent sign-in button flash -->
+<script>
+  (function() {
+    try {
+      var a = JSON.parse(localStorage.getItem('zenit-week-google-auth') || 'null');
+      if (a && a.refresh_token) document.documentElement.classList.add('zw-has-session');
+    } catch(e) {}
+  })();
+</script>
 </head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
