@@ -6028,8 +6028,9 @@ function syncStatusUp(nodeId, prop) {
   const parent = findNode(node.parent);
   if (!parent) return;
 
-  const siblings = parent.children.map(findNode);
-  const allTrue = siblings.every(s => s && s[prop]);
+  const siblings = parent.children.map(findNode).filter(Boolean);
+  if (siblings.length === 0) return;
+  const allTrue = siblings.every(s => s[prop]);
 
   if (parent[prop] !== allTrue) {
     if (parent.type !== 'branch') {
