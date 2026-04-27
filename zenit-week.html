@@ -2398,9 +2398,13 @@
 // ─── OAuth popup callback — relay code to opener and halt all initialization ──
 const IS_OAUTH_POPUP = (() => {
   if (!window.opener) return false;
-  const code = new URLSearchParams(location.search).get('code');
-  if (!code) return false;
-  try { window.opener.postMessage({ type: 'zenit-oauth', code }, location.origin); } catch {}
+  const params = new URLSearchParams(location.search);
+  const code   = params.get('code');
+  const error  = params.get('error');
+  if (!code && !error) return false;
+  if (code) {
+    try { window.opener.postMessage({ type: 'zenit-oauth', code }, location.origin); } catch {}
+  }
   window.close();
   return true;
 })();
