@@ -2967,6 +2967,7 @@ function showSignedOutButton(label = 'Sign in') {
 
   if (dropdown) dropdown.classList.remove('visible');
   if (avatarBtn) avatarBtn.style.display = 'none';
+  document.documentElement.classList.remove('zw-has-session');
   if (btn) { btn.style.display = ''; }
   const labelEl = document.getElementById('sync-btn-label');
   if (labelEl) labelEl.textContent = label;
