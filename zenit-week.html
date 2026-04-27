@@ -4829,6 +4829,13 @@ function moveNodeToNextWeek(nodeId) {
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
 
+  // Re-sync original parent status based on remaining children
+  const remainingParent = findNode(originalParentId);
+  if (remainingParent && remainingParent.children.length > 0) {
+    syncStatusUp(remainingParent.children[0], 'done');
+    syncStatusUp(remainingParent.children[0], 'unplanned');
+  }
+
   // 6. Prune now-empty activity ancestors in current week
   let pruneTarget = findNode(originalParentId);
   while (pruneTarget && pruneTarget.type === 'activity' && pruneTarget.children.length === 0) {
