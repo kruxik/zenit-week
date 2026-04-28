@@ -2993,7 +2993,7 @@ function initGoogleAuth() {
     const stored = getStoredAuth();
     if (!stored?.refresh_token) return;
     if (Date.now() - _tokenReceivedAt > 50 * 60 * 1000) {
-      silentRefresh(stored.refresh_token);
+      silentRefresh(stored.refresh_token).then(ok => { if (!ok) _handleAuthExpiry(); });
     }
   });
 }
@@ -3038,7 +3038,7 @@ async function attemptSilentRestore() {
   if (!ok) {
     localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
     showSignedOutButton('Reconnect');
-    setSyncStatus('error', 'Google session expired — click to reconnect');
+    setSyncStatus('disconnected', 'Session expired — click to reconnect');
   }
 }
 
@@ -3071,7 +3071,7 @@ function _handleAuthExpiry() {
   googleAccessToken = null;
   _gapiInitialized  = false;
   showSignedOutButton('Reconnect');
-  setSyncStatus('error', 'Google session expired — click to reconnect');
+  setSyncStatus('disconnected', 'Session expired — click to reconnect');
 }
 
 // Authenticated fetch: injects Bearer token, recovers from 401 with one silent refresh+retry.
@@ -3102,14 +3102,7 @@ async function onTokensReceived(accessToken) {
     const stored = getStoredAuth();
     if (!stored?.refresh_token) return;
     const ok = await silentRefresh(stored.refresh_token);
-    if (!ok) {
-      localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
-      if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
-      googleAccessToken = null;
-      _gapiInitialized  = false;
-      showSignedOutButton('Reconnect');
-      setSyncStatus('error', 'Google session expired — click to reconnect');
-    }
+    if (!ok) _handleAuthExpiry();
   }, 55 * 60 * 1000);
 
   setSyncStatus('connected', 'Connected to Google Drive');
