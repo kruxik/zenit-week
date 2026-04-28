@@ -112,3 +112,9 @@ A new filter layer compositing with the existing rocks/pebbles/sand depth filter
 | U3 | Hotkey on parent node | Pressing a key while hovering a parent with existing day-children — create new child or do nothing? |
 | U4 | Duplicate day-child edge case | If `mo` already exists under "Running" and user types `(mo)` again — behaviour undefined |
 | U5 | Data migration | How to handle existing counter+day nodes when Track A ships |
+
+## Deferred / Future Analysis
+
+| ID | Topic | Detail |
+|----|-------|--------|
+| F1 | Nx + day-pattern coexistence | Currently day wins and Nx is stripped silently. Should mixed labels like `"Running (mo, fr) 2x"` be an error, show a warning, or support a different semantic (e.g. Nx counter separate from day scheduling)? Needs deepdive before Track B ships. |
