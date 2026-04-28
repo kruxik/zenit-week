@@ -2882,6 +2882,8 @@ let syncDebounceTimer = null;
 let colorsSyncDebounceTimer = null;
 let colorsSyncedHash = null;
 let tokenRenewalTimer = null;
+let _tokenReceivedAt = 0;         // epoch ms when current access token was obtained
+let _refreshPromise = null;       // deduplicates concurrent 401 refresh attempts
 let _gapiInitialized = false;     // true after first loadGapiAndSync completes setup
 let _isFirstConnection = false;   // true when this browser has never synced with Drive before
 let _currentPKCEVerifier   = null; // PKCE code_verifier for the in-progress auth code exchange
@@ -2983,6 +2985,17 @@ function initGoogleAuth() {
   // Migration: remove legacy flag replaced by GOOGLE_AUTH_STORAGE_KEY
   localStorage.removeItem('zenit-week-had-google-session');
   attemptSilentRestore();
+
+  // Proactively refresh when user returns to a tab that may have been hidden >50 min
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!googleAccessToken) return;
+    const stored = getStoredAuth();
+    if (!stored?.refresh_token) return;
+    if (Date.now() - _tokenReceivedAt > 50 * 60 * 1000) {
+      silentRefresh(stored.refresh_token);
+    }
+  });
 }
 
 // ─── PKCE helpers ─────────────────────────────────────────────────────────────
@@ -3029,7 +3042,7 @@ async function attemptSilentRestore() {
   }
 }
 
-async function silentRefresh(refreshToken) {
+async function _doSilentRefresh(refreshToken) {
   try {
     const tokens = await exchangeToken({
       refresh_token: refreshToken,
@@ -3044,9 +3057,44 @@ async function silentRefresh(refreshToken) {
   }
 }
 
+async function silentRefresh(refreshToken) {
+  if (!_refreshPromise) {
+    _refreshPromise = _doSilentRefresh(refreshToken).finally(() => { _refreshPromise = null; });
+  }
+  return _refreshPromise;
+}
+
+// Called when a token refresh fails — stop poll, clear state, prompt reconnect
+function _handleAuthExpiry() {
+  stopDrivePoll();
+  if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
+  googleAccessToken = null;
+  _gapiInitialized  = false;
+  showSignedOutButton('Reconnect');
+  setSyncStatus('error', 'Google session expired — click to reconnect');
+}
+
+// Authenticated fetch: injects Bearer token, recovers from 401 with one silent refresh+retry.
+// Concurrent 401s share a single refresh attempt via _refreshPromise dedup in silentRefresh().
+async function authFetch(url, options = {}) {
+  const withAuth = opts => ({
+    ...opts,
+    headers: { ...(opts.headers || {}), 'Authorization': `Bearer ${googleAccessToken}` },
+  });
+  const resp = await fetch(url, withAuth(options));
+  if (resp.status !== 401) return resp;
+
+  const stored = getStoredAuth();
+  if (!stored?.refresh_token) { _handleAuthExpiry(); return resp; }
+  const ok = await silentRefresh(stored.refresh_token);
+  if (!ok) { _handleAuthExpiry(); return resp; }
+  return fetch(url, withAuth(options));
+}
+
 // ─── Called after every successful token acquisition (code exchange or refresh) ─
 async function onTokensReceived(accessToken) {
   googleAccessToken = accessToken;
+  _tokenReceivedAt  = Date.now();
 
   // Schedule silent token renewal every 55 min (tokens expire at 60 min)
   if (tokenRenewalTimer) clearInterval(tokenRenewalTimer);
@@ -3391,15 +3439,16 @@ async function syncWeekFromDrive(wKey) {
   let delay = 1000;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const headers = { 'Authorization': `Bearer ${googleAccessToken}` };
+      const fetchHeaders = {};
       const etag = etagCache.get(wKey);
-      if (etag) headers['If-None-Match'] = etag;
+      if (etag) fetchHeaders['If-None-Match'] = etag;
 
-      const resp = await fetch(
+      const resp = await authFetch(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-        { method: 'GET', headers }
+        { method: 'GET', headers: fetchHeaders }
       );
 
+      if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
       if (resp.status === 304) return; // not modified — skip merge
 
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
@@ -3657,17 +3706,11 @@ async function _uploadWeekToDrive(wKey, json) {
       const boundary = 'ZenitWeek_' + Date.now();
       const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
       const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-      const resp = await fetch(
+      const resp = await authFetch(
         `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${googleAccessToken}`,
-            'Content-Type': `multipart/related; boundary=${boundary}`,
-          },
-          body,
-        }
+        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
       );
+      if (resp.status === 401) return false; // auth expired — _handleAuthExpiry already called
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, delay + Math.random() * 500));
         delay *= 2;
@@ -3728,10 +3771,11 @@ async function _uploadColorsToDrive(resetToken) {
       if (resetToken) appProps.resetToken = resetToken;
       const meta = JSON.stringify({ appProperties: appProps });
       const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-      const resp = await fetch(
+      const resp = await authFetch(
         `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
-        { method: 'PATCH', headers: { 'Authorization': `Bearer ${googleAccessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
       );
+      if (resp.status === 401) return false;
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, delay + Math.random() * 500));
         delay *= 2;
@@ -3831,10 +3875,11 @@ async function syncColorsToDrive() {
       const boundary = 'ZenitWeek_' + Date.now();
       const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
       const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-      const resp = await fetch(
+      const resp = await authFetch(
         `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
-        { method: 'PATCH', headers: { 'Authorization': `Bearer ${googleAccessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
       );
+      if (resp.status === 401) return;
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, delay + Math.random() * 500));
         delay *= 2;
@@ -3860,10 +3905,10 @@ async function syncColorsFromDrive() {
   if (!googleAccessToken) return;
   try {
     const fileId = await getDriveFileId('colors');
-    const resp = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
+    const resp = await authFetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
     );
+    if (resp.status === 401) return;
     if (resp.status === 404) return;
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const remoteJson = await resp.text();
@@ -3915,10 +3960,10 @@ async function pollDriveMeta(wKey) {
     // Colors / reset-token check runs unconditionally — not gated on week file existence.
     const colorsId = driveFileIdCache.get('colors');
     if (colorsId) {
-      const cResp = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${colorsId}?fields=appProperties`,
-        { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
+      const cResp = await authFetch(
+        `https://www.googleapis.com/drive/v3/files/${colorsId}?fields=appProperties`
       );
+      if (cResp.status === 401) return; // auth expired — _handleAuthExpiry already called
       if (cResp.ok) {
         const { appProperties: cProps } = await cResp.json();
         const remoteResetToken = cProps?.resetToken;
@@ -3938,10 +3983,10 @@ async function pollDriveMeta(wKey) {
     // Week file hash check — skip if file not yet in Drive
     const fileId = driveFileIdCache.get(wKey);
     if (!fileId) return;
-    const resp = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`,
-      { headers: { 'Authorization': `Bearer ${googleAccessToken}` } }
+    const resp = await authFetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`
     );
+    if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
     if (!resp.ok) return;
     const { appProperties } = await resp.json();
     const remoteHash = appProperties?.contentHash;
