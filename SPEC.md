@@ -25,9 +25,10 @@ Non-day counters (`"Reading 3x"`) are unchanged.
 - [ ] `"Duolingo (daily)"` creates parent + 7 day-children in language-canonical order
 - [ ] `(day)` groups are stripped from the parent label; other `(...)` groups are preserved
 - [ ] Committing `"Running (mo, fr)"` on an existing "Running" node that already has `"Mo"` → appends `"Fr"` child only; `"Mo"` and its state are untouched
-- [ ] Nx pattern and day pattern in the same label: day wins; both stripped; no counter created
+- [ ] A single day indicator `"Running (mo)"`: treated as a schedule hint only — no day-children, no counter created, label unchanged
+- [ ] Nx pattern and 2+ day indicators in same label: day wins; both stripped; no counter created; `"Pushups 10x (mo)"` (only 1 day) → counter created (Nx wins)
 - [ ] Day-child renamed to a canonical day token (e.g. `"We"` → `"Fr"`): label and `dayIndex` both update
-- [ ] Day-child renamed to a non-day string: plain label rename; `dayChild: true` stays; `dayIndex` set to `null`
+- [ ] Day-child renamed to an invalid (non-day) string: label silently reverts to previous value; `dayIndex` unchanged
 - [ ] Tab on a day-child node is blocked (no children allowed)
 - [ ] "Add child" in context menu is hidden for day-child nodes
 - [ ] Todo panel shows day-children as `"Running · Mo"` (parent label · day label)
@@ -82,8 +83,8 @@ Fires on every label commit (both new node creation and rename), **except** when
 Steps:
 
 1. Call `parseTodoDays(label)` → `Set<dayIndex>`
-2. If set is empty → existing Nx/counter logic unchanged (no change here)
-3. If set is non-empty:
+2. If set has fewer than 2 members → existing Nx/counter logic unchanged (a single day indicator is a schedule hint; `(daily)` produces 7 members and is always ≥ 2)
+3. If set has 2 or more members:
    a. Check if label also contains an Nx pattern → ignore Nx; day wins
    b. Strip all day-pattern `(...)` groups from label using `stripDayGroups(label)`
    c. Strip any remaining Nx pattern (`/\s*\d+x\b/i`) from label when day wins
@@ -91,7 +92,8 @@ Steps:
    e. Collect existing day-children: `node.children.map(findNode).filter(n => n?.dayChild)`
    f. Build set of existing `dayIndex` values from those children
    g. For each `dayIndex` in parsed set not already in existing set → call `createDayChild(nodeId, dayIndex)`
-   h. Remove any counter child that existed (day replaces counter — should not coexist)
+   h. Sort all day-children in `parent.children` by ISO week order: Mon(1) … Sat(6) … Sun(0); non-day children sort before day-children; `dayIndex: null` nodes sort last among day-children
+   i. Remove any counter child that existed (day replaces counter — should not coexist)
 
 ### 4.2 `stripDayGroups(label)` — new helper
 
@@ -243,10 +245,11 @@ Extend the existing vitest suite (`npm test`). No new test files — add cases t
 | `stripDayGroups('"No groups"')` | `"No groups"` |
 | `commitEdit` on new node `"Running (mo, fr)"` | parent label `"Running"`, two day-children `Mo`/`Fr`, `dayChild:true`, `dayIndex` correct |
 | `commitEdit` on `"Running"` (existing, already has `Mo`) → label `"Running (mo, fr)"` | appends `Fr` only; `Mo` state unchanged |
-| `commitEdit` on `"Pushups 10x (mo)"` | day wins: parent `"Pushups"`, child `Mo`; no counter |
+| `commitEdit` on `"Pushups 10x (mo)"` | 1 day indicator → Nx wins; counter max=10 created; label unchanged |
+| `commitEdit` on `"Running (mo)"` | 1 day indicator → schedule hint only; no day-children, no counter |
 | `commitEdit` on `"Pushups 10x"` | counter created as before |
 | Rename day-child `"Mo"` → `"Fr"` | `label:'Fr'`, `dayIndex:5` |
-| Rename day-child `"Mo"` → `"Morning run"` | `label:'Morning run'`, `dayIndex:null` |
+| Rename day-child `"Mo"` → `"Morning run"` | label reverts to `'Mo'`; `dayIndex` unchanged |
 | `migrateDayCounters`: activity with `(mo, fr)` + counter | counter removed, `Mo`/`Fr` children created, label stripped |
 | `migrateDayCounters`: activity already migrated (no counter child) | no change |
 | `transferReusable` with reusable parent having day-children | day-children carried over with `done:false` |

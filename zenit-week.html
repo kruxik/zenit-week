@@ -2780,6 +2780,12 @@ Object.entries(SCHED_DAY_TOKENS).forEach(([day, tokens]) => {
 // Daily indicator tokens (EN + CS + CS without diacritics), case-insensitive
 const SCHED_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
 
+// Canonical day labels per language (0=Sun … 6=Sat)
+const DAY_LABELS = {
+  en: { 0:'Su', 1:'Mo', 2:'Tu', 3:'We', 4:'Th', 5:'Fr', 6:'Sa' },
+  cs: { 0:'Ne', 1:'Po', 2:'Út', 3:'St', 4:'Čt', 5:'Pá', 6:'So' },
+};
+
 // Returns the Set of weekday indices (0–6) declared in a label's (…) groups.
 // A group is recognised when every token is a known day abbr, or it's a daily indicator.
 function parseTodoDays(label) {
@@ -2799,6 +2805,19 @@ function parseTodoDays(label) {
     }
   });
   return days;
+}
+
+// Strips only (…) groups that are valid day-pattern groups from a label.
+// Non-day groups like "(v3)" are preserved.
+function stripDayGroups(label) {
+  return label.replace(/\s*\([^)]+\)/g, match => {
+    const inner = match.slice(match.indexOf('(') + 1, -1).trim();
+    const tokens = inner.split(/[\s,]+/).map(t => t.toLowerCase()).filter(Boolean);
+    if (!tokens.length) return match;
+    if (tokens.length === 1 && SCHED_DAILY_TOKENS.has(tokens[0])) return '';
+    if (tokens.every(t => t in SCHED_TOKEN_MAP)) return '';
+    return match;
+  }).trim();
 }
 
 function getNodeSize(nodeId) {
@@ -2858,9 +2877,28 @@ function getNodeSize(nodeId) {
   const w = Math.max(style.minW, Math.ceil(textW) + style.padX * 2);
   const h = Math.max(style.minH, totalTextH + style.padY * 2);
 
-  return { 
+  // Day-child leaves: circle when no status badges present, pill/oval otherwise.
+  // rx = h/2 always so ends stay fully rounded.
+  if (node.dayChild) {
+    const isEditing = editState && editState.nodeId === nodeId;
+    const hasBadges = !isEditing && (
+      node.priority === 'high' || node.priority === 'critical' ||
+      node.unplanned || node.reusable
+    );
+    const diameter = node.parent ? getNodeSize(node.parent).h : h;
+    const ovalW = hasBadges
+      ? Math.max(diameter, Math.ceil(textW) + style.padX * 2)
+      : diameter;
+    return {
+      w: ovalW, h: diameter,
+      fontSize: style.fontSize, padX: style.padX, padY: style.padY, rx: diameter / 2,
+      lines, lineH, totalTextH,
+    };
+  }
+
+  return {
     w, h, fontSize: style.fontSize, padX: style.padX, padY: style.padY, rx: style.rx,
-    lines, lineH, totalTextH 
+    lines, lineH, totalTextH
   };
   }
 
@@ -4408,6 +4446,12 @@ function validateAndRepair(data) {
       n.val = typeof n.val === 'number' && isFinite(n.val) ? Math.max(0, Math.floor(n.val)) : 0;
       n.max = typeof n.max === 'number' && isFinite(n.max) ? Math.max(1, Math.floor(n.max)) : 1;
     }
+    // Preserve dayChild/dayIndex — validate dayIndex is a valid weekday index or null
+    if (n.dayChild) {
+      if (n.dayIndex !== null && (typeof n.dayIndex !== 'number' || n.dayIndex < 0 || n.dayIndex > 6 || !Number.isInteger(n.dayIndex))) {
+        n.dayIndex = null;
+      }
+    }
   });
 
   const nodeMap = new Map();
@@ -4468,12 +4512,55 @@ function migrateCrdt(data) {
   return data;
 }
 
+// TODO: remove after 2026-07-28 — all early adopters expected migrated by then
+function migrateDayCounters(data) {
+  if (!Array.isArray(data.nodes)) return data;
+  const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
+  const toRemove = new Set();
+  const toAdd = [];
+  data.nodes.forEach(node => {
+    if (node.type !== 'activity' || node.dayChild) return;
+    const days = parseTodoDays(node.label || '');
+    if (days.size < 2) return;
+    const counter = (node.children || []).map(id => nodeMap.get(id)).find(n => n && n.type === 'counter');
+    if (!counter) return;
+    toRemove.add(counter.id);
+    node.children = node.children.filter(id => id !== counter.id);
+    node.label = stripDayGroups(node.label);
+    if (node.done) { node.done = false; delete node.doneAt; }
+    const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+    days.forEach(dayIndex => {
+      const id = genId();
+      const child = {
+        id, type: 'activity', dayChild: true, dayIndex,
+        branch: node.branch, parent: node.id,
+        label: langLabels[dayIndex],
+        done: false, unplanned: node.unplanned || false,
+        children: [], _ts: Date.now(),
+      };
+      toAdd.push(child);
+      node.children.push(id);
+    });
+    // Sort day-children in ISO week order (Mon first, Sun last)
+    node.children.sort((aId, bId) => {
+      const a = nodeMap.get(aId) || toAdd.find(n => n.id === aId);
+      const b = nodeMap.get(bId) || toAdd.find(n => n.id === bId);
+      const ka = !a?.dayChild ? -1 : (a.dayIndex === 0 ? 7 : (a.dayIndex ?? 8));
+      const kb = !b?.dayChild ? -1 : (b.dayIndex === 0 ? 7 : (b.dayIndex ?? 8));
+      return ka - kb;
+    });
+  });
+  data.nodes = data.nodes.filter(n => !toRemove.has(n.id));
+  toAdd.forEach(n => data.nodes.push(n));
+  return data;
+}
+
 function loadWeek(wk) {
   const raw = localStorage.getItem(storageKey(wk));
   if (raw) {
     try {
       const data = JSON.parse(raw);
-      return migrateCrdt(validateAndRepair(data));
+      return migrateCrdt(validateAndRepair(migrateDayCounters(data)));
     } catch(e) {
       console.warn(`[zenit-week] Failed to parse week data for key ${wk} — using defaults:`, e);
     }
@@ -4667,10 +4754,12 @@ function transferReusable() {
   const prevById = new Map(prevData.nodes.map(n => [n.id, n]));
   const branches = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
 
-  // 1. Collect reusable activity nodes + their counter children
+  // 1. Collect reusable activity nodes + their counter/day-child children
   const reusableIds = new Set(prevData.nodes.filter(n => n.reusable === true).map(n => n.id));
   const candidateIds = new Set(prevData.nodes
-    .filter(n => n.reusable === true || (n.type === 'counter' && reusableIds.has(n.parent)))
+    .filter(n => n.reusable === true ||
+      (n.type === 'counter' && reusableIds.has(n.parent)) ||
+      (n.dayChild === true && reusableIds.has(n.parent)))
     .map(n => n.id)
   );
 
@@ -4737,6 +4826,7 @@ function transferReusable() {
       } else {
         newNode.reusable = true;
         if (newNode.type === 'counter') { newNode.val = 0; newNode.ticks = []; }
+        if (newNode.dayChild) { newNode.done = false; delete newNode.doneAt; }
       }
       newNodes.push(newNode);
       oldToNew.set(oldId, id);
@@ -4993,6 +5083,12 @@ function getNodeVisuals(nodeId) {
   if (scale !== 1.0) {
     rx *= scale;
     sw *= scale;
+  }
+
+  // Day-child circles: rx = diameter/2 (height returned by getNodeSize)
+  if (node.dayChild) {
+    const { h } = getNodeSize(nodeId);
+    rx = h / 2;
   }
 
   const { CENTER_COLOR, DONE_BG, DONE_UNPLANNED_BG, DONE_TEXT, DONE_BORDER, UNPLANNED_BG, UNPLANNED_BORDER } = getThemeColors();
@@ -5595,8 +5691,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     g.appendChild(plusG);
   }
 
-  // "+" add-child button
-  if (!isCenter && type !== 'counter') {
+  // "+" add-child button (hidden for counter nodes and day-child leaves)
+  if (!isCenter && type !== 'counter' && !node?.dayChild) {
     const bc = BRANCH_COLORS[branch] || { main: document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666' };
     const btnColor = bc.main;
     const depth = getNodeDepth(id);
@@ -5720,7 +5816,11 @@ function resizeInlineInput() {
 
   // Use SVG width by default (input matches node exactly); expand only when CSS
   // measurement says the text would overflow the SVG-sized content area.
-  const totalW = Math.ceil(Math.max(svgTotalW, sizerTotalW));
+  // Day-child circles: always keep width = height so the input stays a circle.
+  const editNode = findNode(nodeId);
+  const totalW = editNode?.dayChild
+    ? Math.ceil((h + sw) * zoom)
+    : Math.ceil(Math.max(svgTotalW, sizerTotalW));
   const totalH = Math.ceil((h + sw) * zoom);
 
   inlineInput.style.borderWidth = (sw / 2 * zoom) + 'px';
@@ -5797,9 +5897,26 @@ function smoothPanToRevealNode(nodeId) {
   requestAnimationFrame(step);
 }
 
+function createDayChild(parentId, dayIndex) {
+  const parent = findNode(parentId);
+  const label = (DAY_LABELS[currentLang] ?? DAY_LABELS.en)[dayIndex];
+  const id = genId();
+  const node = {
+    id, type: 'activity', dayChild: true, dayIndex,
+    branch: parent.branch, parent: parentId,
+    label, done: false, unplanned: parent.unplanned || false,
+    children: [], _ts: Date.now(),
+  };
+  weekData.nodes.push(node);
+  parent.children.push(id);
+  rebuildNodeMap();
+  return id;
+}
+
 function startAddNode(parentId) {
   const parent = findNode(parentId);
   if (!parent) return;
+  if (parent.dayChild) return; // day-children are leaves — no children allowed
   takeSnapshot();
   const branch = parent.branch || parent.id;
   const id = genId();
@@ -5836,6 +5953,7 @@ function _openInlineInput(nodeId, isNew) {
   
   const initialNodeW = nodeW * zoom;
   editState = { nodeId, isNew, originalLabel: node.label, initialNodeW };
+  inlineInput.maxLength = node.dayChild ? 2 : 524288;
   inlineInput.value = isNew ? '' : node.label;
 
   const sp = nodeScreenPos(nodeId);
@@ -5892,70 +6010,109 @@ function commitEdit(followUp = 'auto') {
     delete node._editing;
     touchNode(nodeId);
 
-    // Counter auto-creation (not applicable to branch nodes)
-    // max = max(Nx value, number of day indicators) — whichever is higher wins
-    const nxMatch = node.type !== 'branch' && label.match(/(\d+)x/);
-    const nxVal   = nxMatch ? parseInt(nxMatch[1], 10) : 0;
-    const dayCount = node.type !== 'branch' ? parseTodoDays(label).size : 0;
-    const counterMax = Math.max(nxVal >= 2 ? nxVal : 0, dayCount >= 2 ? dayCount : 0);
-    if (counterMax > 0) {
-      const maxVal = counterMax;
-      // Check if it already has a counter child
-      const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
-      if (counterNode) {
-        const oldMax = counterNode.max;
-        counterNode.max = maxVal;
-        if (counterNode.val > maxVal) counterNode.val = maxVal;
-        // Trim excess ticks from the bottom up when max is lowered
-        if (maxVal < oldMax && counterNode.ticks && counterNode.ticks.length > maxVal - 1) {
-          counterNode.ticks.splice(maxVal - 1);
-        }
-        touchNode(counterNode.id);
-        // S2: if val no longer reaches new max, reopen counter and parent
-        if (counterNode.val < counterNode.max && counterNode.done) {
-          counterNode.done = false;
-          // The final click was stored as doneAt (not in ticks) — move it to ticks
-          // so the activity log shows it as "+1 Progress" instead of losing it
-          if (counterNode.doneAt) {
-            if (!counterNode.ticks) counterNode.ticks = [];
-            counterNode.ticks.push(counterNode.doneAt);
-            delete counterNode.doneAt;
-          }
-          syncStatusUp(counterNode.id, 'done');
+    // Day-child rename: accept only valid canonical day tokens; revert otherwise
+    if (node.dayChild) {
+      const tok = label.toLowerCase();
+      if (tok in SCHED_TOKEN_MAP) {
+        node.dayIndex = SCHED_TOKEN_MAP[tok];
+        node.label = (DAY_LABELS[currentLang] ?? DAY_LABELS.en)[node.dayIndex];
+      } else {
+        node.label = originalLabel; // invalid token — silently revert
+      }
+    } else if (node.type !== 'branch') {
+      // Day-child creation: if label contains day patterns, day wins over Nx
+      const parsedDays = parseTodoDays(label);
+      if (parsedDays.size >= 2) {
+        const cleanLabel = stripDayGroups(label).replace(/\s*\d+x\b/gi, '').trim();
+        node.label = cleanLabel || label;
+        touchNode(nodeId);
+        const existingDayIndices = new Set(
+          node.children.map(findNode).filter(n => n?.dayChild).map(n => n.dayIndex)
+        );
+        parsedDays.forEach(dayIndex => {
+          if (!existingDayIndices.has(dayIndex)) createDayChild(nodeId, dayIndex);
+        });
+        // Sort day-children in ISO week order (Mon first, Sun last)
+        node.children.sort((aId, bId) => {
+          const a = findNode(aId), b = findNode(bId);
+          const ka = !a?.dayChild ? -1 : (a.dayIndex === 0 ? 7 : (a.dayIndex ?? 8));
+          const kb = !b?.dayChild ? -1 : (b.dayIndex === 0 ? 7 : (b.dayIndex ?? 8));
+          return ka - kb;
+        });
+        // Remove any counter child (day replaces counter — should not coexist)
+        const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+        if (counterNode) {
+          tombstoneNodes([counterNode.id]);
+          node.children = node.children.filter(id => id !== counterNode.id);
+          weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
+          rebuildNodeMap();
+          touchNode(nodeId);
         }
       } else {
-        const counterId = genId();
-        const counterNode = {
-          id: counterId,
-          type: 'counter',
-          branch: node.branch,
-          parent: nodeId,
-          label: '0',
-          val: 0,
-          max: maxVal,
-          unplanned: node.unplanned || false,
-          children: [],
-          _ts: Date.now(),
-        };
-        weekData.nodes.push(counterNode);
-        rebuildNodeMap();
-        node.children.push(counterId);
-        touchNode(nodeId);
-      }
-    } else {
-      // S1: no Nx and no day indicators — remove any existing counter child
-      const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
-      if (counterNode) {
-        tombstoneNodes([counterNode.id]);
-        node.children = node.children.filter(id => id !== counterNode.id);
-        weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
-        rebuildNodeMap();
-        touchNode(nodeId);
-        if (node.done) {
-          node.done = false;
-          delete node.doneAt;
+        // Counter auto-creation — Nx pattern only (day indicators handled above)
+        const nxMatch = label.match(/(\d+)x/);
+        const nxVal   = nxMatch ? parseInt(nxMatch[1], 10) : 0;
+        const counterMax = nxVal >= 2 ? nxVal : 0;
+        if (counterMax > 0) {
+          const maxVal = counterMax;
+          // Check if it already has a counter child
+          const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+          if (counterNode) {
+            const oldMax = counterNode.max;
+            counterNode.max = maxVal;
+            if (counterNode.val > maxVal) counterNode.val = maxVal;
+            // Trim excess ticks from the bottom up when max is lowered
+            if (maxVal < oldMax && counterNode.ticks && counterNode.ticks.length > maxVal - 1) {
+              counterNode.ticks.splice(maxVal - 1);
+            }
+            touchNode(counterNode.id);
+            // S2: if val no longer reaches new max, reopen counter and parent
+            if (counterNode.val < counterNode.max && counterNode.done) {
+              counterNode.done = false;
+              // The final click was stored as doneAt (not in ticks) — move it to ticks
+              // so the activity log shows it as "+1 Progress" instead of losing it
+              if (counterNode.doneAt) {
+                if (!counterNode.ticks) counterNode.ticks = [];
+                counterNode.ticks.push(counterNode.doneAt);
+                delete counterNode.doneAt;
+              }
+              syncStatusUp(counterNode.id, 'done');
+            }
+          } else {
+            const counterId = genId();
+            const counterNode = {
+              id: counterId,
+              type: 'counter',
+              branch: node.branch,
+              parent: nodeId,
+              label: '0',
+              val: 0,
+              max: maxVal,
+              unplanned: node.unplanned || false,
+              children: [],
+              _ts: Date.now(),
+            };
+            weekData.nodes.push(counterNode);
+            rebuildNodeMap();
+            node.children.push(counterId);
+            touchNode(nodeId);
+          }
+        } else {
+          // S1: no Nx and no day indicators — remove any existing counter child
+          const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+          if (counterNode) {
+            tombstoneNodes([counterNode.id]);
+            node.children = node.children.filter(id => id !== counterNode.id);
+            weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
+            rebuildNodeMap();
+            touchNode(nodeId);
+            if (node.done) {
+              node.done = false;
+              delete node.doneAt;
+            }
+            syncStatusUp(node.id, 'done');
+          }
         }
-        syncStatusUp(node.id, 'done');
       }
     }
 
@@ -6694,7 +6851,7 @@ function showContextMenu(x, y, nodeId) {
 
   const canDeleteBranch = isBranch && weekData.nodes.filter(n => n.type === 'branch').length > 1;
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
-  document.getElementById('ctx-add-child').style.display = (isCenter  || isCounter)            ? 'none' : '';
+  document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || (node && node.dayChild)) ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter)            ? 'none' : '';
 
   // Color change (branch only)
@@ -7330,6 +7487,7 @@ function handleNodeDrop(mouseX, mouseY) {
   const nodeId = dragState.activeNodeId;
   const node = findNode(nodeId);
   if (!node) return;
+  if (node.dayChild) { saveWeek(currentWeekKey, weekData); render(); return; } // day-children can move but not rebind
   takeSnapshot();
 
   const rect = container.getBoundingClientRect();
@@ -7344,6 +7502,8 @@ function handleNodeDrop(mouseX, mouseY) {
     if (otherId === nodeId || otherId === 'center') continue;
     // Don't bind to own descendant
     if (getDescendantIds(nodeId).includes(otherId)) continue;
+    // Day-children cannot receive dropped nodes
+    if (findNode(otherId)?.dayChild) continue;
 
     const pos = positions[otherId];
     // Hit test against the node's rectangle
@@ -7932,6 +8092,15 @@ window.addEventListener('load', () => {
       });
     });
 
+    // Collect day-child nodes scheduled for today (dayIndex matches today)
+    weekData.nodes.forEach(node => {
+      if (!node.dayChild || node.dayIndex !== todayDow) return;
+      if (seenLeafIds.has(node.id)) return;
+      seenLeafIds.add(node.id);
+      const parentLabel = findNode(node.parent)?.label || '';
+      allEntries.push({ leafNode: node, label: `${parentLabel} · ${node.label}` });
+    });
+
     const today = new Date().toISOString().slice(0, 10);
 
     // Split into pending and done.
@@ -7960,9 +8129,14 @@ window.addEventListener('load', () => {
       if (!isDoneToday(node)) return;
       doneSeen.add(node.id);
       const parent = findNode(node.parent);
-      const label = (parent && parent.type !== 'center' && parent.type !== 'branch')
-        ? `${stripDisplayTokens(parent.label)}: ${stripDisplayTokens(node.label)}`
-        : stripDisplayTokens(node.label);
+      let label;
+      if (node.dayChild && parent) {
+        label = `${parent.label} · ${node.label}`;
+      } else if (parent && parent.type !== 'center' && parent.type !== 'branch') {
+        label = `${stripDisplayTokens(parent.label)}: ${stripDisplayTokens(node.label)}`;
+      } else {
+        label = stripDisplayTokens(node.label);
+      }
       doneEntries.push({ leafNode: node, label });
     });
 

@@ -76,7 +76,12 @@ const sandbox = {
     createElementNS: (_ns, _tag) => elementStub(),
     body: elementStub(),
   },
-  localStorage: { getItem: () => null, setItem: () => {} },
+  _lsStore: {},
+  localStorage: {
+    getItem(k)    { return sandbox._lsStore[k] ?? null; },
+    setItem(k, v) { sandbox._lsStore[k] = v; },
+    removeItem(k) { delete sandbox._lsStore[k]; },
+  },
   location: { hash: '' },
   navigator: { userAgentData: null, userAgent: '' },
   performance: { now: () => 0 },
@@ -95,6 +100,17 @@ _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
 _state.setWeekKey = function(k) { currentWeekKey = k; };
 _state.reset     = function() { undoStack = []; redoStack = []; };
+_state.setLang   = function(l) { currentLang = l; };
+_state.setEditState = function(v, inputVal) {
+  editState = v;
+  if (inputVal !== undefined) inlineInput.value = inputVal;
+};
+_state.setLocalStorage = function(key, data) {
+  _lsStore[key] = JSON.stringify(data);
+};
+_state.clearLocalStorage = function() {
+  for (const k in _lsStore) delete _lsStore[k];
+};
 `;
 
 vm.runInContext(scriptCode + stateAccessors, sandbox);
@@ -120,5 +136,11 @@ export const {
   rebuildNodeMap,
   isLeafActivity,
   getDescendantIds,
+  // Day-child functions
+  parseTodoDays,
+  stripDayGroups,
+  commitEdit,
+  migrateDayCounters,
+  transferReusable,
   _state,
 } = sandbox;
