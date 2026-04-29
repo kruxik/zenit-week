@@ -4515,6 +4515,7 @@ function setLanguage(lang) {
   currentLang = lang;
   localStorage.setItem('zenit-week-lang', lang);
   applyTranslations();
+  if (currentView === 'agenda') renderAgenda();
   render();
   saveBranchColors(); // propagate lang change to Drive via colors file
 }
