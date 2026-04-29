@@ -1620,6 +1620,13 @@
     cursor: default;
   }
 
+  .agenda-item.agenda-item-focused {
+    background: var(--bg-hover);
+    border-radius: 4px;
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 1px;
+  }
+
   .agenda-priority-icon {
     flex-shrink: 0;
     display: inline-flex;
@@ -7014,7 +7021,46 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (currentView === 'agenda') return; // Agenda handles its own shortcuts
+  if (currentView === 'agenda') {
+    const inputFocused = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+    if (inputFocused || e.metaKey || e.ctrlKey) return;
+
+    // Tab-switching: 0 = Overdue, 1–7 = Mon–Sun
+    if (e.key >= '0' && e.key <= '7') {
+      e.preventDefault();
+      const tabMap = { '0': 'overdue', '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 0 };
+      agendaActiveTab = tabMap[e.key];
+      renderAgenda();
+      return;
+    }
+
+    // Item-level shortcuts require a hovered / keyboard-focused item
+    const node = hoveredAgendaNode;
+    if (!node) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        navigateAgendaItem(e.key === 'ArrowDown');
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      navigateAgendaItem(e.key === 'ArrowDown');
+    } else if (e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      setStatus(node.id, node.done ? 'undone' : 'done');
+      renderAgenda();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      deleteNode(node.id);
+      renderAgenda();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      startAgendaRename(node.id);
+    }
+    return;
+  }
 
   if (!hoveredNodeId) return;
 
@@ -7671,6 +7717,21 @@ let currentView = localStorage.getItem('zenit-week-view') || 'mindmap';
 let agendaActiveTab = null;
 let hoveredAgendaNode = null;
 
+function navigateAgendaItem(down) {
+  const items = [...document.querySelectorAll('#agenda-tab-content .agenda-item')];
+  if (!items.length) return;
+  const curIdx = hoveredAgendaNode
+    ? items.findIndex(el => el.dataset.nodeId === hoveredAgendaNode.id)
+    : -1;
+  const nextIdx = curIdx === -1
+    ? (down ? 0 : items.length - 1)
+    : (down ? Math.min(curIdx + 1, items.length - 1) : Math.max(curIdx - 1, 0));
+  items.forEach(el => el.classList.remove('agenda-item-focused'));
+  items[nextIdx].classList.add('agenda-item-focused');
+  hoveredAgendaNode = findNode(items[nextIdx].dataset.nodeId) || null;
+  items[nextIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
 // ISO week day-tab order: Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
 const AGENDA_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
@@ -7762,7 +7823,10 @@ function buildAgendaItem(node, label) {
   }
   item.appendChild(btn);
 
-  item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
+  item.addEventListener('mouseenter', () => {
+    hoveredAgendaNode = node;
+    document.querySelectorAll('.agenda-item-focused').forEach(el => el.classList.remove('agenda-item-focused'));
+  });
   item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
@@ -7821,7 +7885,10 @@ function buildAnyDayItem(node) {
     item.appendChild(undoneBtn);
   }
 
-  item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
+  item.addEventListener('mouseenter', () => {
+    hoveredAgendaNode = node;
+    document.querySelectorAll('.agenda-item-focused').forEach(el => el.classList.remove('agenda-item-focused'));
+  });
   item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
