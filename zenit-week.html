@@ -1542,10 +1542,13 @@
 
   #agenda-day-strip {
     display: flex;
-    align-items: stretch;
+    align-items: center;
     overflow-x: auto;
     width: 100%;
     min-width: 0;
+    height: 48px;
+    padding: 0 8px;
+    gap: 2px;
     border-bottom: 1px solid var(--border-default);
     background: var(--bg-surface);
     flex-shrink: 0;
@@ -1556,7 +1559,7 @@
   .agenda-tab {
     flex-shrink: 0;
     padding: 0 16px;
-    height: 44px;
+    height: 32px;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1566,12 +1569,10 @@
     color: var(--text-muted);
     background: none;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
-    transition: color 0.15s, border-color 0.15s, background 0.15s;
-    position: relative;
-    top: 1px; /* sit on border-bottom */
+    transition: background 0.15s, color 0.15s;
     user-select: none;
     -webkit-user-select: none;
   }
@@ -1582,16 +1583,17 @@
     }
   }
 
-  .agenda-tab:hover { color: var(--text-primary); }
+  .agenda-tab:hover {
+    background: var(--bg-hover);
+    color: var(--text-dim);
+  }
 
   .agenda-tab.active {
-    color: var(--accent-primary);
-    border-bottom-color: var(--accent-primary);
-    background: var(--bg-hover);
+    background: var(--view-btn-active-bg);
+    color: var(--view-btn-active-text);
   }
 
   .agenda-tab:active {
-    background: var(--bg-hover);
     opacity: 0.7;
   }
 
