@@ -4288,6 +4288,10 @@ const TRANSLATIONS = {
     'help.legendTitle':           'Legend',
     'help.unplanned':             'Unplanned',
     'help.done':                  'Done',
+    'filter.unscheduled':         'Unscheduled',
+    'filter.off':                 'Filter off',
+    'filter.alreadyScheduled':    'Already scheduled for',
+    'menu.clearDayFilter':        'Clear Day Filter',
   },
   cs: {
     'toolbar.today':              'Dnes',
@@ -4389,6 +4393,10 @@ const TRANSLATIONS = {
     'help.legendTitle':           'Legenda',
     'help.unplanned':             'Neplánované',
     'help.done':                  'Hotovo',
+    'filter.unscheduled':         'Neplánované',
+    'filter.off':                 'Filtr vypnut',
+    'filter.alreadyScheduled':    'Již naplánováno pro',
+    'menu.clearDayFilter':        'Zrušit filtr dne',
   },
 };
 
@@ -6938,6 +6946,28 @@ window.addEventListener('keydown', (e) => {
       startAgendaRename(node.id);
     }
     return;
+  }
+
+  // Mindmap canvas hotkeys 1–8: toggle day filter
+  if (currentView === 'mindmap' && !hoveredNodeId && !e.metaKey && !e.ctrlKey) {
+    const inputFocused = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+    if (!inputFocused && e.key >= '1' && e.key <= '8') {
+      e.preventDefault();
+      const KEY_TO_DAY = { '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0, '8':'unscheduled' };
+      const newFilter = KEY_TO_DAY[e.key];
+      if (activeDayFilter === newFilter) {
+        activeDayFilter = null;
+        showToast(t('filter.off'));
+      } else {
+        activeDayFilter = newFilter;
+        const msg = newFilter === 'unscheduled'
+          ? t('filter.unscheduled')
+          : `Filter: ${DAY_LABELS.en[newFilter]}`;
+        showToast(msg);
+      }
+      applyFilters();
+      return;
+    }
   }
 
   if (!hoveredNodeId) return;
