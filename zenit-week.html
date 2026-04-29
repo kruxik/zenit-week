@@ -335,13 +335,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 24px;
+    padding: 0 12px;
     height: 56px;
     background: var(--toolbar-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border-default);
-    z-index: 1100;
+    z-index: 2600; /* Above all panels and toggle bar */
     position: absolute;
     top: 0;
     left: 0;
@@ -349,7 +349,6 @@
   }
 
   #logo {
-    flex: 1;
     color: var(--text-primary);
     display: flex;
     align-items: center;
@@ -358,31 +357,36 @@
   }
 
   .nav-btn {
-    background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end));
-    border: 1.5px solid var(--border-subtle);
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     cursor: pointer;
     font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
-    color: var(--text-button);
-    box-shadow: 0 2px 6px var(--shadow-sm);
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    color: var(--text-subtle);
+    box-shadow: 0 2px 8px var(--shadow-md);
   }
 
   .nav-btn:hover {
-    background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end));
-    border-color: var(--border-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px var(--shadow-md);
+    background: var(--bg-hover);
+    color: var(--text-dim);
+    box-shadow: 0 4px 12px var(--shadow-md);
   }
   .nav-btn.active {
     background: var(--view-btn-active-bg);
     color: var(--view-btn-active-text);
   }
+  .nav-btn .icon, #sync-btn .icon {
+    vertical-align: middle;
+  }
+
   .nav-btn:focus { outline: none; }
 
   #zoom-slider-header {
@@ -680,45 +684,33 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 12px;
   }
 
   #sync-btn {
     display: none;
     align-items: center;
     gap: 7px;
-    height: 36px;
-    padding: 0 14px;
-    background: #ffffff;
-    border: 1.5px solid #dadce0;
+    height: 44px;
+    padding: 0 16px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
-    color: #3c4043;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-    transition: all 0.2s;
+    color: var(--text-subtle);
+    box-shadow: 0 2px 8px var(--shadow-md);
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     white-space: nowrap;
   }
 
   #sync-btn:hover {
-    background: #f8f9fa;
-    border-color: #c6c7c8;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
-  }
-
-  [data-theme="dark"] #sync-btn {
-    background: var(--bg-surface);
-    border-color: var(--border-subtle);
-    color: var(--text-button);
-    box-shadow: 0 2px 6px var(--shadow-sm);
-  }
-
-  [data-theme="dark"] #sync-btn:hover {
-    background: var(--bg-surface-subtle);
-    border-color: var(--border-hover);
-    box-shadow: 0 4px 10px var(--shadow-md);
+    background: var(--bg-hover);
+    color: var(--text-dim);
+    box-shadow: 0 4px 12px var(--shadow-md);
   }
 
   #sync-dot {
@@ -741,45 +733,50 @@
   }
 
   #sync-avatar-btn {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    border: none;
+    border: 1px solid var(--border-subtle);
     padding: 0;
     cursor: pointer;
     overflow: hidden;
-    background: transparent;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     flex-shrink: 0;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+    box-shadow: 0 2px 8px var(--shadow-md);
     transition: transform 0.15s, box-shadow 0.15s;
     display: none;
+    align-items: center;
+    justify-content: center;
   }
 
   html:not(.zw-has-session) #sync-btn { display: inline-flex; }
   html.zw-has-session #sync-avatar-btn { display: flex; }
 
   #sync-avatar-btn:hover {
-    transform: scale(1.08);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.28);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px var(--shadow-md);
   }
 
   #sync-avatar-img {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     object-fit: cover;
     display: none;
   }
 
   #sync-avatar-initials {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
-    color: #fff;
+    color: var(--text-primary);
+    background: var(--bg-surface);
     letter-spacing: 0.5px;
   }
 
@@ -840,14 +837,17 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    flex: 1;
-    justify-content: flex-end; /* Align items to the right */
+    justify-content: flex-end;
   }
 
   #settings-container {
     position: relative;
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+  }
+
+  #settings-btn .icon {
+    transform: translateY(0.5px); /* Optical centering adjustment */
   }
 
 
