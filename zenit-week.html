@@ -4139,6 +4139,7 @@ let editState = null;           // { nodeId, isNew, originalLabel }
 let _editJustCommitted = false; // true for 600ms after commit, guards resize handler
 let hoveredNodeId = null;  // Track currently hovered node
 let currentViewLevel = 'full'; // 'full' | 'pebbles' | 'rocks'
+let activeDayFilter = null;   // null | 0–6 | 'unscheduled'
 
 let _atomicOpsDepth = 0;    // nesting counter; Drive sync deferred while > 0
 let _pendingUploadKey = null; // wKey deferred by an active atomic op
@@ -6530,29 +6531,65 @@ function getNodeDepth(nodeId) {
   return depth + 1; // +1 for the branch level itself
 }
 
-function applyViewLevel() {
+function getDayFilterOpacity(nodeId) {
+  if (activeDayFilter === null) return 1;
+
+  const node = nodeId === 'center' ? { type: 'center' } : findNode(nodeId);
+  if (!node) return 1;
+
+  const type = node.type;
+  if (type === 'center' || type === 'branch') return 1;
+
+  const d = activeDayFilter;
+
+  if (node.dayChild) {
+    if (d === 'unscheduled') return 0.12;
+    return node.dayIndex === d ? 1 : 0.12;
+  }
+
+  if (type === 'counter') {
+    const parent = findNode(node.parent);
+    return parent ? getDayFilterOpacity(parent.id) : 1;
+  }
+
+  // activity (non-dayChild)
+  const dayChildren = (node.children || []).map(id => findNode(id)).filter(n => n?.dayChild);
+
+  if (d === 'unscheduled') {
+    const hasCounter = (node.children || []).some(id => findNode(id)?.type === 'counter');
+    return (dayChildren.length === 0 && !hasCounter) ? 1 : 0.12;
+  }
+
+  if (dayChildren.length > 0) {
+    return dayChildren.some(n => n.dayIndex === d) ? 1 : 0.12;
+  }
+  return parseTodoDays(node.label || '').has(d) ? 1 : 0.12;
+}
+
+function applyFilters() {
   const nodesLayer = document.getElementById('nodes-layer');
   const linesLayer = document.getElementById('lines-layer');
   if (!nodesLayer || !linesLayer) return;
 
-  // Determine the fade threshold: nodes at depth >= threshold get faded
-  // full: no fading, pebbles: fade depth >= 3, rocks: fade depth >= 2
   let fadeThreshold;
-  if (currentViewLevel === 'full')    fadeThreshold = Infinity;
+  if (currentViewLevel === 'full')         fadeThreshold = Infinity;
   else if (currentViewLevel === 'pebbles') fadeThreshold = 3;
-  else /* rocks */                    fadeThreshold = 2;
+  else /* rocks */                         fadeThreshold = 2;
 
-  // Apply opacity to node groups
   nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
-    const depth = getNodeDepth(g.dataset.id);
-    g.style.opacity = depth >= fadeThreshold ? '0.15' : '';
+    const id = g.dataset.id;
+    const depthOpacity = getNodeDepth(id) >= fadeThreshold ? 0.15 : 1;
+    const dayOpacity   = getDayFilterOpacity(id);
+    const final = Math.min(depthOpacity, dayOpacity);
+    g.style.opacity = final === 1 ? '' : String(final);
   });
 
-  // Apply opacity to edges — fade an edge if its child node is faded
   linesLayer.querySelectorAll('path[data-to]').forEach(path => {
     const toId = path.getAttribute('data-to');
-    const depth = getNodeDepth(toId);
-    path.style.opacity = depth >= fadeThreshold ? '0.15' : '';
+    const depthOpacity = getNodeDepth(toId) >= fadeThreshold ? 0.15 : 1;
+    const dayOpacity   = getDayFilterOpacity(toId);
+    const final = Math.min(depthOpacity, dayOpacity);
+    path.style.opacity = final === 1 ? '' : String(final);
   });
 }
 
@@ -6800,7 +6837,7 @@ function render() {
   });
 
   attachNodeListeners();
-  applyViewLevel();
+  applyFilters();
   updateSummary();
 }
 
@@ -8387,7 +8424,7 @@ document.querySelectorAll('.view-level-btn').forEach(btn => {
     if (level === currentViewLevel) return;
     currentViewLevel = level;
     document.querySelectorAll('.view-level-btn').forEach(b => b.classList.toggle('active', b.dataset.level === level));
-    applyViewLevel();
+    applyFilters();
   });
 });
 
@@ -8403,7 +8440,7 @@ function _setViewLevel(level) {
   document.querySelectorAll('.view-level-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.level === level)
   );
-  applyViewLevel();
+  applyFilters();
   _toast.textContent = VIEW_LEVEL_LABELS[level];
   _toast.classList.add('visible');
   clearTimeout(_toastTimer);

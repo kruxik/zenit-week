@@ -111,6 +111,7 @@ _state.setLocalStorage = function(key, data) {
 _state.clearLocalStorage = function() {
   for (const k in _lsStore) delete _lsStore[k];
 };
+_state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 `;
 
 vm.runInContext(scriptCode + stateAccessors, sandbox);
@@ -137,6 +138,7 @@ export const {
   isLeafActivity,
   getDescendantIds,
   // Day-child functions
+  getDayFilterOpacity,
   parseTodoDays,
   stripDayGroups,
   commitEdit,
