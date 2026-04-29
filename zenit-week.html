@@ -1631,6 +1631,42 @@
   .agenda-priority-icon.high     { color: var(--accent-warning-text); }
   .agenda-priority-icon.critical { color: var(--accent-danger); }
 
+  /* Reschedule submenu */
+  #ctx-reschedule-submenu {
+    position: fixed;
+    z-index: 9001;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    padding: 4px 0;
+    min-width: 100px;
+    box-shadow: 0 8px 32px var(--shadow-md);
+    display: none;
+  }
+  #ctx-reschedule-submenu.visible { display: block; }
+
+  .ctx-submenu-arrow {
+    font-size: 9px;
+    margin-left: auto;
+    padding-left: 8px;
+    pointer-events: none;
+    color: var(--text-muted);
+  }
+
+  /* Agenda inline rename input */
+  .agenda-rename-input {
+    border: 1px solid var(--accent-primary);
+    border-radius: 4px;
+    padding: 1px 4px;
+    font-size: inherit;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--bg-page);
+    flex: 1;
+    min-width: 60px;
+    outline: none;
+  }
+
   #help-overlay {
     position: fixed;
     top: 0;
@@ -2422,6 +2458,7 @@
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
   <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.nextWeek">Next week</span></div>
+  <div class="ctx-item" id="ctx-reschedule"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.reschedule">Reschedule</span><span class="ctx-submenu-arrow">▶</span></div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
   <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> <span data-i18n="menu.prioNormal">Priority Normal</span></div>
   <div class="ctx-item" id="ctx-prio-high"><svg class="icon" aria-hidden="true"><use href="#icon-alert-circle"/></svg> <span data-i18n="menu.prioHigh">Priority High</span></div>
@@ -2434,6 +2471,8 @@
   <div class="ctx-separator" id="ctx-sep-3"></div>
   <div class="ctx-item danger" id="ctx-delete"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.delete">Delete</span></div>
 </div>
+
+<div id="ctx-reschedule-submenu"></div>
 
 <textarea id="inline-input" autocomplete="off" spellcheck="false"></textarea>
 <span id="inline-sizer"></span>
@@ -4320,6 +4359,8 @@ const TRANSLATIONS = {
     'agenda.emptyDay':            'No tasks for this day.',
     'agenda.emptyOverdue':        'No overdue tasks.',
     'agenda.anyDay':              'Any day',
+    'agenda.alreadyScheduled':    'Already scheduled for',
+    'menu.reschedule':            'Reschedule',
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
     'view.rocks':                 'Rocks',
@@ -4422,6 +4463,8 @@ const TRANSLATIONS = {
     'agenda.emptyDay':            'Pro tento den žádné úkoly.',
     'agenda.emptyOverdue':        'Žádné zpožděné úkoly.',
     'agenda.anyDay':              'Kdykoli',
+    'agenda.alreadyScheduled':    'Již naplánováno pro',
+    'menu.reschedule':            'Přeplánovat',
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
     'view.rocks':                 'Kameny',
@@ -6223,6 +6266,60 @@ function startRenameNode(nodeId) {
   _openInlineInput(nodeId, false);
 }
 
+function startAgendaRename(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
+  const targetId = node.dayChild ? node.parent : nodeId;
+  const target = findNode(targetId);
+  if (!target) return;
+
+  const itemEl = document.querySelector(`#agenda-tab-content .agenda-item[data-node-id="${CSS.escape(nodeId)}"]`);
+  if (!itemEl) return;
+  const labelEl = itemEl.querySelector('.daily-log-label');
+  if (!labelEl) return;
+
+  const originalLabel = target.label;
+  takeSnapshot();
+  target._editing = true;
+  editState = { nodeId: targetId, isNew: false, originalLabel, initialNodeW: 0 };
+  beginAtomicOp();
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = originalLabel;
+  input.className = 'agenda-rename-input';
+  labelEl.textContent = '';
+  labelEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+
+  function doCommit() {
+    if (done) return;
+    done = true;
+    labelEl.textContent = input.value.trim() || originalLabel;
+    inlineInput.value = input.value;
+    commitEdit();
+    if (currentView === 'agenda') renderAgenda();
+  }
+
+  function doCancel() {
+    if (done) return;
+    done = true;
+    labelEl.textContent = originalLabel;
+    delete target._editing;
+    cancelEdit();
+  }
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); doCommit(); }
+    if (e.key === 'Escape') { e.preventDefault(); doCancel(); }
+    e.stopPropagation();
+  });
+  input.addEventListener('blur', doCommit);
+}
+
 function _openInlineInput(nodeId, isNew) {
   const node = findNode(nodeId);
   if (!node) return;
@@ -7144,6 +7241,7 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
   document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || (node && node.dayChild)) ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter)            ? 'none' : '';
+  document.getElementById('ctx-reschedule').style.display = (isActivity && node.dayChild) ? '' : 'none';
 
   // Color change (branch only)
   document.getElementById('ctx-sep-color').style.display    = isBranch ? '' : 'none';
@@ -7180,6 +7278,7 @@ function showContextMenu(x, y, nodeId) {
 function hideContextMenu() {
   ctxMenu.classList.remove('visible');
   contextTarget = null;
+  document.getElementById('ctx-reschedule-submenu').classList.remove('visible');
 }
 
 // ─── Color picker (custom inline SB+hue) ──────────────────────────────────────
@@ -7387,6 +7486,58 @@ document.getElementById('ctx-move-next-week').addEventListener('click', () => {
   hideContextMenu();
 });
 
+(function () {
+  const rescheduleItem   = document.getElementById('ctx-reschedule');
+  const rescheduleSubmenu = document.getElementById('ctx-reschedule-submenu');
+  let _hideSubTimer = null;
+
+  function showRescheduleSubmenu() {
+    clearTimeout(_hideSubTimer);
+    rescheduleSubmenu.innerHTML = '';
+    const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+    const node = findNode(contextTarget);
+    AGENDA_DAY_ORDER.forEach(dayIdx => {
+      const btn = document.createElement('div');
+      btn.className = 'ctx-item' + (node && node.dayIndex === dayIdx ? ' ctx-item-selected' : '');
+      btn.textContent = langLabels[dayIdx];
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const ok = rescheduleNode(contextTarget, dayIdx);
+        if (!ok) showToast(`${t('agenda.alreadyScheduled')} ${langLabels[dayIdx]}`);
+        hideContextMenu();
+      });
+      rescheduleSubmenu.appendChild(btn);
+    });
+    rescheduleSubmenu.style.visibility = 'hidden';
+    rescheduleSubmenu.classList.add('visible');
+    const ctxRect  = ctxMenu.getBoundingClientRect();
+    const itemRect = rescheduleItem.getBoundingClientRect();
+    const subW = rescheduleSubmenu.offsetWidth;
+    const subH = rescheduleSubmenu.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
+    let left = ctxRect.right + 4;
+    if (left + subW > vw - pad) left = ctxRect.left - subW - 4;
+    let top = Math.max(pad, Math.min(itemRect.top, vh - subH - pad));
+    rescheduleSubmenu.style.left = left + 'px';
+    rescheduleSubmenu.style.top  = top  + 'px';
+    rescheduleSubmenu.style.visibility = '';
+  }
+
+  rescheduleItem.addEventListener('mouseenter', showRescheduleSubmenu);
+  rescheduleItem.addEventListener('click', showRescheduleSubmenu);
+  rescheduleItem.addEventListener('mouseleave', e => {
+    if (!rescheduleSubmenu.contains(e.relatedTarget)) {
+      _hideSubTimer = setTimeout(() => rescheduleSubmenu.classList.remove('visible'), 120);
+    }
+  });
+  rescheduleSubmenu.addEventListener('mouseenter', () => clearTimeout(_hideSubTimer));
+  rescheduleSubmenu.addEventListener('mouseleave', e => {
+    if (!rescheduleItem.contains(e.relatedTarget)) {
+      _hideSubTimer = setTimeout(() => rescheduleSubmenu.classList.remove('visible'), 120);
+    }
+  });
+})();
+
 document.getElementById('ctx-clear-week').addEventListener('click', () => {
   hideContextMenu();
   takeSnapshot();
@@ -7399,11 +7550,13 @@ document.getElementById('ctx-clear-week').addEventListener('click', () => {
 
 document.getElementById('ctx-done').addEventListener('click', () => {
   if (contextTarget) setStatus(contextTarget, 'done');
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.getElementById('ctx-undone').addEventListener('click', () => {
   if (contextTarget) setStatus(contextTarget, 'undone');
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
@@ -7431,6 +7584,7 @@ document.getElementById('ctx-unplanned').addEventListener('click', () => {
     const n = findNode(contextTarget);
     setStatus(contextTarget, (n && n.unplanned) ? 'planned' : 'unplanned');
   }
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
@@ -7457,23 +7611,28 @@ document.getElementById('ctx-reusable').addEventListener('click', () => {
 
 document.getElementById('ctx-prio-normal').addEventListener('click', () => {
   if (contextTarget) setStatus(contextTarget, 'prio-normal');
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.getElementById('ctx-prio-high').addEventListener('click', () => {
   if (contextTarget) setStatus(contextTarget, 'prio-high');
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.getElementById('ctx-prio-critical').addEventListener('click', () => {
   if (contextTarget) setStatus(contextTarget, 'prio-critical');
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.getElementById('ctx-rename').addEventListener('click', () => {
   const id = contextTarget;
   hideContextMenu();
-  if (id) startRenameNode(id);
+  if (!id) return;
+  if (currentView === 'agenda') startAgendaRename(id);
+  else startRenameNode(id);
 });
 
 document.getElementById('ctx-add-child').addEventListener('click', () => {
@@ -7485,11 +7644,13 @@ document.getElementById('ctx-add-child').addEventListener('click', () => {
 document.getElementById('ctx-delete').addEventListener('click', () => {
   if (!contextTarget) { hideContextMenu(); return; }
   deleteNode(contextTarget);
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.addEventListener('click', (e) => {
-  if (!ctxMenu.contains(e.target)) hideContextMenu();
+  const rescheduleSubmenu = document.getElementById('ctx-reschedule-submenu');
+  if (!ctxMenu.contains(e.target) && !rescheduleSubmenu.contains(e.target)) hideContextMenu();
 });
 
 document.addEventListener('contextmenu', (e) => {
@@ -7603,6 +7764,14 @@ function buildAgendaItem(node, label) {
 
   item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
   item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
+  item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
+
+  // Long-press for mobile
+  let _lpTimer = null;
+  item.addEventListener('touchstart',  e => { _lpTimer = setTimeout(() => { showContextMenu(e.touches[0].clientX, e.touches[0].clientY, node.id); }, 500); }, { passive: true });
+  item.addEventListener('touchend',    () => clearTimeout(_lpTimer));
+  item.addEventListener('touchcancel', () => clearTimeout(_lpTimer));
+  item.addEventListener('touchmove',   () => clearTimeout(_lpTimer), { passive: true });
 
   return item;
 }
@@ -7654,6 +7823,13 @@ function buildAnyDayItem(node) {
 
   item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
   item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
+  item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
+
+  let _lpTimer2 = null;
+  item.addEventListener('touchstart',  e => { _lpTimer2 = setTimeout(() => { showContextMenu(e.touches[0].clientX, e.touches[0].clientY, node.id); }, 500); }, { passive: true });
+  item.addEventListener('touchend',    () => clearTimeout(_lpTimer2));
+  item.addEventListener('touchcancel', () => clearTimeout(_lpTimer2));
+  item.addEventListener('touchmove',   () => clearTimeout(_lpTimer2), { passive: true });
 
   return item;
 }
@@ -8286,6 +8462,13 @@ function _setViewLevel(level) {
   _toast.classList.add('visible');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => _toast.classList.remove('visible'), 1200);
+}
+
+function showToast(msg, duration = 2000) {
+  _toast.textContent = msg;
+  _toast.classList.add('visible');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => _toast.classList.remove('visible'), duration);
 }
 
 window.addEventListener('branchSwipeStart', (e) => {
