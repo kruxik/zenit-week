@@ -1437,6 +1437,32 @@
     flex-direction: column;
     overflow: hidden;
     background: var(--bg-page);
+    z-index: 800;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+
+  @media (min-width: 768px) {
+    #agenda-view {
+      position: fixed;
+      top: 66px;
+      right: 20px;
+      left: auto;
+      bottom: 20px;
+      width: 420px;
+      border-radius: 20px;
+      border: 1px solid var(--border-default);
+      box-shadow: 0 20px 60px var(--shadow-xl);
+      background: var(--bg-surface);
+      transform: translateX(20px);
+      opacity: 0;
+      pointer-events: none;
+    }
+    #agenda-view.active {
+      display: flex;
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: all;
+    }
   }
 
   #agenda-view.active {
@@ -8127,12 +8153,15 @@ function switchView(view) {
   const agendaEl  = document.getElementById('agenda-view');
   const btnMM     = document.getElementById('vtb-mindmap');
   const btnAG     = document.getElementById('vtb-agenda');
+  const isDesktop = window.innerWidth >= 768;
+
   if (view === 'agenda') {
-    canvasEl.style.display = 'none';
+    canvasEl.style.display = isDesktop ? '' : 'none';
     agendaEl.classList.add('active');
     btnMM.classList.remove('active');
     btnAG.classList.add('active');
     renderAgenda();
+    if (isDesktop) render(); // Ensure mindmap is rendered in background
   } else {
     canvasEl.style.display = '';
     agendaEl.classList.remove('active');
@@ -8141,6 +8170,20 @@ function switchView(view) {
     render();
   }
 }
+
+// Ensure layout updates on resize if agenda view is active
+window.addEventListener('resize', () => {
+  if (currentView === 'agenda') {
+    const canvasEl = document.getElementById('canvas-container');
+    const isDesktop = window.innerWidth >= 768;
+    const currentDisplay = canvasEl.style.display;
+    const targetDisplay = isDesktop ? '' : 'none';
+    if (currentDisplay !== targetDisplay) {
+      canvasEl.style.display = targetDisplay;
+      if (isDesktop) render();
+    }
+  }
+});
 
 const ZOOM_MIN = isMobile ? 0.06 : 0.2;
 const ZOOM_MAX = isMobile ? 1.2 : 1.8;
