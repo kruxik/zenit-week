@@ -1656,7 +1656,7 @@
     display: none;
     flex-direction: column;
     z-index: 2000;
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease, border-radius 0.3s ease, top 0.3s ease, bottom 0.3s ease, width 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease, border-radius 0.3s ease, top 0.3s ease, bottom 0.3s ease, width 0.3s ease, left 0.3s ease;
     opacity: 0;
     pointer-events: none;
     transform: translateY(20px);
@@ -1676,9 +1676,6 @@
       box-shadow: 0 20px 60px var(--shadow-xl);
       transform: translateX(-50%) translateY(20px);
     }
-    #help-panel.visible {
-      transform: translateX(-50%) translateY(0);
-    }
   }
 
   #help-panel.visible {
@@ -1686,6 +1683,12 @@
     opacity: 1;
     pointer-events: all;
     transform: translateY(0);
+  }
+
+  @media (min-width: 768px) {
+    #help-panel.visible {
+      transform: translateX(-50%) translateY(0);
+    }
   }
 
   #import-confirm-overlay {
