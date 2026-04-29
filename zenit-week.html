@@ -6889,20 +6889,21 @@ window.addEventListener('keydown', (e) => {
   if (editState) return; // Don't interfere with inline editing
 
   // View toggle shortcuts — active unless typing in an input
-  if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'a') {
-    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-      if (currentView !== 'agenda') { e.preventDefault(); switchView('agenda'); }
-      return;
+  if (!e.metaKey && !e.ctrlKey && !e.shiftKey) {
+    const key = e.key.toLowerCase();
+    if (key === 'a' || key === 'm') {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        const targetView = key === 'a' ? 'agenda' : 'mindmap';
+        if (currentView !== targetView) {
+          e.preventDefault();
+          switchView(targetView);
+        }
+        return;
+      }
     }
   }
 
   if (e.key === 'Escape') {
-    // Agenda view: Esc returns to Mindmap
-    if (currentView === 'agenda') {
-      switchView('mindmap');
-      return;
-    }
-
     const settings = document.getElementById('settings-dropdown');
     const help = document.getElementById('help-overlay');
     const status = document.getElementById('placeholder-panel');
