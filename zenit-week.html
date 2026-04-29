@@ -7607,6 +7607,57 @@ function buildAgendaItem(node, label) {
   return item;
 }
 
+function buildAnyDayItem(node) {
+  const cc = getCounterChild(node);
+  const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
+
+  const item = document.createElement('div');
+  item.className = 'daily-log-item agenda-item';
+  item.dataset.nodeId = node.id;
+
+  const dot = document.createElement('div');
+  dot.className = 'daily-log-branch-dot';
+  dot.style.background = branchColor;
+  item.appendChild(dot);
+
+  const labelEl = document.createElement('div');
+  labelEl.className = 'daily-log-label';
+  if (node.done) labelEl.style.opacity = '0.5';
+  labelEl.textContent = node.label || t('todo.noLabel');
+  item.appendChild(labelEl);
+
+  if (!node.done && cc) {
+    const pill = document.createElement('div');
+    pill.className = 'daily-log-badge tick';
+    pill.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
+    pill.innerHTML = `${iconSvg('circle-half-2')} ${cc.val} / ${cc.max}`;
+    item.appendChild(pill);
+
+    const plusBtn = document.createElement('button');
+    plusBtn.className = 'reset-btn';
+    plusBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
+    plusBtn.innerHTML = `${iconSvg('plus')} +1`;
+    plusBtn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
+    item.appendChild(plusBtn);
+  } else {
+    const undoneBtn = document.createElement('button');
+    undoneBtn.className = 'reset-btn';
+    undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
+    undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
+    undoneBtn.addEventListener('click', () => {
+      if (cc) updateCounter(cc.id, -1);
+      else setStatus(node.id, 'undone');
+      renderAgenda();
+    });
+    item.appendChild(undoneBtn);
+  }
+
+  item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
+  item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
+
+  return item;
+}
+
 function renderAgendaTabContent() {
   const content = document.getElementById('agenda-tab-content');
   content.innerHTML = '';
@@ -7676,7 +7727,9 @@ function renderAgendaTabContent() {
     return stripDayGroups(n.label) || n.label;
   }
 
-  if (pending.length === 0 && done.length === 0) {
+  const anyDayItems = isOverdue ? [] : getAnyDayItems();
+
+  if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'daily-log-empty';
     empty.textContent = isOverdue ? t('agenda.emptyOverdue') : t('agenda.emptyDay');
@@ -7700,6 +7753,17 @@ function renderAgendaTabContent() {
     list.appendChild(divider);
     scheduledDone.forEach(n => list.appendChild(buildAgendaItem(n, labelFn(n))));
     crossDayDone.forEach(n => list.appendChild(buildAgendaItem(n, doneLabelFor(n))));
+  }
+
+  if (anyDayItems.length > 0) {
+    if (list.lastElementChild) {
+      list.lastElementChild.style.borderBottom = 'none';
+    }
+    const anyDivider = document.createElement('div');
+    anyDivider.className = 'today-done-divider';
+    anyDivider.textContent = t('agenda.anyDay');
+    list.appendChild(anyDivider);
+    anyDayItems.forEach(n => list.appendChild(buildAnyDayItem(n)));
   }
 }
 
