@@ -1359,6 +1359,10 @@
     color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
+  #help-fab.active {
+    background: var(--view-btn-active-bg);
+    color: var(--view-btn-active-text);
+  }
 
   /* ─── View Toggle Bar ────────────────────────────────────────────────────── */
   #view-toggle-bar {
@@ -1560,16 +1564,15 @@
 
   #help-overlay {
     position: fixed;
-    top: 0;
+    top: 56px; /* Below toolbar */
     left: 0;
     width: 100%;
-    height: 100%;
+    height: calc(100% - 56px);
     background: var(--overlay-sm);
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
+    z-index: 950; /* Above canvas, below panels/toolbar */
     opacity: 0;
     transition: opacity 0.3s ease;
   }
@@ -1579,16 +1582,29 @@
   }
 
   #help-panel {
+    position: fixed;
+    top: 66px; /* Align with top summary panel */
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    width: 592px;
+    max-width: calc(100vw - 40px);
+    height: calc(100vh - 66px - 12px);
     background: var(--bg-surface);
-    width: 456px;
     border-radius: 20px;
     box-shadow: 0 20px 60px var(--shadow-xl);
     overflow: hidden;
-    transform: translateY(20px);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: none;
+    flex-direction: column;
+    z-index: 2000; /* Above everything */
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
   }
-  #help-overlay.visible #help-panel {
-    transform: translateY(0);
+  #help-panel.visible {
+    display: flex;
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: all;
   }
 
   #import-confirm-overlay {
@@ -1710,7 +1726,7 @@
 
   #help-content {
     padding: 24px;
-    max-height: 70vh;
+    flex: 1;
     overflow-y: auto;
   }
 
@@ -2437,14 +2453,15 @@
 
 <div id="help-fab" data-i18n-title="help.fab" title="Help & Hotkeys"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"/></svg></div>
 
-<div id="help-overlay">
-  <div id="help-panel">
-    <div id="help-header">
-      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="help.title">Help & Hotkeys</div>
-      <div id="help-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
-    </div>
-    
-    <div id="help-content">
+<div id="help-overlay"></div>
+
+<div id="help-panel">
+  <div id="help-header">
+    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="help.title">Help & Hotkeys</div>
+    <div id="help-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
+  </div>
+  
+  <div id="help-content">
       <div class="help-section">
         <div class="help-section-title" data-i18n="help.hotkeysTitle">Activity hotkeys (On Hover)</div>
         <div class="help-row"><span data-i18n="help.rename">Rename</span> <kbd>Enter</kbd></div>
@@ -6928,8 +6945,13 @@ window.addEventListener('keydown', (e) => {
       settings.classList.remove('visible');
       return;
     }
-    if (help && help.classList.contains('visible')) {
-      help.classList.remove('visible');
+    const helpPanel = document.getElementById('help-panel');
+    if (helpPanel && helpPanel.classList.contains('visible')) {
+      if (window.doCloseHelp) window.doCloseHelp();
+      else {
+        helpPanel.classList.remove('visible');
+        if (help) help.classList.remove('visible');
+      }
       return;
     }
     if (status && status.classList.contains('expanded')) {
@@ -8895,19 +8917,24 @@ window.addEventListener('load', () => {
   // Help panel listeners
   const helpFab = document.getElementById('help-fab');
   const helpOverlay = document.getElementById('help-overlay');
+  const helpPanel = document.getElementById('help-panel');
   const helpClose = document.getElementById('help-close');
 
   helpFab.addEventListener('click', () => {
     helpOverlay.classList.add('visible');
+    helpPanel.classList.add('visible');
+    helpFab.classList.add('active');
   });
 
-  helpClose.addEventListener('click', () => {
+  const doCloseHelp = () => {
     helpOverlay.classList.remove('visible');
-  });
+    helpPanel.classList.remove('visible');
+    helpFab.classList.remove('active');
+  };
+  window.doCloseHelp = doCloseHelp;
 
-  helpOverlay.addEventListener('click', (e) => {
-    if (e.target === helpOverlay) helpOverlay.classList.remove('visible');
-  });
+  helpClose.addEventListener('click', doCloseHelp);
+  helpOverlay.addEventListener('click', doCloseHelp);
 
   // Expandable summary panel
   const summaryPanel = document.getElementById('placeholder-panel');
