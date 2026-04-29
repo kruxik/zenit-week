@@ -1595,6 +1595,14 @@
     opacity: 0.7;
   }
 
+  .agenda-tab-separator {
+    width: 1px;
+    height: 18px;
+    background: var(--view-separator);
+    align-self: center;
+    flex-shrink: 0;
+  }
+
   .agenda-overdue-badge {
     display: inline-flex;
     align-items: center;
@@ -8018,6 +8026,12 @@ function renderAgendaStrip() {
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
   const overdueCount = getOverdueItems().length;
 
+  function addSeparator() {
+    const sep = document.createElement('div');
+    sep.className = 'agenda-tab-separator';
+    strip.appendChild(sep);
+  }
+
   // Overdue tab
   const overdueBtn = document.createElement('button');
   overdueBtn.className = 'agenda-tab' + (agendaActiveTab === 'overdue' ? ' active' : '');
@@ -8040,6 +8054,8 @@ function renderAgendaStrip() {
 
   // Day tabs in ISO week order
   AGENDA_DAY_ORDER.forEach(dayIdx => {
+    addSeparator();
+
     const btn = document.createElement('button');
     btn.className = 'agenda-tab' + (agendaActiveTab === dayIdx ? ' active' : '');
     btn.dataset.tab = String(dayIdx);
