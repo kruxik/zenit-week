@@ -328,7 +328,9 @@
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
+    width: 100%;
     position: relative;
+    overflow-x: hidden;
   }
 
   #toolbar {
@@ -337,6 +339,7 @@
     justify-content: space-between;
     padding: 0 12px;
     height: 56px;
+    width: 100%;
     background: var(--toolbar-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1496,6 +1499,8 @@
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100%;
+    max-width: 100%;
     display: none;
     flex-direction: column;
     overflow: hidden;
@@ -1539,6 +1544,8 @@
     display: flex;
     align-items: stretch;
     overflow-x: auto;
+    width: 100%;
+    min-width: 0;
     border-bottom: 1px solid var(--border-default);
     background: var(--bg-surface);
     flex-shrink: 0;
@@ -1562,9 +1569,17 @@
     border-bottom: 2px solid transparent;
     cursor: pointer;
     white-space: nowrap;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
     position: relative;
     top: 1px; /* sit on border-bottom */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  @media (max-width: 480px) {
+    .agenda-tab {
+      padding: 0 12px;
+    }
   }
 
   .agenda-tab:hover { color: var(--text-primary); }
@@ -1572,6 +1587,12 @@
   .agenda-tab.active {
     color: var(--accent-primary);
     border-bottom-color: var(--accent-primary);
+    background: var(--bg-hover);
+  }
+
+  .agenda-tab:active {
+    background: var(--bg-hover);
+    opacity: 0.7;
   }
 
   .agenda-overdue-badge {
@@ -1594,6 +1615,9 @@
   #agenda-tab-content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+    min-width: 0;
     padding: 0;
     padding-bottom: 66px;
   }
@@ -7978,6 +8002,15 @@ function navigateAgendaItem(down) {
 // ISO week day-tab order: Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
 const AGENDA_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
+function scrollAgendaTabIntoView(strip, btn) {
+  if (!strip || !btn) return;
+  const stripWidth = strip.clientWidth;
+  const btnLeft = btn.offsetLeft;
+  const btnWidth = btn.offsetWidth;
+  const targetScroll = btnLeft - (stripWidth / 2) + (btnWidth / 2);
+  strip.scrollTo({ left: targetScroll, behavior: 'smooth' });
+}
+
 function renderAgendaStrip() {
   const strip = document.getElementById('agenda-day-strip');
   strip.innerHTML = '';
@@ -8000,6 +8033,11 @@ function renderAgendaStrip() {
   overdueBtn.addEventListener('click', () => { agendaActiveTab = 'overdue'; renderAgenda(); });
   strip.appendChild(overdueBtn);
 
+  // Scroll overdue tab into view
+  if (agendaActiveTab === 'overdue') {
+    requestAnimationFrame(() => scrollAgendaTabIntoView(strip, overdueBtn));
+  }
+
   // Day tabs in ISO week order
   AGENDA_DAY_ORDER.forEach(dayIdx => {
     const btn = document.createElement('button');
@@ -8011,7 +8049,7 @@ function renderAgendaStrip() {
 
     // Scroll active tab into view
     if (agendaActiveTab === dayIdx) {
-      requestAnimationFrame(() => btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }));
+      requestAnimationFrame(() => scrollAgendaTabIntoView(strip, btn));
     }
   });
 }
