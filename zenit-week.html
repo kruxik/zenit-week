@@ -7717,6 +7717,53 @@ let currentView = localStorage.getItem('zenit-week-view') || 'mindmap';
 let agendaActiveTab = null;
 let hoveredAgendaNode = null;
 
+// Attaches swipe-right=done, swipe-left=context-menu, and long-press=context-menu to an agenda item.
+// Non-passive touchmove is required so we can preventDefault during a confirmed horizontal swipe.
+function addSwipeGesture(item, node) {
+  let startX = 0, startY = 0, lpTimer = null;
+  let state = 'idle'; // 'idle' | 'pending' | 'swiping' | 'aborted'
+
+  item.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    startX = t.clientX;
+    startY = t.clientY;
+    state = 'pending';
+    lpTimer = setTimeout(() => {
+      if (state === 'pending') {
+        state = 'aborted';
+        showContextMenu(t.clientX, t.clientY, node.id);
+      }
+    }, 500);
+  }, { passive: true });
+
+  item.addEventListener('touchmove', e => {
+    if (state === 'aborted' || state === 'idle') return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = Math.abs(e.touches[0].clientY - startY);
+    if (dy > 30) { state = 'aborted'; clearTimeout(lpTimer); return; }
+    if (Math.abs(dx) >= 50) {
+      state = 'swiping';
+      clearTimeout(lpTimer);
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  item.addEventListener('touchend', e => {
+    clearTimeout(lpTimer);
+    if (state !== 'swiping') { state = 'idle'; return; }
+    const dx = e.changedTouches[0].clientX - startX;
+    state = 'idle';
+    if (dx > 0) {
+      setStatus(node.id, node.done ? 'undone' : 'done');
+      renderAgenda();
+    } else {
+      showContextMenu(e.changedTouches[0].clientX, e.changedTouches[0].clientY, node.id);
+    }
+  });
+
+  item.addEventListener('touchcancel', () => { clearTimeout(lpTimer); state = 'idle'; });
+}
+
 function navigateAgendaItem(down) {
   const items = [...document.querySelectorAll('#agenda-tab-content .agenda-item')];
   if (!items.length) return;
@@ -7830,12 +7877,7 @@ function buildAgendaItem(node, label) {
   item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
-  // Long-press for mobile
-  let _lpTimer = null;
-  item.addEventListener('touchstart',  e => { _lpTimer = setTimeout(() => { showContextMenu(e.touches[0].clientX, e.touches[0].clientY, node.id); }, 500); }, { passive: true });
-  item.addEventListener('touchend',    () => clearTimeout(_lpTimer));
-  item.addEventListener('touchcancel', () => clearTimeout(_lpTimer));
-  item.addEventListener('touchmove',   () => clearTimeout(_lpTimer), { passive: true });
+  addSwipeGesture(item, node);
 
   return item;
 }
@@ -7892,11 +7934,7 @@ function buildAnyDayItem(node) {
   item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
-  let _lpTimer2 = null;
-  item.addEventListener('touchstart',  e => { _lpTimer2 = setTimeout(() => { showContextMenu(e.touches[0].clientX, e.touches[0].clientY, node.id); }, 500); }, { passive: true });
-  item.addEventListener('touchend',    () => clearTimeout(_lpTimer2));
-  item.addEventListener('touchcancel', () => clearTimeout(_lpTimer2));
-  item.addEventListener('touchmove',   () => clearTimeout(_lpTimer2), { passive: true });
+  addSwipeGesture(item, node);
 
   return item;
 }
