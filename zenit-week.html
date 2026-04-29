@@ -1369,48 +1369,54 @@
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    height: 48px;
     display: flex;
     align-items: center;
+    gap: 0;
     background: var(--view-bar-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--border-subtle);
-    border-radius: 24px;
-    padding: 4px;
-    gap: 4px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px var(--shadow-md);
+    padding: 3px;
     z-index: 1001;
-    box-shadow: 0 4px 12px var(--shadow-md);
+    user-select: none;
   }
 
   .view-toggle-btn {
-    padding: 0 16px;
-    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    font-family: inherit;
-    color: var(--text-muted);
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 5px;
     cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    color: var(--text-subtle);
+    font-size: 13px;
+    font-weight: 600;
     border: none;
     background: none;
-    border-radius: 20px;
-    transition: background 0.15s, color 0.15s;
     user-select: none;
     white-space: nowrap;
   }
 
   .view-toggle-btn:hover {
     background: var(--bg-hover);
-    color: var(--text-primary);
+    color: var(--text-dim);
   }
 
   .view-toggle-btn.active {
     background: var(--view-btn-active-bg);
     color: var(--view-btn-active-text);
+  }
+
+  .view-toggle-separator {
+    width: 1px;
+    height: 22px;
+    background: var(--view-separator);
+    margin: 0;
   }
 
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
@@ -2423,6 +2429,7 @@
     <svg class="icon" aria-hidden="true"><use href="#icon-list-details"/></svg>
     <span data-i18n="view.agenda">Agenda</span>
   </button>
+  <div class="view-toggle-separator"></div>
   <button class="view-toggle-btn active" id="vtb-mindmap">
     <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-sitemap"/></svg>
     <span data-i18n="view.mindmap">Mindmap</span>
