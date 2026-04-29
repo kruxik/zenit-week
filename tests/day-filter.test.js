@@ -181,13 +181,22 @@ describe('getDayFilterOpacity — day filter 1 (Mon)', () => {
 // ─── Unscheduled filter ───────────────────────────────────────────────────────
 
 describe('getDayFilterOpacity — unscheduled filter', () => {
-  test('activity with no day-children, no counter → 1', () => {
+  test('activity with no day-children, no counter, no label days → 1', () => {
     const b = mkBranch('b1');
     const a = mkActivity('a1', 'b1', 'b1');
     b.children = ['a1'];
     setUp([b, a]);
     _state.setActiveDayFilter('unscheduled');
     expect(getDayFilterOpacity('a1')).toBe(1);
+  });
+
+  test('activity with label day "(Mo)", no day-children → 0.12', () => {
+    const b = mkBranch('b1');
+    const a = mkActivity('a1', 'b1', 'b1', { label: 'Running (Mo)' });
+    b.children = ['a1'];
+    setUp([b, a]);
+    _state.setActiveDayFilter('unscheduled');
+    expect(getDayFilterOpacity('a1')).toBe(0.12);
   });
 
   test('activity with day-child → 0.12', () => {

@@ -5998,6 +5998,39 @@ function createDayChild(parentId, dayIndex) {
   return id;
 }
 
+// Replaces the day-schedule of an activity node: removes all existing day-children,
+// rewrites the label's day annotations, and creates fresh day-children for newDays.
+// newDays is a Set of dayIndex values (0–6). Caller must takeSnapshot() first.
+// keepAsChildren: if true, even a single remaining day is stored as a day-child
+// (used when the activity was already in multi-day children mode).
+function setActivityDays(nodeId, newDays, keepAsChildren = false) {
+  const node = findNode(nodeId);
+  if (!node || node.type !== 'activity' || node.dayChild) return;
+
+  const dayChildIds = (node.children || []).filter(id => findNode(id)?.dayChild);
+  tombstoneNodes(dayChildIds);
+  weekData.nodes = weekData.nodes.filter(n => !dayChildIds.includes(n.id));
+  node.children = node.children.filter(id => !dayChildIds.includes(id));
+  rebuildNodeMap();
+
+  const sortedDays = [...newDays].sort((a, b) => isoWeekPos(a) - isoWeekPos(b));
+  const useChildren = sortedDays.length >= 2 || (keepAsChildren && sortedDays.length === 1);
+
+  if (useChildren) {
+    // Multi-day: strip day annotation from label, days live as children
+    node.label = stripDayGroups(node.label || '').trim();
+    sortedDays.forEach(d => createDayChild(nodeId, d));
+  } else {
+    // 0 or 1 day: annotation in label only, no children
+    const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+    const baseLabel = stripDayGroups(node.label || '').trim();
+    node.label = sortedDays.length === 1
+      ? `${baseLabel} (${langLabels[sortedDays[0]]})`.trim()
+      : baseLabel;
+  }
+  touchNode(nodeId);
+}
+
 // ─── Agenda helpers ───────────────────────────────────────────────────────────
 
 // Maps JS getDay() value to ISO week position (Mon=1 … Sun=7)
@@ -6565,7 +6598,8 @@ function getDayFilterOpacity(nodeId) {
 
   if (d === 'unscheduled') {
     const hasCounter = (node.children || []).some(id => findNode(id)?.type === 'counter');
-    return (dayChildren.length === 0 && !hasCounter) ? 1 : 0.12;
+    const hasLabelDays = parseTodoDays(node.label || '').size > 0;
+    return (dayChildren.length === 0 && !hasCounter && !hasLabelDays) ? 1 : 0.12;
   }
 
   if (dayChildren.length > 0) {
@@ -6998,6 +7032,77 @@ window.addEventListener('keydown', (e) => {
       e.preventDefault();
       setStatus(id, node.unplanned ? 'planned' : 'unplanned');
     }
+  } else if (!e.metaKey && !e.ctrlKey && e.key >= '1' && e.key <= '8') {
+    const KEY_TO_DAY = { '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0 };
+
+    if (node.type === 'activity' && !node.dayChild) {
+      e.preventDefault();
+      const dayChildrenList = (node.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild);
+      const hasDayChildren = dayChildrenList.length > 0;
+      const currentDays = new Set([
+        ...dayChildrenList.map(c => c.dayIndex),
+        ...parseTodoDays(node.label || ''),
+      ]);
+      if (e.key === '8') {
+        if (currentDays.size === 0) return;
+        takeSnapshot();
+        setActivityDays(id, new Set());
+      } else {
+        const dayIndex = KEY_TO_DAY[e.key];
+        let newDays;
+        if (hasDayChildren) {
+          // Multi-day children mode: checkbox toggle, keep as children
+          newDays = new Set(currentDays);
+          if (newDays.has(dayIndex)) newDays.delete(dayIndex);
+          else newDays.add(dayIndex);
+          takeSnapshot();
+          setActivityDays(id, newDays, true);
+        } else {
+          // Single-day label mode: radio (replace or toggle off)
+          newDays = currentDays.has(dayIndex) ? new Set() : new Set([dayIndex]);
+          takeSnapshot();
+          setActivityDays(id, newDays);
+        }
+      }
+      saveWeek(currentWeekKey, weekData);
+      render();
+
+    } else if (node.dayChild) {
+      e.preventDefault();
+      const parent = findNode(node.parent);
+      if (!parent || parent.type !== 'activity') return;
+      const currentDays = new Set(
+        (parent.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild).map(c => c.dayIndex)
+      );
+      if (e.key === '8') {
+        takeSnapshot();
+        setActivityDays(parent.id, new Set());
+        saveWeek(currentWeekKey, weekData);
+        render();
+      } else {
+        const newDayIndex = KEY_TO_DAY[e.key];
+        if (node.dayIndex === newDayIndex) {
+          // toggle off; remaining days stay as children
+          const newDays = new Set(currentDays);
+          newDays.delete(newDayIndex);
+          takeSnapshot();
+          setActivityDays(parent.id, newDays, newDays.size > 0);
+          saveWeek(currentWeekKey, weekData);
+          render();
+        } else if (!currentDays.has(newDayIndex)) {
+          // reassign, no collision; always keep as children
+          const newDays = new Set(currentDays);
+          newDays.delete(node.dayIndex);
+          newDays.add(newDayIndex);
+          takeSnapshot();
+          setActivityDays(parent.id, newDays, true);
+          saveWeek(currentWeekKey, weekData);
+          render();
+        }
+        // collision (newDayIndex already exists): no-op
+      }
+    }
+    // branch, center, counter: no-op
   }
 });
 
