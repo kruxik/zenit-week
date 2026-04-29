@@ -2337,6 +2337,7 @@
   <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.transferUnfinished">Transfer Unfinished</span></div>
   <div class="ctx-item" id="ctx-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> <span data-i18n="menu.transferReusable">Transfer Reusable</span></div>
   <div class="ctx-item" id="ctx-set-baseline"><svg class="icon" aria-hidden="true"><use href="#icon-battery-2"/></svg> <span data-i18n="menu.setBaseline">Set Effort Baseline</span></div>
+  <div class="ctx-item" id="ctx-clear-day-filter"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed"/></svg> <span data-i18n="menu.clearDayFilter">Clear Day Filter</span></div>
   <div class="ctx-separator" id="ctx-sep-transfer"></div>
   <div class="ctx-item danger" id="ctx-clear-week"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.clearWeek">Clear the Week</span></div>
   <div class="ctx-item" id="ctx-done"><svg class="icon" aria-hidden="true"><use href="#icon-circle-check"/></svg> <span data-i18n="menu.done">Done</span></div>
@@ -7268,6 +7269,7 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-transfer-reusable').style.display  = isCenter ? '' : 'none';
   document.getElementById('ctx-clear-week').style.display         = isCenter ? '' : 'none';
   document.getElementById('ctx-set-baseline').style.display       = isCenter ? '' : 'none';
+  document.getElementById('ctx-clear-day-filter').style.display   = (isCenter && activeDayFilter !== null) ? '' : 'none';
   document.getElementById('ctx-sep-transfer').style.display       = isCenter ? '' : 'none';
 
   // Show/hide items depending on node type and status
@@ -7517,6 +7519,12 @@ bpInput.addEventListener('keydown', (e) => {
 
 document.addEventListener('pointerdown', (e) => {
   if (bpPanel.classList.contains('visible') && !bpPanel.contains(e.target)) closeBaselinePanel();
+});
+
+document.getElementById('ctx-clear-day-filter').addEventListener('click', () => {
+  activeDayFilter = null;
+  applyFilters();
+  hideContextMenu();
 });
 
 document.getElementById('ctx-set-baseline').addEventListener('click', () => {
