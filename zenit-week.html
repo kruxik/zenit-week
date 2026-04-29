@@ -1876,7 +1876,7 @@
   /* Placeholder Panel (Expandable Drawer) */
   #placeholder-panel {
     position: fixed;
-    bottom: 76px;
+    top: 76px;
     left: 50%;
     transform: translateX(-50%);
     width: auto;
@@ -1902,7 +1902,7 @@
   }
 
   #placeholder-panel.expanded {
-    max-height: 200px;
+    max-height: 400px;
     border-radius: 16px;
     padding: 16px 14px;
     overflow: visible; /* Ensure chevron stays visible when expanded */
@@ -1924,7 +1924,7 @@
 
   #summary-chevron {
     position: absolute;
-    top: 0;
+    top: 100%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 24px;
@@ -2316,13 +2316,13 @@
       <g id="map-root"></g>
     </svg>
     <div id="placeholder-panel">
-      <div id="summary-chevron"><svg class="icon" aria-hidden="true"><use href="#icon-caret-up"/></svg></div>
       <div id="summary-header">
         <span id="summary-main">Activities Done: 0 (0 %) / 0 😀</span>
       </div>
       <div id="summary-details">
         <div id="ratio-bar"></div>
       </div>
+      <div id="summary-chevron"><svg class="icon" aria-hidden="true"><use href="#icon-caret-down"/></svg></div>
     </div>
   </div>
   <div id="agenda-view">
