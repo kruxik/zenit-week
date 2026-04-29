@@ -364,6 +364,7 @@
     border-radius: 8px;
     width: 44px;
     height: 44px;
+    padding: 3px;
     cursor: pointer;
     font-size: 20px;
     display: flex;
@@ -375,13 +376,34 @@
   }
 
   .nav-btn:hover {
-    background: var(--bg-hover);
     color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
-  .nav-btn.active {
+
+  /* Inner-inset hover and active effect */
+  .nav-btn:hover::before, .nav-btn.active::before {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px; right: 3px; bottom: 3px;
+    border-radius: 5px;
+    z-index: -1;
+  }
+
+  .nav-btn:hover::before {
+    background: var(--bg-hover);
+  }
+
+  .nav-btn.active::before {
     background: var(--view-btn-active-bg);
+  }
+
+  .nav-btn.active {
     color: var(--view-btn-active-text);
+  }
+
+  .nav-btn {
+    position: relative;
+    z-index: 1;
   }
   .nav-btn .icon, #sync-btn .icon {
     vertical-align: middle;
@@ -705,12 +727,22 @@
     box-shadow: 0 2px 8px var(--shadow-md);
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     white-space: nowrap;
+    position: relative;
+    z-index: 1;
   }
 
   #sync-btn:hover {
-    background: var(--bg-hover);
     color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
+  }
+
+  #sync-btn:hover::before {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px; right: 3px; bottom: 3px;
+    background: var(--bg-hover);
+    border-radius: 5px;
+    z-index: -1;
   }
 
   #sync-dot {
@@ -1360,12 +1392,23 @@
     user-select: none;
   }
   #help-fab:hover {
-    background: var(--bg-hover);
     color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
-  #help-fab.active {
+  #help-fab:hover::before, #help-fab.active::before {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px; right: 3px; bottom: 3px;
+    border-radius: 5px;
+    z-index: -1;
+  }
+  #help-fab:hover::before {
+    background: var(--bg-hover);
+  }
+  #help-fab.active::before {
     background: var(--view-btn-active-bg);
+  }
+  #help-fab.active {
     color: var(--view-btn-active-text);
   }
 
