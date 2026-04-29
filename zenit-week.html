@@ -1337,27 +1337,26 @@
     right: 12px;
     width: 44px;
     height: 44px;
-    background: var(--glass-bg);
+    background: var(--view-bar-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    color: var(--text-button);
-    border: 1.5px solid var(--border-subtle);
-    border-radius: 50%;
+    color: var(--text-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
     font-size: 20px;
     cursor: pointer;
-    box-shadow: 0 2px 8px var(--shadow-sm);
+    box-shadow: 0 2px 8px var(--shadow-md);
     z-index: 1000;
-    transition: transform 0.2s, background 0.2s, box-shadow 0.2s, border-color 0.2s;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    user-select: none;
   }
   #help-fab:hover {
-    transform: scale(1.1);
-    background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end));
-    border-color: var(--border-hover);
-    box-shadow: 0 4px 14px var(--shadow-md);
+    background: var(--bg-hover);
+    color: var(--text-dim);
+    box-shadow: 0 4px 12px var(--shadow-md);
   }
 
   /* ─── View Toggle Bar ────────────────────────────────────────────────────── */
