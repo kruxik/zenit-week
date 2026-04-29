@@ -379,6 +379,11 @@
     transform: translateY(-1px);
     box-shadow: 0 4px 10px var(--shadow-md);
   }
+  .nav-btn.active {
+    background: var(--view-btn-active-bg);
+    color: var(--view-btn-active-text);
+  }
+  .nav-btn:focus { outline: none; }
 
   #zoom-slider-header {
     display: flex;
@@ -6943,6 +6948,8 @@ window.addEventListener('keydown', (e) => {
     }
     if (settings && settings.classList.contains('visible')) {
       settings.classList.remove('visible');
+      const sBtn = document.getElementById('settings-btn');
+      if (sBtn) sBtn.classList.remove('active');
       return;
     }
     const helpPanel = document.getElementById('help-panel');
@@ -8774,12 +8781,14 @@ const settingsDropdown = document.getElementById('settings-dropdown');
 
 settingsBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  settingsDropdown.classList.toggle('visible');
+  const isVisible = settingsDropdown.classList.toggle('visible');
+  settingsBtn.classList.toggle('active', isVisible);
 });
 
 document.addEventListener('click', (e) => {
   if (!settingsDropdown.contains(e.target) && e.target !== settingsBtn) {
     settingsDropdown.classList.remove('visible');
+    settingsBtn.classList.remove('active');
   }
 });
 
