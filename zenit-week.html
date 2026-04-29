@@ -9036,9 +9036,14 @@ window.addEventListener('load', () => {
   const helpClose = document.getElementById('help-close');
 
   helpFab.addEventListener('click', () => {
-    helpOverlay.classList.add('visible');
-    helpPanel.classList.add('visible');
-    helpFab.classList.add('active');
+    const isVisible = helpPanel.classList.contains('visible');
+    if (isVisible) {
+      doCloseHelp();
+    } else {
+      helpOverlay.classList.add('visible');
+      helpPanel.classList.add('visible');
+      helpFab.classList.add('active');
+    }
   });
 
   const doCloseHelp = () => {
