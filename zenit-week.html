@@ -1385,8 +1385,28 @@
     border-radius: 8px;
     box-shadow: 0 2px 8px var(--shadow-md);
     padding: 3px;
-    z-index: 1001;
+    z-index: 2500; /* Above Agenda/Help panels (2000) */
     user-select: none;
+  }
+
+  /* ─── Agenda Overlay (Blur) ──────────────────────────────────────────────── */
+  #agenda-overlay {
+    position: fixed;
+    top: 56px; /* Below toolbar */
+    left: 0;
+    width: 100%;
+    height: calc(100% - 56px);
+    background: var(--overlay-sm);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    z-index: 950; /* Above canvas, below Agenda panel */
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #agenda-overlay.visible {
+    display: flex;
+    opacity: 1;
   }
 
   .view-toggle-btn {
@@ -2488,6 +2508,7 @@
 <div id="help-fab" data-i18n-title="help.fab" title="Help & Hotkeys"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"/></svg></div>
 
 <div id="help-overlay"></div>
+<div id="agenda-overlay"></div>
 
 <div id="help-panel">
   <div id="help-header">
@@ -8154,6 +8175,7 @@ function switchView(view) {
   localStorage.setItem('zenit-week-view', view);
   const canvasEl  = document.getElementById('canvas-container');
   const agendaEl  = document.getElementById('agenda-view');
+  const overlayEl = document.getElementById('agenda-overlay');
   const btnMM     = document.getElementById('vtb-mindmap');
   const btnAG     = document.getElementById('vtb-agenda');
   const isDesktop = window.innerWidth >= 768;
@@ -8161,6 +8183,7 @@ function switchView(view) {
   if (view === 'agenda') {
     canvasEl.style.display = isDesktop ? '' : 'none';
     agendaEl.classList.add('active');
+    if (overlayEl) overlayEl.classList.toggle('visible', isDesktop);
     btnMM.classList.remove('active');
     btnAG.classList.add('active');
     renderAgenda();
@@ -8168,6 +8191,7 @@ function switchView(view) {
   } else {
     canvasEl.style.display = '';
     agendaEl.classList.remove('active');
+    if (overlayEl) overlayEl.classList.remove('visible');
     btnMM.classList.add('active');
     btnAG.classList.remove('active');
     render();
@@ -8178,12 +8202,17 @@ function switchView(view) {
 window.addEventListener('resize', () => {
   if (currentView === 'agenda') {
     const canvasEl = document.getElementById('canvas-container');
+    const overlayEl = document.getElementById('agenda-overlay');
     const isDesktop = window.innerWidth >= 768;
-    const currentDisplay = canvasEl.style.display;
+    
     const targetDisplay = isDesktop ? '' : 'none';
-    if (currentDisplay !== targetDisplay) {
+    if (canvasEl.style.display !== targetDisplay) {
       canvasEl.style.display = targetDisplay;
       if (isDesktop) render();
+    }
+    
+    if (overlayEl) {
+      overlayEl.classList.toggle('visible', isDesktop);
     }
   }
 });
@@ -8990,6 +9019,14 @@ window.addEventListener('load', () => {
 
   helpClose.addEventListener('click', doCloseHelp);
   helpOverlay.addEventListener('click', doCloseHelp);
+
+  // Agenda overlay click to close
+  const agendaOverlay = document.getElementById('agenda-overlay');
+  if (agendaOverlay) {
+    agendaOverlay.addEventListener('click', () => {
+      if (currentView === 'agenda') switchView('mindmap');
+    });
+  }
 
   // Expandable summary panel
   const summaryPanel = document.getElementById('placeholder-panel');
