@@ -543,7 +543,7 @@
     top: 0;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: 52px;
     overflow: hidden;
     cursor: grab;
     touch-action: none;
@@ -1421,7 +1421,7 @@
   /* Help System */
   #today-fab {
     position: fixed;
-    bottom: 24px;
+    bottom: 76px;
     left: 24px;
     width: 44px;
     height: 44px;
@@ -1453,7 +1453,7 @@
 
   #help-fab {
     position: fixed;
-    bottom: 24px;
+    bottom: 76px;
     right: 24px;
     width: 44px;
     height: 44px;
@@ -1482,6 +1482,154 @@
   @media (max-width: 520px) {
     #help-fab { right: 12px; }
   }
+
+  /* ─── View Toggle Bar ────────────────────────────────────────────────────── */
+  #view-toggle-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    display: flex;
+    align-items: stretch;
+    background: var(--view-bar-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-top: 1px solid var(--border-default);
+    z-index: 1001;
+  }
+
+  .view-toggle-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--text-muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+  }
+
+  .view-toggle-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .view-toggle-btn.active {
+    color: var(--accent-primary);
+    background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  }
+
+  .view-toggle-separator {
+    width: 1px;
+    background: var(--border-default);
+    margin: 12px 0;
+    flex-shrink: 0;
+  }
+
+  /* ─── Agenda View ────────────────────────────────────────────────────────── */
+  #agenda-view {
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 52px;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-page);
+  }
+
+  #agenda-view.active {
+    display: flex;
+  }
+
+  #agenda-day-strip {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+  #agenda-day-strip::-webkit-scrollbar { display: none; }
+
+  .agenda-tab {
+    flex-shrink: 0;
+    padding: 0 16px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+    position: relative;
+    top: 1px; /* sit on border-bottom */
+  }
+
+  .agenda-tab:hover { color: var(--text-primary); }
+
+  .agenda-tab.active {
+    color: var(--accent-primary);
+    border-bottom-color: var(--accent-primary);
+  }
+
+  .agenda-overdue-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--accent-danger);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .agenda-overdue-badge:empty { display: none; }
+
+  #agenda-tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  .agenda-item-list {
+    padding: 0 16px;
+  }
+
+  .agenda-item {
+    cursor: default;
+  }
+
+  .agenda-priority-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+  }
+
+  .agenda-priority-icon.high     { color: var(--accent-warning-text); }
+  .agenda-priority-icon.critical { color: var(--accent-danger); }
 
   #help-overlay {
     position: fixed;
@@ -1805,7 +1953,7 @@
   /* Placeholder Panel (Expandable Drawer) */
   #placeholder-panel {
     position: fixed;
-    bottom: 24px;
+    bottom: 76px;
     left: 50%;
     transform: translateX(-50%);
     width: auto;
@@ -2252,6 +2400,10 @@
       </div>
     </div>
   </div>
+  <div id="agenda-view">
+    <div id="agenda-day-strip"></div>
+    <div id="agenda-tab-content"></div>
+  </div>
 </div>
 
 <div id="view-level-toast"></div>
@@ -2345,6 +2497,12 @@
       <button class="reset-btn danger" id="import-confirm-ok" data-i18n="settings.importConfirmOk">Yes, import</button>
     </div>
   </div>
+</div>
+
+<div id="view-toggle-bar">
+  <button class="view-toggle-btn active" id="vtb-mindmap" data-i18n="view.mindmap">Mindmap</button>
+  <div class="view-toggle-separator"></div>
+  <button class="view-toggle-btn" id="vtb-agenda" data-i18n="view.agenda">Agenda</button>
 </div>
 
 <div id="today-fab" data-i18n-title="toolbar.todo" title="Today's Activities"><svg class="icon" aria-hidden="true"><use href="#icon-rosette-discount-check"/></svg></div>
@@ -2550,6 +2708,7 @@ function _applySnapshot(raw) {
   }
 
   render();
+  if (currentView === 'agenda') renderAgenda();
   window.dispatchEvent(new CustomEvent('snapshotApplied'));
 }
 
@@ -4096,6 +4255,11 @@ let dragState = {
 let pendingDrag = null; // { id, startX, startY } — drag not yet activated
 
 // ─── Week utilities ───────────────────────────────────────────────────────────
+// Return 'YYYY-MM-DD' using the LOCAL calendar date of `date`
+function localDateStr(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
 function getISOWeek(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
@@ -4150,6 +4314,12 @@ const TRANSLATIONS = {
     'settings.importError':       'Invalid file — could not import.',
     'settings.autoLayout':        'Auto layout',
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
+    'view.mindmap':               'Mindmap',
+    'view.agenda':                'Agenda',
+    'agenda.overdue':             'Overdue',
+    'agenda.emptyDay':            'No tasks for this day.',
+    'agenda.emptyOverdue':        'No overdue tasks.',
+    'agenda.anyDay':              'Any day',
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
     'view.rocks':                 'Rocks',
@@ -4246,6 +4416,12 @@ const TRANSLATIONS = {
     'settings.importError':       'Neplatný soubor — import se nezdařil.',
     'settings.autoLayout':        'Automatické rozvržení',
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
+    'view.mindmap':               'Mindmap',
+    'view.agenda':                'Agenda',
+    'agenda.overdue':             'Zpožděné',
+    'agenda.emptyDay':            'Pro tento den žádné úkoly.',
+    'agenda.emptyOverdue':        'Žádné zpožděné úkoly.',
+    'agenda.anyDay':              'Kdykoli',
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
     'view.rocks':                 'Kameny',
@@ -5270,7 +5446,8 @@ function setStatus(id, status) {
         if (child.type === 'counter') {
           child.val = child.max;
         }
-        child.doneAt = new Date().toISOString();
+        child.doneAt  = new Date().toISOString();
+        child.donedOn = localDateStr();
         setDescendants(cid, 'done');
       } else if (newStatus === 'undone') {
         child.done = false;
@@ -5279,6 +5456,7 @@ function setStatus(id, status) {
           child.ticks = [];
         }
         delete child.doneAt;
+        delete child.donedOn;
         setDescendants(cid, 'undone');
       } else if (newStatus === 'unplanned') {
         child.unplanned = true;
@@ -5308,8 +5486,9 @@ function setStatus(id, status) {
   let fullRenderNeeded = false;
 
   if (status === 'done') {
-    node.done = true;
-    node.doneAt = new Date().toISOString();
+    node.done    = true;
+    node.doneAt  = new Date().toISOString();
+    node.donedOn = localDateStr();
     if (node.type === 'counter') node.val = node.max;
     touchNode(id);
     setDescendants(id, 'done');
@@ -5317,6 +5496,7 @@ function setStatus(id, status) {
   } else if (status === 'undone') {
     node.done = false;
     delete node.doneAt;
+    delete node.donedOn;
     if (node.type === 'counter') node.val = Math.max(0, (node.val || 0) - 1);
     touchNode(id);
     setDescendants(id, 'undone');
@@ -5913,6 +6093,107 @@ function createDayChild(parentId, dayIndex) {
   return id;
 }
 
+// ─── Agenda helpers ───────────────────────────────────────────────────────────
+
+// Maps JS getDay() value to ISO week position (Mon=1 … Sun=7)
+function isoWeekPos(dayIndex) {
+  return dayIndex === 0 ? 7 : dayIndex;
+}
+
+// Re-sorts a node's children by ISO week order (non-day first, then Mon–Sun, null last)
+function sortDayChildren(node) {
+  node.children.sort((aId, bId) => {
+    const a = findNode(aId), b = findNode(bId);
+    const ka = !a?.dayChild ? -1 : (a.dayIndex === 0 ? 7 : (a.dayIndex ?? 8));
+    const kb = !b?.dayChild ? -1 : (b.dayIndex === 0 ? 7 : (b.dayIndex ?? 8));
+    return ka - kb;
+  });
+}
+
+// Returns true when an activity has no day-child leaves (single-day hint case)
+function _hasNoDayLeaves(node) {
+  return !(node.children || []).some(id => findNode(id)?.dayChild);
+}
+
+// All day-leaf nodes for a given dayIndex (both done and pending).
+// Also includes single-day annotated activities that have no day-leaf children.
+function getAgendaItems(dayIndex) {
+  return weekData.nodes.filter(n => {
+    if (n.type !== 'activity') return false;
+    // Multi-day parent leaf
+    if (n.dayChild && n.dayIndex === dayIndex) return true;
+    // Single-day annotated activity with no day-leaf children
+    if (!n.dayChild && _hasNoDayLeaves(n)) {
+      const days = parseTodoDays(n.label || '');
+      return days.has(dayIndex);
+    }
+    return false;
+  });
+}
+
+// Undone day-leaf nodes (or single-day annotated activities) whose ISO-week
+// position is before today's (current week only).
+// today is optional — defaults to new Date() for production; pass a Date in tests
+function getOverdueItems(today = new Date()) {
+  const todayPos = isoWeekPos(today.getDay());
+  return weekData.nodes.filter(n => {
+    if (n.type !== 'activity' || n.done) return false;
+    if (n.dayChild) {
+      return n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos;
+    }
+    // Single-day annotated activity with no day-leaf children
+    if (_hasNoDayLeaves(n)) {
+      const days = parseTodoDays(n.label || '');
+      if (days.size === 0) return false;
+      return [...days].some(d => isoWeekPos(d) < todayPos);
+    }
+    return false;
+  });
+}
+
+// Activity nodes that have a counter child but no dayChild children
+function getAnyDayItems() {
+  return weekData.nodes.filter(n => {
+    if (n.type !== 'activity' || n.dayChild) return false;
+    const hasDayChildren = n.children.some(id => findNode(id)?.dayChild);
+    const hasCounter     = n.children.some(id => findNode(id)?.type === 'counter');
+    return hasCounter && !hasDayChildren;
+  });
+}
+
+// Returns the "YYYY-MM-DD" calendar date for a given JS dayIndex (0=Sun…6=Sat)
+// within the currently loaded week. Returns a local-date string 'YYYY-MM-DD'
+// using local-time date components so it matches donedOn (also local date).
+function tabDateString(dayIndex) {
+  const { year, week } = parseWeekKey(currentWeekKey);
+  const { monday } = getWeekBounds(year, week);
+  const offset = dayIndex === 0 ? 6 : dayIndex - 1; // Mon=0 … Sun=6
+  const d = new Date(monday);
+  d.setUTCDate(monday.getUTCDate() + offset);
+  return localDateStr(d);
+}
+
+// Move a day-leaf to newDayIndex; returns false if sibling conflict or same day
+function rescheduleNode(nodeId, newDayIndex) {
+  const node = findNode(nodeId);
+  if (!node?.dayChild) return false;
+  const parent = findNode(node.parent);
+  if (!parent) return false;
+  if (node.dayIndex === newDayIndex) return false;
+  const siblings = parent.children.map(id => findNode(id)).filter(n => n?.dayChild);
+  if (siblings.some(n => n.id !== nodeId && n.dayIndex === newDayIndex)) return false;
+  takeSnapshot();
+  const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+  node.dayIndex = newDayIndex;
+  node.label    = langLabels[newDayIndex];
+  node._ts      = Date.now();
+  sortDayChildren(parent);
+  saveWeek(currentWeekKey, weekData);
+  render();
+  renderAgenda();
+  return true;
+}
+
 function startAddNode(parentId) {
   const parent = findNode(parentId);
   if (!parent) return;
@@ -6032,13 +6313,7 @@ function commitEdit(followUp = 'auto') {
         parsedDays.forEach(dayIndex => {
           if (!existingDayIndices.has(dayIndex)) createDayChild(nodeId, dayIndex);
         });
-        // Sort day-children in ISO week order (Mon first, Sun last)
-        node.children.sort((aId, bId) => {
-          const a = findNode(aId), b = findNode(bId);
-          const ka = !a?.dayChild ? -1 : (a.dayIndex === 0 ? 7 : (a.dayIndex ?? 8));
-          const kb = !b?.dayChild ? -1 : (b.dayIndex === 0 ? 7 : (b.dayIndex ?? 8));
-          return ka - kb;
-        });
+        sortDayChildren(node);
         // Remove any counter child (day replaces counter — should not coexist)
         const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
         if (counterNode) {
@@ -6239,8 +6514,8 @@ function syncStatusUp(nodeId, prop) {
       parent[prop] = allTrue;
       touchNode(parent.id);
       if (prop === 'done') {
-        if (allTrue) parent.doneAt = new Date().toISOString();
-        else delete parent.doneAt;
+        if (allTrue) { parent.doneAt = new Date().toISOString(); parent.donedOn = localDateStr(); }
+        else { delete parent.doneAt; delete parent.donedOn; }
         updateNodeUI(parent.id);
       } else if (prop === 'unplanned') {
         if (allTrue) parent.unplannedAt = new Date().toISOString();
@@ -6583,7 +6858,21 @@ function render() {
 window.addEventListener('keydown', (e) => {
   if (editState) return; // Don't interfere with inline editing
 
+  // View toggle shortcuts — active unless typing in an input
+  if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'a') {
+    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      if (currentView !== 'agenda') { e.preventDefault(); switchView('agenda'); }
+      return;
+    }
+  }
+
   if (e.key === 'Escape') {
+    // Agenda view: Esc returns to Mindmap
+    if (currentView === 'agenda') {
+      switchView('mindmap');
+      return;
+    }
+
     const settings = document.getElementById('settings-dropdown');
     const help = document.getElementById('help-overlay');
     const status = document.getElementById('placeholder-panel');
@@ -6627,6 +6916,8 @@ window.addEventListener('keydown', (e) => {
     redo();
     return;
   }
+
+  if (currentView === 'agenda') return; // Agenda handles its own shortcuts
 
   if (!hoveredNodeId) return;
 
@@ -7211,6 +7502,238 @@ const container = document.getElementById('canvas-container');
 const mapRoot   = document.getElementById('map-root');
 
 const isMobile = navigator.maxTouchPoints > 0;
+
+// ─── View state ───────────────────────────────────────────────────────────────
+let currentView = localStorage.getItem('zenit-week-view') || 'mindmap';
+
+// 'overdue' | 0–6 (dayIndex). null = uninitialised, defaults to today on first open.
+let agendaActiveTab = null;
+let hoveredAgendaNode = null;
+
+// ISO week day-tab order: Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
+const AGENDA_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+function renderAgendaStrip() {
+  const strip = document.getElementById('agenda-day-strip');
+  strip.innerHTML = '';
+
+  const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+  const overdueCount = getOverdueItems().length;
+
+  // Overdue tab
+  const overdueBtn = document.createElement('button');
+  overdueBtn.className = 'agenda-tab' + (agendaActiveTab === 'overdue' ? ' active' : '');
+  overdueBtn.dataset.tab = 'overdue';
+  const overdueLabel = document.createTextNode(t('agenda.overdue'));
+  overdueBtn.appendChild(overdueLabel);
+  if (overdueCount > 0) {
+    const badge = document.createElement('span');
+    badge.className = 'agenda-overdue-badge';
+    badge.textContent = String(overdueCount);
+    overdueBtn.appendChild(badge);
+  }
+  overdueBtn.addEventListener('click', () => { agendaActiveTab = 'overdue'; renderAgenda(); });
+  strip.appendChild(overdueBtn);
+
+  // Day tabs in ISO week order
+  AGENDA_DAY_ORDER.forEach(dayIdx => {
+    const btn = document.createElement('button');
+    btn.className = 'agenda-tab' + (agendaActiveTab === dayIdx ? ' active' : '');
+    btn.dataset.tab = String(dayIdx);
+    btn.textContent = langLabels[dayIdx];
+    btn.addEventListener('click', () => { agendaActiveTab = dayIdx; renderAgenda(); });
+    strip.appendChild(btn);
+
+    // Scroll active tab into view
+    if (agendaActiveTab === dayIdx) {
+      requestAnimationFrame(() => btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }));
+    }
+  });
+}
+
+function buildAgendaItem(node, label) {
+  const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
+
+  const item = document.createElement('div');
+  item.className = 'daily-log-item agenda-item';
+  item.dataset.nodeId = node.id;
+
+  // Branch dot
+  const dot = document.createElement('div');
+  dot.className = 'daily-log-branch-dot';
+  dot.style.background = branchColor;
+  item.appendChild(dot);
+
+  // Priority icon (no user data — priority is a controlled enum)
+  if (node.priority === 'high' || node.priority === 'critical') {
+    const prioEl = document.createElement('span');
+    prioEl.className = 'agenda-priority-icon ' + node.priority;
+    prioEl.innerHTML = iconSvg(node.priority === 'high' ? 'alert-circle' : 'flame');
+    item.appendChild(prioEl);
+  }
+
+  // Label (user data — use textContent)
+  const labelEl = document.createElement('div');
+  labelEl.className = 'daily-log-label';
+  if (node.done) labelEl.style.opacity = '0.5';
+  labelEl.textContent = label || t('todo.noLabel');
+  item.appendChild(labelEl);
+
+  // Unplanned badge (no user data)
+  if (node.unplanned) {
+    const bolt = document.createElement('span');
+    bolt.className = 'daily-log-badge unplanned';
+    bolt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;';
+    bolt.innerHTML = iconSvg('bolt');
+    item.appendChild(bolt);
+  }
+
+  // Done / Undone button
+  const btn = document.createElement('button');
+  btn.className = 'reset-btn';
+  btn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
+  if (node.done) {
+    btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
+    btn.addEventListener('click', () => { setStatus(node.id, 'undone'); renderAgenda(); });
+  } else {
+    btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
+    btn.addEventListener('click', () => { setStatus(node.id, 'done'); renderAgenda(); });
+  }
+  item.appendChild(btn);
+
+  item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
+  item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
+
+  return item;
+}
+
+function renderAgendaTabContent() {
+  const content = document.getElementById('agenda-tab-content');
+  content.innerHTML = '';
+  hoveredAgendaNode = null;
+
+  const isOverdue = agendaActiveTab === 'overdue';
+
+  let items, labelFn;
+  if (isOverdue) {
+    items = getOverdueItems();
+    labelFn = n => {
+      if (n.dayChild) {
+        const p = findNode(n.parent);
+        return p?.label ? `${p.label} · ${n.label}` : n.label;
+      }
+      // Single-day annotated activity: show "Label · Day"
+      const stripped = stripDayGroups(n.label) || n.label;
+      const days = parseTodoDays(n.label || '');
+      if (days.size > 0) {
+        const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+        const [dayIdx] = [...days];
+        return `${stripped} · ${langLabels[dayIdx]}`;
+      }
+      return stripped;
+    };
+  } else {
+    items = getAgendaItems(agendaActiveTab);
+    labelFn = n => {
+      if (n.dayChild) return findNode(n.parent)?.label || n.label;
+      // Single-day annotated activity: strip the day hint from the label
+      return stripDayGroups(n.label) || n.label;
+    };
+  }
+
+  // Pending: scheduled for this tab and not yet done
+  const pending = items.filter(n => !n.done);
+
+  // Done section (non-overdue tabs only).
+  // A done item belongs to the Done section of the day it was marked done,
+  // not the day it was scheduled. donedOn (local date string) is the primary
+  // comparison; doneAt UTC prefix is the fallback for older nodes.
+  // 1. scheduledDone — items scheduled for this tab, completed on this date
+  // 2. crossDayDone  — day-leaf / single-day-annotated nodes from OTHER tabs
+  // Parent nodes with day-leaf children are excluded from crossDayDone.
+  let scheduledDone = [];
+  let crossDayDone = [];
+  if (!isOverdue) {
+    const tabDate = tabDateString(agendaActiveTab);
+    const scheduledIds = new Set(items.map(n => n.id));
+    const doneOnTab = n => n.done && (n.donedOn === tabDate || n.doneAt?.startsWith(tabDate));
+    scheduledDone = items.filter(doneOnTab);
+    crossDayDone = weekData.nodes.filter(n =>
+      n.type === 'activity' &&
+      doneOnTab(n) &&
+      !scheduledIds.has(n.id) &&
+      (n.dayChild === true || (_hasNoDayLeaves(n) && parseTodoDays(n.label || '').size > 0))
+    );
+  }
+  const done = [...scheduledDone, ...crossDayDone];
+
+  // Label for done items
+  function doneLabelFor(n) {
+    if (n.dayChild) {
+      const p = findNode(n.parent);
+      return p?.label ? `${p.label} · ${n.label}` : n.label;
+    }
+    return stripDayGroups(n.label) || n.label;
+  }
+
+  if (pending.length === 0 && done.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'daily-log-empty';
+    empty.textContent = isOverdue ? t('agenda.emptyOverdue') : t('agenda.emptyDay');
+    content.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'agenda-item-list';
+  content.appendChild(list);
+
+  pending.forEach(n => list.appendChild(buildAgendaItem(n, labelFn(n))));
+
+  if (done.length > 0) {
+    if (pending.length > 0 && list.lastElementChild) {
+      list.lastElementChild.style.borderBottom = 'none';
+    }
+    const divider = document.createElement('div');
+    divider.className = 'today-done-divider';
+    divider.textContent = t('todo.done');
+    list.appendChild(divider);
+    scheduledDone.forEach(n => list.appendChild(buildAgendaItem(n, labelFn(n))));
+    crossDayDone.forEach(n => list.appendChild(buildAgendaItem(n, doneLabelFor(n))));
+  }
+}
+
+function renderAgenda() {
+  // Default active tab to today on first open
+  if (agendaActiveTab === null) {
+    agendaActiveTab = new Date().getDay(); // 0=Sun … 6=Sat; matches dayIndex
+  }
+  renderAgendaStrip();
+  renderAgendaTabContent();
+}
+
+function switchView(view) {
+  currentView = view;
+  localStorage.setItem('zenit-week-view', view);
+  const canvasEl  = document.getElementById('canvas-container');
+  const agendaEl  = document.getElementById('agenda-view');
+  const btnMM     = document.getElementById('vtb-mindmap');
+  const btnAG     = document.getElementById('vtb-agenda');
+  if (view === 'agenda') {
+    canvasEl.style.display = 'none';
+    agendaEl.classList.add('active');
+    btnMM.classList.remove('active');
+    btnAG.classList.add('active');
+    renderAgenda();
+  } else {
+    canvasEl.style.display = '';
+    agendaEl.classList.remove('active');
+    btnMM.classList.add('active');
+    btnAG.classList.remove('active');
+    render();
+  }
+}
+
 const ZOOM_MIN = isMobile ? 0.06 : 0.2;
 const ZOOM_MAX = isMobile ? 1.2 : 1.8;
 const ZOOM_DEFAULT = 0.6;
@@ -7961,6 +8484,11 @@ window.addEventListener('load', () => {
   loadAndRender(initialWeek);
   applyTranslations();
   updateColorDots();
+
+  // View toggle bar
+  document.getElementById('vtb-mindmap').addEventListener('click', () => switchView('mindmap'));
+  document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
+  switchView(currentView); // apply persisted view (renders canvas or agenda)
 
   // Position the default-zoom marker on the track
   const defaultMarker = document.getElementById('zoom-default-marker');

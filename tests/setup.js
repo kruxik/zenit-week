@@ -142,5 +142,14 @@ export const {
   commitEdit,
   migrateDayCounters,
   transferReusable,
+  // Agenda helpers
+  isoWeekPos,
+  sortDayChildren,
+  getAgendaItems,
+  getOverdueItems,
+  getAnyDayItems,
+  rescheduleNode,
+  localDateStr,
+  tabDateString,
   _state,
 } = sandbox;
