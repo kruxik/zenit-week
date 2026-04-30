@@ -6920,11 +6920,24 @@ function getDayFilterOpacity(nodeId) {
   if (type === 'center' || type === 'branch') return 1;
 
   const d = activeDayFilter;
+  const todayPos = isoWeekPos(new Date().getDay());
 
   // Counter nodes inherit from parent
   if (type === 'counter') {
     const parent = findNode(node.parent);
     return parent ? getDayFilterOpacity(parent.id) : 1;
+  }
+
+  function isOverdueMatch(n) {
+    if (n.type !== 'activity' || n.done) return false;
+    if (n.dayChild) {
+      return n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos;
+    }
+    if (_hasNoDayLeaves(n)) {
+      const days = parseTodoDays(n.label || '');
+      return [...days].some(dayIdx => isoWeekPos(dayIdx) < todayPos);
+    }
+    return false;
   }
 
   // Recursive check for activity/dayChild match in subtree
@@ -6933,11 +6946,12 @@ function getDayFilterOpacity(nodeId) {
     if (!n) return false;
 
     // 1. Direct match?
-    if (n.dayChild) {
+    if (d === 'overdue') {
+      if (isOverdueMatch(n)) return true;
+    } else if (n.dayChild) {
       if (d === 'unscheduled') return false;
       return n.dayIndex === d;
-    }
-    if (n.type === 'activity') {
+    } else if (n.type === 'activity') {
       if (d === 'unscheduled') {
         const children = (n.children || []).map(cid => findNode(cid));
         const hasDayChild = children.some(c => c?.dayChild);
@@ -7350,18 +7364,20 @@ window.addEventListener('keydown', (e) => {
   // Mindmap canvas hotkeys 1–8: toggle day filter
   if (currentView === 'mindmap' && !hoveredNodeId && !e.metaKey && !e.ctrlKey) {
     const inputFocused = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
-    if (!inputFocused && e.key >= '1' && e.key <= '8') {
+    if (!inputFocused && e.key >= '0' && e.key <= '8') {
       e.preventDefault();
-      const KEY_TO_DAY = { '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0, '8':'unscheduled' };
+      const KEY_TO_DAY = { '0':'overdue', '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0, '8':'unscheduled' };
       const newFilter = KEY_TO_DAY[e.key];
       if (activeDayFilter === newFilter) {
         activeDayFilter = null;
         showToast(t('filter.off'));
       } else {
         activeDayFilter = newFilter;
-        const filterName = newFilter === 'unscheduled'
-          ? t('filter.unscheduled')
-          : (DAY_FULL_NAMES[currentLang] || DAY_FULL_NAMES.en)[newFilter];
+        let filterName;
+        if (newFilter === 'unscheduled') filterName = t('filter.unscheduled');
+        else if (newFilter === 'overdue') filterName = t('agenda.overdue');
+        else filterName = (DAY_FULL_NAMES[currentLang] || DAY_FULL_NAMES.en)[newFilter];
+
         showToast(`${t('filter.prefix')}: ${filterName}`);
       }
       applyFilters();

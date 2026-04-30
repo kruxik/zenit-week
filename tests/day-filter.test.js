@@ -287,3 +287,53 @@ describe('getDayFilterOpacity — Branch Visibility', () => {
     expect(getDayFilterOpacity('me')).toBe(1); // Branch always 1
   });
 });
+
+// ─── Overdue filter ──────────────────────────────────────────────────────────
+
+describe('getDayFilterOpacity — overdue filter', () => {
+  let todayIdx, todayPos;
+
+  beforeEach(() => {
+    todayIdx = new Date().getDay();
+    todayPos = todayIdx === 0 ? 7 : todayIdx;
+  });
+
+  test('undone past day activity → 1', () => {
+    if (todayPos === 1) return; // Skip if it's Monday, no past days in current week
+
+    const pastDayIdx = todayIdx === 1 ? 0 : (todayIdx === 0 ? 6 : todayIdx - 1);
+    const b = mkBranch('b1');
+    const a = mkActivity('a1', 'b1', 'b1');
+    const dc = mkDayChild('dc1', 'a1', 'b1', pastDayIdx);
+    a.children = ['dc1'];
+    b.children = ['a1'];
+    setUp([b, a, dc]);
+    _state.setActiveDayFilter('overdue');
+    expect(getDayFilterOpacity('a1')).toBe(1);
+  });
+
+  test('undone today activity → 0.12', () => {
+    const b = mkBranch('b1');
+    const a = mkActivity('a1', 'b1', 'b1');
+    const dc = mkDayChild('dc1', 'a1', 'b1', todayIdx);
+    a.children = ['dc1'];
+    b.children = ['a1'];
+    setUp([b, a, dc]);
+    _state.setActiveDayFilter('overdue');
+    expect(getDayFilterOpacity('a1')).toBe(0.12);
+  });
+
+  test('undone future day activity → 0.12', () => {
+    if (todayPos === 7) return; // Skip if it's Sunday, no future days in current week
+
+    const futureDayIdx = todayIdx === 6 ? 0 : todayIdx + 1;
+    const b = mkBranch('b1');
+    const a = mkActivity('a1', 'b1', 'b1');
+    const dc = mkDayChild('dc1', 'a1', 'b1', futureDayIdx);
+    a.children = ['dc1'];
+    b.children = ['a1'];
+    setUp([b, a, dc]);
+    _state.setActiveDayFilter('overdue');
+    expect(getDayFilterOpacity('a1')).toBe(0.12);
+  });
+});

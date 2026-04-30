@@ -88,6 +88,7 @@ const sandbox = {
   requestAnimationFrame: () => {},
   setTimeout,
   clearTimeout,
+  Date,
   // Test state bridge — populated by the appended accessor snippet below
   _state: {},
 };
