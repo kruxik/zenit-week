@@ -8670,20 +8670,45 @@ function renderAgendaTabContent() {
       const handle = el.querySelector('.agenda-drag-handle');
       if (handle) {
         let touchSrcId = null;
+        let ghost = null;
+        let touchOffsetY = 0;
 
         handle.addEventListener('touchstart', (e) => {
           e.stopPropagation(); // suppress swipe gesture on the item
           touchSrcId = node.id;
-          requestAnimationFrame(() => el.classList.add('agenda-item-dragging'));
+          const touch = e.touches[0];
+          const rect = el.getBoundingClientRect();
+          touchOffsetY = touch.clientY - rect.top;
+
+          // Create floating ghost clone
+          ghost = el.cloneNode(true);
+          ghost.style.cssText = [
+            'position:fixed',
+            `top:${rect.top}px`,
+            `left:${rect.left}px`,
+            `width:${rect.width}px`,
+            'z-index:9999',
+            'pointer-events:none',
+            'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
+            'border-radius:6px',
+            'opacity:0.95',
+            'transition:none',
+          ].join(';');
+          document.body.appendChild(ghost);
+
+          el.classList.add('agenda-item-dragging');
         }, { passive: true });
 
         handle.addEventListener('touchmove', (e) => {
           if (!touchSrcId) return;
           e.preventDefault(); // lock scroll while dragging
           const touch = e.touches[0];
-          el.style.pointerEvents = 'none';
+
+          // Move ghost with finger
+          if (ghost) ghost.style.top = `${touch.clientY - touchOffsetY}px`;
+
+          // Find drop target (ghost has pointer-events:none so elementFromPoint skips it)
           const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
-          el.style.pointerEvents = '';
           list.querySelectorAll('.agenda-item').forEach(x =>
             x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
           if (targetEl && targetEl !== el) {
@@ -8695,13 +8720,12 @@ function renderAgendaTabContent() {
 
         const finishTouchDrag = (e) => {
           if (!touchSrcId) return;
+          if (ghost) { ghost.remove(); ghost = null; }
           el.classList.remove('agenda-item-dragging');
           list.querySelectorAll('.agenda-item').forEach(x =>
             x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
           const touch = e.changedTouches[0];
-          el.style.pointerEvents = 'none';
           const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
-          el.style.pointerEvents = '';
           if (targetEl && targetEl !== el && targetEl.dataset.nodeId) {
             const targetId = targetEl.dataset.nodeId;
             const rect = targetEl.getBoundingClientRect();
