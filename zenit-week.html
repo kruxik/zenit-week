@@ -8174,8 +8174,15 @@ function buildAgendaItem(node, label) {
   }
   item.appendChild(btn);
 
-  item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
-  item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
+  item.addEventListener('mouseenter', () => {
+    hoveredAgendaNode = node;
+    document.querySelectorAll('#agenda-tab-content .agenda-item').forEach(el => el.classList.remove('agenda-item-focused'));
+    item.classList.add('agenda-item-focused');
+  });
+  item.addEventListener('mouseleave', () => {
+    hoveredAgendaNode = null;
+    item.classList.remove('agenda-item-focused');
+  });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
   addSwipeGesture(item, node);
@@ -8228,8 +8235,15 @@ function buildAnyDayItem(node) {
     item.appendChild(undoneBtn);
   }
 
-  item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
-  item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
+  item.addEventListener('mouseenter', () => {
+    hoveredAgendaNode = node;
+    document.querySelectorAll('#agenda-tab-content .agenda-item').forEach(el => el.classList.remove('agenda-item-focused'));
+    item.classList.add('agenda-item-focused');
+  });
+  item.addEventListener('mouseleave', () => {
+    hoveredAgendaNode = null;
+    item.classList.remove('agenda-item-focused');
+  });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
   addSwipeGesture(item, node);
