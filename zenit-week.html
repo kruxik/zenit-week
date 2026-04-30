@@ -8240,6 +8240,7 @@ function addSwipeGesture(item, node) {
   let state = 'idle'; // 'idle' | 'pending' | 'swiping' | 'aborted'
 
   item.addEventListener('touchstart', e => {
+    if (e.target.closest('.agenda-drag-handle')) return; // handle owns this touch
     const t = e.touches[0];
     startX = t.clientX;
     startY = t.clientY;
@@ -8622,6 +8623,8 @@ function renderAgendaTabContent() {
     let dragSrcId = null;
     nodes.forEach(node => {
       const el = buildFn(node);
+
+      // ── Desktop HTML5 drag-and-drop ───────────────────────────────────────
       el.addEventListener('dragstart', (e) => {
         dragSrcId = node.id;
         e.dataTransfer.effectAllowed = 'move';
@@ -8662,6 +8665,68 @@ function renderAgendaTabContent() {
         saveAgendaGroupOrder(tabKey, groupKey, current);
         renderAgenda();
       });
+
+      // ── Mobile touch-drag via handle ──────────────────────────────────────
+      const handle = el.querySelector('.agenda-drag-handle');
+      if (handle) {
+        let touchSrcId = null;
+
+        handle.addEventListener('touchstart', (e) => {
+          e.stopPropagation(); // suppress swipe gesture on the item
+          touchSrcId = node.id;
+          requestAnimationFrame(() => el.classList.add('agenda-item-dragging'));
+        }, { passive: true });
+
+        handle.addEventListener('touchmove', (e) => {
+          if (!touchSrcId) return;
+          e.preventDefault(); // lock scroll while dragging
+          const touch = e.touches[0];
+          el.style.pointerEvents = 'none';
+          const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
+          el.style.pointerEvents = '';
+          list.querySelectorAll('.agenda-item').forEach(x =>
+            x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
+          if (targetEl && targetEl !== el) {
+            const rect = targetEl.getBoundingClientRect();
+            targetEl.classList.add(touch.clientY < rect.top + rect.height / 2
+              ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+          }
+        }, { passive: false });
+
+        const finishTouchDrag = (e) => {
+          if (!touchSrcId) return;
+          el.classList.remove('agenda-item-dragging');
+          list.querySelectorAll('.agenda-item').forEach(x =>
+            x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
+          const touch = e.changedTouches[0];
+          el.style.pointerEvents = 'none';
+          const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
+          el.style.pointerEvents = '';
+          if (targetEl && targetEl !== el && targetEl.dataset.nodeId) {
+            const targetId = targetEl.dataset.nodeId;
+            const rect = targetEl.getBoundingClientRect();
+            const before = touch.clientY < rect.top + rect.height / 2;
+            const current = loadAgendaGroupOrder(tabKey, groupKey);
+            const fromIdx = current.indexOf(touchSrcId);
+            if (fromIdx !== -1) {
+              current.splice(fromIdx, 1);
+              const toIdx = current.indexOf(targetId);
+              if (toIdx !== -1) {
+                current.splice(before ? toIdx : toIdx + 1, 0, touchSrcId);
+                saveAgendaGroupOrder(tabKey, groupKey, current);
+                touchSrcId = null;
+                renderAgenda();
+                return;
+              }
+            }
+          }
+          touchSrcId = null;
+        };
+
+        handle.addEventListener('touchend', finishTouchDrag);
+        handle.addEventListener('touchcancel', finishTouchDrag);
+      }
+
       list.appendChild(el);
     });
   }
