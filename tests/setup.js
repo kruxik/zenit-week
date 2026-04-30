@@ -157,5 +157,9 @@ export const {
   rescheduleNode,
   localDateStr,
   tabDateString,
+  // Agenda group ordering
+  loadAgendaGroupOrder,
+  saveAgendaGroupOrder,
+  applyAgendaOrder,
   _state,
 } = sandbox;

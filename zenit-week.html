@@ -1700,7 +1700,7 @@
 
   .agenda-item {
     cursor: default;
-    padding-left: 16px;
+    padding-left: 8px;
     padding-right: 16px;
   }
 
@@ -1708,6 +1708,24 @@
     background: var(--bg-hover);
     border-radius: 4px;
   }
+
+  .agenda-drag-handle {
+    flex-shrink: 0;
+    color: var(--text-placeholder);
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    font-size: 16px;
+    transition: color 0.15s;
+    opacity: 0;
+  }
+  .agenda-item:hover .agenda-drag-handle { opacity: 1; }
+  .agenda-drag-handle:active { cursor: grabbing; }
+
+  .agenda-item-dragging { opacity: 0.35; }
+  .agenda-item-drop-above { box-shadow: 0 -2px 0 0 var(--accent, #1ABCFE); }
+  .agenda-item-drop-below { box-shadow: 0 2px 0 0 var(--accent, #1ABCFE); }
 
   .agenda-priority-icon {
     flex-shrink: 0;
@@ -3688,8 +3706,9 @@ function mergeWeekData(local, remote) {
     const winnerSide = (remote.savedAt||0) >= (local.savedAt||0) ? remote : local;
     const loserSide  = (remote.savedAt||0) >= (local.savedAt||0) ? local  : remote;
     const mergedBaseline = winnerSide.baseline ?? loserSide.baseline;
-    // todoOrder: per-date arrays — winner's dates override loser's, loser fills any missing dates.
-    const mergedTodoOrder = { ...(loserSide.todoOrder || {}), ...(winnerSide.todoOrder || {}) };
+    // todoOrder / agendaOrder: per-key arrays — winner's keys override loser's, loser fills any missing keys.
+    const mergedTodoOrder   = { ...(loserSide.todoOrder   || {}), ...(winnerSide.todoOrder   || {}) };
+    const mergedAgendaOrder = { ...(loserSide.agendaOrder || {}), ...(winnerSide.agendaOrder || {}) };
     const merged = validateAndRepair({
       nodes: sorted,
       tombstones: Array.from(tombstones),
@@ -3697,6 +3716,7 @@ function mergeWeekData(local, remote) {
       crdtVersion: Math.max(local.crdtVersion||0, remote.crdtVersion||0) + 1,
       ...(mergedBaseline !== undefined && { baseline: mergedBaseline }),
       todoOrder: mergedTodoOrder,
+      agendaOrder: mergedAgendaOrder,
     });
 
     return migrateCrdt(merged);
@@ -6437,6 +6457,33 @@ function getAnyDayItems() {
   });
 }
 
+// ── Agenda group ordering ────────────────────────────────────────────────────
+
+function loadAgendaGroupOrder(tabKey, group) {
+  return (weekData.agendaOrder || {})[`${tabKey}-${group}`] || [];
+}
+
+function saveAgendaGroupOrder(tabKey, group, ids) {
+  if (!weekData.agendaOrder) weekData.agendaOrder = {};
+  weekData.agendaOrder[`${tabKey}-${group}`] = ids;
+  saveWeek(currentWeekKey, weekData);
+}
+
+// Apply saved order to a node list; append unknowns; prune stale IDs.
+// Returns a new array — does not mutate the input.
+function applyAgendaOrder(nodes, savedOrder) {
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const seen = new Set();
+  const result = [];
+  for (const id of savedOrder) {
+    if (byId.has(id) && !seen.has(id)) { result.push(byId.get(id)); seen.add(id); }
+  }
+  for (const n of nodes) {
+    if (!seen.has(n.id)) result.push(n);
+  }
+  return result;
+}
+
 // Returns the "YYYY-MM-DD" calendar date for a given JS dayIndex (0=Sun…6=Sat)
 // within the currently loaded week. Returns a local-date string 'YYYY-MM-DD'
 // using local-time date components so it matches donedOn (also local date).
@@ -8345,6 +8392,13 @@ function buildAgendaItem(node, label) {
   const item = document.createElement('div');
   item.className = 'daily-log-item agenda-item';
   item.dataset.nodeId = node.id;
+  item.draggable = true;
+
+  // Grip handle
+  const handle = document.createElement('div');
+  handle.className = 'agenda-drag-handle';
+  handle.innerHTML = iconSvg('grip-vertical');
+  item.appendChild(handle);
 
   // Branch dot
   const dot = document.createElement('div');
@@ -8411,6 +8465,13 @@ function buildAnyDayItem(node) {
   const item = document.createElement('div');
   item.className = 'daily-log-item agenda-item';
   item.dataset.nodeId = node.id;
+  item.draggable = true;
+
+  // Grip handle
+  const handle = document.createElement('div');
+  handle.className = 'agenda-drag-handle';
+  handle.innerHTML = iconSvg('grip-vertical');
+  item.appendChild(handle);
 
   const dot = document.createElement('div');
   dot.className = 'daily-log-branch-dot';
@@ -8542,25 +8603,88 @@ function renderAgendaTabContent() {
     return;
   }
 
+  const tabKey = isOverdue ? 'overdue' : agendaActiveTab;
+
   const list = document.createElement('div');
   list.className = 'agenda-item-list';
   content.appendChild(list);
 
-  pending.forEach(n => list.appendChild(buildAgendaItem(n, labelFn(n))));
+  // Apply saved order per group, then render with drag-and-drop wiring
+  const orderedPending  = applyAgendaOrder(pending,    loadAgendaGroupOrder(tabKey, 'pending'));
+  const orderedDone     = applyAgendaOrder(done,       loadAgendaGroupOrder(tabKey, 'done'));
+  const orderedAnyDay   = applyAgendaOrder(anyDayItems, loadAgendaGroupOrder(tabKey, 'anyday'));
 
-  if (done.length > 0) {
-    if (pending.length > 0 && list.lastElementChild) {
+  // Persist pruned/completed orders back
+  saveAgendaGroupOrder(tabKey, 'pending', orderedPending.map(n => n.id));
+  if (!isOverdue) saveAgendaGroupOrder(tabKey, 'done',    orderedDone.map(n => n.id));
+  if (!isOverdue) saveAgendaGroupOrder(tabKey, 'anyday',  orderedAnyDay.map(n => n.id));
+
+  function makeDragZone(nodes, groupKey, buildFn) {
+    let dragSrcId = null;
+    nodes.forEach(node => {
+      const el = buildFn(node);
+      el.addEventListener('dragstart', (e) => {
+        dragSrcId = node.id;
+        e.dataTransfer.effectAllowed = 'move';
+        requestAnimationFrame(() => el.classList.add('agenda-item-dragging'));
+      });
+      el.addEventListener('dragend', () => {
+        el.classList.remove('agenda-item-dragging');
+        list.querySelectorAll('.agenda-item').forEach(x => {
+          x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
+        });
+        dragSrcId = null;
+      });
+      el.addEventListener('dragover', (e) => {
+        if (!dragSrcId || dragSrcId === node.id) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const mid = el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2;
+        list.querySelectorAll('.agenda-item').forEach(x => {
+          x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
+        });
+        el.classList.add(e.clientY < mid ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+      });
+      el.addEventListener('dragleave', () => {
+        el.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
+      });
+      el.addEventListener('drop', (e) => {
+        if (!dragSrcId || dragSrcId === node.id) return;
+        e.preventDefault();
+        el.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
+        const before = e.clientY < el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2;
+        const current = loadAgendaGroupOrder(tabKey, groupKey);
+        const fromIdx = current.indexOf(dragSrcId);
+        if (fromIdx === -1) return;
+        current.splice(fromIdx, 1);
+        const toIdx = current.indexOf(node.id);
+        if (toIdx === -1) return;
+        current.splice(before ? toIdx : toIdx + 1, 0, dragSrcId);
+        saveAgendaGroupOrder(tabKey, groupKey, current);
+        renderAgenda();
+      });
+      list.appendChild(el);
+    });
+  }
+
+  makeDragZone(orderedPending, 'pending', n => buildAgendaItem(n, labelFn(n)));
+
+  if (orderedDone.length > 0) {
+    if (orderedPending.length > 0 && list.lastElementChild) {
       list.lastElementChild.style.borderBottom = 'none';
     }
     const divider = document.createElement('div');
     divider.className = 'today-done-divider';
     divider.textContent = t('todo.done');
     list.appendChild(divider);
-    scheduledDone.forEach(n => list.appendChild(buildAgendaItem(n, labelFn(n))));
-    crossDayDone.forEach(n => list.appendChild(buildAgendaItem(n, doneLabelFor(n))));
+    const scheduledDoneIds = new Set(scheduledDone.map(n => n.id));
+    makeDragZone(orderedDone, 'done', n => {
+      const label = scheduledDoneIds.has(n.id) ? labelFn(n) : doneLabelFor(n);
+      return buildAgendaItem(n, label);
+    });
   }
 
-  if (anyDayItems.length > 0) {
+  if (orderedAnyDay.length > 0) {
     if (list.lastElementChild) {
       list.lastElementChild.style.borderBottom = 'none';
     }
@@ -8568,7 +8692,7 @@ function renderAgendaTabContent() {
     anyDivider.className = 'today-done-divider';
     anyDivider.textContent = t('agenda.anyDay');
     list.appendChild(anyDivider);
-    anyDayItems.forEach(n => list.appendChild(buildAnyDayItem(n)));
+    makeDragZone(orderedAnyDay, 'anyday', n => buildAnyDayItem(n));
   }
 }
 
