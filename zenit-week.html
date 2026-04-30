@@ -8324,7 +8324,7 @@ function addSwipeGesture(item, node) {
     }
     if (state !== 'swiping') return;
     e.preventDefault();
-    const maxDx = item.offsetWidth * 0.32;
+    const maxDx = item.offsetWidth * 0.25;
     const clampedDx = Math.max(-maxDx, Math.min(maxDx, dx));
     item.style.transition = 'none';
     item.style.transform = `translateX(${clampedDx}px)`;
