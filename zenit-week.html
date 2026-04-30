@@ -1742,9 +1742,10 @@
     color: #fff;
   }
   .agenda-swipe-action .icon { width: 24px; height: 24px; flex-shrink: 0; }
-  .agenda-swipe-action-left  { left: 0;  background: #22c55e; }
+  .agenda-swipe-action-left  { left: 0;  background: #22c55e; visibility: hidden; }
   .agenda-swipe-action-left.undone { background: #f59e0b; }
-  .agenda-swipe-action-right { right: 0; background: #6366f1; }
+  .agenda-swipe-action-right { right: 0; background: #6366f1; visibility: hidden; }
+  .agenda-swipe-wrapper.is-swiping .agenda-swipe-action { visibility: visible; }
   .agenda-item {
     position: relative;
     z-index: 1;
@@ -8269,13 +8270,31 @@ function addSwipeGesture(item, node) {
   let startX = 0, startY = 0, lpTimer = null;
   let state = 'idle'; // 'idle' | 'pending' | 'swiping' | 'aborted'
 
+  function getWrapper() { return item.closest('.agenda-swipe-wrapper'); }
+
+  function startSwiping() {
+    const w = getWrapper();
+    if (w) w.classList.add('is-swiping');
+  }
+
+  function stopSwiping() {
+    const w = getWrapper();
+    if (w) w.classList.remove('is-swiping');
+  }
+
   function snapBack(callback) {
     item.style.transition = 'transform 0.2s ease';
     item.style.transform = 'translateX(0)';
     if (callback) {
       item.addEventListener('transitionend', function h() {
         item.removeEventListener('transitionend', h);
+        stopSwiping();
         callback();
+      });
+    } else {
+      item.addEventListener('transitionend', function h() {
+        item.removeEventListener('transitionend', h);
+        stopSwiping();
       });
     }
   }
@@ -8308,6 +8327,7 @@ function addSwipeGesture(item, node) {
       if (Math.abs(dx) < 10) return; // not yet decided
       state = 'swiping';
       clearTimeout(lpTimer);
+      startSwiping();
     }
     if (state !== 'swiping') return;
     e.preventDefault();
@@ -8324,8 +8344,9 @@ function addSwipeGesture(item, node) {
     const threshold = item.offsetWidth * 0.20;
     state = 'idle';
     if (dx >= threshold) {
-      // Right swipe: done or undone — item will disappear, no snap-back needed
+      // Right swipe: done or undone — item disappears, no snap-back
       item.style.transition = 'none';
+      stopSwiping();
       setStatus(node.id, node.done ? 'undone' : 'done');
       renderAgenda();
     } else if (dx <= -threshold) {
