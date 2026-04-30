@@ -7762,7 +7762,7 @@ function showContextMenu(x, y, nodeId) {
 
   const canDeleteBranch = isBranch && weekData.nodes.filter(n => n.type === 'branch').length > 1;
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
-  document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || (node && node.dayChild)) ? 'none' : '';
+  document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || (node && node.dayChild) || currentView === 'agenda') ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter)            ? 'none' : '';
   document.getElementById('ctx-reschedule').style.display = isActivity ? '' : 'none';
 
