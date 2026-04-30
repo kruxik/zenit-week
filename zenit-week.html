@@ -8194,7 +8194,7 @@ function buildAnyDayItem(node) {
     const plusBtn = document.createElement('button');
     plusBtn.className = 'reset-btn';
     plusBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
-    plusBtn.innerHTML = `${iconSvg('plus')} +1`;
+    plusBtn.textContent = '+1';
     plusBtn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
     item.appendChild(plusBtn);
   } else {
