@@ -3100,6 +3100,11 @@ const DAY_LABELS = {
   cs: { 0:'Ne', 1:'Po', 2:'Út', 3:'St', 4:'Čt', 5:'Pá', 6:'So' },
 };
 
+const DAY_FULL_NAMES = {
+  en: { 0:'Sunday', 1:'Monday', 2:'Tuesday', 3:'Wednesday', 4:'Thursday', 5:'Friday', 6:'Saturday' },
+  cs: { 0:'Neděle', 1:'Pondělí', 2:'Úterý', 3:'Středa', 4:'Čtvrtek', 5:'Pátek', 6:'Sobota' },
+};
+
 // Returns the Set of weekday indices (0–6) declared in a label's (…) groups.
 // A group is recognised when every token is a known day abbr, or it's a daily indicator.
 function parseTodoDays(label) {
@@ -4548,6 +4553,7 @@ const TRANSLATIONS = {
     'help.unplanned':             'Unplanned',
     'help.done':                  'Done',
     'filter.unscheduled':         'Unscheduled',
+    'filter.prefix':              'Filter',
     'filter.off':                 'Filter off',
     'filter.alreadyScheduled':    'Already scheduled for',
     'menu.clearDayFilter':        'Clear Day Filter',
@@ -4655,6 +4661,7 @@ const TRANSLATIONS = {
     'help.unplanned':             'Neplánované',
     'help.done':                  'Hotovo',
     'filter.unscheduled':         'Neplánované',
+    'filter.prefix':              'Filtr',
     'filter.off':                 'Filtr vypnut',
     'filter.alreadyScheduled':    'Již naplánováno pro',
     'menu.clearDayFilter':        'Zrušit filtr dne',
@@ -7352,10 +7359,10 @@ window.addEventListener('keydown', (e) => {
         showToast(t('filter.off'));
       } else {
         activeDayFilter = newFilter;
-        const msg = newFilter === 'unscheduled'
+        const filterName = newFilter === 'unscheduled'
           ? t('filter.unscheduled')
-          : `Filter: ${DAY_LABELS.en[newFilter]}`;
-        showToast(msg);
+          : (DAY_FULL_NAMES[currentLang] || DAY_FULL_NAMES.en)[newFilter];
+        showToast(`${t('filter.prefix')}: ${filterName}`);
       }
       applyFilters();
       return;
