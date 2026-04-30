@@ -1733,7 +1733,10 @@
   .agenda-swipe-wrapper {
     position: relative;
     overflow: hidden;
+    border-bottom: 1px solid var(--border-faint);
   }
+  .agenda-swipe-wrapper:last-child { border-bottom: none; }
+  .agenda-swipe-wrapper .daily-log-item { border-bottom: none; }
   .agenda-swipe-action {
     position: absolute;
     top: 0;
