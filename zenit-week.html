@@ -8319,6 +8319,7 @@ function addSwipeGesture(item, node) {
       if (Math.abs(dx) < 10) return; // not yet decided
       state = 'swiping';
       clearTimeout(lpTimer);
+      hideContextMenu();
       document.querySelectorAll('#agenda-tab-content .agenda-item').forEach(el => el.classList.remove('agenda-item-focused'));
       item.classList.add('agenda-item-focused');
     }
