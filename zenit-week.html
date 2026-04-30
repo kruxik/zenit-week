@@ -1726,6 +1726,34 @@
   .agenda-item-drop-above { box-shadow: 0 -2px 0 0 var(--accent, #1ABCFE); }
   .agenda-item-drop-below { box-shadow: 0 2px 0 0 var(--accent, #1ABCFE); }
 
+  .agenda-swipe-wrapper {
+    position: relative;
+    overflow: hidden;
+  }
+  .agenda-swipe-action {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 25%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    color: #fff;
+  }
+  .agenda-swipe-action .icon { width: 24px; height: 24px; flex-shrink: 0; }
+  .agenda-swipe-action-left  { left: 0;  background: #22c55e; }
+  .agenda-swipe-action-left.undone { background: #f59e0b; }
+  .agenda-swipe-action-right { right: 0; background: #6366f1; }
+  .agenda-item {
+    position: relative;
+    z-index: 1;
+    background: var(--bg-page);
+  }
+  @media (min-width: 768px) {
+    .agenda-item { background: var(--bg-surface); }
+  }
+
   .agenda-priority-icon {
     flex-shrink: 0;
     display: inline-flex;
@@ -2387,6 +2415,7 @@
   <symbol id="icon-battery-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 7h11a2 2 0 0 1 2 2v.5a.5 .5 0 0 0 .5 .5a.5 .5 0 0 1 .5 .5v3a.5 .5 0 0 1 -.5 .5a.5 .5 0 0 0 -.5 .5v.5a2 2 0 0 1 -2 2h-11a2 2 0 0 1 -2 -2v-6a2 2 0 0 1 2 -2"/><path d="M7 10l0 4"/><path d="M10 10l0 4"/></symbol>
   <symbol id="icon-sitemap" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1" /><path d="M12 9l0 3" /></symbol>
   <symbol id="icon-list-details" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M13 5h8" /><path d="M13 9h5" /><path d="M13 15h8" /><path d="M13 19h5" /><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" /><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" /></symbol>
+  <symbol id="icon-menu-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></symbol>
 </svg>
 
 
@@ -8233,14 +8262,31 @@ let currentView = localStorage.getItem('zenit-week-view') || 'mindmap';
 let agendaActiveTab = null;
 let hoveredAgendaNode = null;
 
-// Attaches swipe-right=done, swipe-left=context-menu, and long-press=context-menu to an agenda item.
-// Non-passive touchmove is required so we can preventDefault during a confirmed horizontal swipe.
+// Attaches swipe-right=done/undone, swipe-left=context-menu, and long-press=context-menu to an agenda item.
+// The item slides over action areas revealed underneath (managed by .agenda-swipe-wrapper).
+// Non-passive touchmove required to preventDefault during confirmed horizontal swipe.
 function addSwipeGesture(item, node) {
   let startX = 0, startY = 0, lpTimer = null;
   let state = 'idle'; // 'idle' | 'pending' | 'swiping' | 'aborted'
 
+  function snapBack(callback) {
+    item.style.transition = 'transform 0.2s ease';
+    item.style.transform = 'translateX(0)';
+    if (callback) {
+      item.addEventListener('transitionend', function h() {
+        item.removeEventListener('transitionend', h);
+        callback();
+      });
+    }
+  }
+
   item.addEventListener('touchstart', e => {
-    if (e.target.closest('.agenda-drag-handle')) return; // handle owns this touch
+    // Exclude grip handle zone (handle + 20px buffer to its right)
+    const handle = item.querySelector('.agenda-drag-handle');
+    if (handle) {
+      const hr = handle.getBoundingClientRect();
+      if (e.touches[0].clientX < hr.right + 20) return;
+    }
     const t = e.touches[0];
     startX = t.clientX;
     startY = t.clientY;
@@ -8257,28 +8303,44 @@ function addSwipeGesture(item, node) {
     if (state === 'aborted' || state === 'idle') return;
     const dx = e.touches[0].clientX - startX;
     const dy = Math.abs(e.touches[0].clientY - startY);
-    if (dy > 30) { state = 'aborted'; clearTimeout(lpTimer); return; }
-    if (Math.abs(dx) >= 50) {
+    if (state === 'pending') {
+      if (dy > 10 && dy > Math.abs(dx)) { state = 'aborted'; clearTimeout(lpTimer); return; }
+      if (Math.abs(dx) < 10) return; // not yet decided
       state = 'swiping';
       clearTimeout(lpTimer);
-      e.preventDefault();
     }
+    if (state !== 'swiping') return;
+    e.preventDefault();
+    const maxDx = item.offsetWidth * 0.32;
+    const clampedDx = Math.max(-maxDx, Math.min(maxDx, dx));
+    item.style.transition = 'none';
+    item.style.transform = `translateX(${clampedDx}px)`;
   }, { passive: false });
 
   item.addEventListener('touchend', e => {
     clearTimeout(lpTimer);
     if (state !== 'swiping') { state = 'idle'; return; }
     const dx = e.changedTouches[0].clientX - startX;
+    const threshold = item.offsetWidth * 0.20;
     state = 'idle';
-    if (dx > 0) {
+    if (dx >= threshold) {
+      // Right swipe: done or undone — item will disappear, no snap-back needed
+      item.style.transition = 'none';
       setStatus(node.id, node.done ? 'undone' : 'done');
       renderAgenda();
+    } else if (dx <= -threshold) {
+      // Left swipe: context menu after snap-back
+      snapBack(() => showContextMenu(e.changedTouches[0].clientX, e.changedTouches[0].clientY, node.id));
     } else {
-      showContextMenu(e.changedTouches[0].clientX, e.changedTouches[0].clientY, node.id);
+      snapBack();
     }
   });
 
-  item.addEventListener('touchcancel', () => { clearTimeout(lpTimer); state = 'idle'; });
+  item.addEventListener('touchcancel', () => {
+    clearTimeout(lpTimer);
+    state = 'idle';
+    snapBack();
+  });
 }
 
 function navigateAgendaItem(down) {
@@ -8392,7 +8454,6 @@ function buildAgendaItem(node, label) {
   const item = document.createElement('div');
   item.className = 'daily-log-item agenda-item';
   item.dataset.nodeId = node.id;
-  item.draggable = true;
 
   // Grip handle
   const handle = document.createElement('div');
@@ -8453,8 +8514,6 @@ function buildAgendaItem(node, label) {
   });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
-  addSwipeGesture(item, node);
-
   return item;
 }
 
@@ -8465,7 +8524,6 @@ function buildAnyDayItem(node) {
   const item = document.createElement('div');
   item.className = 'daily-log-item agenda-item';
   item.dataset.nodeId = node.id;
-  item.draggable = true;
 
   // Grip handle
   const handle = document.createElement('div');
@@ -8518,8 +8576,6 @@ function buildAnyDayItem(node) {
     item.classList.remove('agenda-item-focused');
   });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
-
-  addSwipeGesture(item, node);
 
   return item;
 }
@@ -8622,7 +8678,23 @@ function renderAgendaTabContent() {
   function makeDragZone(nodes, groupKey, buildFn) {
     let dragSrcId = null;
     nodes.forEach(node => {
-      const el = buildFn(node);
+      const item = buildFn(node); // .daily-log-item.agenda-item
+
+      // Build swipe wrapper: action areas sit behind the sliding item
+      const swipeLeft = document.createElement('div');
+      swipeLeft.className = 'agenda-swipe-action agenda-swipe-action-left' + (node.done ? ' undone' : '');
+      swipeLeft.innerHTML = node.done ? iconSvg('circle-dashed-check') : iconSvg('circle-check');
+      const swipeRight = document.createElement('div');
+      swipeRight.className = 'agenda-swipe-action agenda-swipe-action-right';
+      swipeRight.innerHTML = iconSvg('menu-2');
+      const el = document.createElement('div');
+      el.className = 'agenda-swipe-wrapper';
+      el.draggable = true;
+      el.appendChild(swipeLeft);
+      el.appendChild(swipeRight);
+      el.appendChild(item);
+
+      addSwipeGesture(item, node);
 
       // ── Desktop HTML5 drag-and-drop ───────────────────────────────────────
       el.addEventListener('dragstart', (e) => {
@@ -8632,7 +8704,7 @@ function renderAgendaTabContent() {
       });
       el.addEventListener('dragend', () => {
         el.classList.remove('agenda-item-dragging');
-        list.querySelectorAll('.agenda-item').forEach(x => {
+        list.querySelectorAll('.agenda-swipe-wrapper').forEach(x => {
           x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
         });
         dragSrcId = null;
@@ -8642,7 +8714,7 @@ function renderAgendaTabContent() {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         const mid = el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2;
-        list.querySelectorAll('.agenda-item').forEach(x => {
+        list.querySelectorAll('.agenda-swipe-wrapper').forEach(x => {
           x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
         });
         el.classList.add(e.clientY < mid ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
@@ -8709,12 +8781,15 @@ function renderAgendaTabContent() {
 
           // Find drop target (ghost has pointer-events:none so elementFromPoint skips it)
           const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
-          list.querySelectorAll('.agenda-item').forEach(x =>
+          list.querySelectorAll('.agenda-swipe-wrapper').forEach(x =>
             x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
-          if (targetEl && targetEl !== el) {
-            const rect = targetEl.getBoundingClientRect();
-            targetEl.classList.add(touch.clientY < rect.top + rect.height / 2
-              ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+          if (targetEl && targetEl !== item) {
+            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
+            if (targetWrapper) {
+              const rect = targetWrapper.getBoundingClientRect();
+              targetWrapper.classList.add(touch.clientY < rect.top + rect.height / 2
+                ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+            }
           }
         }, { passive: false });
 
@@ -8722,13 +8797,14 @@ function renderAgendaTabContent() {
           if (!touchSrcId) return;
           if (ghost) { ghost.remove(); ghost = null; }
           el.classList.remove('agenda-item-dragging');
-          list.querySelectorAll('.agenda-item').forEach(x =>
+          list.querySelectorAll('.agenda-swipe-wrapper').forEach(x =>
             x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
           const touch = e.changedTouches[0];
           const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
-          if (targetEl && targetEl !== el && targetEl.dataset.nodeId) {
+          if (targetEl && targetEl !== item && targetEl.dataset.nodeId) {
             const targetId = targetEl.dataset.nodeId;
-            const rect = targetEl.getBoundingClientRect();
+            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
+            const rect = (targetWrapper || targetEl).getBoundingClientRect();
             const before = touch.clientY < rect.top + rect.height / 2;
             const current = loadAgendaGroupOrder(tabKey, groupKey);
             const fromIdx = current.indexOf(touchSrcId);
