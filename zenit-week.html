@@ -5735,18 +5735,41 @@ function computeLayout() {
   const positions = {};
   const heights = {};
   const VERTICAL_GAP = 12; // Vertical gap between siblings
+  const nodeZigZagMetrics = {};
 
-  function isZigZag(nodeId) {
+  function getZigZagMetrics(nodeId) {
+    if (nodeId in nodeZigZagMetrics) return nodeZigZagMetrics[nodeId];
     const node = findNode(nodeId);
-    if (!node || node.type !== 'activity') return false;
+    if (!node || node.type !== 'activity') return nodeZigZagMetrics[nodeId] = null;
+    
     const activeChildren = (node.children || []).filter(cid => {
       const child = findNode(cid);
       const isActiveEdit = editState && editState.nodeId === cid;
       return child && (!child._editing || isActiveEdit);
     });
-    if (activeChildren.length < 3) return false;
+    if (activeChildren.length < 3) return nodeZigZagMetrics[nodeId] = null;
+    
     const dayChildCount = activeChildren.filter(cid => findNode(cid)?.dayChild).length;
-    return dayChildCount >= 3;
+    if (dayChildCount < 3) return nodeZigZagMetrics[nodeId] = null;
+    
+    let maxW1 = 0;
+    let maxW2 = 0;
+    activeChildren.forEach((cid, i) => {
+      const { w } = getNodeSize(cid);
+      if (i % 2 === 0) maxW1 = Math.max(maxW1, w);
+      else maxW2 = Math.max(maxW2, w);
+    });
+    
+    const standardH = 32 + VERTICAL_GAP; // Activity height + gap
+    const vStep = standardH / 2;
+    const metrics = {
+      maxW1,
+      maxW2,
+      staggerX: (maxW1 + maxW2) / 2 + VERTICAL_GAP,
+      vStep,
+      totalH: standardH + (activeChildren.length - 1) * vStep
+    };
+    return nodeZigZagMetrics[nodeId] = metrics;
   }
 
   // Calculate total height of each subtree
@@ -5773,16 +5796,11 @@ function computeLayout() {
 
     let h = 0;
     const isBranch = node.type === 'branch';
-    const useZigZag = isZigZag(nodeId);
+    const zig = getZigZagMetrics(nodeId);
 
-    if (useZigZag) {
-      let hTotal = 0;
-      activeChildren.forEach((cid, i) => {
-        const ch = calcHeight(cid);
-        if (i === 0) hTotal = ch;
-        else hTotal += ch / 2;
-      });
-      h = hTotal;
+    if (zig) {
+      activeChildren.forEach(calcHeight);
+      h = zig.totalH;
     } else {
       activeChildren.forEach((cid, i) => {
         h += calcHeight(cid);
@@ -5851,15 +5869,10 @@ function computeLayout() {
 
     if (activeChildren.length === 0) return;
 
-    const useZigZag = isZigZag(nodeId);
+    const zig = getZigZagMetrics(nodeId);
     let childrenH = 0;
-    if (useZigZag) {
-      let hTotal = 0;
-      activeChildren.forEach((cid, i) => {
-        if (i === 0) hTotal = heights[cid];
-        else hTotal += heights[cid] / 2;
-      });
-      childrenH = hTotal;
+    if (zig) {
+      childrenH = zig.totalH;
     } else {
       childrenH = activeChildren.reduce((acc, cid) => acc + heights[cid], 0);
     }
@@ -5875,14 +5888,12 @@ function computeLayout() {
       const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
       
       let x, y;
-      if (useZigZag) {
+      if (zig) {
         const isStaggered = i % 2 !== 0;
-        // Hexagonal packing: Vertical shift = L/2, Horizontal stagger = L * sqrt(3)/2
-        // This ensures the distance between any two adjacent nodes is exactly childH
-        const staggerX = childH * 0.866; 
-        x = parentX + dir * (parentW / 2 + childGap + w / 2 + (isStaggered ? staggerX : 0));
-        y = currentY + childH / 2;
-        currentY += childH / 2; 
+        const groupBaseX = parentX + dir * (parentW / 2 + childGap);
+        x = groupBaseX + dir * (zig.maxW1 / 2 + (isStaggered ? zig.staggerX : 0));
+        y = currentY + 32 / 2; // Fixed node height (32) center
+        currentY += zig.vStep; 
       } else {
         x = parentX + dir * (parentW / 2 + childGap + w / 2);
         y = currentY + childH / 2;
