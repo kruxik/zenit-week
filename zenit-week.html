@@ -8003,16 +8003,30 @@ function addSwipeGesture(item, node) {
 function navigateAgendaItem(down) {
   const items = [...document.querySelectorAll('#agenda-tab-content .agenda-item')];
   if (!items.length) return;
-  const curIdx = hoveredAgendaNode
-    ? items.findIndex(el => el.dataset.nodeId === hoveredAgendaNode.id)
-    : -1;
+  const curIdx = items.findIndex(el => el.classList.contains('agenda-item-focused'));
+  if (curIdx === -1 && !down) return;
   const nextIdx = curIdx === -1
-    ? (down ? 0 : items.length - 1)
+    ? 0
     : (down ? Math.min(curIdx + 1, items.length - 1) : Math.max(curIdx - 1, 0));
+  if (nextIdx === curIdx) return;
   items.forEach(el => el.classList.remove('agenda-item-focused'));
   items[nextIdx].classList.add('agenda-item-focused');
   hoveredAgendaNode = findNode(items[nextIdx].dataset.nodeId) || null;
-  items[nextIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  const container = document.getElementById('agenda-tab-content');
+  if (nextIdx === 0) {
+    container.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (nextIdx === items.length - 1) {
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+  } else {
+    const cRect = container.getBoundingClientRect();
+    const eRect = items[nextIdx].getBoundingClientRect();
+    const margin = 12;
+    if (eRect.top < cRect.top + margin) {
+      container.scrollBy({ top: eRect.top - cRect.top - margin, behavior: 'smooth' });
+    } else if (eRect.bottom > cRect.bottom - margin) {
+      container.scrollBy({ top: eRect.bottom - cRect.bottom + margin, behavior: 'smooth' });
+    }
+  }
 }
 
 // ISO week day-tab order: Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
@@ -8128,10 +8142,7 @@ function buildAgendaItem(node, label) {
   }
   item.appendChild(btn);
 
-  item.addEventListener('mouseenter', () => {
-    hoveredAgendaNode = node;
-    document.querySelectorAll('.agenda-item-focused').forEach(el => el.classList.remove('agenda-item-focused'));
-  });
+  item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
   item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
@@ -8185,10 +8196,7 @@ function buildAnyDayItem(node) {
     item.appendChild(undoneBtn);
   }
 
-  item.addEventListener('mouseenter', () => {
-    hoveredAgendaNode = node;
-    document.querySelectorAll('.agenda-item-focused').forEach(el => el.classList.remove('agenda-item-focused'));
-  });
+  item.addEventListener('mouseenter', () => { hoveredAgendaNode = node; });
   item.addEventListener('mouseleave', () => { hoveredAgendaNode = null; });
   item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
 
