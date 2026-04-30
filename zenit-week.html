@@ -7183,6 +7183,12 @@ window.addEventListener('keydown', (e) => {
       return;
     }
 
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      navigateAgendaTab(e.key === 'ArrowRight');
+      return;
+    }
+
     // Item-level shortcuts require a hovered / keyboard-focused item
     const node = hoveredAgendaNode;
     if (!node) {
@@ -8044,6 +8050,18 @@ function navigateAgendaItem(down) {
 
 // ISO week day-tab order: Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
 const AGENDA_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+const AGENDA_TAB_ORDER = ['overdue', ...AGENDA_DAY_ORDER];
+
+function navigateAgendaTab(right) {
+  const idx = AGENDA_TAB_ORDER.indexOf(agendaActiveTab);
+  const next = right
+    ? Math.min(idx + 1, AGENDA_TAB_ORDER.length - 1)
+    : Math.max(idx - 1, 0);
+  if (next === idx) return;
+  agendaActiveTab = AGENDA_TAB_ORDER[next];
+  renderAgenda();
+}
 
 function scrollAgendaTabIntoView(strip, btn) {
   if (!strip || !btn) return;
