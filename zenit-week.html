@@ -8301,7 +8301,7 @@ function addSwipeGesture(item, node) {
     lpTimer = setTimeout(() => {
       if (state === 'pending') {
         state = 'aborted';
-        showContextMenu(t.clientX, t.clientY, node.id);
+        startAgendaRename(node.id);
       }
     }, 500);
   }, { passive: true });
