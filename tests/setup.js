@@ -144,6 +144,8 @@ export const {
   commitEdit,
   migrateDayCounters,
   transferReusable,
+  computeLayout,
+  getNodeSize,
   // Agenda helpers
   isoWeekPos,
   sortDayChildren,
