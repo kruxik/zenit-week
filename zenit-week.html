@@ -8203,6 +8203,7 @@ document.getElementById('ctx-reusable').addEventListener('click', () => {
       setReusable(contextTarget);
       saveWeek(currentWeekKey, weekData);
       render();
+      if (currentView === 'agenda') renderAgenda();
     }
   }
   hideContextMenu();
@@ -8504,6 +8505,15 @@ function buildAgendaItem(node, label) {
     bolt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;';
     bolt.innerHTML = iconSvg('bolt');
     item.appendChild(bolt);
+  }
+
+  // Reusable badge (no user data)
+  if (node.reusable) {
+    const rep = document.createElement('span');
+    rep.className = 'daily-log-badge';
+    rep.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;';
+    rep.innerHTML = iconSvg('repeat');
+    item.appendChild(rep);
   }
 
   // Done / Undone button
