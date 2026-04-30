@@ -8013,6 +8013,7 @@ document.getElementById('ctx-transfer-reusable').addEventListener('click', () =>
 
 document.getElementById('ctx-move-next-week').addEventListener('click', () => {
   moveNodeToNextWeek(contextTarget);
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
