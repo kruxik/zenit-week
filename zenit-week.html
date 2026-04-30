@@ -1028,6 +1028,41 @@
     border-color: var(--accent-danger);
   }
 
+  .agenda-action-btn {
+    position: relative;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--text-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px var(--shadow-md);
+    transition: color 0.15s, box-shadow 0.15s;
+    user-select: none;
+  }
+  .agenda-action-btn:hover {
+    color: var(--text-dim);
+    box-shadow: 0 4px 12px var(--shadow-md);
+  }
+  .agenda-action-btn:hover::before {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px; right: 3px; bottom: 3px;
+    border-radius: 5px;
+    background: var(--bg-hover);
+    z-index: -1;
+  }
+
   /* Modal */
   /* Context menu */
   #context-menu {
@@ -8163,8 +8198,7 @@ function buildAgendaItem(node, label) {
 
   // Done / Undone button
   const btn = document.createElement('button');
-  btn.className = 'reset-btn';
-  btn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
+  btn.className = 'agenda-action-btn';
   if (node.done) {
     btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
     btn.addEventListener('click', () => { setStatus(node.id, 'undone'); renderAgenda(); });
@@ -8217,15 +8251,13 @@ function buildAnyDayItem(node) {
     item.appendChild(pill);
 
     const plusBtn = document.createElement('button');
-    plusBtn.className = 'reset-btn';
-    plusBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
+    plusBtn.className = 'agenda-action-btn';
     plusBtn.textContent = '+1';
     plusBtn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
     item.appendChild(plusBtn);
   } else {
     const undoneBtn = document.createElement('button');
-    undoneBtn.className = 'reset-btn';
-    undoneBtn.style.cssText = 'height:28px;padding:0 10px;font-size:12px;flex-shrink:0;';
+    undoneBtn.className = 'agenda-action-btn';
     undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
     undoneBtn.addEventListener('click', () => {
       if (cc) updateCounter(cc.id, -1);
