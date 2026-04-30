@@ -1568,6 +1568,7 @@
     height: 32px;
     display: flex;
     align-items: center;
+    position: relative;
     gap: 6px;
     font-size: 13px;
     font-weight: 600;
@@ -1601,6 +1602,18 @@
 
   .agenda-tab:active {
     opacity: 0.7;
+  }
+
+  .agenda-tab.agenda-tab-today::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-primary);
   }
 
   .agenda-tab-separator {
@@ -8079,7 +8092,8 @@ function renderAgendaStrip() {
     addSeparator();
 
     const btn = document.createElement('button');
-    btn.className = 'agenda-tab' + (agendaActiveTab === dayIdx ? ' active' : '');
+    const isToday = dayIdx === new Date().getDay();
+    btn.className = 'agenda-tab' + (agendaActiveTab === dayIdx ? ' active' : '') + (isToday ? ' agenda-tab-today' : '');
     btn.dataset.tab = String(dayIdx);
     btn.textContent = langLabels[dayIdx];
     btn.addEventListener('click', () => { agendaActiveTab = dayIdx; renderAgenda(); });
