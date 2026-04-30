@@ -6914,29 +6914,42 @@ function getDayFilterOpacity(nodeId) {
 
   const d = activeDayFilter;
 
-  if (node.dayChild) {
-    if (d === 'unscheduled') return 0.12;
-    return node.dayIndex === d ? 1 : 0.12;
-  }
-
+  // Counter nodes inherit from parent
   if (type === 'counter') {
     const parent = findNode(node.parent);
     return parent ? getDayFilterOpacity(parent.id) : 1;
   }
 
-  // activity (non-dayChild)
-  const dayChildren = (node.children || []).map(id => findNode(id)).filter(n => n?.dayChild);
+  // Recursive check for activity/dayChild match in subtree
+  function hasMatch(id) {
+    const n = findNode(id);
+    if (!n) return false;
 
-  if (d === 'unscheduled') {
-    const hasCounter = (node.children || []).some(id => findNode(id)?.type === 'counter');
-    const hasLabelDays = parseTodoDays(node.label || '').size > 0;
-    return (dayChildren.length === 0 && !hasCounter && !hasLabelDays) ? 1 : 0.12;
+    // 1. Direct match?
+    if (n.dayChild) {
+      if (d === 'unscheduled') return false;
+      return n.dayIndex === d;
+    }
+    if (n.type === 'activity') {
+      if (d === 'unscheduled') {
+        const children = (n.children || []).map(cid => findNode(cid));
+        const hasDayChild = children.some(c => c?.dayChild);
+        const hasCounter = children.some(c => c?.type === 'counter');
+        const hasLabelDays = parseTodoDays(n.label || '').size > 0;
+        if (!hasDayChild && !hasCounter && !hasLabelDays) return true;
+      } else {
+        if (parseTodoDays(n.label || '').has(d)) return true;
+      }
+    }
+
+    // 2. Subtree match (skip counters in recursion)
+    return (n.children || []).some(cid => {
+      const child = findNode(cid);
+      return child && child.type !== 'counter' && hasMatch(cid);
+    });
   }
 
-  if (dayChildren.length > 0) {
-    return dayChildren.some(n => n.dayIndex === d) ? 1 : 0.12;
-  }
-  return parseTodoDays(node.label || '').has(d) ? 1 : 0.12;
+  return hasMatch(nodeId) ? 1 : 0.12;
 }
 
 function applyFilters() {

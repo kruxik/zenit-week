@@ -239,3 +239,51 @@ describe('getDayFilterOpacity — unscheduled filter', () => {
     expect(getDayFilterOpacity('b1')).toBe(1);
   });
 });
+
+// ─── Branch Visibility ───────────────────────────────────────────────────────
+
+describe('getDayFilterOpacity — Branch Visibility', () => {
+  test('Activity should be visible if its grandchild matches the day filter', () => {
+    // Week -> Me (branch) -> Sports (a1) -> Running (a2) -> We (dc)
+    const b = mkBranch('me');
+    const a1 = mkActivity('a1', 'me', 'me', { label: 'Sports' });
+    const a2 = mkActivity('a2', 'a1', 'me', { label: 'Running' });
+    const dc = mkDayChild('dc', 'a2', 'me', 3); // Wednesday
+
+    b.children = ['a1'];
+    a1.children = ['a2'];
+    a2.children = ['dc'];
+
+    setUp([b, a1, a2, dc]);
+    _state.setActiveDayFilter(3);
+
+    // dc should be visible
+    expect(getDayFilterOpacity('dc')).toBe(1);
+    // a2 (Running) should be visible (direct parent)
+    expect(getDayFilterOpacity('a2')).toBe(1);
+    // a1 (Sports) should be visible (ancestor - the bug was here)
+    expect(getDayFilterOpacity('a1')).toBe(1);
+    // me (Branch) should be visible
+    expect(getDayFilterOpacity('me')).toBe(1);
+  });
+
+  test('Activity should NOT be visible if none of its descendants match the day filter', () => {
+    // Week -> Me (branch) -> Sports (a1) -> Running (a2) -> Mo (dc)
+    const b = mkBranch('me');
+    const a1 = mkActivity('a1', 'me', 'me', { label: 'Sports' });
+    const a2 = mkActivity('a2', 'a1', 'me', { label: 'Running' });
+    const dc = mkDayChild('dc', 'a2', 'me', 1); // Monday
+
+    b.children = ['a1'];
+    a1.children = ['a2'];
+    a2.children = ['dc'];
+
+    setUp([b, a1, a2, dc]);
+    _state.setActiveDayFilter(3); // Filter for Wednesday
+
+    expect(getDayFilterOpacity('dc')).toBe(0.12);
+    expect(getDayFilterOpacity('a2')).toBe(0.12);
+    expect(getDayFilterOpacity('a1')).toBe(0.12);
+    expect(getDayFilterOpacity('me')).toBe(1); // Branch always 1
+  });
+});
