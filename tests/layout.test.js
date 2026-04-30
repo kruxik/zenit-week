@@ -89,4 +89,29 @@ describe('Zig-Zag Layout', () => {
     expect(positions['d1'].x).toBe(positions['d2'].x);
     expect(positions['d2'].y).toBeGreaterThan(positions['d1'].y);
   });
+
+  test('zig-zag is disabled when autoLayout is false', () => {
+    const data = {
+      nodes: [
+        { id: 'center', type: 'center', label: 'Week', children: ['b1'] },
+        { id: 'b1', type: 'branch', parent: 'center', label: 'Work', side: 'right', children: ['a1'] },
+        mkActivity('a1', 'b1', 'b1', { children: ['d1', 'd2', 'd3'] }),
+        mkActivity('d1', 'a1', 'b1', { label: 'Mo', dayChild: true }),
+        mkActivity('d2', 'a1', 'b1', { label: 'Tu', dayChild: true }),
+        mkActivity('d3', 'a1', 'b1', { label: 'We', dayChild: true }),
+      ]
+    };
+    _state.set(data);
+    rebuildNodeMap();
+    _state.setAutoLayout(false);
+
+    const positions = computeLayout();
+
+    // Should be standard vertical layout: same x
+    expect(positions['d1'].x).toBe(positions['d2'].x);
+    expect(positions['d1'].x).toBe(positions['d3'].x);
+    
+    // Cleanup for other tests
+    _state.setAutoLayout(true);
+  });
 });

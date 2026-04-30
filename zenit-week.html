@@ -8874,7 +8874,7 @@ function handleNodeDrop(mouseX, mouseY) {
   const nodeId = dragState.activeNodeId;
   const node = findNode(nodeId);
   if (!node) return;
-  if (node.dayChild) { saveWeek(currentWeekKey, weekData); render(); return; } // day-children can move but not rebind
+  
   takeSnapshot();
 
   const rect = container.getBoundingClientRect();
@@ -8884,24 +8884,27 @@ function handleNodeDrop(mouseX, mouseY) {
   const positions = computeLayout();
 
   // 1. Check for rebinding (dropping over another node's body)
+  // Day-children can move but not rebind to a new parent.
   let targetParentId = null;
-  for (const otherId of Object.keys(positions)) {
-    if (otherId === nodeId || otherId === 'center') continue;
-    // Don't bind to own descendant
-    if (getDescendantIds(nodeId).includes(otherId)) continue;
-    // Day-children cannot receive dropped nodes
-    if (findNode(otherId)?.dayChild) continue;
+  if (!node.dayChild) {
+    for (const otherId of Object.keys(positions)) {
+      if (otherId === nodeId || otherId === 'center') continue;
+      // Don't bind to own descendant
+      if (getDescendantIds(nodeId).includes(otherId)) continue;
+      // Day-children cannot receive dropped nodes
+      if (findNode(otherId)?.dayChild) continue;
 
-    const pos = positions[otherId];
-    // Hit test against the node's rectangle
-    if (
-      svgX >= pos.x - pos.w / 2 &&
-      svgX <= pos.x + pos.w / 2 &&
-      svgY >= pos.y - pos.h / 2 &&
-      svgY <= pos.y + pos.h / 2
-    ) {
-      targetParentId = otherId;
-      break;
+      const pos = positions[otherId];
+      // Hit test against the node's rectangle
+      if (
+        svgX >= pos.x - pos.w / 2 &&
+        svgX <= pos.x + pos.w / 2 &&
+        svgY >= pos.y - pos.h / 2 &&
+        svgY <= pos.y + pos.h / 2
+      ) {
+        targetParentId = otherId;
+        break;
+      }
     }
   }
 

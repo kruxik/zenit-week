@@ -101,6 +101,7 @@ _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
 _state.setWeekKey = function(k) { currentWeekKey = k; };
 _state.reset     = function() { undoStack = []; redoStack = []; };
 _state.setLang   = function(l) { currentLang = l; };
+_state.setAutoLayout = function(v) { autoLayout = v; };
 _state.setEditState = function(v, inputVal) {
   editState = v;
   if (inputVal !== undefined) inlineInput.value = inputVal;
