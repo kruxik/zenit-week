@@ -8427,6 +8427,12 @@ function applyTransform() {
 }
 
 function resetView() {
+  if (currentView === 'agenda') {
+    agendaActiveTab = null;
+    renderAgenda();
+    return;
+  }
+
   const svg = document.getElementById('main-svg');
   const w = svg.clientWidth  || svg.getBoundingClientRect().width  || 800;
   const h = svg.clientHeight || svg.getBoundingClientRect().height || 600;
