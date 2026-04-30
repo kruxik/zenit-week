@@ -1705,7 +1705,7 @@
   }
 
   .agenda-item.agenda-item-focused {
-    background: var(--bg-hover);
+    box-shadow: inset 0 0 0 9999px var(--bg-hover);
     border-radius: 4px;
   }
 
@@ -1742,10 +1742,9 @@
     color: #fff;
   }
   .agenda-swipe-action .icon { width: 24px; height: 24px; flex-shrink: 0; }
-  .agenda-swipe-action-left  { left: 0;  background: #22c55e; visibility: hidden; }
+  .agenda-swipe-action-left  { left: 0;  background: #22c55e; }
   .agenda-swipe-action-left.undone { background: #f59e0b; }
-  .agenda-swipe-action-right { right: 0; background: #6366f1; visibility: hidden; }
-  .agenda-swipe-wrapper.is-swiping .agenda-swipe-action { visibility: visible; }
+  .agenda-swipe-action-right { right: 0; background: #6366f1; }
   .agenda-item {
     position: relative;
     z-index: 1;
@@ -7796,6 +7795,7 @@ function hideContextMenu() {
   ctxMenu.classList.remove('visible');
   contextTarget = null;
   document.getElementById('ctx-reschedule-submenu').classList.remove('visible');
+  document.querySelectorAll('#agenda-tab-content .agenda-item').forEach(el => el.classList.remove('agenda-item-focused'));
 }
 
 // ─── Color picker (custom inline SB+hue) ──────────────────────────────────────
@@ -8270,31 +8270,16 @@ function addSwipeGesture(item, node) {
   let startX = 0, startY = 0, lpTimer = null;
   let state = 'idle'; // 'idle' | 'pending' | 'swiping' | 'aborted'
 
-  function getWrapper() { return item.closest('.agenda-swipe-wrapper'); }
-
-  function startSwiping() {
-    const w = getWrapper();
-    if (w) w.classList.add('is-swiping');
-  }
-
-  function stopSwiping() {
-    const w = getWrapper();
-    if (w) w.classList.remove('is-swiping');
-  }
-
-  function snapBack(callback) {
+  // Snap item back to translateX(0). keepFocused=true retains the highlight
+  // (used for left-swipe → context menu, so the user knows which item it targets).
+  function snapBack(callback, keepFocused = false) {
+    if (!keepFocused) item.classList.remove('agenda-item-focused');
     item.style.transition = 'transform 0.2s ease';
     item.style.transform = 'translateX(0)';
     if (callback) {
       item.addEventListener('transitionend', function h() {
         item.removeEventListener('transitionend', h);
-        stopSwiping();
         callback();
-      });
-    } else {
-      item.addEventListener('transitionend', function h() {
-        item.removeEventListener('transitionend', h);
-        stopSwiping();
       });
     }
   }
@@ -8327,7 +8312,8 @@ function addSwipeGesture(item, node) {
       if (Math.abs(dx) < 10) return; // not yet decided
       state = 'swiping';
       clearTimeout(lpTimer);
-      startSwiping();
+      document.querySelectorAll('#agenda-tab-content .agenda-item').forEach(el => el.classList.remove('agenda-item-focused'));
+      item.classList.add('agenda-item-focused');
     }
     if (state !== 'swiping') return;
     e.preventDefault();
@@ -8344,14 +8330,14 @@ function addSwipeGesture(item, node) {
     const threshold = item.offsetWidth * 0.20;
     state = 'idle';
     if (dx >= threshold) {
-      // Right swipe: done or undone — item disappears, no snap-back
+      // Right swipe: item disappears into done/undone group, no snap-back needed
       item.style.transition = 'none';
-      stopSwiping();
+      item.classList.remove('agenda-item-focused');
       setStatus(node.id, node.done ? 'undone' : 'done');
       renderAgenda();
     } else if (dx <= -threshold) {
-      // Left swipe: context menu after snap-back
-      snapBack(() => showContextMenu(e.changedTouches[0].clientX, e.changedTouches[0].clientY, node.id));
+      // Left swipe: snap back keeping highlight, then open context menu
+      snapBack(() => showContextMenu(e.changedTouches[0].clientX, e.changedTouches[0].clientY, node.id), true);
     } else {
       snapBack();
     }
