@@ -4467,6 +4467,7 @@ const TRANSLATIONS = {
     'settings.importConfirmOk':   'Yes, import',
     'settings.importConfirmCancel':'Cancel',
     'settings.importError':       'Invalid file — could not import.',
+    'settings.importReloadHint':  'Data imported — refresh the page to see it.',
     'settings.autoLayout':        'Auto layout',
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
     'view.mindmap':               'Mindmap',
@@ -4573,6 +4574,7 @@ const TRANSLATIONS = {
     'settings.importConfirmOk':   'Ano, importovat',
     'settings.importConfirmCancel':'Zrušit',
     'settings.importError':       'Neplatný soubor — import se nezdařil.',
+    'settings.importReloadHint':  'Data importována — obnovte stránku pro zobrazení.',
     'settings.autoLayout':        'Automatické rozvržení',
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
     'view.mindmap':               'Mindmap',
@@ -4960,7 +4962,7 @@ function exportAllData() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 // Normalize a key from either old (week-planner-*) or new (zenit-week-*) prefix to zenit-week-*
@@ -4973,31 +4975,42 @@ function normalizeImportKey(key) {
 function importAllData(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
+    let parsed;
     try {
-      const parsed = JSON.parse(e.target.result);
+      parsed = JSON.parse(e.target.result);
       if (!parsed.version || !parsed.data || typeof parsed.data !== 'object') throw new Error('Invalid format');
-      // Remove existing zenit-week-* keys first
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('zenit-week-')) keysToRemove.push(key);
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      // Write imported keys, normalizing old week-planner-* prefix if present
-      Object.entries(parsed.data).forEach(([key, value]) => {
-        const normalized = normalizeImportKey(key);
-        if (normalized) localStorage.setItem(normalized, value);
-      });
-      // Generate a new reset token — other browsers that see a different token will wipe and resync.
-      // Token is set before import-pending so forcePushAllToDrive can read it.
-      localStorage.setItem('zenit-week-reset-token', crypto.randomUUID());
-      // Mark import pending — Drive will be force-pushed on next sign-in or immediately if signed in
-      localStorage.setItem('zenit-week-import-pending', '1');
-      // Re-initialize in-place — preserves Google auth session
+    } catch (err) {
+      const errEl = document.getElementById('import-error');
+      if (errEl) { errEl.style.display = ''; errEl.textContent = t('settings.importError'); }
+      console.error('[zenit-week] Import failed:', err);
+      return;
+    }
+    // Remove existing zenit-week-* keys first
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('zenit-week-')) keysToRemove.push(key);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    // Write imported keys, normalizing old week-planner-* prefix if present
+    Object.entries(parsed.data).forEach(([key, value]) => {
+      const normalized = normalizeImportKey(key);
+      if (normalized) localStorage.setItem(normalized, value);
+    });
+    // Generate a new reset token — other browsers that see a different token will wipe and resync.
+    // Token is set before import-pending so forcePushAllToDrive can read it.
+    localStorage.setItem('zenit-week-reset-token', crypto.randomUUID());
+    // Mark import pending — Drive will be force-pushed on next sign-in or immediately if signed in
+    localStorage.setItem('zenit-week-import-pending', '1');
+    // Stop any running poll — prevents it from detecting a resetToken mismatch between the
+    // new local token and the still-old remote token before forcePushAllToDrive completes.
+    stopDrivePoll();
+    // Re-initialize in-place — avoids a reload race where pollDriveMeta fires before
+    // forcePushAllToDrive updates the remote resetToken, causing a wipe of imported data.
+    try {
       undoStack = [];
       redoStack = [];
       currentLang = localStorage.getItem('zenit-week-lang') || 'en';
-      // Apply imported theme to DOM (standalone key is in localStorage but DOM needs explicit update)
       const importedTheme = localStorage.getItem('zenit-week-theme') || 'light';
       document.documentElement.dataset.theme = importedTheme === 'dark' ? 'dark' : '';
       loadBranchColors();
@@ -5005,13 +5018,13 @@ function importAllData(file) {
       updateSvgFilters();
       updateColorDots();
       applyTranslations();
-      // Write current theme + lang into the colors file so forcePushAllToDrive carries them to Drive
       saveBranchColors();
       loadAndRender(todayWeekKey());
-    } catch (err) {
+    } catch (reinitErr) {
+      // Data is safely in localStorage — a manual refresh will show it.
+      console.error('[zenit-week] Import re-init failed:', reinitErr);
       const errEl = document.getElementById('import-error');
-      if (errEl) { errEl.style.display = ''; }
-      console.error('[zenit-week] Import failed:', err);
+      if (errEl) { errEl.style.display = ''; errEl.textContent = t('settings.importReloadHint'); }
     }
   };
   reader.readAsText(file);
