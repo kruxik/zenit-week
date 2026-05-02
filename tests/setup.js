@@ -46,7 +46,14 @@ function elementStub() {
 const sandbox = {
   crypto: globalThis.crypto,
   console,
-  window: { addEventListener: () => {} },
+  CustomEvent: class {
+    constructor(type) { this.type = type; }
+  },
+  window: { 
+    addEventListener: () => {},
+    dispatchEvent: () => {},
+    location: { origin: '' },
+  },
   BroadcastChannel: class {
     constructor() {}
     postMessage() {}
@@ -70,7 +77,7 @@ const sandbox = {
     },
     querySelector: () => null,
     querySelectorAll: () => [],
-    documentElement: { dataset: {} },
+    documentElement: { dataset: { theme: 'light' } },
     createTextNode: (text) => ({ nodeType: 3, textContent: text }),
     createElement: (tag) => {
       if (tag === 'canvas') {
@@ -187,7 +194,11 @@ _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
 _state.setWeekKey = function(k) { currentWeekKey = k; };
 _state.reset     = function() { undoStack = []; redoStack = []; };
-_state.setLang   = function(l) { currentLang = l; };
+_state.getUndoStack = function() { return undoStack; };
+_state.setLang   = function(l) { 
+  currentLang = l; 
+  localStorage.setItem('zenit-week-lang', l);
+};
 _state.setAutoLayout = function(v) { autoLayout = v; };
 _state.setEditState = function(v, inputVal) {
   editState = v;
@@ -202,6 +213,7 @@ _state.clearLocalStorage = function() {
 _state.getLocalStorage = function(key) {
   return _lsStore[key];
 };
+_state.getDocument = function() { return document; };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 
 // Initialize app state
