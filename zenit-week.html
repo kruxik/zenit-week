@@ -2351,6 +2351,9 @@
     flex-shrink: 0;
   }
 
+  body.app-loading #main-svg {
+    opacity: 0;
+  }
 </style>
 <!-- Key migration: rename week-planner-* → zenit-week-* once, before any reads -->
 <script>
@@ -2392,7 +2395,7 @@
   })();
 </script>
 </head>
-<body>
+<body class="app-loading">
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
@@ -2816,6 +2819,176 @@ const IS_OAUTH_POPUP = (() => {
   return true;
 })();
 
+// ─── IndexedDB ────────────────────────────────────────────────────────────────
+const DB_NAME = 'zenit-week-db';
+const DB_VERSION = 1;
+let _db = null;
+let _dbPromise = null;
+
+function onDbBlocked() {
+  // Wired in Task 10
+}
+
+function openDB() {
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('weeks')) {
+        db.createObjectStore('weeks', { keyPath: 'weekKey' });
+      }
+      if (!db.objectStoreNames.contains('misc')) {
+        db.createObjectStore('misc');
+      }
+    };
+    request.onblocked = () => onDbBlocked();
+    request.onsuccess = (e) => {
+      _db = e.target.result;
+      resolve(_db);
+    };
+    request.onerror = (e) => reject(e.target.error);
+  });
+  return _dbPromise;
+}
+
+async function loadWeekIDB(wk) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('weeks', 'readonly');
+    const store = tx.objectStore('weeks');
+    const request = store.get(wk);
+    request.onsuccess = () => resolve(request.result ? request.result.data : null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveWeekIDB(wk, data) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction('weeks', 'readwrite');
+      const store = tx.objectStore('weeks');
+      store.put({ weekKey: wk, data });
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => {
+        const error = e.target.error;
+        if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+          // Wired in Task 10: show toast
+        }
+        reject(error);
+      };
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function listWeekKeysIDB() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('weeks', 'readonly');
+    const store = tx.objectStore('weeks');
+    const request = store.getAllKeys();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteWeekIDB(wk) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('weeks', 'readwrite');
+    const store = tx.objectStore('weeks');
+    store.delete(wk);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadValueIDB(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('misc', 'readonly');
+    const store = tx.objectStore('misc');
+    const request = store.get(key);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveValueIDB(key, value) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('misc', 'readwrite');
+    const store = tx.objectStore('misc');
+    store.put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function deleteValueIDB(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('misc', 'readwrite');
+    const store = tx.objectStore('misc');
+    store.delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// TODO: remove after 2026-07-28 — localStorage→IDB migration code
+async function runMigrationIfNeeded() {
+  if (localStorage.getItem('zenit-week-storage-migrated')) return;
+
+  const weekKeys = [];
+  const colorsKey = 'zenit-week-colors';
+  const importPendingKey = 'zenit-week-import-pending';
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('zenit-week-') && /^\d{4}-\d{2}$/.test(k.slice(11))) {
+      weekKeys.push(k);
+    }
+  }
+
+  // Migrate weeks
+  for (const k of weekKeys) {
+    try {
+      const raw = localStorage.getItem(k);
+      const data = raw ? JSON.parse(raw) : null;
+      if (data) {
+        await saveWeekIDB(k.slice(11), data);
+      }
+    } catch (e) {
+      console.error('Migration failed for key:', k, e);
+    }
+  }
+
+  // Migrate misc
+  const colorsData = localStorage.getItem(colorsKey);
+  if (colorsData) {
+    try {
+      await saveValueIDB(colorsKey, JSON.parse(colorsData));
+    } catch (e) {
+      console.error('Migration failed for colors', e);
+    }
+  }
+
+  const importPendingData = localStorage.getItem(importPendingKey);
+  if (importPendingData) {
+    await saveValueIDB(importPendingKey, importPendingData);
+  }
+
+  // Set flag and cleanup
+  localStorage.setItem('zenit-week-storage-migrated', '1');
+  weekKeys.forEach(k => localStorage.removeItem(k));
+  localStorage.removeItem(colorsKey);
+  localStorage.removeItem(importPendingKey);
+}
+
 // ─── Icon helper ──────────────────────────────────────────────────────────────
 function iconSvg(name) {
   return `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"/></svg>`;
@@ -2826,6 +2999,7 @@ let undoStack = [];
 let redoStack = [];
 const MAX_UNDO = 100;
 let _applyingSnapshot = false;
+let _nextWeekRawCache = null;
 
 let nodeMap = new Map();
 
@@ -2850,7 +3024,7 @@ function takeSnapshot() {
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
     nextWeekKey:   nextKey,
-    nextWeekRaw:   localStorage.getItem(storageKey(nextKey)),
+    nextWeekRaw:   _nextWeekRawCache,
     theme:         localStorage.getItem('zenit-week-theme'),
     lang:          localStorage.getItem('zenit-week-lang'),
   };
@@ -2859,7 +3033,7 @@ function takeSnapshot() {
   redoStack = [];
 }
 
-function _applySnapshot(raw) {
+async function _applySnapshot(raw) {
   const snapshot = JSON.parse(raw);
 
   // Switch to the week this snapshot was taken on, without clearing the stacks
@@ -2891,15 +3065,15 @@ function _applySnapshot(raw) {
   Object.keys(BRANCH_CONFIG).forEach(b => { delete BRANCH_CONFIG[b]; });
   syncBranchConfig();
   rebuildNodeMap();
-  saveWeek(currentWeekKey, weekData);
+  await saveWeek(currentWeekKey, weekData);
 
   // Restore next week's state if the snapshot captured it
   if (snapshot.nextWeekKey) {
-    const sk = storageKey(snapshot.nextWeekKey);
+    _nextWeekRawCache = snapshot.nextWeekRaw;
     if (snapshot.nextWeekRaw === null) {
-      localStorage.removeItem(sk);
+      await deleteWeekIDB(snapshot.nextWeekKey);
     } else {
-      localStorage.setItem(sk, snapshot.nextWeekRaw);
+      await saveWeekIDB(snapshot.nextWeekKey, JSON.parse(snapshot.nextWeekRaw));
     }
   }
 
@@ -2932,22 +3106,22 @@ function _currentSnapshot() {
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
     nextWeekKey:   nextKey,
-    nextWeekRaw:   localStorage.getItem(storageKey(nextKey)),
+    nextWeekRaw:   _nextWeekRawCache,
     theme:         localStorage.getItem('zenit-week-theme'),
     lang:          localStorage.getItem('zenit-week-lang'),
   });
 }
 
-function undo() {
+async function undo() {
   if (undoStack.length === 0) return;
   redoStack.push(_currentSnapshot());
-  _applySnapshot(undoStack.pop());
+  await _applySnapshot(undoStack.pop());
 }
 
-function redo() {
+async function redo() {
   if (redoStack.length === 0) return;
   undoStack.push(_currentSnapshot());
-  _applySnapshot(redoStack.pop());
+  await _applySnapshot(redoStack.pop());
 }
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
@@ -3023,27 +3197,26 @@ function reloadBranchPalettes() {
   });
 }
 
-function loadBranchColors() {
+async function loadBranchColors() {
   try {
-    const raw = localStorage.getItem(COLORS_STORAGE_KEY);
-    if (!raw) return;
-    const saved = JSON.parse(raw);
+    const saved = await loadValueIDB(COLORS_STORAGE_KEY);
+    if (!saved) return;
     Object.keys(saved).forEach(b => {
       if (saved[b] && saved[b].main) BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
     });
   } catch(e) {
-    console.warn('[zenit-week] Failed to load branch colors from localStorage:', e);
+    console.warn('[zenit-week] Failed to load branch colors from IndexedDB:', e);
   }
 }
 
-function saveBranchColors() {
+async function saveBranchColors() {
   const toSave = { savedAt: Date.now() };
   Object.keys(BRANCH_COLORS).forEach(b => {
     toSave[b] = { main: BRANCH_COLORS[b].main };
   });
   toSave.theme = localStorage.getItem('zenit-week-theme') || 'light';
   toSave.lang  = currentLang || 'en';
-  localStorage.setItem(COLORS_STORAGE_KEY, JSON.stringify(toSave));
+  await saveValueIDB(COLORS_STORAGE_KEY, toSave);
   scheduleColorsSync();
 }
 
@@ -3762,20 +3935,20 @@ function mergeWeekData(local, remote) {
 }
 
 // Apply a CRDT-merged result — defer if any atomic operation is in progress.
-function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData) {
+async function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData) {
   if (isAtomicOpActive() && wKey === currentWeekKey) {
     // Atomic op in progress — store remote data for re-merge once the op finishes
     pendingRemoteMerge = { wKey, remoteData };
     return;
   }
-  _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+  await _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
 }
 
-function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload) {
+async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload) {
   try {
-    localStorage.setItem(storageKey(wKey), mergedJson);
+    await saveWeekIDB(wKey, mergedData);
   } catch (e) {
-    console.error('[Drive] Failed to write merged data to localStorage:', e);
+    console.error('[Drive] Failed to write merged data to IndexedDB:', e);
   }
   if (wKey === currentWeekKey) {
     weekData = mergedData;
@@ -3791,18 +3964,17 @@ function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUp
   if (scheduleUpload) scheduleDriveSync(wKey);
 }
 
-function _flushPendingMerge() {
+async function _flushPendingMerge() {
   if (!pendingRemoteMerge) return;
   const { wKey, remoteData } = pendingRemoteMerge;
   pendingRemoteMerge = null;
   // Re-merge against current local state so any just-committed changes are included
-  const localJson = localStorage.getItem(storageKey(wKey));
-  const localData = localJson ? JSON.parse(localJson) : { nodes: [] };
+  const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
   const mergedData = mergeWeekData(localData, remoteData);
   const mergedJson = JSON.stringify(mergedData);
   const mergedHash = fnv1a32(mergedJson);
   const scheduleUpload = mergedHash !== fnv1a32(JSON.stringify(remoteData));
-  _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+  await _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
 }
 
 function beginAtomicOp() {
@@ -3871,8 +4043,7 @@ async function syncWeekFromDrive(wKey) {
       if (!remoteJson) return; // empty file — nothing to merge
 
       // CRDT merge: per-node LWW by _ts, union tombstones
-      const localJson = localStorage.getItem(storageKey(wKey));
-      const localData  = localJson ? JSON.parse(localJson) : { nodes: [] };
+      const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
       const remoteData = migrateCrdt(JSON.parse(remoteJson));
       const mergedData = mergeWeekData(localData, remoteData);
       const mergedJson = JSON.stringify(mergedData);
@@ -4144,8 +4315,9 @@ async function syncWeekToDrive(wKey) {
   await syncWeekFromDrive(wKey);
 
   // Re-read local after merge (syncWeekFromDrive may have updated it)
-  const json = localStorage.getItem(storageKey(wKey));
-  if (!json) return;
+  const data = await loadWeekIDB(wKey);
+  if (!data) return;
+  const json = JSON.stringify(data);
 
   const hash = fnv1a32(json);
   if (lastSyncedHash.get(wKey) === hash) return; // no change after merge — skip upload
@@ -4162,7 +4334,8 @@ async function syncWeekToDrive(wKey) {
 // Raw multipart PATCH for colors — no hash guard, no pull. Returns true on success.
 async function _uploadColorsToDrive(resetToken) {
   // Use stored colors if available, otherwise a minimal stub so resetToken always reaches Drive.
-  const json = localStorage.getItem(COLORS_STORAGE_KEY) || JSON.stringify({ savedAt: Date.now() });
+  const data = await loadValueIDB(COLORS_STORAGE_KEY);
+  const json = data ? JSON.stringify(data) : JSON.stringify({ savedAt: Date.now() });
   const hash = fnv1a32(json);
   let savedAt = 0;
   try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
@@ -4213,22 +4386,17 @@ async function forcePushAllToDrive() {
 
   setSyncStatus('syncing', 'Uploading imported data to Drive…');
 
-  // Collect all local week keys
-  const weekKeys = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    const m = key?.match(/^zenit-week-(\d{4}-\d{2})$/);
-    if (m) weekKeys.push(m[1]);
-  }
+  // Collect all local week keys from IDB
+  const weekKeys = await listWeekKeysIDB();
 
   // Upload all weeks (5 concurrent) and track failures
   let allOk = true;
   const CONCURRENCY = 5;
   for (let i = 0; i < weekKeys.length; i += CONCURRENCY) {
     const batch = weekKeys.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(batch.map(wKey => {
-      const json = localStorage.getItem(storageKey(wKey));
-      return json ? _uploadWeekToDrive(wKey, json) : Promise.resolve(true);
+    const results = await Promise.all(batch.map(async (wKey) => {
+      const data = await loadWeekIDB(wKey);
+      return data ? _uploadWeekToDrive(wKey, JSON.stringify(data)) : Promise.resolve(true);
     }));
     if (results.some(r => !r)) allOk = false;
   }
@@ -4240,7 +4408,7 @@ async function forcePushAllToDrive() {
   if (!colorsOk) allOk = false;
 
   if (allOk) {
-    localStorage.removeItem('zenit-week-import-pending');
+    await deleteValueIDB('zenit-week-import-pending');
     setSyncStatus('connected', 'Imported data synced to Drive');
   } else {
     setSyncStatus('error', 'Import sync incomplete — will retry on next sign-in');
@@ -4320,17 +4488,17 @@ async function syncColorsFromDrive() {
     if (!remoteJson.trim()) return;
     const remoteData = JSON.parse(remoteJson);
     const remoteSavedAt = remoteData.savedAt ?? 0;
-    const localJson = localStorage.getItem(COLORS_STORAGE_KEY);
-    let localSavedAt = 0;
-    if (localJson) { try { localSavedAt = JSON.parse(localJson).savedAt ?? 0; } catch { /* ignore */ } }
+    const localData = await loadValueIDB(COLORS_STORAGE_KEY);
+    const localSavedAt = localData?.savedAt ?? 0;
+
     if (remoteSavedAt > localSavedAt) {
-      localStorage.setItem(COLORS_STORAGE_KEY, remoteJson);
+      await saveValueIDB(COLORS_STORAGE_KEY, remoteData);
       // Apply theme to DOM before loading colors — deriveBranchPalette reads the DOM theme.
       if (remoteData.theme === 'light' || remoteData.theme === 'dark') {
         localStorage.setItem('zenit-week-theme', remoteData.theme);
         document.documentElement.dataset.theme = remoteData.theme === 'dark' ? 'dark' : '';
       }
-      loadBranchColors();    // now derives palettes against the correct theme
+      await loadBranchColors();    // now derives palettes against the correct theme
       reloadBranchPalettes(); // ensure light/text variants are re-derived for new theme
       if (remoteData.lang && remoteData.lang in TRANSLATIONS && remoteData.lang !== currentLang) {
         currentLang = remoteData.lang;
@@ -4960,22 +5128,34 @@ function migrateDayCounters(data) {
   return data;
 }
 
-function loadWeek(wk) {
-  const raw = localStorage.getItem(storageKey(wk));
-  if (raw) {
-    try {
-      const data = JSON.parse(raw);
-      return migrateCrdt(validateAndRepair(migrateDayCounters(data)));
-    } catch(e) {
-      console.warn(`[zenit-week] Failed to parse week data for key ${wk} — using defaults:`, e);
+async function loadWeek(wk) {
+  let data = await loadWeekIDB(wk);
+  if (!data) {
+    // Fallback for first load if migration hasn't run or failed
+    const raw = localStorage.getItem(storageKey(wk));
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch(e) {}
     }
   }
+
+  if (data) {
+    return migrateCrdt(validateAndRepair(migrateDayCounters(data)));
+  }
+
   // New week — inherit all branch nodes (IDs, labels, colors) from the previous week
   const prevWk = offsetWeek(wk, -1);
-  const prevRaw = localStorage.getItem(storageKey(prevWk));
-  if (prevRaw) {
+  let prevData = await loadWeekIDB(prevWk);
+  if (!prevData) {
+    const prevRaw = localStorage.getItem(storageKey(prevWk));
+    if (prevRaw) {
+      try { prevData = JSON.parse(prevRaw); } catch(e) {}
+    }
+  }
+
+  if (prevData) {
     try {
-      const prevData = JSON.parse(prevRaw);
       const prevBranches = (prevData.nodes || []).filter(n => n.type === 'branch');
       if (prevBranches.length > 0) {
         // Ensure BRANCH_COLORS has entries for all inherited branch IDs
@@ -4994,26 +5174,32 @@ function loadWeek(wk) {
   }
   return defaultWeekData();
 }
-function saveWeek(wk, data) {
+
+async function saveWeek(wk, data) {
   data.savedAt = Date.now();
   data.crdtVersion = (data.crdtVersion || 0) + 1;
   if (!Array.isArray(data.tombstones)) data.tombstones = [];
-  try {
-    localStorage.setItem(storageKey(wk), JSON.stringify(data));
-  } catch(e) {
-    console.error('[zenit-week] Failed to save week data — localStorage may be full:', e);
+  
+  await saveWeekIDB(wk, data);
+
+  // Update cache if this is the next week
+  if (wk === offsetWeek(currentWeekKey, 1)) {
+    _nextWeekRawCache = JSON.stringify(data);
   }
+
   scheduleDriveSync(wk);
 }
 
-function exportAllData() {
+async function exportAllData() {
   const data = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('zenit-week-')) {
-      data[key] = localStorage.getItem(key);
-    }
+  const weekKeys = await listWeekKeysIDB();
+  for (const wk of weekKeys) {
+    const wd = await loadWeekIDB(wk);
+    if (wd) data['zenit-week-' + wk] = JSON.stringify(wd);
   }
+  const colors = await loadValueIDB(COLORS_STORAGE_KEY);
+  if (colors) data[COLORS_STORAGE_KEY] = JSON.stringify(colors);
+
   const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data }, null, 2);
   const blob = new Blob([payload], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -5034,9 +5220,9 @@ function normalizeImportKey(key) {
   return null;
 }
 
-function importAllData(file) {
+async function importAllData(file) {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     let parsed;
     try {
       parsed = JSON.parse(e.target.result);
@@ -5047,43 +5233,43 @@ function importAllData(file) {
       console.error('[zenit-week] Import failed:', err);
       return;
     }
-    // Remove existing zenit-week-* keys first
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('zenit-week-')) keysToRemove.push(key);
+    // Remove existing zenit-week-* keys first from IDB
+    const weekKeys = await listWeekKeysIDB();
+    for (const wk of weekKeys) await deleteWeekIDB(wk);
+    await deleteValueIDB(COLORS_STORAGE_KEY);
+
+    for (const [key, val] of Object.entries(parsed.data)) {
+      const nk = normalizeImportKey(key);
+      if (!nk) continue;
+      if (nk.startsWith('zenit-week-') && /^\d{4}-\d{2}$/.test(nk.slice(11))) {
+        await saveWeekIDB(nk.slice(11), JSON.parse(val));
+      } else if (nk === COLORS_STORAGE_KEY) {
+        await saveValueIDB(COLORS_STORAGE_KEY, JSON.parse(val));
+      }
     }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-    // Write imported keys, normalizing old week-planner-* prefix if present
-    Object.entries(parsed.data).forEach(([key, value]) => {
-      const normalized = normalizeImportKey(key);
-      if (normalized) localStorage.setItem(normalized, value);
-    });
     // Generate a new reset token — other browsers that see a different token will wipe and resync.
     // Token is set before import-pending so forcePushAllToDrive can read it.
-    localStorage.setItem('zenit-week-reset-token', crypto.randomUUID());
+    localStorage.setItem('zenit-week-reset-token', genId());
     // Mark import pending — Drive will be force-pushed on next sign-in or immediately if signed in
-    localStorage.setItem('zenit-week-import-pending', '1');
-    // Stop any running poll — prevents it from detecting a resetToken mismatch between the
-    // new local token and the still-old remote token before forcePushAllToDrive completes.
+    await saveValueIDB('zenit-week-import-pending', '1');
+    // Stop any running poll — prevents it from detecting a resetToken mismatch
     stopDrivePoll();
-    // Re-initialize in-place — avoids a reload race where pollDriveMeta fires before
-    // forcePushAllToDrive updates the remote resetToken, causing a wipe of imported data.
+    // Re-initialize in-place
     try {
       undoStack = [];
       redoStack = [];
       currentLang = localStorage.getItem('zenit-week-lang') || 'en';
       const importedTheme = localStorage.getItem('zenit-week-theme') || 'light';
       document.documentElement.dataset.theme = importedTheme === 'dark' ? 'dark' : '';
-      loadBranchColors();
+      await loadBranchColors();
       reloadBranchPalettes();
       updateSvgFilters();
       updateColorDots();
       applyTranslations();
       saveBranchColors();
-      loadAndRender(todayWeekKey());
+      if (googleAccessToken) await forcePushAllToDrive();
+      await loadAndRender(todayWeekKey());
     } catch (reinitErr) {
-      // Data is safely in localStorage — a manual refresh will show it.
       console.error('[zenit-week] Import re-init failed:', reinitErr);
       const errEl = document.getElementById('import-error');
       if (errEl) { errEl.style.display = ''; errEl.textContent = t('settings.importReloadHint'); }
@@ -5092,9 +5278,9 @@ function importAllData(file) {
   reader.readAsText(file);
 }
 
-function transferUnfinished() {
+async function transferUnfinished() {
   const prevWeekKey = offsetWeek(currentWeekKey, -1);
-  const prevData = loadWeek(prevWeekKey);
+  const prevData = await loadWeek(prevWeekKey);
   if (!prevData || !prevData.nodes) return;
 
   beginAtomicOp();
@@ -5152,15 +5338,15 @@ function transferUnfinished() {
   });
   rebuildNodeMap();
 
-  saveWeek(currentWeekKey, weekData);
+  await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
   render();
   applyAutoLayout();
 }
 
-function transferReusable() {
+async function transferReusable() {
   const prevWeekKey = offsetWeek(currentWeekKey, -1);
-  const prevData = loadWeek(prevWeekKey);
+  const prevData = await loadWeek(prevWeekKey);
   if (!prevData || !prevData.nodes) return;
 
   beginAtomicOp();
@@ -5274,13 +5460,13 @@ function transferReusable() {
   });
   rebuildNodeMap();
 
-  saveWeek(currentWeekKey, weekData);
+  await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
   render();
   applyAutoLayout();
 }
 
-function moveNodeToNextWeek(nodeId) {
+async function moveNodeToNextWeek(nodeId) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
 
@@ -5288,7 +5474,7 @@ function moveNodeToNextWeek(nodeId) {
   takeSnapshot();
 
   const nextKey = offsetWeek(currentWeekKey, +1);
-  const nextData = loadWeek(nextKey);
+  const nextData = await loadWeek(nextKey);
   const nextById = new Map(nextData.nodes.map(n => [n.id, n]));
 
   // 1. Ensure the branch exists in next week (same id)
@@ -5395,8 +5581,8 @@ function moveNodeToNextWeek(nodeId) {
     pruneTarget = findNode(pruneParentId);
   }
 
-  saveWeek(nextKey, nextData);
-  saveWeek(currentWeekKey, weekData);
+  await saveWeek(nextKey, nextData);
+  await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
   render();
   applyAutoLayout();
@@ -7328,6 +7514,8 @@ function render() {
   attachNodeListeners();
   applyFilters();
   updateSummary();
+
+  document.body.classList.remove('app-loading');
 }
 
 // Global keyboard shortcuts for hovered node
@@ -7482,10 +7670,25 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     startAddNode(id);
   } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    if (id === 'center') {
+      e.preventDefault();
+      showAppConfirm({
+        title: t('menu.clearWeek'),
+        body: t('confirm.clearWeek'),
+        okLabel: t('menu.clearWeek'),
+        danger: true,
+        onConfirm: async () => {
+          await deleteWeekIDB(currentWeekKey);
+          await loadAndRender(currentWeekKey);
+        }
+      });
+      return;
+    }
     if (node.type === 'branch' && weekData.nodes.filter(n => n.type === 'branch').length <= 1) return;
     e.preventDefault();
     deleteNode(id);
-  } else if (e.key.toLowerCase() === 'd') {
+  }
+ else if (e.key.toLowerCase() === 'd') {
     if (id !== 'center' && node.type !== 'branch') {
       e.preventDefault();
       setStatus(id, node.done ? 'undone' : 'done');
@@ -7996,23 +8199,23 @@ document.getElementById('ctx-set-baseline').addEventListener('click', () => {
   openBaselinePanel(rect.right + 4, rect.top);
 });
 
-document.getElementById('ctx-current-week').addEventListener('click', () => {
-  loadAndRender(todayWeekKey());
+document.getElementById('ctx-current-week').addEventListener('click', async () => {
+  await loadAndRender(todayWeekKey());
   hideContextMenu();
 });
 
-document.getElementById('ctx-transfer-unfinished').addEventListener('click', () => {
-  transferUnfinished();
+document.getElementById('ctx-transfer-unfinished').addEventListener('click', async () => {
+  await transferUnfinished();
   hideContextMenu();
 });
 
-document.getElementById('ctx-transfer-reusable').addEventListener('click', () => {
-  transferReusable();
+document.getElementById('ctx-transfer-reusable').addEventListener('click', async () => {
+  await transferReusable();
   hideContextMenu();
 });
 
-document.getElementById('ctx-move-next-week').addEventListener('click', () => {
-  moveNodeToNextWeek(contextTarget);
+document.getElementById('ctx-move-next-week').addEventListener('click', async () => {
+  if (contextTarget) await moveNodeToNextWeek(contextTarget);
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
@@ -8138,11 +8341,11 @@ document.getElementById('ctx-move-next-week').addEventListener('click', () => {
   });
 })();
 
-document.getElementById('ctx-clear-week').addEventListener('click', () => {
+document.getElementById('ctx-clear-week').addEventListener('click', async () => {
   hideContextMenu();
   takeSnapshot();
-  localStorage.removeItem(storageKey(currentWeekKey));
-  weekData = loadWeek(currentWeekKey);
+  await deleteWeekIDB(currentWeekKey);
+  weekData = await loadWeek(currentWeekKey);
   rebuildNodeMap();
   syncBranchConfig();
   render();
@@ -9469,9 +9672,9 @@ window.addEventListener('pointerup', (e) => {
 });
 
 // ─── Week navigation ──────────────────────────────────────────────────────────
-function loadAndRender(wk) {
+async function loadAndRender(wk) {
   currentWeekKey = wk;
-  weekData = loadWeek(wk);
+  weekData = await loadWeek(wk);
   rebuildNodeMap();
   syncBranchConfig();
   location.hash = wk;
@@ -9485,12 +9688,12 @@ function loadAndRender(wk) {
   }
 }
 
-window.addEventListener('hashchange', () => {
+window.addEventListener('hashchange', async () => {
   if (_applyingSnapshot) return;
   const hashWeek = location.hash.slice(1);
   if (/^\d{4}-\d{2}$/.test(hashWeek) && hashWeek !== currentWeekKey) {
     currentWeekKey = hashWeek;
-    weekData = loadWeek(currentWeekKey);
+    weekData = await loadWeek(currentWeekKey);
     rebuildNodeMap();
     syncBranchConfig();
     render();
@@ -9691,8 +9894,12 @@ document.getElementById('export-data-btn').addEventListener('click', () => {
 })();
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   if (IS_OAUTH_POPUP) return;
+
+  await openDB();
+  await runMigrationIfNeeded();
+
   currentLang = localStorage.getItem('zenit-week-lang') || 'en';
   loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
@@ -9707,7 +9914,13 @@ window.addEventListener('load', () => {
   initGoogleAuth(); // no-op if GIS not yet loaded; onGoogleLibraryLoad handles that case
   const hashWeek = location.hash.slice(1);
   const initialWeek = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
-  loadAndRender(initialWeek);
+
+  // Cache next week raw data for undo/redo
+  const nextWeekKey = offsetWeek(initialWeek, 1);
+  const nextWeekData = await loadWeekIDB(nextWeekKey);
+  _nextWeekRawCache = nextWeekData ? JSON.stringify(nextWeekData) : null;
+
+  await loadAndRender(initialWeek);
   applyTranslations();
   updateColorDots();
 
