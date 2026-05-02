@@ -73,7 +73,10 @@ const sandbox = {
         };
         return { ...elementStub(), getContext: () => ctx2d, width: 160, height: 120 };
       }
-      return elementStub();
+      // Return a cached stub per ID so tests can verify side effects (like .style.display)
+      if (!sandbox._elCache) sandbox._elCache = {};
+      if (!sandbox._elCache[id]) sandbox._elCache[id] = elementStub();
+      return sandbox._elCache[id];
     },
     querySelector: () => null,
     querySelectorAll: () => [],
@@ -204,6 +207,7 @@ startDrivePoll = () => {};
 forcePushAllToDrive = () => {};
 initDriveSync = () => Promise.resolve();
 scheduleDriveSync = () => {};
+todayWeekKey = () => currentWeekKey;
 
 _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
@@ -229,6 +233,7 @@ _state.getLocalStorage = function(key) {
   return _lsStore[key];
 };
 _state.getDocument = function() { return document; };
+_state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
@@ -295,7 +300,9 @@ export const {
   takeSnapshot,
   undo,
   redo,
-  // UI & Theme
+  // UI & Action Logic
+  showContextMenu,
+  hideContextMenu,
   applyTheme,
   getThemeColors,
   deriveBranchPalette,
