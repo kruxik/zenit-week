@@ -199,6 +199,9 @@ _state.setLocalStorage = function(key, data) {
 _state.clearLocalStorage = function() {
   for (const k in _lsStore) delete _lsStore[k];
 };
+_state.getLocalStorage = function(key) {
+  return _lsStore[key];
+};
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 
 // Initialize app state
