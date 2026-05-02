@@ -93,6 +93,8 @@ const sandbox = {
     getItem(k)    { return sandbox._lsStore[k] ?? null; },
     setItem(k, v) { sandbox._lsStore[k] = v; },
     removeItem(k) { delete sandbox._lsStore[k]; },
+    key(i)        { return Object.keys(sandbox._lsStore)[i] ?? null; },
+    get length()  { return Object.keys(sandbox._lsStore).length; },
   },
   location: { hash: '' },
   navigator: { userAgentData: null, userAgent: '' },
@@ -118,6 +120,7 @@ const sandbox = {
       onerror: null,
     }),
   },
+  _idbStore: {},
   // Test state bridge — populated by the appended accessor snippet below
   _state: {},
 };
@@ -165,13 +168,25 @@ saveWeek = function(wk, data) {
 
 // Mock IDB functions to be no-ops or simple resolved promises to avoid ReferenceErrors
 openDB = () => Promise.resolve(_dbMock);
-loadWeekIDB = (wk) => Promise.resolve(null);
-saveWeekIDB = (wk, data) => Promise.resolve();
-deleteWeekIDB = (wk) => Promise.resolve();
-listWeekKeysIDB = () => Promise.resolve([]);
-loadValueIDB = (key) => Promise.resolve(null);
-saveValueIDB = (key, val) => Promise.resolve();
-deleteValueIDB = (key) => Promise.resolve();
+loadWeekIDB = (wk) => Promise.resolve(_idbStore['week-' + wk] ?? null);
+saveWeekIDB = (wk, data) => {
+  _idbStore['week-' + wk] = data;
+  return Promise.resolve();
+};
+deleteWeekIDB = (wk) => {
+  delete _idbStore['week-' + wk];
+  return Promise.resolve();
+};
+listWeekKeysIDB = () => Promise.resolve(Object.keys(_idbStore).filter(k => k.startsWith('week-')).map(k => k.slice(5)));
+loadValueIDB = (key) => Promise.resolve(_idbStore['val-' + key] ?? null);
+saveValueIDB = (key, val) => {
+  _idbStore['val-' + key] = val;
+  return Promise.resolve();
+};
+deleteValueIDB = (key) => {
+  delete _idbStore['val-' + key];
+  return Promise.resolve();
+};
 
 // UI/DOM Stubs to prevent crashes in VM
 render = () => {};
@@ -215,6 +230,8 @@ _state.getLocalStorage = function(key) {
 };
 _state.getDocument = function() { return document; };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
+_state.getIDBStore = function() { return _idbStore; };
+_state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
 
 // Initialize app state
 currentLang = 'en';
