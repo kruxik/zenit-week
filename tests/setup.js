@@ -298,6 +298,7 @@ export const {
   // UI & Theme
   applyTheme,
   getThemeColors,
+  deriveBranchPalette,
   t,
   // Storage
   runMigrationIfNeeded,
