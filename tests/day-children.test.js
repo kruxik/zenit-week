@@ -368,7 +368,7 @@ describe('validateAndRepair — dayChild/dayIndex fields preserved', () => {
 describe('transferReusable — day-children of reusable parents carry over', () => {
   beforeEach(() => { _state.clearLocalStorage(); });
 
-  test('day-children of reusable parent are transferred with done reset', () => {
+  test('day-children of reusable parent are transferred with done reset', async () => {
     const curKey = '2026-01';
     const prevKey = '2025-52';
 
@@ -387,7 +387,7 @@ describe('transferReusable — day-children of reusable parents carry over', () 
     _state.setWeekKey(curKey);
     _state.reset();
 
-    transferReusable();
+    await transferReusable();
 
     const nodes = _state.get().nodes;
     const parent = nodes.find(n => n.label === 'Running');

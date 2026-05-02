@@ -6024,6 +6024,7 @@ function computeLayout() {
   const nodeZigZagMetrics = {};
 
   function getZigZagMetrics(nodeId) {
+    if (!autoLayout) return nodeZigZagMetrics[nodeId] = null;
     if (nodeId in nodeZigZagMetrics) return nodeZigZagMetrics[nodeId];
     const node = findNode(nodeId);
     if (!node || node.type !== 'activity') return nodeZigZagMetrics[nodeId] = null;
@@ -6712,7 +6713,10 @@ function getAnyDayItems() {
     if (n.type !== 'activity' || n.dayChild) return false;
     const hasDayChildren = n.children.some(id => findNode(id)?.dayChild);
     if (hasDayChildren) return false;
-    return parseTodoDays(n.label || '').size === 0;
+    // Exclude if it has (mo, tu...) tokens in label
+    if (parseTodoDays(n.label || '').size > 0) return false;
+    // Include only if it has a counter child
+    return n.children.some(id => findNode(id)?.type === 'counter');
   });
 }
 
@@ -10063,4 +10067,6 @@ window.addEventListener('resize', () => {
 <div id="custom-tooltip"></div>
 </body>
 <!-- bstack-verify: d6b2f4e8c1a30975b4e2d6f8c1a30e79 -->
+</html>
+79 -->
 </html>
