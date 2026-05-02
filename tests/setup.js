@@ -166,6 +166,23 @@ loadValueIDB = (key) => Promise.resolve(null);
 saveValueIDB = (key, val) => Promise.resolve();
 deleteValueIDB = (key) => Promise.resolve();
 
+// UI/DOM Stubs to prevent crashes in VM
+render = () => {};
+applyAutoLayout = () => {};
+updateSummary = () => {};
+updateColorDots = () => {};
+updateSvgFilters = () => {};
+syncBranchConfig = () => {};
+applyTranslations = () => {};
+updateThemeColor = () => {};
+scheduleColorsSync = () => {};
+isAtomicOpActive = () => false;
+stopDrivePoll = () => {};
+startDrivePoll = () => {};
+forcePushAllToDrive = () => {};
+initDriveSync = () => Promise.resolve();
+scheduleDriveSync = () => {};
+
 _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
 _state.setWeekKey = function(k) { currentWeekKey = k; };
@@ -183,6 +200,12 @@ _state.clearLocalStorage = function() {
   for (const k in _lsStore) delete _lsStore[k];
 };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
+
+// Initialize app state
+currentLang = 'en';
+currentWeekKey = '2026-01';
+weekData = defaultWeekData();
+rebuildNodeMap();
 `;
 
 vm.runInContext(scriptCode + stateAccessors, sandbox);
@@ -230,5 +253,21 @@ export const {
   loadAgendaGroupOrder,
   saveAgendaGroupOrder,
   applyAgendaOrder,
+  // CRDT & Sync
+  mergeWeekData,
+  migrateCrdt,
+  // Transfers
+  transferUnfinished,
+  moveNodeToNextWeek,
+  // History
+  takeSnapshot,
+  undo,
+  redo,
+  // UI & Theme
+  applyTheme,
+  getThemeColors,
+  t,
+  // Storage
+  runMigrationIfNeeded,
   _state,
 } = sandbox;
