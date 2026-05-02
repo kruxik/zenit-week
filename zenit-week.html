@@ -2373,24 +2373,6 @@
   #single-tab-overlay h1 { font-weight: 400; margin-bottom: 12px; }
   #single-tab-overlay p { opacity: 0.8; max-width: 400px; line-height: 1.5; }
 </style>
-<!-- Key migration: rename week-planner-* → zenit-week-* once, before any reads -->
-<script>
-  (function() {
-    'use strict';
-    if (!localStorage.getItem('zenit-week-migrated')) {
-      const toMigrate = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('week-planner-')) toMigrate.push(k);
-      }
-      toMigrate.forEach(function(k) {
-        localStorage.setItem('zenit-week-' + k.slice('week-planner-'.length), localStorage.getItem(k));
-        localStorage.removeItem(k);
-      });
-      localStorage.setItem('zenit-week-migrated', '1');
-    }
-  })();
-</script>
 <!-- Theme init: runs synchronously before first paint to prevent flash of wrong theme -->
 <script>
   (function() {
