@@ -7313,7 +7313,7 @@ function applyFilters() {
 function updateSummary() {
   const allNodes = weekData.nodes.filter(n => !n._editing);
   const leaves = allNodes.filter(n => {
-    if (n.type === 'branch') return false;
+    if (n.type === 'branch' || n.type === 'center') return false;
     // Only count as leaf if no active children exist
     const activeChildren = (n.children || []).filter(cid => {
       const child = findNode(cid);

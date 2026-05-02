@@ -1,0 +1,47 @@
+Mobil - chybí Undo/Redo ikonky
+Mobil - přehodit ten dolní panel nahoru
+Mobil - přechodit chování drag a click - click: menu, drag přesouvání
+
+Nemůžu plánovat TODO listy na jednotlivé dny v seznamech
+Komentář k danému nodu - dávat si tam poznámky
+Ikonky nejsou dobře formátované, když se vloží aktivitou. Po refreshi se to srovná
+Edit vypadá dementně - dřív to bylo lepší
+Todays activities zobrazuje v jiném týdnu nesmysly
+Když přesouvám node nad jiný node, nevidím vizuálně, že se spojí, to by chtělo zlepšit.
+Všechny operace s položkou musí jít dělat i v Today's Activities
+
+
+-- WIP --
++ Agenda, Mapa prohodit
++ Změnit ty hnusné button Agenda a Mapa na krásné rounded pilulky
++ Agenda je na desktopu nesmyslně široká
+- Counters se chovají divně: nejdou do Done, dokud nejsou opravdu done.
++ Agenda nerespektuje jazyk okamžitě, musí se refreshnout.
++ Grafický styl highlighnuté položky je ugly
+- Swipe by měl být viditelný
+- Toast should be up
+- Clear day filter - add icon
+
+
+== Hotovo ==
+Přidat automatické rozvržení
+Mezi větvema chci dvojnásobnou mezeru
+Login - vydrží jen hoďku
+Login - krade focus
+Login - furt žádá o práva
+Staging a Production prostředí
+Když přesunu nějaký nod do příštího, rodič dostane blesk a done.
+Když přesunu z větve poslední nedodělanou položku na příští týden, rodič se neuzavře, to samé pro Unplanned
+
+
+
+
+== Nevím, jestli řešit ==
+Přihlášení by mělo být vázané na doménu, abych si nepřepisoval localhostem produkční data
+
+Read SPEC.md first. Then read docs/ideas/agenda-and-day-filter.md (Track B section) and zenit-week.html to understand the current codebase before writing anything.                                                                      
+  Track A is already implemented, Track B 1-4 is already implemente. Continue with Track B step 5.                                                                                                                                               After each implementation step, print a numbered list of manual test scenarios in this format before asking to commit:                                                                                                                   
+  1. What to do: exact steps (open app, click X, type Y, press Z)                                                                                                                                                                          
+  2. What to expect: the exact visual/behavioural result                                                                                                                                                                                   
+  Cover the golden path and key edge cases for that step. Wait for me to confirm all scenarios pass before moving to the next step. Report any glitches one by one before committing.                                                      
+  The existing vitest suite is in tests/ — extend it for any new data logic.  

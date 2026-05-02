@@ -20,6 +20,9 @@ function elementStub() {
     removeEventListener: () => {},
     classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
     style: {},
+    title: '',
+    ariaLabel: '',
+    placeholder: '',
     contains: () => false,
     value: '',
     textContent: '',
@@ -30,7 +33,16 @@ function elementStub() {
     removeChild: () => {},
     insertBefore: () => {},
     querySelector: () => null,
-    querySelectorAll: () => [],
+    querySelectorAll: (selector) => {
+      const all = Object.values(sandbox._elCache || {});
+      if (selector === '[data-i18n]') {
+        return all.filter(el => el.dataset.i18n);
+      }
+      if (selector === '[data-i18n-title]') {
+        return all.filter(el => el.dataset.i18nTitle);
+      }
+      return [];
+    },
     focus: () => {},
     select: () => {},
     scrollWidth: 0,
@@ -79,7 +91,16 @@ const sandbox = {
       return sandbox._elCache[id];
     },
     querySelector: () => null,
-    querySelectorAll: () => [],
+    querySelectorAll: (selector) => {
+      const all = Object.values(sandbox._elCache || {});
+      if (selector === '[data-i18n]') {
+        return all.filter(el => el.dataset.i18n);
+      }
+      if (selector === '[data-i18n-title]') {
+        return all.filter(el => el.dataset.i18nTitle);
+      }
+      return [];
+    },
     documentElement: { dataset: { theme: 'light' } },
     createTextNode: (text) => ({ nodeType: 3, textContent: text }),
     createElement: (tag) => {
@@ -194,11 +215,9 @@ deleteValueIDB = (key) => {
 // UI/DOM Stubs to prevent crashes in VM
 render = () => {};
 applyAutoLayout = () => {};
-updateSummary = () => {};
 updateColorDots = () => {};
 updateSvgFilters = () => {};
 syncBranchConfig = () => {};
-applyTranslations = () => {};
 updateThemeColor = () => {};
 scheduleColorsSync = () => {};
 isAtomicOpActive = () => false;
@@ -237,6 +256,8 @@ _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
+_state.getBranchConfig = function() { return BRANCH_CONFIG; };
+_state.getBranchColors = function() { return BRANCH_COLORS; };
 
 // Initialize app state
 currentLang = 'en';
@@ -267,6 +288,8 @@ export const {
   findNode,
   rebuildNodeMap,
   isLeafActivity,
+  getPriorityScale,
+  getPriorityWeight,
   getDescendantIds,
   // Day-child functions
   getDayFilterOpacity,
@@ -277,6 +300,12 @@ export const {
   transferReusable,
   computeLayout,
   getNodeSize,
+  updateCounter,
+  addBranch,
+  deleteBranch,
+  applyBranchColor,
+  updateSummary,
+  applyTranslations,
   // Agenda helpers
   isoWeekPos,
   sortDayChildren,
@@ -311,3 +340,6 @@ export const {
   runMigrationIfNeeded,
   _state,
 } = sandbox;
+
+export const BRANCH_CONFIG = sandbox._state.getBranchConfig();
+export const BRANCH_COLORS = sandbox._state.getBranchColors();
