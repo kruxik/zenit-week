@@ -2354,6 +2354,24 @@
   body.app-loading #main-svg {
     opacity: 0;
   }
+
+  /* Single-tab enforcement overlay */
+  #single-tab-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg-overlay);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    text-align: center;
+    padding: 24px;
+  }
+  #single-tab-overlay.visible { display: flex; }
+  #single-tab-overlay h1 { font-weight: 400; margin-bottom: 12px; }
+  #single-tab-overlay p { opacity: 0.8; max-width: 400px; line-height: 1.5; }
 </style>
 <!-- Key migration: rename week-planner-* → zenit-week-* once, before any reads -->
 <script>
@@ -2396,6 +2414,12 @@
 </script>
 </head>
 <body class="app-loading">
+<div id="single-tab-overlay">
+  <div>
+    <h1 data-i18n="blocked.title">Application Blocked</h1>
+    <p data-i18n="blocked.body">Zenit Week is already open in another tab. Please use that tab or close it to continue here.</p>
+  </div>
+</div>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
@@ -2819,6 +2843,32 @@ const IS_OAUTH_POPUP = (() => {
   return true;
 })();
 
+// ─── Single Tab Enforcement ───────────────────────────────────────────────────
+const tabChannel = new BroadcastChannel('zenit-week-tabs');
+let _isBlocked = false;
+
+function showBlockedOverlay() {
+  _isBlocked = true;
+  document.getElementById('single-tab-overlay').classList.add('visible');
+}
+
+tabChannel.onmessage = (e) => {
+  if (e.data === 'ping' && !_isBlocked) {
+    tabChannel.postMessage('pong');
+  } else if (e.data === 'pong') {
+    showBlockedOverlay();
+  }
+};
+
+// Initial check: ping other tabs. If any pong back within 150ms, block this one.
+if (!IS_OAUTH_POPUP) {
+  tabChannel.postMessage('ping');
+  setTimeout(() => {
+    // If we're already blocked by a pong, do nothing.
+    // If not, we're the winner tab.
+  }, 150);
+}
+
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
 const DB_NAME = 'zenit-week-db';
 const DB_VERSION = 1;
@@ -2826,7 +2876,7 @@ let _db = null;
 let _dbPromise = null;
 
 function onDbBlocked() {
-  // Wired in Task 10
+  showBlockedOverlay();
 }
 
 function openDB() {
@@ -2874,7 +2924,7 @@ async function saveWeekIDB(wk, data) {
       tx.onerror = (e) => {
         const error = e.target.error;
         if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
-          // Wired in Task 10: show toast
+          showToast(t('error.quotaExceeded') || 'Storage quota exceeded — changes might not be saved', 5000);
         }
         reject(error);
       };
@@ -4776,10 +4826,13 @@ const TRANSLATIONS = {
     'help.unplanned':             'Unplanned',
     'help.done':                  'Done',
     'filter.unscheduled':         'Unscheduled',
+    'blocked.title':              'Application Blocked',
+    'blocked.body':               'Zenit Week is already open in another tab. Please use that tab or close it to continue here.',
     'filter.prefix':              'Filter',
     'filter.off':                 'Filter off',
     'filter.alreadyScheduled':    'Already scheduled for',
     'menu.clearDayFilter':        'Clear Day Filter',
+    'error.quotaExceeded':        'Storage quota exceeded — changes might not be saved',
   },
   cs: {
     'toolbar.today':              'Dnes',
@@ -4884,10 +4937,13 @@ const TRANSLATIONS = {
     'help.unplanned':             'Neplánované',
     'help.done':                  'Hotovo',
     'filter.unscheduled':         'Neplánované',
+    'blocked.title':              'Aplikace je blokována',
+    'blocked.body':               'Zenit Week je již otevřen v jiném panelu. Pokračujte tam, nebo jej zavřete a pokračujte zde.',
     'filter.prefix':              'Filtr',
     'filter.off':                 'Filtr vypnut',
     'filter.alreadyScheduled':    'Již naplánováno pro',
     'menu.clearDayFilter':        'Zrušit filtr dne',
+    'error.quotaExceeded':        'Úložná kvóta byla překročena — změny nemusí být uloženy',
   },
 };
 

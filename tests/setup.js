@@ -47,6 +47,11 @@ const sandbox = {
   crypto: globalThis.crypto,
   console,
   window: { addEventListener: () => {} },
+  BroadcastChannel: class {
+    constructor() {}
+    postMessage() {}
+    close() {}
+  },
   document: {
     addEventListener: () => {},
     getElementById: (id) => {
