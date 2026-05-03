@@ -16,10 +16,19 @@ const scriptCode = match[1];
 
 // Reusable stub for DOM elements returned by getElementById / createElement
 function elementStub() {
+  const classes = new Set();
   return {
     addEventListener: () => {},
     removeEventListener: () => {},
-    classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
+    classList: {
+      add: (c) => classes.add(c),
+      remove: (c) => classes.delete(c),
+      contains: (c) => classes.has(c),
+      toggle: (c) => {
+        if (classes.has(c)) classes.delete(c);
+        else classes.add(c);
+      }
+    },
     style: {},
     title: '',
     ariaLabel: '',

@@ -134,32 +134,30 @@ describe('Persistence (IndexedDB)', () => {
     it('should handle QuotaExceededError', async () => {
       _state.resetIDB();
       const db = await openDB();
-      const originalTransaction = db.transaction;
       
-      // Mock db.transaction to simulate an async QuotaExceededError
-      db.transaction = function(...args) {
-        const tx = originalTransaction.apply(this, args);
-        if (args[0] === 'weeks' && args[1] === 'readwrite') {
-          const originalObjectStore = tx.objectStore;
-          tx.objectStore = function(...osArgs) {
-            const store = originalObjectStore.apply(this, osArgs);
-            const originalPut = store.put;
-            store.put = function(...putArgs) {
-              const request = originalPut.apply(this, putArgs);
-              setTimeout(() => {
-                const error = new DOMException('Quota exceeded', 'QuotaExceededError');
-                if (tx.onerror) tx.onerror({ target: { error } });
-              }, 0);
-              return request;
-            };
-            return store;
-          };
-        }
-        return tx;
+      const mockTx = {
+        objectStore: () => ({
+          put: () => ({ onsuccess: null, onerror: null })
+        }),
+        oncomplete: null,
+        onerror: null,
+        abort: () => {}
       };
+      
+      const originalTransaction = db.transaction;
+      db.transaction = () => mockTx;
 
       try {
-        await expect(saveWeekIDB('any', {})).rejects.toThrow();
+        const savePromise = saveWeekIDB('any', {});
+        
+        // Trigger the error on the next tick
+        setTimeout(() => {
+          const error = new DOMException('Quota exceeded', 'QuotaExceededError');
+          if (mockTx.onerror) mockTx.onerror({ target: { error } });
+        }, 0);
+        
+        await expect(savePromise).rejects.toThrow();
+        
         const toast = _state.getElement('toast');
         expect(toast.textContent).toBeDefined();
       } finally {
@@ -191,6 +189,15 @@ describe('Persistence (IndexedDB)', () => {
       } finally {
         _state.sandbox.openDB = originalOpenDB;
       }
+    });
+
+    it('should show blocked overlay if IDB is blocked', async () => {
+      const overlay = _state.getElement('single-tab-overlay');
+      expect(overlay.classList.contains('visible')).toBe(false);
+      
+      _state.sandbox.onDbBlocked();
+      
+      expect(overlay.classList.contains('visible')).toBe(true);
     });
   });
 });
