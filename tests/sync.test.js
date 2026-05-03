@@ -151,6 +151,15 @@ describe('Google Drive Sync', () => {
       const ok = await silentRefresh('invalid_token');
       expect(ok).toBe(false);
     });
+
+    test('attemptSilentRestore clears localStorage on failure', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'invalid_token', email: 'test@ex.com' });
+      
+      await attemptSilentRestore();
+      
+      expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBeUndefined();
+      expect(_state.getAccessToken()).toBeNull();
+    });
   });
 
   describe('Drive API Orchestration', () => {
@@ -198,6 +207,9 @@ describe('Google Drive Sync', () => {
       
       expect(patchedBody).not.toBeNull();
       expect(patchedBody).toContain('local_node');
+      // Acceptance criteria: Verify metadata appProperties
+      expect(patchedBody).toContain('appProperties');
+      expect(patchedBody).toContain('contentHash');
     });
 
     test('pollDriveMeta detects remote changes and triggers sync', async () => {
@@ -211,6 +223,30 @@ describe('Google Drive Sync', () => {
       
       const merged = (await _state.loadWeekIDB('2026-01'));
       expect(merged.nodes.some(n => n.id === 'remote_node')).toBe(true);
+    });
+
+    test('pollDriveMeta skips download when hash matches local', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+      await attemptSilentRestore();
+      _state.setDriveFileId('2026-01', 'file_id_2026_01');
+      
+      let fetchCount = 0;
+      server.use(
+        http.get('https://www.googleapis.com/drive/v3/files/file_id_2026_01', ({ request }) => {
+          const url = new URL(request.url);
+          if (url.searchParams.get('alt') === 'media') {
+            fetchCount++;
+            return HttpResponse.json(defaultWeekData());
+          }
+          return HttpResponse.json({ appProperties: { contentHash: 'synced_hash' } });
+        })
+      );
+
+      _state.setLastSyncedHash('2026-01', 'synced_hash');
+      
+      await pollDriveMeta('2026-01');
+      
+      expect(fetchCount).toBe(0); // Should skip the media fetch
     });
     
     test('pollDriveMeta handles resetToken mismatch (Full Resync)', async () => {
