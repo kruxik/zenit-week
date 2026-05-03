@@ -57,6 +57,12 @@ function elementStub() {
 // window.addEventListener is stubbed so the 'load' callback never fires.
 const sandbox = {
   crypto: globalThis.crypto,
+  fetch: (url, options) => {
+    const finalUrl = (typeof url === 'string' && url.startsWith('/'))
+      ? `http://localhost${url}`
+      : url;
+    return globalThis.fetch(finalUrl, options);
+  },
   console,
   CustomEvent: class {
     constructor(type) { this.type = type; }
@@ -64,7 +70,35 @@ const sandbox = {
   window: { 
     addEventListener: () => {},
     dispatchEvent: () => {},
-    location: { origin: '' },
+    location: { origin: 'http://localhost', pathname: '/' },
+    fetch: null, // populated below
+    gapi: null,  // populated below
+  },
+  gapi: {
+    load: (name, cb) => cb(),
+    client: {
+      init: () => Promise.resolve(),
+      setToken: () => {},
+      request: async (config) => {
+        const url = new URL(config.path);
+        if (config.params) {
+          Object.entries(config.params).forEach(([k, v]) => url.searchParams.append(k, v));
+        }
+        const resp = await globalThis.fetch(url.toString(), {
+          method: config.method,
+          headers: config.headers,
+          body: config.body,
+        });
+        const result = await resp.json();
+        if (!resp.ok) {
+          const error = new Error('GAPI Error');
+          error.status = resp.status;
+          error.result = { error: { code: resp.status, message: result.error?.message } };
+          throw error;
+        }
+        return { result };
+      }
+    }
   },
   BroadcastChannel: class {
     constructor() {}
@@ -101,7 +135,7 @@ const sandbox = {
       }
       return [];
     },
-    documentElement: { dataset: { theme: 'light' } },
+    documentElement: { ...elementStub(), dataset: { theme: 'light' } },
     createTextNode: (text) => ({ nodeType: 3, textContent: text }),
     createElement: (tag) => {
       if (tag === 'canvas') {
@@ -148,11 +182,48 @@ const sandbox = {
   // Test state bridge — populated by the appended accessor snippet below
   _state: {},
 };
+sandbox.window.fetch = sandbox.fetch;
+sandbox.window.gapi = sandbox.gapi;
 
 vm.createContext(sandbox);
 
 // Append state accessors so tests can read/write let-scoped app variables
 const stateAccessors = `
+const _origExchangeToken = exchangeToken;
+exchangeToken = async function(params) {
+  return _origExchangeToken(params);
+};
+
+const _origSilentRefresh = silentRefresh;
+silentRefresh = async function(token) {
+  return _origSilentRefresh(token);
+};
+
+const _origSyncWeekFromDrive = syncWeekFromDrive;
+syncWeekFromDrive = async function(wk) {
+  return _origSyncWeekFromDrive(wk);
+};
+
+const _origSyncWeekToDrive = syncWeekToDrive;
+syncWeekToDrive = async function(wk) {
+  return _origSyncWeekToDrive(wk);
+};
+
+const _origPollDriveMeta = pollDriveMeta;
+pollDriveMeta = async function(wk) {
+  return _origPollDriveMeta(wk);
+};
+
+const _origMergeWeekData = mergeWeekData;
+mergeWeekData = function(l, r) {
+  return _origMergeWeekData(l, r);
+};
+
+const _origApplyRemoteMerge = applyRemoteMerge;
+applyRemoteMerge = function(w, d, j, h, s, r) {
+  return _origApplyRemoteMerge(w, d, j, h, s, r);
+};
+
 // Sync overrides for tests because existing tests are synchronous
 loadWeek = function(wk) {
   const raw = localStorage.getItem('zenit-week-' + wk);
@@ -223,6 +294,11 @@ scheduleColorsSync = () => {};
 isAtomicOpActive = () => false;
 stopDrivePoll = () => {};
 startDrivePoll = () => {};
+loadGapiAndSync = () => {};
+onTokensReceived = async (token) => {
+  googleAccessToken = token;
+  _tokenReceivedAt = Date.now();
+};
 forcePushAllToDrive = () => {};
 initDriveSync = () => Promise.resolve();
 scheduleDriveSync = () => {};
@@ -258,6 +334,36 @@ _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
 _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
+_state.resetSyncState = function() {
+  googleAccessToken = null;
+  _gapiInitialized = false;
+  driveFileIdCache.clear();
+  lastSyncedHash.clear();
+  etagCache.clear();
+  colorsSyncedHash = null;
+  if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
+};
+_state.getAccessToken = () => googleAccessToken;
+_state.saveWeekIDB = function(wk, data) {
+  _idbStore['week-' + wk] = data;
+  return Promise.resolve();
+};
+_state.loadWeekIDB = function(wk) {
+  return Promise.resolve(_idbStore['week-' + wk] ?? null);
+};
+_state.saveValueIDB = function(key, val) {
+  _idbStore['val-' + key] = val;
+  return Promise.resolve();
+};
+_state.loadValueIDB = function(key) {
+  return Promise.resolve(_idbStore['val-' + key] ?? null);
+};
+_state.setDriveFileId = function(wk, id) {
+  driveFileIdCache.set(wk, id);
+};
+_state.setLastSyncedHash = function(wk, hash) {
+  lastSyncedHash.set(wk, hash);
+};
 
 // Initialize app state
 currentLang = 'en';
@@ -338,6 +444,16 @@ export const {
   t,
   // Storage
   runMigrationIfNeeded,
+  fnv1a32,
+  // Google Drive Sync
+  attemptSilentRestore,
+  authFetch,
+  driveApiRequest,
+  syncWeekFromDrive,
+  syncWeekToDrive,
+  pollDriveMeta,
+  silentRefresh,
+  exchangeToken,
   _state,
 } = sandbox;
 

@@ -4082,7 +4082,7 @@ async function syncWeekFromDrive(wKey) {
       const mergedHash = fnv1a32(mergedJson);
       const scheduleUpload = mergedHash !== fnv1a32(remoteJson);
 
-      applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
+      await applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
       return;
 
     } catch (err) {
