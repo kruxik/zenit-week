@@ -5087,11 +5087,11 @@ function validateAndRepair(data) {
     }
   });
 
-  // 3a. Identify all branch nodes as reachability roots
-  const rootBranches = data.nodes.filter(n => n.type === 'branch').map(n => n.id);
+  // 3a. Identify all branch and center nodes as reachability roots
+  const roots = data.nodes.filter(n => n.type === 'branch' || n.type === 'center').map(n => n.id);
 
   // 3b. Rebuild Parent-Child Symmetry
-  // Identify all nodes reachable from branch roots
+  // Identify all nodes reachable from roots
   const reachable = new Set();
 
   function collect(id, parentId) {
@@ -5103,7 +5103,7 @@ function validateAndRepair(data) {
       n.children.forEach(cid => collect(cid, id));
     }
   }
-  rootBranches.forEach(bid => collect(bid, null));
+  roots.forEach(rid => collect(rid, null));
 
   // 4. Garbage collection: remove unreachable nodes
   data.nodes = data.nodes.filter(n => reachable.has(n.id));
@@ -5167,7 +5167,13 @@ function migrateDayCounters(data) {
 }
 
 async function loadWeek(wk) {
-  let data = await loadWeekIDB(wk);
+  let data = null;
+  try {
+    data = await loadWeekIDB(wk);
+  } catch (e) {
+    console.error('loadWeekIDB failed, falling back to localStorage:', e);
+  }
+
   if (!data) {
     // Fallback for first load if migration hasn't run or failed
     const raw = localStorage.getItem(storageKey(wk));
@@ -5179,7 +5185,8 @@ async function loadWeek(wk) {
   }
 
   if (data) {
-    return migrateCrdt(validateAndRepair(migrateDayCounters(data)));
+    const repaired = validateAndRepair(data);
+    return migrateCrdt(migrateDayCounters(repaired));
   }
 
   // New week — inherit all branch nodes (IDs, labels, colors) from the previous week

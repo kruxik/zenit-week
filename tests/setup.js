@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { indexedDB as fakeIndexedDB } from 'fake-indexeddb';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -161,9 +162,7 @@ const sandbox = {
   setTimeout,
   clearTimeout,
   Date,
-  indexedDB: {
-    open: () => ({ onsuccess: null, onupgradeneeded: null, onerror: null, onblocked: null })
-  },
+  indexedDB: fakeIndexedDB,
   _dbMock: {
     objectStoreNames: { contains: () => true },
     createObjectStore: () => {},
@@ -261,27 +260,96 @@ saveWeek = function(wk, data) {
   localStorage.setItem('zenit-week-' + wk, JSON.stringify(data));
 };
 
-// Mock IDB functions to be no-ops or simple resolved promises to avoid ReferenceErrors
-openDB = () => Promise.resolve(_dbMock);
-loadWeekIDB = (wk) => Promise.resolve(_idbStore['week-' + wk] ?? null);
-saveWeekIDB = (wk, data) => {
-  _idbStore['week-' + wk] = data;
-  return Promise.resolve();
-};
-deleteWeekIDB = (wk) => {
-  delete _idbStore['week-' + wk];
-  return Promise.resolve();
-};
-listWeekKeysIDB = () => Promise.resolve(Object.keys(_idbStore).filter(k => k.startsWith('week-')).map(k => k.slice(5)));
-loadValueIDB = (key) => Promise.resolve(_idbStore['val-' + key] ?? null);
-saveValueIDB = (key, val) => {
-  _idbStore['val-' + key] = val;
-  return Promise.resolve();
-};
-deleteValueIDB = (key) => {
-  delete _idbStore['val-' + key];
-  return Promise.resolve();
-};
+// Mock IDB functions by default to keep existing tests synchronous and stable.
+// persistence.test.js will opt-out of this by setting _state.useRealIDB(true).
+let _useMockIDB = true;
+
+const _realOpenDB = openDB;
+const _realLoadWeekIDB = loadWeekIDB;
+const _realSaveWeekIDB = saveWeekIDB;
+const _realDeleteWeekIDB = deleteWeekIDB;
+const _realListWeekKeysIDB = listWeekKeysIDB;
+const _realLoadValueIDB = loadValueIDB;
+const _realSaveValueIDB = saveValueIDB;
+const _realDeleteValueIDB = deleteValueIDB;
+
+const _realLoadWeek = loadWeek;
+const _realSaveWeek = saveWeek;
+
+function updateIDBMethods() {
+  if (_useMockIDB) {
+    openDB = () => Promise.resolve(_dbMock);
+    loadWeekIDB = (wk) => Promise.resolve(_idbStore['week-' + wk] ?? null);
+    saveWeekIDB = (wk, data) => {
+      _idbStore['week-' + wk] = data;
+      return Promise.resolve();
+    };
+    deleteWeekIDB = (wk) => {
+      delete _idbStore['week-' + wk];
+      return Promise.resolve();
+    };
+    listWeekKeysIDB = () => Promise.resolve(Object.keys(_idbStore).filter(k => k.startsWith('week-')).map(k => k.slice(5)));
+    loadValueIDB = (key) => Promise.resolve(_idbStore['val-' + key] ?? null);
+    saveValueIDB = (key, val) => {
+      _idbStore['val-' + key] = val;
+      return Promise.resolve();
+    };
+    deleteValueIDB = (key) => {
+      delete _idbStore['val-' + key];
+      return Promise.resolve();
+    };
+
+    // Sync overrides for tests because existing tests are synchronous
+    loadWeek = function(wk) {
+      const raw = localStorage.getItem('zenit-week-' + wk);
+      if (raw) {
+        try {
+          const data = JSON.parse(raw);
+          return migrateCrdt(validateAndRepair(migrateDayCounters(data)));
+        } catch(e) {}
+      }
+      const prevWk = offsetWeek(wk, -1);
+      const prevRaw = localStorage.getItem('zenit-week-' + prevWk);
+      if (prevRaw) {
+        try {
+          const prevData = JSON.parse(prevRaw);
+          const prevBranches = (prevData.nodes || []).filter(n => n.type === 'branch');
+          if (prevBranches.length > 0) {
+            prevBranches.forEach(b => {
+              if (!BRANCH_COLORS[b.id]) {
+                BRANCH_COLORS[b.id] = deriveBranchPalette((BRANCH_COLORS[b.id] || {}).main || pickBranchColor());
+              }
+            });
+            const newWeek = { nodes: prevBranches.map(b => ({ ...b, children: [] })) };
+            if (prevData.baseline) newWeek.baseline = prevData.baseline;
+            return newWeek;
+          }
+        } catch(e) {}
+      }
+      return defaultWeekData();
+    };
+
+    saveWeek = function(wk, data) {
+      data.savedAt = Date.now();
+      data.crdtVersion = (data.crdtVersion || 0) + 1;
+      if (!Array.isArray(data.tombstones)) data.tombstones = [];
+      localStorage.setItem('zenit-week-' + wk, JSON.stringify(data));
+    };
+  } else {
+    openDB = _realOpenDB;
+    loadWeekIDB = _realLoadWeekIDB;
+    saveWeekIDB = _realSaveWeekIDB;
+    deleteWeekIDB = _realDeleteWeekIDB;
+    listWeekKeysIDB = _realListWeekKeysIDB;
+    loadValueIDB = _realLoadValueIDB;
+    saveValueIDB = _realSaveValueIDB;
+    deleteValueIDB = _realDeleteValueIDB;
+    loadWeek = _realLoadWeek;
+    saveWeek = _realSaveWeek;
+  }
+}
+
+updateIDBMethods();
 
 // UI/DOM Stubs to prevent crashes in VM
 render = () => {};
@@ -344,6 +412,16 @@ _state.resetSyncState = function() {
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
 };
 _state.getAccessToken = () => googleAccessToken;
+_state.useRealIDB = function(v) {
+  _useMockIDB = !v;
+  _db = null;
+  _dbPromise = null;
+  updateIDBMethods();
+};
+_state.resetIDB = function() {
+  _db = null;
+  _dbPromise = null;
+};
 _state.saveWeekIDB = function(wk, data) {
   _idbStore['week-' + wk] = data;
   return Promise.resolve();
@@ -374,7 +452,21 @@ rebuildNodeMap();
 
 vm.runInContext(scriptCode + stateAccessors, sandbox);
 
+sandbox._state.sandbox = sandbox;
+
 // Re-export the pure utility functions for use in tests
+export const openDB = (...args) => sandbox.openDB(...args);
+export const loadWeekIDB = (...args) => sandbox.loadWeekIDB(...args);
+export const saveWeekIDB = (...args) => sandbox.saveWeekIDB(...args);
+export const deleteWeekIDB = (...args) => sandbox.deleteWeekIDB(...args);
+export const listWeekKeysIDB = (...args) => sandbox.listWeekKeysIDB(...args);
+export const loadValueIDB = (...args) => sandbox.loadValueIDB(...args);
+export const saveValueIDB = (...args) => sandbox.saveValueIDB(...args);
+export const deleteValueIDB = (...args) => sandbox.deleteValueIDB(...args);
+export const loadWeek = (...args) => sandbox.loadWeek(...args);
+export const saveWeek = (...args) => sandbox.saveWeek(...args);
+export const runMigrationIfNeeded = (...args) => sandbox.runMigrationIfNeeded(...args);
+
 export const {
   getISOWeek,
   weeksInYear,
@@ -443,7 +535,6 @@ export const {
   deriveBranchPalette,
   t,
   // Storage
-  runMigrationIfNeeded,
   fnv1a32,
   // Google Drive Sync
   attemptSilentRestore,
