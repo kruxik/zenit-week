@@ -7568,7 +7568,7 @@ function render() {
 }
 
 // Global keyboard shortcuts for hovered node
-window.addEventListener('keydown', (e) => {
+function _windowKeydownHandler(e) {
   if (editState) return; // Don't interfere with inline editing
 
   // View toggle shortcuts — active unless typing in an input
@@ -7612,6 +7612,10 @@ window.addEventListener('keydown', (e) => {
     }
     if (status && status.classList.contains('expanded')) {
       status.classList.remove('expanded');
+      return;
+    }
+    if (currentView === 'agenda' && window.innerWidth >= 768) {
+      switchView('mindmap');
       return;
     }
   }
@@ -7819,7 +7823,8 @@ window.addEventListener('keydown', (e) => {
     }
     // branch, center, counter: no-op
   }
-});
+}
+window.addEventListener('keydown', _windowKeydownHandler);
 
 function updateCounter(id, dir) {
   const node = findNode(id);

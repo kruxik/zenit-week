@@ -77,12 +77,14 @@ const sandbox = {
   CustomEvent: class {
     constructor(type) { this.type = type; }
   },
-  window: { 
+  window: {
     addEventListener: () => {},
     dispatchEvent: () => {},
     location: { origin: 'http://localhost', pathname: '/' },
     fetch: null, // populated below
     gapi: null,  // populated below
+    innerWidth: 1280,
+    innerHeight: 768,
   },
   gapi: {
     load: (name, cb) => cb(),
@@ -405,6 +407,10 @@ _state.getLocalStorage = function(key) {
   return _lsStore[key];
 };
 _state.getDocument = function() { return document; };
+_state.getCurrentView = function() { return currentView; };
+_state.setCurrentView = function(v) { currentView = v; };
+_state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
+_state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 _state.getIDBStore = function() { return _idbStore; };
