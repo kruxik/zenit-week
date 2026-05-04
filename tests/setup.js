@@ -381,11 +381,13 @@ onTokensReceived = async (token) => {
 forcePushAllToDrive = () => {};
 initDriveSync = () => Promise.resolve();
 scheduleDriveSync = () => {};
-todayWeekKey = () => currentWeekKey;
+todayWeekKey = () => _todayWeekKeyOverride || currentWeekKey;
+let _todayWeekKeyOverride = null;
 
 _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
 _state.setWeekKey = function(k) { currentWeekKey = k; };
+_state.getWeekKey = function() { return currentWeekKey; };
 _state.reset     = function() { undoStack = []; redoStack = []; };
 _state.getUndoStack = function() { return undoStack; };
 _state.setLang   = function(l) { 
@@ -413,6 +415,12 @@ _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
+_state.getActiveDayFilter = function() { return activeDayFilter; };
+_state.setAgendaActiveTab = function(v) { agendaActiveTab = v; };
+_state.getAgendaActiveTab = function() { return agendaActiveTab; };
+_state.setTodayWeekKey   = function(k) { _todayWeekKeyOverride = k; };
+_state.clearTodayWeekKeyOverride = function() { _todayWeekKeyOverride = null; };
+_state.resetView         = async function() { return resetView(); };
 _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
 _state.getBranchConfig = function() { return BRANCH_CONFIG; };

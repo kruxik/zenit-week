@@ -9223,11 +9223,19 @@ function applyTransform() {
   }
 }
 
-function resetView() {
+async function resetView() {
   if (currentView === 'agenda') {
     agendaActiveTab = null;
+    if (currentWeekKey !== todayWeekKey()) {
+      await loadAndRender(todayWeekKey());
+    }
     renderAgenda();
     return;
+  }
+
+  activeDayFilter = null;
+  if (currentWeekKey !== todayWeekKey()) {
+    await loadAndRender(todayWeekKey());
   }
 
   const svg = document.getElementById('main-svg');
