@@ -7910,6 +7910,7 @@ function attachNodeListeners() {
       if (e.target.closest('.add-btn')) return;
       if (e.target.closest('.add-branch-btn')) return;
       if (e.target.closest('.counter-btn')) return;
+      if (e.target.closest('.week-nav-btn')) return;
 
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       e.stopPropagation();
