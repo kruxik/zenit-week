@@ -8843,6 +8843,7 @@ function renderAgendaStrip() {
 }
 
 function buildAgendaItem(node, label) {
+  const cc = getCounterChild(node);
   const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
 
   const item = document.createElement('div');
@@ -8861,7 +8862,7 @@ function buildAgendaItem(node, label) {
   dot.style.background = branchColor;
   item.appendChild(dot);
 
-  // Priority icon (no user data — priority is a controlled enum)
+  // Priority icon
   if (node.priority === 'high' || node.priority === 'critical') {
     const prioEl = document.createElement('span');
     prioEl.className = 'agenda-priority-icon ' + node.priority;
@@ -8869,14 +8870,14 @@ function buildAgendaItem(node, label) {
     item.appendChild(prioEl);
   }
 
-  // Label (user data — use textContent)
+  // Label
   const labelEl = document.createElement('div');
   labelEl.className = 'daily-log-label';
   if (node.done) labelEl.style.opacity = '0.5';
-  labelEl.textContent = label || t('todo.noLabel');
+  labelEl.textContent = label || node.label || t('todo.noLabel');
   item.appendChild(labelEl);
 
-  // Unplanned badge (no user data)
+  // Unplanned badge
   if (node.unplanned) {
     const bolt = document.createElement('span');
     bolt.className = 'daily-log-badge unplanned';
@@ -8885,7 +8886,7 @@ function buildAgendaItem(node, label) {
     item.appendChild(bolt);
   }
 
-  // Reusable badge (no user data)
+  // Reusable badge
   if (node.reusable) {
     const rep = document.createElement('span');
     rep.className = 'daily-log-badge';
@@ -8894,12 +8895,28 @@ function buildAgendaItem(node, label) {
     item.appendChild(rep);
   }
 
-  // Done / Undone button
+  // Progress pill for counters
+  if (!node.done && cc) {
+    const pill = document.createElement('div');
+    pill.className = 'daily-log-badge tick';
+    pill.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
+    pill.innerHTML = `${iconSvg('circle-half-2')} ${cc.val} / ${cc.max}`;
+    item.appendChild(pill);
+  }
+
+  // Action button
   const btn = document.createElement('button');
   btn.className = 'agenda-action-btn';
   if (node.done) {
     btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
-    btn.addEventListener('click', () => { setStatus(node.id, 'undone'); renderAgenda(); });
+    btn.addEventListener('click', () => { 
+      if (cc) updateCounter(cc.id, -1);
+      else setStatus(node.id, 'undone'); 
+      renderAgenda(); 
+    });
+  } else if (cc) {
+    btn.textContent = '+1';
+    btn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
   } else {
     btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
     btn.addEventListener('click', () => { setStatus(node.id, 'done'); renderAgenda(); });
@@ -8921,66 +8938,8 @@ function buildAgendaItem(node, label) {
 }
 
 function buildAnyDayItem(node) {
-  const cc = getCounterChild(node);
-  const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
-
-  const item = document.createElement('div');
-  item.className = 'daily-log-item agenda-item';
-  item.dataset.nodeId = node.id;
-
-  // Grip handle
-  const handle = document.createElement('div');
-  handle.className = 'agenda-drag-handle';
-  handle.innerHTML = iconSvg('grip-vertical');
-  item.appendChild(handle);
-
-  const dot = document.createElement('div');
-  dot.className = 'daily-log-branch-dot';
-  dot.style.background = branchColor;
-  item.appendChild(dot);
-
-  const labelEl = document.createElement('div');
-  labelEl.className = 'daily-log-label';
-  if (node.done) labelEl.style.opacity = '0.5';
-  labelEl.textContent = node.label || t('todo.noLabel');
-  item.appendChild(labelEl);
-
-  if (!node.done && cc) {
-    const pill = document.createElement('div');
-    pill.className = 'daily-log-badge tick';
-    pill.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
-    pill.innerHTML = `${iconSvg('circle-half-2')} ${cc.val} / ${cc.max}`;
-    item.appendChild(pill);
-
-    const plusBtn = document.createElement('button');
-    plusBtn.className = 'agenda-action-btn';
-    plusBtn.textContent = '+1';
-    plusBtn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
-    item.appendChild(plusBtn);
-  } else {
-    const undoneBtn = document.createElement('button');
-    undoneBtn.className = 'agenda-action-btn';
-    undoneBtn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
-    undoneBtn.addEventListener('click', () => {
-      if (cc) updateCounter(cc.id, -1);
-      else setStatus(node.id, 'undone');
-      renderAgenda();
-    });
-    item.appendChild(undoneBtn);
-  }
-
-  item.addEventListener('mouseenter', () => {
-    hoveredAgendaNode = node;
-    document.querySelectorAll('#agenda-tab-content .agenda-item').forEach(el => el.classList.remove('agenda-item-focused'));
-    item.classList.add('agenda-item-focused');
-  });
-  item.addEventListener('mouseleave', () => {
-    hoveredAgendaNode = null;
-    item.classList.remove('agenda-item-focused');
-  });
-  item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
-
-  return item;
+  // Now identical to buildAgendaItem but specialized for any-day list
+  return buildAgendaItem(node, node.label);
 }
 
 function renderAgendaTabContent() {
@@ -8989,6 +8948,13 @@ function renderAgendaTabContent() {
   hoveredAgendaNode = null;
 
   const isOverdue = agendaActiveTab === 'overdue';
+  const tabDate = isOverdue ? null : tabDateString(agendaActiveTab);
+
+  const tickedOnTab = n => {
+    if (isOverdue || !tabDate) return false;
+    const cc = getCounterChild(n);
+    return cc && cc.ticks && cc.ticks.some(t => localDateStr(new Date(t)) === tabDate);
+  };
 
   let items;
   if (isOverdue) {
@@ -8997,33 +8963,33 @@ function renderAgendaTabContent() {
     items = getAgendaItems(agendaActiveTab);
   }
 
-  // Pending: scheduled for this tab and not yet done
-  const pending = items.filter(n => !n.done);
+  // Pending: scheduled for this tab and not yet done, and NOT ticked today
+  const pending = items.filter(n => !n.done && !tickedOnTab(n));
 
   // Done section (non-overdue tabs only).
-  // A done item belongs to the Done section of the day it was marked done,
-  // not the day it was scheduled. donedOn (local date string) is the primary
-  // comparison; doneAt UTC prefix is the fallback for older nodes.
-  // 1. scheduledDone — items scheduled for this tab, completed on this date
-  // 2. crossDayDone  — day-leaf / single-day-annotated nodes (or their children) from OTHER tabs
   let scheduledDone = [];
   let crossDayDone = [];
   if (!isOverdue) {
-    const tabDate = tabDateString(agendaActiveTab);
     const scheduledIds = new Set(items.map(n => n.id));
-    const doneOnTab = n => n.done && (n.donedOn === tabDate || n.doneAt?.startsWith(tabDate));
-    scheduledDone = items.filter(doneOnTab);
+    const logOnTab = n => {
+      if (n.donedOn === tabDate) return true;
+      if (n.doneAt && localDateStr(new Date(n.doneAt)) === tabDate) return true;
+      return tickedOnTab(n);
+    };
+    
+    scheduledDone = items.filter(logOnTab);
     crossDayDone = weekData.nodes.filter(n => {
-      if (n.type !== 'activity' || !doneOnTab(n) || scheduledIds.has(n.id)) return false;
-      // It must be a dayChild OR a child of an annotated parent OR an annotated parent with no day-leaves
+      if (n.type !== 'activity' || !logOnTab(n) || scheduledIds.has(n.id)) return false;
+      // Include if it's a day-leaf, has a counter, or is a leaf activity
+      const hasCounter = !!getCounterChild(n);
       const p = findNode(n.parent);
       const isAnnotatedParent = p && p.type === 'activity' && parseTodoDays(p.label).size > 0;
-      return n.dayChild === true || isAnnotatedParent || (_hasNoDayLeaves(n) && parseTodoDays(n.label || '').size > 0);
+      return n.dayChild === true || hasCounter || isAnnotatedParent || (_hasNoDayLeaves(n) && (parseTodoDays(n.label || '').size > 0 || isLeafActivity(n)));
     });
   }
   const done = [...scheduledDone, ...crossDayDone];
 
-  const anyDayItems = isOverdue ? [] : getAnyDayItems();
+  const anyDayItems = isOverdue ? [] : getAnyDayItems().filter(n => !n.done && !tickedOnTab(n));
 
   if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0) {
     const empty = document.createElement('div');
