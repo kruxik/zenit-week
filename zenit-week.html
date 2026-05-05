@@ -6753,17 +6753,25 @@ function _hasNoDayLeaves(node) {
 // All day-leaf nodes for a given dayIndex (both done and pending).
 // Also includes single-day annotated activities that have no day-leaf children.
 function getAgendaItems(dayIndex) {
-  return weekData.nodes.filter(n => {
-    if (n.type !== 'activity') return false;
-    // Multi-day parent leaf
-    if (n.dayChild && n.dayIndex === dayIndex) return true;
-    // Single-day annotated activity with no day-leaf children
-    if (!n.dayChild && _hasNoDayLeaves(n)) {
+  const result = [];
+  weekData.nodes.forEach(n => {
+    if (n.type !== 'activity') return;
+
+    if (n.dayChild) {
+      if (n.dayIndex === dayIndex) result.push(n);
+    } else {
       const days = parseTodoDays(n.label || '');
-      return days.has(dayIndex);
+      if (days.has(dayIndex) && _hasNoDayLeaves(n)) {
+        // Expand to children if any, otherwise include self
+        const children = (n.children || [])
+          .map(id => findNode(id))
+          .filter(c => c && c.type === 'activity' && !c.dayChild);
+        if (children.length > 0) result.push(...children);
+        else result.push(n);
+      }
     }
-    return false;
   });
+  return result;
 }
 
 // Undone day-leaf nodes (or single-day annotated activities) whose ISO-week
@@ -6771,19 +6779,28 @@ function getAgendaItems(dayIndex) {
 // today is optional — defaults to new Date() for production; pass a Date in tests
 function getOverdueItems(today = new Date()) {
   const todayPos = isoWeekPos(today.getDay());
-  return weekData.nodes.filter(n => {
-    if (n.type !== 'activity' || n.done) return false;
+  const result = [];
+
+  weekData.nodes.forEach(n => {
+    if (n.type !== 'activity' || n.done) return;
+
     if (n.dayChild) {
-      return n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos;
-    }
-    // Single-day annotated activity with no day-leaf children
-    if (_hasNoDayLeaves(n)) {
+      if (n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos) {
+        result.push(n);
+      }
+    } else {
       const days = parseTodoDays(n.label || '');
-      if (days.size === 0) return false;
-      return [...days].some(d => isoWeekPos(d) < todayPos);
+      if (days.size > 0 && [...days].some(d => isoWeekPos(d) < todayPos) && _hasNoDayLeaves(n)) {
+        // Expand to children if any, otherwise include self
+        const children = (n.children || [])
+          .map(id => findNode(id))
+          .filter(c => c && c.type === 'activity' && !c.dayChild);
+        if (children.length > 0) result.push(...children);
+        else result.push(n);
+      }
     }
-    return false;
   });
+  return result;
 }
 
 // Activity nodes that have a counter child but no dayChild children
@@ -6797,6 +6814,34 @@ function getAnyDayItems() {
     // Include only if it has a counter child
     return n.children.some(id => findNode(id)?.type === 'counter');
   });
+}
+
+function getAgendaNodeLabel(node, includeDayHint = false) {
+  const p = findNode(node.parent);
+
+  // Case 1: Virtual day-leaf (Mo, Tu...). Show only parent label.
+  if (node.dayChild) {
+    return p ? (stripDayGroups(p.label) || p.label) : node.label;
+  }
+
+  // Case 2: Real sub-task child of an annotated parent. Show Parent · Child.
+  const isAnnotatedParent = p && p.type === 'activity' && parseTodoDays(p.label).size > 0;
+  if (isAnnotatedParent) {
+    const parentLabel = stripDayGroups(p.label) || p.label;
+    return parentLabel ? `${parentLabel} · ${node.label}` : node.label;
+  }
+
+  // Case 3: Standard activity (possibly with day hint like "Yoga (tu)").
+  const stripped = stripDayGroups(node.label) || node.label;
+  if (includeDayHint) {
+    const days = parseTodoDays(node.label || '');
+    if (days.size > 0) {
+      const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+      const [dayIdx] = [...days];
+      return `${stripped} · ${langLabels[dayIdx]}`;
+    }
+  }
+  return stripped;
 }
 
 // ── Agenda group ordering ────────────────────────────────────────────────────
@@ -8945,31 +8990,11 @@ function renderAgendaTabContent() {
 
   const isOverdue = agendaActiveTab === 'overdue';
 
-  let items, labelFn;
+  let items;
   if (isOverdue) {
     items = getOverdueItems();
-    labelFn = n => {
-      if (n.dayChild) {
-        const p = findNode(n.parent);
-        return p?.label ? `${p.label} · ${n.label}` : n.label;
-      }
-      // Single-day annotated activity: show "Label · Day"
-      const stripped = stripDayGroups(n.label) || n.label;
-      const days = parseTodoDays(n.label || '');
-      if (days.size > 0) {
-        const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
-        const [dayIdx] = [...days];
-        return `${stripped} · ${langLabels[dayIdx]}`;
-      }
-      return stripped;
-    };
   } else {
     items = getAgendaItems(agendaActiveTab);
-    labelFn = n => {
-      if (n.dayChild) return findNode(n.parent)?.label || n.label;
-      // Single-day annotated activity: strip the day hint from the label
-      return stripDayGroups(n.label) || n.label;
-    };
   }
 
   // Pending: scheduled for this tab and not yet done
@@ -8980,8 +9005,7 @@ function renderAgendaTabContent() {
   // not the day it was scheduled. donedOn (local date string) is the primary
   // comparison; doneAt UTC prefix is the fallback for older nodes.
   // 1. scheduledDone — items scheduled for this tab, completed on this date
-  // 2. crossDayDone  — day-leaf / single-day-annotated nodes from OTHER tabs
-  // Parent nodes with day-leaf children are excluded from crossDayDone.
+  // 2. crossDayDone  — day-leaf / single-day-annotated nodes (or their children) from OTHER tabs
   let scheduledDone = [];
   let crossDayDone = [];
   if (!isOverdue) {
@@ -8989,23 +9013,15 @@ function renderAgendaTabContent() {
     const scheduledIds = new Set(items.map(n => n.id));
     const doneOnTab = n => n.done && (n.donedOn === tabDate || n.doneAt?.startsWith(tabDate));
     scheduledDone = items.filter(doneOnTab);
-    crossDayDone = weekData.nodes.filter(n =>
-      n.type === 'activity' &&
-      doneOnTab(n) &&
-      !scheduledIds.has(n.id) &&
-      (n.dayChild === true || (_hasNoDayLeaves(n) && parseTodoDays(n.label || '').size > 0))
-    );
+    crossDayDone = weekData.nodes.filter(n => {
+      if (n.type !== 'activity' || !doneOnTab(n) || scheduledIds.has(n.id)) return false;
+      // It must be a dayChild OR a child of an annotated parent OR an annotated parent with no day-leaves
+      const p = findNode(n.parent);
+      const isAnnotatedParent = p && p.type === 'activity' && parseTodoDays(p.label).size > 0;
+      return n.dayChild === true || isAnnotatedParent || (_hasNoDayLeaves(n) && parseTodoDays(n.label || '').size > 0);
+    });
   }
   const done = [...scheduledDone, ...crossDayDone];
-
-  // Label for done items
-  function doneLabelFor(n) {
-    if (n.dayChild) {
-      const p = findNode(n.parent);
-      return p?.label ? `${p.label} · ${n.label}` : n.label;
-    }
-    return stripDayGroups(n.label) || n.label;
-  }
 
   const anyDayItems = isOverdue ? [] : getAnyDayItems();
 
@@ -9194,7 +9210,7 @@ function renderAgendaTabContent() {
     });
   }
 
-  makeDragZone(orderedPending, 'pending', n => buildAgendaItem(n, labelFn(n)));
+  makeDragZone(orderedPending, 'pending', n => buildAgendaItem(n, getAgendaNodeLabel(n, isOverdue)));
 
   if (orderedDone.length > 0) {
     if (orderedPending.length > 0 && list.lastElementChild) {
@@ -9204,11 +9220,7 @@ function renderAgendaTabContent() {
     divider.className = 'today-done-divider';
     divider.textContent = t('todo.done');
     list.appendChild(divider);
-    const scheduledDoneIds = new Set(scheduledDone.map(n => n.id));
-    makeDragZone(orderedDone, 'done', n => {
-      const label = scheduledDoneIds.has(n.id) ? labelFn(n) : doneLabelFor(n);
-      return buildAgendaItem(n, label);
-    });
+    makeDragZone(orderedDone, 'done', n => buildAgendaItem(n, getAgendaNodeLabel(n)));
   }
 
   if (orderedAnyDay.length > 0) {
