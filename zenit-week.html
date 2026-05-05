@@ -8533,7 +8533,7 @@ let hoveredAgendaNode = null;
 // Attaches swipe-right=done/undone, swipe-left=context-menu, and long-press=context-menu to an agenda item.
 // The item slides over action areas revealed underneath (managed by .agenda-swipe-wrapper).
 // Non-passive touchmove required to preventDefault during confirmed horizontal swipe.
-function addSwipeGesture(item, node) {
+function addSwipeGesture(item, node, onLongPress) {
   let startX = 0, startY = 0, lpTimer = null;
   let state = 'idle'; // 'idle' | 'pending' | 'swiping' | 'aborted'
 
@@ -8561,11 +8561,13 @@ function addSwipeGesture(item, node) {
     const t = e.touches[0];
     startX = t.clientX;
     startY = t.clientY;
+    const touchClientX = t.clientX;
+    const touchClientY = t.clientY;
     state = 'pending';
     lpTimer = setTimeout(() => {
       if (state === 'pending') {
         state = 'aborted';
-        startAgendaRename(node.id);
+        if (onLongPress) onLongPress({ clientX: touchClientX, clientY: touchClientY });
       }
     }, 500);
   }, { passive: true });
@@ -8978,7 +8980,101 @@ function renderAgendaTabContent() {
       el.appendChild(swipeRight);
       el.appendChild(item);
 
-      addSwipeGesture(item, node);
+      // ── Mobile touch-drag: shared state for handle and long-press ────────
+      {
+        let touchSrcId = null;
+        let ghost = null;
+        let touchOffsetY = 0;
+
+        function initTouchDrag(touch) {
+          touchSrcId = node.id;
+          const rect = el.getBoundingClientRect();
+          touchOffsetY = touch.clientY - rect.top;
+
+          ghost = el.cloneNode(true);
+          ghost.style.cssText = [
+            'position:fixed',
+            `top:${rect.top}px`,
+            `left:${rect.left}px`,
+            `width:${rect.width}px`,
+            'z-index:9999',
+            'pointer-events:none',
+            'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
+            'border-radius:6px',
+            'opacity:0.95',
+            'transition:none',
+          ].join(';');
+          document.body.appendChild(ghost);
+          el.classList.add('agenda-item-dragging');
+
+          document.addEventListener('touchmove', onDocTouchMove, { passive: false });
+          document.addEventListener('touchend', finishTouchDrag);
+          document.addEventListener('touchcancel', finishTouchDrag);
+        }
+
+        function onDocTouchMove(e) {
+          if (!touchSrcId) return;
+          e.preventDefault();
+          const touch = e.touches[0];
+
+          if (ghost) ghost.style.top = `${touch.clientY - touchOffsetY}px`;
+
+          const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
+          list.querySelectorAll('.agenda-swipe-wrapper').forEach(x =>
+            x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
+          if (targetEl && targetEl !== item) {
+            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
+            if (targetWrapper) {
+              const r = targetWrapper.getBoundingClientRect();
+              targetWrapper.classList.add(touch.clientY < r.top + r.height / 2
+                ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+            }
+          }
+        }
+
+        function finishTouchDrag(e) {
+          if (!touchSrcId) return;
+          document.removeEventListener('touchmove', onDocTouchMove);
+          document.removeEventListener('touchend', finishTouchDrag);
+          document.removeEventListener('touchcancel', finishTouchDrag);
+          if (ghost) { ghost.remove(); ghost = null; }
+          el.classList.remove('agenda-item-dragging');
+          list.querySelectorAll('.agenda-swipe-wrapper').forEach(x =>
+            x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
+          const touch = e.changedTouches[0];
+          const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
+          if (targetEl && targetEl !== item && targetEl.dataset.nodeId) {
+            const targetId = targetEl.dataset.nodeId;
+            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
+            const r = (targetWrapper || targetEl).getBoundingClientRect();
+            const before = touch.clientY < r.top + r.height / 2;
+            const current = loadAgendaGroupOrder(tabKey, groupKey);
+            const fromIdx = current.indexOf(touchSrcId);
+            if (fromIdx !== -1) {
+              current.splice(fromIdx, 1);
+              const toIdx = current.indexOf(targetId);
+              if (toIdx !== -1) {
+                current.splice(before ? toIdx : toIdx + 1, 0, touchSrcId);
+                saveAgendaGroupOrder(tabKey, groupKey, current);
+                touchSrcId = null;
+                renderAgenda();
+                return;
+              }
+            }
+          }
+          touchSrcId = null;
+        }
+
+        const handle = el.querySelector('.agenda-drag-handle');
+        if (handle) {
+          handle.addEventListener('touchstart', (e) => {
+            e.stopPropagation(); // suppress swipe gesture on the item
+            initTouchDrag(e.touches[0]);
+          }, { passive: true });
+        }
+
+        addSwipeGesture(item, node, initTouchDrag);
+      }
 
       // ── Desktop HTML5 drag-and-drop ───────────────────────────────────────
       el.addEventListener('dragstart', (e) => {
@@ -9021,95 +9117,6 @@ function renderAgendaTabContent() {
         saveAgendaGroupOrder(tabKey, groupKey, current);
         renderAgenda();
       });
-
-      // ── Mobile touch-drag via handle ──────────────────────────────────────
-      const handle = el.querySelector('.agenda-drag-handle');
-      if (handle) {
-        let touchSrcId = null;
-        let ghost = null;
-        let touchOffsetY = 0;
-
-        handle.addEventListener('touchstart', (e) => {
-          e.stopPropagation(); // suppress swipe gesture on the item
-          touchSrcId = node.id;
-          const touch = e.touches[0];
-          const rect = el.getBoundingClientRect();
-          touchOffsetY = touch.clientY - rect.top;
-
-          // Create floating ghost clone
-          ghost = el.cloneNode(true);
-          ghost.style.cssText = [
-            'position:fixed',
-            `top:${rect.top}px`,
-            `left:${rect.left}px`,
-            `width:${rect.width}px`,
-            'z-index:9999',
-            'pointer-events:none',
-            'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
-            'border-radius:6px',
-            'opacity:0.95',
-            'transition:none',
-          ].join(';');
-          document.body.appendChild(ghost);
-
-          el.classList.add('agenda-item-dragging');
-        }, { passive: true });
-
-        handle.addEventListener('touchmove', (e) => {
-          if (!touchSrcId) return;
-          e.preventDefault(); // lock scroll while dragging
-          const touch = e.touches[0];
-
-          // Move ghost with finger
-          if (ghost) ghost.style.top = `${touch.clientY - touchOffsetY}px`;
-
-          // Find drop target (ghost has pointer-events:none so elementFromPoint skips it)
-          const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
-          list.querySelectorAll('.agenda-swipe-wrapper').forEach(x =>
-            x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
-          if (targetEl && targetEl !== item) {
-            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
-            if (targetWrapper) {
-              const rect = targetWrapper.getBoundingClientRect();
-              targetWrapper.classList.add(touch.clientY < rect.top + rect.height / 2
-                ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
-            }
-          }
-        }, { passive: false });
-
-        const finishTouchDrag = (e) => {
-          if (!touchSrcId) return;
-          if (ghost) { ghost.remove(); ghost = null; }
-          el.classList.remove('agenda-item-dragging');
-          list.querySelectorAll('.agenda-swipe-wrapper').forEach(x =>
-            x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
-          const touch = e.changedTouches[0];
-          const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
-          if (targetEl && targetEl !== item && targetEl.dataset.nodeId) {
-            const targetId = targetEl.dataset.nodeId;
-            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
-            const rect = (targetWrapper || targetEl).getBoundingClientRect();
-            const before = touch.clientY < rect.top + rect.height / 2;
-            const current = loadAgendaGroupOrder(tabKey, groupKey);
-            const fromIdx = current.indexOf(touchSrcId);
-            if (fromIdx !== -1) {
-              current.splice(fromIdx, 1);
-              const toIdx = current.indexOf(targetId);
-              if (toIdx !== -1) {
-                current.splice(before ? toIdx : toIdx + 1, 0, touchSrcId);
-                saveAgendaGroupOrder(tabKey, groupKey, current);
-                touchSrcId = null;
-                renderAgenda();
-                return;
-              }
-            }
-          }
-          touchSrcId = null;
-        };
-
-        handle.addEventListener('touchend', finishTouchDrag);
-        handle.addEventListener('touchcancel', finishTouchDrag);
-      }
 
       list.appendChild(el);
     });
