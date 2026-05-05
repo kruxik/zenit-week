@@ -7393,6 +7393,11 @@ function getDayFilterOpacity(nodeId) {
         const hasLabelDays = parseTodoDays(n.label || '').size > 0;
         if (!hasDayChild && !hasCounter && !hasLabelDays) return true;
       } else {
+        const dayChildren = (n.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild);
+        if (dayChildren.length > 0) {
+          // Multi-day selector: only match if one of its day-children matches (or matches d)
+          return dayChildren.some(c => d === 'overdue' ? isOverdueMatch(c) : c.dayIndex === d);
+        }
         if (parseTodoDays(n.label || '').has(d)) return true;
       }
     }
