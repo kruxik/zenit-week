@@ -748,19 +748,23 @@
     z-index: -1;
   }
 
-  #sync-dot {
-    width: 8px;
-    height: 8px;
+  #sync-badge {
+    position: absolute;
+    bottom: 1px;
+    right: 1px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     background: #aaaaaa;
-    flex-shrink: 0;
+    border: 2px solid var(--bg-app);
+    pointer-events: none;
     transition: background 0.3s;
-    cursor: default;
+    z-index: 1;
   }
 
-  #sync-dot[data-status="connected"] { background: #34a853; }
-  #sync-dot[data-status="syncing"]   { background: #fbbc04; animation: sync-pulse 1s ease-in-out infinite; }
-  #sync-dot[data-status="error"]     { background: #ea4335; }
+  #sync-badge[data-status="connected"] { background: #34a853; }
+  #sync-badge[data-status="syncing"]   { background: #fbbc04; animation: sync-pulse 1s ease-in-out infinite; }
+  #sync-badge[data-status="error"]     { background: #ea4335; }
 
   @keyframes sync-pulse {
     0%, 100% { opacity: 1; }
@@ -875,15 +879,6 @@
     justify-content: flex-end;
   }
 
-  #settings-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-
-  #settings-btn .icon {
-    transform: translateY(0.5px); /* Optical centering adjustment */
-  }
 
 
   /* ── Responsive spans inside week label ── */
@@ -903,9 +898,10 @@
   }
 
   #settings-dropdown {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    position: fixed;
+    bottom: 56px;
+    right: 12px;
+    top: auto;
     background: var(--settings-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -913,7 +909,7 @@
     border-radius: 14px;
     box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
     padding: 10px;
-    z-index: 1000;
+    z-index: 1001;
     min-width: 200px;
     display: none;
     flex-direction: column;
@@ -1414,7 +1410,7 @@
   }
 
   /* Help System */
-  #help-fab {
+  #settings-fab {
     position: fixed;
     bottom: 12px;
     right: 12px;
@@ -1436,25 +1432,77 @@
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     user-select: none;
   }
-  #help-fab:hover {
+  #settings-fab:hover {
     color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
-  #help-fab:hover::before, #help-fab.active::before {
+  #settings-fab:hover::before, #settings-fab.active::before {
     content: '';
     position: absolute;
     top: 3px; left: 3px; right: 3px; bottom: 3px;
     border-radius: 5px;
     z-index: -1;
   }
-  #help-fab:hover::before {
+  #settings-fab:hover::before {
     background: var(--bg-hover);
   }
-  #help-fab.active::before {
+  #settings-fab.active::before {
     background: var(--view-btn-active-bg);
   }
-  #help-fab.active {
+  #settings-fab.active {
     color: var(--view-btn-active-text);
+  }
+
+  /* ─── Undo / Redo Bar ───────────────────────────────────────────────────── */
+  #undo-redo-bar {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px var(--shadow-md);
+    padding: 3px;
+    z-index: 2500;
+    user-select: none;
+  }
+
+  .undo-redo-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    color: var(--text-subtle);
+    border: none;
+    background: none;
+    outline: none;
+  }
+
+  .undo-redo-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-dim);
+  }
+
+  .undo-redo-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .undo-redo-separator {
+    width: 1px;
+    height: 22px;
+    background: var(--view-separator);
+    margin: 0;
   }
 
   /* ─── View Toggle Bar ────────────────────────────────────────────────────── */
@@ -2432,6 +2480,8 @@
   <symbol id="icon-sitemap" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1" /><path d="M12 9l0 3" /></symbol>
   <symbol id="icon-list-details" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M13 5h8" /><path d="M13 9h5" /><path d="M13 15h8" /><path d="M13 19h5" /><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" /><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" /></symbol>
   <symbol id="icon-menu-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></symbol>
+  <symbol id="icon-arrow-back-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></symbol>
+  <symbol id="icon-arrow-forward-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></symbol>
 </svg>
 
 
@@ -2488,6 +2538,7 @@
             } catch(e) {}
           })();
         </script>
+        <div id="sync-badge" data-status="disconnected" title="Not connected to Google Drive"></div>
         <div id="sync-dropdown" role="menu">
           <div id="sync-dropdown-email"></div>
           <div class="settings-separator"></div>
@@ -2496,65 +2547,9 @@
           <button id="sync-dropdown-signout">Sign out of Google Drive</button>
         </div>
       </div>
-      <div id="sync-dot" data-status="disconnected" title="Not connected to Google Drive"></div>
-      <div id="settings-container">
-        <button class="nav-btn" id="settings-btn" data-i18n-title="toolbar.settings" title="Settings">
-          <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
-        </button>
-        <div id="settings-dropdown">
-          <div class="settings-section">
-            <div id="zoom-slider-header">
-              <div class="settings-label" data-i18n="settings.zoom">Zoom</div>
-              <div id="zoom-label" data-i18n-title="settings.resetView" title="Click to reset view">100%</div>
-            </div>
-            <div id="zoom-track">
-              <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
-              <div id="zoom-default-marker"></div>
-              <div id="zoom-thumb"></div>
-            </div>
-          </div>
-          <div class="settings-separator"></div>
-          <div class="settings-section">
-            <div class="settings-label" data-i18n="settings.language">Language</div>
-            <select id="lang-select">
-              <option value="en">English</option>
-              <option value="cs">Čeština</option>
-            </select>
-          </div>
-          <div class="settings-separator"></div>
-          <div class="settings-section">
-            <div class="settings-label" data-i18n="settings.appearance">Appearance</div>
-            <div class="theme-toggle-row">
-              <span class="theme-label active" id="theme-label-light" data-i18n="settings.light">Light</span>
-              <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" data-i18n-title="settings.toggleDark" title="Toggle dark mode">
-                <div class="theme-toggle-thumb"></div>
-              </button>
-              <span class="theme-label" id="theme-label-dark" data-i18n="settings.dark">Dark</span>
-            </div>
-          </div>
-          <div class="settings-separator"></div>
-          <div class="settings-section">
-            <div class="theme-toggle-row">
-              <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
-              <button class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change">
-                <div class="theme-toggle-thumb"></div>
-              </button>
-            </div>
-          </div>
-          <div class="settings-separator"></div>
-          <div class="settings-section">
-            <div class="settings-label" data-i18n="settings.data">Data</div>
-            <div style="display:flex;gap:6px;">
-              <button class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
-              <button class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
-              <input type="file" id="import-file-input" accept=".json" style="display:none;">
-            </div>
-            <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file — could not import.</div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
+
 
   <div id="canvas-container">
     <div id="view-level-bar">
@@ -2739,7 +2734,75 @@
 </div>
 
 
-<div id="help-fab" data-i18n-title="help.fab" title="Help & Hotkeys"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"/></svg></div>
+<div id="undo-redo-bar">
+  <button type="button" class="undo-redo-btn" id="undo-btn" data-i18n-title="help.undo" title="Undo" aria-label="Undo" disabled>
+    <svg class="icon" aria-hidden="true"><use href="#icon-arrow-back-up"/></svg>
+  </button>
+  <div class="undo-redo-separator"></div>
+  <button type="button" class="undo-redo-btn" id="redo-btn" data-i18n-title="help.redo" title="Redo" aria-label="Redo" disabled>
+    <svg class="icon" aria-hidden="true"><use href="#icon-arrow-forward-up"/></svg>
+  </button>
+</div>
+
+<button type="button" id="settings-fab" data-i18n-title="toolbar.settings" title="Settings" aria-label="Settings" aria-haspopup="true">
+  <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
+</button>
+
+<div id="settings-dropdown">
+  <div class="settings-section">
+    <div id="zoom-slider-header">
+      <div class="settings-label" data-i18n="settings.zoom">Zoom</div>
+      <div id="zoom-label" data-i18n-title="settings.resetView" title="Click to reset view">100%</div>
+    </div>
+    <div id="zoom-track">
+      <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
+      <div id="zoom-default-marker"></div>
+      <div id="zoom-thumb"></div>
+    </div>
+  </div>
+  <div class="settings-separator"></div>
+  <div class="settings-section">
+    <div class="settings-label" data-i18n="settings.language">Language</div>
+    <select id="lang-select">
+      <option value="en">English</option>
+      <option value="cs">Čeština</option>
+    </select>
+  </div>
+  <div class="settings-separator"></div>
+  <div class="settings-section">
+    <div class="settings-label" data-i18n="settings.appearance">Appearance</div>
+    <div class="theme-toggle-row">
+      <span class="theme-label active" id="theme-label-light" data-i18n="settings.light">Light</span>
+      <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" data-i18n-title="settings.toggleDark" title="Toggle dark mode">
+        <div class="theme-toggle-thumb"></div>
+      </button>
+      <span class="theme-label" id="theme-label-dark" data-i18n="settings.dark">Dark</span>
+    </div>
+  </div>
+  <div class="settings-separator"></div>
+  <div class="settings-section">
+    <div class="theme-toggle-row">
+      <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
+      <button class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change">
+        <div class="theme-toggle-thumb"></div>
+      </button>
+    </div>
+  </div>
+  <div class="settings-separator"></div>
+  <div class="settings-section">
+    <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab" style="width:100%;">Help &amp; Hotkeys</button>
+  </div>
+  <div class="settings-separator"></div>
+  <div class="settings-section">
+    <div class="settings-label" data-i18n="settings.data">Data</div>
+    <div style="display:flex;gap:6px;">
+      <button class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
+      <button class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
+      <input type="file" id="import-file-input" accept=".json" style="display:none;">
+    </div>
+    <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file — could not import.</div>
+  </div>
+</div>
 
 <div id="help-overlay"></div>
 <div id="agenda-overlay"></div>
@@ -3063,6 +3126,7 @@ function takeSnapshot() {
   undoStack.push(JSON.stringify(snapshot));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
   redoStack = [];
+  if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
 
 async function _applySnapshot(raw) {
@@ -3148,12 +3212,14 @@ async function undo() {
   if (undoStack.length === 0) return;
   redoStack.push(_currentSnapshot());
   await _applySnapshot(undoStack.pop());
+  if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
 
 async function redo() {
   if (redoStack.length === 0) return;
   undoStack.push(_currentSnapshot());
   await _applySnapshot(redoStack.pop());
+  if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
@@ -3845,7 +3911,7 @@ function signOut() {
 function setSyncStatus(status, message) {
   if (status === 'error' && syncStatus === 'disconnected') return;
   syncStatus = status;
-  const dot = document.getElementById('sync-dot');
+  const dot = document.getElementById('sync-badge');
   if (!dot) return;
   dot.dataset.status = status;
   dot.title = message || ({
@@ -5303,6 +5369,7 @@ async function importAllData(file) {
     try {
       undoStack = [];
       redoStack = [];
+      if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
       currentLang = localStorage.getItem('zenit-week-lang') || 'en';
       const importedTheme = localStorage.getItem('zenit-week-theme') || 'light';
       document.documentElement.dataset.theme = importedTheme === 'dark' ? 'dark' : '';
@@ -7597,8 +7664,8 @@ function _windowKeydownHandler(e) {
     }
     if (settings && settings.classList.contains('visible')) {
       settings.classList.remove('visible');
-      const sBtn = document.getElementById('settings-btn');
-      if (sBtn) sBtn.classList.remove('active');
+      const sFab = document.getElementById('settings-fab');
+      if (sFab) sFab.classList.remove('active');
       return;
     }
     const helpPanel = document.getElementById('help-panel');
@@ -9858,19 +9925,19 @@ window.addEventListener('beforeunload', () => {
 })();
 
 // ─── Settings Dropdown ────────────────────────────────────────────────────────
-const settingsBtn = document.getElementById('settings-btn');
+const settingsFab = document.getElementById('settings-fab');
 const settingsDropdown = document.getElementById('settings-dropdown');
 
-settingsBtn.addEventListener('click', (e) => {
+settingsFab.addEventListener('click', (e) => {
   e.stopPropagation();
   const isVisible = settingsDropdown.classList.toggle('visible');
-  settingsBtn.classList.toggle('active', isVisible);
+  settingsFab.classList.toggle('active', isVisible);
 });
 
 document.addEventListener('click', (e) => {
-  if (!settingsDropdown.contains(e.target) && e.target !== settingsBtn) {
+  if (!settingsDropdown.contains(e.target) && e.target !== settingsFab) {
     settingsDropdown.classList.remove('visible');
-    settingsBtn.classList.remove('active');
+    settingsFab.classList.remove('active');
   }
 });
 
@@ -10016,28 +10083,42 @@ window.addEventListener('load', async () => {
 
 
   // Help panel listeners
-  const helpFab = document.getElementById('help-fab');
   const helpOverlay = document.getElementById('help-overlay');
   const helpPanel = document.getElementById('help-panel');
   const helpClose = document.getElementById('help-close');
 
-  helpFab.addEventListener('click', () => {
-    const isVisible = helpPanel.classList.contains('visible');
-    if (isVisible) {
-      doCloseHelp();
-    } else {
-      helpOverlay.classList.add('visible');
-      helpPanel.classList.add('visible');
-      helpFab.classList.add('active');
-    }
-  });
+  const doOpenHelp = () => {
+    helpOverlay.classList.add('visible');
+    helpPanel.classList.add('visible');
+  };
 
   const doCloseHelp = () => {
     helpOverlay.classList.remove('visible');
     helpPanel.classList.remove('visible');
-    helpFab.classList.remove('active');
   };
   window.doCloseHelp = doCloseHelp;
+
+  const settingsHelpBtn = document.getElementById('settings-help-btn');
+  if (settingsHelpBtn) {
+    settingsHelpBtn.addEventListener('click', () => {
+      settingsDropdown.classList.remove('visible');
+      settingsFab.classList.remove('active');
+      doOpenHelp();
+    });
+  }
+
+  // Undo / Redo buttons
+  function updateUndoRedoButtons() {
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
+    if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+    if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+  }
+  window.updateUndoRedoButtons = updateUndoRedoButtons;
+
+  document.getElementById('undo-btn').addEventListener('click', () => undo());
+  document.getElementById('redo-btn').addEventListener('click', () => redo());
+  updateUndoRedoButtons();
 
   helpClose.addEventListener('click', doCloseHelp);
   helpOverlay.addEventListener('click', doCloseHelp);
