@@ -1549,14 +1549,9 @@
   .quick-add-branch-option:hover { background: var(--bg-hover); }
   .quick-add-branch-option.selected { color: var(--text-primary); font-weight: 600; }
 
-  #quick-add-row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    position: relative;
-  }
   #quick-add-input {
-    flex: 1;
+    width: 100%;
+    box-sizing: border-box;
     padding: 7px 10px;
     background: var(--bg-input, var(--bg-surface));
     border: 1px solid var(--border-subtle);
@@ -1567,18 +1562,6 @@
     transition: border-color 0.15s;
   }
   #quick-add-input:focus { border-color: var(--accent, #1ABCFE); }
-  #quick-add-submit {
-    width: 36px; height: 36px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--accent, #1ABCFE);
-    border: none; border-radius: 6px;
-    color: #fff;
-    cursor: pointer;
-    transition: opacity 0.15s;
-    flex-shrink: 0;
-  }
-  #quick-add-submit:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
-  #quick-add-submit:not(:disabled):hover { opacity: 0.85; }
 
   /* ─── Undo / Redo Bar ───────────────────────────────────────────────────── */
   #undo-redo-bar {
@@ -2896,13 +2879,8 @@
     </button>
     <div id="quick-add-branch-dropdown" role="listbox"></div>
   </div>
-  <div id="quick-add-row">
-    <input type="text" id="quick-add-input" maxlength="200"
-      data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…" autocomplete="off">
-    <button type="button" id="quick-add-submit" disabled data-i18n-title="quick_add.submit" title="Add">
-      <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
-    </button>
-  </div>
+  <input type="text" id="quick-add-input" maxlength="200"
+    data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…" autocomplete="off">
 </div>
 
 <div id="settings-dropdown">
@@ -10164,7 +10142,6 @@ document.addEventListener('click', (e) => {
   const branchName = document.getElementById('quick-add-branch-name');
   const branchDrop = document.getElementById('quick-add-branch-dropdown');
   const input      = document.getElementById('quick-add-input');
-  const submit     = document.getElementById('quick-add-submit');
   const fabAdd     = document.getElementById('fab-add');
 
   // Apply placeholder translation (not handled by applyTranslations)
@@ -10238,7 +10215,6 @@ document.addEventListener('click', (e) => {
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     input.value = '';
-    submit.disabled = true;
     // Small delay so mobile keyboard doesn't fight the slide animation
     requestAnimationFrame(() => input.focus());
   }
@@ -10301,16 +10277,10 @@ document.addEventListener('click', (e) => {
     else openBranchDropdown();
   });
 
-  input.addEventListener('input', () => {
-    submit.disabled = input.value.trim().length === 0;
-  });
-
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); submitQuickAdd(); }
     if (e.key === 'Escape') { e.preventDefault(); closeQuickAdd(); }
   });
-
-  submit.addEventListener('click', submitQuickAdd);
 
   backdrop.addEventListener('click', closeQuickAdd);
 
