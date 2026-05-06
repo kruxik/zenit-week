@@ -5381,12 +5381,17 @@ async function saveWeek(wk, data) {
   data.savedAt = Date.now();
   data.crdtVersion = (data.crdtVersion || 0) + 1;
   if (!Array.isArray(data.tombstones)) data.tombstones = [];
-  
-  await saveWeekIDB(wk, data);
+
+  // Strip in-progress edits BEFORE any await — saveWeekIDB awaits openDB()
+  // before put(), and commitEdit→startAddNode can push a placeholder editing
+  // node into weekData before the IDB write actually runs.
+  const persisted = { ...data, nodes: data.nodes.filter(n => !n._editing) };
+
+  await saveWeekIDB(wk, persisted);
 
   // Update cache if this is the next week
   if (wk === offsetWeek(currentWeekKey, 1)) {
-    _nextWeekRawCache = JSON.stringify(data);
+    _nextWeekRawCache = JSON.stringify(persisted);
   }
 
   scheduleDriveSync(wk);
