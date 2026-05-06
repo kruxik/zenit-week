@@ -2342,7 +2342,7 @@
     z-index: 1000;
     cursor: pointer;
     user-select: none;
-    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     max-height: 44px;
   }
 
@@ -2354,7 +2354,6 @@
   #placeholder-panel.expanded {
     max-height: 400px;
     border-radius: 8px;
-    padding: 16px 14px;
   }
 
   #summary-header {
@@ -2380,7 +2379,7 @@
     gap: 8px;
     opacity: 0;
     transition: opacity 0.2s;
-    padding-top: 12px;
+    padding: 12px 11px 13px;
     border-top: 1px solid var(--border-soft);
     pointer-events: none;
   }
