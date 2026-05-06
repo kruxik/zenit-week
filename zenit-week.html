@@ -6934,6 +6934,8 @@ function getAnyDayItems() {
     if (hasDayChildren) return false;
     // Exclude if it has (mo, tu...) tokens in label
     if (parseTodoDays(n.label || '').size > 0) return false;
+    // Inbox nodes with no day tokens always appear in Any Day
+    if (n.inbox) return true;
     // Include only if it has a counter child
     return n.children.some(id => findNode(id)?.type === 'counter');
   });
