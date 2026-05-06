@@ -1455,6 +1455,131 @@
     flex-shrink: 0;
   }
 
+  /* ─── Quick-Add Panel ───────────────────────────────────────────────────── */
+  #quick-add-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1099;
+  }
+  #quick-add-backdrop.is-open { display: block; }
+
+  #quick-add-panel {
+    position: fixed;
+    z-index: 1100;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+  }
+  /* desktop: popup above the pill */
+  #quick-add-panel.is-desktop {
+    bottom: 58px;
+    right: 12px;
+    width: 300px;
+    border-radius: 12px;
+  }
+  /* mobile: slide-up panel, floating above the bottom pill row */
+  #quick-add-panel.is-mobile {
+    bottom: 66px;
+    left: 12px;
+    right: 12px;
+    border-radius: 12px;
+    padding-bottom: 10px;
+    transform: translateY(calc(100% + 74px));
+    transition: transform 0.25s ease;
+  }
+  #quick-add-panel.is-open {
+    display: flex;
+  }
+  #quick-add-panel.is-mobile.is-open {
+    transform: translateY(0);
+  }
+
+  #quick-add-branch-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px 8px;
+    background: none;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #quick-add-branch-btn:hover { background: var(--bg-hover); }
+  #quick-add-branch-btn .branch-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  #quick-add-branch-btn .branch-name { flex: 1; text-align: left; }
+  #quick-add-branch-dropdown {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--settings-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px var(--shadow-md);
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    z-index: 10;
+  }
+  #quick-add-branch-dropdown.is-open { display: flex; }
+  .quick-add-branch-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .quick-add-branch-option:hover { background: var(--bg-hover); }
+  .quick-add-branch-option.selected { color: var(--text-primary); font-weight: 600; }
+
+  #quick-add-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    position: relative;
+  }
+  #quick-add-input {
+    flex: 1;
+    padding: 7px 10px;
+    background: var(--bg-input, var(--bg-surface));
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #quick-add-input:focus { border-color: var(--accent, #1ABCFE); }
+  #quick-add-submit {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent, #1ABCFE);
+    border: none; border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  #quick-add-submit:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+  #quick-add-submit:not(:disabled):hover { opacity: 0.85; }
+
   /* ─── Undo / Redo Bar ───────────────────────────────────────────────────── */
   #undo-redo-bar {
     position: fixed;
@@ -2759,6 +2884,25 @@
   <button type="button" id="fab-add" title="Quick add" aria-label="Quick add">
     <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
   </button>
+</div>
+
+<div id="quick-add-backdrop"></div>
+<div id="quick-add-panel" role="dialog" aria-label="Quick add" aria-modal="true">
+  <div style="position:relative;">
+    <button type="button" id="quick-add-branch-btn" aria-haspopup="listbox" aria-expanded="false">
+      <span class="branch-dot" id="quick-add-branch-dot"></span>
+      <span class="branch-name" id="quick-add-branch-name" data-i18n="quick_add.branch_label">Branch</span>
+      <svg class="icon" aria-hidden="true" style="margin-left:auto;"><use href="#icon-caret-down"/></svg>
+    </button>
+    <div id="quick-add-branch-dropdown" role="listbox"></div>
+  </div>
+  <div id="quick-add-row">
+    <input type="text" id="quick-add-input" maxlength="200"
+      data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…" autocomplete="off">
+    <button type="button" id="quick-add-submit" disabled data-i18n-title="quick_add.submit" title="Add">
+      <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
+    </button>
+  </div>
 </div>
 
 <div id="settings-dropdown">
@@ -4789,6 +4933,9 @@ const TRANSLATIONS = {
     'toolbar.prevWeek':           'Previous week',
     'toolbar.nextWeek':           'Next week',
     'toolbar.settings':           'Settings',
+    'quick_add.placeholder':      'Add a task…',
+    'quick_add.submit':           'Add',
+    'quick_add.branch_label':     'Branch',
     'week.word':                  'Week',
     'week.short':                 'W',
     'settings.appearance':        'Theme',
@@ -4900,6 +5047,9 @@ const TRANSLATIONS = {
     'toolbar.prevWeek':           'Předchozí týden',
     'toolbar.nextWeek':           'Příští týden',
     'toolbar.settings':           'Nastavení',
+    'quick_add.placeholder':      'Přidat úkol…',
+    'quick_add.submit':           'Přidat',
+    'quick_add.branch_label':     'Větev',
     'week.word':                  'Týden',
     'week.short':                 'T',
     'settings.appearance':        'Téma',
@@ -9986,6 +10136,176 @@ document.addEventListener('click', (e) => {
     settingsFab.classList.remove('active');
   }
 });
+
+
+// ─── Quick-Add Panel ──────────────────────────────────────────────────────────
+(function () {
+  'use strict';
+
+  const STORAGE_KEY = 'zenit-week-quick-add-branch';
+
+  const panel      = document.getElementById('quick-add-panel');
+  const backdrop   = document.getElementById('quick-add-backdrop');
+  const branchBtn  = document.getElementById('quick-add-branch-btn');
+  const branchDot  = document.getElementById('quick-add-branch-dot');
+  const branchName = document.getElementById('quick-add-branch-name');
+  const branchDrop = document.getElementById('quick-add-branch-dropdown');
+  const input      = document.getElementById('quick-add-input');
+  const submit     = document.getElementById('quick-add-submit');
+  const fabAdd     = document.getElementById('fab-add');
+
+  // Apply placeholder translation (not handled by applyTranslations)
+  input.placeholder = t('quick_add.placeholder');
+
+  let selectedBranchId = null;
+
+  function isMobile() {
+    return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 640;
+  }
+
+  function getBranches() {
+    return weekData.nodes.filter(n => n.type === 'branch');
+  }
+
+  function getBranchColor(branchId) {
+    return (BRANCH_COLORS[branchId] && BRANCH_COLORS[branchId].main) || '#888';
+  }
+
+  function selectBranch(id) {
+    selectedBranchId = id;
+    localStorage.setItem(STORAGE_KEY, id);
+    const branch = weekData.nodes.find(n => n.id === id);
+    branchDot.style.background = getBranchColor(id);
+    branchName.textContent = branch ? branch.label : t('quick_add.branch_label');
+    closeBranchDropdown();
+  }
+
+  function openBranchDropdown() {
+    branchDrop.innerHTML = '';
+    getBranches().forEach(b => {
+      const opt = document.createElement('div');
+      opt.className = 'quick-add-branch-option' + (b.id === selectedBranchId ? ' selected' : '');
+      opt.setAttribute('role', 'option');
+      const dot = document.createElement('span');
+      dot.className = 'branch-dot';
+      dot.style.cssText = `width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${getBranchColor(b.id)}`;
+      const label = document.createElement('span');
+      label.textContent = b.label;
+      opt.appendChild(dot);
+      opt.appendChild(label);
+      opt.addEventListener('click', (e) => { e.stopPropagation(); selectBranch(b.id); });
+      branchDrop.appendChild(opt);
+    });
+    branchDrop.classList.add('is-open');
+    branchBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeBranchDropdown() {
+    branchDrop.classList.remove('is-open');
+    branchBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function openQuickAdd() {
+    // Pick layout mode
+    if (isMobile()) {
+      panel.classList.remove('is-desktop');
+      panel.classList.add('is-mobile');
+    } else {
+      panel.classList.remove('is-mobile');
+      panel.classList.add('is-desktop');
+    }
+
+    // Resolve default branch
+    const branches = getBranches();
+    if (!branches.length) return;
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const defaultId = (saved && branches.find(b => b.id === saved)) ? saved : branches[0].id;
+    selectBranch(defaultId);
+
+    panel.classList.add('is-open');
+    backdrop.classList.add('is-open');
+    input.value = '';
+    submit.disabled = true;
+    // Small delay so mobile keyboard doesn't fight the slide animation
+    requestAnimationFrame(() => input.focus());
+  }
+
+  function closeQuickAdd() {
+    panel.classList.remove('is-open');
+    backdrop.classList.remove('is-open');
+    closeBranchDropdown();
+  }
+
+  function submitQuickAdd() {
+    const label = input.value.trim();
+    if (!label || !selectedBranchId) return;
+
+    // Create inbox node
+    takeSnapshot();
+    const branch = findNode(selectedBranchId);
+    if (!branch) return;
+    const node = {
+      id:        genId(),
+      type:      'activity',
+      label:     label.slice(0, 200),
+      parent:    selectedBranchId,
+      branch:    selectedBranchId,
+      children:  [],
+      inbox:     true,
+      done:      false,
+      unplanned: false,
+      priority:  'normal',
+      reusable:  false,
+      offX: 0, offY: 0,
+      _ts: Date.now(),
+    };
+    weekData.nodes.push(node);
+    rebuildNodeMap();
+    branch.children.push(node.id);
+    touchNode(selectedBranchId);
+    saveWeek(currentWeekKey, weekData);
+    render();
+
+    closeQuickAdd();
+  }
+
+  // ── Event listeners ──
+  fabAdd.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Close settings dropdown if open
+    settingsDropdown.classList.remove('visible');
+    settingsFab.classList.remove('active');
+    if (panel.classList.contains('is-open')) {
+      closeQuickAdd();
+    } else {
+      openQuickAdd();
+    }
+  });
+
+  branchBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (branchDrop.classList.contains('is-open')) closeBranchDropdown();
+    else openBranchDropdown();
+  });
+
+  input.addEventListener('input', () => {
+    submit.disabled = input.value.trim().length === 0;
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); submitQuickAdd(); }
+    if (e.key === 'Escape') { e.preventDefault(); closeQuickAdd(); }
+  });
+
+  submit.addEventListener('click', submitQuickAdd);
+
+  backdrop.addEventListener('click', closeQuickAdd);
+
+  // Close on global Esc (already handled in keydown on input, but cover backdrop focus too)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && panel.classList.contains('is-open')) closeQuickAdd();
+  });
+})();
 
 
 // ─── Theme Toggle ─────────────────────────────────────────────────────────────
