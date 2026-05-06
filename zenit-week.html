@@ -10243,6 +10243,11 @@ document.addEventListener('click', (e) => {
 
   backdrop.addEventListener('click', closeQuickAdd);
 
+  // Block pinch-to-zoom while panel is open (prevents viewport scale breaking the layout)
+  document.addEventListener('touchmove', (e) => {
+    if (panel.classList.contains('is-open') && e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+
   // Close on global Esc (already handled in keydown on input, but cover backdrop focus too)
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && panel.classList.contains('is-open')) closeQuickAdd();
