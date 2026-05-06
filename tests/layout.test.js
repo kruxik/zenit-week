@@ -34,11 +34,13 @@ describe('Zig-Zag Layout', () => {
 
     const positions = computeLayout();
 
-    // In fixed vertical zig-zag layout, centers are spaced by 22px (half of 32+12)
-    const expectedVStep = (32 + 12) / 2;
+    // Day-leaf circles take diameter from their parent activity height.
+    // Parent a1 is a depth-1 activity (DEPTH1 style, minH 42 padded by text → h=48.1).
+    // Zig-zag vStep = (maxH + 12) / 2 = (48.1 + 12) / 2 = 30.05.
+    const expectedVStep = (48.1 + 12) / 2;
     expect(positions['d2'].y - positions['d1'].y).toBeCloseTo(expectedVStep, 1);
     expect(positions['d3'].y - positions['d2'].y).toBeCloseTo(expectedVStep, 1);
-    
+
     // Check horizontal stagger: staggerX = (maxW1 + maxW2) / 2 + Gap
     // Since all are Mo/Tu/We circles (width 48.1), staggerX = 48.1 + 12 = 60.1
     expect(Math.abs(positions['d2'].x - positions['d1'].x)).toBeCloseTo(60.1, 1);
@@ -59,10 +61,10 @@ describe('Zig-Zag Layout', () => {
     rebuildNodeMap();
 
     const positions = computeLayout();
-    
-    // Check vertical spacing: still 22px
-    expect(positions['d2'].y - positions['d1'].y).toBeCloseTo(22, 1);
-    
+
+    // Vertical spacing still derived from maxH = parent height (48.1) → vStep = 30.05
+    expect(positions['d2'].y - positions['d1'].y).toBeCloseTo((48.1 + 12) / 2, 1);
+
     // Horizontal stagger: (maxW1 + maxW2)/2 + 12
     // maxW1 is d1 (oval, width 86)
     // maxW2 is d2 (circle, width 48.1)
@@ -90,7 +92,7 @@ describe('Zig-Zag Layout', () => {
     expect(positions['d2'].y).toBeGreaterThan(positions['d1'].y);
   });
 
-  test('zig-zag is disabled when autoLayout is false', () => {
+  test('zig-zag still applies to day-children when autoLayout is false', () => {
     const data = {
       nodes: [
         { id: 'center', type: 'center', label: 'Week', children: ['b1'] },
@@ -107,10 +109,11 @@ describe('Zig-Zag Layout', () => {
 
     const positions = computeLayout();
 
-    // Should be standard vertical layout: same x
-    expect(positions['d1'].x).toBe(positions['d2'].x);
+    // Zig-zag is independent of autoLayout — day-children always stagger to fit.
+    expect(positions['d1'].x).not.toBe(positions['d2'].x);
     expect(positions['d1'].x).toBe(positions['d3'].x);
-    
+    expect(Math.abs(positions['d2'].x - positions['d1'].x)).toBeCloseTo(60.1, 1);
+
     // Cleanup for other tests
     _state.setAutoLayout(true);
   });
