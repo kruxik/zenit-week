@@ -1504,29 +1504,23 @@
   #quick-add-branches {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
   }
   .qab-pill {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    border: 1.5px solid;
-    font-size: 12px;
-    font-weight: 500;
+    justify-content: center;
+    padding: 7px 18px;
+    border-radius: 50px;
+    border: 2.5px solid;
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
-    background: transparent;
-    transition: background 0.15s, color 0.15s;
     white-space: nowrap;
+    transition: box-shadow 0.15s, opacity 0.15s;
   }
-  .qab-pill .branch-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .qab-pill.selected .branch-dot { background: #fff !important; }
-  .qab-pill:not(.selected):hover { background: var(--bg-hover); }
+  .qab-pill:not(.selected) { opacity: 0.72; }
+  .qab-pill:not(.selected):hover { opacity: 1; }
 
   #quick-add-input {
     width: 100%;
@@ -10122,44 +10116,45 @@ document.addEventListener('click', (e) => {
     return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 640;
   }
 
-  function getBranchColor(branchId) {
-    return (BRANCH_COLORS[branchId] && BRANCH_COLORS[branchId].main) || '#888';
+  function hexToRgba(hex, alpha) {
+    const m = hex.match(/^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+    if (!m) return `rgba(128,128,128,${alpha})`;
+    return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${alpha})`;
+  }
+
+  function applyPillStyles(pill, bc, selected) {
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const topStop = isDark ? bc.light : '#ffffff';
+    const botStop = isDark ? '#1a1a1a' : bc.light;
+    pill.style.background   = `linear-gradient(to bottom, ${topStop}, ${botStop})`;
+    pill.style.borderColor  = bc.main;
+    pill.style.color        = bc.text;
+    pill.style.boxShadow    = selected
+      ? `0 0 12px ${hexToRgba(bc.main, isDark ? 0.55 : 0.35)}`
+      : 'none';
+    pill.classList.toggle('selected', selected);
   }
 
   function selectBranch(id) {
     selectedBranchId = id;
     localStorage.setItem(STORAGE_KEY, id);
     branchesRow.querySelectorAll('.qab-pill').forEach(pill => {
-      const isSelected = pill.dataset.id === id;
-      const color = getBranchColor(pill.dataset.id);
-      pill.classList.toggle('selected', isSelected);
-      pill.style.borderColor = color;
-      if (isSelected) {
-        pill.style.background = color;
-        pill.style.color = '#fff';
-      } else {
-        pill.style.background = '';
-        pill.style.color = color;
-      }
+      const bc = BRANCH_COLORS[pill.dataset.id] || { main: '#888', light: '#eee', text: '#444' };
+      applyPillStyles(pill, bc, pill.dataset.id === id);
     });
   }
 
   function populateBranches() {
     branchesRow.innerHTML = '';
     weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
-      const color = getBranchColor(b.id);
+      const bc = BRANCH_COLORS[b.id] || { main: '#888', light: '#eee', text: '#444' };
       const pill = document.createElement('button');
       pill.type = 'button';
       pill.className = 'qab-pill';
       pill.dataset.id = b.id;
-      pill.style.borderColor = color;
-      pill.style.color = color;
-      const dot = document.createElement('span');
-      dot.className = 'branch-dot';
-      dot.style.background = color;
+      applyPillStyles(pill, bc, false);
       const label = document.createElement('span');
       label.textContent = b.label;
-      pill.appendChild(dot);
       pill.appendChild(label);
       pill.addEventListener('click', (e) => { e.stopPropagation(); selectBranch(b.id); input.focus(); });
       branchesRow.appendChild(pill);
