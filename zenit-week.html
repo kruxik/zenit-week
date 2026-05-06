@@ -9465,24 +9465,15 @@ function applyTransform() {
   }
 }
 
-async function resetView() {
-  if (currentView === 'agenda') {
-    agendaActiveTab = null;
-    if (currentWeekKey !== todayWeekKey()) {
-      await loadAndRender(todayWeekKey());
-    }
-    renderAgenda();
-    return;
-  }
-
-  activeDayFilter = null;
-  if (currentWeekKey !== todayWeekKey()) {
-    await loadAndRender(todayWeekKey());
-  }
-
+function fitMindmapView() {
   const svg = document.getElementById('main-svg');
-  const w = svg.clientWidth  || svg.getBoundingClientRect().width  || 800;
-  const h = svg.clientHeight || svg.getBoundingClientRect().height || 600;
+  // Canvas may be display:none (mobile, agenda view) → svg has zero size.
+  // Fall back to viewport dims since canvas-container fills #app (100dvh × 100%),
+  // which equals viewport. This lets us fit correctly on init even when boot
+  // view is Agenda, so the mindmap (visible blurred on desktop) is laid out
+  // and the zoom slider reflects the true zoom from the start.
+  const w = svg.clientWidth  || svg.getBoundingClientRect().width  || window.innerWidth  || 800;
+  const h = svg.clientHeight || svg.getBoundingClientRect().height || window.innerHeight || 600;
 
   const positions = computeLayout();
   const nodes = Object.values(positions);
@@ -9506,14 +9497,30 @@ async function resetView() {
     zoom = Math.max(ZOOM_MIN, fitZoom);
     panX = w / 2 - ((minX + maxX) / 2) * zoom;
     panY = h / 2 - ((minY + maxY) / 2) * zoom;
-    applyTransform();
+  } else {
+    zoom = ZOOM_DEFAULT;
+    panX = w / 2;
+    panY = h / 2;
+  }
+  applyTransform();
+}
+
+async function resetView() {
+  if (currentView === 'agenda') {
+    agendaActiveTab = null;
+    if (currentWeekKey !== todayWeekKey()) {
+      await loadAndRender(todayWeekKey());
+    }
+    renderAgenda();
     return;
   }
 
-  zoom = ZOOM_DEFAULT;
-  panX = w / 2;
-  panY = h / 2;
-  applyTransform();
+  activeDayFilter = null;
+  if (currentWeekKey !== todayWeekKey()) {
+    await loadAndRender(todayWeekKey());
+  }
+
+  fitMindmapView();
 }
 
 function applyAutoLayout() {
@@ -10471,9 +10478,12 @@ window.addEventListener('load', async () => {
     summaryPanel.classList.toggle('expanded');
   });
 
-  // Small delay to let SVG lay out before computing center
+  // Small delay to let SVG lay out before computing center.
+  // Always fit the mindmap — even when booting into Agenda — so the canvas
+  // (visible blurred behind the agenda overlay on desktop) and the zoom slider
+  // reflect the true fit-zoom from the first paint.
   requestAnimationFrame(() => {
-    resetView();
+    fitMindmapView();
   });
 
   // Custom tooltip logic
