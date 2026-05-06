@@ -6206,17 +6206,20 @@ function computeLayout() {
     
     let maxW1 = 0;
     let maxW2 = 0;
+    let maxH = 0;
     activeChildren.forEach((cid, i) => {
-      const { w } = getNodeSize(cid);
+      const { w, h } = getNodeSize(cid);
       if (i % 2 === 0) maxW1 = Math.max(maxW1, w);
       else maxW2 = Math.max(maxW2, w);
+      maxH = Math.max(maxH, h);
     });
-    
-    const standardH = 32 + VERTICAL_GAP; // Activity height + gap
+
+    const standardH = maxH + VERTICAL_GAP; // Tallest child + gap
     const vStep = standardH / 2;
     const metrics = {
       maxW1,
       maxW2,
+      maxH,
       staggerX: (maxW1 + maxW2) / 2 + VERTICAL_GAP,
       vStep,
       totalH: standardH + (activeChildren.length - 1) * vStep
@@ -6352,8 +6355,8 @@ function computeLayout() {
         const isStaggered = i % 2 !== 0;
         const groupBaseX = parentX + dir * (parentW / 2 + childGap);
         x = groupBaseX + dir * (zig.maxW1 / 2 + (isStaggered ? zig.staggerX : 0));
-        y = currentY + 32 / 2; // Fixed node height (32) center
-        currentY += zig.vStep; 
+        y = currentY + zig.maxH / 2; // Center within row using actual max child height
+        currentY += zig.vStep;
       } else {
         x = parentX + dir * (parentW / 2 + childGap + w / 2);
         y = currentY + childH / 2;
