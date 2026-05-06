@@ -1501,53 +1501,32 @@
     transform: translateY(0);
   }
 
-  #quick-add-branch-btn {
+  #quick-add-branches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .qab-pill {
     display: flex;
     align-items: center;
-    gap: 6px;
-    width: 100%;
-    padding: 6px 8px;
-    background: none;
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    color: var(--text-dim);
-    font-size: 13px;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1.5px solid;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
-    transition: background 0.15s;
+    background: transparent;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
   }
-  #quick-add-branch-btn:hover { background: var(--bg-hover); }
-  #quick-add-branch-btn .branch-dot {
-    width: 8px; height: 8px;
+  .qab-pill .branch-dot {
+    width: 7px; height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
   }
-  #quick-add-branch-btn .branch-name { flex: 1; text-align: left; }
-  #quick-add-branch-dropdown {
-    position: absolute;
-    bottom: calc(100% + 4px);
-    left: 0; right: 0;
-    background: var(--settings-bg);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    box-shadow: 0 4px 16px var(--shadow-md);
-    overflow: hidden;
-    display: none;
-    flex-direction: column;
-    z-index: 10;
-  }
-  #quick-add-branch-dropdown.is-open { display: flex; }
-  .quick-add-branch-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    font-size: 13px;
-    color: var(--text-dim);
-    cursor: pointer;
-    transition: background 0.1s;
-  }
-  .quick-add-branch-option:hover { background: var(--bg-hover); }
-  .quick-add-branch-option.selected { color: var(--text-primary); font-weight: 600; }
+  .qab-pill.selected .branch-dot { background: #fff !important; }
+  .qab-pill:not(.selected):hover { background: var(--bg-hover); }
 
   #quick-add-input {
     width: 100%;
@@ -2871,14 +2850,7 @@
 
 <div id="quick-add-backdrop"></div>
 <div id="quick-add-panel" role="dialog" aria-label="Quick add" aria-modal="true">
-  <div style="position:relative;">
-    <button type="button" id="quick-add-branch-btn" aria-haspopup="listbox" aria-expanded="false">
-      <span class="branch-dot" id="quick-add-branch-dot"></span>
-      <span class="branch-name" id="quick-add-branch-name" data-i18n="quick_add.branch_label">Branch</span>
-      <svg class="icon" aria-hidden="true" style="margin-left:auto;"><use href="#icon-caret-down"/></svg>
-    </button>
-    <div id="quick-add-branch-dropdown" role="listbox"></div>
-  </div>
+  <div id="quick-add-branches" role="group" aria-label="Branch"></div>
   <input type="text" id="quick-add-input" maxlength="200"
     data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…" autocomplete="off">
 </div>
@@ -10135,14 +10107,11 @@ document.addEventListener('click', (e) => {
 
   const STORAGE_KEY = 'zenit-week-quick-add-branch';
 
-  const panel      = document.getElementById('quick-add-panel');
-  const backdrop   = document.getElementById('quick-add-backdrop');
-  const branchBtn  = document.getElementById('quick-add-branch-btn');
-  const branchDot  = document.getElementById('quick-add-branch-dot');
-  const branchName = document.getElementById('quick-add-branch-name');
-  const branchDrop = document.getElementById('quick-add-branch-dropdown');
-  const input      = document.getElementById('quick-add-input');
-  const fabAdd     = document.getElementById('fab-add');
+  const panel        = document.getElementById('quick-add-panel');
+  const backdrop     = document.getElementById('quick-add-backdrop');
+  const branchesRow  = document.getElementById('quick-add-branches');
+  const input        = document.getElementById('quick-add-input');
+  const fabAdd       = document.getElementById('fab-add');
 
   // Apply placeholder translation (not handled by applyTranslations)
   input.placeholder = t('quick_add.placeholder');
@@ -10153,10 +10122,6 @@ document.addEventListener('click', (e) => {
     return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 640;
   }
 
-  function getBranches() {
-    return weekData.nodes.filter(n => n.type === 'branch');
-  }
-
   function getBranchColor(branchId) {
     return (BRANCH_COLORS[branchId] && BRANCH_COLORS[branchId].main) || '#888';
   }
@@ -10164,39 +10129,44 @@ document.addEventListener('click', (e) => {
   function selectBranch(id) {
     selectedBranchId = id;
     localStorage.setItem(STORAGE_KEY, id);
-    const branch = weekData.nodes.find(n => n.id === id);
-    branchDot.style.background = getBranchColor(id);
-    branchName.textContent = branch ? branch.label : t('quick_add.branch_label');
-    closeBranchDropdown();
+    branchesRow.querySelectorAll('.qab-pill').forEach(pill => {
+      const isSelected = pill.dataset.id === id;
+      const color = getBranchColor(pill.dataset.id);
+      pill.classList.toggle('selected', isSelected);
+      pill.style.borderColor = color;
+      if (isSelected) {
+        pill.style.background = color;
+        pill.style.color = '#fff';
+      } else {
+        pill.style.background = '';
+        pill.style.color = color;
+      }
+    });
   }
 
-  function openBranchDropdown() {
-    branchDrop.innerHTML = '';
-    getBranches().forEach(b => {
-      const opt = document.createElement('div');
-      opt.className = 'quick-add-branch-option' + (b.id === selectedBranchId ? ' selected' : '');
-      opt.setAttribute('role', 'option');
+  function populateBranches() {
+    branchesRow.innerHTML = '';
+    weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
+      const color = getBranchColor(b.id);
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'qab-pill';
+      pill.dataset.id = b.id;
+      pill.style.borderColor = color;
+      pill.style.color = color;
       const dot = document.createElement('span');
       dot.className = 'branch-dot';
-      dot.style.cssText = `width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${getBranchColor(b.id)}`;
+      dot.style.background = color;
       const label = document.createElement('span');
       label.textContent = b.label;
-      opt.appendChild(dot);
-      opt.appendChild(label);
-      opt.addEventListener('click', (e) => { e.stopPropagation(); selectBranch(b.id); });
-      branchDrop.appendChild(opt);
+      pill.appendChild(dot);
+      pill.appendChild(label);
+      pill.addEventListener('click', (e) => { e.stopPropagation(); selectBranch(b.id); input.focus(); });
+      branchesRow.appendChild(pill);
     });
-    branchDrop.classList.add('is-open');
-    branchBtn.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeBranchDropdown() {
-    branchDrop.classList.remove('is-open');
-    branchBtn.setAttribute('aria-expanded', 'false');
   }
 
   function openQuickAdd() {
-    // Pick layout mode
     if (isMobile()) {
       panel.classList.remove('is-desktop');
       panel.classList.add('is-mobile');
@@ -10205,24 +10175,24 @@ document.addEventListener('click', (e) => {
       panel.classList.add('is-desktop');
     }
 
-    // Resolve default branch
-    const branches = getBranches();
-    if (!branches.length) return;
+    populateBranches();
+    selectedBranchId = null;
+
+    // Re-select last used branch if still valid
     const saved = localStorage.getItem(STORAGE_KEY);
-    const defaultId = (saved && branches.find(b => b.id === saved)) ? saved : branches[0].id;
-    selectBranch(defaultId);
+    if (saved && weekData.nodes.find(n => n.id === saved && n.type === 'branch')) {
+      selectBranch(saved);
+    }
 
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     input.value = '';
-    // Small delay so mobile keyboard doesn't fight the slide animation
     requestAnimationFrame(() => input.focus());
   }
 
   function closeQuickAdd() {
     panel.classList.remove('is-open');
     backdrop.classList.remove('is-open');
-    closeBranchDropdown();
   }
 
   function submitQuickAdd() {
@@ -10269,12 +10239,6 @@ document.addEventListener('click', (e) => {
     } else {
       openQuickAdd();
     }
-  });
-
-  branchBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (branchDrop.classList.contains('is-open')) closeBranchDropdown();
-    else openBranchDropdown();
   });
 
   input.addEventListener('keydown', (e) => {
