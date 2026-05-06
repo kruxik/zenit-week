@@ -7800,25 +7800,27 @@ function render() {
       if (!childPos) return;
       const childNode = findNode(childId);
       if (!childNode) return; // Prevent orphan lines
-      if (childNode.inbox) return; // Inbox nodes have no bezier connection
-      const { w: childW } = getNodeSize(childId);
-      const color = branchColor(branch);
+      // Inbox nodes have no bezier to their branch, but recurse to draw their day-leaf connections
+      if (!childNode.inbox) {
+        const { w: childW } = getNodeSize(childId);
+        const color = branchColor(branch);
 
-      // Level2 (depth=0): branch→activity; Level3+ (depth≥1): deeper nesting
-      let swStart, swEnd;
-      if (depth === 0) { swStart = 8;   swEnd = 5.3; }
-      else             { swStart = 5.3; swEnd = 3.5; }
+        // Level2 (depth=0): branch→activity; Level3+ (depth≥1): deeper nesting
+        let swStart, swEnd;
+        if (depth === 0) { swStart = 8;   swEnd = 5.3; }
+        else             { swStart = 5.3; swEnd = 3.5; }
 
-      let x1, x2;
-      if (side === 'left') {
-        x1 = pos.x - nodeW / 2;
-        x2 = childPos.x + childW / 2;
-      } else {
-        x1 = pos.x + nodeW / 2;
-        x2 = childPos.x - childW / 2;
+        let x1, x2;
+        if (side === 'left') {
+          x1 = pos.x - nodeW / 2;
+          x2 = childPos.x + childW / 2;
+        } else {
+          x1 = pos.x + nodeW / 2;
+          x2 = childPos.x - childW / 2;
+        }
+
+        linesG.appendChild(makeTaperedCurve(x1, pos.y, x2, childPos.y, color, swStart, swEnd, nodeId, childId, defsEl));
       }
-
-      linesG.appendChild(makeTaperedCurve(x1, pos.y, x2, childPos.y, color, swStart, swEnd, nodeId, childId, defsEl));
       drawEdges(childId, depth + 1);
     });
   }
@@ -7854,7 +7856,7 @@ function render() {
       node.id, pos.x, pos.y, node.label,
       node.type, node.branch || node.id, node, pos.side
     );
-    if (node.inbox) g.setAttribute('opacity', '0.55');
+    if (node.inbox || (node.dayChild && findNode(node.parent)?.inbox)) g.setAttribute('opacity', '0.55');
     nodesG.appendChild(g);
   });
 
@@ -10230,6 +10232,11 @@ document.addEventListener('click', (e) => {
     rebuildNodeMap();
     branch.children.push(node.id);
     touchNode(selectedBranchId);
+
+    // Apply day tokens if present (reuses existing logic — strips label, creates day-children)
+    const parsedDays = parseTodoDays(label);
+    if (parsedDays.size > 0) setActivityDays(node.id, parsedDays);
+
     saveWeek(currentWeekKey, weekData);
     render();
 
