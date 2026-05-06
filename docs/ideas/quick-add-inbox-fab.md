@@ -3,9 +3,13 @@
 ## Problem Statement
 How might we let mobile users capture activities in under 3 seconds without navigating the mindmap — so friction never causes an idea to be lost?
 
+## Current State (as of 2026-05)
+
+Bottom-right corner is occupied by `#settings-fab` — a 44×44px fixed button (`bottom: 12px; right: 12px`) that opens a settings dropdown. The help button mentioned in the original idea was already moved to the Settings menu (`#settings-help-btn`). So the conflict is: **settings FAB vs. quick-add FAB, both wanting bottom-right**.
+
 ## Recommended Direction
 
-A floating "+" FAB replaces the current Help button (bottom-right). Tapping it opens a slide-up input drawer above the keyboard with immediate cursor focus. User types a label, optionally appends `#prefix` to route it to a branch. Submitting closes the drawer and keyboard.
+A floating "+" FAB in the bottom-right opens a slide-up input drawer above the keyboard with immediate cursor focus. User types a label, optionally appends `#prefix` to route it to a branch. Submitting closes the drawer and keyboard. The settings FAB must be relocated or merged to make room.
 
 Items created this way become **inbox nodes** — marked with `inbox: true` flag, rendered below their assigned branch node (or below the center node if unassigned) without a bezier connection, in a muted visual style. They appear as the last item in the existing "Any Day" group in the daily/todo panels. User drags them to a permanent home later — existing drag system, no new behavior needed.
 
