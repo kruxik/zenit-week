@@ -1459,10 +1459,21 @@
   #quick-add-backdrop {
     display: none;
     position: fixed;
-    inset: 0;
+    top: 56px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 56px);
+    background: var(--overlay-sm);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     z-index: 1099;
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
-  #quick-add-backdrop.is-open { display: block; }
+  #quick-add-backdrop.is-open {
+    display: block;
+    opacity: 1;
+  }
 
   #quick-add-panel {
     position: fixed;
