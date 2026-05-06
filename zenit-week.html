@@ -5286,6 +5286,8 @@ function validateAndRepair(data) {
       n.val = typeof n.val === 'number' && isFinite(n.val) ? Math.max(0, Math.floor(n.val)) : 0;
       n.max = typeof n.max === 'number' && isFinite(n.max) ? Math.max(1, Math.floor(n.max)) : 1;
     }
+    // Coerce inbox flag to boolean
+    if (n.inbox !== undefined) n.inbox = !!n.inbox;
     // Preserve dayChild/dayIndex — validate dayIndex is a valid weekday index or null
     if (n.dayChild) {
       if (n.dayIndex !== null && (typeof n.dayIndex !== 'number' || n.dayIndex < 0 || n.dayIndex > 6 || !Number.isInteger(n.dayIndex))) {
@@ -6296,6 +6298,14 @@ function computeLayout() {
     return nodeZigZagMetrics[nodeId] = metrics;
   }
 
+  function sortedChildren(childIds) {
+    return [...childIds].sort((a, b) => {
+      const ia = findNode(a)?.inbox ? 1 : 0;
+      const ib = findNode(b)?.inbox ? 1 : 0;
+      return ia - ib;
+    });
+  }
+
   // Calculate total height of each subtree
   function calcHeight(nodeId) {
     const node = findNode(nodeId);
@@ -6306,12 +6316,12 @@ function computeLayout() {
     }
     const { h: nodeH } = getNodeSize(nodeId);
     const selfH = nodeH + VERTICAL_GAP;
-    
-    const activeChildren = (node.children || []).filter(cid => {
+
+    const activeChildren = sortedChildren((node.children || []).filter(cid => {
       const child = findNode(cid);
       const isChildActiveEdit = editState && editState.nodeId === cid;
       return child && (!child._editing || isChildActiveEdit);
-    });
+    }));
 
     if (activeChildren.length === 0) {
       heights[nodeId] = selfH;
@@ -6385,11 +6395,11 @@ function computeLayout() {
     const isActiveEdit = editState && editState.nodeId === nodeId;
     if (!node || (node._editing && !isActiveEdit)) return;
 
-    const activeChildren = (node.children || []).filter(cid => {
+    const activeChildren = sortedChildren((node.children || []).filter(cid => {
       const child = findNode(cid);
       const isChildActiveEdit = editState && editState.nodeId === cid;
       return child && (!child._editing || isChildActiveEdit);
-    });
+    }));
 
     if (activeChildren.length === 0) return;
 
@@ -7833,6 +7843,7 @@ function render() {
       if (!childPos) return;
       const childNode = findNode(childId);
       if (!childNode) return; // Prevent orphan lines
+      if (childNode.inbox) return; // Inbox nodes have no bezier connection
       const { w: childW } = getNodeSize(childId);
       const color = branchColor(branch);
 
@@ -7886,6 +7897,7 @@ function render() {
       node.id, pos.x, pos.y, node.label,
       node.type, node.branch || node.id, node, pos.side
     );
+    if (node.inbox) g.setAttribute('opacity', '0.55');
     nodesG.appendChild(g);
   });
 
