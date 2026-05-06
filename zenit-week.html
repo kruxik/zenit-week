@@ -9591,6 +9591,7 @@ window.addEventListener('pointermove', (e) => {
         if (el) {
           el.style.transition = 'none';
           el.setAttribute('pointer-events', 'none');
+          el.style.opacity = '0.4';
           document.getElementById('nodes-layer').appendChild(el);
         }
       });
@@ -9599,6 +9600,7 @@ window.addEventListener('pointermove', (e) => {
         const fromId = path.getAttribute('data-from');
         const toId = path.getAttribute('data-to');
         if (initialPositions[fromId] || initialPositions[toId]) {
+          path.style.opacity = '0.4';
           topLines.appendChild(path);
         }
       });
@@ -9674,7 +9676,11 @@ window.addEventListener('pointerup', (e) => {
       if (el) {
         el.removeAttribute('pointer-events');
         el.style.transition = '';
+        el.style.opacity = '';
       }
+    });
+    document.querySelectorAll('#top-lines-layer path').forEach(path => {
+      path.style.opacity = '';
     });
     document.getElementById('main-svg').classList.remove('dragging-active');
     handleNodeDrop(e.clientX, e.clientY);
@@ -9703,6 +9709,17 @@ window.addEventListener('pointercancel', (e) => {
   endPointer(e);
   pendingDrag = null;
   if (dragState.activeNodeId) {
+    Object.keys(dragState.initialPositions).forEach(id => {
+      const el = document.querySelector(`.node-group[data-id="${id}"]`);
+      if (el) {
+        el.removeAttribute('pointer-events');
+        el.style.transition = '';
+        el.style.opacity = '';
+      }
+    });
+    document.querySelectorAll('#top-lines-layer path').forEach(path => {
+      path.style.opacity = '';
+    });
     document.getElementById('main-svg').classList.remove('dragging-active');
     endAtomicOp();
   }
