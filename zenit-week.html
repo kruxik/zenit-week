@@ -6189,7 +6189,6 @@ function computeLayout() {
   const nodeZigZagMetrics = {};
 
   function getZigZagMetrics(nodeId) {
-    if (!autoLayout) return nodeZigZagMetrics[nodeId] = null;
     if (nodeId in nodeZigZagMetrics) return nodeZigZagMetrics[nodeId];
     const node = findNode(nodeId);
     if (!node || node.type !== 'activity') return nodeZigZagMetrics[nodeId] = null;
