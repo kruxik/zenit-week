@@ -7412,6 +7412,54 @@ function getDayFilterOpacity(nodeId) {
   return hasMatch(nodeId) ? 1 : 0.12;
 }
 
+// Returns true when all day-filter-matching descendants of nodeId are done,
+// so the parent can be shown as virtually done without touching data.
+function isVirtuallyDone(nodeId) {
+  if (typeof activeDayFilter !== 'number') return false;
+  const node = findNode(nodeId);
+  if (!node || node.done || node.dayChild) return false;
+  const type = node.type;
+  if (type === 'center' || type === 'counter') return false;
+
+  const d = activeDayFilter;
+
+  function collectMatchingLeaves(id) {
+    const n = findNode(id);
+    if (!n) return [];
+    if (n.dayChild) return n.dayIndex === d ? [n] : [];
+    if (n.type === 'activity') {
+      const dayChildren = (n.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild);
+      if (dayChildren.length > 0) return dayChildren.filter(c => c.dayIndex === d);
+      if (parseTodoDays(n.label || '').has(d)) return [n];
+    }
+    return (n.children || []).flatMap(cid => {
+      const child = findNode(cid);
+      return child && child.type !== 'counter' ? collectMatchingLeaves(cid) : [];
+    });
+  }
+
+  const leaves = collectMatchingLeaves(nodeId);
+  return leaves.length > 0 && leaves.every(n => n.done);
+}
+
+function applyVirtualDoneUI(id, isVirtual) {
+  const g = document.querySelector(`.node-group[data-id="${id}"]`);
+  if (!g) return;
+  if (isVirtual) {
+    const { DONE_BG, DONE_BORDER, DONE_TEXT } = getThemeColors();
+    const rect = g.querySelector('.node-rect');
+    if (rect) { rect.setAttribute('fill', DONE_BG); rect.setAttribute('stroke', DONE_BORDER); }
+    g.querySelectorAll('text').forEach(t => {
+      t.setAttribute('fill', DONE_TEXT);
+      t.setAttribute('text-decoration', 'line-through');
+    });
+    g.dataset.virtualDone = '1';
+  } else if (g.dataset.virtualDone) {
+    delete g.dataset.virtualDone;
+    updateNodeUI(id);
+  }
+}
+
 function applyFilters() {
   const nodesLayer = document.getElementById('nodes-layer');
   const linesLayer = document.getElementById('lines-layer');
@@ -7428,6 +7476,7 @@ function applyFilters() {
     const dayOpacity   = getDayFilterOpacity(id);
     const final = Math.min(depthOpacity, dayOpacity);
     g.style.opacity = final === 1 ? '' : String(final);
+    applyVirtualDoneUI(id, final === 1 && isVirtuallyDone(id));
   });
 
   linesLayer.querySelectorAll('path[data-to]').forEach(path => {
