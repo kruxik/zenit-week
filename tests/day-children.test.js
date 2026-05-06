@@ -574,11 +574,11 @@ describe('getAnyDayItems', () => {
     expect(getAnyDayItems()).toEqual([]);
   });
 
-  test('plain activity (no counter, no dayChild) → excluded', () => {
+  test('plain activity (no counter, no dayChild) → included', () => {
     const branch = mkBranch('work', ['p1']);
     const p1 = mkActivity('p1', 'work', 'work');
     setUp([branch, p1]);
-    expect(getAnyDayItems()).toEqual([]);
+    expect(getAnyDayItems().map(n => n.id)).toEqual(['p1']);
   });
 
   test('branch/counter nodes → excluded', () => {

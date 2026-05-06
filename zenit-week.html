@@ -6904,18 +6904,13 @@ function getOverdueItems(today = new Date()) {
   return result;
 }
 
-// Activity nodes that have a counter child but no dayChild children
+// Activity nodes with no scheduled day (no dayChild, no day tokens in label).
 function getAnyDayItems() {
   return weekData.nodes.filter(n => {
     if (n.type !== 'activity' || n.dayChild) return false;
-    const hasDayChildren = n.children.some(id => findNode(id)?.dayChild);
-    if (hasDayChildren) return false;
-    // Exclude if it has (mo, tu...) tokens in label
+    if (n.children.some(id => findNode(id)?.dayChild)) return false;
     if (parseTodoDays(n.label || '').size > 0) return false;
-    // Inbox nodes with no day tokens always appear in Any Day
-    if (n.inbox) return true;
-    // Include only if it has a counter child
-    return n.children.some(id => findNode(id)?.type === 'counter');
+    return true;
   });
 }
 
