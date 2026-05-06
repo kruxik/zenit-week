@@ -9824,6 +9824,7 @@ function handleNodeDrop(mouseX, mouseY) {
     const newParent = findNode(targetParentId);
     node.parent = targetParentId;
     node.branch = newParent.branch || newParent.id;
+    delete node.inbox; // promote from inbox to permanent map node
     newParent.children.push(nodeId);
     touchNode(targetParentId);
     // Re-sync new parent (node.parent now points to new parent)
