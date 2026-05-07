@@ -6936,10 +6936,16 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
   }
 
   // Case 2: Real sub-task child of an annotated parent. Show Parent · Child.
-  const isAnnotatedParent = p && p.type === 'activity' && parseTodoDays(p.label).size > 0;
-  if (isAnnotatedParent) {
+  const parentDays = p && p.type === 'activity' ? parseTodoDays(p.label) : new Set();
+  if (parentDays.size > 0) {
     const parentLabel = stripDayGroups(p.label) || p.label;
-    return parentLabel ? `${parentLabel} · ${node.label}` : node.label;
+    const base = parentLabel ? `${parentLabel} · ${node.label}` : node.label;
+    if (includeDayHint) {
+      const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+      const [dayIdx] = [...parentDays];
+      return `${base} · ${langLabels[dayIdx]}`;
+    }
+    return base;
   }
 
   // Case 3: Standard activity (possibly with day hint like "Yoga (tu)").
