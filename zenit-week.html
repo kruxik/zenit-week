@@ -10236,6 +10236,7 @@ document.addEventListener('click', (e) => {
 
     saveWeek(currentWeekKey, weekData);
     render();
+    if (currentView === 'agenda') renderAgenda();
 
     closeQuickAdd();
   }
