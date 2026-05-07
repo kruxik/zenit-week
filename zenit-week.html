@@ -7211,10 +7211,12 @@ function commitEdit(followUp = 'auto') {
           touchNode(nodeId);
         }
       } else {
-        // Counter auto-creation — Nx pattern only (day indicators handled above)
+        // Counter auto-creation — Nx pattern only, and only when no day token
+        // is present. A single-day Nx (e.g. "Pushups 10x (tu)") means "do 10
+        // pushups on Tuesday" — schedule, no counter.
         const nxMatch = label.match(/(\d+)x/);
         const nxVal   = nxMatch ? parseInt(nxMatch[1], 10) : 0;
-        const counterMax = nxVal >= 2 ? nxVal : 0;
+        const counterMax = (nxVal >= 2 && parsedDays.size === 0) ? nxVal : 0;
         if (counterMax > 0) {
           const maxVal = counterMax;
           // Check if it already has a counter child
