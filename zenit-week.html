@@ -6837,6 +6837,119 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false) {
   touchNode(nodeId);
 }
 
+// Applies "magic" label rules to an activity node based on its current label:
+//   • Multi-day token group ("(mo, we)") → strip the group, create one
+//     day-child per weekday, drop any counter (day wins over counter).
+//   • No day token + Nx pattern ("Pushups 10x") → create/update a counter
+//     child holding the count, strip "Nx" from the stored label.
+//   • Single-day token ("(tu)") → keep label as-is, no counter.
+//   • Plain label → drop any stale counter child.
+// Caller must have already assigned node.label and called touchNode.
+// Shared by commitEdit and submitQuickAdd so both flows behave identically.
+function applyMagicLabel(nodeId) {
+  const node = findNode(nodeId);
+  if (!node || node.type !== 'activity' || node.dayChild) return;
+  const label = node.label || '';
+  const parsedDays = parseTodoDays(label);
+
+  if (parsedDays.size >= 2) {
+    // Keep Nx in label — "Pushups 10x (mo, we)" means "do 10 pushups on
+    // Mon and Wed", schedule per day; counter would be misleading.
+    const cleanLabel = stripDayGroups(label).trim();
+    if (cleanLabel && cleanLabel !== node.label) {
+      node.label = cleanLabel;
+      touchNode(nodeId);
+    }
+    const existingDayIndices = new Set(
+      node.children.map(findNode).filter(n => n?.dayChild).map(n => n.dayIndex)
+    );
+    parsedDays.forEach(dayIndex => {
+      if (!existingDayIndices.has(dayIndex)) createDayChild(nodeId, dayIndex);
+    });
+    sortDayChildren(node);
+    const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+    if (counterNode) {
+      tombstoneNodes([counterNode.id]);
+      node.children = node.children.filter(id => id !== counterNode.id);
+      weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
+      rebuildNodeMap();
+      touchNode(nodeId);
+    }
+    return;
+  }
+
+  // 0 or 1 day token: counter logic. Single-day annotation (size === 1)
+  // disables counter creation but otherwise behaves like the no-day branch.
+  const nxMatch = label.match(/(\d+)x/);
+  const nxVal = nxMatch ? parseInt(nxMatch[1], 10) : 0;
+  const counterMax = (nxVal >= 2 && parsedDays.size === 0) ? nxVal : 0;
+
+  if (counterMax > 0) {
+    // Counter holds the count — strip "Nx" from the stored label.
+    const cleanLabel = label.replace(/\s*\d+x\b/gi, '').trim();
+    if (cleanLabel && cleanLabel !== node.label) {
+      node.label = cleanLabel;
+      touchNode(nodeId);
+    }
+    const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+    if (counterNode) {
+      const oldMax = counterNode.max;
+      counterNode.max = counterMax;
+      if (counterNode.val > counterMax) counterNode.val = counterMax;
+      if (counterMax < oldMax && counterNode.ticks && counterNode.ticks.length > counterMax - 1) {
+        counterNode.ticks.splice(counterMax - 1);
+      }
+      touchNode(counterNode.id);
+      // S2: if val no longer reaches new max, reopen counter and parent
+      if (counterNode.val < counterNode.max && counterNode.done) {
+        counterNode.done = false;
+        // The final click was stored as doneAt (not in ticks) — move it to ticks
+        // so the activity log shows it as "+1 Progress" instead of losing it
+        if (counterNode.doneAt) {
+          if (!counterNode.ticks) counterNode.ticks = [];
+          counterNode.ticks.push(counterNode.doneAt);
+          delete counterNode.doneAt;
+        }
+        syncStatusUp(counterNode.id, 'done');
+      }
+    } else {
+      const counterId = genId();
+      const newCounter = {
+        id: counterId,
+        type: 'counter',
+        branch: node.branch,
+        parent: nodeId,
+        label: '0',
+        val: 0,
+        max: counterMax,
+        unplanned: node.unplanned || false,
+        children: [],
+        _ts: Date.now(),
+      };
+      weekData.nodes.push(newCounter);
+      rebuildNodeMap();
+      node.children.push(counterId);
+      touchNode(nodeId);
+    }
+    return;
+  }
+
+  // S1: no Nx (or single-day blocks counter) — remove any stale counter child
+  const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+  if (counterNode) {
+    tombstoneNodes([counterNode.id]);
+    node.children = node.children.filter(id => id !== counterNode.id);
+    weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
+    rebuildNodeMap();
+    touchNode(nodeId);
+    if (node.done) {
+      node.done = false;
+      delete node.doneAt;
+    }
+    syncStatusUp(node.id, 'done');
+  }
+}
+
 // ─── Agenda helpers ───────────────────────────────────────────────────────────
 
 // Maps JS getDay() value to ISO week position (Mon=1 … Sun=7)
@@ -7188,104 +7301,7 @@ function commitEdit(followUp = 'auto') {
         node.label = originalLabel; // invalid token — silently revert
       }
     } else if (node.type !== 'branch') {
-      // Day-child creation: if label contains day patterns, day wins over Nx
-      const parsedDays = parseTodoDays(label);
-      if (parsedDays.size >= 2) {
-        // Keep Nx in label — "Pushups 10x (mo, we)" means "do 10 pushups on
-        // Mon and Wed", schedule per day; counter would be misleading.
-        const cleanLabel = stripDayGroups(label).trim();
-        node.label = cleanLabel || label;
-        touchNode(nodeId);
-        const existingDayIndices = new Set(
-          node.children.map(findNode).filter(n => n?.dayChild).map(n => n.dayIndex)
-        );
-        parsedDays.forEach(dayIndex => {
-          if (!existingDayIndices.has(dayIndex)) createDayChild(nodeId, dayIndex);
-        });
-        sortDayChildren(node);
-        // Remove any counter child (day replaces counter — should not coexist)
-        const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
-        if (counterNode) {
-          tombstoneNodes([counterNode.id]);
-          node.children = node.children.filter(id => id !== counterNode.id);
-          weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
-          rebuildNodeMap();
-          touchNode(nodeId);
-        }
-      } else {
-        // Counter auto-creation — Nx pattern only, and only when no day token
-        // is present. A single-day Nx (e.g. "Pushups 10x (tu)") means "do 10
-        // pushups on Tuesday" — schedule, no counter.
-        const nxMatch = label.match(/(\d+)x/);
-        const nxVal   = nxMatch ? parseInt(nxMatch[1], 10) : 0;
-        const counterMax = (nxVal >= 2 && parsedDays.size === 0) ? nxVal : 0;
-        if (counterMax > 0) {
-          const maxVal = counterMax;
-          // Counter holds the count — strip "Nx" from the stored label.
-          const cleanLabel = label.replace(/\s*\d+x\b/gi, '').trim();
-          if (cleanLabel && cleanLabel !== node.label) {
-            node.label = cleanLabel;
-            touchNode(nodeId);
-          }
-          // Check if it already has a counter child
-          const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
-          if (counterNode) {
-            const oldMax = counterNode.max;
-            counterNode.max = maxVal;
-            if (counterNode.val > maxVal) counterNode.val = maxVal;
-            // Trim excess ticks from the bottom up when max is lowered
-            if (maxVal < oldMax && counterNode.ticks && counterNode.ticks.length > maxVal - 1) {
-              counterNode.ticks.splice(maxVal - 1);
-            }
-            touchNode(counterNode.id);
-            // S2: if val no longer reaches new max, reopen counter and parent
-            if (counterNode.val < counterNode.max && counterNode.done) {
-              counterNode.done = false;
-              // The final click was stored as doneAt (not in ticks) — move it to ticks
-              // so the activity log shows it as "+1 Progress" instead of losing it
-              if (counterNode.doneAt) {
-                if (!counterNode.ticks) counterNode.ticks = [];
-                counterNode.ticks.push(counterNode.doneAt);
-                delete counterNode.doneAt;
-              }
-              syncStatusUp(counterNode.id, 'done');
-            }
-          } else {
-            const counterId = genId();
-            const counterNode = {
-              id: counterId,
-              type: 'counter',
-              branch: node.branch,
-              parent: nodeId,
-              label: '0',
-              val: 0,
-              max: maxVal,
-              unplanned: node.unplanned || false,
-              children: [],
-              _ts: Date.now(),
-            };
-            weekData.nodes.push(counterNode);
-            rebuildNodeMap();
-            node.children.push(counterId);
-            touchNode(nodeId);
-          }
-        } else {
-          // S1: no Nx and no day indicators — remove any existing counter child
-          const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
-          if (counterNode) {
-            tombstoneNodes([counterNode.id]);
-            node.children = node.children.filter(id => id !== counterNode.id);
-            weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
-            rebuildNodeMap();
-            touchNode(nodeId);
-            if (node.done) {
-              node.done = false;
-              delete node.doneAt;
-            }
-            syncStatusUp(node.id, 'done');
-          }
-        }
-      }
+      applyMagicLabel(nodeId);
     }
 
     saveWeek(currentWeekKey, weekData);
@@ -10283,9 +10299,8 @@ document.addEventListener('click', (e) => {
     branch.children.push(node.id);
     touchNode(selectedBranchId);
 
-    // Apply day tokens if present (reuses existing logic — strips label, creates day-children)
-    const parsedDays = parseTodoDays(label);
-    if (parsedDays.size > 0) setActivityDays(node.id, parsedDays);
+    // Apply day-token + Nx-counter rules — same logic as commitEdit.
+    applyMagicLabel(node.id);
 
     saveWeek(currentWeekKey, weekData);
     renderIfVisible();

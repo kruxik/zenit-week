@@ -517,6 +517,7 @@ export const {
   parseTodoDays,
   stripDayGroups,
   commitEdit,
+  applyMagicLabel,
   migrateDayCounters,
   transferReusable,
   computeLayout,

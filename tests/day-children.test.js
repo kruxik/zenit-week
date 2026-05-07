@@ -176,32 +176,30 @@ describe('commitEdit — day-child creation', () => {
     expect(node.children).toHaveLength(0);
   });
 
-  test('Nx + single day (mo): Nx wins, counter created, label unchanged', () => {
+  test('Nx + single day (mo): scheduled, no counter, label unchanged', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 10x (mo)', true);
     const node = findNode(id);
     expect(node.label).toBe('Pushups 10x (mo)');
-    const kids = node.children.map(findNode);
-    expect(kids).toHaveLength(1);
-    expect(kids[0].type).toBe('counter');
-    expect(kids[0].max).toBe(10);
+    expect(node.children).toHaveLength(0);
   });
 
-  test('Nx + 2 day indicators: day wins, no counter, label stripped of both', () => {
+  test('Nx + 2 day indicators: day-children created, counter removed, Nx kept in label', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 10x (mo, fr)', true);
     const node = findNode(id);
-    expect(node.label).toBe('Pushups');
+    expect(node.label).toBe('Pushups 10x');
     const kids = node.children.map(findNode);
     expect(kids).toHaveLength(2);
     expect(kids.every(k => k.dayChild === true)).toBe(true);
     expect(kids.some(k => k.type === 'counter')).toBe(false);
   });
 
-  test('Nx pattern alone still creates counter', () => {
+  test('Nx pattern alone creates counter and strips Nx from label', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 10x', true);
     const node = findNode(id);
+    expect(node.label).toBe('Pushups');
     const kids = node.children.map(findNode);
     expect(kids).toHaveLength(1);
     expect(kids[0].type).toBe('counter');
