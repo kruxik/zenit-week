@@ -7191,7 +7191,9 @@ function commitEdit(followUp = 'auto') {
       // Day-child creation: if label contains day patterns, day wins over Nx
       const parsedDays = parseTodoDays(label);
       if (parsedDays.size >= 2) {
-        const cleanLabel = stripDayGroups(label).replace(/\s*\d+x\b/gi, '').trim();
+        // Keep Nx in label — "Pushups 10x (mo, we)" means "do 10 pushups on
+        // Mon and Wed", schedule per day; counter would be misleading.
+        const cleanLabel = stripDayGroups(label).trim();
         node.label = cleanLabel || label;
         touchNode(nodeId);
         const existingDayIndices = new Set(
@@ -7219,6 +7221,12 @@ function commitEdit(followUp = 'auto') {
         const counterMax = (nxVal >= 2 && parsedDays.size === 0) ? nxVal : 0;
         if (counterMax > 0) {
           const maxVal = counterMax;
+          // Counter holds the count — strip "Nx" from the stored label.
+          const cleanLabel = label.replace(/\s*\d+x\b/gi, '').trim();
+          if (cleanLabel && cleanLabel !== node.label) {
+            node.label = cleanLabel;
+            touchNode(nodeId);
+          }
           // Check if it already has a counter child
           const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
           if (counterNode) {
