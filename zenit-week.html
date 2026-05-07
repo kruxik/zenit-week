@@ -6924,12 +6924,17 @@ function getAnyDayItems() {
 
 function getAgendaNodeLabel(node, includeDayHint = false) {
   const p = findNode(node.parent);
+  const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+  const isSingleWord = s => /^\S+$/.test(s);
 
   // Case 1: Virtual day-leaf (Mo, Tu...). Show only parent label.
   if (node.dayChild) {
-    const base = p ? (stripDayGroups(p.label) || p.label) : node.label;
+    let base = p ? (stripDayGroups(p.label) || p.label) : node.label;
+    if (p && isSingleWord(base)) {
+      const gp = findNode(p.parent);
+      if (gp) base = `${gp.label} · ${base}`;
+    }
     if (includeDayHint && node.dayIndex != null) {
-      const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
       return `${base} · ${langLabels[node.dayIndex]}`;
     }
     return base;
@@ -6941,7 +6946,6 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
     const parentLabel = stripDayGroups(p.label) || p.label;
     const base = parentLabel ? `${parentLabel} · ${node.label}` : node.label;
     if (includeDayHint) {
-      const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
       const [dayIdx] = [...parentDays];
       return `${base} · ${langLabels[dayIdx]}`;
     }
@@ -6949,11 +6953,13 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
   }
 
   // Case 3: Standard activity (possibly with day hint like "Yoga (tu)").
-  const stripped = stripDayGroups(node.label) || node.label;
+  let stripped = stripDayGroups(node.label) || node.label;
+  if (p && isSingleWord(stripped)) {
+    stripped = `${p.label} · ${stripped}`;
+  }
   if (includeDayHint) {
     const days = parseTodoDays(node.label || '');
     if (days.size > 0) {
-      const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
       const [dayIdx] = [...days];
       return `${stripped} · ${langLabels[dayIdx]}`;
     }
