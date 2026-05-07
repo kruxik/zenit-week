@@ -9289,6 +9289,7 @@ function renderAgendaTabContent() {
       swipeRight.innerHTML = iconSvg('menu-2');
       const el = document.createElement('div');
       el.className = 'agenda-swipe-wrapper';
+      el.dataset.group = groupKey;
       el.draggable = true;
       el.appendChild(swipeLeft);
       el.appendChild(swipeRight);
@@ -9313,7 +9314,7 @@ function renderAgendaTabContent() {
             w.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
           if (targetEl && targetEl !== item) {
             const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
-            if (targetWrapper) {
+            if (targetWrapper && targetWrapper.dataset.group === groupKey) {
               const r = targetWrapper.getBoundingClientRect();
               targetWrapper.classList.add(cy < r.top + r.height / 2
                 ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
@@ -9409,17 +9410,32 @@ function renderAgendaTabContent() {
           const touch = e.changedTouches[0];
           const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
           if (targetEl && targetEl !== item && targetEl.dataset.nodeId) {
-            const targetId = targetEl.dataset.nodeId;
             const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
-            const r = (targetWrapper || targetEl).getBoundingClientRect();
-            const before = touch.clientY < r.top + r.height / 2;
+            const targetGroup = targetWrapper?.dataset.group;
             const current = loadAgendaGroupOrder(tabKey, groupKey);
             const fromIdx = current.indexOf(touchSrcId);
             if (fromIdx !== -1) {
               current.splice(fromIdx, 1);
-              const toIdx = current.indexOf(targetId);
-              if (toIdx !== -1) {
-                current.splice(before ? toIdx : toIdx + 1, 0, touchSrcId);
+              if (targetGroup === groupKey) {
+                // Same group: insert before/after target
+                const targetId = targetEl.dataset.nodeId;
+                const r = (targetWrapper || targetEl).getBoundingClientRect();
+                const before = touch.clientY < r.top + r.height / 2;
+                const toIdx = current.indexOf(targetId);
+                if (toIdx !== -1) {
+                  current.splice(before ? toIdx : toIdx + 1, 0, touchSrcId);
+                  saveAgendaGroupOrder(tabKey, groupKey, current);
+                  touchSrcId = null;
+                  renderAgenda();
+                  return;
+                }
+              } else if (targetWrapper) {
+                // Foreign group: snap to start/end of source group based on DOM position
+                const firstSrc = list.querySelector(`.agenda-swipe-wrapper[data-group="${CSS.escape(groupKey)}"]`);
+                const targetIsAboveSource = firstSrc &&
+                  !!(targetWrapper.compareDocumentPosition(firstSrc) & Node.DOCUMENT_POSITION_FOLLOWING);
+                if (targetIsAboveSource) current.unshift(touchSrcId);
+                else current.push(touchSrcId);
                 saveAgendaGroupOrder(tabKey, groupKey, current);
                 touchSrcId = null;
                 renderAgenda();
