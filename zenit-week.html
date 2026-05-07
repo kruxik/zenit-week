@@ -1911,6 +1911,11 @@
   .agenda-item-drop-above .agenda-item { box-shadow: inset 0 2px 0 0 var(--accent, #1ABCFE); }
   .agenda-item-drop-below .agenda-item { box-shadow: inset 0 -2px 0 0 var(--accent, #1ABCFE); }
 
+  .agenda-swipe-wrapper, .agenda-item {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
   .agenda-swipe-wrapper {
     position: relative;
     overflow: hidden;
@@ -8901,7 +8906,7 @@ let currentView = localStorage.getItem('zenit-week-view') || 'mindmap';
 let agendaActiveTab = null;
 let hoveredAgendaNode = null;
 
-// Attaches swipe-right=done/undone, swipe-left=context-menu, and long-press=context-menu to an agenda item.
+// Attaches swipe-right=done/undone and swipe-left=context-menu to an agenda item.
 // The item slides over action areas revealed underneath (managed by .agenda-swipe-wrapper).
 // Non-passive touchmove required to preventDefault during confirmed horizontal swipe.
 function addSwipeGesture(item, node, onLongPress) {
@@ -9289,16 +9294,72 @@ function renderAgendaTabContent() {
       el.appendChild(swipeRight);
       el.appendChild(item);
 
-      // ── Mobile touch-drag: shared state for handle and long-press ────────
+      // ── Mobile touch-drag from grip handle ───────────────────────────────
       {
         let touchSrcId = null;
         let ghost = null;
         let touchOffsetY = 0;
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+        let scrollRaf = 0;
+        let scrollSpeed = 0;
+
+        const SCROLL_EDGE = 100;
+        const SCROLL_MAX_SPEED = 18;
+
+        function refreshDropTarget(cx, cy) {
+          const targetEl = document.elementFromPoint(cx, cy)?.closest('.agenda-item');
+          list.querySelectorAll('.agenda-swipe-wrapper').forEach(w =>
+            w.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
+          if (targetEl && targetEl !== item) {
+            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
+            if (targetWrapper) {
+              const r = targetWrapper.getBoundingClientRect();
+              targetWrapper.classList.add(cy < r.top + r.height / 2
+                ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+            }
+          }
+        }
+
+        function updateAutoScroll(cy) {
+          const container = document.getElementById('agenda-tab-content');
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const topDist = cy - rect.top;
+          const botDist = rect.bottom - cy;
+          if (topDist < SCROLL_EDGE) {
+            scrollSpeed = -Math.max(2, Math.round((1 - topDist / SCROLL_EDGE) * SCROLL_MAX_SPEED));
+          } else if (botDist < SCROLL_EDGE) {
+            scrollSpeed = Math.max(2, Math.round((1 - botDist / SCROLL_EDGE) * SCROLL_MAX_SPEED));
+          } else {
+            scrollSpeed = 0;
+          }
+          if (scrollSpeed !== 0 && !scrollRaf) {
+            scrollRaf = requestAnimationFrame(autoScrollTick);
+          }
+        }
+
+        function autoScrollTick() {
+          scrollRaf = 0;
+          if (!touchSrcId || scrollSpeed === 0) return;
+          const container = document.getElementById('agenda-tab-content');
+          if (!container) return;
+          const before = container.scrollTop;
+          container.scrollTop = before + scrollSpeed;
+          if (container.scrollTop === before) {
+            scrollSpeed = 0;
+            return;
+          }
+          refreshDropTarget(lastTouchX, lastTouchY);
+          scrollRaf = requestAnimationFrame(autoScrollTick);
+        }
 
         function initTouchDrag(touch) {
           touchSrcId = node.id;
           const rect = el.getBoundingClientRect();
           touchOffsetY = touch.clientY - rect.top;
+          lastTouchX = touch.clientX;
+          lastTouchY = touch.clientY;
 
           ghost = el.cloneNode(true);
           ghost.style.cssText = [
@@ -9325,24 +9386,19 @@ function renderAgendaTabContent() {
           if (!touchSrcId) return;
           e.preventDefault();
           const touch = e.touches[0];
+          lastTouchX = touch.clientX;
+          lastTouchY = touch.clientY;
 
           if (ghost) ghost.style.top = `${touch.clientY - touchOffsetY}px`;
 
-          const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
-          list.querySelectorAll('.agenda-swipe-wrapper').forEach(x =>
-            x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
-          if (targetEl && targetEl !== item) {
-            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
-            if (targetWrapper) {
-              const r = targetWrapper.getBoundingClientRect();
-              targetWrapper.classList.add(touch.clientY < r.top + r.height / 2
-                ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
-            }
-          }
+          refreshDropTarget(touch.clientX, touch.clientY);
+          updateAutoScroll(touch.clientY);
         }
 
         function finishTouchDrag(e) {
           if (!touchSrcId) return;
+          if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = 0; }
+          scrollSpeed = 0;
           document.removeEventListener('touchmove', onDocTouchMove);
           document.removeEventListener('touchend', finishTouchDrag);
           document.removeEventListener('touchcancel', finishTouchDrag);
@@ -9382,7 +9438,7 @@ function renderAgendaTabContent() {
           }, { passive: true });
         }
 
-        addSwipeGesture(item, node, initTouchDrag);
+        addSwipeGesture(item, node, null);
       }
 
       // ── Desktop HTML5 drag-and-drop ───────────────────────────────────────
