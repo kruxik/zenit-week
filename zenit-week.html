@@ -3533,6 +3533,19 @@ function parseTodoDays(label) {
   return days;
 }
 
+// Walks the node and its ancestors and returns the day-set from the first
+// label whose parsed days are non-empty. Self wins (deepest annotation wins).
+// Returns an empty Set when no ancestor in the chain has a day annotation.
+function getEffectiveDays(node) {
+  let cur = node;
+  while (cur) {
+    const days = parseTodoDays(cur.label || '');
+    if (days.size > 0) return days;
+    cur = findNode(cur.parent);
+  }
+  return new Set();
+}
+
 // Strips only (…) groups that are valid day-pattern groups from a label.
 // Non-day groups like "(v3)" are preserved.
 function stripDayGroups(label) {
@@ -6967,71 +6980,54 @@ function sortDayChildren(node) {
   });
 }
 
-// Returns true when an activity has no day-child leaves (single-day hint case)
+// True when an activity has no day-child leaves — used by the mindmap
+// day-filter to decide whether a label-annotated activity is itself the
+// item to highlight (no children short-circuit yet).
 function _hasNoDayLeaves(node) {
   return !(node.children || []).some(id => findNode(id)?.dayChild);
 }
 
-// All day-leaf nodes for a given dayIndex (both done and pending).
-// Also includes single-day annotated activities that have no day-leaf children.
+// All agenda items for a given dayIndex (both done and pending).
+// Includes day-leaves matching dayIndex plus regular leaf-activities whose
+// closest annotated ancestor (or own label) targets that day.
 function getAgendaItems(dayIndex) {
   const result = [];
   weekData.nodes.forEach(n => {
     if (n.type !== 'activity') return;
-
     if (n.dayChild) {
       if (n.dayIndex === dayIndex) result.push(n);
-    } else {
-      const days = parseTodoDays(n.label || '');
-      if (days.has(dayIndex) && _hasNoDayLeaves(n)) {
-        // Expand to children if any, otherwise include self
-        const children = (n.children || [])
-          .map(id => findNode(id))
-          .filter(c => c && c.type === 'activity' && !c.dayChild);
-        if (children.length > 0) result.push(...children);
-        else result.push(n);
-      }
+      return;
     }
+    if (!isLeafActivity(n)) return;
+    if (getEffectiveDays(n).has(dayIndex)) result.push(n);
   });
   return result;
 }
 
-// Undone day-leaf nodes (or single-day annotated activities) whose ISO-week
-// position is before today's (current week only).
+// Undone agenda items whose ISO-week position is before today's.
 // today is optional — defaults to new Date() for production; pass a Date in tests
 function getOverdueItems(today = new Date()) {
   const todayPos = isoWeekPos(today.getDay());
   const result = [];
-
   weekData.nodes.forEach(n => {
     if (n.type !== 'activity' || n.done) return;
-
     if (n.dayChild) {
-      if (n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos) {
-        result.push(n);
-      }
-    } else {
-      const days = parseTodoDays(n.label || '');
-      if (days.size > 0 && [...days].some(d => isoWeekPos(d) < todayPos) && _hasNoDayLeaves(n)) {
-        // Expand to children if any, otherwise include self
-        const children = (n.children || [])
-          .map(id => findNode(id))
-          .filter(c => c && c.type === 'activity' && !c.dayChild);
-        if (children.length > 0) result.push(...children);
-        else result.push(n);
-      }
+      if (n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos) result.push(n);
+      return;
     }
+    if (!isLeafActivity(n)) return;
+    const days = getEffectiveDays(n);
+    if (days.size > 0 && [...days].some(d => isoWeekPos(d) < todayPos)) result.push(n);
   });
   return result;
 }
 
-// Activity nodes with no scheduled day (no dayChild, no day tokens in label).
+// Leaf activities with no effective day (own label and no annotated ancestor).
 function getAnyDayItems() {
   return weekData.nodes.filter(n => {
     if (n.type !== 'activity' || n.dayChild) return false;
-    if (n.children.some(id => findNode(id)?.dayChild)) return false;
-    if (parseTodoDays(n.label || '').size > 0) return false;
-    return true;
+    if (!isLeafActivity(n)) return false;
+    return getEffectiveDays(n).size === 0;
   });
 }
 
@@ -7040,7 +7036,7 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
   const isSingleWord = s => /^\S+$/.test(s);
 
-  // Case 1: Virtual day-leaf (Mo, Tu...). Show only parent label.
+  // Case 1: Virtual day-leaf (Mo, Tu...). Show parent's stripped label.
   if (node.dayChild) {
     let base = p ? (stripDayGroups(p.label) || p.label) : node.label;
     if (p && isSingleWord(base)) {
@@ -7053,25 +7049,15 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
     return base;
   }
 
-  // Case 2: Real sub-task child of an annotated parent. Show Parent · Child.
-  const parentDays = p && p.type === 'activity' ? parseTodoDays(p.label) : new Set();
-  if (parentDays.size > 0) {
-    const parentLabel = stripDayGroups(p.label) || p.label;
-    const base = parentLabel ? `${parentLabel} · ${node.label}` : node.label;
-    if (includeDayHint) {
-      const [dayIdx] = [...parentDays];
-      return `${base} · ${langLabels[dayIdx]}`;
-    }
-    return base;
-  }
-
-  // Case 3: Standard activity (possibly with day hint like "Yoga (tu)").
+  // Case 2: Regular leaf activity. Display = own stripped label, with
+  // immediate-parent prefix when single word. Day hint comes from the
+  // closest annotated ancestor (or self) — see getEffectiveDays.
   let stripped = stripDayGroups(node.label) || node.label;
   if (p && isSingleWord(stripped)) {
     stripped = `${p.label} · ${stripped}`;
   }
   if (includeDayHint) {
-    const days = parseTodoDays(node.label || '');
+    const days = getEffectiveDays(node);
     if (days.size > 0) {
       const [dayIdx] = [...days];
       return `${stripped} · ${langLabels[dayIdx]}`;
