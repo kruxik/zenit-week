@@ -9240,16 +9240,6 @@ function renderAgendaTabContent() {
   list.className = 'agenda-item-list';
   content.appendChild(list);
 
-  // Apply saved order per group, then render with drag-and-drop wiring
-  const orderedPending  = applyAgendaOrder(pending,    loadAgendaGroupOrder(tabKey, 'pending'));
-  const orderedDone     = applyAgendaOrder(done,       loadAgendaGroupOrder(tabKey, 'done'));
-  const orderedAnyDay   = applyAgendaOrder(anyDayItems, loadAgendaGroupOrder(tabKey, 'anyday'));
-
-  // Persist pruned/completed orders back
-  saveAgendaGroupOrder(tabKey, 'pending', orderedPending.map(n => n.id));
-  if (!isOverdue) saveAgendaGroupOrder(tabKey, 'done',    orderedDone.map(n => n.id));
-  if (!isOverdue) saveAgendaGroupOrder(tabKey, 'anyday',  orderedAnyDay.map(n => n.id));
-
   function makeDragZone(nodes, groupKey, buildFn) {
     let dragSrcId = null;
     nodes.forEach(node => {
@@ -9411,10 +9401,10 @@ function renderAgendaTabContent() {
     });
   }
 
-  function makeSectionDivider(labelKey, count) {
+  function makeSectionDivider(labelText, count) {
     const div = document.createElement('div');
     div.className = 'today-done-divider';
-    div.textContent = t(labelKey);
+    div.textContent = labelText;
     const badge = document.createElement('span');
     badge.className = 'agenda-section-count';
     badge.textContent = String(count);
@@ -9422,25 +9412,43 @@ function renderAgendaTabContent() {
     return div;
   }
 
-  if (orderedPending.length > 0) {
-    list.appendChild(makeSectionDivider('agenda.scheduled', orderedPending.length));
-    makeDragZone(orderedPending, 'pending', n => buildAgendaItem(n, getAgendaNodeLabel(n, isOverdue)));
+  function renderGroup(nodes, groupKey, dividerLabel, buildFn) {
+    const ordered = applyAgendaOrder(nodes, loadAgendaGroupOrder(tabKey, groupKey));
+    saveAgendaGroupOrder(tabKey, groupKey, ordered.map(n => n.id));
+    if (ordered.length === 0) return;
+    if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
+    list.appendChild(makeSectionDivider(dividerLabel, ordered.length));
+    makeDragZone(ordered, groupKey, buildFn);
   }
 
-  if (orderedDone.length > 0) {
-    if (orderedPending.length > 0 && list.lastElementChild) {
-      list.lastElementChild.style.borderBottom = 'none';
-    }
-    list.appendChild(makeSectionDivider('todo.done', orderedDone.length));
-    makeDragZone(orderedDone, 'done', n => buildAgendaItem(n, getAgendaNodeLabel(n)));
-  }
-
-  if (orderedAnyDay.length > 0) {
-    if (list.lastElementChild) {
-      list.lastElementChild.style.borderBottom = 'none';
-    }
-    list.appendChild(makeSectionDivider('agenda.anyDay', orderedAnyDay.length));
-    makeDragZone(orderedAnyDay, 'anyday', n => buildAnyDayItem(n));
+  if (isOverdue) {
+    const todayPos = isoWeekPos(new Date().getDay());
+    const langFull = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
+    const overdueDaysOf = n => {
+      if (n.dayChild) return n.dayIndex != null ? [n.dayIndex] : [];
+      return [...getEffectiveDays(n)].filter(d => isoWeekPos(d) < todayPos);
+    };
+    const groupsByDay = new Map();
+    pending.forEach(n => {
+      overdueDaysOf(n).forEach(d => {
+        if (!groupsByDay.has(d)) groupsByDay.set(d, []);
+        groupsByDay.get(d).push(n);
+      });
+    });
+    [...groupsByDay.keys()]
+      .sort((a, b) => isoWeekPos(a) - isoWeekPos(b))
+      .forEach(dayIdx => {
+        renderGroup(
+          groupsByDay.get(dayIdx),
+          `pending-${dayIdx}`,
+          langFull[dayIdx],
+          n => buildAgendaItem(n, getAgendaNodeLabel(n))
+        );
+      });
+  } else {
+    renderGroup(pending,     'pending', t('agenda.scheduled'), n => buildAgendaItem(n, getAgendaNodeLabel(n)));
+    renderGroup(done,        'done',    t('todo.done'),        n => buildAgendaItem(n, getAgendaNodeLabel(n)));
+    renderGroup(anyDayItems, 'anyday',  t('agenda.anyDay'),    n => buildAnyDayItem(n));
   }
 }
 
