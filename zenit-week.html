@@ -6927,7 +6927,12 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
 
   // Case 1: Virtual day-leaf (Mo, Tu...). Show only parent label.
   if (node.dayChild) {
-    return p ? (stripDayGroups(p.label) || p.label) : node.label;
+    const base = p ? (stripDayGroups(p.label) || p.label) : node.label;
+    if (includeDayHint && node.dayIndex != null) {
+      const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+      return `${base} · ${langLabels[node.dayIndex]}`;
+    }
+    return base;
   }
 
   // Case 2: Real sub-task child of an annotated parent. Show Parent · Child.
