@@ -4911,6 +4911,7 @@ const TRANSLATIONS = {
     'agenda.emptyDay':            'No tasks for this day.',
     'agenda.emptyOverdue':        'No overdue tasks.',
     'agenda.anyDay':              'Any day',
+    'agenda.scheduled':           'Scheduled',
     'agenda.alreadyScheduled':    'Already scheduled for',
     'menu.reschedule':            'Reschedule',
     'menu.clearDay':              'Clear day',
@@ -5025,6 +5026,7 @@ const TRANSLATIONS = {
     'agenda.emptyDay':            'Pro tento den žádné úkoly.',
     'agenda.emptyOverdue':        'Žádné zpožděné úkoly.',
     'agenda.anyDay':              'Kdykoli',
+    'agenda.scheduled':           'Naplánováno',
     'agenda.alreadyScheduled':    'Již naplánováno pro',
     'menu.reschedule':            'Přeplánovat',
     'menu.clearDay':              'Zrušit den',
@@ -9394,7 +9396,13 @@ function renderAgendaTabContent() {
     });
   }
 
-  makeDragZone(orderedPending, 'pending', n => buildAgendaItem(n, getAgendaNodeLabel(n, isOverdue)));
+  if (orderedPending.length > 0) {
+    const schedDivider = document.createElement('div');
+    schedDivider.className = 'today-done-divider';
+    schedDivider.textContent = t('agenda.scheduled');
+    list.appendChild(schedDivider);
+    makeDragZone(orderedPending, 'pending', n => buildAgendaItem(n, getAgendaNodeLabel(n, isOverdue)));
+  }
 
   if (orderedDone.length > 0) {
     if (orderedPending.length > 0 && list.lastElementChild) {
