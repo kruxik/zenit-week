@@ -2510,6 +2510,10 @@
     try {
       var a = JSON.parse(localStorage.getItem('zenit-week-google-auth') || 'null');
       if (a && a.refresh_token) document.documentElement.classList.add('zw-has-session');
+      // Sign-in is about to complete via redirect — suppress sign-in button flash
+      if (location.search && new URLSearchParams(location.search).get('code')) {
+        document.documentElement.classList.add('zw-has-session');
+      }
     } catch(e) {}
   })();
 </script>
@@ -2957,18 +2961,19 @@
 <script id="app">
 'use strict';
 
-// ─── OAuth popup callback — relay code to opener and halt all initialization ──
-const IS_OAUTH_POPUP = (() => {
-  if (!window.opener) return false;
+// ─── OAuth redirect callback capture ──────────────────────────────────────────
+// Detects ?code= / ?error= on app load, captures, then strips URL before app init.
+// Replaces the obsolete popup flow (Safari blocks popups by default).
+const _PENDING_OAUTH_CALLBACK = (() => {
+  if (typeof URLSearchParams === 'undefined' || !location.search) return null;
   const params = new URLSearchParams(location.search);
   const code   = params.get('code');
   const error  = params.get('error');
-  if (!code && !error) return false;
-  if (code) {
-    try { window.opener.postMessage({ type: 'zenit-oauth', code }, location.origin); } catch {}
-  }
-  window.close();
-  return true;
+  const state  = params.get('state');
+  if (!code && !error) return null;
+  // Strip query immediately so refresh doesn't re-trigger and code stays out of history
+  history.replaceState(null, '', location.pathname + location.hash);
+  return { code, error, state };
 })();
 
 // ─── Single Tab Enforcement ───────────────────────────────────────────────────
@@ -2988,14 +2993,8 @@ tabChannel.onmessage = (e) => {
   }
 };
 
-// Initial check: ping other tabs. If any pong back within 150ms, block this one.
-if (!IS_OAUTH_POPUP) {
-  tabChannel.postMessage('ping');
-  setTimeout(() => {
-    // If we're already blocked by a pong, do nothing.
-    // If not, we're the winner tab.
-  }, 150);
-}
+// Initial check: ping other tabs. If any pong back, block this one.
+tabChannel.postMessage('ping');
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
 const DB_NAME = 'zenit-week-db';
@@ -3648,6 +3647,7 @@ const BRANCH_CONFIG = {};
 const GOOGLE_CLIENT_ID    = '458902252486-kh8ptv2b2b2q1echn99soes191smr56p.apps.googleusercontent.com';
 const GOOGLE_DRIVE_SCOPE  = 'https://www.googleapis.com/auth/drive.appdata';
 const GOOGLE_AUTH_STORAGE_KEY = 'zenit-week-google-auth';
+const PKCE_SESSION_KEY        = 'zenit-week-pkce-pending'; // sessionStorage: { verifier, redirectUri, state }
 
 // Sync status: 'disconnected' | 'connected' | 'syncing' | 'error'
 let syncStatus = 'disconnected';
@@ -3663,9 +3663,6 @@ let _tokenReceivedAt = 0;         // epoch ms when current access token was obta
 let _refreshPromise = null;       // deduplicates concurrent 401 refresh attempts
 let _gapiInitialized = false;     // true after first loadGapiAndSync completes setup
 let _isFirstConnection = false;   // true when this browser has never synced with Drive before
-let _currentPKCEVerifier   = null; // PKCE code_verifier for the in-progress auth code exchange
-let _currentRedirectUri    = null; // redirect_uri used in the in-progress auth code exchange
-let _pendingOAuthHandler   = null; // active postMessage listener for OAuth popup callback
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
 let _pollTimer = null;          // setInterval handle for 30s background metadata poll
 const POLL_INTERVAL_MS = 10_000;
@@ -3761,7 +3758,12 @@ function showSignedOutButton(label = 'Sign in') {
 function initGoogleAuth() {
   // Migration: remove legacy flag replaced by GOOGLE_AUTH_STORAGE_KEY
   localStorage.removeItem('zenit-week-had-google-session');
-  attemptSilentRestore();
+  if (_PENDING_OAUTH_CALLBACK) {
+    setSyncStatus('syncing', 'Completing sign-in…');
+    handleAuthCode(_PENDING_OAUTH_CALLBACK);
+  } else {
+    attemptSilentRestore();
+  }
 
   // Proactively refresh when user returns to a tab that may have been hidden >50 min
   document.addEventListener('visibilitychange', () => {
@@ -3895,65 +3897,65 @@ async function onTokensReceived(accessToken) {
   }
 }
 
-// ─── Interactive sign-in: manual popup with PKCE, no GIS code client ──────────
+// ─── Interactive sign-in: full-page redirect with PKCE (Safari-compatible) ────
 async function startSignIn() {
   const { verifier, challenge } = await generatePKCE();
-  _currentPKCEVerifier = verifier;
-  _currentRedirectUri  = window.location.origin + window.location.pathname;
+  const redirectUri = window.location.origin + window.location.pathname;
+  const stateBytes  = crypto.getRandomValues(new Uint8Array(16));
+  const state = btoa(String.fromCharCode(...stateBytes))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+  // Store across redirect — sessionStorage survives navigation, dies with the tab
+  sessionStorage.setItem(PKCE_SESSION_KEY, JSON.stringify({ verifier, redirectUri, state }));
 
   const params = new URLSearchParams({
     client_id:             GOOGLE_CLIENT_ID,
-    redirect_uri:          _currentRedirectUri,
+    redirect_uri:          redirectUri,
     response_type:         'code',
     scope:                 GOOGLE_DRIVE_SCOPE,
     access_type:           'offline',
     prompt:                'consent',
+    state,
     code_challenge:        challenge,
     code_challenge_method: 'S256',
   });
 
-  if (_pendingOAuthHandler) {
-    window.removeEventListener('message', _pendingOAuthHandler);
-    _pendingOAuthHandler = null;
-  }
-
-  const popup = window.open(
-    `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
-    'Google Sign In',
-    'width=500,height=620,left=200,top=100'
-  );
-  if (!popup) {
-    setSyncStatus('error', 'Sign-in popup was blocked — allow popups for this page');
-    return;
-  }
-
-  _pendingOAuthHandler = function(event) {
-    if (event.origin !== location.origin) return;
-    if (event.data?.type !== 'zenit-oauth') return;
-    window.removeEventListener('message', _pendingOAuthHandler);
-    _pendingOAuthHandler = null;
-    if (event.data.code) handleAuthCode({ code: event.data.code });
-  };
-  window.addEventListener('message', _pendingOAuthHandler);
+  window.location.assign(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 }
 
-async function handleAuthCode(response) {
-  if (response.error) {
-    if (response.error !== 'access_denied') {
-      console.warn('[Drive] Auth error:', response);
+async function handleAuthCode(callback) {
+  let pending = null;
+  try { pending = JSON.parse(sessionStorage.getItem(PKCE_SESSION_KEY)); } catch {}
+  sessionStorage.removeItem(PKCE_SESSION_KEY);
+
+  if (callback.error) {
+    if (callback.error !== 'access_denied') {
+      console.warn('[Drive] Auth error:', callback.error);
       setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+    } else {
+      setSyncStatus('disconnected');
     }
     return;
   }
+  if (!pending) {
+    console.warn('[Drive] OAuth callback received but no pending PKCE state — ignoring');
+    setSyncStatus('disconnected');
+    return;
+  }
+  if (callback.state !== pending.state) {
+    console.warn('[Drive] OAuth state mismatch — possible CSRF, aborting');
+    setSyncStatus('error', 'Sign-in failed — security check failed, try again');
+    return;
+  }
+
   try {
     const tokens = await exchangeToken({
-      code:          response.code,
+      code:          callback.code,
       client_id:     GOOGLE_CLIENT_ID,
-      code_verifier: _currentPKCEVerifier,
+      code_verifier: pending.verifier,
       grant_type:    'authorization_code',
-      redirect_uri:  _currentRedirectUri,
+      redirect_uri:  pending.redirectUri,
     });
-    _currentPKCEVerifier = null;
     if (tokens.error) {
       console.warn('[Drive] Token exchange error:', tokens);
       setSyncStatus('error', 'Sign-in failed — check your connection and try again');
@@ -10424,8 +10426,6 @@ document.getElementById('export-data-btn').addEventListener('click', () => {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', async () => {
-  if (IS_OAUTH_POPUP) return;
-
   await openDB();
   await runMigrationIfNeeded();
 
