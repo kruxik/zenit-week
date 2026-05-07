@@ -9172,11 +9172,6 @@ function buildAgendaItem(node, label) {
   return item;
 }
 
-function buildAnyDayItem(node) {
-  // Now identical to buildAgendaItem but specialized for any-day list
-  return buildAgendaItem(node, node.label);
-}
-
 function renderAgendaTabContent() {
   const content = document.getElementById('agenda-tab-content');
   content.innerHTML = '';
@@ -9448,7 +9443,7 @@ function renderAgendaTabContent() {
   } else {
     renderGroup(pending,     'pending', t('agenda.scheduled'), n => buildAgendaItem(n, getAgendaNodeLabel(n)));
     renderGroup(done,        'done',    t('todo.done'),        n => buildAgendaItem(n, getAgendaNodeLabel(n)));
-    renderGroup(anyDayItems, 'anyday',  t('agenda.anyDay'),    n => buildAnyDayItem(n));
+    renderGroup(anyDayItems, 'anyday',  t('agenda.anyDay'),    n => buildAgendaItem(n, getAgendaNodeLabel(n)));
   }
 }
 
