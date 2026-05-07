@@ -7075,7 +7075,6 @@ function getAnyDayItems() {
 function getAgendaNodeLabel(node, includeDayHint = false) {
   const p = findNode(node.parent);
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
-  const isSingleWord = s => /^\S+$/.test(s);
 
   let prefix = '';
   let main;
@@ -7084,7 +7083,7 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
   // Case 1: Virtual day-leaf (Mo, Tu...). Show parent's stripped label.
   if (node.dayChild) {
     main = p ? (stripDayGroups(p.label) || p.label) : node.label;
-    if (p && isSingleWord(main)) {
+    if (p) {
       const gp = findNode(p.parent);
       if (gp) prefix = gp.label;
     }
@@ -7093,12 +7092,10 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
     }
   } else {
     // Case 2: Regular leaf activity. Display = own stripped label, with
-    // immediate-parent prefix when single word. Day hint comes from the
-    // closest annotated ancestor (or self) — see getEffectiveDays.
+    // immediate-parent prefix. Day hint comes from the closest annotated
+    // ancestor (or self) — see getEffectiveDays.
     main = stripDayGroups(node.label) || node.label;
-    if (p && isSingleWord(main)) {
-      prefix = p.label;
-    }
+    if (p) prefix = p.label;
     if (includeDayHint) {
       const days = getEffectiveDays(node);
       if (days.size > 0) {
