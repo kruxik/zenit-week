@@ -46,7 +46,7 @@ describe('Zig-Zag Layout', () => {
     expect(Math.abs(positions['d2'].x - positions['d1'].x)).toBeCloseTo(60.1, 1);
   });
 
-  test('oval node in first column expands horizontal stagger but keeps vertical spacing', () => {
+  test('oval node in first column expands horizontal stagger and scales vertical spacing by priority', () => {
     const data = {
       nodes: [
         { id: 'center', type: 'center', label: 'Week', children: ['b1'] },
@@ -62,8 +62,9 @@ describe('Zig-Zag Layout', () => {
 
     const positions = computeLayout();
 
-    // Vertical spacing still derived from maxH = parent height (48.1) → vStep = 30.05
-    expect(positions['d2'].y - positions['d1'].y).toBeCloseTo((48.1 + 12) / 2, 1);
+    // Vertical spacing scales by highest-priority child: maxChildScale = 2 (critical d1)
+    // standardH = maxH + VERTICAL_GAP * maxChildScale = 48.1 + 12*2 = 72.1, vStep = 36.05
+    expect(positions['d2'].y - positions['d1'].y).toBeCloseTo((48.1 + 12 * 2) / 2, 1);
 
     // Horizontal stagger: (maxW1 + maxW2)/2 + 12
     // maxW1 is d1 (oval, width 86)

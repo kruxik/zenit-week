@@ -6239,7 +6239,8 @@ function computeLayout() {
       maxH = Math.max(maxH, h);
     });
 
-    const standardH = maxH + VERTICAL_GAP; // Tallest child + gap
+    const maxChildScale = activeChildren.reduce((m, cid) => Math.max(m, getPriorityScale(cid)), 1);
+    const standardH = maxH + VERTICAL_GAP * maxChildScale; // Tallest child + gap (scaled by highest-priority child)
     const vStep = standardH / 2;
     const metrics = {
       maxW1,
@@ -6269,7 +6270,7 @@ function computeLayout() {
       return 0;
     }
     const { h: nodeH } = getNodeSize(nodeId);
-    const selfH = nodeH + VERTICAL_GAP;
+    const selfH = nodeH + VERTICAL_GAP * getPriorityScale(nodeId);
 
     const activeChildren = sortedChildren((node.children || []).filter(cid => {
       const child = findNode(cid);
@@ -6292,7 +6293,10 @@ function computeLayout() {
     } else {
       activeChildren.forEach((cid, i) => {
         h += calcHeight(cid);
-        if (isBranch && i < activeChildren.length - 1) h += VERTICAL_GAP * 2;
+        if (isBranch && i < activeChildren.length - 1) {
+          const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(activeChildren[i + 1]));
+          h += VERTICAL_GAP * 2 * neighborScale;
+        }
       });
     }
 
@@ -6386,7 +6390,10 @@ function computeLayout() {
         x = parentX + dir * (parentW / 2 + childGap + w / 2);
         y = currentY + childH / 2;
         currentY += childH;
-        if (depth === 0 && i < activeChildren.length - 1) currentY += VERTICAL_GAP * 2;
+        if (depth === 0 && i < activeChildren.length - 1) {
+          const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(activeChildren[i + 1]));
+          currentY += VERTICAL_GAP * 2 * neighborScale;
+        }
       }
 
       const finalX = x + (child.offX || 0);
