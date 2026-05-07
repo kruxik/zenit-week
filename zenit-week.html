@@ -1391,9 +1391,24 @@
 
   .daily-log-label {
     flex: 1;
-    white-space: nowrap;
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+  }
+  .daily-log-label-prefix {
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .daily-log-label-sep {
+    flex: 0 0 auto;
+    white-space: pre;
+  }
+  .daily-log-label-main {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   .daily-log-time {
@@ -7062,34 +7077,39 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
   const isSingleWord = s => /^\S+$/.test(s);
 
+  let prefix = '';
+  let main;
+  let dayHint = null;
+
   // Case 1: Virtual day-leaf (Mo, Tu...). Show parent's stripped label.
   if (node.dayChild) {
-    let base = p ? (stripDayGroups(p.label) || p.label) : node.label;
-    if (p && isSingleWord(base)) {
+    main = p ? (stripDayGroups(p.label) || p.label) : node.label;
+    if (p && isSingleWord(main)) {
       const gp = findNode(p.parent);
-      if (gp) base = `${gp.label} · ${base}`;
+      if (gp) prefix = gp.label;
     }
     if (includeDayHint && node.dayIndex != null) {
-      return `${base} · ${langLabels[node.dayIndex]}`;
+      dayHint = langLabels[node.dayIndex];
     }
-    return base;
+  } else {
+    // Case 2: Regular leaf activity. Display = own stripped label, with
+    // immediate-parent prefix when single word. Day hint comes from the
+    // closest annotated ancestor (or self) — see getEffectiveDays.
+    main = stripDayGroups(node.label) || node.label;
+    if (p && isSingleWord(main)) {
+      prefix = p.label;
+    }
+    if (includeDayHint) {
+      const days = getEffectiveDays(node);
+      if (days.size > 0) {
+        const [dayIdx] = [...days];
+        dayHint = langLabels[dayIdx];
+      }
+    }
   }
 
-  // Case 2: Regular leaf activity. Display = own stripped label, with
-  // immediate-parent prefix when single word. Day hint comes from the
-  // closest annotated ancestor (or self) — see getEffectiveDays.
-  let stripped = stripDayGroups(node.label) || node.label;
-  if (p && isSingleWord(stripped)) {
-    stripped = `${p.label} · ${stripped}`;
-  }
-  if (includeDayHint) {
-    const days = getEffectiveDays(node);
-    if (days.size > 0) {
-      const [dayIdx] = [...days];
-      return `${stripped} · ${langLabels[dayIdx]}`;
-    }
-  }
-  return stripped;
+  if (dayHint) main = `${main} · ${dayHint}`;
+  return { prefix, main };
 }
 
 // ── Agenda group ordering ────────────────────────────────────────────────────
@@ -9105,11 +9125,27 @@ function buildAgendaItem(node, label) {
     item.appendChild(prioEl);
   }
 
-  // Label
+  // Label — prefix shrinks with ellipsis, main always fully visible
+  const lbl = (label && typeof label === 'object')
+    ? label
+    : { prefix: '', main: label || node.label || t('todo.noLabel') };
   const labelEl = document.createElement('div');
   labelEl.className = 'daily-log-label';
   if (node.done) labelEl.style.opacity = '0.5';
-  labelEl.textContent = label || node.label || t('todo.noLabel');
+  if (lbl.prefix) {
+    const prefixEl = document.createElement('span');
+    prefixEl.className = 'daily-log-label-prefix';
+    prefixEl.textContent = lbl.prefix;
+    labelEl.appendChild(prefixEl);
+    const sepEl = document.createElement('span');
+    sepEl.className = 'daily-log-label-sep';
+    sepEl.textContent = ' · ';
+    labelEl.appendChild(sepEl);
+  }
+  const mainEl = document.createElement('span');
+  mainEl.className = 'daily-log-label-main';
+  mainEl.textContent = lbl.main;
+  labelEl.appendChild(mainEl);
   item.appendChild(labelEl);
 
   // Unplanned badge
