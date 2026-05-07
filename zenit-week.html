@@ -1831,6 +1831,21 @@
 
   .agenda-overdue-badge:empty { display: none; }
 
+  .agenda-section-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--text-placeholder);
+    color: var(--bg-surface);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
   #agenda-tab-content {
     flex: 1;
     overflow-y: auto;
@@ -9396,11 +9411,19 @@ function renderAgendaTabContent() {
     });
   }
 
+  function makeSectionDivider(labelKey, count) {
+    const div = document.createElement('div');
+    div.className = 'today-done-divider';
+    div.textContent = t(labelKey);
+    const badge = document.createElement('span');
+    badge.className = 'agenda-section-count';
+    badge.textContent = String(count);
+    div.appendChild(badge);
+    return div;
+  }
+
   if (orderedPending.length > 0) {
-    const schedDivider = document.createElement('div');
-    schedDivider.className = 'today-done-divider';
-    schedDivider.textContent = t('agenda.scheduled');
-    list.appendChild(schedDivider);
+    list.appendChild(makeSectionDivider('agenda.scheduled', orderedPending.length));
     makeDragZone(orderedPending, 'pending', n => buildAgendaItem(n, getAgendaNodeLabel(n, isOverdue)));
   }
 
@@ -9408,10 +9431,7 @@ function renderAgendaTabContent() {
     if (orderedPending.length > 0 && list.lastElementChild) {
       list.lastElementChild.style.borderBottom = 'none';
     }
-    const divider = document.createElement('div');
-    divider.className = 'today-done-divider';
-    divider.textContent = t('todo.done');
-    list.appendChild(divider);
+    list.appendChild(makeSectionDivider('todo.done', orderedDone.length));
     makeDragZone(orderedDone, 'done', n => buildAgendaItem(n, getAgendaNodeLabel(n)));
   }
 
@@ -9419,10 +9439,7 @@ function renderAgendaTabContent() {
     if (list.lastElementChild) {
       list.lastElementChild.style.borderBottom = 'none';
     }
-    const anyDivider = document.createElement('div');
-    anyDivider.className = 'today-done-divider';
-    anyDivider.textContent = t('agenda.anyDay');
-    list.appendChild(anyDivider);
+    list.appendChild(makeSectionDivider('agenda.anyDay', orderedAnyDay.length));
     makeDragZone(orderedAnyDay, 'anyday', n => buildAnyDayItem(n));
   }
 }
