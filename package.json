@@ -7,13 +7,13 @@
   "license": "MIT",
   "scripts": {
     "validate": "html-validate zenit-week.html",
-    "test": "vitest run"
+    "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^1.6.1",
+    "@vitest/coverage-v8": "^4.1.5",
     "fake-indexeddb": "^6.2.5",
     "html-validate": "^9.0.0",
     "msw": "^2.14.2",
-    "vitest": "^1.4.0"
+    "vitest": "^4.1.5"
   }
 }
