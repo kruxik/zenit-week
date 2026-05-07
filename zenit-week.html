@@ -4150,8 +4150,14 @@ async function _flushPendingMerge() {
   if (!pendingRemoteMerge) return;
   const { wKey, remoteData } = pendingRemoteMerge;
   pendingRemoteMerge = null;
-  // Re-merge against current local state so any just-committed changes are included
-  const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
+  // For the displayed week, weekData is freshest — saveWeek writes IDB async
+  // and is not awaited by all callers, so the disk can lag in-memory state.
+  // Reading IDB here would lose any node added to weekData since the last
+  // completed write (e.g. the follow-up node from a chained commitEdit).
+  // Other weeks aren't held in memory; IDB is authoritative for them.
+  const localData = (wKey === currentWeekKey)
+    ? structuredClone(weekData)
+    : (await loadWeekIDB(wKey)) || { nodes: [] };
   const mergedData = mergeWeekData(localData, remoteData);
   const mergedJson = JSON.stringify(mergedData);
   const mergedHash = fnv1a32(mergedJson);
@@ -7256,15 +7262,21 @@ function commitEdit(followUp = 'auto') {
     }
 
     saveWeek(currentWeekKey, weekData);
-    endAtomicOp();
     renderIfVisible();
 
+    // Hold atomic op across the chained startAddNode so a remote-merge flush
+    // can't fire between this commit and the next _openInlineInput. Without
+    // this, the just-pushed follow-up node lives only in weekData (not yet in
+    // IDB) when _flushPendingMerge reads disk → merged data overwrites
+    // weekData and the new node disappears with no parent edge.
     if (followUp === 'child') {
       startAddNode(nodeId);
     } else if (followUp === 'sibling' || (followUp === 'auto' && isNew && node.parent)) {
       startAddNode(node.parent);
     }
+    endAtomicOp();
   } else {
+    endAtomicOp();
     renderIfVisible();
   }
 }
