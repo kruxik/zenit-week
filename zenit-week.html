@@ -9131,7 +9131,7 @@ function buildAgendaItem(node, label) {
   }
 
   // Progress pill for counters
-  if (!node.done && cc) {
+  if (cc) {
     const pill = document.createElement('div');
     pill.className = 'daily-log-badge tick';
     pill.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
