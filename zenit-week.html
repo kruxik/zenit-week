@@ -3272,7 +3272,7 @@ async function _applySnapshot(raw) {
     applyTranslations();
   }
 
-  render();
+  renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
   window.dispatchEvent(new CustomEvent('snapshotApplied'));
 }
@@ -3421,7 +3421,7 @@ function applyBranchColor(branch, hex) {
   BRANCH_COLORS[branch] = deriveBranchPalette(hex);
   saveBranchColors();
   updateColorDots();
-  render();
+  renderIfVisible();
 }
 
 function updateThemeColor() {
@@ -3437,7 +3437,7 @@ function applyTheme(theme) {
   // Re-derive branch palettes for new theme and re-render SVG layer
   reloadBranchPalettes();
   updateSvgFilters();
-  render();
+  renderIfVisible();
   updateColorDots();
   updateSummary();
   saveBranchColors(); // propagate theme change to Drive via colors file
@@ -4134,7 +4134,8 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
   if (wKey === currentWeekKey) {
     weekData = mergedData;
     rebuildNodeMap();
-    render();
+    renderIfVisible();
+    if (currentView === 'agenda') renderAgenda();
   }
   // Only mark as synced when merged == remote (nothing to push).
   // When scheduleUpload is true, keep lastSyncedHash at its pre-merge value so
@@ -4688,7 +4689,8 @@ async function syncColorsFromDrive() {
       }
       updateColorDots();
       updateSvgFilters();
-      render();
+      renderIfVisible();
+      if (currentView === 'agenda') renderAgenda();
       colorsSyncedHash = fnv1a32(remoteJson);
       lastSyncedAt = Date.now();
       updateDropdownSyncTime();
@@ -5115,7 +5117,7 @@ function setLanguage(lang) {
   localStorage.setItem('zenit-week-lang', lang);
   applyTranslations();
   if (currentView === 'agenda') renderAgenda();
-  render();
+  renderIfVisible();
   saveBranchColors(); // propagate lang change to Drive via colors file
 }
 
@@ -5548,7 +5550,7 @@ async function transferUnfinished() {
 
   await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
-  render();
+  renderIfVisible();
   applyAutoLayout();
 }
 
@@ -5670,7 +5672,7 @@ async function transferReusable() {
 
   await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
-  render();
+  renderIfVisible();
   applyAutoLayout();
 }
 
@@ -5792,7 +5794,7 @@ async function moveNodeToNextWeek(nodeId) {
   await saveWeek(nextKey, nextData);
   await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
-  render();
+  renderIfVisible();
   applyAutoLayout();
 }
 
@@ -6033,7 +6035,7 @@ function deleteNode(id) {
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
   saveWeek(currentWeekKey, weekData);
-  render();
+  renderIfVisible();
   applyAutoLayout();
 }
 
@@ -6044,7 +6046,7 @@ function renameNode(id, label) {
   node.label = label.trim();
   touchNode(id);
   saveWeek(currentWeekKey, weekData);
-  render();
+  renderIfVisible();
   applyAutoLayout();
 }
 
@@ -6171,7 +6173,7 @@ function setStatus(id, status) {
   saveWeek(currentWeekKey, weekData);
 
   if (fullRenderNeeded) {
-    render();
+    renderIfVisible();
   } else {
     updateNodeUI(id);
     getDescendantIds(id).forEach(updateNodeUI);
@@ -7255,7 +7257,7 @@ function commitEdit(followUp = 'auto') {
 
     saveWeek(currentWeekKey, weekData);
     endAtomicOp();
-    render();
+    renderIfVisible();
 
     if (followUp === 'child') {
       startAddNode(nodeId);
@@ -7263,7 +7265,7 @@ function commitEdit(followUp = 'auto') {
       startAddNode(node.parent);
     }
   } else {
-    render();
+    renderIfVisible();
   }
 }
 
@@ -7300,7 +7302,7 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
     if (node) { node.label = originalLabel; delete node._editing; }
   }
   endAtomicOp();
-  render();
+  renderIfVisible();
 }
 
 inlineInput.addEventListener('keydown', (e) => {
@@ -7838,6 +7840,13 @@ function render() {
   updateSummary();
 
   document.body.classList.remove('app-loading');
+}
+
+// Skip mindmap render when canvas is display:none (mobile + agenda view).
+// Caller must invoke renderAgenda() separately when the agenda needs refreshing.
+function renderIfVisible() {
+  if (currentView === 'agenda' && window.innerWidth < 768) return;
+  render();
 }
 
 // Global keyboard shortcuts for hovered node
@@ -8534,11 +8543,13 @@ document.getElementById('ctx-current-week').addEventListener('click', async () =
 
 document.getElementById('ctx-transfer-unfinished').addEventListener('click', async () => {
   await transferUnfinished();
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.getElementById('ctx-transfer-reusable').addEventListener('click', async () => {
   await transferReusable();
+  if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
@@ -8676,7 +8687,8 @@ document.getElementById('ctx-clear-week').addEventListener('click', async () => 
   weekData = await loadWeek(currentWeekKey);
   rebuildNodeMap();
   syncBranchConfig();
-  render();
+  renderIfVisible();
+  if (currentView === 'agenda') renderAgenda();
 });
 
 document.getElementById('ctx-done').addEventListener('click', () => {
@@ -8734,7 +8746,7 @@ document.getElementById('ctx-reusable').addEventListener('click', () => {
       }
       setReusable(contextTarget);
       saveWeek(currentWeekKey, weekData);
-      render();
+      renderIfVisible();
       if (currentView === 'agenda') renderAgenda();
     }
   }
@@ -9501,7 +9513,7 @@ function applyAutoLayout() {
     if (n.type !== 'center') { n.offX = 0; n.offY = 0; }
   });
   saveWeek(currentWeekKey, weekData);
-  render();
+  renderIfVisible();
 }
 
 function zoomAt(cx, cy, factor) {
@@ -9979,7 +9991,8 @@ async function loadAndRender(wk) {
   rebuildNodeMap();
   syncBranchConfig();
   location.hash = wk;
-  render();
+  renderIfVisible();
+  if (currentView === 'agenda') renderAgenda();
   if (googleAccessToken) {
     if (localStorage.getItem('zenit-week-import-pending')) {
       forcePushAllToDrive();
@@ -9997,7 +10010,8 @@ window.addEventListener('hashchange', async () => {
     weekData = await loadWeek(currentWeekKey);
     rebuildNodeMap();
     syncBranchConfig();
-    render();
+    renderIfVisible();
+    if (currentView === 'agenda') renderAgenda();
     if (googleAccessToken) startDrivePoll(currentWeekKey);
   }
 });
@@ -10235,7 +10249,7 @@ document.addEventListener('click', (e) => {
     if (parsedDays.size > 0) setActivityDays(node.id, parsedDays);
 
     saveWeek(currentWeekKey, weekData);
-    render();
+    renderIfVisible();
     if (currentView === 'agenda') renderAgenda();
 
     closeQuickAdd();
