@@ -6,6 +6,10 @@ on:
     tags:
       - 'v[0-9]*'
 
+permissions:
+  contents: read
+  deployments: write
+
 jobs:
   deploy:
     name: Deploy to zenitweek.com
@@ -22,9 +26,56 @@ jobs:
       - name: Run tests
         run: npm ci && npm test
 
+      - name: Create GitHub deployment
+        id: deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DEPLOYMENT_ID=$(gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/deployments \
+            --input - \
+            --jq '.id' <<EOF
+          {
+            "ref": "${{ github.ref_name }}",
+            "environment": "production",
+            "description": "Deploy ${{ github.ref_name }}",
+            "auto_merge": false,
+            "required_contexts": []
+          }
+          EOF
+          )
+          echo "id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+
       - name: Deploy to Vercel (production)
         run: npx vercel --prod --yes
         env:
           VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Mark deployment success
+        if: success() && steps.deployment.outputs.id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/deployments/${{ steps.deployment.outputs.id }}/statuses \
+            -f state=success \
+            -f environment_url=https://zenitweek.com \
+            -f description="Deployed to production"
+
+      - name: Mark deployment failure
+        if: failure() && steps.deployment.outputs.id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/deployments/${{ steps.deployment.outputs.id }}/statuses \
+            -f state=failure \
+            -f description="Production deploy failed"
