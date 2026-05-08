@@ -9837,6 +9837,90 @@ container.addEventListener('pointerdown', (e) => {
   container.classList.add('panning');
 });
 
+// ─── Drag visuals + edge autoscroll ───────────────────────────────────────────
+const DRAG_EDGE = 80;          // px from container edge that triggers autoscroll
+const DRAG_MAX_SPEED = 16;     // max pan speed in px/frame at the very edge
+
+function updateDraggedVisuals(clientX, clientY) {
+  if (!dragState.activeNodeId) return;
+  const dx = (clientX - dragState.startX) / zoom;
+  const dy = (clientY - dragState.startY) / zoom;
+
+  Object.keys(dragState.initialPositions).forEach(id => {
+    const pos = dragState.initialPositions[id];
+    const el = document.querySelector(`.node-group[data-id="${id}"]`);
+    if (el) el.setAttribute('transform', `translate(${pos.x + dx},${pos.y + dy})`);
+  });
+
+  document.querySelectorAll('#lines-layer path, #top-lines-layer path').forEach(path => {
+    const fromId = path.getAttribute('data-from');
+    const toId = path.getAttribute('data-to');
+    const isFromDragging = !!dragState.initialPositions[fromId];
+    const isToDragging   = !!dragState.initialPositions[toId];
+    if (!isFromDragging && !isToDragging) return;
+
+    const x1 = parseFloat(path.getAttribute('data-x1'));
+    const y1 = parseFloat(path.getAttribute('data-y1'));
+    const x2 = parseFloat(path.getAttribute('data-x2'));
+    const y2 = parseFloat(path.getAttribute('data-y2'));
+    const swStart = parseFloat(path.getAttribute('data-sw-start'));
+    const swEnd   = parseFloat(path.getAttribute('data-sw-end'));
+
+    let nx1 = x1, ny1 = y1, nx2 = x2, ny2 = y2;
+    if (isFromDragging) { nx1 += dx; ny1 += dy; }
+    if (isToDragging)   { nx2 += dx; ny2 += dy; }
+
+    path.setAttribute('d', taperedPathD(nx1, ny1, nx2, ny2, swStart, swEnd));
+
+    const grad = document.getElementById(`grad-${fromId}-${toId}`);
+    if (grad) {
+      grad.setAttribute('x1', nx1); grad.setAttribute('y1', ny1);
+      grad.setAttribute('x2', nx2); grad.setAttribute('y2', ny2);
+    }
+  });
+}
+
+function updateDragAutoScroll(cx, cy) {
+  const rect = container.getBoundingClientRect();
+  const leftDist   = cx - rect.left;
+  const rightDist  = rect.right - cx;
+  const topDist    = cy - rect.top;
+  const bottomDist = rect.bottom - cy;
+
+  let vx = 0, vy = 0;
+  if (leftDist < DRAG_EDGE)        vx =  Math.round((1 - Math.max(0, leftDist)   / DRAG_EDGE) * DRAG_MAX_SPEED);
+  else if (rightDist < DRAG_EDGE)  vx = -Math.round((1 - Math.max(0, rightDist)  / DRAG_EDGE) * DRAG_MAX_SPEED);
+  if (topDist < DRAG_EDGE)         vy =  Math.round((1 - Math.max(0, topDist)    / DRAG_EDGE) * DRAG_MAX_SPEED);
+  else if (bottomDist < DRAG_EDGE) vy = -Math.round((1 - Math.max(0, bottomDist) / DRAG_EDGE) * DRAG_MAX_SPEED);
+
+  dragState.vx = vx;
+  dragState.vy = vy;
+  if ((vx !== 0 || vy !== 0) && !dragState.rafId) {
+    dragState.rafId = requestAnimationFrame(dragAutoScrollTick);
+  }
+}
+
+function dragAutoScrollTick() {
+  dragState.rafId = 0;
+  if (!dragState.activeNodeId) return;
+  const { vx, vy } = dragState;
+  if (vx === 0 && vy === 0) return;
+  panX += vx;
+  panY += vy;
+  // Compensate so cursor stays over the dragged node while we pan
+  dragState.startX += vx;
+  dragState.startY += vy;
+  applyTransform();
+  updateDraggedVisuals(dragState.lastClientX, dragState.lastClientY);
+  dragState.rafId = requestAnimationFrame(dragAutoScrollTick);
+}
+
+function stopDragAutoScroll() {
+  if (dragState.rafId) { cancelAnimationFrame(dragState.rafId); dragState.rafId = 0; }
+  dragState.vx = 0;
+  dragState.vy = 0;
+}
+
 window.addEventListener('pointermove', (e) => {
   // Update stored pointer position for pinch tracking
   if (activePointers.has(e.pointerId)) {
@@ -9888,54 +9972,22 @@ window.addEventListener('pointermove', (e) => {
         }
       });
       beginAtomicOp();
-      dragState = { activeNodeId: id, startX: originX, startY: originY, initialPositions };
+      dragState = {
+        activeNodeId: id,
+        startX: originX, startY: originY,
+        initialPositions,
+        vx: 0, vy: 0, rafId: 0,
+        lastClientX: e.clientX, lastClientY: e.clientY,
+      };
       document.getElementById('main-svg').classList.add('dragging-active');
     }
   }
 
   if (dragState.activeNodeId) {
-    const dx = (e.clientX - dragState.startX) / zoom;
-    const dy = (e.clientY - dragState.startY) / zoom;
-
-    // Update nodes
-    Object.keys(dragState.initialPositions).forEach(id => {
-      const pos = dragState.initialPositions[id];
-      const newX = pos.x + dx;
-      const newY = pos.y + dy;
-      const el = document.querySelector(`.node-group[data-id="${id}"]`);
-      if (el) {
-        el.setAttribute('transform', `translate(${newX},${newY})`);
-      }
-    });
-
-    // Update lines
-    document.querySelectorAll('#lines-layer path, #top-lines-layer path').forEach(path => {
-      const fromId = path.getAttribute('data-from');
-      const toId = path.getAttribute('data-to');
-      const isFromDragging = !!dragState.initialPositions[fromId];
-      const isToDragging = !!dragState.initialPositions[toId];
-
-      if (isFromDragging || isToDragging) {
-        const x1 = parseFloat(path.getAttribute('data-x1'));
-        const y1 = parseFloat(path.getAttribute('data-y1'));
-        const x2 = parseFloat(path.getAttribute('data-x2'));
-        const y2 = parseFloat(path.getAttribute('data-y2'));
-        const swStart = parseFloat(path.getAttribute('data-sw-start'));
-        const swEnd   = parseFloat(path.getAttribute('data-sw-end'));
-
-        let nx1 = x1, ny1 = y1, nx2 = x2, ny2 = y2;
-        if (isFromDragging) { nx1 += dx; ny1 += dy; }
-        if (isToDragging)   { nx2 += dx; ny2 += dy; }
-
-        path.setAttribute('d', taperedPathD(nx1, ny1, nx2, ny2, swStart, swEnd));
-
-        const grad = document.getElementById(`grad-${fromId}-${toId}`);
-        if (grad) {
-          grad.setAttribute('x1', nx1); grad.setAttribute('y1', ny1);
-          grad.setAttribute('x2', nx2); grad.setAttribute('y2', ny2);
-        }
-      }
-    });
+    dragState.lastClientX = e.clientX;
+    dragState.lastClientY = e.clientY;
+    updateDraggedVisuals(e.clientX, e.clientY);
+    updateDragAutoScroll(e.clientX, e.clientY);
     return;
   }
   if (!isPanning) return;
@@ -9954,6 +10006,7 @@ window.addEventListener('pointerup', (e) => {
   pendingDrag = null;
 
   if (dragState.activeNodeId) {
+    stopDragAutoScroll();
     Object.keys(dragState.initialPositions).forEach(id => {
       const el = document.querySelector(`.node-group[data-id="${id}"]`);
       if (el) {
@@ -9992,6 +10045,7 @@ window.addEventListener('pointercancel', (e) => {
   endPointer(e);
   pendingDrag = null;
   if (dragState.activeNodeId) {
+    stopDragAutoScroll();
     Object.keys(dragState.initialPositions).forEach(id => {
       const el = document.querySelector(`.node-group[data-id="${id}"]`);
       if (el) {
