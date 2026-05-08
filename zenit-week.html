@@ -2289,6 +2289,21 @@
     opacity: 1;
   }
 
+  .add-btn-inner {
+    transform-origin: center;
+    transform-box: fill-box;
+    transition: transform 0.15s ease;
+  }
+  .node-group.drag-target .node-rect {
+    filter: brightness(0.88);
+  }
+  .node-group.drag-target .add-btn {
+    opacity: 1;
+  }
+  .node-group.drag-target .add-btn-inner {
+    transform: scale(1.5);
+  }
+
   @media (pointer: coarse) {
     .add-btn, .week-nav-btn { opacity: 1; }
   }
@@ -6687,7 +6702,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     const hLine = svgEl('line', { x1: -arm, y1: 0, x2: arm, y2: 0, stroke: btnSymbolColor, 'stroke-width': plusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' });
     const vLine = svgEl('line', { x1: 0, y1: -arm, x2: 0, y2: arm, stroke: btnSymbolColor, 'stroke-width': plusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' });
 
-    btnG.appendChild(circle); btnG.appendChild(hLine); btnG.appendChild(vLine);
+    const inner = svgEl('g', { class: 'add-btn-inner' });
+    inner.appendChild(circle); inner.appendChild(hLine); inner.appendChild(vLine);
+    btnG.appendChild(inner);
     g.appendChild(btnG);
   }
 
@@ -9912,6 +9929,7 @@ function dragAutoScrollTick() {
   dragState.startY += vy;
   applyTransform();
   updateDraggedVisuals(dragState.lastClientX, dragState.lastClientY);
+  updateDragTarget(dragState.lastClientX, dragState.lastClientY);
   dragState.rafId = requestAnimationFrame(dragAutoScrollTick);
 }
 
@@ -9919,6 +9937,50 @@ function stopDragAutoScroll() {
   if (dragState.rafId) { cancelAnimationFrame(dragState.rafId); dragState.rafId = 0; }
   dragState.vx = 0;
   dragState.vy = 0;
+}
+
+function updateDragTarget(cx, cy) {
+  if (!dragState.activeNodeId) return;
+  const node = findNode(dragState.activeNodeId);
+  if (!node) return;
+
+  let targetId = null;
+  // Day-children move but do not rebind, mirror handleNodeDrop logic.
+  if (!node.dayChild) {
+    const rect = container.getBoundingClientRect();
+    const svgX = (cx - rect.left - panX) / zoom;
+    const svgY = (cy - rect.top - panY) / zoom;
+    const positions = dragState.layoutPositions;
+    for (const otherId of Object.keys(positions)) {
+      if (otherId === 'center') continue;
+      if (dragState.descendantSet.has(otherId)) continue;
+      if (findNode(otherId)?.dayChild) continue;
+      const pos = positions[otherId];
+      if (svgX >= pos.x - pos.w / 2 && svgX <= pos.x + pos.w / 2 &&
+          svgY >= pos.y - pos.h / 2 && svgY <= pos.y + pos.h / 2) {
+        targetId = otherId;
+        break;
+      }
+    }
+  }
+
+  if (dragState.targetId === targetId) return;
+  if (dragState.targetId) {
+    const prev = document.querySelector(`.node-group[data-id="${dragState.targetId}"]`);
+    if (prev) prev.classList.remove('drag-target');
+  }
+  if (targetId) {
+    const cur = document.querySelector(`.node-group[data-id="${targetId}"]`);
+    if (cur) cur.classList.add('drag-target');
+  }
+  dragState.targetId = targetId;
+}
+
+function clearDragTarget() {
+  if (!dragState.targetId) return;
+  const el = document.querySelector(`.node-group[data-id="${dragState.targetId}"]`);
+  if (el) el.classList.remove('drag-target');
+  dragState.targetId = null;
 }
 
 window.addEventListener('pointermove', (e) => {
@@ -9976,6 +10038,9 @@ window.addEventListener('pointermove', (e) => {
         activeNodeId: id,
         startX: originX, startY: originY,
         initialPositions,
+        layoutPositions: positions,
+        descendantSet: new Set([id, ...getDescendantIds(id)]),
+        targetId: null,
         vx: 0, vy: 0, rafId: 0,
         lastClientX: e.clientX, lastClientY: e.clientY,
       };
@@ -9987,6 +10052,7 @@ window.addEventListener('pointermove', (e) => {
     dragState.lastClientX = e.clientX;
     dragState.lastClientY = e.clientY;
     updateDraggedVisuals(e.clientX, e.clientY);
+    updateDragTarget(e.clientX, e.clientY);
     updateDragAutoScroll(e.clientX, e.clientY);
     return;
   }
@@ -10007,6 +10073,7 @@ window.addEventListener('pointerup', (e) => {
 
   if (dragState.activeNodeId) {
     stopDragAutoScroll();
+    clearDragTarget();
     Object.keys(dragState.initialPositions).forEach(id => {
       const el = document.querySelector(`.node-group[data-id="${id}"]`);
       if (el) {
@@ -10046,6 +10113,7 @@ window.addEventListener('pointercancel', (e) => {
   pendingDrag = null;
   if (dragState.activeNodeId) {
     stopDragAutoScroll();
+    clearDragTarget();
     Object.keys(dragState.initialPositions).forEach(id => {
       const el = document.querySelector(`.node-group[data-id="${id}"]`);
       if (el) {
