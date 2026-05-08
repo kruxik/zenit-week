@@ -9610,11 +9610,30 @@ window.addEventListener('resize', () => {
   }
 });
 
-const ZOOM_MIN = isMobile ? 0.06 : 0.2;
-const ZOOM_MAX = isMobile ? 1.2 : 1.8;
-const ZOOM_DEFAULT = 0.6;
-const LOG_ZOOM_MIN = Math.log(ZOOM_MIN);
-const LOG_ZOOM_MAX = Math.log(ZOOM_MAX);
+// Zoom bounds are dynamic: ZOOM_DEFAULT tracks fit-to-screen for the current
+// layout, and 100% on the slider always means "whole map visible".
+// ZOOM_MAX_BASE / ZOOM_MIN_FLOOR are absolute clamps so big maps can shrink
+// far enough to fit and tiny maps still allow useful zoom-in for reading.
+const ZOOM_MAX_BASE = isMobile ? 1.2 : 1.8;
+const ZOOM_MIN_FLOOR = 0.02;
+let ZOOM_MIN = isMobile ? 0.06 : 0.2;
+let ZOOM_MAX = ZOOM_MAX_BASE;
+let ZOOM_DEFAULT = 0.6;
+let LOG_ZOOM_MIN = Math.log(ZOOM_MIN);
+let LOG_ZOOM_MAX = Math.log(ZOOM_MAX);
+
+function recomputeZoomBounds(fitZoom) {
+  ZOOM_DEFAULT = Math.max(ZOOM_MIN_FLOOR, fitZoom);
+  ZOOM_MIN = Math.max(ZOOM_MIN_FLOOR, ZOOM_DEFAULT * 0.3);
+  ZOOM_MAX = Math.max(ZOOM_MAX_BASE, ZOOM_DEFAULT * 2);
+  LOG_ZOOM_MIN = Math.log(ZOOM_MIN);
+  LOG_ZOOM_MAX = Math.log(ZOOM_MAX);
+  const defaultMarker = document.getElementById('zoom-default-marker');
+  if (defaultMarker) {
+    const defaultPct = (Math.log(ZOOM_DEFAULT) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
+    defaultMarker.style.left = defaultPct + '%';
+  }
+}
 
 function applyTransform() {
   mapRoot.setAttribute('transform',
@@ -9629,8 +9648,8 @@ function applyTransform() {
   const trackEl = document.getElementById('zoom-track');
   if (trackEl) {
     const diff = Math.abs(zoom - ZOOM_DEFAULT);
-    trackEl.classList.toggle('snapped',      diff < 0.005);
-    trackEl.classList.toggle('near-default', diff >= 0.005 && diff < 0.18);
+    trackEl.classList.toggle('snapped',      diff < ZOOM_DEFAULT * 0.008);
+    trackEl.classList.toggle('near-default', diff >= ZOOM_DEFAULT * 0.008 && diff < ZOOM_DEFAULT * 0.3);
   }
 }
 
@@ -9657,16 +9676,18 @@ function fitMindmapView() {
       minY = Math.min(minY, p.y - hh);
       maxY = Math.max(maxY, p.y + hh);
     });
-    const zoomCap = isMobile ? ZOOM_MAX : ZOOM_DEFAULT;
+    const zoomCap = isMobile ? ZOOM_MAX_BASE : 0.6;
     const fitZoom = Math.min(
       (w - pad * 2) / (maxX - minX),
       (h - pad * 2) / (maxY - minY),
       zoomCap
     );
-    zoom = Math.max(ZOOM_MIN, fitZoom);
+    recomputeZoomBounds(fitZoom);
+    zoom = ZOOM_DEFAULT;
     panX = w / 2 - ((minX + maxX) / 2) * zoom;
     panY = h / 2 - ((minY + maxY) / 2) * zoom;
   } else {
+    recomputeZoomBounds(0.6);
     zoom = ZOOM_DEFAULT;
     panX = w / 2;
     panY = h / 2;
@@ -10069,9 +10090,10 @@ function zoomFromClientX(clientX) {
   const pct  = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   let newZoom = Math.exp(LOG_ZOOM_MIN + pct * (LOG_ZOOM_MAX - LOG_ZOOM_MIN));
 
-  // Magnetic snap: pull zone eases toward default, snap zone locks in
-  const PULL_ZONE = 0.22;
-  const SNAP_ZONE = 0.09;
+  // Magnetic snap: pull zone eases toward default, snap zone locks in.
+  // Zones scale with ZOOM_DEFAULT so feel stays constant as fit-zoom varies.
+  const PULL_ZONE = ZOOM_DEFAULT * 0.37;
+  const SNAP_ZONE = ZOOM_DEFAULT * 0.15;
   const diff = newZoom - ZOOM_DEFAULT;
   const absDiff = Math.abs(diff);
   if (absDiff < SNAP_ZONE) {
