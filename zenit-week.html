@@ -6276,6 +6276,7 @@ function setStatus(id, status) {
     getDescendantIds(id).forEach(updateNodeUI);
     updateSummary();
   }
+  if (currentView === 'agenda') renderAgenda();
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -9599,6 +9600,8 @@ function renderAgendaTabContent() {
 
   function renderGroup(nodes, groupKey, dividerLabel, buildFn) {
     const ordered = applyAgendaOrder(nodes, loadAgendaGroupOrder(tabKey, groupKey));
+    // Higher priority always wins within a group; stable sort preserves user drag order within each priority bucket.
+    ordered.sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
     saveAgendaGroupOrder(tabKey, groupKey, ordered.map(n => n.id));
     if (ordered.length === 0) return;
     if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
