@@ -9939,30 +9939,45 @@ function stopDragAutoScroll() {
   dragState.vy = 0;
 }
 
+function rectOverlapArea(a, b) {
+  const ox = Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2);
+  const oy = Math.min(a.y + a.h / 2, b.y + b.h / 2) - Math.max(a.y - a.h / 2, b.y - b.h / 2);
+  return (ox > 0 && oy > 0) ? ox * oy : 0;
+}
+
+function currentDragRect(cx, cy) {
+  const p = dragState.layoutPositions[dragState.activeNodeId];
+  if (!p) return null;
+  const dx = (cx - dragState.startX) / zoom;
+  const dy = (cy - dragState.startY) / zoom;
+  return { x: p.x + dx, y: p.y + dy, w: p.w, h: p.h };
+}
+
+function findRebindTarget(dragRect) {
+  if (!dragRect) return null;
+  const positions = dragState.layoutPositions;
+  let bestId = null;
+  let bestArea = 0;
+  for (const otherId of Object.keys(positions)) {
+    if (otherId === 'center') continue;
+    if (dragState.descendantSet.has(otherId)) continue;
+    if (findNode(otherId)?.dayChild) continue;
+    const area = rectOverlapArea(dragRect, positions[otherId]);
+    if (area > bestArea) {
+      bestArea = area;
+      bestId = otherId;
+    }
+  }
+  return bestId;
+}
+
 function updateDragTarget(cx, cy) {
   if (!dragState.activeNodeId) return;
   const node = findNode(dragState.activeNodeId);
   if (!node) return;
 
-  let targetId = null;
   // Day-children move but do not rebind, mirror handleNodeDrop logic.
-  if (!node.dayChild) {
-    const rect = container.getBoundingClientRect();
-    const svgX = (cx - rect.left - panX) / zoom;
-    const svgY = (cy - rect.top - panY) / zoom;
-    const positions = dragState.layoutPositions;
-    for (const otherId of Object.keys(positions)) {
-      if (otherId === 'center') continue;
-      if (dragState.descendantSet.has(otherId)) continue;
-      if (findNode(otherId)?.dayChild) continue;
-      const pos = positions[otherId];
-      if (svgX >= pos.x - pos.w / 2 && svgX <= pos.x + pos.w / 2 &&
-          svgY >= pos.y - pos.h / 2 && svgY <= pos.y + pos.h / 2) {
-        targetId = otherId;
-        break;
-      }
-    }
-  }
+  const targetId = node.dayChild ? null : findRebindTarget(currentDragRect(cx, cy));
 
   if (dragState.targetId === targetId) return;
   if (dragState.targetId) {
@@ -10146,30 +10161,9 @@ function handleNodeDrop(mouseX, mouseY) {
 
   const positions = computeLayout();
 
-  // 1. Check for rebinding (dropping over another node's body)
+  // 1. Check for rebinding via rect overlap (max-area target wins).
   // Day-children can move but not rebind to a new parent.
-  let targetParentId = null;
-  if (!node.dayChild) {
-    for (const otherId of Object.keys(positions)) {
-      if (otherId === nodeId || otherId === 'center') continue;
-      // Don't bind to own descendant
-      if (getDescendantIds(nodeId).includes(otherId)) continue;
-      // Day-children cannot receive dropped nodes
-      if (findNode(otherId)?.dayChild) continue;
-
-      const pos = positions[otherId];
-      // Hit test against the node's rectangle
-      if (
-        svgX >= pos.x - pos.w / 2 &&
-        svgX <= pos.x + pos.w / 2 &&
-        svgY >= pos.y - pos.h / 2 &&
-        svgY <= pos.y + pos.h / 2
-      ) {
-        targetParentId = otherId;
-        break;
-      }
-    }
-  }
+  const targetParentId = node.dayChild ? null : findRebindTarget(currentDragRect(mouseX, mouseY));
 
   if (targetParentId) {
     // REBINDING
