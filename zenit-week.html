@@ -2293,6 +2293,28 @@
     .add-btn, .week-nav-btn { opacity: 1; }
   }
 
+  .drag-handle {
+    opacity: 0;
+    pointer-events: none;
+    cursor: grab;
+    transition: opacity 0.15s ease;
+    touch-action: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .node-group:hover .drag-handle,
+  .node-group.selected .drag-handle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .dragging-active .node-group:hover .drag-handle {
+    opacity: 1;
+  }
+  @media (pointer: coarse) {
+    .node-group.selected .node-rect {
+      stroke-dasharray: 4 3;
+    }
+  }
+
   .gear-btn {
     cursor: pointer;
     opacity: 0.6;
@@ -6669,6 +6691,27 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     g.appendChild(btnG);
   }
 
+  // Drag handle (skip center, counter, dayChild, inbox)
+  if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.inbox) {
+    const dragG = svgEl('g', {
+      class: 'drag-handle',
+      transform: `translate(0, ${boxH / 2 + 14})`,
+    });
+    // Invisible 44×44 hit rect centered on handle
+    dragG.appendChild(svgEl('rect', {
+      x: -22, y: -22, width: 44, height: 44,
+      fill: 'transparent',
+    }));
+    // Visible grip glyph
+    dragG.appendChild(svgEl('use', {
+      href: '#icon-grip-vertical',
+      x: -9, y: -9, width: 18, height: 18,
+      style: `color:${textColor};fill:currentColor;stroke:none;opacity:0.5`,
+      'pointer-events': 'none',
+    }));
+    g.appendChild(dragG);
+  }
+
   g.setAttribute('transform', `translate(${x},${y})`);
   return g;
 }
@@ -8299,14 +8342,20 @@ function attachNodeListeners() {
         return;
       }
 
-      if (e.pointerType === 'touch') {
+      const fromHandle = !!e.target.closest('.drag-handle');
+
+      if (e.pointerType === 'touch' && !fromHandle) {
         const node = findNode(id);
         if (node && node.type === 'branch') {
           window.dispatchEvent(new CustomEvent('branchSwipeStart', { detail: { x: e.clientX, y: e.clientY, side: node.side || 'right' } }));
         }
-        return; // touch = navigate only, no drag
+        return; // touch on body = navigate only
       }
 
+      if (fromHandle) {
+        // Suppress native long-press contextmenu so drag can activate cleanly
+        e.preventDefault();
+      }
       pendingDrag = { id, startX: e.clientX, startY: e.clientY };
     });
 
@@ -8315,6 +8364,21 @@ function attachNodeListeners() {
       e.preventDefault();
       const node = findNode(id);
       if (node && (node.type === 'activity' || node.type === 'branch')) startRenameNode(id);
+    });
+
+    // Tap-to-select: shows drag handle (mainly for touch; harmless on desktop)
+    g.addEventListener('click', (e) => {
+      if (e.target.closest('.add-btn')) return;
+      if (e.target.closest('.add-branch-btn')) return;
+      if (e.target.closest('.counter-btn')) return;
+      if (e.target.closest('.week-nav-btn')) return;
+      if (e.target.closest('.gear-btn')) return;
+      if (e.target.closest('.drag-handle')) return;
+      if (id === 'center') return;
+      document.querySelectorAll('.node-group.selected').forEach(el => {
+        if (el !== g) el.classList.remove('selected');
+      });
+      g.classList.add('selected');
     });
 
     g.querySelectorAll('.add-btn').forEach(btn => {
@@ -8336,6 +8400,8 @@ function attachNodeListeners() {
     g.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      // Long-press on drag-handle is for drag, not menu
+      if (e.target.closest('.drag-handle')) return;
       showContextMenu(e.clientX, e.clientY, id);
     });
   });
@@ -9755,6 +9821,10 @@ container.addEventListener('pointerdown', (e) => {
 
   // Commit edit if clicking outside the input
   if (editState && e.target !== inlineInput) commitEdit();
+  // Tapping canvas (not a node) clears selection
+  if (!e.target.closest('.node-group')) {
+    document.querySelectorAll('.node-group.selected').forEach(el => el.classList.remove('selected'));
+  }
   // Only pan on background (not nodes)
   if (e.target.closest('.node-group')) return;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
