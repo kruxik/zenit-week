@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="index,follow">
   <title>Privacy Policy — Zenit Week</title>
+  <link rel="canonical" href="https://zenitweek.com/privacy">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1a2e'/%3E%3Cpath d='M18,32 C32,32 32,14 42,14' fill='none' stroke='%23A259FF' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M18,32 C32,32 32,50 42,50' fill='none' stroke='%231ABCFE' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='32' r='7' fill='%23f0f0f0'/%3E%3Ccircle cx='48' cy='14' r='5' fill='%23A259FF'/%3E%3Ccircle cx='48' cy='50' r='5' fill='%231ABCFE'/%3E%3C/svg%3E">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,7 +26,7 @@
     }
     nav a { text-decoration: none; color: #1a1a2e; font-weight: 600; font-size: 1rem; }
     main {
-      max-width: 680px;
+      max-width: 720px;
       margin: 3rem auto;
       padding: 0 1.5rem 4rem;
     }
@@ -33,60 +35,135 @@
     h2 { font-size: 1.1rem; font-weight: 700; margin: 2rem 0 0.5rem; }
     p  { margin-bottom: 0.75rem; }
     ul { padding-left: 1.5rem; margin-bottom: 0.75rem; }
-    li { margin-bottom: 0.25rem; }
+    li { margin-bottom: 0.4rem; }
     a  { color: #7000FF; }
     code { background: #f0eeff; padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
+    .tldr {
+      background: #fff;
+      border: 1px solid #e8e8ee;
+      border-left: 3px solid #1ABCFE;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0 2rem;
+      font-size: 0.95rem;
+    }
+    .tldr strong { display: block; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6b6b80; margin-bottom: 0.4rem; }
   </style>
 </head>
 <body>
   <nav><a href="/">← Zenit Week</a></nav>
   <main>
     <h1>Privacy Policy</h1>
-    <p class="meta">Last updated: 24 April 2026</p>
+    <p class="meta">Last updated: 9 May 2026</p>
+
+    <div class="tldr">
+      <strong>TL;DR</strong>
+      Zenit Week has no servers and stores no user data. Your plans live in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see them. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel.
+    </div>
 
     <h2>1. Controller</h2>
     <p>
-      Zenit Week is an <a href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener">open-source</a> project operated by Petr Burian, a self-employed individual
-      based in the Czech Republic (part of the EU).<br>
-      Contact: <a href="mailto:petr@petrburian.com">petr@petrburian.com</a>
+      Zenit Week is an <a href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener">open-source</a> project operated by <strong>Petr Burian</strong>, a self-employed individual based in the Czech Republic (EU).
+    </p>
+    <p>
+      Contact for any privacy matter: <a href="mailto:petr@petrburian.com">petr@petrburian.com</a>. Postal correspondence is available on request through the same email.
+    </p>
+    <p>
+      No Data Protection Officer (DPO) is appointed; the scale and nature of processing do not require one under Article 37 GDPR.
     </p>
 
     <h2>2. What data we process and where it lives</h2>
-    <p>Zenit Week has <strong>no servers</strong>. Your planning data is never transmitted to or stored by us.</p>
+    <p>Zenit Week has <strong>no servers of its own</strong>. Your planning data is never transmitted to or stored by us. The only data involved is processed in the locations listed below.</p>
+
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.1 In your browser (always)</h3>
+    <p>The app uses your browser's local storage (<code>localStorage</code> and <code>IndexedDB</code>) to keep:</p>
     <ul>
-      <li><strong>Local storage</strong> — your weekly plans are saved in your browser's <code>localStorage</code> and never leave your device unless you explicitly enable Google Drive sync.</li>
-      <li><strong>Google Drive (optional)</strong> — if you sign in with Google, your data is saved to a private, app-specific folder in <em>your own</em> Google Drive using the <code>drive.appdata</code> scope. This folder is invisible to other apps and to us. We never read, copy, or process your Drive data on any server.</li>
+      <li><strong>Planning data</strong> — your weekly mind maps, branches, activities, counters, daily logs.</li>
+      <li><strong>Preferences</strong> — theme (light/dark), language (en/cs), branch colors, layout settings.</li>
+      <li><strong>Sync state</strong> — internal flags such as a per-device reset token used to avoid overwriting newer data on other devices.</li>
+      <li><strong>Google OAuth refresh token</strong> (only if you sign in with Google) — a long-lived credential issued by Google that allows the app to refresh its access to <em>your own</em> Drive without prompting you again. It grants access only to the app-specific Drive folder described in §4. You can revoke it at any time (see §10).</li>
+    </ul>
+    <p>This data never leaves your device unless you explicitly enable Google Drive sync.</p>
+
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.2 In your own Google Drive (only if you sign in)</h3>
+    <p>If you choose to sign in with Google, the app stores a copy of your planning data inside <em>your own</em> Google Drive, in a private app-specific folder, using the <code>drive.appdata</code> scope. This folder is invisible to other apps and to us. We never read, copy, or process your Drive data on any server.</p>
+
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.3 Transient network data (during page loads)</h3>
+    <p>When you open the website, our hosting provider Vercel processes your IP address and standard HTTP request metadata (user agent, referrer, timestamps) for the time strictly necessary to serve the page and operate the OAuth token-exchange endpoint at <code>/api/token</code>. Vercel does not share this with us in identifiable form. See §4 (Service providers) for details.</p>
+
+    <h2>3. Cookies and tracking</h2>
+    <p>Zenit Week sets <strong>no cookies</strong>, runs <strong>no analytics</strong>, and uses <strong>no advertising or behavioural-tracking technologies</strong>. The marketing pages (homepage, privacy, terms) load no third-party scripts at all. The app page itself (<code>/app</code>) loads Google's official JavaScript client library (<code>apis.google.com/js/api.js</code>) so that Google Drive sync can work if you choose to sign in. The library does not transmit any data to Google until you initiate sign-in.</p>
+
+    <h2>4. Service providers (sub-processors)</h2>
+    <p>We rely on the following providers strictly to deliver the service:</p>
+    <ul>
+      <li>
+        <strong>Vercel Inc.</strong> — static-site hosting and the OAuth token-exchange Edge Function (<code>/api/token</code>). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
+      </li>
+      <li>
+        <strong>Google LLC</strong> — Google Identity Services and Google Drive APIs, used only when you sign in. Data is stored in <em>your own</em> Drive account, governed by your Google Account terms. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
+      </li>
     </ul>
 
-    <h2>3. Google API scopes used</h2>
-    <p>When you choose to sign in with Google, the app requests one scope:</p>
+    <h2>5. Google API scopes</h2>
+    <p>When you sign in with Google, the app requests one scope only:</p>
     <ul>
-      <li><code>https://www.googleapis.com/auth/drive.appdata</code> — read and write files in the hidden app-data folder of your Google Drive. No access to any other files in your Drive.</li>
+      <li><code>https://www.googleapis.com/auth/drive.appdata</code> — read and write files in the hidden app-data folder of <em>your</em> Google Drive. No access to any other files in your Drive, no access to your Gmail, Calendar, profile photo, or any other Google service.</li>
     </ul>
     <p>
-      Zenit Week's use of Google APIs complies with the
+      Zenit Week's use and transfer of information received from Google APIs adheres to the
       <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>,
-      including the Limited Use requirements.
+      including the Limited Use requirements. We do not use Google user data for advertising, do not transfer it to third parties except as necessary to provide the service, do not allow humans to read it, and do not use it to develop, improve, or train generalized AI/ML models.
     </p>
 
-    <h2>4. Legal basis (GDPR)</h2>
+    <h2>6. International data transfers</h2>
+    <p>Vercel and Google operate globally and may process data in the United States or other jurisdictions outside the EU/EEA. Both providers rely on the EU Standard Contractual Clauses (SCCs) and, where applicable, the EU–US Data Privacy Framework as transfer mechanisms. We do not initiate any additional international transfers ourselves.</p>
+
+    <h2>7. Legal basis (GDPR Article 6)</h2>
     <ul>
-      <li><strong>Consent</strong> (Art. 6(1)(a) GDPR) — Google Drive sync is strictly opt-in. You can revoke consent at any time by signing out or revoking access in your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account settings</a>.</li>
-      <li><strong>Legitimate interest</strong> (Art. 6(1)(f) GDPR) — local browser storage is used solely to provide the core functionality of the app on your device.</li>
+      <li><strong>Article 6(1)(a) — Consent.</strong> Google Drive sign-in and Drive sync are strictly opt-in. You can withdraw consent at any time by signing out in the app or revoking access in your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account settings</a>; withdrawal does not affect the lawfulness of processing before withdrawal.</li>
+      <li><strong>Article 6(1)(f) — Legitimate interest.</strong> Storing your plans in your browser is necessary to provide the core functionality of the app on your device. Vercel's transient processing of IP/request metadata is necessary to deliver the website and prevent abuse.</li>
     </ul>
 
-    <h2>5. Data sharing</h2>
-    <p>We do not sell, share, or disclose your data to any third party. The only external service involved is Google Drive, which you control through your own Google Account.</p>
+    <h2>8. Retention and deletion</h2>
+    <ul>
+      <li><strong>Local browser data</strong> — retained until you clear your browser's site data, use the in-app sign-out (which removes the OAuth refresh token), or uninstall/reset your browser.</li>
+      <li><strong>Drive data</strong> — retained in <em>your</em> Google Drive until you delete it directly or revoke the app's access. We hold no copies.</li>
+      <li><strong>Vercel request logs</strong> — handled per Vercel's standard retention (typically up to 30 days for operational logs).</li>
+    </ul>
 
-    <h2>6. Retention and deletion</h2>
-    <p>Local data is retained until you clear your browser storage. Drive data is retained in your Google Drive until you delete it or revoke the app's access. We hold no copies.</p>
+    <h2>9. Data sharing</h2>
+    <p>We do not sell, rent, share, or disclose your data to any third party for any purpose. The only external services involved are the sub-processors listed in §4, and the only data that ever touches them is described in §2.</p>
 
-    <h2>7. Your rights under GDPR</h2>
-    <p>As an EU resident you have the right to access, rectify, erase, and port your data, and to object to its processing. Because we hold no data ourselves, these rights are exercised directly through your browser settings (for local storage) or your Google Account (for Drive data). For any questions write to <a href="mailto:petr@petrburian.com">petr@petrburian.com</a>.</p>
-    <p>You may also lodge a complaint with the Czech Data Protection Authority (<a href="https://www.uoou.cz" target="_blank" rel="noopener">ÚOOÚ</a>).</p>
+    <h2>10. Your rights under GDPR</h2>
+    <p>As an EU/EEA resident you have the right to:</p>
+    <ul>
+      <li>Access the personal data we process about you (Art. 15);</li>
+      <li>Have inaccurate data rectified (Art. 16);</li>
+      <li>Have your data erased (Art. 17);</li>
+      <li>Restrict or object to processing (Arts. 18, 21);</li>
+      <li>Receive your data in a portable format (Art. 20) — the app's <em>Settings → Export</em> feature does this directly;</li>
+      <li>Withdraw any previously given consent (Art. 7).</li>
+    </ul>
+    <p>Because we hold no data ourselves, most rights are exercised directly:</p>
+    <ul>
+      <li><strong>Local data</strong> — clear your browser's site data, or use Settings → Reset in the app.</li>
+      <li><strong>Drive data</strong> — manage in your <a href="https://drive.google.com" target="_blank" rel="noopener">Google Drive</a>; revoke our access in your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account permissions</a>.</li>
+    </ul>
+    <p>For any question or formal request, write to <a href="mailto:petr@petrburian.com">petr@petrburian.com</a>. We respond within 30 days at no charge, in line with Article 12 GDPR.</p>
+    <p>You have the right to lodge a complaint with the Czech Data Protection Authority (<a href="https://www.uoou.cz" target="_blank" rel="noopener">Úřad pro ochranu osobních údajů — ÚOOÚ</a>) or with the supervisory authority in your EU country of residence.</p>
 
-    <h2>8. Changes to this policy</h2>
-    <p>Material changes will be reflected by an updated "Last updated" date above. Continued use of the app after changes constitutes acceptance.</p>
+    <h2>11. Children</h2>
+    <p>Zenit Week is not directed at children under 16. We do not knowingly collect data from children. If you believe a child has used the app and you are their guardian, contact us and we will help you remove any associated data from your devices and your Google Drive (we cannot delete it ourselves because we hold no copies).</p>
+
+    <h2>12. Automated decision-making and profiling</h2>
+    <p>The app does not perform profiling and does not subject users to any automated decision-making within the meaning of Article 22 GDPR. There is no AI/ML processing of your data.</p>
+
+    <h2>13. Security</h2>
+    <p>The website is served over HTTPS only. The OAuth flow uses PKCE and a CSRF state parameter. The Google client secret is held server-side in the Vercel Edge Function and never reaches the browser. The OAuth refresh token stored in your browser grants access only to the app-specific Drive folder (§5) and can be revoked at any time.</p>
+
+    <h2>14. Changes to this policy</h2>
+    <p>Material changes will be reflected by an updated "Last updated" date above and, when warranted, by a notice in the app. Continued use of the app after changes constitutes acceptance.</p>
   </main>
 </body>
 </html>
