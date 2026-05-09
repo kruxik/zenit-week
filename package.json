@@ -9,7 +9,8 @@
     "validate": "html-validate zenit-week.html",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
     "screenshots": "node scripts/screenshots.mjs",
-    "hero": "node scripts/hero.mjs"
+    "hero": "node scripts/hero.mjs",
+    "hero:svg": "node scripts/hero-svg.mjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.5",
