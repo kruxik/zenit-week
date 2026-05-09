@@ -182,17 +182,21 @@ const html = /* html */ `
     border-radius: 34px;
     overflow: hidden;
     background: #000;
-    display: flex;
-    justify-content: flex-start; /* anchor LEFT so the Zenit Week logo stays visible */
-    align-items: flex-start;     /* anchor TOP so bottom rows get cropped */
   }
-  /* Image is rendered taller than the screen window so the bottom of the
-     agenda gets cropped — last visible row lands on "1:1 with Sara". */
+  /* Show the whole agenda edge-to-edge horizontally. Cover-fit with
+     top-center anchor keeps the full width visible (only ~6 px of side
+     bleed cropped) and the top of the agenda anchored. */
   .phone .screen img {
-    height: 1140px;
-    width: auto;
-    flex-shrink: 0;
+    width: 100%;
+    height: 100%;
     display: block;
+    object-fit: cover;
+    object-position: top center;
+    image-rendering: -webkit-optimize-contrast;
+  }
+  .lid .screen img,
+  .phone .screen img {
+    image-rendering: -webkit-optimize-contrast;
   }
   .phone .island {
     position: absolute;
@@ -235,7 +239,7 @@ const html = /* html */ `
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
   viewport: { width: STAGE_W, height: STAGE_H },
-  deviceScaleFactor: 2,
+  deviceScaleFactor: 3,           // matches mobile capture DPR for crisp screen content
 });
 const page = await ctx.newPage();
 await page.setContent(html, { waitUntil: 'load' });
