@@ -1,6 +1,9 @@
 // Screenshot generator for Zenit Week.
-// Seeds IndexedDB with realistic week data, captures PNGs in light/dark themes
-// at desktop and mobile viewports, then wraps them in laptop/phone SVG mockups.
+// Loads the canonical week from zenit-week-2026-05-09.json (with light typo
+// polish), seeds IndexedDB with it, then captures PNGs at desktop and mobile
+// viewports in both views (mindmap + agenda) and both themes (light + dark).
+// Each PNG is also wrapped in a vector laptop / phone SVG frame.
+//
 // Run: npm run screenshots
 
 import { chromium } from 'playwright';
@@ -12,109 +15,42 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..');
 const APP_URL = pathToFileURL(resolve(REPO, 'zenit-week.html')).href;
 const ASSETS = resolve(REPO, 'assets');
+const SOURCE_JSON = resolve(REPO, 'zenit-week-2026-05-09.json');
 
-// ─── Mock week data ──────────────────────────────────────────────────────────
-// Realistic week: 3 branches, mix of done/priority/counters/unplanned/reusable.
-// Counter children auto-create when activity label matches /\d+x$/ in the app,
-// but here we wire them explicitly so seeded state is deterministic.
-function buildMockData() {
-  const now = Date.now();
-  const dayMs = 86_400_000;
+// The canonical seed week — must match what `todayWeekKey()` resolves to so
+// the app loads it on boot. Today (2026-05-09) is ISO week 19.
+const SEED_WEEK_KEY = '2026-19';
 
-  // Helper to generate stable-ish ids (the app accepts any string).
-  let i = 0;
-  const id = (prefix) => `${prefix}${(++i).toString().padStart(3, '0')}`;
+// ─── Seed data load ──────────────────────────────────────────────────────────
+// Polish: correct obvious typos in user-authored labels so the marketing
+// shots don't immortalise them. Keep the rest of the export untouched.
+const LABEL_FIXES = {
+  'Park walkt together': 'Park walk together',
+  'Dropp of donations':  'Drop off donations',
+  'Codereview':          'Code review',
+};
 
-  const nodes = [];
+function loadSeed() {
+  const raw = JSON.parse(readFileSync(SOURCE_JSON, 'utf8'));
+  // Each value under .data is a stringified payload. Pick the seed week.
+  const weekRaw = raw.data?.[`zenit-week-${SEED_WEEK_KEY}`];
+  if (!weekRaw) throw new Error(`Seed week ${SEED_WEEK_KEY} missing from ${SOURCE_JSON}`);
+  const week = JSON.parse(weekRaw);
 
-  // ── Branches (defaults) ─────────────────────────────────────────────────
-  const work   = { id: 'work',   type: 'branch', branch: 'work',   label: 'Work',   children: [], _ts: 0 };
-  const family = { id: 'family', type: 'branch', branch: 'family', label: 'Family', children: [], _ts: 0 };
-  const me     = { id: 'me',     type: 'branch', branch: 'me',     label: 'Me',     children: [], _ts: 0 };
-  nodes.push(work, family, me);
-
-  // ── Activity factory ────────────────────────────────────────────────────
-  function activity(branch, label, opts = {}) {
-    const a = {
-      id: id('a'),
-      type: 'activity',
-      branch: branch.id,
-      parent: branch.id,
-      label,
-      done: !!opts.done,
-      unplanned: !!opts.unplanned,
-      reusable: !!opts.reusable,
-      priority: opts.priority || 'normal',
-      children: [],
-      _ts: now - (opts.ageDays || 0) * dayMs,
-    };
-    if (opts.done)      a.doneAt      = now - (opts.ageDays || 0) * dayMs;
-    if (opts.unplanned) a.unplannedAt = now - (opts.ageDays || 0) * dayMs;
-    branch.children.push(a.id);
-    nodes.push(a);
-
-    if (opts.counter) {
-      const c = {
-        id: id('c'),
-        type: 'counter',
-        branch: branch.id,
-        parent: a.id,
-        label: String(opts.counter.val),
-        val: opts.counter.val,
-        max: opts.counter.max,
-        ticks: opts.counter.ticks || [],
-        children: [],
-        _ts: now,
-      };
-      if (c.val >= c.max) {
-        c.done = true;
-        c.doneAt = now;
-      }
-      a.children.push(c.id);
-      nodes.push(c);
-    }
-    return a;
+  for (const n of week.nodes) {
+    if (n.label && LABEL_FIXES[n.label]) n.label = LABEL_FIXES[n.label];
   }
 
-  // ── Work ────────────────────────────────────────────────────────────────
-  activity(work, 'Q2 OKRs draft',           { priority: 'critical', ageDays: 1 });
-  activity(work, '1:1 with Sara',           { done: true, ageDays: 2 });
-  activity(work, 'Sprint review prep',      { priority: 'high' });
-  activity(work, 'Code reviews 5x',         { counter: { val: 3, max: 5, ticks: [
-    new Date(now - 3 * dayMs).toISOString(),
-    new Date(now - 2 * dayMs).toISOString(),
-    new Date(now - 1 * dayMs).toISOString(),
-  ] } });
-  activity(work, 'Onboarding doc',          { done: true, ageDays: 3 });
+  const colorsRaw = raw.data?.['zenit-week-colors'];
+  const colors = colorsRaw ? JSON.parse(colorsRaw) : null;
 
-  // ── Family ──────────────────────────────────────────────────────────────
-  activity(family, 'Birthday cake for Mia', { priority: 'critical' });
-  activity(family, 'Park walk',             { done: true, ageDays: 1 });
-  activity(family, 'Call grandma',          { done: true, ageDays: 2 });
-  activity(family, 'Plan summer trip',      { priority: 'high' });
-
-  // ── Me ──────────────────────────────────────────────────────────────────
-  activity(me, 'Pushups 50x',               { counter: { val: 30, max: 50, ticks: [
-    new Date(now - 4 * dayMs).toISOString(),
-    new Date(now - 3 * dayMs).toISOString(),
-    new Date(now - 2 * dayMs).toISOString(),
-  ] } });
-  activity(me, 'Read 30 min 7x',            { reusable: true, counter: { val: 4, max: 7, ticks: [
-    new Date(now - 4 * dayMs).toISOString(),
-    new Date(now - 3 * dayMs).toISOString(),
-    new Date(now - 1 * dayMs).toISOString(),
-    new Date(now).toISOString(),
-  ] } });
-  activity(me, 'Yoga session',              { done: true, reusable: true, ageDays: 1 });
-  activity(me, 'Drop off donations',        { unplanned: true });
-
-  return { nodes, tombstones: [], crdtVersion: 0 };
+  return { week, colors };
 }
 
 // ─── Page seeding ────────────────────────────────────────────────────────────
 // Runs in browser context. Writes localStorage + IDB before app first paint.
-async function seedPage(page, theme, view, mockData) {
-  await page.evaluate(async ({ theme, view, mockData }) => {
+async function seedPage(page, { theme, view, week, colors }) {
+  await page.evaluate(async ({ theme, view, week, colors }) => {
     localStorage.setItem('zenit-week-theme', theme);
     localStorage.setItem('zenit-week-lang', 'en');
     localStorage.setItem('zenit-week-view', view);
@@ -131,7 +67,6 @@ async function seedPage(page, theme, view, mockData) {
       req.onerror   = (e) => rej(e.target.error);
     });
 
-    // Compute current ISO week key the app would use (YYYY-WW).
     function todayWeekKey() {
       const d = new Date();
       const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -143,69 +78,80 @@ async function seedPage(page, theme, view, mockData) {
     }
     const wk = todayWeekKey();
 
+    // Seed weekData.
     await new Promise((res, rej) => {
       const tx = db.transaction('weeks', 'readwrite');
-      tx.objectStore('weeks').put({ weekKey: wk, data: mockData });
+      tx.objectStore('weeks').put({ weekKey: wk, data: week });
       tx.oncomplete = res;
       tx.onerror = (e) => rej(e.target.error);
     });
 
+    // Seed branch colors so the custom Growth branch keeps its green.
+    if (colors) {
+      await new Promise((res, rej) => {
+        const tx = db.transaction('misc', 'readwrite');
+        tx.objectStore('misc').put(colors, 'zenit-week-colors');
+        tx.oncomplete = res;
+        tx.onerror = (e) => rej(e.target.error);
+      });
+    }
+
     db.close();
-  }, { theme, view, mockData });
+  }, { theme, view, week, colors });
 }
 
-// ─── Capture loop ────────────────────────────────────────────────────────────
-// Each form factor is paired with the view that shows the app at its best:
-// mindmap for the wide laptop canvas, agenda for the tall phone canvas.
-const VIEWPORTS = {
-  desktop: { width: 1440, height: 900, deviceScaleFactor: 2, view: 'mindmap' },
-  mobile:  { width: 390,  height: 844, deviceScaleFactor: 3, view: 'agenda', isMobile: true, hasTouch: true },
+// ─── Capture matrix ──────────────────────────────────────────────────────────
+// Mobile mindmap is intentionally skipped: the mind-map's wide aspect leaves
+// large dead zones in portrait. The agenda is how the app is actually used
+// on a phone, so that's what we ship.
+const FORMS = {
+  desktop: { width: 1440, height: 900, deviceScaleFactor: 2,                                    views: ['mindmap', 'agenda'] },
+  mobile:  { width: 390,  height: 844, deviceScaleFactor: 3, isMobile: true, hasTouch: true,    views: ['agenda'] },
 };
 const THEMES = ['light', 'dark'];
 
 async function capture() {
   const browser = await chromium.launch();
-  const mockData = buildMockData();
+  const seed = loadSeed();
 
   const results = {};
   for (const theme of THEMES) {
-    for (const [form, vp] of Object.entries(VIEWPORTS)) {
-      const ctx = await browser.newContext({
-        viewport: { width: vp.width, height: vp.height },
-        deviceScaleFactor: vp.deviceScaleFactor,
-        isMobile: !!vp.isMobile,
-        hasTouch: !!vp.hasTouch,
-      });
-      const page = await ctx.newPage();
+    for (const [form, vp] of Object.entries(FORMS)) {
+      for (const view of vp.views) {
+        const ctx = await browser.newContext({
+          viewport: { width: vp.width, height: vp.height },
+          deviceScaleFactor: vp.deviceScaleFactor,
+          isMobile: !!vp.isMobile,
+          hasTouch: !!vp.hasTouch,
+        });
+        const page = await ctx.newPage();
 
-      // Visit once to establish origin so IDB/localStorage writes apply.
-      await page.goto(APP_URL, { waitUntil: 'load' });
-      await seedPage(page, theme, vp.view, mockData);
+        await page.goto(APP_URL, { waitUntil: 'load' });
+        await seedPage(page, { theme, view, week: seed.week, colors: seed.colors });
+        await page.reload({ waitUntil: 'load' });
 
-      // Reload so the app boots with seeded state.
-      await page.reload({ waitUntil: 'load' });
+        if (view === 'mindmap') {
+          await page.waitForFunction(
+            () => document.querySelectorAll('#main-svg text').length > 3,
+            { timeout: 10_000 },
+          );
+          // Fit content to viewport — same UX as clicking the zoom label.
+          await page.evaluate(() => document.getElementById('zoom-label')?.click());
+        } else {
+          await page.waitForFunction(
+            () => document.querySelector('#agenda-view')?.children.length > 0,
+            { timeout: 10_000 },
+          );
+        }
+        await page.waitForTimeout(500);
 
-      if (vp.view === 'mindmap') {
-        await page.waitForFunction(
-          () => document.querySelectorAll('#main-svg text').length > 3,
-          { timeout: 10_000 },
-        );
-        // Fit content to viewport — same UX as clicking the zoom label.
-        await page.evaluate(() => document.getElementById('zoom-label')?.click());
-      } else {
-        await page.waitForFunction(
-          () => document.querySelector('#agenda-view')?.children.length > 0,
-          { timeout: 10_000 },
-        );
+        const out = resolve(ASSETS, `screen-${theme}-${form}-${view}.png`);
+        await page.screenshot({ path: out, type: 'png' });
+        results[`${theme}-${form}-${view}`] = out;
+        console.log(`  ✓ ${out.replace(REPO + '/', '')}`);
+
+        await ctx.close();
       }
-      await page.waitForTimeout(500); // settle: layout/animations
-
-      const out = resolve(ASSETS, `screen-${theme}-${form}.png`);
-      await page.screenshot({ path: out, type: 'png' });
-      results[`${theme}-${form}`] = out;
-      console.log(`  ✓ ${out.replace(REPO + '/', '')}`);
-
-      await ctx.close();
     }
   }
   await browser.close();
@@ -214,7 +160,7 @@ async function capture() {
 
 // ─── SVG mockups ─────────────────────────────────────────────────────────────
 // Embed each PNG inside a vector device frame. PNG is base64-inlined so the
-// SVG is portable without companion files.
+// SVG stays portable without companion files.
 function pngDataUri(path) {
   const b64 = readFileSync(path).toString('base64');
   return `data:image/png;base64,${b64}`;
@@ -259,9 +205,7 @@ function laptopMockup(pngPath, theme) {
   <!-- Lid -->
   <g filter="url(#lid-shadow)">
     <rect x="${lidX}" y="${lidY}" width="${lidW}" height="${lidH}" rx="${bezel + 6}" ry="${bezel + 6}" fill="${lid}"/>
-    <!-- Camera notch -->
     <circle cx="${totalW / 2}" cy="${lidY + pad / 2}" r="3" fill="#0a0a0a"/>
-    <!-- Screen -->
     <image href="${dataUri}" x="${screenX}" y="${screenY}" width="${screenW}" height="${screenH}" preserveAspectRatio="xMidYMid slice" clip-path="url(#screen-clip)"/>
   </g>
 
@@ -274,7 +218,6 @@ function laptopMockup(pngPath, theme) {
            L ${baseX + baseW - 30} ${baseY + hingeH + baseH}
            L ${baseX + 30} ${baseY + hingeH + baseH} Z"
         fill="url(#base-grad)"/>
-  <!-- Trackpad notch -->
   <rect x="${totalW / 2 - 80}" y="${baseY + hingeH + 4}" width="160" height="6" rx="3" fill="#000" opacity="0.35"/>
 </svg>`;
 }
@@ -289,7 +232,6 @@ function phoneMockup(pngPath, theme) {
   const frame = theme === 'dark' ? '#1a1d24' : '#1f2229';
   const dataUri = pngDataUri(pngPath);
 
-  // Outer canvas adds margin around the device for shadow.
   const margin = 40;
   const canvasW = totalW + margin * 2;
   const canvasH = totalH + margin * 2;
@@ -306,11 +248,9 @@ function phoneMockup(pngPath, theme) {
   </defs>
   <rect width="${canvasW}" height="${canvasH}" fill="${bg}"/>
 
-  <!-- Phone body -->
   <g filter="url(#phone-shadow)">
     <rect x="${fx}" y="${fy}" width="${totalW}" height="${totalH}" rx="${radius}" ry="${radius}" fill="${frame}"/>
     <image href="${dataUri}" x="${fx + bezel}" y="${fy + bezel}" width="${screenW}" height="${screenH}" preserveAspectRatio="xMidYMid slice" clip-path="url(#phone-screen-clip)"/>
-    <!-- Dynamic island -->
     <rect x="${fx + totalW / 2 - 50}" y="${fy + 16}" width="100" height="28" rx="14" fill="#0a0a0a"/>
   </g>
 </svg>`;
@@ -318,14 +258,16 @@ function phoneMockup(pngPath, theme) {
 
 function buildMockups(captures) {
   for (const theme of THEMES) {
-    const laptop = laptopMockup(captures[`${theme}-desktop`], theme);
-    const phone  = phoneMockup(captures[`${theme}-mobile`], theme);
-    const lp = resolve(ASSETS, `mockup-laptop-${theme}.svg`);
-    const pp = resolve(ASSETS, `mockup-phone-${theme}.svg`);
-    writeFileSync(lp, laptop);
-    writeFileSync(pp, phone);
-    console.log(`  ✓ ${lp.replace(REPO + '/', '')}`);
-    console.log(`  ✓ ${pp.replace(REPO + '/', '')}`);
+    for (const view of FORMS.desktop.views) {
+      const lp = resolve(ASSETS, `mockup-laptop-${theme}-${view}.svg`);
+      writeFileSync(lp, laptopMockup(captures[`${theme}-desktop-${view}`], theme));
+      console.log(`  ✓ ${lp.replace(REPO + '/', '')}`);
+    }
+    for (const view of FORMS.mobile.views) {
+      const pp = resolve(ASSETS, `mockup-phone-${theme}-${view}.svg`);
+      writeFileSync(pp, phoneMockup(captures[`${theme}-mobile-${view}`], theme));
+      console.log(`  ✓ ${pp.replace(REPO + '/', '')}`);
+    }
   }
 }
 
