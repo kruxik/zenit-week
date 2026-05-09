@@ -3,7 +3,7 @@
 > Plan your week around what matters most — not what's just urgent.
 > A visual mind-map planner that runs in your browser. No signup. No servers. Free.
 
-![Zenit Week — visual mind-map week planner](./screenshot.png)
+![Zenit Week — visual mind-map week planner](./screenshot.svg)
 
 [**Try it now →**](https://zenitweek.com/) · [Privacy](https://zenitweek.com/privacy) · [Available in English & Čeština](https://zenitweek.com/cs/)
 
