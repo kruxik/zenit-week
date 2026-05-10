@@ -2094,6 +2094,15 @@
     }
   }
 
+  /* Mobile: hide bottom pill bars while help is open (full-screen help) */
+  @media (max-width: 767px) {
+    body:has(#help-panel.visible) #fab-pill,
+    body:has(#help-panel.visible) #undo-redo-bar,
+    body:has(#help-panel.visible) #view-toggle-bar {
+      display: none;
+    }
+  }
+
   #import-confirm-overlay {
     position: fixed;
     top: 0; left: 0;
