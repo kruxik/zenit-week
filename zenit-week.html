@@ -2544,7 +2544,8 @@
     flex-shrink: 0;
   }
 
-  body.app-loading #main-svg {
+  body.app-loading #main-svg,
+  body.app-loading #placeholder-panel {
     opacity: 0;
   }
 
@@ -2769,7 +2770,7 @@
     </svg>
     <div id="placeholder-panel">
       <div id="summary-header">
-        <span id="summary-main">Activities Done: 0 (0 %) / 0 😀</span>
+        <span id="summary-main"></span>
       </div>
       <div id="summary-details">
         <div id="ratio-bar"></div>
@@ -7787,13 +7788,12 @@ function updateSummary() {
     const wBaseline = weekData.baseline || 105;
     const wOverload = Math.floor(wBaseline * 1.33);
     let totalColor = isDarkSummary ? '#2ecc71' : '#28a745';
-    let emoji = '😀';
     let tooltip = t('summary.tooltipNormal');
     if (global.total > wOverload) {
-      totalColor = isDarkSummary ? '#ff6b5b' : '#d93025'; emoji = '🤯';
+      totalColor = isDarkSummary ? '#ff6b5b' : '#d93025';
       tooltip = t('summary.tooltipOverload');
     } else if (global.total >= wBaseline + 1) {
-      totalColor = isDarkSummary ? '#f5a623' : '#f29900'; emoji = '😅';
+      totalColor = isDarkSummary ? '#f5a623' : '#f29900';
       tooltip = t('summary.tooltipStretch');
     }
 
