@@ -206,6 +206,33 @@ describe('commitEdit — day-child creation', () => {
     expect(kids[0].max).toBe(10);
   });
 
+  test('single day token added to node with existing day-children appends to schedule', () => {
+    // First save: "Running (mo, we)" → label "Running" + Mo + We day children
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Running (mo, we)', true);
+    let node = findNode(id);
+    expect(node.label).toBe('Running');
+    expect(node.children.map(findNode).filter(k => k.dayChild)).toHaveLength(2);
+
+    // Re-edit with single day token "(th)" — must extend, not revert
+    triggerCommitEdit(id, 'Running (th)');
+    node = findNode(id);
+    expect(node.label).toBe('Running'); // (th) stripped, not kept inline
+    const dayKids = node.children.map(findNode).filter(k => k.dayChild);
+    expect(dayKids).toHaveLength(3);
+    const indices = dayKids.map(k => k.dayIndex).sort();
+    expect(indices).toEqual([1, 3, 4]); // Mo=1, We=3, Th=4
+  });
+
+  test('plain label edit on node with existing day-children preserves schedule', () => {
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Running (mo, we)', true);
+    triggerCommitEdit(id, 'Jogging');
+    const node = findNode(id);
+    expect(node.label).toBe('Jogging');
+    expect(node.children.map(findNode).filter(k => k.dayChild)).toHaveLength(2);
+  });
+
   test('re-edit Nx label on node with existing day-children does not create counter', () => {
     // First save: "Pushups 10x (mo, we)" → label "Pushups 10x" + day children
     const id = setupWithActivity('');
