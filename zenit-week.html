@@ -1699,6 +1699,37 @@
     margin: 0;
   }
 
+  /* ─── Pre-paint view state ───────────────────────────────────────────────── */
+  /* Set by inline <head> script from localStorage so the correct view is
+     visible on first paint, avoiding a mindmap→agenda flash on refresh. */
+  html[data-view="agenda"] #agenda-view { display: flex; }
+  @media (max-width: 767px) {
+    html[data-view="agenda"] #canvas-container { display: none; }
+  }
+  @media (min-width: 768px) {
+    html[data-view="agenda"] #agenda-view {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      pointer-events: all;
+    }
+    html[data-view="agenda"] #agenda-overlay {
+      display: flex;
+      opacity: 1;
+    }
+  }
+  /* View-toggle pill: highlight the persisted view's button on first paint.
+     ID-based selectors override the static .active class in markup. */
+  html[data-view="agenda"]  #vtb-agenda,
+  html[data-view="mindmap"] #vtb-mindmap {
+    background: var(--view-btn-active-bg);
+    color: var(--view-btn-active-text);
+  }
+  html[data-view="agenda"]  #vtb-mindmap,
+  html[data-view="mindmap"] #vtb-agenda {
+    background: none;
+    color: var(--text-subtle);
+  }
+
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
   #agenda-view {
     position: absolute;
@@ -2591,6 +2622,16 @@
       }
     } catch(e) {}
   })();
+</script>
+<script>
+  // Apply persisted view before first paint so refresh in agenda doesn't
+  // flash the mindmap. CSS rules keyed on html[data-view] handle visibility.
+  try {
+    var v = localStorage.getItem('zenit-week-view');
+    document.documentElement.dataset.view = (v === 'agenda') ? 'agenda' : 'mindmap';
+  } catch (e) {
+    document.documentElement.dataset.view = 'mindmap';
+  }
 </script>
 </head>
 <body class="app-loading">
@@ -9657,6 +9698,7 @@ function renderAgenda() {
 function switchView(view) {
   currentView = view;
   localStorage.setItem('zenit-week-view', view);
+  document.documentElement.dataset.view = view;
   const canvasEl  = document.getElementById('canvas-container');
   const agendaEl  = document.getElementById('agenda-view');
   const overlayEl = document.getElementById('agenda-overlay');
