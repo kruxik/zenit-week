@@ -4170,7 +4170,7 @@ function mergeWeekData(local, remote) {
     sorted.forEach(n => {
       const winner = winnerById.get(n.id);
       if (winner?.children) {
-        const base = winner.children.filter(cid => mergedIds.has(cid));
+        const base = winner.children.filter(cid => mergedIds.has(cid) && byId.get(cid)?.parent === n.id);
         const baseSet = new Set(base);
         const extra = sorted.filter(c => c.parent === n.id && !baseSet.has(c.id)).map(c => c.id);
         n.children = [...base, ...extra];
