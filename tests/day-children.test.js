@@ -206,6 +206,23 @@ describe('commitEdit — day-child creation', () => {
     expect(kids[0].max).toBe(10);
   });
 
+  test('re-edit Nx label on node with existing day-children does not create counter', () => {
+    // First save: "Pushups 10x (mo, we)" → label "Pushups 10x" + day children
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Pushups 10x (mo, we)', true);
+    let node = findNode(id);
+    expect(node.label).toBe('Pushups 10x');
+    expect(node.children.map(findNode).filter(k => k.dayChild)).toHaveLength(2);
+
+    // Re-edit: label is now "Pushups 10x" (no day tokens); must NOT spawn counter
+    triggerCommitEdit(id, 'Pushups 10x');
+    node = findNode(id);
+    expect(node.label).toBe('Pushups 10x'); // Nx preserved
+    const kids = node.children.map(findNode);
+    expect(kids.some(k => k.type === 'counter')).toBe(false);
+    expect(kids.filter(k => k.dayChild)).toHaveLength(2); // day-children intact
+  });
+
   test('existing counter removed when 2+ day pattern added', () => {
     const b = mkBranch('work', ['a1']);
     const a = mkActivity('a1', 'work', 'work', { label: 'Pushups 10x', children: ['c1'] });

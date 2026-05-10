@@ -7002,9 +7002,13 @@ function applyMagicLabel(nodeId) {
 
   // 0 or 1 day token: counter logic. Single-day annotation (size === 1)
   // disables counter creation but otherwise behaves like the no-day branch.
+  // Existing day-children also disable counter creation — re-editing
+  // "Pushups 10x" on a node already scheduled as multi-day must not flip
+  // it into counter mode (day wins over counter, same as the multi-day path).
   const nxMatch = label.match(/(\d+)x/);
   const nxVal = nxMatch ? parseInt(nxMatch[1], 10) : 0;
-  const counterMax = (nxVal >= 2 && parsedDays.size === 0) ? nxVal : 0;
+  const hasDayChildren = node.children.map(findNode).some(n => n?.dayChild);
+  const counterMax = (nxVal >= 2 && parsedDays.size === 0 && !hasDayChildren) ? nxVal : 0;
 
   if (counterMax > 0) {
     // Counter holds the count — strip "Nx" from the stored label.
