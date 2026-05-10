@@ -10876,6 +10876,7 @@ window.addEventListener('load', async () => {
 
   // Expandable summary panel
   const summaryPanel = document.getElementById('placeholder-panel');
+  summaryPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
   summaryPanel.addEventListener('click', () => {
     summaryPanel.classList.toggle('expanded');
   });
