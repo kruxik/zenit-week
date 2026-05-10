@@ -2094,12 +2094,60 @@
     }
   }
 
-  /* Mobile: hide bottom pill bars while help is open (full-screen help) */
+  /* Mobile: floating "Close" pill replaces the top-right X while help is open */
+  #help-close-bar {
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px var(--shadow-md);
+    padding: 3px;
+    z-index: 2500;
+    user-select: none;
+  }
+  .help-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    color: var(--text-subtle);
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    background: none;
+    user-select: none;
+    white-space: nowrap;
+    outline: none;
+  }
+  .help-close-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-dim);
+  }
+
+  /* Mobile: hide bottom pill bars while help is open; swap top-X for bottom Close pill */
   @media (max-width: 767px) {
     body:has(#help-panel.visible) #fab-pill,
     body:has(#help-panel.visible) #undo-redo-bar,
     body:has(#help-panel.visible) #view-toggle-bar {
       display: none;
+    }
+    body:has(#help-panel.visible) #help-close {
+      display: none;
+    }
+    body:has(#help-panel.visible) #help-close-bar {
+      display: flex;
     }
   }
 
@@ -3080,6 +3128,13 @@
       </div>
     </div>
   </div>
+</div>
+
+<div id="help-close-bar">
+  <button type="button" class="help-close-btn" id="help-close-mobile">
+    <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    <span data-i18n="help.close">Close</span>
+  </button>
 </div>
 
 
@@ -5108,6 +5163,7 @@ const TRANSLATIONS = {
     'help.legendTitle':           'Legend',
     'help.unplanned':             'Unplanned',
     'help.done':                  'Done',
+    'help.close':                 'Close',
     'filter.unscheduled':         'Unscheduled',
     'blocked.title':              'Application Blocked',
     'blocked.body':               'Zenit Week is already open in another tab. Please use that tab or close it to continue here.',
@@ -5223,6 +5279,7 @@ const TRANSLATIONS = {
     'help.legendTitle':           'Legenda',
     'help.unplanned':             'Neplánované',
     'help.done':                  'Hotovo',
+    'help.close':                 'Zavřít',
     'filter.unscheduled':         'Neplánované',
     'blocked.title':              'Aplikace je blokována',
     'blocked.body':               'Zenit Week je již otevřen v jiném panelu. Pokračujte tam, nebo jej zavřete a pokračujte zde.',
@@ -10916,6 +10973,8 @@ window.addEventListener('load', async () => {
 
   helpClose.addEventListener('click', doCloseHelp);
   helpOverlay.addEventListener('click', doCloseHelp);
+  const helpCloseMobile = document.getElementById('help-close-mobile');
+  if (helpCloseMobile) helpCloseMobile.addEventListener('click', doCloseHelp);
 
   // Agenda overlay click to close
   const agendaOverlay = document.getElementById('agenda-overlay');
