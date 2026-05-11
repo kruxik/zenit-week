@@ -5,5 +5,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['tests/setup.js'],
+    reporters: [['default', { summary: false }]],
+    silent: 'passed-only',
   },
 });
