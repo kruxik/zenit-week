@@ -2284,6 +2284,14 @@
   .help-section {
     margin-bottom: 24px;
   }
+  .help-version {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-placeholder);
+    letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
+    margin-top: 8px;
+  }
   .help-section-title {
     font-size: 11px;
     font-weight: 700;
@@ -3126,6 +3134,8 @@
           <div class="legend-item"><div class="legend-dot" style="background:var(--node-done-bg); border: 1px solid var(--node-done-border)"></div><span data-i18n="help.done">Done</span></div>
         </div>
       </div>
+
+      <div class="help-version"><span id="app-version">dev</span></div>
     </div>
   </div>
 </div>
@@ -3140,6 +3150,16 @@
 
 <script id="app">
 'use strict';
+
+// ─── App version ──────────────────────────────────────────────────────────────
+// Placeholder below is replaced at build by scripts/inject-version.js.
+// Local dev shows "dev" because the unresolved placeholder starts with "__".
+const APP_VERSION = '__APP_VERSION__';
+const _displayVersion = APP_VERSION.startsWith('__') ? 'dev' : APP_VERSION;
+{
+  const _verEl = document.getElementById('app-version');
+  if (_verEl) _verEl.textContent = _displayVersion;
+}
 
 // ─── OAuth redirect callback capture ──────────────────────────────────────────
 // Detects ?code= / ?error= on app load, captures, then strips URL before app init.

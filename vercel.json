@@ -1,8 +1,30 @@
 {
+  "buildCommand": "npm run build",
+  "installCommand": "npm install --omit=dev",
   "rewrites": [
     { "source": "/app",      "destination": "/zenit-week.html" },
     { "source": "/app/(.*)", "destination": "/zenit-week.html" },
     { "source": "/privacy",  "destination": "/privacy.html" },
     { "source": "/terms",    "destination": "/terms.html" }
+  ],
+  "headers": [
+    {
+      "source": "/zenit-week.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/app",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/app/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    }
   ]
 }
