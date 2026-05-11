@@ -305,7 +305,7 @@
       height: 3px;
       background: linear-gradient(90deg, var(--family), var(--me));
       border-radius: 2px;
-      margin: 0 auto 32px;
+      margin: 0 auto 24px;
     }
 
     /* ── Why section ──────────────────────────────────────────────── */
@@ -328,17 +328,19 @@
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--muted);
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
 
-    .why h2 {
+    .why h2,
+    .preview h2,
+    .features h2 {
       font-size: clamp(24px, 4vw, 36px);
       font-weight: 700;
       line-height: 1.25;
-      margin-bottom: 20px;
+      margin: 0 0 24px;
     }
 
-    .why p {
+    .why p:not(.section-label) {
       font-size: 17px;
       color: var(--muted);
       line-height: 1.7;
@@ -362,14 +364,8 @@
       margin: 0 auto;
     }
 
-    .preview h2 {
-      font-size: clamp(24px, 4vw, 36px);
-      font-weight: 700;
-      margin-bottom: 14px;
-    }
-
-    .preview > .preview-inner > p,
-    .features > .features-inner > p {
+    .preview > .preview-inner > p:not(.section-label),
+    .features > .features-inner > p:not(.section-label) {
       font-size: 17px;
       color: var(--muted);
       margin-bottom: 52px;
@@ -444,17 +440,12 @@
       margin: 0 auto;
     }
 
-    .features h2 {
-      font-size: clamp(24px, 4vw, 36px);
-      font-weight: 700;
-      margin-bottom: 48px;
-    }
-
     .features-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 16px;
       text-align: left;
+      margin-top: 8px;
     }
 
     @media (max-width: 540px) {
