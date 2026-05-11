@@ -5199,6 +5199,15 @@ function stopDrivePoll() {
 let currentWeekKey = '';   // 'YYYY-WW'
 let weekData = {};          // { nodes: [...] }
 let currentLang = 'en';
+function detectBrowserLang() {
+  const tags = navigator.languages?.length ? navigator.languages : [navigator.language || 'en'];
+  for (const tag of tags) {
+    const code = tag.toLowerCase().split('-')[0];
+    if (code === 'cs') return 'cs';
+    if (typeof TRANSLATIONS !== 'undefined' && code in TRANSLATIONS) return code;
+  }
+  return 'en';
+}
 let autoLayout = localStorage.getItem('zenit-week-autolayout') !== 'false';
 
 let zoom    = 0.6;
@@ -11098,7 +11107,7 @@ window.addEventListener('load', async () => {
   await openDB();
   await runMigrationIfNeeded();
 
-  currentLang = localStorage.getItem('zenit-week-lang') || 'en';
+  currentLang = localStorage.getItem('zenit-week-lang') || detectBrowserLang();
   loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   // One-time bootstrap: if stored colors file is missing theme/lang, write them now
