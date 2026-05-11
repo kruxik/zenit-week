@@ -20,6 +20,8 @@ export async function resolveVersion(opts = {}) {
 
   // Diagnostic logging — useful for understanding Vercel build env.
   console.log(`[inject-version] VERCEL_GIT_COMMIT_REF=${env.VERCEL_GIT_COMMIT_REF || '(unset)'}`);
+  console.log(`[inject-version] VERCEL_GIT_REPO_OWNER=${env.VERCEL_GIT_REPO_OWNER || '(unset)'}`);
+  console.log(`[inject-version] VERCEL_GIT_REPO_NAME=${env.VERCEL_GIT_REPO_NAME || '(unset)'}`);
   console.log(`[inject-version] VERCEL_GIT_REPO_SLUG=${env.VERCEL_GIT_REPO_SLUG || '(unset)'}`);
 
   // 1. Tag-push deploys on Vercel: VERCEL_GIT_COMMIT_REF is the tag name.
@@ -52,11 +54,18 @@ export async function resolveVersion(opts = {}) {
 }
 
 function resolveRepoSlug(env) {
-  if (env.VERCEL_GIT_REPO_SLUG) return env.VERCEL_GIT_REPO_SLUG;
+  // VERCEL_GIT_REPO_OWNER + _NAME is the canonical pair on Vercel. The bare
+  // VERCEL_GIT_REPO_SLUG turns out to be just the repo name (no owner), so
+  // it can't be used as a full GitHub slug on its own.
   if (env.VERCEL_GIT_REPO_OWNER && env.VERCEL_GIT_REPO_NAME) {
     return `${env.VERCEL_GIT_REPO_OWNER}/${env.VERCEL_GIT_REPO_NAME}`;
   }
-  // On Vercel without the slug env vars (older runtime?), hardcode the repo.
+  // Only honor REPO_SLUG when it actually has the owner/name shape.
+  if (env.VERCEL_GIT_REPO_SLUG && env.VERCEL_GIT_REPO_SLUG.includes('/')) {
+    return env.VERCEL_GIT_REPO_SLUG;
+  }
+  // On Vercel without the slug env vars (older runtime, or slug stripped to
+  // just the repo name as observed), hardcode the known repo.
   if (env.VERCEL) return 'kruxik/zenit-week';
   return null;
 }

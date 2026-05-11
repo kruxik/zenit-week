@@ -49,17 +49,42 @@ describe('resolveVersion', () => {
     expect(v).toBe('v2026.05.12');
   });
 
-  it('builds slug from VERCEL_GIT_REPO_OWNER + _NAME when SLUG is unset', async () => {
+  it('prefers VERCEL_GIT_REPO_OWNER + _NAME over the bare REPO_SLUG', async () => {
     let seenSlug = null;
     await resolveVersion({
       runGit:    () => { throw new Error('no git'); },
       fetchTags: async (slug) => { seenSlug = slug; return 'v2026.05.13'; },
-      env: { VERCEL_GIT_REPO_OWNER: 'foo', VERCEL_GIT_REPO_NAME: 'bar', VERCEL_GIT_COMMIT_SHA: 'abc1234' },
+      env: {
+        VERCEL_GIT_REPO_OWNER: 'foo',
+        VERCEL_GIT_REPO_NAME:  'bar',
+        VERCEL_GIT_REPO_SLUG:  'bar', // bare repo name observed in Vercel logs
+        VERCEL_GIT_COMMIT_SHA: 'abc1234',
+      },
     });
     expect(seenSlug).toBe('foo/bar');
   });
 
-  it('hardcodes slug on Vercel when neither slug env var is set', async () => {
+  it('ignores REPO_SLUG without owner/name shape', async () => {
+    let seenSlug = null;
+    await resolveVersion({
+      runGit:    () => { throw new Error('no git'); },
+      fetchTags: async (slug) => { seenSlug = slug; return 'v2026.05.13'; },
+      env: { VERCEL_GIT_REPO_SLUG: 'just-repo-name', VERCEL: '1', VERCEL_GIT_COMMIT_SHA: 'abc1234' },
+    });
+    expect(seenSlug).toBe('kruxik/zenit-week'); // falls through to hardcoded
+  });
+
+  it('honors REPO_SLUG when it includes owner/', async () => {
+    let seenSlug = null;
+    await resolveVersion({
+      runGit:    () => { throw new Error('no git'); },
+      fetchTags: async (slug) => { seenSlug = slug; return 'v2026.05.13'; },
+      env: { VERCEL_GIT_REPO_SLUG: 'someone/their-repo', VERCEL_GIT_COMMIT_SHA: 'abc1234' },
+    });
+    expect(seenSlug).toBe('someone/their-repo');
+  });
+
+  it('hardcodes slug on Vercel when no slug env vars are set', async () => {
     let seenSlug = null;
     await resolveVersion({
       runGit:    () => { throw new Error('no git'); },
