@@ -124,6 +124,11 @@
       transition: opacity 0.15s;
     }
     .nav-cta:hover { opacity: 0.82; }
+    .nav-cta .nav-cta-short { display: none; }
+    @media (max-width: 540px) {
+      .nav-cta .nav-cta-full { display: none; }
+      .nav-cta .nav-cta-short { display: inline; }
+    }
 
     .nav-right { display: flex; align-items: center; gap: 16px; }
     .lang-switcher {
@@ -569,7 +574,7 @@
       <span class="lang-sep" aria-hidden="true">|</span>
       <a href="/cs/" class="lang-link" hreflang="cs">CS</a>
     </div>
-    <a href="/app" class="nav-cta">Open app →</a>
+    <a href="/app" class="nav-cta"><span class="nav-cta-full">Open app →</span><span class="nav-cta-short">app</span></a>
   </div>
 </nav>
 
