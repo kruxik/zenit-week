@@ -15,9 +15,18 @@ const VERSION_REGEX = /^v\d{4}\.\d{2}\.\d{2}(\.\d+)?$/;
 const FALLBACK_REGEX = /^dev(-[0-9a-f]{7})?$/;
 
 export function resolveVersion({ runGit = runGitDescribe, env = process.env } = {}) {
+  // 1. Tag-push deploys: Vercel sets VERCEL_GIT_COMMIT_REF to the tag name.
+  //    Most reliable signal — no git CLI dependency.
+  const ref = env.VERCEL_GIT_COMMIT_REF;
+  if (ref && VERSION_REGEX.test(ref)) return ref;
+  // 2. Branch-push deploys: derive the nearest tag reachable from HEAD via
+  //    `git describe`. May fail on Vercel's shallow clone without tag refs.
   let tag = null;
-  try { tag = runGit(); } catch (_) { /* swallow */ }
+  try { tag = runGit(); } catch (err) {
+    console.warn('[inject-version] git describe failed:', err && err.message);
+  }
   if (tag && VERSION_REGEX.test(tag)) return tag;
+  // 3. Fallback to short SHA (still self-consistent, just not a release label).
   const sha = env.VERCEL_GIT_COMMIT_SHA;
   if (sha && /^[0-9a-f]{7,}$/i.test(sha)) return `dev-${sha.slice(0, 7).toLowerCase()}`;
   return 'dev';
@@ -36,11 +45,21 @@ export function substitutePlaceholder(html, version) {
 }
 
 function runGitDescribe() {
-  // Vercel checks out a shallow clone (depth ~10) without tags. We need both
-  // the tag refs and enough history for the tag's commit to be reachable.
-  // Try unshallow first; on already-complete clones it errors harmlessly.
-  try { execSync('git fetch --tags --unshallow', { stdio: 'pipe' }); } catch (_) {
-    try { execSync('git fetch --tags', { stdio: 'pipe' }); } catch (_) { /* fall through */ }
+  // Vercel ships a shallow clone (depth ~10) without tag refs. Try the
+  // broadest fetch first; degrade gracefully on already-complete clones or
+  // when origin isn't configured for fetch.
+  const fetchAttempts = [
+    'git fetch --tags --unshallow',
+    'git fetch --tags --depth=100',
+    'git fetch --tags',
+  ];
+  for (const cmd of fetchAttempts) {
+    try {
+      execSync(cmd, { stdio: 'pipe' });
+      break; // first success is enough
+    } catch (err) {
+      console.warn(`[inject-version] '${cmd}' failed:`, (err.stderr || err.message || '').toString().trim().slice(0, 200));
+    }
   }
   return execSync('git describe --tags --abbrev=0', { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
 }

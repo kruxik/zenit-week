@@ -11,6 +11,22 @@ describe('resolveVersion', () => {
     expect(v).toBe('v2026.05.10');
   });
 
+  it('prefers VERCEL_GIT_COMMIT_REF when it matches CalVer (tag-push deploy)', () => {
+    const v = resolveVersion({
+      runGit: () => { throw new Error('should not be called'); },
+      env: { VERCEL_GIT_COMMIT_REF: 'v2026.05.11' },
+    });
+    expect(v).toBe('v2026.05.11');
+  });
+
+  it('ignores VERCEL_GIT_COMMIT_REF when it is a branch name and falls back to git describe', () => {
+    const v = resolveVersion({
+      runGit: () => 'v2026.05.10',
+      env: { VERCEL_GIT_COMMIT_REF: 'main', VERCEL_GIT_COMMIT_SHA: 'deadbee1234' },
+    });
+    expect(v).toBe('v2026.05.10');
+  });
+
   it('accepts a CalVer tag with same-day build suffix', () => {
     const v = resolveVersion({ runGit: () => 'v2026.05.10.1', env: {} });
     expect(v).toBe('v2026.05.10.1');
