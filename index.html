@@ -149,6 +149,47 @@
     .lang-link.active { color: var(--ink); background: var(--surface); border: 1px solid var(--border); }
     .lang-sep { color: var(--border); font-weight: 300; }
 
+    /* ── Lang banner ──────────────────────────────────────────────── */
+    .lang-banner[hidden] { display: none; }
+    .lang-banner {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--ink);
+    }
+    .lang-banner-text { color: var(--muted); }
+    .lang-banner-cta {
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      transition: opacity 0.15s;
+    }
+    .lang-banner-cta:hover { opacity: 0.82; }
+    .lang-banner-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .lang-banner-close:hover { color: var(--ink); background: var(--cloud); }
+    @media (max-width: 540px) {
+      .lang-banner { font-size: 13px; padding: 8px 12px; gap: 8px; }
+    }
+
     /* ── Hero ─────────────────────────────────────────────────────── */
     .hero {
       max-width: 760px;
@@ -554,6 +595,13 @@
 </head>
 <body>
 
+<!-- ── Lang suggestion banner ─────────────────────────────────────── -->
+<aside id="lang-banner" class="lang-banner" hidden role="region" aria-label="Language suggestion">
+  <span class="lang-banner-text">Tato stránka je dostupná v češtině.</span>
+  <a href="/cs/" class="lang-banner-cta" id="lang-banner-cta">Přepnout</a>
+  <button type="button" class="lang-banner-close" id="lang-banner-close" aria-label="Zavřít">×</button>
+</aside>
+
 <!-- ── Nav ──────────────────────────────────────────────────────────── -->
 <nav>
   <a href="/" class="nav-logo" aria-label="Zenit Week home">
@@ -919,6 +967,39 @@
   <p>© 2026 Zenit Week · MIT License · <a href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener">Open source</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
   <a href="/app">Open app →</a>
 </footer>
+
+<script>
+(function() {
+  try {
+    var KEY = 'zw-lang-pref';
+    var currentLang = document.documentElement.lang === 'cs' ? 'cs' : 'en';
+    var otherLang = currentLang === 'cs' ? 'en' : 'cs';
+    Array.prototype.forEach.call(document.querySelectorAll('.lang-link'), function(a) {
+      a.addEventListener('click', function() {
+        try { localStorage.setItem(KEY, a.getAttribute('href').indexOf('/cs') === 0 ? 'cs' : 'en'); } catch (e) {}
+      });
+    });
+    if (localStorage.getItem(KEY)) return;
+    var tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
+    var prefersCs = false;
+    for (var i = 0; i < tags.length; i++) {
+      if (String(tags[i]).toLowerCase().indexOf('cs') === 0) { prefersCs = true; break; }
+    }
+    var preferred = prefersCs ? 'cs' : 'en';
+    if (preferred === currentLang) return;
+    var banner = document.getElementById('lang-banner');
+    if (!banner) return;
+    banner.hidden = false;
+    document.getElementById('lang-banner-cta').addEventListener('click', function() {
+      try { localStorage.setItem(KEY, otherLang); } catch (e) {}
+    });
+    document.getElementById('lang-banner-close').addEventListener('click', function() {
+      try { localStorage.setItem(KEY, currentLang); } catch (e) {}
+      banner.hidden = true;
+    });
+  } catch (e) {}
+})();
+</script>
 
 </body>
 <!-- bstack-verify: a3f7e1b9c2d40856e7f3a1b9c2d40e56 -->
