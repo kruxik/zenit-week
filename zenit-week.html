@@ -3161,6 +3161,62 @@ const _displayVersion = APP_VERSION.startsWith('__') ? 'dev' : APP_VERSION;
   if (_verEl) _verEl.textContent = _displayVersion;
 }
 
+// ─── Quiet refresh: asset version probe (Slice 2 — observability only) ───────
+// Probes the deployed asset's ETag on foreground/focus. Loop guard: the new
+// ETag is persisted to localStorage *before* `_pendingReload` is flagged, so a
+// broken deploy can only reload once. `_pendingReload` is currently observed
+// but not acted upon; Slice 4 will wire it to an actual reload.
+let _pendingReload = false;
+let _newAssetEtag  = null;
+const ASSET_ETAG_KEY = 'zenit-week-asset-etag';
+function _assetProbeUrl() {
+  // Probe whatever document URL actually served the page (works on Vercel
+  // `/app`, plain `/zenit-week.html`, or any rewrite). Strip hash + search.
+  return (location.pathname || '/') + `?v=${Date.now()}`;
+}
+
+function parseAssetVersionHeaders(headers) {
+  const etag         = headers.get('etag');
+  const lastModified = headers.get('last-modified');
+  return { etag, lastModified, token: etag || lastModified || null };
+}
+
+async function checkForAssetUpdate() {
+  let resp;
+  try {
+    resp = await fetch(_assetProbeUrl(), { method: 'HEAD', cache: 'no-store' });
+  } catch (err) {
+    console.debug('[quiet-refresh] probe-failed', err && err.message);
+    return;
+  }
+  if (!resp.ok) {
+    console.debug('[quiet-refresh] probe-non-ok', resp.status);
+    return;
+  }
+  const { token } = parseAssetVersionHeaders(resp.headers);
+  if (!token) {
+    console.debug('[quiet-refresh] probe-no-token');
+    return;
+  }
+  const prev = localStorage.getItem(ASSET_ETAG_KEY);
+  if (prev === null) {
+    localStorage.setItem(ASSET_ETAG_KEY, token);
+    console.debug('[quiet-refresh] baseline-seeded', token);
+    return;
+  }
+  if (prev === token) return;
+  localStorage.setItem(ASSET_ETAG_KEY, token);
+  _newAssetEtag  = token;
+  _pendingReload = true;
+  console.debug('[quiet-refresh] update-detected', { etag: token, prevEtag: prev });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForAssetUpdate();
+});
+window.addEventListener('focus', () => checkForAssetUpdate());
+checkForAssetUpdate();
+
 // ─── OAuth redirect callback capture ──────────────────────────────────────────
 // Detects ?code= / ?error= on app load, captures, then strips URL before app init.
 // Replaces the obsolete popup flow (Safari blocks popups by default).

@@ -560,6 +560,8 @@ export const {
   t,
   // Storage
   fnv1a32,
+  // Quiet Refresh
+  parseAssetVersionHeaders,
   // Google Drive Sync
   attemptSilentRestore,
   authFetch,
