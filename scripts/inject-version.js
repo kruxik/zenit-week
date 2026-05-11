@@ -1,35 +1,77 @@
 #!/usr/bin/env node
 // Build-time version injector — replaces __APP_VERSION__ in zenit-week.html
-// with `git describe --tags --abbrev=0`. Runs on Vercel via `npm run build`.
-// Never executed in the browser. Modifying the HTML in-place is fine on
-// Vercel's ephemeral build container; locally, avoid running unless you intend
-// to commit the resolved version (you shouldn't — the placeholder must stay in
-// source).
+// with the CalVer git tag. Runs on Vercel via `npm run build`. Never
+// executed in the browser. Vercel strips the .git directory from its build
+// container, so the canonical path is the GitHub API; git CLI is used only
+// as a local-dev / non-Vercel-CI convenience.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PLACEHOLDER = '__APP_VERSION__';
-const VERSION_REGEX = /^v\d{4}\.\d{2}\.\d{2}(\.\d+)?$/;
-const FALLBACK_REGEX = /^dev(-[0-9a-f]{7})?$/;
+const PLACEHOLDER     = '__APP_VERSION__';
+const VERSION_REGEX   = /^v\d{4}\.\d{2}\.\d{2}(\.\d+)?$/;
+const FALLBACK_REGEX  = /^dev(-[0-9a-f]{7})?$/;
 
-export function resolveVersion({ runGit = runGitDescribe, env = process.env } = {}) {
-  // 1. Tag-push deploys: Vercel sets VERCEL_GIT_COMMIT_REF to the tag name.
-  //    Most reliable signal — no git CLI dependency.
+export async function resolveVersion(opts = {}) {
+  const env        = opts.env        || process.env;
+  const runGit     = opts.runGit     || runGitDescribe;
+  const fetchTags  = opts.fetchTags  || fetchLatestCalverTagFromGitHub;
+
+  // Diagnostic logging — useful for understanding Vercel build env.
+  console.log(`[inject-version] VERCEL_GIT_COMMIT_REF=${env.VERCEL_GIT_COMMIT_REF || '(unset)'}`);
+  console.log(`[inject-version] VERCEL_GIT_REPO_SLUG=${env.VERCEL_GIT_REPO_SLUG || '(unset)'}`);
+
+  // 1. Tag-push deploys on Vercel: VERCEL_GIT_COMMIT_REF is the tag name.
   const ref = env.VERCEL_GIT_COMMIT_REF;
   if (ref && VERSION_REGEX.test(ref)) return ref;
-  // 2. Branch-push deploys: derive the nearest tag reachable from HEAD via
-  //    `git describe`. May fail on Vercel's shallow clone without tag refs.
+
+  // 2. Local dev or any CI that ships a real .git: derive nearest tag.
   let tag = null;
   try { tag = runGit(); } catch (err) {
     console.warn('[inject-version] git describe failed:', err && err.message);
   }
   if (tag && VERSION_REGEX.test(tag)) return tag;
-  // 3. Fallback to short SHA (still self-consistent, just not a release label).
+
+  // 3. Vercel build (no .git): fetch tags via GitHub API. Only attempted
+  //    when a repo slug is resolvable — keeps tests offline by default.
+  const slug = resolveRepoSlug(env);
+  if (slug) {
+    try {
+      const apiTag = await fetchTags(slug);
+      if (apiTag && VERSION_REGEX.test(apiTag)) return apiTag;
+    } catch (err) {
+      console.warn('[inject-version] GitHub tag fetch failed:', err && err.message);
+    }
+  }
+
+  // 4. SHA fallback — still ships a self-consistent build, just not a release.
   const sha = env.VERCEL_GIT_COMMIT_SHA;
   if (sha && /^[0-9a-f]{7,}$/i.test(sha)) return `dev-${sha.slice(0, 7).toLowerCase()}`;
   return 'dev';
+}
+
+function resolveRepoSlug(env) {
+  if (env.VERCEL_GIT_REPO_SLUG) return env.VERCEL_GIT_REPO_SLUG;
+  if (env.VERCEL_GIT_REPO_OWNER && env.VERCEL_GIT_REPO_NAME) {
+    return `${env.VERCEL_GIT_REPO_OWNER}/${env.VERCEL_GIT_REPO_NAME}`;
+  }
+  // On Vercel without the slug env vars (older runtime?), hardcode the repo.
+  if (env.VERCEL) return 'kruxik/zenit-week';
+  return null;
+}
+
+async function fetchLatestCalverTagFromGitHub(slug) {
+  const url = `https://api.github.com/repos/${slug}/tags?per_page=50`;
+  const resp = await fetch(url, { headers: { 'User-Agent': 'zenit-week-inject-version' } });
+  if (!resp.ok) throw new Error(`GitHub API ${resp.status}`);
+  const tags = await resp.json();
+  // GitHub returns tags in repo order (usually most-recent first by commit
+  // date). For CalVer the alphabetic sort coincides with chronological, so
+  // sorting descending by name is also correct and resilient to ordering
+  // changes.
+  const calvers = tags.map(t => t.name).filter(n => VERSION_REGEX.test(n)).sort().reverse();
+  return calvers[0] || null;
 }
 
 export function validateResolvedVersion(v) {
@@ -45,9 +87,6 @@ export function substitutePlaceholder(html, version) {
 }
 
 function runGitDescribe() {
-  // Vercel ships a shallow clone (depth ~10) without tag refs. Try the
-  // broadest fetch first; degrade gracefully on already-complete clones or
-  // when origin isn't configured for fetch.
   const fetchAttempts = [
     'git fetch --tags --unshallow',
     'git fetch --tags --depth=100',
@@ -56,7 +95,7 @@ function runGitDescribe() {
   for (const cmd of fetchAttempts) {
     try {
       execSync(cmd, { stdio: 'pipe' });
-      break; // first success is enough
+      break;
     } catch (err) {
       console.warn(`[inject-version] '${cmd}' failed:`, (err.stderr || err.message || '').toString().trim().slice(0, 200));
     }
@@ -64,10 +103,10 @@ function runGitDescribe() {
   return execSync('git describe --tags --abbrev=0', { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
 }
 
-export function main() {
+export async function main() {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const htmlPath = resolve(__dirname, '..', 'zenit-week.html');
-  const version = resolveVersion();
+  const version = await resolveVersion();
   if (!validateResolvedVersion(version)) {
     throw new Error(`Resolved version "${version}" failed validation`);
   }

@@ -5,71 +5,133 @@ import {
   substitutePlaceholder,
 } from '../scripts/inject-version.js';
 
+// Default mocks — tests opt in to the real network path explicitly.
+const NO_FETCH = async () => null;
+
 describe('resolveVersion', () => {
-  it('accepts a valid CalVer tag', () => {
-    const v = resolveVersion({ runGit: () => 'v2026.05.10', env: {} });
+  it('accepts a valid CalVer tag', async () => {
+    const v = await resolveVersion({ runGit: () => 'v2026.05.10', env: {}, fetchTags: NO_FETCH });
     expect(v).toBe('v2026.05.10');
   });
 
-  it('prefers VERCEL_GIT_COMMIT_REF when it matches CalVer (tag-push deploy)', () => {
-    const v = resolveVersion({
-      runGit: () => { throw new Error('should not be called'); },
-      env: { VERCEL_GIT_COMMIT_REF: 'v2026.05.11' },
+  it('prefers VERCEL_GIT_COMMIT_REF when it matches CalVer (tag-push deploy)', async () => {
+    const v = await resolveVersion({
+      runGit:    () => { throw new Error('should not be called'); },
+      fetchTags: NO_FETCH,
+      env:       { VERCEL_GIT_COMMIT_REF: 'v2026.05.11' },
     });
     expect(v).toBe('v2026.05.11');
   });
 
-  it('ignores VERCEL_GIT_COMMIT_REF when it is a branch name and falls back to git describe', () => {
-    const v = resolveVersion({
-      runGit: () => 'v2026.05.10',
-      env: { VERCEL_GIT_COMMIT_REF: 'main', VERCEL_GIT_COMMIT_SHA: 'deadbee1234' },
+  it('ignores VERCEL_GIT_COMMIT_REF when it is a branch name and falls back to git describe', async () => {
+    const v = await resolveVersion({
+      runGit:    () => 'v2026.05.10',
+      fetchTags: NO_FETCH,
+      env:       { VERCEL_GIT_COMMIT_REF: 'main', VERCEL_GIT_COMMIT_SHA: 'deadbee1234' },
     });
     expect(v).toBe('v2026.05.10');
   });
 
-  it('accepts a CalVer tag with same-day build suffix', () => {
-    const v = resolveVersion({ runGit: () => 'v2026.05.10.1', env: {} });
+  it('accepts a CalVer tag with same-day build suffix', async () => {
+    const v = await resolveVersion({ runGit: () => 'v2026.05.10.1', env: {}, fetchTags: NO_FETCH });
     expect(v).toBe('v2026.05.10.1');
   });
 
-  it('rejects malformed tag (single-digit month) and falls back to SHA', () => {
-    const v = resolveVersion({
-      runGit: () => 'v2026.5.10',
-      env: { VERCEL_GIT_COMMIT_SHA: 'abc1234def56789' },
+  it('falls back to GitHub API when git CLI fails (Vercel no-git env)', async () => {
+    const v = await resolveVersion({
+      runGit:    () => { throw new Error('not a git repository'); },
+      fetchTags: async (slug) => {
+        expect(slug).toBe('kruxik/zenit-week');
+        return 'v2026.05.12';
+      },
+      env: { VERCEL_GIT_REPO_SLUG: 'kruxik/zenit-week', VERCEL_GIT_COMMIT_SHA: 'abc1234' },
+    });
+    expect(v).toBe('v2026.05.12');
+  });
+
+  it('builds slug from VERCEL_GIT_REPO_OWNER + _NAME when SLUG is unset', async () => {
+    let seenSlug = null;
+    await resolveVersion({
+      runGit:    () => { throw new Error('no git'); },
+      fetchTags: async (slug) => { seenSlug = slug; return 'v2026.05.13'; },
+      env: { VERCEL_GIT_REPO_OWNER: 'foo', VERCEL_GIT_REPO_NAME: 'bar', VERCEL_GIT_COMMIT_SHA: 'abc1234' },
+    });
+    expect(seenSlug).toBe('foo/bar');
+  });
+
+  it('hardcodes slug on Vercel when neither slug env var is set', async () => {
+    let seenSlug = null;
+    await resolveVersion({
+      runGit:    () => { throw new Error('no git'); },
+      fetchTags: async (slug) => { seenSlug = slug; return 'v2026.05.14'; },
+      env: { VERCEL: '1', VERCEL_GIT_COMMIT_SHA: 'abc1234' },
+    });
+    expect(seenSlug).toBe('kruxik/zenit-week');
+  });
+
+  it('skips GitHub API when no slug resolvable (tests / local non-Vercel)', async () => {
+    let calls = 0;
+    const v = await resolveVersion({
+      runGit:    () => { throw new Error('no git'); },
+      fetchTags: async () => { calls++; return 'v2026.05.99'; },
+      env: { VERCEL_GIT_COMMIT_SHA: 'abc1234567' },
+    });
+    expect(calls).toBe(0);
+    expect(v).toBe('dev-abc1234');
+  });
+
+  it('rejects malformed tag (single-digit month) and falls back to SHA', async () => {
+    const v = await resolveVersion({
+      runGit:    () => 'v2026.5.10',
+      fetchTags: NO_FETCH,
+      env:       { VERCEL_GIT_COMMIT_SHA: 'abc1234def56789' },
     });
     expect(v).toBe('dev-abc1234');
   });
 
-  it('rejects unprefixed tag and falls back to SHA', () => {
-    const v = resolveVersion({
-      runGit: () => '2026.05.10',
-      env: { VERCEL_GIT_COMMIT_SHA: '0123456789abcdef' },
+  it('rejects unprefixed tag and falls back to SHA', async () => {
+    const v = await resolveVersion({
+      runGit:    () => '2026.05.10',
+      fetchTags: NO_FETCH,
+      env:       { VERCEL_GIT_COMMIT_SHA: '0123456789abcdef' },
     });
     expect(v).toBe('dev-0123456');
   });
 
-  it('falls back to "dev" when both git and SHA are missing', () => {
-    const v = resolveVersion({
-      runGit: () => { throw new Error('no tags'); },
-      env: {},
+  it('falls back to "dev" when nothing resolves', async () => {
+    const v = await resolveVersion({
+      runGit:    () => { throw new Error('no tags'); },
+      fetchTags: NO_FETCH,
+      env:       {},
     });
     expect(v).toBe('dev');
   });
 
-  it('falls back to SHA when git throws but VERCEL_GIT_COMMIT_SHA is present', () => {
-    const v = resolveVersion({
-      runGit: () => { throw new Error('shallow clone'); },
-      env: { VERCEL_GIT_COMMIT_SHA: 'deadbeefcafe1234' },
+  it('falls back to SHA when git throws but VERCEL_GIT_COMMIT_SHA is present', async () => {
+    const v = await resolveVersion({
+      runGit:    () => { throw new Error('shallow clone'); },
+      fetchTags: NO_FETCH,
+      env:       { VERCEL_GIT_COMMIT_SHA: 'deadbeefcafe1234' },
     });
     expect(v).toBe('dev-deadbee');
   });
 
-  it('lowercases SHA fallback', () => {
-    const v = resolveVersion({
-      runGit: () => '',
-      env: { VERCEL_GIT_COMMIT_SHA: 'ABCDEF1234567890' },
+  it('lowercases SHA fallback', async () => {
+    const v = await resolveVersion({
+      runGit:    () => '',
+      fetchTags: NO_FETCH,
+      env:       { VERCEL_GIT_COMMIT_SHA: 'ABCDEF1234567890' },
     });
     expect(v).toBe('dev-abcdef1');
+  });
+
+  it('falls back to SHA when GitHub API itself fails', async () => {
+    const v = await resolveVersion({
+      runGit:    () => { throw new Error('no git'); },
+      fetchTags: async () => { throw new Error('GitHub 500'); },
+      env:       { VERCEL_GIT_REPO_SLUG: 'kruxik/zenit-week', VERCEL_GIT_COMMIT_SHA: '0123456789' },
+    });
+    expect(v).toBe('dev-0123456');
   });
 });
 
