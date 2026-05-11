@@ -3209,6 +3209,7 @@ async function checkForAssetUpdate() {
   _newAssetEtag  = token;
   _pendingReload = true;
   console.debug('[quiet-refresh] update-detected', { etag: token, prevEtag: prev });
+  tryQuietReload();
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -3274,6 +3275,75 @@ window.__quietRefreshReloadNow = function() {
   console.debug('[quiet-refresh] manual reload-fired', payload);
   location.reload();
 };
+
+// ─── Quiet refresh: quiescence gate + auto-reload (Slice 4) ──────────────────
+// Defers `location.reload()` until the app is idle: no inline edit, no pan,
+// no in-flight atomic op or Drive upload, no open panel/menu/dialog.
+// Wired to mouseup/touchend/keyup, endAtomicOp, visibilitychange, and the
+// asset probe itself — any of these may transition the app into quiescence.
+const QUIESCENCE_PANEL_IDS = [
+  'single-tab-overlay',
+  'app-confirm-overlay',
+  'context-menu',
+  'ctx-reschedule-submenu',
+  'help-panel',
+  'help-overlay',
+  'settings-dropdown',
+  'sync-dropdown',
+  'color-picker-panel',
+  'baseline-panel',
+];
+
+function isAppQuiescent(state) {
+  if (state.hasEditingNode)      return { quiescent: false, reason: 'editing' };
+  if (state.isPanning)           return { quiescent: false, reason: 'panning' };
+  if (state.atomicOpsDepth > 0)  return { quiescent: false, reason: 'atomic-op' };
+  if (state.pendingUploadKey)    return { quiescent: false, reason: 'pending-upload' };
+  if (state.openPanel)           return { quiescent: false, reason: `panel:${state.openPanel}` };
+  return { quiescent: true, reason: null };
+}
+
+function _collectQuiescenceState() {
+  let openPanel = null;
+  for (const id of QUIESCENCE_PANEL_IDS) {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('visible')) { openPanel = id; break; }
+  }
+  return {
+    hasEditingNode:   weekData && weekData.nodes ? weekData.nodes.some(n => n._editing) : false,
+    isPanning:        isPanning,
+    atomicOpsDepth:   _atomicOpsDepth,
+    pendingUploadKey: _pendingUploadKey,
+    openPanel,
+  };
+}
+
+let _lastDeferReason = null;
+function tryQuietReload() {
+  if (!_pendingReload) return;
+  const result = isAppQuiescent(_collectQuiescenceState());
+  if (!result.quiescent) {
+    if (result.reason !== _lastDeferReason) {
+      console.debug('[quiet-refresh] reload-deferred', { reason: result.reason });
+      _lastDeferReason = result.reason;
+    }
+    return;
+  }
+  _lastDeferReason = null;
+  const payload = buildRestorePayload({
+    panX, panY, zoom,
+    currentView, currentWeekKey,
+    hoveredNodeId,
+    now: Date.now(),
+  });
+  localStorage.setItem(RESTORE_KEY, JSON.stringify(payload));
+  console.debug('[quiet-refresh] reload-fired');
+  location.reload();
+}
+
+document.addEventListener('mouseup',   tryQuietReload);
+document.addEventListener('touchend',  tryQuietReload);
+document.addEventListener('keyup',     tryQuietReload);
 
 // ─── OAuth redirect callback capture ──────────────────────────────────────────
 // Detects ?code= / ?error= on app load, captures, then strips URL before app init.
@@ -4500,7 +4570,10 @@ function beginAtomicOp() {
 
 function endAtomicOp() {
   if (_atomicOpsDepth > 0) _atomicOpsDepth--;
-  if (_atomicOpsDepth === 0) _flushPendingSync();
+  if (_atomicOpsDepth === 0) {
+    _flushPendingSync();
+    tryQuietReload();
+  }
 }
 
 function isAtomicOpActive() {

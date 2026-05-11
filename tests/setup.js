@@ -564,6 +564,7 @@ export const {
   parseAssetVersionHeaders,
   buildRestorePayload,
   validateRestorePayload,
+  isAppQuiescent,
   // Google Drive Sync
   attemptSilentRestore,
   authFetch,
