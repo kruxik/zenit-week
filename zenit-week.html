@@ -3172,6 +3172,9 @@ const ASSET_ETAG_KEY = 'zenit-week-asset-etag';
 function _assetProbeUrl() {
   // Probe whatever document URL actually served the page (works on Vercel
   // `/app`, plain `/zenit-week.html`, or any rewrite). Strip hash + search.
+  // `?v=<timestamp>` defeats CDN HEAD caching deterministically; using the
+  // last-known ETag instead would tie URLs to versions but offers no
+  // measurable benefit at this scale.
   return (location.pathname || '/') + `?v=${Date.now()}`;
 }
 

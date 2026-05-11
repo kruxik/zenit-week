@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added Quiet Refresh: app silently detects new deploys via ETag and reloads at the next quiet moment, preserving pan/zoom/view/week so the update is visually indistinguishable from no-op.
+- Added build-time version injection: the CalVer git tag (`v2026.05.10` or `v2026.05.10.N`) is substituted into the HTML at deploy and shown in the Help panel footer.
 - Added `LICENSE` (MIT).
 - Added `README.md` with features and hotkeys.
 - Optimized performance by removing redundant `render()` on typing.
