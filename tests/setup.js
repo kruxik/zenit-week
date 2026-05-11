@@ -562,6 +562,8 @@ export const {
   fnv1a32,
   // Quiet Refresh
   parseAssetVersionHeaders,
+  buildRestorePayload,
+  validateRestorePayload,
   // Google Drive Sync
   attemptSilentRestore,
   authFetch,

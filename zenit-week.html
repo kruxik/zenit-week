@@ -3217,6 +3217,64 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', () => checkForAssetUpdate());
 checkForAssetUpdate();
 
+// ─── Quiet refresh: restore payload helpers (Slice 3) ────────────────────────
+// Volatile view-state survives location.reload() via this serializable payload.
+// Slice 3 wires only the manual debug trigger (window.__quietRefreshReloadNow);
+// Slice 4 will connect it to auto-reload.
+const RESTORE_KEY        = 'zenit-week-pending-restore';
+const RESTORE_TTL_MS     = 5 * 60 * 1000;
+const RESTORE_SCHEMA_V   = 1;
+
+function buildRestorePayload(state) {
+  return {
+    v:              RESTORE_SCHEMA_V,
+    ts:             state.now,
+    panX:           state.panX,
+    panY:           state.panY,
+    zoom:           state.zoom,
+    currentView:    state.currentView,
+    currentWeekKey: state.currentWeekKey,
+    hoveredNodeId:  state.hoveredNodeId || null,
+  };
+}
+
+function validateRestorePayload(payload, ctx) {
+  if (!payload || typeof payload !== 'object') return null;
+  if (payload.v !== RESTORE_SCHEMA_V) return null;
+  if (typeof payload.ts !== 'number' || !isFinite(payload.ts)) return null;
+  if (ctx.now - payload.ts > RESTORE_TTL_MS) return null;
+  if (typeof payload.currentWeekKey !== 'string' || payload.currentWeekKey !== ctx.currentWeekKey) return null;
+  if (typeof payload.panX !== 'number' || !isFinite(payload.panX)) return null;
+  if (typeof payload.panY !== 'number' || !isFinite(payload.panY)) return null;
+  if (typeof payload.zoom !== 'number' || !isFinite(payload.zoom) || payload.zoom <= 0) return null;
+  if (typeof payload.currentView !== 'string') return null;
+  if (payload.hoveredNodeId !== null && typeof payload.hoveredNodeId !== 'string') return null;
+  return {
+    v:              RESTORE_SCHEMA_V,
+    ts:             payload.ts,
+    panX:           payload.panX,
+    panY:           payload.panY,
+    zoom:           payload.zoom,
+    currentView:    payload.currentView,
+    currentWeekKey: payload.currentWeekKey,
+    hoveredNodeId:  payload.hoveredNodeId || null,
+  };
+}
+
+// Debug surface — intentionally retained in production for diagnosability.
+// Invoke from DevTools to verify the round-trip survives a real reload.
+window.__quietRefreshReloadNow = function() {
+  const payload = buildRestorePayload({
+    panX, panY, zoom,
+    currentView, currentWeekKey,
+    hoveredNodeId,
+    now: Date.now(),
+  });
+  localStorage.setItem(RESTORE_KEY, JSON.stringify(payload));
+  console.debug('[quiet-refresh] manual reload-fired', payload);
+  location.reload();
+};
+
 // ─── OAuth redirect callback capture ──────────────────────────────────────────
 // Detects ?code= / ?error= on app load, captures, then strips URL before app init.
 // Replaces the obsolete popup flow (Safari blocks popups by default).
@@ -10984,7 +11042,32 @@ window.addEventListener('load', async () => {
   const nextWeekData = await loadWeekIDB(nextWeekKey);
   _nextWeekRawCache = nextWeekData ? JSON.stringify(nextWeekData) : null;
 
+  // Quiet-refresh restore: apply persisted view-state before first paint.
+  // Returns the cleaned payload so hoveredNodeId can be applied once weekData
+  // is loaded (findNode is meaningless before that).
+  const _quietRestore = (() => {
+    let raw = null;
+    try { raw = localStorage.getItem(RESTORE_KEY); } catch (_) { return null; }
+    if (!raw) return null;
+    localStorage.removeItem(RESTORE_KEY); // always consume — even on invalid
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (_) { return null; }
+    return validateRestorePayload(parsed, { currentWeekKey: initialWeek, now: Date.now() });
+  })();
+  if (_quietRestore) {
+    panX        = _quietRestore.panX;
+    panY        = _quietRestore.panY;
+    zoom        = _quietRestore.zoom;
+    currentView = _quietRestore.currentView;
+    console.debug('[quiet-refresh] restore-applied', _quietRestore);
+  }
+
   await loadAndRender(initialWeek);
+
+  if (_quietRestore && _quietRestore.hoveredNodeId && findNode(_quietRestore.hoveredNodeId)) {
+    hoveredNodeId = _quietRestore.hoveredNodeId;
+  }
+
   applyTranslations();
   updateColorDots();
 
@@ -11071,8 +11154,11 @@ window.addEventListener('load', async () => {
   // Always fit the mindmap — even when booting into Agenda — so the canvas
   // (visible blurred behind the agenda overlay on desktop) and the zoom slider
   // reflect the true fit-zoom from the first paint.
+  // Exception: quiet-refresh restore wins; skip the fit and just paint the
+  // restored pan/zoom via applyTransform.
   requestAnimationFrame(() => {
-    fitMindmapView();
+    if (_quietRestore) applyTransform();
+    else               fitMindmapView();
   });
 
   // Custom tooltip logic
