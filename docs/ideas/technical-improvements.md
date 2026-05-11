@@ -15,32 +15,12 @@ This document tracks identified technical improvements for the Zenit Week applic
 - Add a string-field sanitization pass inside `validateAndRepair` that truncates labels beyond a max length and strips/encodes HTML-special characters (`<`, `>`, `"`, `&`).
 - Alternatively, fix all `innerHTML` call-sites (see §1) so raw label strings are never treated as HTML — this is the higher-leverage fix.
 
-## 1b. Security: Content Security Policy (Medium)
-**Issue:** No `Content-Security-Policy` meta tag exists. The app loads two external scripts from Google (`accounts.google.com`, `apis.google.com`) without any policy restricting what else can load.
-**Risk:** If XSS is ever exploited, the absence of CSP means scripts can freely exfiltrate data to any origin.
-**Recommendations:**
-- Add a `<meta http-equiv="Content-Security-Policy">` tag to `<head>` allowing at minimum:
-  ```
-  default-src 'self';
-  script-src 'self' https://accounts.google.com https://apis.google.com;
-  connect-src 'self' https://www.googleapis.com https://accounts.google.com;
-  img-src 'self' data: https:;
-  style-src 'self' 'unsafe-inline';
-  ```
-- Note: inline `<script>` blocks require either `'unsafe-inline'` or per-block nonces; evaluate whether the favicon inline script can be moved to an external file or replaced with a hash.
-
 ## 1c. Security: Drive Colors File Theme Validation (Low)
 **Issue:** When syncing the colors/settings file from Drive, `remoteData.theme` is written directly to `localStorage` and applied to `document.documentElement.dataset.theme` (line ~3710) without checking that the value is `'light'` or `'dark'`.
 **Risk:** An arbitrary string in `dataset.theme` could match unintended CSS attribute selectors; combined with `'unsafe-inline'` styles it widens any XSS surface.
 **Recommendations:**
 - Validate before applying: `if (['light', 'dark'].includes(remoteData.theme))` — reject anything else.
 - Same pattern for `remoteData.lang`: validate it is a known locale key before setting `currentLang`.
-
-## 1d. Security: Label Length Cap (Low)
-**Issue:** Node labels are only `.trim()`'d before saving (line ~4892). No maximum length is enforced.
-**Risk:** An unbounded label is an unbounded `localStorage` write. A crafted import or Drive file with very large labels could push storage toward the browser's ~5–10 MB per-origin limit, causing silent data loss on the next save.
-**Recommendations:**
-- Enforce a reasonable cap (e.g. 200 characters) in `renameNode` and in `validateAndRepair`'s string-sanitization pass (see §1a).
 
 ## 2. Performance: Rendering & Layout
 **Issue:** `render()` performs a full SVG rebuild on every change, and `computeLayout()` runs frequently.
