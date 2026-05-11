@@ -1,6 +1,7 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm install --omit=dev",
+  "outputDirectory": ".",
   "rewrites": [
     { "source": "/app",      "destination": "/zenit-week.html" },
     { "source": "/app/(.*)", "destination": "/zenit-week.html" },

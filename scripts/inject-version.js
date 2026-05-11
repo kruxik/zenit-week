@@ -36,7 +36,12 @@ export function substitutePlaceholder(html, version) {
 }
 
 function runGitDescribe() {
-  try { execSync('git fetch --tags --depth=1', { stdio: 'pipe' }); } catch (_) { /* shallow ok */ }
+  // Vercel checks out a shallow clone (depth ~10) without tags. We need both
+  // the tag refs and enough history for the tag's commit to be reachable.
+  // Try unshallow first; on already-complete clones it errors harmlessly.
+  try { execSync('git fetch --tags --unshallow', { stdio: 'pipe' }); } catch (_) {
+    try { execSync('git fetch --tags', { stdio: 'pipe' }); } catch (_) { /* fall through */ }
+  }
   return execSync('git describe --tags --abbrev=0', { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
 }
 
