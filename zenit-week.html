@@ -3135,8 +3135,8 @@
       </div>
 
       <div class="help-section">
-        <div class="help-section-title" data-i18n="help.dayIndicatorsTitle">Day indicators (daily list)</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.dayIndicatorsDesc">Add (day) to any activity name to schedule it for that weekday in the daily list.</div>
+        <div class="help-section-title" data-i18n="help.dayIndicatorsTitle">Magic day indicators</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.dayIndicatorsDescA">Add </span><strong data-i18n="help.dayIndicatorsDescKey">(day)</strong><span data-i18n="help.dayIndicatorsDescB"> to any activity name to schedule it for that weekday in the daily list.</span></div>
         <div id="help-days-cs" class="help-row" style="margin-top: 8px;">
           <span style="font-size: 13px; color: var(--text-secondary);">
             <kbd>po</kbd> <kbd>út</kbd> <kbd>st</kbd> <kbd>čt</kbd> <kbd>pá</kbd> <kbd>so</kbd> <kbd>ne</kbd>
@@ -3147,9 +3147,8 @@
             <kbd>mo</kbd> <kbd>tu</kbd> <kbd>we</kbd> <kbd>th</kbd> <kbd>fr</kbd> <kbd>sa</kbd> <kbd>su</kbd>
           </span>
         </div>
-        <div class="help-row" style="margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.multipleDays">Multiple days: (mo, we, fr) — spaces or commas both work.</div>
-        <div id="help-daily-cs" class="help-row" style="margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">Každý den: <kbd>denně</kbd> — také přidá počítadlo s max 7.</div>
-        <div id="help-daily-en" class="help-row" style="margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">Every day: <kbd>daily</kbd> — also adds a counter with max 7.</div>
+        <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.multipleDaysA">Multiple days: </span><strong data-i18n="help.multipleDaysKey">(mo, we, fr)</strong><span data-i18n="help.multipleDaysB"> — spaces or commas both work.</span></div>
+        <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.everyDayA">Every day: type </span><strong data-i18n="help.everyDayKey">(daily)</strong><span data-i18n="help.everyDayB"> and it expands to all 7 days.</span></div>
       </div>
 
       <div class="help-section">
@@ -5444,11 +5443,18 @@ const TRANSLATIONS = {
     'help.undo':                  'Undo',
     'help.redo':                  'Redo',
     'help.navFitDesc':            'Double-click the background to fit everything to the view.',
-    'help.dayIndicatorsTitle':    'Day indicators (daily list)',
-    'help.dayIndicatorsDesc':     'Add (day) to any activity name to schedule it for that weekday in the daily list.',
+    'help.dayIndicatorsTitle':    'Magic day indicators',
+    'help.dayIndicatorsDescA':    'Add ',
+    'help.dayIndicatorsDescKey':  '(day)',
+    'help.dayIndicatorsDescB':    ' to any activity name to schedule it for that weekday in the daily list.',
     'help.czech':                 'Czech',
     'help.english':               'English',
-    'help.multipleDays':          'Multiple days: (mo, we, fr) — spaces or commas both work.',
+    'help.multipleDaysA':         'Multiple days: ',
+    'help.multipleDaysKey':       '(mo, we, fr)',
+    'help.multipleDaysB':         ' — spaces or commas both work.',
+    'help.everyDayA':             'Every day: type ',
+    'help.everyDayKey':           '(daily)',
+    'help.everyDayB':             ' and it expands to all 7 days.',
     'help.countersTitle':         'Counters',
     'help.countersDesc':          'Add Nx to an activity name (e.g. Pushups 10x) to create a sub-counter.',
     'help.rebindTitle':           'Activity rebinding & organizing',
@@ -5595,11 +5601,18 @@ const TRANSLATIONS = {
     'help.undo':                  'Zpět',
     'help.redo':                  'Znovu',
     'help.navFitDesc':            'Dvojklikem na pozadí vyplníte vše do pohledu.',
-    'help.dayIndicatorsTitle':    'Denní indikátory (seznam úkolů)',
-    'help.dayIndicatorsDesc':     'Přidejte (den) k názvu aktivity pro zařazení do seznamu úkolů daného dne.',
+    'help.dayIndicatorsTitle':    'Magické denní indikátory',
+    'help.dayIndicatorsDescA':    'Přidejte ',
+    'help.dayIndicatorsDescKey':  '(den)',
+    'help.dayIndicatorsDescB':    ' k názvu aktivity pro zařazení do seznamu úkolů daného dne.',
     'help.czech':                 'Česky',
     'help.english':               'Anglicky',
-    'help.multipleDays':          'Více dní: (po, st, pá) — mezery i čárky fungují.',
+    'help.multipleDaysA':         'Více dní: ',
+    'help.multipleDaysKey':       '(po, st, pá)',
+    'help.multipleDaysB':         ' — mezery i čárky fungují.',
+    'help.everyDayA':             'Každý den: napište ',
+    'help.everyDayKey':           '(denně)',
+    'help.everyDayB':             ' a rozšíří se na všech 7 dnů.',
     'help.countersTitle':         'Počítadla',
     'help.countersDesc':          'Přidejte Nx k názvu aktivity (např. Kliky 10x) pro vytvoření počítadla.',
     'help.rebindTitle':           'Přesouvání aktivit',
@@ -5640,10 +5653,6 @@ function applyTranslations() {
   const daysEn = document.getElementById('help-days-en');
   if (daysCs) daysCs.style.display = currentLang === 'cs' ? '' : 'none';
   if (daysEn) daysEn.style.display = currentLang === 'en' ? '' : 'none';
-  const dailyCs = document.getElementById('help-daily-cs');
-  const dailyEn = document.getElementById('help-daily-en');
-  if (dailyCs) dailyCs.style.display = currentLang === 'cs' ? '' : 'none';
-  if (dailyEn) dailyEn.style.display = currentLang === 'en' ? '' : 'none';
 }
 
 function setLanguage(lang) {
