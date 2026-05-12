@@ -3889,6 +3889,9 @@ const MIN_HORIZONTAL_GAP = 200; // Level 2 gap (branch → direct children); Lev
 const DY = 44;  // Vertical spacing between siblings
 const BRANCH_GAP = 300; // Vertical gap between main branches
 
+// Hard cap on N in "Nx" magic counters — anything above clamps silently.
+const MAX_TICK_COUNT = 100;
+
 const NODE_STYLE = {
   center:   { fontSize: 26, padX: 38, padY: 24, minW: 240, minH: 80, rx: 20,  avgCharW: 0.55 },
   branch:   { fontSize: 22, padX: 25, padY: 19, minW: 160, minH: 64, rx: 16,  avgCharW: 0.55 },
@@ -7565,10 +7568,11 @@ function applyMagicLabel(nodeId) {
 
   // 0 or 1 day token, no existing day-children: Nx tick-children logic.
   // Single-day annotation (size === 1) disables Nx expansion but otherwise
-  // behaves like the no-day branch.
+  // behaves like the no-day branch. N is capped at MAX_TICK_COUNT so a
+  // careless "Pushups 9999x" doesn't generate thousands of leaves.
   const nxMatch = label.match(/(\d+)x/);
   const nxVal = nxMatch ? parseInt(nxMatch[1], 10) : 0;
-  const tickCount = (nxVal >= 2 && parsedDays.size === 0) ? nxVal : 0;
+  const tickCount = (nxVal >= 2 && parsedDays.size === 0) ? Math.min(nxVal, MAX_TICK_COUNT) : 0;
 
   if (tickCount > 0) {
     // Tick-children hold the count — strip "Nx" from the stored label.

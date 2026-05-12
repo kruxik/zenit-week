@@ -75,6 +75,19 @@ describe('applyMagicLabel — tick-children creation', () => {
     expect(tickKids(id)).toHaveLength(0);
   });
 
+  test('N is capped at 100 — anything higher silently clamps', () => {
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Pushups 250x', true);
+    expect(tickKids(id)).toHaveLength(100);
+    expect(findNode(id).label).toBe('Pushups');
+  });
+
+  test('100x creates exactly 100 ticks (boundary)', () => {
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Pushups 100x', true);
+    expect(tickKids(id)).toHaveLength(100);
+  });
+
   test('tick-children inherit parent priority and reusable', () => {
     const b = mkBranch('work', ['a1']);
     const a = mkActivity('a1', 'work', 'work', {
