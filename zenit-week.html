@@ -10037,15 +10037,31 @@ function buildAgendaItem(node, label, opts = {}) {
     const pill = document.createElement('div');
     pill.className = 'daily-log-badge tick';
     pill.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
-    const pillVal = tickRecord ? tickRecord.position : (cc ? cc.val : tickInfo.done);
-    const pillMax = tickRecord ? tickRecord.total : (cc ? cc.max : tickInfo.total);
+    let pillVal, pillMax;
+    if (tickRecord) {
+      pillVal = tickRecord.position;
+      pillMax = tickRecord.total;
+    } else if (!inDoneSection && cc) {
+      // Pending row: preview the tick the Done button will produce (val+1),
+      // not the current val.
+      pillVal = Math.min((cc.val || 0) + 1, cc.max);
+      pillMax = cc.max;
+    } else if (!inDoneSection && tickInfo) {
+      // Pending row: show the label of the next undone tick.
+      const nextTick = tickInfo.ticks.find(t => !t.done);
+      pillVal = nextTick ? nextTick.label : tickInfo.total;
+      pillMax = tickInfo.total;
+    } else {
+      pillVal = cc ? cc.val : tickInfo.done;
+      pillMax = cc ? cc.max : tickInfo.total;
+    }
     pill.innerHTML = `${iconSvg('circle-half-2')} ${pillVal} / ${pillMax}`;
     item.appendChild(pill);
   }
 
   // Action button. In the Done section, partial-progress rows (counter/tick
   // parents ticked today but not yet at max) also show Undone so the user
-  // can revert just-completed steps without seeing two "+1" buttons.
+  // can revert just-completed steps without seeing a second Done button.
   const showUndone = node.done || (inDoneSection && (cc || tickInfo));
   const btn = document.createElement('button');
   btn.className = 'agenda-action-btn';
@@ -10065,10 +10081,10 @@ function buildAgendaItem(node, label, opts = {}) {
       renderAgenda();
     });
   } else if (cc) {
-    btn.textContent = '+1';
+    btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
     btn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
   } else if (tickInfo) {
-    btn.textContent = '+1';
+    btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
     btn.addEventListener('click', () => {
       const next = tickInfo.ticks.find(t => !t.done);
       if (next) setStatus(next.id, 'done');
