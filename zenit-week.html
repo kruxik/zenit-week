@@ -6473,8 +6473,8 @@ function getNodeVisuals(nodeId) {
     sw *= scale;
   }
 
-  // Day-child circles: rx = diameter/2 (height returned by getNodeSize)
-  if (node.dayChild) {
+  // Day-child / tick-child circles: rx = diameter/2 (height returned by getNodeSize)
+  if (node.dayChild || node.tickChild) {
     const { h } = getNodeSize(nodeId);
     rx = h / 2;
   }
