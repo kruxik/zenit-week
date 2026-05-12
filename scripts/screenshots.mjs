@@ -1,5 +1,5 @@
 // Screenshot generator for Zenit Week.
-// Loads the canonical week from assets/zenit-week-2026-05-11.json (with light
+// Loads the canonical week from assets/zenit-week-2026-05-12.json (with light
 // typo polish), seeds IndexedDB with it, then captures PNGs at desktop and
 // mobile viewports in both views (mindmap + agenda) and both themes (light + dark).
 // Each PNG is also wrapped in a vector laptop / phone SVG frame.
