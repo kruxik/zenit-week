@@ -6370,6 +6370,27 @@ async function moveNodeToNextWeek(nodeId) {
     pruneTarget = findNode(pruneParentId);
   }
 
+  // 7. If a tick-child was moved, renumber surviving ticks on both sides so
+  //    indices stay contiguous (1..N) in each week.
+  if (node.tickChild) {
+    if (findNode(originalParentId)) renumberTickChildren(originalParentId);
+    const nextParent = nextById.get(nodeParentIdInNext);
+    if (nextParent) {
+      const nextTicks = (nextParent.children || [])
+        .map(cid => nextById.get(cid))
+        .filter(n => n?.tickChild)
+        .sort((a, b) => (a.tickIndex || 0) - (b.tickIndex || 0));
+      nextTicks.forEach((t, i) => {
+        const newIdx = i + 1;
+        if (t.tickIndex !== newIdx) {
+          t.tickIndex = newIdx;
+          t.label = String(newIdx);
+          t._ts = Date.now();
+        }
+      });
+    }
+  }
+
   await saveWeek(nextKey, nextData);
   await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
@@ -6595,6 +6616,8 @@ function deleteNode(id) {
   if (node.type === 'branch') { deleteBranch(id); return; }
 
   takeSnapshot();
+  const wasTick = node.tickChild === true;
+  const origParentId = node.parent;
   const toRemove = new Set([id, ...getDescendantIds(id)]);
   tombstoneNodes([...toRemove]);
 
@@ -6615,6 +6638,7 @@ function deleteNode(id) {
 
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
+  if (wasTick && origParentId) renumberTickChildren(origParentId);
   saveWeek(currentWeekKey, weekData);
   renderIfVisible();
   applyAutoLayout();
@@ -7711,6 +7735,27 @@ function sortTickChildren(node) {
     const kb = !b?.tickChild ? -1 : (b.tickIndex ?? 999);
     return ka - kb;
   });
+}
+
+// Re-assigns 1..N tickIndex (and matching label) to the surviving tick-children
+// of a parent activity. Call after a tick is removed (delete, move-next-week)
+// so the displayed sequence stays contiguous.
+function renumberTickChildren(parentId) {
+  const parent = findNode(parentId);
+  if (!parent) return;
+  const ticks = (parent.children || [])
+    .map(findNode)
+    .filter(n => n?.tickChild)
+    .sort((a, b) => (a.tickIndex || 0) - (b.tickIndex || 0));
+  ticks.forEach((t, i) => {
+    const newIdx = i + 1;
+    if (t.tickIndex !== newIdx) {
+      t.tickIndex = newIdx;
+      t.label = String(newIdx);
+      touchNode(t.id);
+    }
+  });
+  sortTickChildren(parent);
 }
 
 // ─── Agenda helpers ───────────────────────────────────────────────────────────
