@@ -127,14 +127,27 @@ describe('applyMagicLabel — tick-children grow / shrink', () => {
     expect(ticks.filter(t => t.tickIndex !== 2).every(t => !t.done)).toBe(true);
   });
 
-  test('removing Nx from label drops all tick-children', () => {
+  test('renaming parent without Nx preserves tick-children', () => {
+    // "Clean 3x" → "Clean" + 3 ticks. Then rename to "Clean house" — ticks stay.
     const id = setupWithActivity('');
-    triggerCommitEdit(id, 'Pushups 3x', true);
-    expect(tickKids(id)).toHaveLength(3);
+    triggerCommitEdit(id, 'Clean 3x', true);
+    const initialTickIds = tickKids(id).map(t => t.id);
+    expect(initialTickIds).toHaveLength(3);
 
-    triggerCommitEdit(id, 'Pushups');
-    expect(tickKids(id)).toHaveLength(0);
-    expect(findNode(id).label).toBe('Pushups');
+    triggerCommitEdit(id, 'Clean house');
+    expect(findNode(id).label).toBe('Clean house');
+    const afterTickIds = tickKids(id).map(t => t.id);
+    expect(afterTickIds).toEqual(initialTickIds); // exact same nodes
+  });
+
+  test('rename preserves done-state of individual ticks', () => {
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Clean 3x', true);
+    const tick2 = tickKids(id).find(t => t.tickIndex === 2);
+    setStatus(tick2.id, 'done');
+
+    triggerCommitEdit(id, 'Clean house');
+    expect(tickKids(id).find(t => t.tickIndex === 2).done).toBe(true);
   });
 });
 

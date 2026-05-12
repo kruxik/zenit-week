@@ -7595,9 +7595,26 @@ function applyMagicLabel(nodeId) {
     return;
   }
 
-  // S1: no Nx (or single-day blocks Nx) — drop any stale counter / tick-children
-  const hadNxKids = _purgeNxChildren(node);
-  if (hadNxKids) {
+  // S1: no Nx in label, no existing day-children.
+  // Decide fate of any Nx-managed kids:
+  //   • Tick-children survive a *pure rename* (no day token gained) —
+  //     mirrors day-children semantics: once managed leaves exist, plain
+  //     label edits leave them alone. User reaches them via Nx re-edit
+  //     ("Clean 3x" → "Clean 5x") or via context-menu actions.
+  //   • A single-day token added to a tick-children parent drops ticks —
+  //     "day wins" rule (consistent with the multi-day branch above).
+  //   • Legacy counters drop on any non-Nx label edit (pre-existing
+  //     behaviour preserved for option-(b) coexistence).
+  const hasTickChildren = node.children.map(findNode).some(n => n?.tickChild);
+  const dayTokenAdded = parsedDays.size > 0;
+
+  let droppedSomething = false;
+  if (hasTickChildren && dayTokenAdded) {
+    droppedSomething = _purgeNxChildren(node);
+  } else if (!hasTickChildren) {
+    droppedSomething = _removeLegacyCounter(node);
+  }
+  if (droppedSomething) {
     if (node.done) {
       node.done = false;
       delete node.doneAt;
