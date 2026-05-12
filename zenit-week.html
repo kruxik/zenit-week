@@ -6772,23 +6772,25 @@ function computeLayout() {
       const isActiveEdit = editState && editState.nodeId === cid;
       return child && (!child._editing || isActiveEdit);
     });
-    if (activeChildren.length < 3) return nodeZigZagMetrics[nodeId] = null;
-    
-    const dayChildCount = activeChildren.filter(cid => findNode(cid)?.dayChild).length;
-    if (dayChildCount < 3) return nodeZigZagMetrics[nodeId] = null;
-    
+
+    // Zigzag layout only applies to day-children (Mon..Sun leaves). Non-day
+    // siblings (e.g. added via Tab) get standard column layout — they must
+    // not occupy slots in the two-column day grid.
+    const dayKids = activeChildren.filter(cid => findNode(cid)?.dayChild);
+    if (dayKids.length < 3) return nodeZigZagMetrics[nodeId] = null;
+
     let maxW1 = 0;
     let maxW2 = 0;
     let maxH = 0;
-    activeChildren.forEach((cid, i) => {
+    dayKids.forEach((cid, i) => {
       const { w, h } = getNodeSize(cid);
       if (i % 2 === 0) maxW1 = Math.max(maxW1, w);
       else maxW2 = Math.max(maxW2, w);
       maxH = Math.max(maxH, h);
     });
 
-    const maxChildScale = activeChildren.reduce((m, cid) => Math.max(m, getPriorityScale(cid)), 1);
-    const standardH = maxH + VERTICAL_GAP * maxChildScale; // Tallest child + gap (scaled by highest-priority child)
+    const maxChildScale = dayKids.reduce((m, cid) => Math.max(m, getPriorityScale(cid)), 1);
+    const standardH = maxH + VERTICAL_GAP * maxChildScale; // Tallest day-child + gap (scaled by highest-priority day-child)
     const vStep = standardH / 2;
     const metrics = {
       maxW1,
@@ -6796,7 +6798,7 @@ function computeLayout() {
       maxH,
       staggerX: (maxW1 + maxW2) / 2 + VERTICAL_GAP,
       vStep,
-      totalH: standardH + (activeChildren.length - 1) * vStep
+      totalH: standardH + (dayKids.length - 1) * vStep
     };
     return nodeZigZagMetrics[nodeId] = metrics;
   }
@@ -6837,7 +6839,11 @@ function computeLayout() {
 
     if (zig) {
       activeChildren.forEach(calcHeight);
-      h = zig.totalH;
+      // Regular (non-day) siblings stack above the zigzag block in a standard column.
+      const regularsH = activeChildren.reduce((acc, cid) => {
+        return findNode(cid)?.dayChild ? acc : acc + heights[cid];
+      }, 0);
+      h = regularsH + zig.totalH;
     } else {
       activeChildren.forEach((cid, i) => {
         h += calcHeight(cid);
@@ -6910,38 +6916,67 @@ function computeLayout() {
     if (activeChildren.length === 0) return;
 
     const zig = getZigZagMetrics(nodeId);
+    const dir = side === 'left' ? -1 : 1;
+
     let childrenH = 0;
     if (zig) {
-      childrenH = zig.totalH;
+      const regularsH = activeChildren.reduce((acc, cid) => {
+        return findNode(cid)?.dayChild ? acc : acc + heights[cid];
+      }, 0);
+      childrenH = regularsH + zig.totalH;
     } else {
       childrenH = activeChildren.reduce((acc, cid) => acc + heights[cid], 0);
     }
 
     let currentY = parentY - childrenH / 2;
 
+    if (zig) {
+      // Standard column for non-day siblings (placed first/top).
+      activeChildren.filter(cid => !findNode(cid)?.dayChild).forEach(cid => {
+        const child = findNode(cid);
+        const childH = heights[cid];
+        const { w, h } = getNodeSize(cid);
+        const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
+        const x = parentX + dir * (parentW / 2 + childGap + w / 2);
+        const y = currentY + childH / 2;
+        currentY += childH;
+        const finalX = x + (child.offX || 0);
+        const finalY = y + (child.offY || 0);
+        positions[cid] = { x: finalX, y: finalY, w, h, side };
+        layoutChildren(cid, finalX, finalY, side, w, depth + 1);
+      });
+      // Zigzag for day-children. Index `di` counts only day-children so
+      // i % 2 never picks up a non-day sibling.
+      activeChildren.filter(cid => findNode(cid)?.dayChild).forEach((cid, di) => {
+        const child = findNode(cid);
+        const { w, h } = getNodeSize(cid);
+        const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
+        const isStaggered = di % 2 !== 0;
+        const groupBaseX = parentX + dir * (parentW / 2 + childGap);
+        const x = groupBaseX + dir * (zig.maxW1 / 2 + (isStaggered ? zig.staggerX : 0));
+        const y = currentY + zig.maxH / 2;
+        currentY += zig.vStep;
+        const finalX = x + (child.offX || 0);
+        const finalY = y + (child.offY || 0);
+        positions[cid] = { x: finalX, y: finalY, w, h, side };
+        layoutChildren(cid, finalX, finalY, side, w, depth + 1);
+      });
+      return;
+    }
+
     activeChildren.forEach((cid, i) => {
       const childH = heights[cid];
       const { w, h } = getNodeSize(cid);
-      const dir = side === 'left' ? -1 : 1;
       const child = findNode(cid);
 
       const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
-      
-      let x, y;
-      if (zig) {
-        const isStaggered = i % 2 !== 0;
-        const groupBaseX = parentX + dir * (parentW / 2 + childGap);
-        x = groupBaseX + dir * (zig.maxW1 / 2 + (isStaggered ? zig.staggerX : 0));
-        y = currentY + zig.maxH / 2; // Center within row using actual max child height
-        currentY += zig.vStep;
-      } else {
-        x = parentX + dir * (parentW / 2 + childGap + w / 2);
-        y = currentY + childH / 2;
-        currentY += childH;
-        if (depth === 0 && i < activeChildren.length - 1) {
-          const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(activeChildren[i + 1]));
-          currentY += VERTICAL_GAP * 2 * neighborScale;
-        }
+
+      const x = parentX + dir * (parentW / 2 + childGap + w / 2);
+      const y = currentY + childH / 2;
+      currentY += childH;
+      if (depth === 0 && i < activeChildren.length - 1) {
+        const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(activeChildren[i + 1]));
+        currentY += VERTICAL_GAP * 2 * neighborScale;
       }
 
       const finalX = x + (child.offX || 0);
