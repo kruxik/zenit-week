@@ -5268,6 +5268,13 @@ const activePointers = new Map(); // pointerId → {x, y} — for pinch-to-zoom
 let pinchLastDist = null;
 
 let contextTarget = null;  // node id
+// Agenda tick-parent mode: when the right-clicked row aggregates tick-children
+// of an activity, contextTarget still holds the parent id (so label-affecting
+// ops like rename / unplanned / reusable / priorities act on parent), while
+// tick-affecting ops (done/undone/move-next-week/delete) redirect to one tick
+// resolved via pickRepresentativeTick. specificTickId is set for per-tick log
+// rows in the Done section; null means "pick by tick state at click time".
+let agendaTickCtx = null; // { parentId, specificTickId|null } or null
 let editState = null;           // { nodeId, isNew, originalLabel }
 let _editJustCommitted = false; // true for 600ms after commit, guards resize handler
 let hoveredNodeId = null;  // Track currently hovered node
@@ -7737,6 +7744,26 @@ function sortTickChildren(node) {
   });
 }
 
+// Picks a representative tick under `parentId` for agenda single-tick ops.
+// Honours agendaTickCtx.specificTickId when set (per-tick log rows in Done).
+// preferPending=true → first not-done tick (used by done/move/delete);
+// preferPending=false → last done tick (used by undone). Returns null if the
+// parent has no tick-children.
+function pickRepresentativeTick(parentId, preferPending) {
+  if (agendaTickCtx && agendaTickCtx.specificTickId) return agendaTickCtx.specificTickId;
+  const parent = findNode(parentId);
+  const ti = getTickInfo(parent);
+  if (!ti || ti.ticks.length === 0) return null;
+  if (preferPending) {
+    const next = ti.ticks.find(t => !t.done);
+    if (next) return next.id;
+    return [...ti.ticks].reverse()[0].id;
+  }
+  const lastDone = [...ti.ticks].reverse().find(t => t.done);
+  if (lastDone) return lastDone.id;
+  return ti.ticks[0].id;
+}
+
 // Re-assigns 1..N tickIndex (and matching label) to the surviving tick-children
 // of a parent activity. Call after a tick is removed (delete, move-next-week)
 // so the displayed sequence stays contiguous.
@@ -9183,6 +9210,40 @@ function showContextMenu(x, y, nodeId) {
     document.getElementById('ctx-color-swatch').style.background = BRANCH_COLORS[branch]?.main || '#888';
   }
 
+  // Agenda tick-parent override: per-tick ops (done/undone/unplanned/reusable/
+  // priorities/move/delete) target the representative tick instead of parent,
+  // so visibility and toggle labels must reflect that tick's state — not the
+  // parent's. Rename / add-child / reschedule remain parent-level.
+  if (currentView === 'agenda' && agendaTickCtx && agendaTickCtx.parentId === nodeId) {
+    const ti = getTickInfo(node);
+    if (ti) {
+      const specific = !!agendaTickCtx.specificTickId;
+      const anyPending = ti.done < ti.total;
+      const anyDone = ti.done > 0;
+      document.getElementById('ctx-done').style.display   = (!specific && anyPending) ? '' : 'none';
+      document.getElementById('ctx-undone').style.display = (specific || anyDone)     ? '' : 'none';
+
+      const repTickId = pickRepresentativeTick(nodeId, true);
+      const repTick = repTickId ? findNode(repTickId) : null;
+      if (repTick) {
+        const tickUnplanned = repTick.unplanned === true;
+        document.getElementById('ctx-unplanned').innerHTML = tickUnplanned
+          ? `${iconSvg('bolt-off')} ${t('menu.planned')}`
+          : `${iconSvg('bolt')} ${t('menu.unplanned')}`;
+        const tickReusable = repTick.reusable === true;
+        document.getElementById('ctx-reusable').innerHTML = tickReusable
+          ? `${iconSvg('repeat-off')} ${t('menu.disposable')}`
+          : `${iconSvg('repeat')} ${t('menu.reusable')}`;
+        const tHigh = repTick.priority === 'high';
+        const tCrit = repTick.priority === 'critical';
+        const tNorm = !tHigh && !tCrit;
+        document.getElementById('ctx-prio-normal').style.display   = tNorm ? 'none' : '';
+        document.getElementById('ctx-prio-high').style.display     = tHigh ? 'none' : '';
+        document.getElementById('ctx-prio-critical').style.display = tCrit ? 'none' : '';
+      }
+    }
+  }
+
   // Handle separators
   document.getElementById('ctx-sep-1').style.display = (isStdActivity || isTick)                 ? '' : 'none';
   document.getElementById('ctx-sep-2').style.display = isStdActivity                              ? '' : 'none';
@@ -9210,6 +9271,7 @@ function showContextMenu(x, y, nodeId) {
 function hideContextMenu() {
   ctxMenu.classList.remove('visible');
   contextTarget = null;
+  agendaTickCtx = null;
   document.getElementById('ctx-reschedule-submenu').classList.remove('visible');
   document.querySelectorAll('#agenda-tab-content .agenda-item').forEach(el => el.classList.remove('agenda-item-focused'));
 }
@@ -9423,7 +9485,7 @@ document.getElementById('ctx-transfer-reusable').addEventListener('click', async
 });
 
 document.getElementById('ctx-move-next-week').addEventListener('click', async () => {
-  if (contextTarget) await moveNodeToNextWeek(contextTarget);
+  if (contextTarget) await moveNodeToNextWeek(_agendaTickRedirect(contextTarget, true));
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
@@ -9442,8 +9504,8 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
 
     const afterMutation = () => {
       saveWeek(currentWeekKey, weekData);
+      renderIfVisible();
       if (currentView === 'agenda') renderAgenda();
-      else render();
       hideContextMenu();
     };
 
@@ -9561,13 +9623,13 @@ document.getElementById('ctx-clear-week').addEventListener('click', async () => 
 });
 
 document.getElementById('ctx-done').addEventListener('click', () => {
-  if (contextTarget) setStatus(contextTarget, 'done');
+  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget, true), 'done');
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.getElementById('ctx-undone').addEventListener('click', () => {
-  if (contextTarget) setStatus(contextTarget, 'undone');
+  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget, false), 'undone');
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
@@ -9591,10 +9653,18 @@ document.getElementById('ctx-reset').addEventListener('click', () => {
   hideContextMenu();
 });
 
+function _agendaTickRedirect(target, preferPending = true) {
+  if (currentView === 'agenda' && agendaTickCtx && agendaTickCtx.parentId === target) {
+    return pickRepresentativeTick(target, preferPending) || target;
+  }
+  return target;
+}
+
 document.getElementById('ctx-unplanned').addEventListener('click', () => {
   if (contextTarget) {
-    const n = findNode(contextTarget);
-    setStatus(contextTarget, (n && n.unplanned) ? 'planned' : 'unplanned');
+    const target = _agendaTickRedirect(contextTarget);
+    const n = findNode(target);
+    setStatus(target, (n && n.unplanned) ? 'planned' : 'unplanned');
   }
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
@@ -9602,7 +9672,8 @@ document.getElementById('ctx-unplanned').addEventListener('click', () => {
 
 document.getElementById('ctx-reusable').addEventListener('click', () => {
   if (contextTarget) {
-    const n = findNode(contextTarget);
+    const target = _agendaTickRedirect(contextTarget);
+    const n = findNode(target);
     if (n) {
       takeSnapshot();
       const newVal = !n.reusable;
@@ -9613,7 +9684,7 @@ document.getElementById('ctx-reusable').addEventListener('click', () => {
         touchNode(id);
         (node.children || []).forEach(setReusable);
       }
-      setReusable(contextTarget);
+      setReusable(target);
       saveWeek(currentWeekKey, weekData);
       renderIfVisible();
       if (currentView === 'agenda') renderAgenda();
@@ -9623,19 +9694,19 @@ document.getElementById('ctx-reusable').addEventListener('click', () => {
 });
 
 document.getElementById('ctx-prio-normal').addEventListener('click', () => {
-  if (contextTarget) setStatus(contextTarget, 'prio-normal');
+  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-normal');
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.getElementById('ctx-prio-high').addEventListener('click', () => {
-  if (contextTarget) setStatus(contextTarget, 'prio-high');
+  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-high');
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
 
 document.getElementById('ctx-prio-critical').addEventListener('click', () => {
-  if (contextTarget) setStatus(contextTarget, 'prio-critical');
+  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-critical');
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
@@ -9656,7 +9727,7 @@ document.getElementById('ctx-add-child').addEventListener('click', () => {
 
 document.getElementById('ctx-delete').addEventListener('click', () => {
   if (!contextTarget) { hideContextMenu(); return; }
-  deleteNode(contextTarget);
+  deleteNode(_agendaTickRedirect(contextTarget, true));
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });
@@ -9721,7 +9792,8 @@ function addSwipeGesture(item, node, onLongPress) {
     lpTimer = setTimeout(() => {
       if (state === 'pending') {
         state = 'aborted';
-        if (onLongPress) onLongPress({ clientX: touchClientX, clientY: touchClientY });
+        if (item._openCtxMenu) item._openCtxMenu(touchClientX, touchClientY);
+        else if (onLongPress) onLongPress({ clientX: touchClientX, clientY: touchClientY });
       }
     }, 500);
   }, { passive: true });
@@ -9761,7 +9833,11 @@ function addSwipeGesture(item, node, onLongPress) {
       renderAgenda();
     } else if (dx <= -threshold) {
       // Left swipe: snap back keeping highlight, then open context menu
-      snapBack(() => showContextMenu(e.changedTouches[0].clientX, e.changedTouches[0].clientY, node.id), true);
+      snapBack(() => {
+        const cx = e.changedTouches[0].clientX, cy = e.changedTouches[0].clientY;
+        if (item._openCtxMenu) item._openCtxMenu(cx, cy);
+        else showContextMenu(cx, cy, node.id);
+      }, true);
     } else {
       snapBack();
     }
@@ -10013,7 +10089,18 @@ function buildAgendaItem(node, label, opts = {}) {
     hoveredAgendaNode = null;
     item.classList.remove('agenda-item-focused');
   });
-  item.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, node.id); });
+  // Open context menu on this agenda row. Sets agendaTickCtx so tick-affecting
+  // ops (done/undone/move-next-week/delete) redirect to a single tick while
+  // label-ops (rename / unplanned / reusable / priorities) stay on parent.
+  // Attached as a property so addSwipeGesture's touch paths reuse it.
+  const openCtxMenu = (x, y) => {
+    agendaTickCtx = tickRecord
+      ? { parentId: node.id, specificTickId: tickRecord.tick.id }
+      : (tickInfo ? { parentId: node.id, specificTickId: null } : null);
+    showContextMenu(x, y, node.id);
+  };
+  item._openCtxMenu = openCtxMenu;
+  item.addEventListener('contextmenu', e => { e.preventDefault(); openCtxMenu(e.clientX, e.clientY); });
 
   return item;
 }
