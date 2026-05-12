@@ -5868,6 +5868,8 @@ function migrateDayCounters(data) {
         branch: node.branch, parent: node.id,
         label: langLabels[dayIndex],
         done: false, unplanned: node.unplanned || false,
+        priority: node.priority || null,
+        reusable: node.reusable || false,
         children: [], _ts: Date.now(),
       };
       toAdd.push(child);
@@ -6505,6 +6507,8 @@ function addNode(parentId, label) {
     label: label,
     done: false,
     unplanned: parent.unplanned || false,
+    priority: parent.priority || null,
+    reusable: parent.reusable || false,
     children: [],
     _ts: Date.now(),
   };
@@ -7383,11 +7387,14 @@ function createDayChild(parentId, dayIndex) {
     id, type: 'activity', dayChild: true, dayIndex,
     branch: parent.branch, parent: parentId,
     label, done: false, unplanned: parent.unplanned || false,
+    priority: parent.priority || null,
+    reusable: parent.reusable || false,
     children: [], _ts: Date.now(),
   };
   weekData.nodes.push(node);
   parent.children.push(id);
   rebuildNodeMap();
+  syncStatusUp(id, 'done');
   return id;
 }
 
@@ -7515,6 +7522,7 @@ function applyMagicLabel(nodeId) {
         val: 0,
         max: counterMax,
         unplanned: node.unplanned || false,
+        priority: node.priority || null,
         children: [],
         _ts: Date.now(),
       };
@@ -7716,7 +7724,10 @@ function startAddNode(parentId) {
   const id = genId();
   const node = {
     id, type: 'activity', branch, parent: parentId,
-    label: '', done: false, unplanned: parent.unplanned || false, children: [],
+    label: '', done: false, unplanned: parent.unplanned || false,
+    priority: parent.priority || null,
+    reusable: parent.reusable || false,
+    children: [],
     _editing: true,
     _ts: Date.now(),
   };
