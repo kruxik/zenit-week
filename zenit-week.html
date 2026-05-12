@@ -7861,6 +7861,7 @@ function startAddNode(parentId) {
 function startRenameNode(nodeId) {
   const node = findNode(nodeId);
   if (!node) return;
+  if (node.tickChild) return; // tick-child labels are managed by the parent's Nx token
   takeSnapshot();
   node._editing = true;
   _openInlineInput(nodeId, false);
@@ -9080,7 +9081,7 @@ function showContextMenu(x, y, nodeId) {
   const canDeleteBranch = isBranch && weekData.nodes.filter(n => n.type === 'branch').length > 1;
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter && !isTick) || canDeleteBranch) ? '' : 'none';
   document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda') ? 'none' : '';
-  document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter)            ? 'none' : '';
+  document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
   document.getElementById('ctx-reschedule').style.display = isStdActivity ? '' : 'none';
 
   // Color change (branch only)
