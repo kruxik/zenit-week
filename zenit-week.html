@@ -4044,9 +4044,9 @@ function getNodeSize(nodeId) {
   const w = Math.max(style.minW, Math.ceil(textW) + style.padX * 2);
   const h = Math.max(style.minH, totalTextH + style.padY * 2);
 
-  // Day-child leaves: circle when no status badges present, pill/oval otherwise.
-  // rx = h/2 always so ends stay fully rounded.
-  if (node.dayChild) {
+  // Day-child / tick-child leaves: circle when no status badges present,
+  // pill/oval otherwise. rx = h/2 always so ends stay fully rounded.
+  if (node.dayChild || node.tickChild) {
     const isEditing = editState && editState.nodeId === nodeId;
     const hasBadges = !isEditing && (
       node.priority === 'high' || node.priority === 'critical' ||
@@ -5784,6 +5784,12 @@ function validateAndRepair(data) {
         n.dayIndex = null;
       }
     }
+    // Preserve tickChild/tickIndex — validate tickIndex is a positive integer
+    if (n.tickChild) {
+      if (typeof n.tickIndex !== 'number' || !Number.isInteger(n.tickIndex) || n.tickIndex < 1) {
+        n.tickIndex = 1;
+      }
+    }
   });
 
   const nodeMap = new Map();
@@ -6081,6 +6087,10 @@ async function transferUnfinished() {
         _ts: Date.now(),
       };
       if (newNode.type === 'counter') newNode.val = 0;
+      if (newNode.tickChild) {
+        delete newNode.doneAt;
+        delete newNode.donedOn;
+      }
       newNodes.push(newNode);
       oldToNew.set(c.id, id);
     }
@@ -6130,12 +6140,14 @@ async function transferReusable() {
   const prevById = new Map(prevData.nodes.map(n => [n.id, n]));
   const branches = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
 
-  // 1. Collect reusable activity nodes + their counter/day-child children
+  // 1. Collect reusable activity nodes + their managed leaf children
+  //    (legacy counter, day-children, tick-children).
   const reusableIds = new Set(prevData.nodes.filter(n => n.reusable === true).map(n => n.id));
   const candidateIds = new Set(prevData.nodes
     .filter(n => n.reusable === true ||
       (n.type === 'counter' && reusableIds.has(n.parent)) ||
-      (n.dayChild === true && reusableIds.has(n.parent)))
+      (n.dayChild === true && reusableIds.has(n.parent)) ||
+      (n.tickChild === true && reusableIds.has(n.parent)))
     .map(n => n.id)
   );
 
@@ -6618,11 +6630,26 @@ function renameNode(id, label) {
 
 function isLeafActivity(node) {
   if (!node || node.type === 'branch' || node.type === 'counter') return false;
-  const nonCounterChildren = (node.children || []).filter(cid => {
+  // Tick-children and legacy counters are mechanical sub-counters managed by
+  // the parent's Nx label — they don't count as "real" sub-tasks, so a
+  // parent with only those children is still treated as a leaf-activity.
+  const nonManagedChildren = (node.children || []).filter(cid => {
     const child = findNode(cid);
-    return child && child.type !== 'counter';
+    return child && child.type !== 'counter' && !child.tickChild;
   });
-  return nonCounterChildren.length === 0;
+  return nonManagedChildren.length === 0;
+}
+
+// Returns { total, done, ticks } for tick-children of `node`, or null when the
+// node has none. `ticks` is the tick-children array sorted by tickIndex.
+function getTickInfo(node) {
+  if (!node) return null;
+  const ticks = (node.children || [])
+    .map(findNode)
+    .filter(c => c?.tickChild)
+    .sort((a, b) => (a.tickIndex || 0) - (b.tickIndex || 0));
+  if (ticks.length === 0) return null;
+  return { total: ticks.length, done: ticks.filter(t => t.done).length, ticks };
 }
 
 function getCounterChild(node) {
@@ -6773,24 +6800,28 @@ function computeLayout() {
       return child && (!child._editing || isActiveEdit);
     });
 
-    // Zigzag layout only applies to day-children (Mon..Sun leaves). Non-day
-    // siblings (e.g. added via Tab) get standard column layout — they must
-    // not occupy slots in the two-column day grid.
-    const dayKids = activeChildren.filter(cid => findNode(cid)?.dayChild);
-    if (dayKids.length < 3) return nodeZigZagMetrics[nodeId] = null;
+    // Zigzag layout applies to leaf groups managed by magic labels — either
+    // day-children (Mon..Sun) or tick-children (1..N from "Nx"). The two are
+    // mutually exclusive by construction. Non-managed siblings (e.g. added
+    // via Tab) get standard column layout and must not occupy zigzag slots.
+    const zigKids = activeChildren.filter(cid => {
+      const c = findNode(cid);
+      return c?.dayChild || c?.tickChild;
+    });
+    if (zigKids.length < 3) return nodeZigZagMetrics[nodeId] = null;
 
     let maxW1 = 0;
     let maxW2 = 0;
     let maxH = 0;
-    dayKids.forEach((cid, i) => {
+    zigKids.forEach((cid, i) => {
       const { w, h } = getNodeSize(cid);
       if (i % 2 === 0) maxW1 = Math.max(maxW1, w);
       else maxW2 = Math.max(maxW2, w);
       maxH = Math.max(maxH, h);
     });
 
-    const maxChildScale = dayKids.reduce((m, cid) => Math.max(m, getPriorityScale(cid)), 1);
-    const standardH = maxH + VERTICAL_GAP * maxChildScale; // Tallest day-child + gap (scaled by highest-priority day-child)
+    const maxChildScale = zigKids.reduce((m, cid) => Math.max(m, getPriorityScale(cid)), 1);
+    const standardH = maxH + VERTICAL_GAP * maxChildScale; // Tallest zig-child + gap (scaled by highest-priority zig-child)
     const vStep = standardH / 2;
     const metrics = {
       maxW1,
@@ -6798,7 +6829,7 @@ function computeLayout() {
       maxH,
       staggerX: (maxW1 + maxW2) / 2 + VERTICAL_GAP,
       vStep,
-      totalH: standardH + (dayKids.length - 1) * vStep
+      totalH: standardH + (zigKids.length - 1) * vStep
     };
     return nodeZigZagMetrics[nodeId] = metrics;
   }
@@ -6839,9 +6870,10 @@ function computeLayout() {
 
     if (zig) {
       activeChildren.forEach(calcHeight);
-      // Regular (non-day) siblings stack above the zigzag block in a standard column.
+      // Regular (non-zig) siblings stack above the zigzag block in a standard column.
       const regularsH = activeChildren.reduce((acc, cid) => {
-        return findNode(cid)?.dayChild ? acc : acc + heights[cid];
+        const c = findNode(cid);
+        return (c?.dayChild || c?.tickChild) ? acc : acc + heights[cid];
       }, 0);
       h = regularsH + zig.totalH;
     } else {
@@ -6918,10 +6950,15 @@ function computeLayout() {
     const zig = getZigZagMetrics(nodeId);
     const dir = side === 'left' ? -1 : 1;
 
+    const isZigKid = (cid) => {
+      const c = findNode(cid);
+      return c?.dayChild || c?.tickChild;
+    };
+
     let childrenH = 0;
     if (zig) {
       const regularsH = activeChildren.reduce((acc, cid) => {
-        return findNode(cid)?.dayChild ? acc : acc + heights[cid];
+        return isZigKid(cid) ? acc : acc + heights[cid];
       }, 0);
       childrenH = regularsH + zig.totalH;
     } else {
@@ -6931,8 +6968,8 @@ function computeLayout() {
     let currentY = parentY - childrenH / 2;
 
     if (zig) {
-      // Standard column for non-day siblings (placed first/top).
-      activeChildren.filter(cid => !findNode(cid)?.dayChild).forEach(cid => {
+      // Standard column for non-zig siblings (placed first/top).
+      activeChildren.filter(cid => !isZigKid(cid)).forEach(cid => {
         const child = findNode(cid);
         const childH = heights[cid];
         const { w, h } = getNodeSize(cid);
@@ -6945,9 +6982,9 @@ function computeLayout() {
         positions[cid] = { x: finalX, y: finalY, w, h, side };
         layoutChildren(cid, finalX, finalY, side, w, depth + 1);
       });
-      // Zigzag for day-children. Index `di` counts only day-children so
-      // i % 2 never picks up a non-day sibling.
-      activeChildren.filter(cid => findNode(cid)?.dayChild).forEach((cid, di) => {
+      // Zigzag for managed leaves (day-children or tick-children). Index `di`
+      // counts only zig-kids so i % 2 never picks up a non-zig sibling.
+      activeChildren.filter(isZigKid).forEach((cid, di) => {
         const child = findNode(cid);
         const { w, h } = getNodeSize(cid);
         const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
@@ -7186,7 +7223,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   }
 
   // "+" add-child button (hidden for counter nodes, day-child leaves, and inbox nodes)
-  if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.inbox) {
+  if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.tickChild && !node?.inbox) {
     const bc = BRANCH_COLORS[branch] || { main: document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666' };
     const btnColor = bc.main;
     const depth = getNodeDepth(id);
@@ -7214,7 +7251,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   }
 
   // Drag handle (skip center, counter, dayChild, inbox)
-  if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.inbox) {
+  if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.tickChild && !node?.inbox) {
     const dragG = svgEl('g', {
       class: 'drag-handle',
       transform: `translate(0, ${boxH / 2 + 14})`,
@@ -7464,20 +7501,24 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false) {
       : baseLabel;
   }
   touchNode(nodeId);
+  // Reconcile Nx state with the new label (drops tick-children / legacy counter
+  // when a day annotation now claims the node).
+  applyMagicLabel(nodeId);
 }
 
 // Applies "magic" label rules to an activity node based on its current label:
 //   • Multi-day token group ("(mo, we)") → strip the group, create one
-//     day-child per weekday, drop any counter (day wins over counter).
-//   • No day token + Nx pattern ("Pushups 10x") → create/update a counter
-//     child holding the count, strip "Nx" from the stored label.
-//   • Single-day token ("(tu)") → keep label as-is, no counter.
-//   • Plain label → drop any stale counter child.
+//     day-child per weekday, drop any counter or tick-children (day wins).
+//   • No day token + Nx pattern ("Pushups 10x") → create/grow/shrink
+//     tick-children leaves (labelled 1..N), strip "Nx" from stored label.
+//     Any legacy counter present is replaced by tick-children.
+//   • Single-day token ("(tu)") → keep label as-is, no Nx expansion.
+//   • Plain label → drop any stale counter or tick-children.
 // Caller must have already assigned node.label and called touchNode.
 // Shared by commitEdit and submitQuickAdd so both flows behave identically.
 function applyMagicLabel(nodeId) {
   const node = findNode(nodeId);
-  if (!node || node.type !== 'activity' || node.dayChild) return;
+  if (!node || node.type !== 'activity' || node.dayChild || node.tickChild) return;
   const label = node.label || '';
   const parsedDays = parseTodoDays(label);
   // Existing day-children promote the node to multi-day mode regardless of
@@ -7486,8 +7527,8 @@ function applyMagicLabel(nodeId) {
   const hasDayChildren = node.children.map(findNode).some(n => n?.dayChild);
 
   if (parsedDays.size >= 2 || hasDayChildren) {
-    // Keep Nx in label — "Pushups 10x (mo, we)" means "do 10 pushups on
-    // Mon and Wed", schedule per day; counter would be misleading.
+    // Day branch wins: strip day tokens, create missing day-children, and
+    // drop any Nx-managed children (legacy counter + new tick-children).
     const cleanLabel = stripDayGroups(label).trim();
     if (cleanLabel && cleanLabel !== node.label) {
       node.label = cleanLabel;
@@ -7500,89 +7541,130 @@ function applyMagicLabel(nodeId) {
       if (!existingDayIndices.has(dayIndex)) createDayChild(nodeId, dayIndex);
     });
     sortDayChildren(node);
-    const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
-    if (counterNode) {
-      tombstoneNodes([counterNode.id]);
-      node.children = node.children.filter(id => id !== counterNode.id);
-      weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
-      rebuildNodeMap();
-      touchNode(nodeId);
-    }
+    _purgeNxChildren(node);
     return;
   }
 
-  // 0 or 1 day token, no existing day-children: counter logic.
-  // Single-day annotation (size === 1) disables counter creation but
-  // otherwise behaves like the no-day branch.
+  // 0 or 1 day token, no existing day-children: Nx tick-children logic.
+  // Single-day annotation (size === 1) disables Nx expansion but otherwise
+  // behaves like the no-day branch.
   const nxMatch = label.match(/(\d+)x/);
   const nxVal = nxMatch ? parseInt(nxMatch[1], 10) : 0;
-  const counterMax = (nxVal >= 2 && parsedDays.size === 0) ? nxVal : 0;
+  const tickCount = (nxVal >= 2 && parsedDays.size === 0) ? nxVal : 0;
 
-  if (counterMax > 0) {
-    // Counter holds the count — strip "Nx" from the stored label.
+  if (tickCount > 0) {
+    // Tick-children hold the count — strip "Nx" from the stored label.
     const cleanLabel = label.replace(/\s*\d+x\b/gi, '').trim();
     if (cleanLabel && cleanLabel !== node.label) {
       node.label = cleanLabel;
       touchNode(nodeId);
     }
-    const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
-    if (counterNode) {
-      const oldMax = counterNode.max;
-      counterNode.max = counterMax;
-      if (counterNode.val > counterMax) counterNode.val = counterMax;
-      if (counterMax < oldMax && counterNode.ticks && counterNode.ticks.length > counterMax - 1) {
-        counterNode.ticks.splice(counterMax - 1);
-      }
-      touchNode(counterNode.id);
-      // S2: if val no longer reaches new max, reopen counter and parent
-      if (counterNode.val < counterNode.max && counterNode.done) {
-        counterNode.done = false;
-        // The final click was stored as doneAt (not in ticks) — move it to ticks
-        // so the activity log shows it as "+1 Progress" instead of losing it
-        if (counterNode.doneAt) {
-          if (!counterNode.ticks) counterNode.ticks = [];
-          counterNode.ticks.push(counterNode.doneAt);
-          delete counterNode.doneAt;
-        }
-        syncStatusUp(counterNode.id, 'done');
-      }
-    } else {
-      const counterId = genId();
-      const newCounter = {
-        id: counterId,
-        type: 'counter',
-        branch: node.branch,
-        parent: nodeId,
-        label: '0',
-        val: 0,
-        max: counterMax,
-        unplanned: node.unplanned || false,
-        priority: node.priority || null,
-        children: [],
-        _ts: Date.now(),
-      };
-      weekData.nodes.push(newCounter);
+    // Drop any legacy counter — re-edit swaps it for the new tick-children model.
+    _removeLegacyCounter(node);
+
+    // Grow or shrink tick-children to reach tickCount. Preserve done-state by
+    // tickIndex; drop highest indices first when shrinking.
+    const existingTicks = node.children
+      .map(findNode)
+      .filter(n => n?.tickChild)
+      .sort((a, b) => (a.tickIndex || 0) - (b.tickIndex || 0));
+
+    if (existingTicks.length > tickCount) {
+      const toRemove = existingTicks.slice(tickCount).map(n => n.id);
+      tombstoneNodes(toRemove);
+      const removeSet = new Set(toRemove);
+      node.children = node.children.filter(id => !removeSet.has(id));
+      weekData.nodes = weekData.nodes.filter(n => !removeSet.has(n.id));
       rebuildNodeMap();
-      node.children.push(counterId);
       touchNode(nodeId);
+    } else if (existingTicks.length < tickCount) {
+      const nextIdx = existingTicks.length > 0
+        ? (existingTicks[existingTicks.length - 1].tickIndex || existingTicks.length) + 1
+        : 1;
+      const toAdd = tickCount - existingTicks.length;
+      for (let i = 0; i < toAdd; i++) {
+        createTickChild(nodeId, nextIdx + i);
+      }
     }
+    // Re-derive the parent's done state from its (now-current) children, then
+    // propagate upward. Calling syncStatusUp on a child updates *that child's
+    // parent* — i.e. our `node` — which is what we want.
+    sortTickChildren(node);
+    const firstChild = node.children[0];
+    if (firstChild) syncStatusUp(firstChild, 'done');
     return;
   }
 
-  // S1: no Nx (or single-day blocks counter) — remove any stale counter child
-  const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
-  if (counterNode) {
-    tombstoneNodes([counterNode.id]);
-    node.children = node.children.filter(id => id !== counterNode.id);
-    weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
-    rebuildNodeMap();
-    touchNode(nodeId);
+  // S1: no Nx (or single-day blocks Nx) — drop any stale counter / tick-children
+  const hadNxKids = _purgeNxChildren(node);
+  if (hadNxKids) {
     if (node.done) {
       node.done = false;
       delete node.doneAt;
     }
     syncStatusUp(node.id, 'done');
   }
+}
+
+// Internal: remove a single legacy counter child if present. Returns true if removed.
+function _removeLegacyCounter(node) {
+  const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
+  if (!counterNode) return false;
+  tombstoneNodes([counterNode.id]);
+  node.children = node.children.filter(id => id !== counterNode.id);
+  weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
+  rebuildNodeMap();
+  touchNode(node.id);
+  return true;
+}
+
+// Internal: remove any Nx-managed children (legacy counter + tick-children). Returns
+// true if anything was removed. Used when the parent's label loses its Nx token or
+// gains a day token (day wins).
+function _purgeNxChildren(node) {
+  let removed = _removeLegacyCounter(node);
+  const tickIds = node.children.map(findNode).filter(n => n?.tickChild).map(n => n.id);
+  if (tickIds.length > 0) {
+    tombstoneNodes(tickIds);
+    const removeSet = new Set(tickIds);
+    node.children = node.children.filter(id => !removeSet.has(id));
+    weekData.nodes = weekData.nodes.filter(n => !removeSet.has(n.id));
+    rebuildNodeMap();
+    touchNode(node.id);
+    removed = true;
+  }
+  return removed;
+}
+
+// Create a tick-child leaf under parentId at the given tickIndex (1-based).
+// Inherits unplanned/priority/reusable from parent like other leaf creators.
+function createTickChild(parentId, tickIndex) {
+  const parent = findNode(parentId);
+  if (!parent) return null;
+  const id = genId();
+  const node = {
+    id, type: 'activity', tickChild: true, tickIndex,
+    branch: parent.branch, parent: parentId,
+    label: String(tickIndex),
+    done: false,
+    unplanned: parent.unplanned || false,
+    priority: parent.priority || null,
+    reusable: parent.reusable || false,
+    children: [], _ts: Date.now(),
+  };
+  weekData.nodes.push(node);
+  parent.children.push(id);
+  rebuildNodeMap();
+  return id;
+}
+
+function sortTickChildren(node) {
+  node.children.sort((aId, bId) => {
+    const a = findNode(aId), b = findNode(bId);
+    const ka = !a?.tickChild ? -1 : (a.tickIndex ?? 999);
+    const kb = !b?.tickChild ? -1 : (b.tickIndex ?? 999);
+    return ka - kb;
+  });
 }
 
 // ─── Agenda helpers ───────────────────────────────────────────────────────────
@@ -7616,6 +7698,7 @@ function getAgendaItems(dayIndex) {
   const result = [];
   weekData.nodes.forEach(n => {
     if (n.type !== 'activity') return;
+    if (n.tickChild) return; // managed by parent — never an agenda row of its own
     if (n.dayChild) {
       if (n.dayIndex === dayIndex) result.push(n);
       return;
@@ -7633,6 +7716,7 @@ function getOverdueItems(today = new Date()) {
   const result = [];
   weekData.nodes.forEach(n => {
     if (n.type !== 'activity' || n.done) return;
+    if (n.tickChild) return;
     if (n.dayChild) {
       if (n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos) result.push(n);
       return;
@@ -7647,7 +7731,7 @@ function getOverdueItems(today = new Date()) {
 // Leaf activities with no effective day (own label and no annotated ancestor).
 function getAnyDayItems() {
   return weekData.nodes.filter(n => {
-    if (n.type !== 'activity' || n.dayChild) return false;
+    if (n.type !== 'activity' || n.dayChild || n.tickChild) return false;
     if (!isLeafActivity(n)) return false;
     return getEffectiveDays(n).size === 0;
   });
@@ -7753,7 +7837,7 @@ function rescheduleNode(nodeId, newDayIndex) {
 function startAddNode(parentId) {
   const parent = findNode(parentId);
   if (!parent) return;
-  if (parent.dayChild) return; // day-children are leaves — no children allowed
+  if (parent.dayChild || parent.tickChild) return; // managed leaves — no children allowed
   takeSnapshot();
   const branch = parent.branch || parent.id;
   const id = genId();
@@ -7785,7 +7869,7 @@ function startRenameNode(nodeId) {
 function startAgendaRename(nodeId) {
   const node = findNode(nodeId);
   if (!node) return;
-  const targetId = node.dayChild ? node.parent : nodeId;
+  const targetId = (node.dayChild || node.tickChild) ? node.parent : nodeId;
   const target = findNode(targetId);
   if (!target) return;
 
@@ -7847,7 +7931,7 @@ function _openInlineInput(nodeId, isNew) {
   
   const initialNodeW = nodeW * zoom;
   editState = { nodeId, isNew, originalLabel: node.label, initialNodeW };
-  inlineInput.maxLength = node.dayChild ? 2 : 524288;
+  inlineInput.maxLength = node.dayChild ? 2 : (node.tickChild ? 4 : 524288);
   inlineInput.value = isNew ? '' : node.label;
 
   const sp = nodeScreenPos(nodeId);
@@ -8973,28 +9057,31 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-unplanned').innerHTML = isUnplanned
     ? `${iconSvg('bolt-off')} ${t('menu.planned')}`
     : `${iconSvg('bolt')} ${t('menu.unplanned')}`;
-  document.getElementById('ctx-unplanned').style.display = (isBranch || isCenter || isCounter) ? 'none' : '';
+  const isTick = node && node.tickChild === true;
+  const isStdActivity = isActivity && !isTick;
+
+  document.getElementById('ctx-unplanned').style.display = (isBranch || isCenter || isCounter || isTick) ? 'none' : '';
 
   const isReusable = node && node.reusable === true;
   document.getElementById('ctx-reusable').innerHTML = isReusable
     ? `${iconSvg('repeat-off')} ${t('menu.disposable')}`
     : `${iconSvg('repeat')} ${t('menu.reusable')}`;
-  document.getElementById('ctx-reusable').style.display       = isActivity ? '' : 'none';
-  document.getElementById('ctx-move-next-week').style.display = isActivity ? '' : 'none';
+  document.getElementById('ctx-reusable').style.display       = isStdActivity ? '' : 'none';
+  document.getElementById('ctx-move-next-week').style.display = isStdActivity ? '' : 'none';
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
   const isNormal = !isHigh && !isCritical;
 
-  document.getElementById('ctx-prio-normal').style.display   = (isBranch || isCenter || isCounter || isNormal)   ? 'none' : '';
-  document.getElementById('ctx-prio-high').style.display     = (isBranch || isCenter || isCounter || isHigh)     ? 'none' : '';
-  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCenter || isCounter || isCritical) ? 'none' : '';
+  document.getElementById('ctx-prio-normal').style.display   = (isBranch || isCenter || isCounter || isTick || isNormal)   ? 'none' : '';
+  document.getElementById('ctx-prio-high').style.display     = (isBranch || isCenter || isCounter || isTick || isHigh)     ? 'none' : '';
+  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCenter || isCounter || isTick || isCritical) ? 'none' : '';
 
   const canDeleteBranch = isBranch && weekData.nodes.filter(n => n.type === 'branch').length > 1;
-  document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
-  document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda') ? 'none' : '';
+  document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter && !isTick) || canDeleteBranch) ? '' : 'none';
+  document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda') ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter)            ? 'none' : '';
-  document.getElementById('ctx-reschedule').style.display = isActivity ? '' : 'none';
+  document.getElementById('ctx-reschedule').style.display = isStdActivity ? '' : 'none';
 
   // Color change (branch only)
   document.getElementById('ctx-sep-color').style.display    = isBranch ? '' : 'none';
@@ -9005,9 +9092,9 @@ function showContextMenu(x, y, nodeId) {
   }
 
   // Handle separators
-  document.getElementById('ctx-sep-1').style.display = (isActivity)                        ? '' : 'none';
-  document.getElementById('ctx-sep-2').style.display = isActivity                           ? '' : 'none';
-  document.getElementById('ctx-sep-3').style.display = (isActivity || canDeleteBranch) ? '' : 'none';
+  document.getElementById('ctx-sep-1').style.display = (isStdActivity)                        ? '' : 'none';
+  document.getElementById('ctx-sep-2').style.display = isStdActivity                           ? '' : 'none';
+  document.getElementById('ctx-sep-3').style.display = (isStdActivity || canDeleteBranch) ? '' : 'none';
 
   // Measure actual menu size, then position by quadrant so it always opens
   // toward the center of the screen — never clips any edge.
@@ -9702,6 +9789,7 @@ function renderAgendaStrip() {
 
 function buildAgendaItem(node, label) {
   const cc = getCounterChild(node);
+  const tickInfo = getTickInfo(node);
   const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
 
   const item = document.createElement('div');
@@ -9769,12 +9857,14 @@ function buildAgendaItem(node, label) {
     item.appendChild(rep);
   }
 
-  // Progress pill for counters
-  if (cc) {
+  // Progress pill for counters (legacy) or tick-children
+  if (cc || tickInfo) {
     const pill = document.createElement('div');
     pill.className = 'daily-log-badge tick';
     pill.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
-    pill.innerHTML = `${iconSvg('circle-half-2')} ${cc.val} / ${cc.max}`;
+    const pillVal = cc ? cc.val : tickInfo.done;
+    const pillMax = cc ? cc.max : tickInfo.total;
+    pill.innerHTML = `${iconSvg('circle-half-2')} ${pillVal} / ${pillMax}`;
     item.appendChild(pill);
   }
 
@@ -9783,14 +9873,25 @@ function buildAgendaItem(node, label) {
   btn.className = 'agenda-action-btn';
   if (node.done) {
     btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
-    btn.addEventListener('click', () => { 
+    btn.addEventListener('click', () => {
       if (cc) updateCounter(cc.id, -1);
-      else setStatus(node.id, 'undone'); 
-      renderAgenda(); 
+      else if (tickInfo) {
+        const lastDone = [...tickInfo.ticks].reverse().find(t => t.done);
+        if (lastDone) setStatus(lastDone.id, 'undone');
+      }
+      else setStatus(node.id, 'undone');
+      renderAgenda();
     });
   } else if (cc) {
     btn.textContent = '+1';
     btn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
+  } else if (tickInfo) {
+    btn.textContent = '+1';
+    btn.addEventListener('click', () => {
+      const next = tickInfo.ticks.find(t => !t.done);
+      if (next) setStatus(next.id, 'done');
+      renderAgenda();
+    });
   } else {
     btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
     btn.addEventListener('click', () => { setStatus(node.id, 'done'); renderAgenda(); });
@@ -9822,7 +9923,9 @@ function renderAgendaTabContent() {
   const tickedOnTab = n => {
     if (isOverdue || !tabDate) return false;
     const cc = getCounterChild(n);
-    return cc && cc.ticks && cc.ticks.some(t => localDateStr(new Date(t)) === tabDate);
+    if (cc && cc.ticks && cc.ticks.some(t => localDateStr(new Date(t)) === tabDate)) return true;
+    const ticks = (n.children || []).map(findNode).filter(c => c?.tickChild && c?.doneAt);
+    return ticks.some(t => localDateStr(new Date(t.doneAt)) === tabDate);
   };
 
   let items;
@@ -9850,10 +9953,12 @@ function renderAgendaTabContent() {
     crossDayDone = weekData.nodes.filter(n => {
       if (n.type !== 'activity' || !logOnTab(n) || scheduledIds.has(n.id)) return false;
       // Include if it's a day-leaf, has a counter, or is a leaf activity
+      if (n.tickChild) return false; // managed by parent — never appears as its own agenda row
       const hasCounter = !!getCounterChild(n);
+      const hasTicks = (n.children || []).some(cid => findNode(cid)?.tickChild);
       const p = findNode(n.parent);
       const isAnnotatedParent = p && p.type === 'activity' && parseTodoDays(p.label).size > 0;
-      return n.dayChild === true || hasCounter || isAnnotatedParent || (_hasNoDayLeaves(n) && (parseTodoDays(n.label || '').size > 0 || isLeafActivity(n)));
+      return n.dayChild === true || hasCounter || hasTicks || isAnnotatedParent || (_hasNoDayLeaves(n) && (parseTodoDays(n.label || '').size > 0 || isLeafActivity(n)));
     });
   }
   const done = [...scheduledDone, ...crossDayDone];
@@ -10496,7 +10601,7 @@ function updateDragTarget(cx, cy) {
   if (!node) return;
 
   // Day-children move but do not rebind, mirror handleNodeDrop logic.
-  const targetId = node.dayChild ? null : findRebindTarget(currentDragRect(cx, cy));
+  const targetId = ( node.dayChild || node.tickChild ) ? null : findRebindTarget(currentDragRect(cx, cy));
 
   if (dragState.targetId === targetId) return;
   if (dragState.targetId) {
@@ -10682,7 +10787,7 @@ function handleNodeDrop(mouseX, mouseY) {
 
   // 1. Check for rebinding via rect overlap (max-area target wins).
   // Day-children can move but not rebind to a new parent.
-  const targetParentId = node.dayChild ? null : findRebindTarget(currentDragRect(mouseX, mouseY));
+  const targetParentId = ( node.dayChild || node.tickChild ) ? null : findRebindTarget(currentDragRect(mouseX, mouseY));
 
   if (targetParentId) {
     // REBINDING

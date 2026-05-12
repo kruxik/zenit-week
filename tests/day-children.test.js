@@ -195,15 +195,17 @@ describe('commitEdit — day-child creation', () => {
     expect(kids.some(k => k.type === 'counter')).toBe(false);
   });
 
-  test('Nx pattern alone creates counter and strips Nx from label', () => {
+  test('Nx pattern alone creates tick-children and strips Nx from label', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 10x', true);
     const node = findNode(id);
     expect(node.label).toBe('Pushups');
     const kids = node.children.map(findNode);
-    expect(kids).toHaveLength(1);
-    expect(kids[0].type).toBe('counter');
-    expect(kids[0].max).toBe(10);
+    expect(kids).toHaveLength(10);
+    expect(kids.every(k => k.tickChild === true)).toBe(true);
+    expect(kids.some(k => k.type === 'counter')).toBe(false);
+    expect(kids.map(k => k.tickIndex).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(kids.every(k => k.label === String(k.tickIndex))).toBe(true);
   });
 
   test('single day token added to node with existing day-children appends to schedule', () => {
