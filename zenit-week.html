@@ -9836,6 +9836,10 @@ function renderAgendaStrip() {
 
 function buildAgendaItem(node, label, opts = {}) {
   const inDoneSection = !!opts.inDoneSection;
+  // tickRecord: when rendering one row per today-tick in the Done section,
+  // carries the specific tick-child + its cumulative position so the pill
+  // reads "n/total" at the moment of that tick, and Undone targets it.
+  const tickRecord = opts.tickRecord || null;
   const cc = getCounterChild(node);
   const tickInfo = getTickInfo(node);
   const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
@@ -9905,13 +9909,15 @@ function buildAgendaItem(node, label, opts = {}) {
     item.appendChild(rep);
   }
 
-  // Progress pill for counters (legacy) or tick-children
+  // Progress pill for counters (legacy) or tick-children. Per-tick log rows
+  // (tickRecord) show the cumulative count at that tick's moment, not the
+  // current live total.
   if (cc || tickInfo) {
     const pill = document.createElement('div');
     pill.className = 'daily-log-badge tick';
     pill.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;box-sizing:border-box;font-variant-numeric:tabular-nums;';
-    const pillVal = cc ? cc.val : tickInfo.done;
-    const pillMax = cc ? cc.max : tickInfo.total;
+    const pillVal = tickRecord ? tickRecord.position : (cc ? cc.val : tickInfo.done);
+    const pillMax = tickRecord ? tickRecord.total : (cc ? cc.max : tickInfo.total);
     pill.innerHTML = `${iconSvg('circle-half-2')} ${pillVal} / ${pillMax}`;
     item.appendChild(pill);
   }
@@ -9925,7 +9931,11 @@ function buildAgendaItem(node, label, opts = {}) {
   if (showUndone) {
     btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
     btn.addEventListener('click', () => {
-      if (cc) updateCounter(cc.id, -1);
+      if (tickRecord) {
+        // Untick THIS specific tick log entry.
+        setStatus(tickRecord.tick.id, 'undone');
+      }
+      else if (cc) updateCounter(cc.id, -1);
       else if (tickInfo) {
         const lastDone = [...tickInfo.ticks].reverse().find(t => t.done);
         if (lastDone) setStatus(lastDone.id, 'undone');
@@ -10274,6 +10284,48 @@ function renderAgendaTabContent() {
     return div;
   }
 
+  // Per-tick log rendering for the Done section. Each tick-child completed
+  // today becomes one row "Pushups n/total" (cumulative position). Legacy
+  // counters and plain done activities each contribute one row. Sorted by
+  // doneAt — chronological log, no drag-reorder.
+  function renderDoneSection(doneNodes) {
+    if (doneNodes.length === 0) return;
+    const rows = [];
+    doneNodes.forEach(n => {
+      const tickInfo = getTickInfo(n);
+      if (tickInfo) {
+        const todayTicks = tickInfo.ticks.filter(t =>
+          t.done && t.doneAt && localDateStr(new Date(t.doneAt)) === tabDate
+        );
+        if (todayTicks.length > 0) {
+          const allDoneSorted = tickInfo.ticks
+            .filter(t => t.done && t.doneAt)
+            .sort((a, b) => new Date(a.doneAt) - new Date(b.doneAt));
+          todayTicks.forEach(t => {
+            const position = allDoneSorted.findIndex(at => at.id === t.id) + 1;
+            rows.push({
+              node: n,
+              sortKey: new Date(t.doneAt).getTime(),
+              tickRecord: { tick: t, position, total: tickInfo.total },
+            });
+          });
+          return;
+        }
+      }
+      const sortAt = n.doneAt || (n.donedOn ? `${n.donedOn}T00:00:00` : null);
+      rows.push({ node: n, sortKey: sortAt ? new Date(sortAt).getTime() : 0 });
+    });
+    rows.sort((a, b) => a.sortKey - b.sortKey);
+    if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
+    list.appendChild(makeSectionDivider(t('todo.done'), rows.length));
+    rows.forEach(rec => {
+      list.appendChild(buildAgendaItem(rec.node, getAgendaNodeLabel(rec.node), {
+        inDoneSection: true,
+        tickRecord: rec.tickRecord || null,
+      }));
+    });
+  }
+
   function renderGroup(nodes, groupKey, dividerLabel, buildFn) {
     const ordered = applyAgendaOrder(nodes, loadAgendaGroupOrder(tabKey, groupKey));
     // Higher priority always wins within a group; stable sort preserves user drag order within each priority bucket.
@@ -10311,7 +10363,7 @@ function renderAgendaTabContent() {
       });
   } else {
     renderGroup(pending,     'pending', t('agenda.scheduled'), n => buildAgendaItem(n, getAgendaNodeLabel(n)));
-    renderGroup(done,        'done',    t('todo.done'),        n => buildAgendaItem(n, getAgendaNodeLabel(n), { inDoneSection: true }));
+    renderDoneSection(done);
     renderGroup(anyDayItems, 'anyday',  t('agenda.anyDay'),    n => buildAgendaItem(n, getAgendaNodeLabel(n)));
   }
 }
