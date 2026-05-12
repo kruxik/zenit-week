@@ -9107,25 +9107,25 @@ function showContextMenu(x, y, nodeId) {
   const isTick = node && node.tickChild === true;
   const isStdActivity = isActivity && !isTick;
 
-  document.getElementById('ctx-unplanned').style.display = (isBranch || isCenter || isCounter || isTick) ? 'none' : '';
+  document.getElementById('ctx-unplanned').style.display = (isBranch || isCenter || isCounter) ? 'none' : '';
 
   const isReusable = node && node.reusable === true;
   document.getElementById('ctx-reusable').innerHTML = isReusable
     ? `${iconSvg('repeat-off')} ${t('menu.disposable')}`
     : `${iconSvg('repeat')} ${t('menu.reusable')}`;
-  document.getElementById('ctx-reusable').style.display       = isStdActivity ? '' : 'none';
-  document.getElementById('ctx-move-next-week').style.display = isStdActivity ? '' : 'none';
+  document.getElementById('ctx-reusable').style.display       = (isStdActivity || isTick) ? '' : 'none';
+  document.getElementById('ctx-move-next-week').style.display = (isStdActivity || isTick) ? '' : 'none';
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
   const isNormal = !isHigh && !isCritical;
 
-  document.getElementById('ctx-prio-normal').style.display   = (isBranch || isCenter || isCounter || isTick || isNormal)   ? 'none' : '';
-  document.getElementById('ctx-prio-high').style.display     = (isBranch || isCenter || isCounter || isTick || isHigh)     ? 'none' : '';
-  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCenter || isCounter || isTick || isCritical) ? 'none' : '';
+  document.getElementById('ctx-prio-normal').style.display   = (isBranch || isCenter || isCounter || isNormal)   ? 'none' : '';
+  document.getElementById('ctx-prio-high').style.display     = (isBranch || isCenter || isCounter || isHigh)     ? 'none' : '';
+  document.getElementById('ctx-prio-critical').style.display = (isBranch || isCenter || isCounter || isCritical) ? 'none' : '';
 
   const canDeleteBranch = isBranch && weekData.nodes.filter(n => n.type === 'branch').length > 1;
-  document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter && !isTick) || canDeleteBranch) ? '' : 'none';
+  document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
   document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda') ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
   document.getElementById('ctx-reschedule').style.display = isStdActivity ? '' : 'none';
@@ -9139,9 +9139,9 @@ function showContextMenu(x, y, nodeId) {
   }
 
   // Handle separators
-  document.getElementById('ctx-sep-1').style.display = (isStdActivity)                        ? '' : 'none';
-  document.getElementById('ctx-sep-2').style.display = isStdActivity                           ? '' : 'none';
-  document.getElementById('ctx-sep-3').style.display = (isStdActivity || canDeleteBranch) ? '' : 'none';
+  document.getElementById('ctx-sep-1').style.display = (isStdActivity || isTick)                 ? '' : 'none';
+  document.getElementById('ctx-sep-2').style.display = isStdActivity                              ? '' : 'none';
+  document.getElementById('ctx-sep-3').style.display = (isStdActivity || isTick || canDeleteBranch) ? '' : 'none';
 
   // Measure actual menu size, then position by quadrant so it always opens
   // toward the center of the screen — never clips any edge.
