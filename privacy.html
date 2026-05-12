@@ -54,11 +54,11 @@
   <nav><a href="/">← Zenit Week</a></nav>
   <main>
     <h1>Privacy Policy</h1>
-    <p class="meta">Last updated: 9 May 2026</p>
+    <p class="meta">Last updated: 12 May 2026</p>
 
     <div class="tldr">
       <strong>TL;DR</strong>
-      Zenit Week has no servers and stores no user data. Your plans live in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see them. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel.
+      Zenit Week has no servers and stores no user data. Your plans live in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see them. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel, plus an aggregated, cookieless visit count (no personal identifiers) used to size traffic and see which countries the app is used from.
     </div>
 
     <h2>1. Controller</h2>
@@ -91,14 +91,23 @@
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.3 Transient network data (during page loads)</h3>
     <p>When you open the website, our hosting provider Vercel processes your IP address and standard HTTP request metadata (user agent, referrer, timestamps) for the time strictly necessary to serve the page and operate the OAuth token-exchange endpoint at <code>/api/token</code>. Vercel does not share this with us in identifiable form. See §4 (Service providers) for details.</p>
 
-    <h2>3. Cookies and tracking</h2>
-    <p>Zenit Week sets <strong>no cookies</strong>, runs <strong>no analytics</strong>, and uses <strong>no advertising or behavioural-tracking technologies</strong>. The marketing pages (homepage, privacy, terms) load no third-party scripts at all. The app page itself (<code>/app</code>) loads Google's official JavaScript client library (<code>apis.google.com/js/api.js</code>) so that Google Drive sync can work if you choose to sign in. The library does not transmit any data to Google until you initiate sign-in.</p>
+    <h2>3. Cookies and analytics</h2>
+    <p>Zenit Week sets <strong>no cookies</strong> and uses <strong>no advertising or behavioural-tracking technologies</strong>. We do not profile users, do not track you across other websites, and do not use any persistent identifier stored on your device for analytics.</p>
+    <p>To understand basic, aggregate usage of the site (number of visits, number of page views, and the country a request comes from) we use <strong>Vercel Web Analytics</strong>, a privacy-first, cookieless analytics product provided by our hosting provider Vercel. It runs on:</p>
+    <ul>
+      <li>the English homepage at <code>/</code>;</li>
+      <li>the Czech homepage at <code>/cs</code>;</li>
+      <li>the application page at <code>/app</code>.</li>
+    </ul>
+    <p>Vercel Web Analytics works without cookies and without writing anything to <code>localStorage</code>, <code>IndexedDB</code>, or any other client-side storage. To approximate a "unique visitor" for the current day, Vercel derives a short, salted hash from the visitor's IP address and user agent; the salt is rotated daily, so the hash cannot be used to recognise the same visitor across days or correlate visits with any other site. The country is derived from the IP address at request time; the raw IP is discarded after this lookup and is not stored alongside the visit. No URL parameters, form contents, or page content are collected.</p>
+    <p>Because no information is stored on or read from the user's device for this purpose, this processing is not subject to the consent requirement of Article 5(3) of the ePrivacy Directive ("cookie law"), and Zenit Week therefore does not show a cookie banner. The processing of the transient IP address by Vercel is necessary to deliver the site and to produce the aggregate count, and relies on the legal basis of legitimate interest under Article 6(1)(f) GDPR (interest: understanding aggregate use of a free, open-source tool in order to maintain and improve it). You can object to this processing at any time — see §10.</p>
+    <p>The marketing pages (homepage in EN and CS, privacy, terms) load no other third-party scripts. The app page (<code>/app</code>) additionally loads Google's official JavaScript client library (<code>apis.google.com/js/api.js</code>) so that Google Drive sync can work if you choose to sign in. That library does not transmit any data to Google until you initiate sign-in.</p>
 
     <h2>4. Service providers (sub-processors)</h2>
     <p>We rely on the following providers strictly to deliver the service:</p>
     <ul>
       <li>
-        <strong>Vercel Inc.</strong> — static-site hosting and the OAuth token-exchange Edge Function (<code>/api/token</code>). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
+        <strong>Vercel Inc.</strong> — static-site hosting, the OAuth token-exchange Edge Function (<code>/api/token</code>), and cookieless aggregate analytics via Vercel Web Analytics (see §3). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
       </li>
       <li>
         <strong>Google LLC</strong> — Google Identity Services and Google Drive APIs, used only when you sign in. Data is stored in <em>your own</em> Drive account, governed by your Google Account terms. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
@@ -122,7 +131,7 @@
     <h2>7. Legal basis (GDPR Article 6)</h2>
     <ul>
       <li><strong>Article 6(1)(a) — Consent.</strong> Google Drive sign-in and Drive sync are strictly opt-in. You can withdraw consent at any time by signing out in the app or revoking access in your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account settings</a>; withdrawal does not affect the lawfulness of processing before withdrawal.</li>
-      <li><strong>Article 6(1)(f) — Legitimate interest.</strong> Storing your plans in your browser is necessary to provide the core functionality of the app on your device. Vercel's transient processing of IP/request metadata is necessary to deliver the website and prevent abuse.</li>
+      <li><strong>Article 6(1)(f) — Legitimate interest.</strong> Storing your plans in your browser is necessary to provide the core functionality of the app on your device. Vercel's transient processing of IP/request metadata is necessary to deliver the website and prevent abuse, and to produce the aggregate, cookieless usage statistics described in §3 so we can understand how this free, open-source tool is used and maintained.</li>
     </ul>
 
     <h2>8. Retention and deletion</h2>
@@ -130,6 +139,7 @@
       <li><strong>Local browser data</strong> — retained until you clear your browser's site data, use the in-app sign-out (which removes the OAuth refresh token), or uninstall/reset your browser.</li>
       <li><strong>Drive data</strong> — retained in <em>your</em> Google Drive until you delete it directly or revoke the app's access. We hold no copies.</li>
       <li><strong>Vercel request logs</strong> — handled per Vercel's standard retention (typically up to 30 days for operational logs).</li>
+      <li><strong>Vercel Web Analytics</strong> — only aggregate counts (visits, page views, country) are retained, per Vercel's analytics retention policy. The raw IP address used to derive the daily salted hash and the country is not stored alongside the aggregated record.</li>
     </ul>
 
     <h2>9. Data sharing</h2>
