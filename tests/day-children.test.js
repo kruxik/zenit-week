@@ -235,7 +235,7 @@ describe('commitEdit — day-child creation', () => {
     expect(node.children.map(findNode).filter(k => k.dayChild)).toHaveLength(2);
   });
 
-  test('re-edit Nx label on node with existing day-children does not create counter', () => {
+  test('re-edit Nx-only label on node with existing day-children switches to tick-children mode', () => {
     // First save: "Pushups 10x (mo, we)" → label "Pushups 10x" + day children
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 10x (mo, we)', true);
@@ -243,13 +243,15 @@ describe('commitEdit — day-child creation', () => {
     expect(node.label).toBe('Pushups 10x');
     expect(node.children.map(findNode).filter(k => k.dayChild)).toHaveLength(2);
 
-    // Re-edit: label is now "Pushups 10x" (no day tokens); must NOT spawn counter
+    // Re-edit with Nx only (no day tokens) — user is switching modes:
+    // day-children drop, tick-children (1..10) take their place, Nx stripped.
     triggerCommitEdit(id, 'Pushups 10x');
     node = findNode(id);
-    expect(node.label).toBe('Pushups 10x'); // Nx preserved
+    expect(node.label).toBe('Pushups');
     const kids = node.children.map(findNode);
     expect(kids.some(k => k.type === 'counter')).toBe(false);
-    expect(kids.filter(k => k.dayChild)).toHaveLength(2); // day-children intact
+    expect(kids.filter(k => k.dayChild)).toHaveLength(0);
+    expect(kids.filter(k => k.tickChild)).toHaveLength(10);
   });
 
   test('existing counter removed when 2+ day pattern added', () => {

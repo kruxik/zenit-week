@@ -7524,7 +7524,25 @@ function applyMagicLabel(nodeId) {
   // Existing day-children promote the node to multi-day mode regardless of
   // how many day tokens the new label has — single-day "(th)" must extend
   // the existing schedule, not silently revert to inline annotation.
-  const hasDayChildren = node.children.map(findNode).some(n => n?.dayChild);
+  let hasDayChildren = node.children.map(findNode).some(n => n?.dayChild);
+
+  // Mode-switch: if label is plain-Nx-only (no day token) and day-children
+  // already exist, the user is switching back to tick mode — drop the
+  // day-children so the Nx branch below creates fresh ticks. Without this
+  // the day branch would absorb the rename, ignoring the new Nx token.
+  const _nxMatch = label.match(/(\d+)x/);
+  const _nxVal = _nxMatch ? parseInt(_nxMatch[1], 10) : 0;
+  const _wantsTicks = _nxVal >= 2 && parsedDays.size === 0;
+  if (hasDayChildren && _wantsTicks) {
+    const dayIds = node.children.map(findNode).filter(n => n?.dayChild).map(n => n.id);
+    tombstoneNodes(dayIds);
+    const removeSet = new Set(dayIds);
+    node.children = node.children.filter(id => !removeSet.has(id));
+    weekData.nodes = weekData.nodes.filter(n => !removeSet.has(n.id));
+    rebuildNodeMap();
+    touchNode(nodeId);
+    hasDayChildren = false;
+  }
 
   if (parsedDays.size >= 2 || hasDayChildren) {
     // Day branch wins: strip day tokens, create missing day-children, and

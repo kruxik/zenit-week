@@ -206,6 +206,37 @@ describe('tick-children vs day-children', () => {
     triggerCommitEdit(id, 'Pushups 3x (mo)', true);
     expect(tickKids(id)).toHaveLength(0);
   });
+
+  test('day-children → Nx mode switch: drops days, creates ticks', () => {
+    // Sequence: "Pushups 3x" → ticks
+    //         → "Pushups (mo, we)" → days replace ticks
+    //         → "Pushups 3x" → ticks should replace days (regression)
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Pushups 3x', true);
+    expect(tickKids(id)).toHaveLength(3);
+
+    triggerCommitEdit(id, 'Pushups (mo, we)');
+    expect(tickKids(id)).toHaveLength(0);
+    expect(findNode(id).children.map(findNode).filter(c => c.dayChild)).toHaveLength(2);
+
+    triggerCommitEdit(id, 'Pushups 3x');
+    const ticks = tickKids(id);
+    expect(ticks).toHaveLength(3);
+    expect(ticks.map(t => t.tickIndex)).toEqual([1, 2, 3]);
+    expect(findNode(id).children.map(findNode).filter(c => c.dayChild)).toHaveLength(0);
+    expect(findNode(id).label).toBe('Pushups');
+  });
+
+  test('day-children + label re-typed with day token + Nx keeps days, strips token, label remains "X Nx"', () => {
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Pushups (mo, we)', true);
+    expect(findNode(id).children.map(findNode).filter(c => c.dayChild)).toHaveLength(2);
+
+    triggerCommitEdit(id, 'Pushups 3x (mo, we)');
+    expect(findNode(id).label).toBe('Pushups 3x'); // day group stripped
+    expect(findNode(id).children.map(findNode).filter(c => c.dayChild)).toHaveLength(2);
+    expect(tickKids(id)).toHaveLength(0); // day wins
+  });
 });
 
 // ─── Legacy counter coexistence ──────────────────────────────────────────────
