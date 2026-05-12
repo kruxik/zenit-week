@@ -9834,7 +9834,8 @@ function renderAgendaStrip() {
   });
 }
 
-function buildAgendaItem(node, label) {
+function buildAgendaItem(node, label, opts = {}) {
+  const inDoneSection = !!opts.inDoneSection;
   const cc = getCounterChild(node);
   const tickInfo = getTickInfo(node);
   const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
@@ -9915,10 +9916,13 @@ function buildAgendaItem(node, label) {
     item.appendChild(pill);
   }
 
-  // Action button
+  // Action button. In the Done section, partial-progress rows (counter/tick
+  // parents ticked today but not yet at max) also show Undone so the user
+  // can revert just-completed steps without seeing two "+1" buttons.
+  const showUndone = node.done || (inDoneSection && (cc || tickInfo));
   const btn = document.createElement('button');
   btn.className = 'agenda-action-btn';
-  if (node.done) {
+  if (showUndone) {
     btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
     btn.addEventListener('click', () => {
       if (cc) updateCounter(cc.id, -1);
@@ -9982,8 +9986,10 @@ function renderAgendaTabContent() {
     items = getAgendaItems(agendaActiveTab);
   }
 
-  // Pending: scheduled for this tab and not yet done, and NOT ticked today
-  const pending = items.filter(n => !n.done && !tickedOnTab(n));
+  // Pending: scheduled for this tab and not yet done. Counter / tick-children
+  // parents stay here even after a tick-today so the user can keep ticking
+  // (the same activity also appears in Done as a record of today's progress).
+  const pending = items.filter(n => !n.done);
 
   // Done section (non-overdue tabs only).
   let scheduledDone = [];
@@ -10010,7 +10016,10 @@ function renderAgendaTabContent() {
   }
   const done = [...scheduledDone, ...crossDayDone];
 
-  const anyDayItems = isOverdue ? [] : getAnyDayItems().filter(n => !n.done && !tickedOnTab(n));
+  // Any-day rows mirror the same rule: counter / tick-children parents keep
+  // their +1 row visible until the parent is fully done, even when a tick
+  // already fired today.
+  const anyDayItems = isOverdue ? [] : getAnyDayItems().filter(n => !n.done);
 
   if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0) {
     const empty = document.createElement('div');
@@ -10302,7 +10311,7 @@ function renderAgendaTabContent() {
       });
   } else {
     renderGroup(pending,     'pending', t('agenda.scheduled'), n => buildAgendaItem(n, getAgendaNodeLabel(n)));
-    renderGroup(done,        'done',    t('todo.done'),        n => buildAgendaItem(n, getAgendaNodeLabel(n)));
+    renderGroup(done,        'done',    t('todo.done'),        n => buildAgendaItem(n, getAgendaNodeLabel(n), { inDoneSection: true }));
     renderGroup(anyDayItems, 'anyday',  t('agenda.anyDay'),    n => buildAgendaItem(n, getAgendaNodeLabel(n)));
   }
 }
