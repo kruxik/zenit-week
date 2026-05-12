@@ -24,7 +24,7 @@ const APP_URL = pathToFileURL(resolve(REPO, 'zenit-week.html')).href;
 const VARIANTS = [
   {
     lang: 'en',
-    centerLabel: 'Your week',
+    centerLabel: 'My week',
     labels:   { work: 'Work',  family: 'Family', me: 'Me', growth: 'Growth' },
     headline: { thin: 'Plan what',         bold: 'matters.', letterSpacing: -2,  fontSize: 80 },
     subtitle: ['A visual mind-map week planner.', 'No signup. No servers. Free.'],
@@ -33,7 +33,7 @@ const VARIANTS = [
   },
   {
     lang: 'cs',
-    centerLabel: 'Tvůj týden',
+    centerLabel: 'Můj týden',
     labels:   { work: 'Práce', family: 'Rodina', me: 'Já', growth: 'Růst' },
     headline: { thin: 'Plánujte to,',      bold: 'na čem záleží.', letterSpacing: -1.5, fontSize: 64 },
     subtitle: ['Vizuální plánovač týdne.', 'Bez registrace. Bez serverů. Zdarma.'],
@@ -60,12 +60,15 @@ const COLORS_SEED = {
 function buildSeedWeek(labels) {
   // Order in the array determines vertical stacking within each side:
   // left → [work top, family bottom]; right → [me top, growth bottom].
+  // offY pushes branches further from horizontal axis so the captured
+  // mindmap bbox is ~square (matches the square embed slot in og-image.svg).
+  const SPREAD = 200;
   return {
     nodes: [
-      { id: 'work',   type: 'branch', branch: 'work',   label: labels.work,   children: [], side: 'left',  _ts: 0 },
-      { id: 'family', type: 'branch', branch: 'family', label: labels.family, children: [], side: 'left',  _ts: 0 },
-      { id: 'me',     type: 'branch', branch: 'me',     label: labels.me,     children: [], side: 'right', _ts: 0 },
-      { id: 'growth', type: 'branch', branch: 'growth', label: labels.growth, children: [], side: 'right', _ts: 0 },
+      { id: 'work',   type: 'branch', branch: 'work',   label: labels.work,   children: [], side: 'left',  offY: -SPREAD, _ts: 0 },
+      { id: 'family', type: 'branch', branch: 'family', label: labels.family, children: [], side: 'left',  offY:  SPREAD, _ts: 0 },
+      { id: 'me',     type: 'branch', branch: 'me',     label: labels.me,     children: [], side: 'right', offY: -SPREAD, _ts: 0 },
+      { id: 'growth', type: 'branch', branch: 'growth', label: labels.growth, children: [], side: 'right', offY:  SPREAD, _ts: 0 },
     ],
     tombstones: [],
     crdtVersion: 0,
@@ -146,6 +149,9 @@ async function captureMindmap(variant) {
   await page.evaluate((centerLabel) => {
     const g = document.querySelector('.node-group[data-id="center"]');
     if (!g) return;
+    // Strip in-app chrome (settings gear, week-nav arrows, +branch buttons)
+    // from the center node — pure noise in a static marketing image.
+    g.querySelectorAll('.gear-btn, .week-nav-btn, .add-btn').forEach(n => n.remove());
     const texts = g.querySelectorAll('text');
     if (!texts.length) return;
     for (let i = 1; i < texts.length; i++) texts[i].remove();
@@ -208,12 +214,14 @@ function buildOgSvg(variant, mindmapB64) {
   const subY1 = Math.round(headlineBoldY + 80);
   const subY2 = subY1 + 38;
 
-  // Mindmap embed area (right column). Keep the same footprint the original
-  // mockup used so the visual rhythm of the card is preserved.
-  const MM_X = 690;
-  const MM_Y = 70;
-  const MM_W = 480;
-  const MM_H = 500;
+  // Mindmap embed area (right column). Square slot, right padding mirrors
+  // the 80px left padding of the brand block. Width is 20% larger than the
+  // original 480px footprint; height matches to keep the slot square so the
+  // bezier curves read as a square mind-map rather than a wide ribbon.
+  const MM_W = 576;            // 480 * 1.2
+  const MM_H = 576;            // square
+  const MM_X = 1200 - 80 - MM_W; // 544 — right padding == left padding (80)
+  const MM_Y = (630 - MM_H) / 2; // 27 — vertically centered
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
   <defs>
