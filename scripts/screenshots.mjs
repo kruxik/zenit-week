@@ -15,11 +15,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..');
 const APP_URL = pathToFileURL(resolve(REPO, 'zenit-week.html')).href;
 const ASSETS = resolve(REPO, 'assets');
-const SOURCE_JSON = resolve(REPO, 'assets', 'zenit-week-2026-05-11.json');
+const SOURCE_JSON = resolve(REPO, 'assets', 'zenit-week-2026-05-12.json');
 
 // The canonical seed week — must match what `todayWeekKey()` resolves to so
-// the app loads it on boot. Week 19 of 2026.
-const SEED_WEEK_KEY = '2026-19';
+// the app loads it on boot. Week 20 of 2026.
+const SEED_WEEK_KEY = '2026-20';
 
 // ─── Seed data load ──────────────────────────────────────────────────────────
 // Polish: correct obvious typos in user-authored labels so the marketing
