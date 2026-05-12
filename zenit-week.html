@@ -6643,6 +6643,13 @@ function isLeafActivity(node) {
   return nonManagedChildren.length === 0;
 }
 
+// True when the node has any tick-child. Used in agenda enumeration so that
+// a parent with mixed children (ticks + regular sub-tasks) still surfaces
+// its tick-pill row alongside the standalone sub-task rows.
+function hasTickChildren(node) {
+  return (node?.children || []).some(cid => findNode(cid)?.tickChild);
+}
+
 // Returns { total, done, ticks } for tick-children of `node`, or null when the
 // node has none. `ticks` is the tick-children array sorted by tickIndex.
 function getTickInfo(node) {
@@ -7742,7 +7749,7 @@ function getAgendaItems(dayIndex) {
       if (n.dayIndex === dayIndex) result.push(n);
       return;
     }
-    if (!isLeafActivity(n)) return;
+    if (!isLeafActivity(n) && !hasTickChildren(n)) return;
     if (getEffectiveDays(n).has(dayIndex)) result.push(n);
   });
   return result;
@@ -7760,7 +7767,7 @@ function getOverdueItems(today = new Date()) {
       if (n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos) result.push(n);
       return;
     }
-    if (!isLeafActivity(n)) return;
+    if (!isLeafActivity(n) && !hasTickChildren(n)) return;
     const days = getEffectiveDays(n);
     if (days.size > 0 && [...days].some(d => isoWeekPos(d) < todayPos)) result.push(n);
   });
@@ -7771,7 +7778,7 @@ function getOverdueItems(today = new Date()) {
 function getAnyDayItems() {
   return weekData.nodes.filter(n => {
     if (n.type !== 'activity' || n.dayChild || n.tickChild) return false;
-    if (!isLeafActivity(n)) return false;
+    if (!isLeafActivity(n) && !hasTickChildren(n)) return false;
     return getEffectiveDays(n).size === 0;
   });
 }

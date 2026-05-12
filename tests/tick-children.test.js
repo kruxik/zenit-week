@@ -306,6 +306,27 @@ describe('agenda integration — tick-children parent', () => {
     expect(getTickInfo(findNode('a1'))).toBeNull();
   });
 
+  test('parent with mixed children (ticks + regular) appears as agenda row alongside the regular child', () => {
+    // Build: Pushups 3x  +  warmup (added via Tab as a regular sub-task)
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Pushups 3x', true);
+
+    const nodes = _state.get().nodes;
+    const warmup = mkActivity('warmup', id, 'work', { label: 'warmup' });
+    _state.set({ nodes: [...nodes, warmup] });
+    findNode(id).children.push('warmup');
+    rebuildNodeMap();
+
+    // Any-day items should include BOTH the parent (for its tick pill) and
+    // the regular sub-task (for its standalone row).
+    const anyDay = getAnyDayItems().map(n => n.id);
+    expect(anyDay).toContain(id);
+    expect(anyDay).toContain('warmup');
+
+    // Tick-children themselves still never surface individually.
+    tickKids(id).forEach(tk => expect(anyDay).not.toContain(tk.id));
+  });
+
   test('tick-children never appear as their own agenda items', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 3x', true);
