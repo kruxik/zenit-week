@@ -539,6 +539,7 @@ export const {
   getOverdueItems,
   getAnyDayItems,
   rescheduleNode,
+  computeDayReschedule,
   localDateStr,
   tabDateString,
   // Agenda group ordering

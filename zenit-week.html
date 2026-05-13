@@ -7602,6 +7602,53 @@ function createDayChild(parentId, dayIndex) {
 // newDays is a Set of dayIndex values (0–6). Caller must takeSnapshot() first.
 // keepAsChildren: if true, even a single remaining day is stored as a day-child
 // (used when the activity was already in multi-day children mode).
+// Pure state machine for "what days is this activity scheduled on?".
+// Shared between hotkeys (1–8) and the context-menu reschedule submenu.
+//   mode               action shape                                  return
+//   'clear'            { currentDays }                               null if already empty, else clear all
+//   'leaf'             { currentDays, currentDayIndex, newDayIndex } null on collision (newDayIndex held by another sibling)
+//   'activity-checkbox'{ currentDays, newDayIndex }                  toggle membership
+//   'activity-radio'   { currentDays, newDayIndex }                  single-day label: toggle off if same, else replace
+function computeDayReschedule(mode, action) {
+  const cur = action.currentDays;
+  if (mode === 'clear') {
+    return cur.size === 0 ? null : { newDays: new Set(), keepAsChildren: false };
+  }
+  const newIdx = action.newDayIndex;
+  if (mode === 'leaf') {
+    if (action.currentDayIndex === newIdx) {
+      const ns = new Set(cur); ns.delete(newIdx);
+      return { newDays: ns, keepAsChildren: ns.size > 0 };
+    }
+    if (cur.has(newIdx)) return null; // collision: another sibling owns this day
+    const ns = new Set(cur);
+    ns.delete(action.currentDayIndex);
+    ns.add(newIdx);
+    return { newDays: ns, keepAsChildren: true };
+  }
+  if (mode === 'activity-checkbox') {
+    const ns = new Set(cur);
+    if (ns.has(newIdx)) ns.delete(newIdx); else ns.add(newIdx);
+    return { newDays: ns, keepAsChildren: true };
+  }
+  if (mode === 'activity-radio') {
+    return {
+      newDays: cur.has(newIdx) ? new Set() : new Set([newIdx]),
+      keepAsChildren: false,
+    };
+  }
+  return null;
+}
+
+// Wrapper: compute → snapshot → mutate. Returns true if mutated.
+function applyDayReschedule(targetId, mode, action) {
+  const result = computeDayReschedule(mode, action);
+  if (!result) return false;
+  takeSnapshot();
+  setActivityDays(targetId, result.newDays, result.keepAsChildren);
+  return true;
+}
+
 function setActivityDays(nodeId, newDays, keepAsChildren = false) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity' || node.dayChild) return;
@@ -9000,29 +9047,13 @@ function _windowKeydownHandler(e) {
         ...dayChildrenList.map(c => c.dayIndex),
         ...parseTodoDays(node.label || ''),
       ]);
-      if (e.key === '8') {
-        if (currentDays.size === 0) return;
-        takeSnapshot();
-        setActivityDays(id, new Set());
-      } else {
-        const dayIndex = KEY_TO_DAY[e.key];
-        let newDays;
-        if (hasDayChildren) {
-          // Multi-day children mode: checkbox toggle, keep as children
-          newDays = new Set(currentDays);
-          if (newDays.has(dayIndex)) newDays.delete(dayIndex);
-          else newDays.add(dayIndex);
-          takeSnapshot();
-          setActivityDays(id, newDays, true);
-        } else {
-          // Single-day label mode: radio (replace or toggle off)
-          newDays = currentDays.has(dayIndex) ? new Set() : new Set([dayIndex]);
-          takeSnapshot();
-          setActivityDays(id, newDays);
-        }
+      const mode = e.key === '8'
+        ? 'clear'
+        : (hasDayChildren ? 'activity-checkbox' : 'activity-radio');
+      if (applyDayReschedule(id, mode, { currentDays, newDayIndex: KEY_TO_DAY[e.key] })) {
+        saveWeek(currentWeekKey, weekData);
+        render();
       }
-      saveWeek(currentWeekKey, weekData);
-      render();
 
     } else if (node.dayChild) {
       e.preventDefault();
@@ -9031,32 +9062,14 @@ function _windowKeydownHandler(e) {
       const currentDays = new Set(
         (parent.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild).map(c => c.dayIndex)
       );
-      if (e.key === '8') {
-        takeSnapshot();
-        setActivityDays(parent.id, new Set());
+      const mode = e.key === '8' ? 'clear' : 'leaf';
+      if (applyDayReschedule(parent.id, mode, {
+        currentDays,
+        currentDayIndex: node.dayIndex,
+        newDayIndex: KEY_TO_DAY[e.key],
+      })) {
         saveWeek(currentWeekKey, weekData);
         render();
-      } else {
-        const newDayIndex = KEY_TO_DAY[e.key];
-        if (node.dayIndex === newDayIndex) {
-          // toggle off; remaining days stay as children
-          const newDays = new Set(currentDays);
-          newDays.delete(newDayIndex);
-          takeSnapshot();
-          setActivityDays(parent.id, newDays, newDays.size > 0);
-          saveWeek(currentWeekKey, weekData);
-          render();
-        } else if (!currentDays.has(newDayIndex)) {
-          // reassign, no collision; always keep as children
-          const newDays = new Set(currentDays);
-          newDays.delete(node.dayIndex);
-          newDays.add(newDayIndex);
-          takeSnapshot();
-          setActivityDays(parent.id, newDays, true);
-          saveWeek(currentWeekKey, weekData);
-          render();
-        }
-        // collision (newDayIndex already exists): no-op
       }
     }
     // branch, center, counter: no-op
@@ -9595,15 +9608,15 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
       hideContextMenu();
     };
 
-    let assignedDays, targetId;
+    let assignedDays, targetId, mode;
     if (node.dayChild) {
-      // dayChild: checkbox logic — same = remove, new = add, collision = disabled
       const parent = findNode(node.parent);
       if (!parent) return;
       targetId = parent.id;
       assignedDays = new Set(
         (parent.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild).map(c => c.dayIndex)
       );
+      mode = 'leaf';
       AGENDA_DAY_ORDER.forEach(dayIdx => {
         const isThis      = node.dayIndex === dayIdx;
         const isAssigned  = assignedDays.has(dayIdx);
@@ -9615,26 +9628,18 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
         btn.textContent = langLabels[dayIdx];
         btn.addEventListener('click', e => {
           e.stopPropagation();
-          const newDays = new Set(assignedDays);
-          if (isThis) {
-            newDays.delete(dayIdx);
-            takeSnapshot();
-            setActivityDays(targetId, newDays, newDays.size > 0);
-            afterMutation();
-          } else if (!isCollision) {
-            newDays.delete(node.dayIndex);
-            newDays.add(dayIdx);
-            takeSnapshot();
-            setActivityDays(targetId, newDays, true);
-            afterMutation();
-          }
+          if (applyDayReschedule(targetId, mode, {
+            currentDays: assignedDays,
+            currentDayIndex: node.dayIndex,
+            newDayIndex: dayIdx,
+          })) afterMutation();
         });
         rescheduleSubmenu.appendChild(btn);
       });
     } else {
-      // Regular activity: radio logic — same = remove, different = replace
       targetId = node.id;
       assignedDays = parseTodoDays(node.label || '');
+      mode = 'activity-radio';
       AGENDA_DAY_ORDER.forEach(dayIdx => {
         const isAssigned = assignedDays.has(dayIdx);
         const btn = document.createElement('div');
@@ -9642,10 +9647,10 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
         btn.textContent = langLabels[dayIdx];
         btn.addEventListener('click', e => {
           e.stopPropagation();
-          const newDays = isAssigned ? new Set() : new Set([dayIdx]);
-          takeSnapshot();
-          setActivityDays(targetId, newDays);
-          afterMutation();
+          if (applyDayReschedule(targetId, mode, {
+            currentDays: assignedDays,
+            newDayIndex: dayIdx,
+          })) afterMutation();
         });
         rescheduleSubmenu.appendChild(btn);
       });
@@ -9661,9 +9666,7 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
       clearBtn.textContent = t('menu.clearDay') || 'Clear day';
       clearBtn.addEventListener('click', e => {
         e.stopPropagation();
-        takeSnapshot();
-        setActivityDays(targetId, new Set());
-        afterMutation();
+        if (applyDayReschedule(targetId, 'clear', { currentDays: assignedDays })) afterMutation();
       });
       rescheduleSubmenu.appendChild(clearBtn);
     }
