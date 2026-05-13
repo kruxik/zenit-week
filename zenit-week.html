@@ -9622,6 +9622,7 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
             setActivityDays(targetId, newDays, newDays.size > 0);
             afterMutation();
           } else if (!isCollision) {
+            newDays.delete(node.dayIndex);
             newDays.add(dayIdx);
             takeSnapshot();
             setActivityDays(targetId, newDays, true);
