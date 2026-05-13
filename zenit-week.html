@@ -6407,11 +6407,14 @@ async function moveNodeToNextWeek(nodeId) {
 
 function defaultWeekData(prevLabels) {
   const l = prevLabels || {};
+  const d = currentLang === 'cs'
+    ? { work: 'Práce', family: 'Rodina', me: 'Já' }
+    : { work: 'Work',  family: 'Family', me: 'Me' };
   return {
     nodes: [
-      { id: 'work',   type: 'branch', branch: 'work',   label: l.work   || 'Work',   children: [], _ts: 0 },
-      { id: 'family', type: 'branch', branch: 'family', label: l.family || 'Family', children: [], _ts: 0 },
-      { id: 'me',     type: 'branch', branch: 'me',     label: l.me     || 'Me',     children: [], _ts: 0 },
+      { id: 'work',   type: 'branch', branch: 'work',   label: l.work   || d.work,   children: [], _ts: 0 },
+      { id: 'family', type: 'branch', branch: 'family', label: l.family || d.family, children: [], _ts: 0 },
+      { id: 'me',     type: 'branch', branch: 'me',     label: l.me     || d.me,     children: [], _ts: 0 },
     ],
     tombstones: [],
     crdtVersion: 0,
