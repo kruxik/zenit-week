@@ -8001,7 +8001,7 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
     main = p ? (stripDayGroups(p.label) || p.label) : node.label;
     if (p) {
       const gp = findNode(p.parent);
-      if (gp) prefix = gp.label;
+      if (gp) prefix = stripDayGroups(gp.label) || gp.label;
     }
     if (includeDayHint && node.dayIndex != null) {
       dayHint = langLabels[node.dayIndex];
@@ -8011,7 +8011,7 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
     // immediate-parent prefix. Day hint comes from the closest annotated
     // ancestor (or self) — see getEffectiveDays.
     main = stripDayGroups(node.label) || node.label;
-    if (p) prefix = p.label;
+    if (p) prefix = stripDayGroups(p.label) || p.label;
     if (includeDayHint) {
       const days = getEffectiveDays(node);
       if (days.size > 0) {
