@@ -2764,7 +2764,7 @@
     </div>
     <div id="toolbar-right">
       <div id="sync-container">
-        <button id="sync-btn" title="Sign in with Google to sync across devices. Your data is stored only in your own Google Drive — Zenit Week never sees or stores it.">
+        <button id="sync-btn" data-i18n-title="sync.btnTitle" title="Sign in with Google to sync across devices. Your data is stored only in your own Google Drive — Zenit Week never sees or stores it.">
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
             <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
             <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
@@ -2773,7 +2773,7 @@
           </svg>
           <span id="sync-btn-label">Sign in</span>
         </button>
-        <button id="sync-avatar-btn" aria-label="Sync options" aria-haspopup="true">
+        <button id="sync-avatar-btn" data-i18n-aria="sync.avatarAria" aria-label="Sync options" aria-haspopup="true">
           <img id="sync-avatar-img" alt="" referrerpolicy="no-referrer" />
           <div id="sync-avatar-initials"></div>
         </button>
@@ -2789,13 +2789,13 @@
             } catch(e) {}
           })();
         </script>
-        <div id="sync-badge" data-status="disconnected" title="Not connected to Google Drive"></div>
+        <div id="sync-badge" data-status="disconnected" data-i18n-title="sync.badge.disconnected" title="Not connected to Google Drive"></div>
         <div id="sync-dropdown" role="menu">
           <div id="sync-dropdown-email"></div>
           <div class="settings-separator"></div>
           <div id="sync-dropdown-last-sync">Last sync: —</div>
           <div class="settings-separator"></div>
-          <button id="sync-dropdown-signout">Sign out of Google Drive</button>
+          <button id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out of Google Drive</button>
         </div>
       </div>
     </div>
@@ -4083,6 +4083,8 @@ const PKCE_SESSION_KEY        = 'zenit-week-pkce-pending'; // sessionStorage: { 
 
 // Sync status: 'disconnected' | 'connected' | 'syncing' | 'error'
 let syncStatus = 'disconnected';
+let lastSyncMessageKey = null;
+let lastSignedOutLabelKey = 'sync.btnLabel';
 let googleAccessToken = null;   // current OAuth access token string
 let driveFileIdCache = new Map(); // weekKey → Drive file ID
 let lastSyncedHash = new Map();   // weekKey → FNV-1a hash of last uploaded JSON
@@ -4129,7 +4131,26 @@ function formatSyncTime(ts) {
 
 function updateDropdownSyncTime() {
   const el = document.getElementById('sync-dropdown-last-sync');
-  if (el) el.textContent = `Last sync: ${formatSyncTime(lastSyncedAt)}`;
+  if (el) el.textContent = `${t('sync.lastSyncLabel')}: ${formatSyncTime(lastSyncedAt)}`;
+}
+
+// Re-render any sync UI text that's set imperatively, so language switches
+// (and first paint) display localized strings.
+function refreshSyncUiText() {
+  const labelEl = document.getElementById('sync-btn-label');
+  if (labelEl) labelEl.textContent = t(lastSignedOutLabelKey);
+  const dot = document.getElementById('sync-badge');
+  if (dot) {
+    const defaults = {
+      disconnected: 'sync.badge.disconnected',
+      connected:    'sync.badge.connected',
+      syncing:      'sync.badge.syncing',
+      error:        'sync.badge.error',
+    };
+    const key = lastSyncMessageKey || defaults[syncStatus];
+    if (key) dot.title = t(key);
+  }
+  updateDropdownSyncTime();
 }
 
 function showSignedInAvatar(user) {
@@ -4168,7 +4189,7 @@ function showSignedInAvatar(user) {
   updateDropdownSyncTime();
 }
 
-function showSignedOutButton(label = 'Sign in') {
+function showSignedOutButton(labelKey = 'sync.btnLabel') {
   const btn       = document.getElementById('sync-btn');
   const avatarBtn = document.getElementById('sync-avatar-btn');
   const dropdown  = document.getElementById('sync-dropdown');
@@ -4177,8 +4198,9 @@ function showSignedOutButton(label = 'Sign in') {
   if (avatarBtn) avatarBtn.style.display = 'none';
   document.documentElement.classList.remove('zw-has-session');
   if (btn) { btn.style.display = ''; }
+  lastSignedOutLabelKey = labelKey;
   const labelEl = document.getElementById('sync-btn-label');
-  if (labelEl) labelEl.textContent = label;
+  if (labelEl) labelEl.textContent = t(labelKey);
 
   googleUserEmail = '';
   googleUserPhoto = '';
@@ -4191,7 +4213,7 @@ function initGoogleAuth() {
   // Migration: remove legacy flag replaced by GOOGLE_AUTH_STORAGE_KEY
   localStorage.removeItem('zenit-week-had-google-session');
   if (_PENDING_OAUTH_CALLBACK) {
-    setSyncStatus('syncing', 'Completing sign-in…');
+    setSyncStatus('syncing', 'sync.msg.completingSignin');
     handleAuthCode(_PENDING_OAUTH_CALLBACK);
   } else {
     attemptSilentRestore();
@@ -4248,8 +4270,8 @@ async function attemptSilentRestore() {
   const ok = await silentRefresh(stored.refresh_token);
   if (!ok) {
     localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
-    showSignedOutButton('Reconnect');
-    setSyncStatus('disconnected', 'Session expired — click to reconnect');
+    showSignedOutButton('sync.reconnect');
+    setSyncStatus('disconnected', 'sync.msg.sessionExpired');
   }
 }
 
@@ -4281,8 +4303,8 @@ function _handleAuthExpiry() {
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
   googleAccessToken = null;
   _gapiInitialized  = false;
-  showSignedOutButton('Reconnect');
-  setSyncStatus('disconnected', 'Session expired — click to reconnect');
+  showSignedOutButton('sync.reconnect');
+  setSyncStatus('disconnected', 'sync.msg.sessionExpired');
 }
 
 // Authenticated fetch: injects Bearer token, recovers from 401 with one silent refresh+retry.
@@ -4316,7 +4338,7 @@ async function onTokensReceived(accessToken) {
     if (!ok) _handleAuthExpiry();
   }, 55 * 60 * 1000);
 
-  setSyncStatus('connected', 'Connected to Google Drive');
+  setSyncStatus('connected', 'sync.msg.connected');
 
   if (!_gapiInitialized) {
     _gapiInitialized = true;
@@ -4363,7 +4385,7 @@ async function handleAuthCode(callback) {
   if (callback.error) {
     if (callback.error !== 'access_denied') {
       console.warn('[Drive] Auth error:', callback.error);
-      setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+      setSyncStatus('error', 'sync.msg.signinFailedNetwork');
     } else {
       setSyncStatus('disconnected');
     }
@@ -4376,7 +4398,7 @@ async function handleAuthCode(callback) {
   }
   if (callback.state !== pending.state) {
     console.warn('[Drive] OAuth state mismatch — possible CSRF, aborting');
-    setSyncStatus('error', 'Sign-in failed — security check failed, try again');
+    setSyncStatus('error', 'sync.msg.signinFailedSecurity');
     return;
   }
 
@@ -4390,7 +4412,7 @@ async function handleAuthCode(callback) {
     });
     if (tokens.error) {
       console.warn('[Drive] Token exchange error:', tokens);
-      setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+      setSyncStatus('error', 'sync.msg.signinFailedNetwork');
       return;
     }
     _isFirstConnection = !getStoredAuth();
@@ -4398,7 +4420,7 @@ async function handleAuthCode(callback) {
     await onTokensReceived(tokens.access_token);
   } catch (err) {
     console.error('[Drive] Token exchange failed:', err);
-    setSyncStatus('error', 'Sign-in failed — check your connection and try again');
+    setSyncStatus('error', 'sync.msg.signinFailedNetwork');
   }
 }
 
@@ -4427,7 +4449,7 @@ function signOut() {
   lastSyncedHash.clear();
   etagCache.clear();
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
-  showSignedOutButton('Sign in');
+  showSignedOutButton('sync.btnLabel');
   setSyncStatus('disconnected');
   const revokeToken = t => t && fetch(
     `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(t)}`,
@@ -4438,18 +4460,21 @@ function signOut() {
 }
 
 // ─── TASK-12: Sync status helper ──────────────────────────────────────────────
-function setSyncStatus(status, message) {
+function setSyncStatus(status, messageKey) {
   if (status === 'error' && syncStatus === 'disconnected') return;
   syncStatus = status;
+  lastSyncMessageKey = messageKey || null;
   const dot = document.getElementById('sync-badge');
   if (!dot) return;
   dot.dataset.status = status;
-  dot.title = message || ({
-    disconnected: 'Not connected to Google Drive',
-    connected:    'Synced with Google Drive',
-    syncing:      'Syncing with Google Drive…',
-    error:        'Sync error',
-  }[status] ?? '');
+  const defaults = {
+    disconnected: 'sync.badge.disconnected',
+    connected:    'sync.badge.connected',
+    syncing:      'sync.badge.syncing',
+    error:        'sync.badge.error',
+  };
+  const key = messageKey || defaults[status];
+  dot.title = key ? t(key) : '';
 }
 
 // ─── TASK-08: Load GAPI client and initiate first sync ────────────────────────
@@ -4479,12 +4504,12 @@ function loadGapiAndSync() {
         storedAuth.photoLink   = user?.photoLink    || '';
         localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(storedAuth));
       }
-      setSyncStatus('connected', 'Synced with Google Drive');
+      setSyncStatus('connected', 'sync.msg.synced');
       await initDriveSync(); // TASK-09 — list all files + 3-phase seed
       startDrivePoll(currentWeekKey);
     } catch (err) {
       console.error('[Drive] GAPI init error:', err);
-      setSyncStatus('error', 'Google Drive init failed — try signing in again');
+      setSyncStatus('error', 'sync.msg.initFailedRetry');
     }
   });
 }
@@ -4646,7 +4671,7 @@ async function syncWeekFromDrive(wKey) {
     fileId = await getDriveFileId(wKey);
   } catch (err) {
     console.error('[Drive] syncWeekFromDrive: getDriveFileId error:', err);
-    setSyncStatus('error', 'Sync failed — could not locate Drive file');
+    setSyncStatus('error', 'sync.msg.failedNoFile');
     return;
   }
 
@@ -4694,7 +4719,7 @@ async function syncWeekFromDrive(wKey) {
     } catch (err) {
       if (attempt >= MAX_RETRIES) {
         console.error('[Drive] syncWeekFromDrive error:', err);
-        setSyncStatus('error', 'Sync failed — using local data');
+        setSyncStatus('error', 'sync.msg.failedUsingLocal');
         return;
       }
     }
@@ -4864,10 +4889,10 @@ async function initDriveSync() {
     }
 
     if (hadConflict) {
-      setSyncStatus('connected', 'Drive data loaded — undo available if you had local changes');
-      setTimeout(() => setSyncStatus('connected', 'Synced with Google Drive'), 6000);
+      setSyncStatus('connected', 'sync.msg.driveLoaded');
+      setTimeout(() => setSyncStatus('connected', 'sync.msg.synced'), 6000);
     } else {
-      setSyncStatus('connected', 'Synced with Google Drive');
+      setSyncStatus('connected', 'sync.msg.synced');
     }
 
     // Step 4b — rest sorted by proximity, merges first then uploads, 5 concurrent
@@ -4887,11 +4912,11 @@ async function initDriveSync() {
         )
       );
     }
-    if (restAll.length > 0) setSyncStatus('connected', 'Synced with Google Drive');
+    if (restAll.length > 0) setSyncStatus('connected', 'sync.msg.synced');
 
   } catch (err) {
     console.error('[Drive] initDriveSync error:', err);
-    setSyncStatus('error', 'Drive init failed — check your connection');
+    setSyncStatus('error', 'sync.msg.driveInitFailed');
   }
 }
 
@@ -4960,12 +4985,12 @@ async function syncWeekToDrive(wKey) {
   const hash = fnv1a32(json);
   if (lastSyncedHash.get(wKey) === hash) return; // no change after merge — skip upload
 
-  setSyncStatus('syncing', 'Syncing with Google Drive…');
+  setSyncStatus('syncing', 'sync.msg.syncing');
   const ok = await _uploadWeekToDrive(wKey, json);
   if (ok) {
-    setSyncStatus('connected', 'Synced with Google Drive');
+    setSyncStatus('connected', 'sync.msg.synced');
   } else {
-    setSyncStatus('error', 'Sync failed — changes saved locally');
+    setSyncStatus('error', 'sync.msg.failedSavedLocal');
   }
 }
 
@@ -5022,7 +5047,7 @@ async function forcePushAllToDrive() {
   etagCache.clear();
   colorsSyncedHash = null;
 
-  setSyncStatus('syncing', 'Uploading imported data to Drive…');
+  setSyncStatus('syncing', 'sync.msg.uploadingImport');
 
   // Collect all local week keys from IDB
   const weekKeys = await listWeekKeysIDB();
@@ -5047,9 +5072,9 @@ async function forcePushAllToDrive() {
 
   if (allOk) {
     await deleteValueIDB('zenit-week-import-pending');
-    setSyncStatus('connected', 'Imported data synced to Drive');
+    setSyncStatus('connected', 'sync.msg.importSynced');
   } else {
-    setSyncStatus('error', 'Import sync incomplete — will retry on next sign-in');
+    setSyncStatus('error', 'sync.msg.importIncomplete');
   }
 
   startDrivePoll(currentWeekKey);
@@ -5075,7 +5100,7 @@ async function syncColorsToDrive() {
   if (!json) return;
   const hash = fnv1a32(json);
   if (colorsSyncedHash === hash) return;
-  setSyncStatus('syncing', 'Syncing with Google Drive…');
+  setSyncStatus('syncing', 'sync.msg.syncing');
   let savedAt = 0;
   try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
   const MAX_RETRIES = 3;
@@ -5100,12 +5125,12 @@ async function syncColorsToDrive() {
       colorsSyncedHash = hash;
       lastSyncedAt = Date.now();
       updateDropdownSyncTime();
-      setSyncStatus('connected', 'Synced with Google Drive');
+      setSyncStatus('connected', 'sync.msg.synced');
       return;
     } catch (err) {
       if (attempt >= MAX_RETRIES) {
         console.error('[Drive] syncColorsToDrive error:', err);
-        setSyncStatus('error', 'Sync failed — changes saved locally');
+        setSyncStatus('error', 'sync.msg.failedSavedLocal');
         return;
       }
     }
@@ -5226,7 +5251,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   lastSyncedHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
-  setSyncStatus('syncing', 'New data detected — resyncing from Drive…');
+  setSyncStatus('syncing', 'sync.msg.resyncing');
   await initDriveSync();
   startDrivePoll(currentWeekKey);
 }
@@ -5493,6 +5518,33 @@ const TRANSLATIONS = {
     'filter.alreadyScheduled':    'Already scheduled for',
     'menu.clearDayFilter':        'Clear Day Filter',
     'error.quotaExceeded':        'Storage quota exceeded — changes might not be saved',
+    'sync.btnLabel':              'Sign in',
+    'sync.btnTitle':              'Sign in with Google to sync across devices. Your data is stored only in your own Google Drive — Zenit Week never sees or stores it.',
+    'sync.avatarAria':            'Sync options',
+    'sync.lastSyncLabel':         'Last sync',
+    'sync.signOut':               'Sign out of Google Drive',
+    'sync.reconnect':             'Reconnect',
+    'sync.badge.disconnected':    'Not connected to Google Drive',
+    'sync.badge.connected':       'Synced with Google Drive',
+    'sync.badge.syncing':         'Syncing with Google Drive…',
+    'sync.badge.error':           'Sync error',
+    'sync.msg.completingSignin':  'Completing sign-in…',
+    'sync.msg.sessionExpired':    'Session expired — click to reconnect',
+    'sync.msg.connected':         'Connected to Google Drive',
+    'sync.msg.signinFailedNetwork': 'Sign-in failed — check your connection and try again',
+    'sync.msg.signinFailedSecurity':'Sign-in failed — security check failed, try again',
+    'sync.msg.synced':            'Synced with Google Drive',
+    'sync.msg.initFailedRetry':   'Google Drive init failed — try signing in again',
+    'sync.msg.failedNoFile':      'Sync failed — could not locate Drive file',
+    'sync.msg.failedUsingLocal':  'Sync failed — using local data',
+    'sync.msg.driveLoaded':       'Drive data loaded — undo available if you had local changes',
+    'sync.msg.driveInitFailed':   'Drive init failed — check your connection',
+    'sync.msg.syncing':           'Syncing with Google Drive…',
+    'sync.msg.failedSavedLocal':  'Sync failed — changes saved locally',
+    'sync.msg.uploadingImport':   'Uploading imported data to Drive…',
+    'sync.msg.importSynced':      'Imported data synced to Drive',
+    'sync.msg.importIncomplete':  'Import sync incomplete — will retry on next sign-in',
+    'sync.msg.resyncing':         'New data detected — resyncing from Drive…',
   },
   cs: {
     'toolbar.today':              'Dnes',
@@ -5598,7 +5650,7 @@ const TRANSLATIONS = {
     'help.featureDaysBody':       ' — napište (po), (po, st) nebo (denně) pro plánování',
     'help.featureBaselineLead':   'Pracovní zátěž',
     'help.featureBaselineBody':   ' — sledujte týdenní zátěž a celkový pokrok',
-    'help.featureSyncLead':       'Synchronizace Google Drive',
+    'help.featureSyncLead':       'Synchronizace Disku Google',
     'help.featureSyncBody':       ' — pouze vlastní Drive (volitelné)',
     'help.featureUndoLead':       'Zpět / Znovu',
     'help.featureUndoBody':       ' — překlep? Vrátit lze kdykoliv',
@@ -5659,6 +5711,33 @@ const TRANSLATIONS = {
     'filter.alreadyScheduled':    'Již naplánováno pro',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena — změny nemusí být uloženy',
+    'sync.btnLabel':              'Přihlásit se',
+    'sync.btnTitle':              'Přihlaste se přes Google a synchronizujte data mezi zařízeními. Data se ukládají pouze na vašem Disku Google — Zenit Week k nim nemá přístup.',
+    'sync.avatarAria':            'Možnosti synchronizace',
+    'sync.lastSyncLabel':         'Poslední synchronizace',
+    'sync.signOut':               'Odhlásit se z Disku Google',
+    'sync.reconnect':             'Připojit znovu',
+    'sync.badge.disconnected':    'Nepřipojeno k Disku Google',
+    'sync.badge.connected':       'Synchronizováno s Diskem Google',
+    'sync.badge.syncing':         'Synchronizuji s Diskem Google…',
+    'sync.badge.error':           'Chyba synchronizace',
+    'sync.msg.completingSignin':  'Dokončuji přihlášení…',
+    'sync.msg.sessionExpired':    'Relace vypršela — klikněte pro opětovné připojení',
+    'sync.msg.connected':         'Připojeno k Disku Google',
+    'sync.msg.signinFailedNetwork': 'Přihlášení selhalo — zkontrolujte připojení a zkuste to znovu',
+    'sync.msg.signinFailedSecurity':'Přihlášení selhalo — selhala bezpečnostní kontrola, zkuste to znovu',
+    'sync.msg.synced':            'Synchronizováno s Diskem Google',
+    'sync.msg.initFailedRetry':   'Inicializace Disku Google selhala — zkuste se přihlásit znovu',
+    'sync.msg.failedNoFile':      'Synchronizace selhala — soubor na Disku nenalezen',
+    'sync.msg.failedUsingLocal':  'Synchronizace selhala — používám lokální data',
+    'sync.msg.driveLoaded':       'Data z Disku načtena — pokud jste měli lokální změny, lze je vrátit zpět',
+    'sync.msg.driveInitFailed':   'Inicializace Disku selhala — zkontrolujte připojení',
+    'sync.msg.syncing':           'Synchronizuji s Diskem Google…',
+    'sync.msg.failedSavedLocal':  'Synchronizace selhala — změny uloženy lokálně',
+    'sync.msg.uploadingImport':   'Nahrávám importovaná data na Disk Google…',
+    'sync.msg.importSynced':      'Importovaná data synchronizována s Diskem Google',
+    'sync.msg.importIncomplete':  'Synchronizace importu neúplná — zkusím to při příštím přihlášení',
+    'sync.msg.resyncing':         'Detekována nová data — synchronizuji z Disku Google…',
   },
 };
 
@@ -5674,6 +5753,10 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
     el.title = t(el.dataset.i18nTitle);
   });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAria));
+  });
+  refreshSyncUiText();
   const sel = document.getElementById('lang-select');
   if (sel) sel.value = currentLang;
   // Show only the day-indicator rows matching the current language
