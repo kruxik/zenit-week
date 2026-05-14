@@ -9999,8 +9999,8 @@ let hoveredAgendaNode = null;
 // Attaches swipe-right=done/undone and swipe-left=context-menu to an agenda item.
 // The item slides over action areas revealed underneath (managed by .agenda-swipe-wrapper).
 // Non-passive touchmove required to preventDefault during confirmed horizontal swipe.
-function addSwipeGesture(item, node, onLongPress) {
-  let startX = 0, startY = 0, lpTimer = null;
+function addSwipeGesture(item, node) {
+  let startX = 0, startY = 0;
   let state = 'idle'; // 'idle' | 'pending' | 'swiping' | 'aborted'
 
   // Snap item back to translateX(0). keepFocused=true retains the highlight
@@ -10027,16 +10027,7 @@ function addSwipeGesture(item, node, onLongPress) {
     const t = e.touches[0];
     startX = t.clientX;
     startY = t.clientY;
-    const touchClientX = t.clientX;
-    const touchClientY = t.clientY;
     state = 'pending';
-    lpTimer = setTimeout(() => {
-      if (state === 'pending') {
-        state = 'aborted';
-        if (item._openCtxMenu) item._openCtxMenu(touchClientX, touchClientY);
-        else if (onLongPress) onLongPress({ clientX: touchClientX, clientY: touchClientY });
-      }
-    }, 500);
   }, { passive: true });
 
   item.addEventListener('touchmove', e => {
@@ -10044,10 +10035,9 @@ function addSwipeGesture(item, node, onLongPress) {
     const dx = e.touches[0].clientX - startX;
     const dy = Math.abs(e.touches[0].clientY - startY);
     if (state === 'pending') {
-      if (dy > 10 && dy > Math.abs(dx)) { state = 'aborted'; clearTimeout(lpTimer); return; }
+      if (dy > 10 && dy > Math.abs(dx)) { state = 'aborted'; return; }
       if (Math.abs(dx) < 10) return; // not yet decided
       state = 'swiping';
-      clearTimeout(lpTimer);
       hideContextMenu();
       document.querySelectorAll('#agenda-tab-content .agenda-item').forEach(el => el.classList.remove('agenda-item-focused'));
       item.classList.add('agenda-item-focused');
@@ -10061,7 +10051,6 @@ function addSwipeGesture(item, node, onLongPress) {
   }, { passive: false });
 
   item.addEventListener('touchend', e => {
-    clearTimeout(lpTimer);
     if (state !== 'swiping') { state = 'idle'; return; }
     const dx = e.changedTouches[0].clientX - startX;
     const threshold = item.offsetWidth * 0.20;
@@ -10085,7 +10074,6 @@ function addSwipeGesture(item, node, onLongPress) {
   });
 
   item.addEventListener('touchcancel', () => {
-    clearTimeout(lpTimer);
     state = 'idle';
     snapBack();
   });
@@ -10357,7 +10345,16 @@ function buildAgendaItem(node, label, opts = {}) {
     showContextMenu(x, y, node.id);
   };
   item._openCtxMenu = openCtxMenu;
-  item.addEventListener('contextmenu', e => { e.preventDefault(); openCtxMenu(e.clientX, e.clientY); });
+  // Track touch start so we can recognise the synthetic contextmenu that
+  // mobile fires on long-press. We suppress that one entirely — left-swipe
+  // is the mobile path to the menu. Desktop right-click still opens it.
+  let lastTouchAt = 0;
+  item.addEventListener('touchstart', () => { lastTouchAt = Date.now(); }, { passive: true });
+  item.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    if (Date.now() - lastTouchAt < 1000) return;
+    openCtxMenu(e.clientX, e.clientY);
+  });
 
   return item;
 }
@@ -10614,7 +10611,7 @@ function renderAgendaTabContent() {
           }, { passive: true });
         }
 
-        addSwipeGesture(item, node, null);
+        addSwipeGesture(item, node);
       }
 
       // ── Desktop HTML5 drag-and-drop ───────────────────────────────────────
