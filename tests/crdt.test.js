@@ -79,19 +79,52 @@ describe('CRDT - mergeWeekData', () => {
     expect(mergedParent.children).toEqual(['c1']);
   });
 
-  test('merges global fields: baseline, todoOrder, agendaOrder', () => {
-    const local = mkWeek([], [], 1000);
-    local.baseline = 10;
-    local.todoOrder = { '2026-01': ['n1'] };
+  test('baseline: newer savedAt wins', () => {
+    const local  = mkWeek([], [], 1000); local.baseline  = 10;
+    const remote = mkWeek([], [], 2000); remote.baseline = 20;
+    expect(mergeWeekData(local, remote).baseline).toBe(20);
+  });
 
-    const remote = mkWeek([], [], 2000);
-    remote.baseline = 20; // newer wins
-    remote.agendaOrder = { '2026-01': ['n2'] };
-
+  test('drops dead todoOrder field on output', () => {
+    const local  = mkWeek([], [], 1000); local.todoOrder  = { 'a': ['x'] };
+    const remote = mkWeek([], [], 2000); remote.todoOrder = { 'b': ['y'] };
     const merged = mergeWeekData(local, remote);
-    expect(merged.baseline).toBe(20);
-    expect(merged.todoOrder['2026-01']).toEqual(['n1']);
-    expect(merged.agendaOrder['2026-01']).toEqual(['n2']);
+    expect(merged.todoOrder).toBeUndefined();
+  });
+
+  test('agendaOrder: per-key LWW by entry.ts (not document savedAt)', () => {
+    // local: low savedAt but fresh per-key ts → must still win
+    const local = mkWeek([], [], 1000);
+    local.agendaOrder = {
+      'mo-pending': { ids: ['fresh1', 'fresh2'], ts: 5000 },
+      'tu-pending': { ids: ['old-local'],       ts: 2000 },
+    };
+    // remote: high savedAt but stale per-key ts → loses on shared key
+    const remote = mkWeek([], [], 9000);
+    remote.agendaOrder = {
+      'mo-pending': { ids: ['stale1'],          ts: 3000 },
+      'we-pending': { ids: ['remote-only'],     ts: 4000 },
+    };
+    const merged = mergeWeekData(local, remote);
+    expect(merged.agendaOrder['mo-pending'].ids).toEqual(['fresh1', 'fresh2']); // local fresh
+    expect(merged.agendaOrder['tu-pending'].ids).toEqual(['old-local']);        // local only
+    expect(merged.agendaOrder['we-pending'].ids).toEqual(['remote-only']);      // remote only
+  });
+
+  test('agendaOrder: tie-break favors remote', () => {
+    const local  = mkWeek([], [], 1000);
+    local.agendaOrder  = { 'k': { ids: ['L'], ts: 100 } };
+    const remote = mkWeek([], [], 2000);
+    remote.agendaOrder = { 'k': { ids: ['R'], ts: 100 } };
+    expect(mergeWeekData(local, remote).agendaOrder['k'].ids).toEqual(['R']);
+  });
+
+  test('agendaOrder: pre-migration array shape treated as ts=0', () => {
+    const local = mkWeek([], [], 1000);
+    local.agendaOrder  = { 'k': ['legacy'] };                       // legacy array → ts=0
+    const remote = mkWeek([], [], 2000);
+    remote.agendaOrder = { 'k': { ids: ['fresh'], ts: 1 } };        // any ts>0 beats legacy
+    expect(mergeWeekData(local, remote).agendaOrder['k'].ids).toEqual(['fresh']);
   });
 
   test('handles complete missing branches by delegating to validateAndRepair', () => {

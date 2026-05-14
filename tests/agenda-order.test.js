@@ -85,9 +85,20 @@ describe('loadAgendaGroupOrder / saveAgendaGroupOrder', () => {
     expect(loadAgendaGroupOrder('overdue', 'pending')).toEqual(['x', 'y']);
   });
 
-  test('saveAgendaGroupOrder persists to weekData.agendaOrder', () => {
+  test('saveAgendaGroupOrder persists wrapped { ids, ts } entry', () => {
+    const before = Date.now();
     saveAgendaGroupOrder(3, 'anyday', ['z1', 'z2']);
+    const after = Date.now();
     const wd = _state.get();
-    expect(wd.agendaOrder?.['3-anyday']).toEqual(['z1', 'z2']);
+    const entry = wd.agendaOrder?.['3-anyday'];
+    expect(entry.ids).toEqual(['z1', 'z2']);
+    expect(entry.ts).toBeGreaterThanOrEqual(before);
+    expect(entry.ts).toBeLessThanOrEqual(after);
+  });
+
+  test('loadAgendaGroupOrder handles legacy bare-array shape', () => {
+    const wd = _state.get();
+    wd.agendaOrder = { '5-pending': ['legacy1', 'legacy2'] };
+    expect(loadAgendaGroupOrder(5, 'pending')).toEqual(['legacy1', 'legacy2']);
   });
 });

@@ -4569,20 +4569,36 @@ function mergeWeekData(local, remote) {
     });
 
     // 5. validateAndRepair handles orphan GC and missing default branches
-    // baseline + todoOrder: winner (higher savedAt) takes precedence per field.
+    // baseline: winner (higher savedAt) wins.
     const winnerSide = (remote.savedAt||0) >= (local.savedAt||0) ? remote : local;
     const loserSide  = (remote.savedAt||0) >= (local.savedAt||0) ? local  : remote;
     const mergedBaseline = winnerSide.baseline ?? loserSide.baseline;
-    // todoOrder / agendaOrder: per-key arrays — winner's keys override loser's, loser fills any missing keys.
-    const mergedTodoOrder   = { ...(loserSide.todoOrder   || {}), ...(winnerSide.todoOrder   || {}) };
-    const mergedAgendaOrder = { ...(loserSide.agendaOrder || {}), ...(winnerSide.agendaOrder || {}) };
+    // agendaOrder: per-key LWW by entry.ts. Document-level savedAt is too coarse —
+    // any unrelated render or edit on the other device would otherwise overwrite a
+    // recent reorder. Tie-break favors remote, matching node LWW convention.
+    const readOrderEntry = v => {
+      if (Array.isArray(v)) return { ids: v, ts: 0 };       // pre-migration shape
+      if (v && Array.isArray(v.ids)) return { ids: v.ids, ts: typeof v.ts === 'number' ? v.ts : 0 };
+      return null;
+    };
+    const mergedAgendaOrder = {};
+    const orderKeys = new Set([
+      ...Object.keys(local.agendaOrder  || {}),
+      ...Object.keys(remote.agendaOrder || {}),
+    ]);
+    for (const k of orderKeys) {
+      const lv = readOrderEntry(local.agendaOrder?.[k]);
+      const rv = readOrderEntry(remote.agendaOrder?.[k]);
+      if (!lv) { if (rv) mergedAgendaOrder[k] = rv; continue; }
+      if (!rv) { mergedAgendaOrder[k] = lv; continue; }
+      mergedAgendaOrder[k] = rv.ts >= lv.ts ? rv : lv;
+    }
     const merged = validateAndRepair({
       nodes: sorted,
       tombstones: Array.from(tombstones),
       savedAt: Math.max(local.savedAt||0, remote.savedAt||0),
       crdtVersion: Math.max(local.crdtVersion||0, remote.crdtVersion||0) + 1,
       ...(mergedBaseline !== undefined && { baseline: mergedBaseline }),
-      todoOrder: mergedTodoOrder,
       agendaOrder: mergedAgendaOrder,
     });
 
@@ -5946,6 +5962,23 @@ function migrateCrdt(data) {
     // This makes mergeWeekData's sort stable and preserves original insertion order.
     if (typeof n._ts !== 'number') n._ts = fallbackTs + i;
   });
+  // agendaOrder shape: bare arrays → { ids, ts: 0 }. ts=0 makes legacy entries
+  // lose per-key LWW against any freshly-stamped reorder.
+  if (data.agendaOrder && typeof data.agendaOrder === 'object') {
+    for (const k of Object.keys(data.agendaOrder)) {
+      const v = data.agendaOrder[k];
+      if (Array.isArray(v)) {
+        data.agendaOrder[k] = { ids: v, ts: 0 };
+      } else if (!v || !Array.isArray(v.ids)) {
+        delete data.agendaOrder[k];
+      } else if (typeof v.ts !== 'number') {
+        v.ts = 0;
+      }
+    }
+  }
+  // todoOrder was carried by an earlier Todo-sidebar that no longer exists.
+  // Drop it so merge complexity doesn't pay rent on a dead field.
+  delete data.todoOrder;
   return data;
 }
 
@@ -8034,12 +8067,17 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
 // ── Agenda group ordering ────────────────────────────────────────────────────
 
 function loadAgendaGroupOrder(tabKey, group) {
-  return (weekData.agendaOrder || {})[`${tabKey}-${group}`] || [];
+  const entry = (weekData.agendaOrder || {})[`${tabKey}-${group}`];
+  if (Array.isArray(entry)) return entry;            // pre-migration shape
+  if (entry && Array.isArray(entry.ids)) return entry.ids;
+  return [];
 }
 
 function saveAgendaGroupOrder(tabKey, group, ids) {
   if (!weekData.agendaOrder) weekData.agendaOrder = {};
-  weekData.agendaOrder[`${tabKey}-${group}`] = ids;
+  // Per-key timestamp drives LWW in mergeWeekData — bumping a document-level
+  // savedAt would let any unrelated edit on another device clobber this order.
+  weekData.agendaOrder[`${tabKey}-${group}`] = { ids, ts: Date.now() };
   saveWeek(currentWeekKey, weekData);
 }
 
@@ -10574,7 +10612,9 @@ function renderAgendaTabContent() {
     const ordered = applyAgendaOrder(nodes, loadAgendaGroupOrder(tabKey, groupKey));
     // Higher priority always wins within a group; stable sort preserves user drag order within each priority bucket.
     ordered.sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
-    saveAgendaGroupOrder(tabKey, groupKey, ordered.map(n => n.id));
+    // No write-back here — saving on every render bumps the order's timestamp
+    // without user intent, which lets later renders on other devices clobber
+    // a fresh reorder via LWW. The drag-drop handlers are the only writers.
     if (ordered.length === 0) return;
     if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
     list.appendChild(makeSectionDivider(dividerLabel, ordered.length));
