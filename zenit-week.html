@@ -7556,7 +7556,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   // "+" add-child button (hidden for counter nodes, day-child leaves, and inbox nodes)
   if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.tickChild && !node?.inbox) {
     const bc = BRANCH_COLORS[branch] || { main: document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666' };
-    const btnColor = bc.main;
+    const btnColor = node?.done ? getThemeColors().DONE_BORDER : bc.main;
     const depth = getNodeDepth(id);
     const btnScale = depth <= 2 ? 1.5 : 1.125;
     const btnR = 10 * btnScale;
@@ -8679,6 +8679,13 @@ function updateNodeUI(nodeId) {
     g.querySelectorAll('use').forEach(u => {
       u.style.color = textColor;
     });
+  }
+
+  // "+" add-child button background follows done state
+  const addBtnCircle = g.querySelector('.add-btn .add-btn-inner > circle');
+  if (addBtnCircle) {
+    const bc = BRANCH_COLORS[node.branch] || { main: '#888' };
+    addBtnCircle.setAttribute('fill', node.done ? getThemeColors().DONE_BORDER : bc.main);
   }
 
   updateEdgeColorTo(nodeId);
