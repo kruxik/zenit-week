@@ -2488,9 +2488,11 @@
   #placeholder-panel {
     position: fixed;
     top: 66px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: auto;
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    width: fit-content;
+    max-width: calc(100vw - 16px);
     min-width: 260px;
     background: var(--glass-bg);
     backdrop-filter: blur(8px);
