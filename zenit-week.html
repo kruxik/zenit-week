@@ -7218,22 +7218,9 @@ function computeLayout() {
     let currentY = parentY - childrenH / 2;
 
     if (zig) {
-      // Standard column for non-zig siblings (placed first/top).
-      activeChildren.filter(cid => !isZigKid(cid)).forEach(cid => {
-        const child = findNode(cid);
-        const childH = heights[cid];
-        const { w, h } = getNodeSize(cid);
-        const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
-        const x = parentX + dir * (parentW / 2 + childGap + w / 2);
-        const y = currentY + childH / 2;
-        currentY += childH;
-        const finalX = x + (child.offX || 0);
-        const finalY = y + (child.offY || 0);
-        positions[cid] = { x: finalX, y: finalY, w, h, side };
-        layoutChildren(cid, finalX, finalY, side, w, depth + 1);
-      });
-      // Zigzag for managed leaves (day-children or tick-children). Index `di`
-      // counts only zig-kids so i % 2 never picks up a non-zig sibling.
+      // Zigzag block placed first (top). Index `di` counts only zig-kids so
+      // i % 2 never picks up a non-zig sibling.
+      const zigStartY = currentY;
       activeChildren.filter(isZigKid).forEach((cid, di) => {
         const child = findNode(cid);
         const { w, h } = getNodeSize(cid);
@@ -7243,6 +7230,22 @@ function computeLayout() {
         const x = groupBaseX + dir * (zig.maxW1 / 2 + (isStaggered ? zig.staggerX : 0));
         const y = currentY + zig.maxH / 2;
         currentY += zig.vStep;
+        const finalX = x + (child.offX || 0);
+        const finalY = y + (child.offY || 0);
+        positions[cid] = { x: finalX, y: finalY, w, h, side };
+        layoutChildren(cid, finalX, finalY, side, w, depth + 1);
+      });
+      // Snap to reserved zig block bottom so non-zig siblings below don't overlap.
+      currentY = zigStartY + zig.totalH;
+      // Standard column for non-zig siblings (placed below the zigzag block).
+      activeChildren.filter(cid => !isZigKid(cid)).forEach(cid => {
+        const child = findNode(cid);
+        const childH = heights[cid];
+        const { w, h } = getNodeSize(cid);
+        const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
+        const x = parentX + dir * (parentW / 2 + childGap + w / 2);
+        const y = currentY + childH / 2;
+        currentY += childH;
         const finalX = x + (child.offX || 0);
         const finalY = y + (child.offY || 0);
         positions[cid] = { x: finalX, y: finalY, w, h, side };
