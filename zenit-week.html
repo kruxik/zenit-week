@@ -2706,8 +2706,18 @@
     padding: 24px;
   }
   #single-tab-overlay.visible { display: flex; }
+  #single-tab-overlay .card {
+    background: var(--bg-surface);
+    border-radius: 8px;
+    box-shadow: 0 20px 60px var(--shadow-xl);
+    padding: 28px 32px;
+    max-width: calc(100vw - 40px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
   #single-tab-overlay h1 { font-weight: 400; margin-bottom: 12px; }
-  #single-tab-overlay p { opacity: 0.8; max-width: 400px; line-height: 1.5; }
+  #single-tab-overlay p { opacity: 0.8; max-width: 400px; line-height: 1.5; margin: 0; white-space: pre-line; }
   #single-tab-overlay .agenda-action-btn { margin-top: 24px; }
 </style>
 <!-- Theme init: runs synchronously before first paint to prevent flash of wrong theme -->
@@ -2748,9 +2758,10 @@
 </head>
 <body class="app-loading">
 <div id="single-tab-overlay">
-  <div>
+  <div class="card">
     <h1 data-i18n="blocked.title">Application Blocked</h1>
-    <p data-i18n="blocked.body">Zenit Week is already open in another tab. Use that tab — or take over here.</p>
+    <p data-i18n="blocked.body">Zenit Week is already open in another tab.
+Use that tab — or take over here.</p>
     <button id="single-tab-takeover-btn" class="agenda-action-btn" type="button" data-i18n="blocked.useHere">Use here</button>
   </div>
 </div>
@@ -5675,7 +5686,7 @@ const TRANSLATIONS = {
     'help.close':                 'Close',
     'filter.unscheduled':         'Unscheduled',
     'blocked.title':              'Application Blocked',
-    'blocked.body':               'Zenit Week is already open in another tab. Use that tab — or take over here.',
+    'blocked.body':               'Zenit Week is already open in another tab.\nUse that tab — or take over here.',
     'blocked.useHere':            'Use here',
     'filter.prefix':              'Filter',
     'filter.off':                 'Filter off',
@@ -5879,7 +5890,7 @@ const TRANSLATIONS = {
     'help.close':                 'Zavřít',
     'filter.unscheduled':         'Neplánované',
     'blocked.title':              'Aplikace je blokována',
-    'blocked.body':               'Zenit Week je již otevřen v jiném panelu. Pokračujte tam — nebo převezměte zde.',
+    'blocked.body':               'Zenit Week je již otevřen v jiném panelu.\nPokračujte tam — nebo převezměte zde.',
     'blocked.useHere':            'Pokračovat zde',
     'filter.prefix':              'Filtr',
     'filter.off':                 'Filtr vypnut',
