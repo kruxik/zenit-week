@@ -1931,9 +1931,10 @@
     cursor: grab;
     display: flex;
     align-items: center;
-    padding: 0 4px;
+    padding: 0 10px;
     font-size: 16px;
     transition: color 0.15s;
+    touch-action: none;
   }
   .agenda-drag-handle:hover { color: var(--text-muted); }
   .agenda-drag-handle:active { cursor: grabbing; }
@@ -10470,7 +10471,13 @@ function renderAgendaTabContent() {
       el.className = 'agenda-swipe-wrapper';
       el.dataset.group = groupKey;
       el.dataset.nodeId = node.id;
-      el.draggable = true;
+      // Native HTML5 DnD is enabled only while mousedown lives on the grip
+      // handle — mobile long-press on the row body must not initiate drag.
+      el.draggable = false;
+      el.addEventListener('mousedown', (e) => {
+        el.draggable = !!e.target.closest('.agenda-drag-handle');
+      });
+      el.addEventListener('mouseup', () => { el.draggable = false; });
       el.appendChild(swipeLeft);
       el.appendChild(swipeRight);
       el.appendChild(item);
@@ -10662,6 +10669,7 @@ function renderAgendaTabContent() {
         clearAgendaDropMarkers();
         cleanupDocDrag();
         dragSrcId = null;
+        el.draggable = false;
       });
 
       list.appendChild(el);
