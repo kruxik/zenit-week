@@ -364,7 +364,7 @@ describe('layout — tick-children zigzag', () => {
     expect(xs[0]).not.toBe(xs[1]);
   });
 
-  test('regular sibling added to tick-children parent stacks above zigzag', () => {
+  test('regular sibling added to tick-children parent stacks below zigzag', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 3x', true);
 
@@ -377,7 +377,7 @@ describe('layout — tick-children zigzag', () => {
 
     const positions = computeLayout();
     const ticks = tickKids(id);
-    // Regular sibling sits above (smaller y) than every zigzag tick.
-    expect(ticks.every(t => positions['reg1'].y < positions[t.id].y)).toBe(true);
+    // Regular sibling sits below (larger y) than every zigzag tick.
+    expect(ticks.every(t => positions['reg1'].y > positions[t.id].y)).toBe(true);
   });
 });
