@@ -10588,16 +10588,16 @@ function renderAgendaTabContent() {
           if (t) {
             const current = loadAgendaGroupOrder(tabKey, groupKey);
             const fromIdx = current.indexOf(touchSrcId);
-            if (fromIdx !== -1) {
+            const targetId = t.wrapper.dataset.nodeId;
+            if (fromIdx !== -1 && current.indexOf(targetId) !== -1) {
+              takeSnapshot();
               current.splice(fromIdx, 1);
-              const toIdx = current.indexOf(t.wrapper.dataset.nodeId);
-              if (toIdx !== -1) {
-                current.splice(t.before ? toIdx : toIdx + 1, 0, touchSrcId);
-                saveAgendaGroupOrder(tabKey, groupKey, current);
-                touchSrcId = null;
-                renderAgenda();
-                return;
-              }
+              const toIdx = current.indexOf(targetId);
+              current.splice(t.before ? toIdx : toIdx + 1, 0, touchSrcId);
+              saveAgendaGroupOrder(tabKey, groupKey, current);
+              touchSrcId = null;
+              renderAgenda();
+              return;
             }
           }
           touchSrcId = null;
@@ -10651,9 +10651,11 @@ function renderAgendaTabContent() {
           const current = loadAgendaGroupOrder(tabKey, groupKey);
           const fromIdx = current.indexOf(srcId);
           if (fromIdx === -1) return;
+          const targetId = t.wrapper.dataset.nodeId;
+          if (current.indexOf(targetId) === -1) return;
+          takeSnapshot();
           current.splice(fromIdx, 1);
-          const toIdx = current.indexOf(t.wrapper.dataset.nodeId);
-          if (toIdx === -1) return;
+          const toIdx = current.indexOf(targetId);
           current.splice(t.before ? toIdx : toIdx + 1, 0, srcId);
           saveAgendaGroupOrder(tabKey, groupKey, current);
           renderAgenda();
