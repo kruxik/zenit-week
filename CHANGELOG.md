@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.05.14] - 2026-05-14
+
+### Added
+
+- **release:** Add npm run release flow with git-cliff and auto GH Release
+- **single-tab:** Add "Use here" button to take over from blocked tab
+- **pwa:** Add Web App Manifest with high-res icons for Android home screen
+- **reschedule menu:** Add "Now"/"Nyní" item that sets today and pins to top
+- **agenda:** Enable swipe gestures on Done items (right=undone, left=menu)
+- **agenda:** Record manual sort drag in undo/redo history
+- **menu:** Mark today in Reschedule submenu with "(Today)/(Dnes)"
+- **agenda:** Add (now)/(teď) magic selector — freezes to today and pins to top of agenda
+- **days:** Add (today)/(dnes) and (tomorrow)/(zítra) magic selectors, frozen on edit
+
+### Changed
+
+- **reschedule menu:** Rename Clear-day action to Any / Kdykoli
+- **reschedule menu:** Replace "(Today)" suffix with blue today dot
+- **reschedule:** Extract pure computeDayReschedule helper; hotkey and context menu share state machine
+
+### Fixed
+
+- **pwa:** Set short_name to "Zenit Week" so Android launcher label matches full name
+- **pwa:** Drop 512 maskable so Chrome picks 1024 for sharp splash on HiDPI
+- **pwa:** Add 1024 icon sizes so HiDPI Android launchers stop softening the logo
+- **pwa:** Regenerate corrected 512 PNGs and harden icon generator
+- **pwa:** Use absolute icon URLs and allow self in img-src so manifest install works
+- **pwa:** Switch manifest icons to static PNGs to enable Android WebAPK install
+- **single-tab:** Wrap blocked overlay in surface card and break body to two lines
+- **pwa:** Use current path for manifest start_url and scope
+- **context menu:** Hide Reschedule on done activities
+- **agenda:** Highlight swipe action icon green when past release threshold
+- **agenda:** Restore desktop drag-reorder broken by mobile DnD fixes
+- **agenda:** Suppress long-press context menu on mobile
+- **agenda:** Restrict drag init to the grip handle, fixing mobile long-press drag
+- **agenda:** Keep reorder drag alive when pointer leaves row horizontally
+- **layout:** Place dropped non-zig siblings below zigzag block
+- **summary:** Center status panel via inset+margin so numbers don't wrap on mobile
+- **url:** Strip hash on current week; installed app ignores hash on cold start
+- **sync:** Per-key LWW for agendaOrder; drop dead todoOrder
+- **mindmap:** Measure text at effective pixel size so badge padding survives zoom-out
+- **agenda:** Strip day groups from prefix labels so "(mo)" doesn't leak into parent crumb
+- **reschedule:** Day-leaf context menu now replaces day instead of duplicating
+
 ## [v2026.05.13.2] - 2026-05-13
 
 ### Changed
