@@ -12286,8 +12286,16 @@ window.addEventListener('resize', () => {
 <div id="custom-tooltip"></div>
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  (function () {
+    var h = location.hostname;
+    var allowed = h === 'zenitweek.com' || h === 'www.zenitweek.com' || h.endsWith('.vercel.app');
+    if (!allowed) return;
+    var s = document.createElement('script');
+    s.defer = true;
+    s.src = '/_vercel/insights/script.js';
+    document.head.appendChild(s);
+  })();
 </script>
-<script defer src="/_vercel/insights/script.js"></script>
 </body>
 <!-- bstack-verify: d6b2f4e8c1a30975b4e2d6f8c1a30e79 -->
 </html>
