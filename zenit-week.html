@@ -5494,6 +5494,7 @@ const TRANSLATIONS = {
     'agenda.scheduled':           'Scheduled',
     'agenda.alreadyScheduled':    'Already scheduled for',
     'menu.reschedule':            'Reschedule',
+    'menu.now':                   'Now',
     'menu.clearDay':              'Any',
     'menu.today':                 'Today',
     'view.sand':                  'Sand',
@@ -5696,6 +5697,7 @@ const TRANSLATIONS = {
     'agenda.scheduled':           'Naplánováno',
     'agenda.alreadyScheduled':    'Již naplánováno pro',
     'menu.reschedule':            'Přeplánovat',
+    'menu.now':                   'Nyní',
     'menu.clearDay':              'Kdykoli',
     'menu.today':                 'Dnes',
     'view.sand':                  'Písek',
@@ -9791,6 +9793,43 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
         (parent.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild).map(c => c.dayIndex)
       );
       mode = 'leaf';
+    } else {
+      targetId = node.id;
+      assignedDays = parseTodoDays(node.label || '');
+      mode = 'activity-radio';
+    }
+
+    // "Now" — set to today and pin to top of today's agenda (mirrors the
+    // (now) magic-token effect). For leaf mode with a today-collision (another
+    // sibling already owns today) we silently fall through to just pinning.
+    const nowBtn = document.createElement('div');
+    nowBtn.className = 'ctx-item';
+    nowBtn.textContent = t('menu.now') || 'Now';
+    nowBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (mode === 'leaf') {
+        if (node.dayIndex !== todayIdx && !assignedDays.has(todayIdx)) {
+          applyDayReschedule(targetId, mode, {
+            currentDays: assignedDays,
+            currentDayIndex: node.dayIndex,
+            newDayIndex: todayIdx,
+          });
+        }
+      } else {
+        if (!(assignedDays.size === 1 && assignedDays.has(todayIdx))) {
+          takeSnapshot();
+          setActivityDays(targetId, new Set([todayIdx]), false);
+        }
+      }
+      pinToTopOfTodayAgenda(targetId);
+      afterMutation();
+    });
+    rescheduleSubmenu.appendChild(nowBtn);
+    const nowSep = document.createElement('div');
+    nowSep.className = 'ctx-separator';
+    rescheduleSubmenu.appendChild(nowSep);
+
+    if (mode === 'leaf') {
       AGENDA_DAY_ORDER.forEach(dayIdx => {
         const isThis      = node.dayIndex === dayIdx;
         const isAssigned  = assignedDays.has(dayIdx);
@@ -9811,9 +9850,6 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
         rescheduleSubmenu.appendChild(btn);
       });
     } else {
-      targetId = node.id;
-      assignedDays = parseTodoDays(node.label || '');
-      mode = 'activity-radio';
       AGENDA_DAY_ORDER.forEach(dayIdx => {
         const isAssigned = assignedDays.has(dayIdx);
         const btn = document.createElement('div');
