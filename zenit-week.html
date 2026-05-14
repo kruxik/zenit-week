@@ -2708,6 +2708,7 @@
   #single-tab-overlay.visible { display: flex; }
   #single-tab-overlay h1 { font-weight: 400; margin-bottom: 12px; }
   #single-tab-overlay p { opacity: 0.8; max-width: 400px; line-height: 1.5; }
+  #single-tab-overlay .agenda-action-btn { margin-top: 24px; }
 </style>
 <!-- Theme init: runs synchronously before first paint to prevent flash of wrong theme -->
 <script>
@@ -2749,7 +2750,8 @@
 <div id="single-tab-overlay">
   <div>
     <h1 data-i18n="blocked.title">Application Blocked</h1>
-    <p data-i18n="blocked.body">Zenit Week is already open in another tab. Please use that tab or close it to continue here.</p>
+    <p data-i18n="blocked.body">Zenit Week is already open in another tab. Use that tab — or take over here.</p>
+    <button id="single-tab-takeover-btn" class="agenda-action-btn" type="button" data-i18n="blocked.useHere">Use here</button>
   </div>
 </div>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -3472,11 +3474,23 @@ tabChannel.onmessage = (e) => {
     tabChannel.postMessage('pong');
   } else if (e.data === 'pong') {
     showBlockedOverlay();
+  } else if (e.data === 'takeover') {
+    // Another tab claimed the lock — block this one (do not reload, preserve current view).
+    showBlockedOverlay();
   }
 };
 
 // Initial check: ping other tabs. If any pong back, block this one.
 tabChannel.postMessage('ping');
+
+// "Use here" button — broadcast takeover, then reload to start with fresh state.
+document.getElementById('single-tab-takeover-btn').addEventListener('click', () => {
+  const btn = document.getElementById('single-tab-takeover-btn');
+  btn.disabled = true;
+  tabChannel.postMessage('takeover');
+  // Small delay so the broadcast lands in other tabs before this one reloads.
+  setTimeout(() => { location.reload(); }, 120);
+});
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
 const DB_NAME = 'zenit-week-db';
@@ -5661,7 +5675,8 @@ const TRANSLATIONS = {
     'help.close':                 'Close',
     'filter.unscheduled':         'Unscheduled',
     'blocked.title':              'Application Blocked',
-    'blocked.body':               'Zenit Week is already open in another tab. Please use that tab or close it to continue here.',
+    'blocked.body':               'Zenit Week is already open in another tab. Use that tab — or take over here.',
+    'blocked.useHere':            'Use here',
     'filter.prefix':              'Filter',
     'filter.off':                 'Filter off',
     'filter.alreadyScheduled':    'Already scheduled for',
@@ -5864,7 +5879,8 @@ const TRANSLATIONS = {
     'help.close':                 'Zavřít',
     'filter.unscheduled':         'Neplánované',
     'blocked.title':              'Aplikace je blokována',
-    'blocked.body':               'Zenit Week je již otevřen v jiném panelu. Pokračujte tam, nebo jej zavřete a pokračujte zde.',
+    'blocked.body':               'Zenit Week je již otevřen v jiném panelu. Pokračujte tam — nebo převezměte zde.',
+    'blocked.useHere':            'Pokračovat zde',
     'filter.prefix':              'Filtr',
     'filter.off':                 'Filtr vypnut',
     'filter.alreadyScheduled':    'Již naplánováno pro',
