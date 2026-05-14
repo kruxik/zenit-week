@@ -1,0 +1,92 @@
+#!/usr/bin/env node
+// Generate static PNG icons for the PWA manifest, rendered from the same
+// canvas brandmark code that draws favicons in zenit-week.html.
+//
+// Why static files: Android Chrome only builds a real WebAPK (no browser
+// badge on the home-screen icon) when the manifest icons resolve to real
+// fetchable URLs. Inline `data:` URLs work for desktop but cause Chrome
+// to install a shortcut instead — hence the Chrome-icon overlay.
+//
+// Outputs:
+//   assets/icon-192.png         purpose "any" — 192x192 with rounded bg
+//   assets/icon-512.png         purpose "any" — 512x512 with rounded bg
+//   assets/icon-512-maskable.png purpose "maskable" — 70% safe zone
+
+import { chromium } from 'playwright';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { Buffer } from 'node:buffer';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ASSETS_DIR = resolve(__dirname, '..', 'assets');
+
+const HTML = `<!doctype html><html><body><canvas id="c"></canvas><script>
+function drawBrandmark(ctx, size, rootFill) {
+  const s = size / 64;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3.5 * s;
+  ctx.strokeStyle = '#A259FF';
+  ctx.beginPath(); ctx.moveTo(18*s, 32*s); ctx.bezierCurveTo(32*s, 32*s, 32*s, 14*s, 42*s, 14*s); ctx.stroke();
+  ctx.strokeStyle = '#1ABCFE';
+  ctx.beginPath(); ctx.moveTo(18*s, 32*s); ctx.bezierCurveTo(32*s, 32*s, 32*s, 50*s, 42*s, 50*s); ctx.stroke();
+  ctx.fillStyle = rootFill;
+  ctx.beginPath(); ctx.arc(12*s, 32*s, 7*s, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#A259FF';
+  ctx.beginPath(); ctx.arc(48*s, 14*s, 5*s, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#1ABCFE';
+  ctx.beginPath(); ctx.arc(48*s, 50*s, 5*s, 0, Math.PI*2); ctx.fill();
+}
+window.renderAny = (size) => {
+  const c = document.getElementById('c');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#181825';
+  if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(0, 0, size, size, size * 0.22); ctx.fill(); }
+  else ctx.fillRect(0, 0, size, size);
+  drawBrandmark(ctx, size, '#f0f0f0');
+  return c.toDataURL('image/png');
+};
+window.renderMaskable = (size) => {
+  const c = document.getElementById('c');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0, 0, size, size);
+  ctx.translate(size * 0.15, size * 0.15);
+  ctx.scale(0.7, 0.7);
+  drawBrandmark(ctx, size, '#f0f0f0');
+  return c.toDataURL('image/png');
+};
+</script></body></html>`;
+
+function dataUrlToBuffer(dataUrl) {
+  const comma = dataUrl.indexOf(',');
+  return Buffer.from(dataUrl.slice(comma + 1), 'base64');
+}
+
+async function main() {
+  mkdirSync(ASSETS_DIR, { recursive: true });
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(HTML);
+
+    const targets = [
+      { fn: 'renderAny',      size: 192, out: 'icon-192.png' },
+      { fn: 'renderAny',      size: 512, out: 'icon-512.png' },
+      { fn: 'renderMaskable', size: 512, out: 'icon-512-maskable.png' },
+    ];
+
+    for (const t of targets) {
+      const dataUrl = await page.evaluate(([fn, size]) => window[fn](size), [t.fn, t.size]);
+      const outPath = resolve(ASSETS_DIR, t.out);
+      writeFileSync(outPath, dataUrlToBuffer(dataUrl));
+      console.log(`[pwa-icons] wrote ${t.out} (${t.size}x${t.size})`);
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+main().catch(err => { console.error(err); process.exit(1); });
