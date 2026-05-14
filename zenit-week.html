@@ -10431,12 +10431,40 @@ function renderAgendaTabContent() {
   list.className = 'agenda-item-list';
   content.appendChild(list);
 
+  // Enable native HTML5 DnD only when the primary pointer is a mouse — on
+  // touch-primary devices, leaving the wrapper non-draggable keeps long-press
+  // from engaging the broken native drag (the touch path handles those cases).
+  const AGENDA_NATIVE_DND = window.matchMedia('(pointer: fine)').matches;
+
   function makeDragZone(nodes, groupKey, buildFn) {
     let dragSrcId = null;
 
     function clearAgendaDropMarkers() {
       list.querySelectorAll('.agenda-swipe-wrapper').forEach(w =>
         w.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
+    }
+
+    // Builds the full group order for a drop: saved order first (so prior
+    // manual sort persists), with any rendered items not yet in the saved
+    // order appended in DOM order. Detached from the live weekData ref so
+    // splices don't mutate it before takeSnapshot. renderGroup intentionally
+    // stopped seeding on every render (commit 93b372d) to protect Drive LWW,
+    // so partial saved orders are the norm — they must be widened here.
+    function currentGroupOrder() {
+      const saved = loadAgendaGroupOrder(tabKey, groupKey);
+      const domIds = Array.from(list.querySelectorAll(
+        `.agenda-swipe-wrapper[data-group="${CSS.escape(groupKey)}"]`
+      )).map(w => w.dataset.nodeId);
+      const domSet = new Set(domIds);
+      const seen = new Set();
+      const order = [];
+      for (const id of saved) {
+        if (domSet.has(id) && !seen.has(id)) { order.push(id); seen.add(id); }
+      }
+      for (const id of domIds) {
+        if (!seen.has(id)) order.push(id);
+      }
+      return order;
     }
 
     // Picks insertion slot by Y only — ignores X so drag handle slipping out
@@ -10468,13 +10496,14 @@ function renderAgendaTabContent() {
       el.className = 'agenda-swipe-wrapper';
       el.dataset.group = groupKey;
       el.dataset.nodeId = node.id;
-      // Native HTML5 DnD is enabled only while mousedown lives on the grip
-      // handle — mobile long-press on the row body must not initiate drag.
-      el.draggable = false;
+      // Native HTML5 DnD opt-in is decided by primary-pointer type so mobile
+      // long-press can't engage the broken native drag. On desktop, dragstart
+      // gates on whether the mousedown originated on the grip handle.
+      el.draggable = AGENDA_NATIVE_DND;
+      let mousedownOnHandle = false;
       el.addEventListener('mousedown', (e) => {
-        el.draggable = !!e.target.closest('.agenda-drag-handle');
+        mousedownOnHandle = !!e.target.closest('.agenda-drag-handle');
       });
-      el.addEventListener('mouseup', () => { el.draggable = false; });
       el.appendChild(swipeLeft);
       el.appendChild(swipeRight);
       el.appendChild(item);
@@ -10586,7 +10615,7 @@ function renderAgendaTabContent() {
           const touch = e.changedTouches[0];
           const t = findAgendaDropTargetByY(touch.clientY, touchSrcId);
           if (t) {
-            const current = loadAgendaGroupOrder(tabKey, groupKey);
+            const current = currentGroupOrder();
             const fromIdx = current.indexOf(touchSrcId);
             const targetId = t.wrapper.dataset.nodeId;
             if (fromIdx !== -1 && current.indexOf(targetId) !== -1) {
@@ -10627,6 +10656,7 @@ function renderAgendaTabContent() {
         docDrop = null;
       };
       el.addEventListener('dragstart', (e) => {
+        if (!mousedownOnHandle) { e.preventDefault(); return; }
         dragSrcId = node.id;
         e.dataTransfer.effectAllowed = 'move';
         requestAnimationFrame(() => el.classList.add('agenda-item-dragging'));
@@ -10648,7 +10678,7 @@ function renderAgendaTabContent() {
           clearAgendaDropMarkers();
           cleanupDocDrag();
           if (!t) return;
-          const current = loadAgendaGroupOrder(tabKey, groupKey);
+          const current = currentGroupOrder();
           const fromIdx = current.indexOf(srcId);
           if (fromIdx === -1) return;
           const targetId = t.wrapper.dataset.nodeId;
@@ -10668,7 +10698,7 @@ function renderAgendaTabContent() {
         clearAgendaDropMarkers();
         cleanupDocDrag();
         dragSrcId = null;
-        el.draggable = false;
+        mousedownOnHandle = false;
       });
 
       list.appendChild(el);
