@@ -3,15 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="
-  default-src 'none';
-  script-src  'self' 'unsafe-inline' https://apis.google.com https://vercel.live;
-  connect-src 'self' https://*.googleapis.com;
-  img-src     data: https://*.googleusercontent.com;
-  style-src   'unsafe-inline';
-  base-uri    'none';
-  object-src  'none';
-  frame-src   https://content.googleapis.com https://vercel.live;
-  form-action 'none';
+  default-src  'none';
+  script-src   'self' 'unsafe-inline' https://apis.google.com https://vercel.live;
+  connect-src  'self' https://*.googleapis.com;
+  img-src      data: https://*.googleusercontent.com;
+  style-src    'unsafe-inline';
+  manifest-src 'self' data:;
+  base-uri     'none';
+  object-src   'none';
+  frame-src    https://content.googleapis.com https://vercel.live;
+  form-action  'none';
 ">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#ffffff">
@@ -68,6 +69,40 @@
   document.getElementById('favicon-16').href  = makePng(16,  null,      rootFill);
   document.getElementById('favicon-32').href  = makePng(32,  null,      rootFill);
   document.getElementById('favicon-180').href = makePng(180, '#181825', '#f0f0f0');
+
+  // Web App Manifest with high-res icons for Android "Add to Home Screen"
+  // (Chrome / Samsung Internet pick install icon from manifest before favicons)
+  function makeMaskablePng(size) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, size, size);
+    // 70% safe zone — OS masks to circle/squircle on Android
+    ctx.translate(size * 0.15, size * 0.15);
+    ctx.scale(0.7, 0.7);
+    drawBrandmark(ctx, size, '#f0f0f0');
+    return c.toDataURL('image/png');
+  }
+
+  const manifest = {
+    name: 'Zenit Week',
+    short_name: 'Zenit',
+    start_url: '.',
+    scope: '.',
+    display: 'standalone',
+    background_color: '#181825',
+    theme_color: '#ffffff',
+    icons: [
+      { src: makePng(192, '#181825', '#f0f0f0'), sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: makePng(512, '#181825', '#f0f0f0'), sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: makeMaskablePng(512),               sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+    ]
+  };
+  const manifestLink = document.createElement('link');
+  manifestLink.rel = 'manifest';
+  manifestLink.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+  document.head.appendChild(manifestLink);
 })();
 </script>
 <style>
