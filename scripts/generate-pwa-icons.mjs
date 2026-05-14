@@ -57,13 +57,17 @@ function newCanvas(size) {
   c.width = c.height = size;
   return c;
 }
-function addWatermark(ctx, size, label) {
+function drawCenteredLabel(ctx, size, label) {
   ctx.save();
   ctx.fillStyle = '#FFEB3B';
-  const fontPx = Math.round(size * 0.12);
+  // Font size shrinks slightly as the label gets longer so 4-char strings
+  // ("1024m") still fit comfortably inside the safe zone.
+  const factor = label.length >= 5 ? 0.26 : label.length >= 4 ? 0.30 : 0.36;
+  const fontPx = Math.round(size * factor);
   ctx.font = 'bold ' + fontPx + 'px sans-serif';
-  ctx.textBaseline = 'top';
-  ctx.fillText(label, size * 0.06, size * 0.06);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, size / 2, size / 2);
   ctx.restore();
 }
 window.renderAny = (size, watermark) => {
@@ -72,8 +76,13 @@ window.renderAny = (size, watermark) => {
   ctx.fillStyle = '#181825';
   if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(0, 0, size, size, size * 0.22); ctx.fill(); }
   else ctx.fillRect(0, 0, size, size);
-  drawBrandmark(ctx, size, '#f0f0f0');
-  if (watermark) addWatermark(ctx, size, String(size));
+  if (watermark) {
+    // Diagnostic mode: replace the brandmark with a big centered size
+    // label so the picked icon is unambiguous on launcher and splash.
+    drawCenteredLabel(ctx, size, String(size));
+  } else {
+    drawBrandmark(ctx, size, '#f0f0f0');
+  }
   return c.toDataURL('image/png');
 };
 window.renderMaskable = (size, watermark) => {
@@ -82,15 +91,14 @@ window.renderMaskable = (size, watermark) => {
   ctx.fillStyle = '#181825';
   ctx.fillRect(0, 0, size, size);
   if (watermark) {
-    // Watermark BEFORE the safe-zone transform so it sits at the true
-    // canvas corner — it'll be clipped by adaptive-icon masking on the
-    // launcher (good — proves the maskable icon was used) but visible
-    // wherever the icon is rendered unmasked.
-    addWatermark(ctx, size, String(size) + 'm');
+    // Label sits at the true canvas center, fully inside the 70% safe
+    // zone — survives adaptive-icon masking on the launcher.
+    drawCenteredLabel(ctx, size, String(size) + 'm');
+  } else {
+    ctx.translate(size * 0.15, size * 0.15);
+    ctx.scale(0.7, 0.7);
+    drawBrandmark(ctx, size, '#f0f0f0');
   }
-  ctx.translate(size * 0.15, size * 0.15);
-  ctx.scale(0.7, 0.7);
-  drawBrandmark(ctx, size, '#f0f0f0');
   return c.toDataURL('image/png');
 };
 </script></body></html>`;
