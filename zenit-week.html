@@ -6885,7 +6885,7 @@ function addBranch(side) {
   saveBranchColors();
   saveWeek(currentWeekKey, weekData);
   _openInlineInput(id, true);
-  smoothPanToRevealNode(id);
+  revealNewlyEditedNode(id);
 }
 
 function deleteBranch(id) {
@@ -7764,7 +7764,49 @@ function resizeInlineInput() {
   render();
 }
 
-let _panAnimCancelled = false;
+let _panAnimToken = 0;
+
+// Reveal the newly-created node after the inline editor opens. Desktop animates
+// to center. Mobile is fully handled by _panEditNodeToVisibleArea (350ms
+// fallback in _openInlineInput + visualViewport.resize listener), which centers
+// the input in the remaining canvas area below the toolbar and above the keyboard.
+function revealNewlyEditedNode(nodeId) {
+  if (isMobile) return;
+  smoothPanToRevealNode(nodeId);
+}
+
+// Eased animation from current panX/panY to a target. Cancels any in-flight
+// animation; restarts smoothly from current values so repeated calls (e.g.
+// debounced vv.resize during a keyboard opening) compose without snapping.
+function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
+  const startX = panX, startY = panY;
+  const startTime = performance.now();
+  const myToken = ++_panAnimToken;     // claim this animation slot (cancels any in-flight)
+  const rect = container.getBoundingClientRect();
+  const positions = computeLayout();
+  const pos = nodeId ? positions[nodeId] : null;
+
+  function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+
+  function step(now) {
+    if (myToken !== _panAnimToken) return;   // superseded by a newer call
+    const t = Math.min((now - startTime) / duration, 1);
+    const e = ease(t);
+    panX = startX + (targetPanX - startX) * e;
+    panY = startY + (targetPanY - startY) * e;
+    applyTransform();
+
+    if (pos && editState && editState.nodeId === nodeId) {
+      const iW = inlineInput.offsetWidth;
+      const iH = inlineInput.offsetHeight;
+      inlineInput.style.left = (rect.left + panX + pos.x * zoom - iW / 2) + 'px';
+      inlineInput.style.top  = (rect.top  + panY + pos.y * zoom - iH / 2) + 'px';
+    }
+
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
 
 function smoothPanToRevealNode(nodeId) {
   const positions = computeLayout();
@@ -7781,33 +7823,7 @@ function smoothPanToRevealNode(nodeId) {
   if (nodeScreenX > margin && nodeScreenX < cW - margin &&
       nodeScreenY > margin && nodeScreenY < cH - margin) return;
 
-  const targetPanX = cW / 2 - pos.x * zoom;
-  const targetPanY = cH / 2 - pos.y * zoom;
-  const startX = panX, startY = panY;
-  const duration = 350;
-  const startTime = performance.now();
-  _panAnimCancelled = false;
-
-  function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
-
-  function step(now) {
-    if (_panAnimCancelled) return;
-    const t = Math.min((now - startTime) / duration, 1);
-    const e = ease(t);
-    panX = startX + (targetPanX - startX) * e;
-    panY = startY + (targetPanY - startY) * e;
-    applyTransform();
-
-    if (editState && editState.nodeId === nodeId) {
-      const iW = inlineInput.offsetWidth;
-      const iH = inlineInput.offsetHeight;
-      inlineInput.style.left = (rect.left + panX + pos.x * zoom - iW / 2) + 'px';
-      inlineInput.style.top  = (rect.top  + panY + pos.y * zoom - iH / 2) + 'px';
-    }
-
-    if (t < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
+  animatePanTo(cW / 2 - pos.x * zoom, cH / 2 - pos.y * zoom, nodeId);
 }
 
 function createDayChild(parentId, dayIndex) {
@@ -8354,8 +8370,9 @@ function startAddNode(parentId) {
   rebuildNodeMap();
   parent.children.push(id);
   syncStatusUp(id, 'done');
+
   _openInlineInput(id, true);
-  smoothPanToRevealNode(id);
+  revealNewlyEditedNode(id);
 }
 
 function startRenameNode(nodeId) {
@@ -8458,12 +8475,15 @@ function _openInlineInput(nodeId, isNew) {
 
   resizeInlineInput();
 
-  inlineInput.focus();
+  // preventScroll keeps the browser from auto-scrolling the body to bring the
+  // focused input into view — we manage canvas pan ourselves once the soft
+  // keyboard has finished animating open (see vv.resize listener below).
+  inlineInput.focus({ preventScroll: true });
   if (!isNew) inlineInput.select();
 
   // Fallback for devices where visualViewport.resize fires unreliably:
-  // re-pan after a short delay once the keyboard has had time to open.
-  setTimeout(_panEditNodeToVisibleArea, 350);
+  // re-pan after the keyboard has had time to settle.
+  setTimeout(_panEditNodeToVisibleArea, 500);
 }
 
 function commitEdit(followUp = 'auto') {
@@ -8580,37 +8600,56 @@ inlineInput.addEventListener('blur', () => { if (editState) commitEdit(); });
 inlineInput.addEventListener('pointerdown', (e) => e.stopPropagation());
 inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 
-// On mobile, re-pan when soft keyboard opens and shrinks the visible viewport.
-// Debounced on a 50ms trailing window so we always act on the final stable
-// viewport height regardless of how long the keyboard animation takes.
+// Mobile-only: center the editing node inside the remaining visible canvas
+// (between the toolbar at the top and the soft keyboard at the bottom). Acts
+// in both axes. Only re-pans when the node + input doesn't already fit in the
+// remaining area, mirroring the "don't move if visible" desktop rule.
+// Fires from: 500ms fallback in _openInlineInput, and visualViewport.resize
+// listener (debounced to fire only after the keyboard finishes animating).
 function _panEditNodeToVisibleArea() {
-  if (!editState || !window.visualViewport) return;
-  const vv = window.visualViewport;
-  // Only act when keyboard is actually open (viewport shrunk by ≥25%)
-  if (vv.height >= window.innerHeight * 0.75) return;
+  if (!editState || !isMobile) return;
   const positions = computeLayout();
   const pos = positions[editState.nodeId];
   if (!pos) return;
 
-  _panAnimCancelled = true; // stop any in-flight smoothPan animation
+  const vv = window.visualViewport;
+  const toolbarEl = document.getElementById('toolbar');
+  const toolbarBottom = toolbarEl ? toolbarEl.getBoundingClientRect().bottom : 0;
+
+  const visLeft   = vv ? vv.offsetLeft : 0;
+  const visRight  = vv ? vv.offsetLeft + vv.width  : window.innerWidth;
+  const visTop    = Math.max(toolbarBottom, vv ? vv.offsetTop : 0);
+  const visBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+
   const rect = container.getBoundingClientRect();
-  // Place node at 38% from top of visible area (comfortably above keyboard)
-  const targetScreenY = vv.offsetTop + vv.height * 0.38;
-  panY = targetScreenY - rect.top - pos.y * zoom;
-  applyTransform();
+  const nodeScreenX = rect.left + panX + pos.x * zoom;
+  const nodeScreenY = rect.top  + panY + pos.y * zoom;
 
   const iW = inlineInput.offsetWidth;
   const iH = inlineInput.offsetHeight;
-  inlineInput.style.left = (rect.left + panX + pos.x * zoom - iW / 2) + 'px';
-  inlineInput.style.top  = (rect.top  + panY + pos.y * zoom - iH / 2) + 'px';
+  const margin = 12;
+  const fitsX = (nodeScreenX - iW / 2) >= visLeft + margin &&
+                (nodeScreenX + iW / 2) <= visRight - margin;
+  const fitsY = (nodeScreenY - iH / 2) >= visTop  + margin &&
+                (nodeScreenY + iH / 2) <= visBottom - margin;
+  if (fitsX && fitsY) return;
+
+  const targetScreenX = (visLeft + visRight) / 2;
+  const targetScreenY = (visTop  + visBottom) / 2;
+  const targetPanX = targetScreenX - rect.left - pos.x * zoom;
+  const targetPanY = targetScreenY - rect.top  - pos.y * zoom;
+  animatePanTo(targetPanX, targetPanY, editState.nodeId, 300);
 }
 
 if (window.visualViewport) {
   let _vpResizeTimer = null;
   window.visualViewport.addEventListener('resize', () => {
     if (!editState) return;
+    // Long debounce: fire only after the soft keyboard finishes animating
+    // open (typical animation is ~250-300ms). Panning while the viewport
+    // is still resizing produces jerky multi-step motion.
     clearTimeout(_vpResizeTimer);
-    _vpResizeTimer = setTimeout(_panEditNodeToVisibleArea, 50);
+    _vpResizeTimer = setTimeout(_panEditNodeToVisibleArea, 250);
   });
 }
 
