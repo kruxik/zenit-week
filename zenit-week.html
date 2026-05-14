@@ -87,12 +87,13 @@
       // Manifest is served as a data: URL, so icon URLs must be absolute —
       // relative or path-only URLs have no base to resolve against and the
       // manifest silently fails to parse, killing the install prompt.
-      // 1024 sizes added for xxxhdpi+ Android launchers that otherwise
-      // resample 512 up and soften the brandmark edges.
+      // Only one maskable size: Chrome was picking 512 maskable for the
+      // splash screen (~192dp ≈ 768px on xxxhdpi) and upscaling it —
+      // soft. With 1024 as the only maskable Chrome is forced onto it for
+      // both launcher and splash, both rendered via clean downscale.
       { src: location.origin + '/assets/icon-192.png',           sizes: '192x192',   type: 'image/png', purpose: 'any' },
       { src: location.origin + '/assets/icon-512.png',           sizes: '512x512',   type: 'image/png', purpose: 'any' },
       { src: location.origin + '/assets/icon-1024.png',          sizes: '1024x1024', type: 'image/png', purpose: 'any' },
-      { src: location.origin + '/assets/icon-512-maskable.png',  sizes: '512x512',   type: 'image/png', purpose: 'maskable' },
       { src: location.origin + '/assets/icon-1024-maskable.png', sizes: '1024x1024', type: 'image/png', purpose: 'maskable' }
     ]
   };

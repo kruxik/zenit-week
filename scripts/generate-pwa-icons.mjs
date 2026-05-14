@@ -11,11 +11,14 @@
 //   assets/icon-192.png           purpose "any"      — 192  rounded bg
 //   assets/icon-512.png           purpose "any"      — 512  rounded bg
 //   assets/icon-1024.png          purpose "any"      — 1024 rounded bg (HiDPI)
-//   assets/icon-512-maskable.png  purpose "maskable" — 512  70% safe zone
-//   assets/icon-1024-maskable.png purpose "maskable" — 1024 70% safe zone (HiDPI)
+//   assets/icon-1024-maskable.png purpose "maskable" — 1024 70% safe zone
 //
-// 1024 sizes exist because Android xxxhdpi+ launchers resample 512 up,
-// softening the brandmark edges. Native-resolution avoids the blur.
+// Only one maskable size: 512 maskable was confirmed via the watermark
+// trick to be the icon Chrome picked for the Android splash screen
+// (~192dp ≈ 768px on xxxhdpi), and upscaling 512→768 softens the
+// brandmark. With only 1024 maskable in the manifest Chrome is forced
+// to use it for both launcher (clean downscale) and splash (clean
+// downscale) so both render sharp.
 //
 // Diagnostic mode:
 //   WATERMARK=1 node scripts/generate-pwa-icons.mjs
@@ -119,7 +122,6 @@ async function main() {
       { fn: 'renderAny',      size: 192,  out: 'icon-192.png' },
       { fn: 'renderAny',      size: 512,  out: 'icon-512.png' },
       { fn: 'renderAny',      size: 1024, out: 'icon-1024.png' },
-      { fn: 'renderMaskable', size: 512,  out: 'icon-512-maskable.png' },
       { fn: 'renderMaskable', size: 1024, out: 'icon-1024-maskable.png' },
     ];
 
