@@ -3145,6 +3145,7 @@
         </div>
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.multipleDaysA">Multiple days: </span><strong data-i18n="help.multipleDaysKey">(mo, we, fr)</strong><span data-i18n="help.multipleDaysB"> — spaces or commas both work.</span></div>
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.everyDayA">Every day: type </span><strong data-i18n="help.everyDayKey">(daily)</strong><span data-i18n="help.everyDayB"> and it expands to all 7 days.</span></div>
+        <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.relativeDayA">Relative: </span><strong data-i18n="help.relativeDayKey">(today)</strong><span data-i18n="help.relativeDayMid"> or </span><strong data-i18n="help.relativeDayKey2">(tomorrow)</strong><span data-i18n="help.relativeDayB"> — frozen to the actual weekday when you save.</span></div>
       </div>
 
       <div class="help-section">
@@ -3939,6 +3940,10 @@ Object.entries(SCHED_DAY_TOKENS).forEach(([day, tokens]) => {
 });
 // Daily indicator tokens (EN + CS + CS without diacritics), case-insensitive
 const SCHED_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
+// Magic relative-day tokens — frozen to a concrete day abbr at edit-commit time
+// (see resolveMagicDayTokens / applyMagicLabel).
+const SCHED_TODAY_TOKENS = new Set(['today', 'dnes']);
+const SCHED_TOMORROW_TOKENS = new Set(['tomorrow', 'zítra', 'zitra']);
 
 // Canonical day labels per language (0=Sun … 6=Sat)
 const DAY_LABELS = {
@@ -3983,6 +3988,31 @@ function getEffectiveDays(node) {
     cur = findNode(cur.parent);
   }
   return new Set();
+}
+
+// Rewrites magic relative-day tokens ("today"/"dnes", "tomorrow"/"zítra")
+// inside (…) groups to the concrete day abbr for the *real-world* current day
+// in the active language. Called once at edit-commit time so the stored label
+// freezes to e.g. "(Th)" — the schedule does not silently shift as days pass.
+// Replacement is per-token: "(today, mo)" on Thursday → "(Th, mo)". Groups
+// with no magic tokens are passed through unchanged. The function is
+// idempotent — running it on an already-frozen label is a no-op.
+function resolveMagicDayTokens(label, now = new Date()) {
+  const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+  const todayIdx = now.getDay();
+  const tomorrowIdx = (todayIdx + 1) % 7;
+  return label.replace(/\(([^)]+)\)/g, (match, inner) => {
+    let changed = false;
+    // split keeps separators (whitespace + commas) so we can reassemble verbatim
+    const parts = inner.split(/([\s,]+)/);
+    const rebuilt = parts.map(part => {
+      const tok = part.toLowerCase();
+      if (SCHED_TODAY_TOKENS.has(tok))    { changed = true; return langLabels[todayIdx]; }
+      if (SCHED_TOMORROW_TOKENS.has(tok)) { changed = true; return langLabels[tomorrowIdx]; }
+      return part;
+    }).join('');
+    return changed ? `(${rebuilt})` : match;
+  });
 }
 
 // Strips only (…) groups that are valid day-pattern groups from a label.
@@ -5516,6 +5546,11 @@ const TRANSLATIONS = {
     'help.everyDayA':             'Every day: type ',
     'help.everyDayKey':           '(daily)',
     'help.everyDayB':             ' and it expands to all 7 days.',
+    'help.relativeDayA':          'Relative: ',
+    'help.relativeDayKey':        '(today)',
+    'help.relativeDayMid':        ' or ',
+    'help.relativeDayKey2':       '(tomorrow)',
+    'help.relativeDayB':          ' — frozen to the actual weekday when you save.',
     'help.countersTitle':         'Magic counters',
     'help.countersDescA':         'Add ',
     'help.countersDescKey':       'Nx',
@@ -5709,6 +5744,11 @@ const TRANSLATIONS = {
     'help.everyDayA':             'Každý den: napište ',
     'help.everyDayKey':           '(denně)',
     'help.everyDayB':             ' a rozšíří se na všech 7 dnů.',
+    'help.relativeDayA':          'Relativně: ',
+    'help.relativeDayKey':        '(dnes)',
+    'help.relativeDayMid':        ' nebo ',
+    'help.relativeDayKey2':       '(zítra)',
+    'help.relativeDayB':          ' — při uložení se zapíše konkrétní zkratka dne.',
     'help.countersTitle':         'Magická počítadla',
     'help.countersDescA':         'Přidejte ',
     'help.countersDescKey':       'Nx',
@@ -7734,6 +7774,13 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false) {
 function applyMagicLabel(nodeId) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity' || node.dayChild || node.tickChild) return;
+  // Freeze magic relative-day tokens (today/tomorrow/dnes/zítra) to concrete
+  // abbrs before any day-parsing logic reads the label.
+  const resolved = resolveMagicDayTokens(node.label || '');
+  if (resolved !== node.label) {
+    node.label = resolved;
+    touchNode(nodeId);
+  }
   const label = node.label || '';
   const parsedDays = parseTodoDays(label);
   // Existing day-children promote the node to multi-day mode regardless of

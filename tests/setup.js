@@ -520,6 +520,7 @@ export const {
   getDayFilterOpacity,
   parseTodoDays,
   stripDayGroups,
+  resolveMagicDayTokens,
   commitEdit,
   applyMagicLabel,
   migrateDayCounters,
