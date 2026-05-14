@@ -88,8 +88,8 @@
   const manifest = {
     name: 'Zenit Week',
     short_name: 'Zenit',
-    start_url: '.',
-    scope: '.',
+    start_url: location.pathname + location.search,
+    scope: location.pathname.replace(/[^/]*$/, ''),
     display: 'standalone',
     background_color: '#181825',
     theme_color: '#ffffff',
