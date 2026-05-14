@@ -16,6 +16,14 @@
 //
 // 1024 sizes exist because Android xxxhdpi+ launchers resample 512 up,
 // softening the brandmark edges. Native-resolution avoids the blur.
+//
+// Diagnostic mode:
+//   WATERMARK=1 node scripts/generate-pwa-icons.mjs
+// Bakes the size into the top-left corner of each PNG so you can
+// visually identify which icon Android Chrome picked for the splash
+// screen (or any other surface). Reinstall the PWA after deploy; the
+// number you see on the splash IS the picked size. Re-run without the
+// flag to regenerate clean icons before committing.
 
 import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -49,20 +57,37 @@ function newCanvas(size) {
   c.width = c.height = size;
   return c;
 }
-window.renderAny = (size) => {
+function addWatermark(ctx, size, label) {
+  ctx.save();
+  ctx.fillStyle = '#FFEB3B';
+  const fontPx = Math.round(size * 0.12);
+  ctx.font = 'bold ' + fontPx + 'px sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.fillText(label, size * 0.06, size * 0.06);
+  ctx.restore();
+}
+window.renderAny = (size, watermark) => {
   const c = newCanvas(size);
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#181825';
   if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(0, 0, size, size, size * 0.22); ctx.fill(); }
   else ctx.fillRect(0, 0, size, size);
   drawBrandmark(ctx, size, '#f0f0f0');
+  if (watermark) addWatermark(ctx, size, String(size));
   return c.toDataURL('image/png');
 };
-window.renderMaskable = (size) => {
+window.renderMaskable = (size, watermark) => {
   const c = newCanvas(size);
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#181825';
   ctx.fillRect(0, 0, size, size);
+  if (watermark) {
+    // Watermark BEFORE the safe-zone transform so it sits at the true
+    // canvas corner — it'll be clipped by adaptive-icon masking on the
+    // launcher (good — proves the maskable icon was used) but visible
+    // wherever the icon is rendered unmasked.
+    addWatermark(ctx, size, String(size) + 'm');
+  }
   ctx.translate(size * 0.15, size * 0.15);
   ctx.scale(0.7, 0.7);
   drawBrandmark(ctx, size, '#f0f0f0');
@@ -90,8 +115,10 @@ async function main() {
       { fn: 'renderMaskable', size: 1024, out: 'icon-1024-maskable.png' },
     ];
 
+    const watermark = !!process.env.WATERMARK;
+    if (watermark) console.log('[pwa-icons] watermark mode ON — bake size labels into corners');
     for (const t of targets) {
-      const dataUrl = await page.evaluate(([fn, size]) => window[fn](size), [t.fn, t.size]);
+      const dataUrl = await page.evaluate(([fn, size, wm]) => window[fn](size, wm), [t.fn, t.size, watermark]);
       const buf = dataUrlToBuffer(dataUrl);
       // Sanity floor — a blank PNG compresses to far less than a drawn one.
       // Anything near the floor for the given size means the canvas
