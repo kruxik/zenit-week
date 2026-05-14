@@ -7,7 +7,7 @@ on:
       - 'v[0-9]*'
 
 permissions:
-  contents: read
+  contents: write
   deployments: write
 
 jobs:
@@ -67,6 +67,24 @@ jobs:
             -f state=success \
             -f environment_url=https://zenitweek.com \
             -f description="Deployed to production"
+
+      - name: Create GitHub Release
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          if node scripts/extract-release-notes.mjs "${{ github.ref_name }}" > "$NOTES_FILE" 2>/dev/null && [ -s "$NOTES_FILE" ]; then
+            echo "Using CHANGELOG.md section for ${{ github.ref_name }}"
+            gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" \
+              --notes-file "$NOTES_FILE"
+          else
+            echo "No CHANGELOG.md section for ${{ github.ref_name }} — falling back to auto-generated notes"
+            gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" \
+              --generate-notes
+          fi
 
       - name: Mark deployment failure
         if: failure() && steps.deployment.outputs.id != ''
