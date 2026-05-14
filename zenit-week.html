@@ -8369,7 +8369,8 @@ function startAddNode(parentId) {
   weekData.nodes.push(node);
   rebuildNodeMap();
   parent.children.push(id);
-  syncStatusUp(id, 'done');
+  // Defer status propagation until commit: a discard (cancel/empty label)
+  // would otherwise leave a done parent stuck in the not-done state.
 
   _openInlineInput(id, true);
   revealNewlyEditedNode(id);
@@ -8526,6 +8527,12 @@ function commitEdit(followUp = 'auto') {
       }
     } else if (node.type !== 'branch') {
       applyMagicLabel(nodeId);
+    }
+
+    // Done status propagation for newly added children was deferred from
+    // startAddNode so a discard doesn't un-done the parent. Apply it now.
+    if (isNew && node.type !== 'branch' && node.parent && node.parent !== 'center') {
+      syncStatusUp(nodeId, 'done');
     }
 
     saveWeek(currentWeekKey, weekData);

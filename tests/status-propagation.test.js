@@ -1,5 +1,5 @@
 import {
-  addNode, startAddNode, cancelEdit, deleteNode,
+  addNode, startAddNode, cancelEdit, commitEdit, deleteNode,
   setStatus, syncStatusUp, findNode,
   _state,
 } from './setup.js';
@@ -43,17 +43,29 @@ describe('fix #1 – adding a child to a done parent clears parent done', () => 
     expect(findNode('a1').done).toBe(false);
   });
 
-  test('startAddNode — parent becomes undone while editing', () => {
+  test('startAddNode — parent stays done while editing (propagation deferred)', () => {
     setUp(donedTree());
     startAddNode('a1');
-    expect(findNode('a1').done).toBe(false);
+    // Done propagation is deferred to commitEdit so a discard doesn't
+    // leave the parent stuck in not-done state.
+    expect(findNode('a1').done).toBe(true);
   });
 
-  test('cancelling startAddNode restores parent to done', () => {
+  test('cancelling startAddNode leaves parent done', () => {
     setUp(donedTree());
     startAddNode('a1');
     cancelEdit();
     expect(findNode('a1').done).toBe(true);
+  });
+
+  test('committing startAddNode with a label propagates done up', () => {
+    setUp(donedTree());
+    startAddNode('a1');
+    _state.setEditState(_state.get().nodes.find(n => n._editing) && {
+      nodeId: _state.get().nodes.find(n => n._editing).id, isNew: true, originalLabel: '',
+    }, 'new task');
+    commitEdit();
+    expect(findNode('a1').done).toBe(false);
   });
 });
 
