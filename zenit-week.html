@@ -5494,7 +5494,7 @@ const TRANSLATIONS = {
     'agenda.scheduled':           'Scheduled',
     'agenda.alreadyScheduled':    'Already scheduled for',
     'menu.reschedule':            'Reschedule',
-    'menu.clearDay':              'Clear day',
+    'menu.clearDay':              'Any',
     'menu.today':                 'Today',
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
@@ -5696,7 +5696,7 @@ const TRANSLATIONS = {
     'agenda.scheduled':           'Naplánováno',
     'agenda.alreadyScheduled':    'Již naplánováno pro',
     'menu.reschedule':            'Přeplánovat',
-    'menu.clearDay':              'Zrušit den',
+    'menu.clearDay':              'Kdykoli',
     'menu.today':                 'Dnes',
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
@@ -9837,7 +9837,7 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
       rescheduleSubmenu.appendChild(sep);
       const clearBtn = document.createElement('div');
       clearBtn.className = 'ctx-item danger';
-      clearBtn.textContent = t('menu.clearDay') || 'Clear day';
+      clearBtn.textContent = t('menu.clearDay') || 'Any';
       clearBtn.addEventListener('click', e => {
         e.stopPropagation();
         if (applyDayReschedule(targetId, 'clear', { currentDays: assignedDays })) afterMutation();
