@@ -10435,6 +10435,27 @@ function renderAgendaTabContent() {
 
   function makeDragZone(nodes, groupKey, buildFn) {
     let dragSrcId = null;
+
+    function clearAgendaDropMarkers() {
+      list.querySelectorAll('.agenda-swipe-wrapper').forEach(w =>
+        w.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
+    }
+
+    // Picks insertion slot by Y only — ignores X so drag handle slipping out
+    // sideways doesn't kill the reorder. Filters to same group; if pointer is
+    // above/below the group, snaps to first/last slot.
+    function findAgendaDropTargetByY(cy, srcId) {
+      const wrappers = Array.from(list.querySelectorAll(
+        `.agenda-swipe-wrapper[data-group="${CSS.escape(groupKey)}"]`
+      )).filter(w => w.dataset.nodeId !== srcId);
+      if (wrappers.length === 0) return null;
+      for (const w of wrappers) {
+        const r = w.getBoundingClientRect();
+        if (cy < r.top + r.height / 2) return { wrapper: w, before: true };
+      }
+      return { wrapper: wrappers[wrappers.length - 1], before: false };
+    }
+
     nodes.forEach(node => {
       const item = buildFn(node); // .daily-log-item.agenda-item
 
@@ -10448,6 +10469,7 @@ function renderAgendaTabContent() {
       const el = document.createElement('div');
       el.className = 'agenda-swipe-wrapper';
       el.dataset.group = groupKey;
+      el.dataset.nodeId = node.id;
       el.draggable = true;
       el.appendChild(swipeLeft);
       el.appendChild(swipeRight);
@@ -10467,17 +10489,10 @@ function renderAgendaTabContent() {
         const SCROLL_MAX_SPEED = 18;
 
         function refreshDropTarget(cx, cy) {
-          const targetEl = document.elementFromPoint(cx, cy)?.closest('.agenda-item');
-          list.querySelectorAll('.agenda-swipe-wrapper').forEach(w =>
-            w.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
-          if (targetEl && targetEl !== item) {
-            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
-            if (targetWrapper && targetWrapper.dataset.group === groupKey) {
-              const r = targetWrapper.getBoundingClientRect();
-              targetWrapper.classList.add(cy < r.top + r.height / 2
-                ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
-            }
-          }
+          clearAgendaDropMarkers();
+          const t = findAgendaDropTargetByY(cy, node.id);
+          if (t) t.wrapper.classList.add(
+            t.before ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
         }
 
         function updateAutoScroll(cy) {
@@ -10563,37 +10578,17 @@ function renderAgendaTabContent() {
           document.removeEventListener('touchcancel', finishTouchDrag);
           if (ghost) { ghost.remove(); ghost = null; }
           el.classList.remove('agenda-item-dragging');
-          list.querySelectorAll('.agenda-swipe-wrapper').forEach(x =>
-            x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below'));
+          clearAgendaDropMarkers();
           const touch = e.changedTouches[0];
-          const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.agenda-item');
-          if (targetEl && targetEl !== item && targetEl.dataset.nodeId) {
-            const targetWrapper = targetEl.closest('.agenda-swipe-wrapper');
-            const targetGroup = targetWrapper?.dataset.group;
+          const t = findAgendaDropTargetByY(touch.clientY, touchSrcId);
+          if (t) {
             const current = loadAgendaGroupOrder(tabKey, groupKey);
             const fromIdx = current.indexOf(touchSrcId);
             if (fromIdx !== -1) {
               current.splice(fromIdx, 1);
-              if (targetGroup === groupKey) {
-                // Same group: insert before/after target
-                const targetId = targetEl.dataset.nodeId;
-                const r = (targetWrapper || targetEl).getBoundingClientRect();
-                const before = touch.clientY < r.top + r.height / 2;
-                const toIdx = current.indexOf(targetId);
-                if (toIdx !== -1) {
-                  current.splice(before ? toIdx : toIdx + 1, 0, touchSrcId);
-                  saveAgendaGroupOrder(tabKey, groupKey, current);
-                  touchSrcId = null;
-                  renderAgenda();
-                  return;
-                }
-              } else if (targetWrapper) {
-                // Foreign group: snap to start/end of source group based on DOM position
-                const firstSrc = list.querySelector(`.agenda-swipe-wrapper[data-group="${CSS.escape(groupKey)}"]`);
-                const targetIsAboveSource = firstSrc &&
-                  !!(targetWrapper.compareDocumentPosition(firstSrc) & Node.DOCUMENT_POSITION_FOLLOWING);
-                if (targetIsAboveSource) current.unshift(touchSrcId);
-                else current.push(touchSrcId);
+              const toIdx = current.indexOf(t.wrapper.dataset.nodeId);
+              if (toIdx !== -1) {
+                current.splice(t.before ? toIdx : toIdx + 1, 0, touchSrcId);
                 saveAgendaGroupOrder(tabKey, groupKey, current);
                 touchSrcId = null;
                 renderAgenda();
@@ -10616,45 +10611,57 @@ function renderAgendaTabContent() {
       }
 
       // ── Desktop HTML5 drag-and-drop ───────────────────────────────────────
+      // Listeners attach to document during the drag so leaving the row
+      // horizontally (e.g. via the left-edge grip) doesn't cancel the operation.
+      // Only Y picks the slot; release anywhere on the page commits.
+      let docDragOver = null;
+      let docDrop = null;
+      const cleanupDocDrag = () => {
+        if (docDragOver) document.removeEventListener('dragover', docDragOver);
+        if (docDrop) document.removeEventListener('drop', docDrop);
+        docDragOver = null;
+        docDrop = null;
+      };
       el.addEventListener('dragstart', (e) => {
         dragSrcId = node.id;
         e.dataTransfer.effectAllowed = 'move';
         requestAnimationFrame(() => el.classList.add('agenda-item-dragging'));
+
+        docDragOver = (ev) => {
+          if (!dragSrcId) return;
+          ev.preventDefault();
+          if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+          clearAgendaDropMarkers();
+          const t = findAgendaDropTargetByY(ev.clientY, dragSrcId);
+          if (t) t.wrapper.classList.add(
+            t.before ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+        };
+        docDrop = (ev) => {
+          if (!dragSrcId) return;
+          ev.preventDefault();
+          const srcId = dragSrcId;
+          const t = findAgendaDropTargetByY(ev.clientY, srcId);
+          clearAgendaDropMarkers();
+          cleanupDocDrag();
+          if (!t) return;
+          const current = loadAgendaGroupOrder(tabKey, groupKey);
+          const fromIdx = current.indexOf(srcId);
+          if (fromIdx === -1) return;
+          current.splice(fromIdx, 1);
+          const toIdx = current.indexOf(t.wrapper.dataset.nodeId);
+          if (toIdx === -1) return;
+          current.splice(t.before ? toIdx : toIdx + 1, 0, srcId);
+          saveAgendaGroupOrder(tabKey, groupKey, current);
+          renderAgenda();
+        };
+        document.addEventListener('dragover', docDragOver);
+        document.addEventListener('drop', docDrop);
       });
       el.addEventListener('dragend', () => {
         el.classList.remove('agenda-item-dragging');
-        list.querySelectorAll('.agenda-swipe-wrapper').forEach(x => {
-          x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
-        });
+        clearAgendaDropMarkers();
+        cleanupDocDrag();
         dragSrcId = null;
-      });
-      el.addEventListener('dragover', (e) => {
-        if (!dragSrcId || dragSrcId === node.id) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const mid = el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2;
-        list.querySelectorAll('.agenda-swipe-wrapper').forEach(x => {
-          x.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
-        });
-        el.classList.add(e.clientY < mid ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
-      });
-      el.addEventListener('dragleave', () => {
-        el.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
-      });
-      el.addEventListener('drop', (e) => {
-        if (!dragSrcId || dragSrcId === node.id) return;
-        e.preventDefault();
-        el.classList.remove('agenda-item-drop-above', 'agenda-item-drop-below');
-        const before = e.clientY < el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2;
-        const current = loadAgendaGroupOrder(tabKey, groupKey);
-        const fromIdx = current.indexOf(dragSrcId);
-        if (fromIdx === -1) return;
-        current.splice(fromIdx, 1);
-        const toIdx = current.indexOf(node.id);
-        if (toIdx === -1) return;
-        current.splice(before ? toIdx : toIdx + 1, 0, dragSrcId);
-        saveAgendaGroupOrder(tabKey, groupKey, current);
-        renderAgenda();
       });
 
       list.appendChild(el);
