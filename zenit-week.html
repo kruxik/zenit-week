@@ -1965,6 +1965,11 @@
     justify-content: center;
     pointer-events: none;
     color: var(--text-muted);
+    transition: color 120ms ease, transform 120ms ease;
+  }
+  .agenda-swipe-action.armed {
+    color: var(--accent-success-text);
+    transform: scale(1.18);
   }
   .agenda-swipe-action .icon { width: 24px; height: 24px; flex-shrink: 0; }
   .agenda-swipe-action-left  { left: 0; }
@@ -10003,10 +10008,17 @@ function addSwipeGesture(item, node) {
   let startX = 0, startY = 0;
   let state = 'idle'; // 'idle' | 'pending' | 'swiping' | 'aborted'
 
+  function clearArmed() {
+    const wrapper = item.parentElement;
+    if (!wrapper) return;
+    wrapper.querySelectorAll('.agenda-swipe-action.armed').forEach(a => a.classList.remove('armed'));
+  }
+
   // Snap item back to translateX(0). keepFocused=true retains the highlight
   // (used for left-swipe → context menu, so the user knows which item it targets).
   function snapBack(callback, keepFocused = false) {
     if (!keepFocused) item.classList.remove('agenda-item-focused');
+    clearArmed();
     item.style.transition = 'transform 0.2s ease';
     item.style.transform = 'translateX(0)';
     if (callback) {
@@ -10048,6 +10060,16 @@ function addSwipeGesture(item, node) {
     const clampedDx = Math.max(-maxDx, Math.min(maxDx, dx));
     item.style.transition = 'none';
     item.style.transform = `translateX(${clampedDx}px)`;
+
+    // Arm/disarm action icons when swipe passes the release threshold.
+    const threshold = item.offsetWidth * 0.20;
+    const wrapper = item.parentElement;
+    if (wrapper) {
+      const leftAction = wrapper.querySelector('.agenda-swipe-action-left');
+      const rightAction = wrapper.querySelector('.agenda-swipe-action-right');
+      if (leftAction) leftAction.classList.toggle('armed', clampedDx >= threshold);
+      if (rightAction) rightAction.classList.toggle('armed', clampedDx <= -threshold);
+    }
   }, { passive: false });
 
   item.addEventListener('touchend', e => {
@@ -10059,6 +10081,7 @@ function addSwipeGesture(item, node) {
       // Right swipe: item disappears into done/undone group, no snap-back needed
       item.style.transition = 'none';
       item.classList.remove('agenda-item-focused');
+      clearArmed();
       setStatus(node.id, node.done ? 'undone' : 'done');
       renderAgenda();
     } else if (dx <= -threshold) {
