@@ -11399,7 +11399,11 @@ async function loadAndRender(wk) {
   weekData = await loadWeek(wk);
   rebuildNodeMap();
   syncBranchConfig();
-  location.hash = wk;
+  if (wk === todayWeekKey()) {
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  } else {
+    location.hash = wk;
+  }
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
   if (googleAccessToken) {
@@ -11414,8 +11418,9 @@ async function loadAndRender(wk) {
 window.addEventListener('hashchange', async () => {
   if (_applyingSnapshot) return;
   const hashWeek = location.hash.slice(1);
-  if (/^\d{4}-\d{2}$/.test(hashWeek) && hashWeek !== currentWeekKey) {
-    currentWeekKey = hashWeek;
+  const target = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
+  if (target !== currentWeekKey) {
+    currentWeekKey = target;
     weekData = await loadWeek(currentWeekKey);
     rebuildNodeMap();
     syncBranchConfig();
@@ -11800,8 +11805,14 @@ window.addEventListener('load', async () => {
   } catch { saveBranchColors(); }
   updateSvgFilters();
   initGoogleAuth(); // no-op if GIS not yet loaded; onGoogleLibraryLoad handles that case
+  const isStandalone =
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    window.navigator.standalone === true;
   const hashWeek = location.hash.slice(1);
-  const initialWeek = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
+  const initialWeek = (!isStandalone && /^\d{4}-\d{2}$/.test(hashWeek)) ? hashWeek : todayWeekKey();
+  if (isStandalone && location.hash) {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
 
   // Cache next week raw data for undo/redo
   const nextWeekKey = offsetWeek(initialWeek, 1);
