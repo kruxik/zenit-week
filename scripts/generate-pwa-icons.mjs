@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ASSETS_DIR = resolve(__dirname, '..', 'assets');
 
-const HTML = `<!doctype html><html><body><canvas id="c"></canvas><script>
+const HTML = `<!doctype html><html><body><script>
 function drawBrandmark(ctx, size, rootFill) {
   const s = size / 64;
   ctx.lineCap = 'round';
@@ -37,9 +37,15 @@ function drawBrandmark(ctx, size, rootFill) {
   ctx.fillStyle = '#1ABCFE';
   ctx.beginPath(); ctx.arc(48*s, 50*s, 5*s, 0, Math.PI*2); ctx.fill();
 }
-window.renderAny = (size) => {
-  const c = document.getElementById('c');
+// Fresh canvas per render — reusing a single canvas across sizes
+// occasionally produced blank output in headless Chromium.
+function newCanvas(size) {
+  const c = document.createElement('canvas');
   c.width = c.height = size;
+  return c;
+}
+window.renderAny = (size) => {
+  const c = newCanvas(size);
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#181825';
   if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(0, 0, size, size, size * 0.22); ctx.fill(); }
@@ -48,8 +54,7 @@ window.renderAny = (size) => {
   return c.toDataURL('image/png');
 };
 window.renderMaskable = (size) => {
-  const c = document.getElementById('c');
-  c.width = c.height = size;
+  const c = newCanvas(size);
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#181825';
   ctx.fillRect(0, 0, size, size);
@@ -80,9 +85,17 @@ async function main() {
 
     for (const t of targets) {
       const dataUrl = await page.evaluate(([fn, size]) => window[fn](size), [t.fn, t.size]);
+      const buf = dataUrlToBuffer(dataUrl);
+      // Sanity floor — a blank 512x512 PNG compresses to ~7KB. A drawn one
+      // is 18-27KB. Anything near the floor for a 512px output means the
+      // canvas rendered empty (silent headless-Chromium glitch).
+      const minBytes = t.size >= 512 ? 12000 : 3000;
+      if (buf.length < minBytes) {
+        throw new Error(`[pwa-icons] ${t.out} suspiciously small (${buf.length} bytes) — likely blank canvas`);
+      }
       const outPath = resolve(ASSETS_DIR, t.out);
-      writeFileSync(outPath, dataUrlToBuffer(dataUrl));
-      console.log(`[pwa-icons] wrote ${t.out} (${t.size}x${t.size})`);
+      writeFileSync(outPath, buf);
+      console.log(`[pwa-icons] wrote ${t.out} (${t.size}x${t.size}, ${buf.length} bytes)`);
     }
   } finally {
     await browser.close();
