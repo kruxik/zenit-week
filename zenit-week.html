@@ -5481,6 +5481,7 @@ const TRANSLATIONS = {
     'agenda.alreadyScheduled':    'Already scheduled for',
     'menu.reschedule':            'Reschedule',
     'menu.clearDay':              'Clear day',
+    'menu.today':                 'Today',
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
     'view.rocks':                 'Rocks',
@@ -5682,6 +5683,7 @@ const TRANSLATIONS = {
     'agenda.alreadyScheduled':    'Již naplánováno pro',
     'menu.reschedule':            'Přeplánovat',
     'menu.clearDay':              'Zrušit den',
+    'menu.today':                 'Dnes',
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
     'view.rocks':                 'Kameny',
@@ -9751,6 +9753,11 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
       hideContextMenu();
     };
 
+    const todayIdx = new Date().getDay();
+    const todayLabel = t('menu.today') || 'Today';
+    const labelFor = dayIdx =>
+      langLabels[dayIdx] + (dayIdx === todayIdx ? ` (${todayLabel})` : '');
+
     let assignedDays, targetId, mode;
     if (node.dayChild) {
       const parent = findNode(node.parent);
@@ -9768,7 +9775,7 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
         btn.className = 'ctx-item' +
           (isAssigned  ? ' ctx-item-selected'  : '') +
           (isCollision ? ' ctx-item-disabled'   : '');
-        btn.textContent = langLabels[dayIdx];
+        btn.textContent = labelFor(dayIdx);
         btn.addEventListener('click', e => {
           e.stopPropagation();
           if (applyDayReschedule(targetId, mode, {
@@ -9787,7 +9794,7 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
         const isAssigned = assignedDays.has(dayIdx);
         const btn = document.createElement('div');
         btn.className = 'ctx-item' + (isAssigned ? ' ctx-item-selected' : '');
-        btn.textContent = langLabels[dayIdx];
+        btn.textContent = labelFor(dayIdx);
         btn.addEventListener('click', e => {
           e.stopPropagation();
           if (applyDayReschedule(targetId, mode, {
