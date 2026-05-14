@@ -10082,8 +10082,14 @@ function addSwipeGesture(item, node) {
       item.style.transition = 'none';
       item.classList.remove('agenda-item-focused');
       clearArmed();
-      setStatus(node.id, node.done ? 'undone' : 'done');
-      renderAgenda();
+      // _undoneAction is set on Done-section rows and handles tickRecord /
+      // counter / tickInfo correctly; pending rows fall back to a simple toggle.
+      if (typeof item._undoneAction === 'function') {
+        item._undoneAction();
+      } else {
+        setStatus(node.id, node.done ? 'undone' : 'done');
+        renderAgenda();
+      }
     } else if (dx <= -threshold) {
       // Left swipe: snap back keeping highlight, then open context menu
       snapBack(() => {
@@ -10319,7 +10325,7 @@ function buildAgendaItem(node, label, opts = {}) {
   btn.className = 'agenda-action-btn';
   if (showUndone) {
     btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
-    btn.addEventListener('click', () => {
+    const undoneAction = () => {
       if (tickRecord) {
         // Untick THIS specific tick log entry.
         setStatus(tickRecord.tick.id, 'undone');
@@ -10331,7 +10337,10 @@ function buildAgendaItem(node, label, opts = {}) {
       }
       else setStatus(node.id, 'undone');
       renderAgenda();
-    });
+    };
+    // Exposed for swipe-right on Done-section rows.
+    item._undoneAction = undoneAction;
+    btn.addEventListener('click', undoneAction);
   } else if (cc) {
     btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
     btn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
@@ -10774,10 +10783,26 @@ function renderAgendaTabContent() {
     if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
     list.appendChild(makeSectionDivider(t('todo.done'), rows.length));
     rows.forEach(rec => {
-      list.appendChild(buildAgendaItem(rec.node, getAgendaNodeLabel(rec.node), {
+      const item = buildAgendaItem(rec.node, getAgendaNodeLabel(rec.node), {
         inDoneSection: true,
         tickRecord: rec.tickRecord || null,
-      }));
+      });
+      // Wrap in swipe wrapper so Done rows accept right-swipe → undone and
+      // left-swipe → context menu, matching Pending behavior.
+      const swipeLeft = document.createElement('div');
+      swipeLeft.className = 'agenda-swipe-action agenda-swipe-action-left undone';
+      swipeLeft.innerHTML = iconSvg('circle-dashed-check');
+      const swipeRight = document.createElement('div');
+      swipeRight.className = 'agenda-swipe-action agenda-swipe-action-right';
+      swipeRight.innerHTML = iconSvg('menu-2');
+      const wrapper = document.createElement('div');
+      wrapper.className = 'agenda-swipe-wrapper';
+      wrapper.dataset.nodeId = rec.node.id;
+      wrapper.appendChild(swipeLeft);
+      wrapper.appendChild(swipeRight);
+      wrapper.appendChild(item);
+      list.appendChild(wrapper);
+      addSwipeGesture(item, rec.node);
     });
   }
 
