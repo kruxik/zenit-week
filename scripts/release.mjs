@@ -172,7 +172,10 @@ async function main() {
 
   shInherit('git add CHANGELOG.md');
   shInherit(`git commit -m "chore(release): ${version}"`);
-  shInherit(`git tag ${version}`);
+  // Annotated tag — `git push --follow-tags` only pushes annotated tags,
+  // so lightweight tags get left behind on the local machine and never
+  // trigger the deploy workflow.
+  shInherit(`git tag -a ${version} -m "Release ${version}"`);
 
   console.log(`\n🎉 Release ${version} prepared locally.\n`);
   console.log(`   To deploy to production, push the commit and tag:\n`);
