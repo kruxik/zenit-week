@@ -7635,6 +7635,34 @@ function taperedPathD(x1, y1, x2, y2, swStart, swEnd) {
          `L ${b_x2} ${b_y2} C ${b_c2x} ${b_c2y} ${b_c1x} ${b_c1y} ${b_x1} ${b_y1} Z`;
 }
 
+// Edge color: done child uses muted DONE_BORDER, else branch color.
+// Mirrors the cascade: when a parent is marked done, all descendants get
+// node.done=true, so each of their incoming edges turns muted in turn.
+function edgeColorFor(childId, branchId) {
+  const child = (childId === 'center') ? null : findNode(childId);
+  if (child && child.done) {
+    return getThemeColors().DONE_BORDER;
+  }
+  return BRANCH_COLORS[branchId]?.main || '#888';
+}
+
+function updateEdgeColorTo(nodeId) {
+  const path = document.querySelector(
+    `#lines-layer path[data-to="${nodeId}"], #top-lines-layer path[data-to="${nodeId}"]`
+  );
+  if (!path) return;
+  const defsEl = document.querySelector('#map-root defs');
+  if (!defsEl) return;
+  const fromId = path.getAttribute('data-from');
+  const child = findNode(nodeId);
+  const branchId = (child && child.type === 'branch') ? child.id : (child?.branch);
+  if (!branchId) return;
+  const colorHex = edgeColorFor(nodeId, branchId);
+  const grad = defsEl.querySelector(`#grad-${fromId}-${nodeId}`);
+  if (!grad) return;
+  grad.querySelectorAll('stop').forEach(s => s.setAttribute('stop-color', colorHex));
+}
+
 function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId, defsEl) {
   const gradId = `grad-${fromId || 'c'}-${toId || 'c'}`;
 
@@ -8652,6 +8680,8 @@ function updateNodeUI(nodeId) {
       u.style.color = textColor;
     });
   }
+
+  updateEdgeColorTo(nodeId);
 }
 
 function getNodeDepth(nodeId) {
@@ -9002,7 +9032,7 @@ function render() {
       // Inbox nodes have no bezier to their branch, but recurse to draw their day-leaf connections
       if (!childNode.inbox) {
         const { w: childW } = getNodeSize(childId);
-        const color = branchColor(branch);
+        const color = edgeColorFor(childId, branch);
 
         // Level2 (depth=0): branch→activity; Level3+ (depth≥1): deeper nesting
         let swStart, swEnd;
@@ -9029,7 +9059,7 @@ function render() {
   branchIds.forEach(bid => {
     const bPos = positions[bid];
     if (!bPos) return;
-    const color = branchColor(bid);
+    const color = edgeColorFor(bid, bid);
     const side = bPos.side;
     const { w: bW } = getNodeSize(bid);
 
