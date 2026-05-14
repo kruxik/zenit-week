@@ -8621,19 +8621,10 @@ function _panEditNodeToVisibleArea() {
   const visTop    = Math.max(toolbarBottom, vv ? vv.offsetTop : 0);
   const visBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
 
+  // Mobile screens are small — always center the edited node, even when it
+  // already fits. The "don't move if visible" rule only applies on desktop
+  // (handled by smoothPanToRevealNode).
   const rect = container.getBoundingClientRect();
-  const nodeScreenX = rect.left + panX + pos.x * zoom;
-  const nodeScreenY = rect.top  + panY + pos.y * zoom;
-
-  const iW = inlineInput.offsetWidth;
-  const iH = inlineInput.offsetHeight;
-  const margin = 12;
-  const fitsX = (nodeScreenX - iW / 2) >= visLeft + margin &&
-                (nodeScreenX + iW / 2) <= visRight - margin;
-  const fitsY = (nodeScreenY - iH / 2) >= visTop  + margin &&
-                (nodeScreenY + iH / 2) <= visBottom - margin;
-  if (fitsX && fitsY) return;
-
   const targetScreenX = (visLeft + visRight) / 2;
   const targetScreenY = (visTop  + visBottom) / 2;
   const targetPanX = targetScreenX - rect.left - pos.x * zoom;
