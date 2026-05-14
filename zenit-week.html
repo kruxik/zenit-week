@@ -3146,6 +3146,7 @@
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.multipleDaysA">Multiple days: </span><strong data-i18n="help.multipleDaysKey">(mo, we, fr)</strong><span data-i18n="help.multipleDaysB"> — spaces or commas both work.</span></div>
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.everyDayA">Every day: type </span><strong data-i18n="help.everyDayKey">(daily)</strong><span data-i18n="help.everyDayB"> and it expands to all 7 days.</span></div>
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.relativeDayA">Relative: </span><strong data-i18n="help.relativeDayKey">(today)</strong><span data-i18n="help.relativeDayMid"> or </span><strong data-i18n="help.relativeDayKey2">(tomorrow)</strong><span data-i18n="help.relativeDayB"> — frozen to the actual weekday when you save.</span></div>
+        <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.nowDayA">Right now: </span><strong data-i18n="help.nowDayKey">(now)</strong><span data-i18n="help.nowDayB"> — like (today), and pins the item to the top of today's agenda.</span></div>
       </div>
 
       <div class="help-section">
@@ -3941,9 +3942,11 @@ Object.entries(SCHED_DAY_TOKENS).forEach(([day, tokens]) => {
 // Daily indicator tokens (EN + CS + CS without diacritics), case-insensitive
 const SCHED_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
 // Magic relative-day tokens — frozen to a concrete day abbr at edit-commit time
-// (see resolveMagicDayTokens / applyMagicLabel).
+// (see resolveMagicDayTokens / applyMagicLabel). "now"/"teď" additionally pins
+// the node to the top of today's agenda group — see pinToTopOfTodayAgenda.
 const SCHED_TODAY_TOKENS = new Set(['today', 'dnes']);
 const SCHED_TOMORROW_TOKENS = new Set(['tomorrow', 'zítra', 'zitra']);
+const SCHED_NOW_TOKENS = new Set(['now', 'teď', 'ted']);
 
 // Canonical day labels per language (0=Sun … 6=Sat)
 const DAY_LABELS = {
@@ -4008,11 +4011,44 @@ function resolveMagicDayTokens(label, now = new Date()) {
     const rebuilt = parts.map(part => {
       const tok = part.toLowerCase();
       if (SCHED_TODAY_TOKENS.has(tok))    { changed = true; return langLabels[todayIdx]; }
+      if (SCHED_NOW_TOKENS.has(tok))      { changed = true; return langLabels[todayIdx]; }
       if (SCHED_TOMORROW_TOKENS.has(tok)) { changed = true; return langLabels[tomorrowIdx]; }
       return part;
     }).join('');
     return changed ? `(${rebuilt})` : match;
   });
+}
+
+// Returns true when the label has a "now"/"teď" token inside any (…) group.
+// Used to trigger agenda-pinning *before* resolveMagicDayTokens overwrites it.
+function hasNowToken(label) {
+  const groups = label.match(/\(([^)]+)\)/g);
+  if (!groups) return false;
+  for (const g of groups) {
+    const inner = g.slice(1, -1).trim();
+    const tokens = inner.split(/[\s,]+/).map(t => t.toLowerCase()).filter(Boolean);
+    if (tokens.some(t => SCHED_NOW_TOKENS.has(t))) return true;
+  }
+  return false;
+}
+
+// Prepends nodeId to today's agenda group order, putting the node first in the
+// Agenda view. Group is "done" or "pending" based on the node's current done
+// state. Skipped when the current week is not the real-world current ISO week
+// (cross-week edit) — the pinning would write into a week the user isn't
+// viewing as "today" and is therefore meaningless.
+function pinToTopOfTodayAgenda(nodeId) {
+  if (currentWeekKey !== todayWeekKey()) return;
+  const node = findNode(nodeId);
+  if (!node) return;
+  const todayIdx = new Date().getDay();
+  const group = node.done ? 'done' : 'pending';
+  const key = `${todayIdx}-${group}`;
+  if (!weekData.agendaOrder) weekData.agendaOrder = {};
+  const existing = weekData.agendaOrder[key];
+  const oldIds = Array.isArray(existing) ? existing : (existing?.ids ?? []);
+  const filtered = oldIds.filter(id => id !== nodeId);
+  weekData.agendaOrder[key] = { ids: [nodeId, ...filtered], ts: Date.now() };
 }
 
 // Strips only (…) groups that are valid day-pattern groups from a label.
@@ -5551,6 +5587,9 @@ const TRANSLATIONS = {
     'help.relativeDayMid':        ' or ',
     'help.relativeDayKey2':       '(tomorrow)',
     'help.relativeDayB':          ' — frozen to the actual weekday when you save.',
+    'help.nowDayA':               'Right now: ',
+    'help.nowDayKey':             '(now)',
+    'help.nowDayB':               ' — like (today), and pins the item to the top of today\'s agenda.',
     'help.countersTitle':         'Magic counters',
     'help.countersDescA':         'Add ',
     'help.countersDescKey':       'Nx',
@@ -5749,6 +5788,9 @@ const TRANSLATIONS = {
     'help.relativeDayMid':        ' nebo ',
     'help.relativeDayKey2':       '(zítra)',
     'help.relativeDayB':          ' — při uložení se zapíše konkrétní zkratka dne.',
+    'help.nowDayA':               'Právě teď: ',
+    'help.nowDayKey':             '(teď)',
+    'help.nowDayB':               ' — jako (dnes), a navíc připne položku na začátek dnešní agendy.',
     'help.countersTitle':         'Magická počítadla',
     'help.countersDescA':         'Přidejte ',
     'help.countersDescKey':       'Nx',
@@ -7774,13 +7816,18 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false) {
 function applyMagicLabel(nodeId) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity' || node.dayChild || node.tickChild) return;
-  // Freeze magic relative-day tokens (today/tomorrow/dnes/zítra) to concrete
-  // abbrs before any day-parsing logic reads the label.
+  // Detect "now"/"teď" *before* the freeze step overwrites it. now resolves to
+  // today's abbr (like today) and additionally pins the node to the top of
+  // today's agenda group.
+  const wantsPin = hasNowToken(node.label || '');
+  // Freeze magic relative-day tokens (today/tomorrow/now and CS variants) to
+  // concrete abbrs before any day-parsing logic reads the label.
   const resolved = resolveMagicDayTokens(node.label || '');
   if (resolved !== node.label) {
     node.label = resolved;
     touchNode(nodeId);
   }
+  if (wantsPin) pinToTopOfTodayAgenda(nodeId);
   const label = node.label || '';
   const parsedDays = parseTodoDays(label);
   // Existing day-children promote the node to multi-day mode regardless of

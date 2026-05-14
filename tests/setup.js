@@ -521,6 +521,8 @@ export const {
   parseTodoDays,
   stripDayGroups,
   resolveMagicDayTokens,
+  hasNowToken,
+  pinToTopOfTodayAgenda,
   commitEdit,
   applyMagicLabel,
   migrateDayCounters,
