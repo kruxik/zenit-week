@@ -8481,6 +8481,12 @@ function _openInlineInput(nodeId, isNew) {
   inlineInput.focus({ preventScroll: true });
   if (!isNew) inlineInput.select();
 
+  // Mobile optimistic pan: if we've measured this device's keyboard before,
+  // start animating to the centered position immediately so the motion runs
+  // in parallel with the keyboard opening. The vv.resize listener will
+  // refine if reality differs.
+  if (isMobile) _panEditNodeToVisibleArea({ optimistic: true });
+
   // Fallback for devices where visualViewport.resize fires unreliably:
   // re-pan after the keyboard has had time to settle.
   setTimeout(_panEditNodeToVisibleArea, 500);
@@ -8600,14 +8606,41 @@ inlineInput.addEventListener('blur', () => { if (editState) commitEdit(); });
 inlineInput.addEventListener('pointerdown', (e) => e.stopPropagation());
 inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 
+// Cached keyboard inset (height in CSS pixels), keyed by orientation + viewport
+// dimensions so we don't apply a portrait value in landscape (or vice versa).
+// Updated each time we observe the keyboard fully open via vv.resize.
+const KEYBOARD_INSET_KEY = 'zenit-week-keyboard-inset';
+function getCachedKeyboardInset() {
+  try {
+    const raw = localStorage.getItem(KEYBOARD_INSET_KEY);
+    if (!raw) return 0;
+    const c = JSON.parse(raw);
+    if (!c) return 0;
+    if (c.viewportW !== window.innerWidth || c.viewportH !== window.innerHeight) return 0;
+    return c.inset || 0;
+  } catch { return 0; }
+}
+function saveKeyboardInset(inset) {
+  try {
+    localStorage.setItem(KEYBOARD_INSET_KEY, JSON.stringify({
+      viewportW: window.innerWidth,
+      viewportH: window.innerHeight,
+      inset,
+    }));
+  } catch {}
+}
+
 // Mobile-only: center the editing node inside the remaining visible canvas
 // (between the toolbar at the top and the soft keyboard at the bottom). Acts
-// in both axes. Only re-pans when the node + input doesn't already fit in the
-// remaining area, mirroring the "don't move if visible" desktop rule.
-// Fires from: 500ms fallback in _openInlineInput, and visualViewport.resize
-// listener (debounced to fire only after the keyboard finishes animating).
-function _panEditNodeToVisibleArea() {
+// in both axes — mobile screens are small enough that "fits in viewport" isn't
+// useful UX, so we always center.
+// Fires from:
+//   - _openInlineInput right after focus (optimistic, using cached keyboard inset)
+//   - 500ms fallback in _openInlineInput
+//   - visualViewport.resize listener (debounced after keyboard settles)
+function _panEditNodeToVisibleArea(opts) {
   if (!editState || !isMobile) return;
+  const optimistic = !!(opts && opts.optimistic);
   const positions = computeLayout();
   const pos = positions[editState.nodeId];
   if (!pos) return;
@@ -8616,14 +8649,26 @@ function _panEditNodeToVisibleArea() {
   const toolbarEl = document.getElementById('toolbar');
   const toolbarBottom = toolbarEl ? toolbarEl.getBoundingClientRect().bottom : 0;
 
+  // Keyboard considered open when visual viewport is meaningfully shorter than
+  // the layout viewport. When closed, we may still want to act on a cached
+  // inset (optimistic mode) so the pan starts before the keyboard finishes.
+  const kbOpen = vv ? (window.innerHeight - vv.height) > 100 : false;
+  let effectiveInset;
+  if (kbOpen) {
+    effectiveInset = window.innerHeight - vv.height;
+  } else if (optimistic) {
+    const cached = getCachedKeyboardInset();
+    if (cached <= 0) return; // no cache yet — wait for real vv.resize to fire
+    effectiveInset = cached;
+  } else {
+    effectiveInset = 0;
+  }
+
   const visLeft   = vv ? vv.offsetLeft : 0;
   const visRight  = vv ? vv.offsetLeft + vv.width  : window.innerWidth;
   const visTop    = Math.max(toolbarBottom, vv ? vv.offsetTop : 0);
-  const visBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+  const visBottom = window.innerHeight - effectiveInset;
 
-  // Mobile screens are small — always center the edited node, even when it
-  // already fits. The "don't move if visible" rule only applies on desktop
-  // (handled by smoothPanToRevealNode).
   const rect = container.getBoundingClientRect();
   const targetScreenX = (visLeft + visRight) / 2;
   const targetScreenY = (visTop  + visBottom) / 2;
@@ -8637,10 +8682,19 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', () => {
     if (!editState) return;
     // Long debounce: fire only after the soft keyboard finishes animating
-    // open (typical animation is ~250-300ms). Panning while the viewport
-    // is still resizing produces jerky multi-step motion.
+    // open (typical animation is ~250-300ms). Panning while the viewport is
+    // still resizing produces jerky multi-step motion.
     clearTimeout(_vpResizeTimer);
-    _vpResizeTimer = setTimeout(_panEditNodeToVisibleArea, 250);
+    _vpResizeTimer = setTimeout(() => {
+      const inset = window.innerHeight - window.visualViewport.height;
+      // Update cache only when keyboard is meaningfully open and the value
+      // drifted enough to matter — avoids churn from sub-pixel jitter.
+      if (inset > 100) {
+        const cached = getCachedKeyboardInset();
+        if (Math.abs(inset - cached) > 10) saveKeyboardInset(inset);
+      }
+      _panEditNodeToVisibleArea();
+    }, 250);
   });
 }
 
