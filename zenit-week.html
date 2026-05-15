@@ -9060,7 +9060,29 @@ function applyFilters() {
   });
 }
 
+// Skip the full summary recompute + DOM write when the inputs that drive the
+// numbers and labels haven't changed since last call. render() invokes
+// updateSummary unconditionally; many of those renders are view-level toggles,
+// drag-reorders, theme/lang flips, etc. that don't touch the relevant state.
+let _lastSummarySig = null;
+function _computeSummarySignature() {
+  let sig = (document.documentElement.dataset.theme || '') + '|' +
+            currentLang + '|' +
+            (weekData.baseline ?? '') + '|' +
+            (activeDayFilter ?? '');
+  for (const n of weekData.nodes) {
+    if (n._editing) continue;
+    sig += '|' + n.id + ':' + n.type + ':' + (n.done ? 1 : 0)
+         + ':' + (n.val ?? 0) + ':' + (n.max ?? 0)
+         + ':' + (n.priority || '') + ':' + (n.branch || '');
+  }
+  return sig;
+}
+
 function updateSummary() {
+  const sig = _computeSummarySignature();
+  if (sig === _lastSummarySig) return;
+  _lastSummarySig = sig;
   const allNodes = weekData.nodes.filter(n => !n._editing);
   const leaves = allNodes.filter(n => {
     if (n.type === 'branch' || n.type === 'center') return false;
