@@ -1686,6 +1686,15 @@
     display: flex;
     opacity: 1;
   }
+  /* Weak-device path: backdrop-filter blur is the single most GPU-expensive
+     effect in this app. The early-init script in <head> tags such devices
+     via prefers-reduced-* or RAM/core heuristics; we drop the blur and bump
+     the overlay opacity so the mindmap still recedes behind the agenda. */
+  html.reduce-effects #agenda-overlay {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--overlay-bg);
+  }
 
   .view-toggle-btn {
     display: flex;
@@ -2755,6 +2764,29 @@
   } catch (e) {
     document.documentElement.dataset.view = 'mindmap';
   }
+</script>
+<script>
+  // Disable GPU-heavy effects (notably the agenda overlay's backdrop-filter
+  // blur) on low-end devices. Runs pre-paint so CSS picks up the class
+  // without a flash. Order of signals: explicit user preference first, then
+  // a conservative RAM+core combo that catches entry-level Chromebooks and
+  // budget Android without false-positiving mid-range hardware.
+  (function() {
+    try {
+      var mq = window.matchMedia;
+      var weak = false;
+      if (mq && mq('(prefers-reduced-motion: reduce)').matches) weak = true;
+      else if (mq && mq('(prefers-reduced-transparency: reduce)').matches) weak = true;
+      else {
+        var mem = navigator.deviceMemory;          // GB, Chromium-only, capped at 8
+        var cores = navigator.hardwareConcurrency; // logical CPU cores
+        if (mem !== undefined && cores !== undefined) weak = (mem <= 4 && cores <= 4);
+        else if (mem !== undefined) weak = (mem <= 2);
+        else if (cores !== undefined) weak = (cores <= 2);
+      }
+      if (weak) document.documentElement.classList.add('reduce-effects');
+    } catch (e) {}
+  })();
 </script>
 </head>
 <body class="app-loading">
