@@ -4028,6 +4028,16 @@ const CENTER_H = NODE_STYLE.center.minH;
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 
+// Per-process cache for canvas text measurements. getNodeSize / makeNodeGroup
+// call measureText many times per render (once per label line, sometimes
+// repeatedly for the same label as layout traverses), and ctx.measureText is
+// notably slow on weak GPUs once `ctx.font` is reassigned. Keying on
+// effSize (= fontSize × zoom) keeps grid-fit accuracy intact across zoom
+// levels at the cost of refilling the cache when zoom changes — which is
+// still cheaper than measuring uncached during the rebuild.
+const _textMeasureCache = new Map();
+const _TEXT_CACHE_MAX = 500;
+
 function measureText(text, fontSize, fontWeight = 'normal') {
   // Browsers grid-fit glyphs wider per em-unit at small effective pixel sizes,
   // so measuring at the rendered size (fontSize × zoom) and scaling back to
@@ -4035,8 +4045,17 @@ function measureText(text, fontSize, fontWeight = 'normal') {
   // logical size undershoots when zoom < 1.0 and crowds inline badges.
   const z = (typeof zoom === 'number' && zoom > 0) ? zoom : 1;
   const effSize = fontSize * z;
+  const key = fontWeight + '|' + effSize + '|' + text;
+  const cached = _textMeasureCache.get(key);
+  if (cached !== undefined) return cached;
   ctx.font = `${fontWeight} ${effSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
-  return ctx.measureText(text).width / z;
+  const result = ctx.measureText(text).width / z;
+  _textMeasureCache.set(key, result);
+  if (_textMeasureCache.size > _TEXT_CACHE_MAX) {
+    // Map iteration is insertion order: drop the oldest entry (FIFO).
+    _textMeasureCache.delete(_textMeasureCache.keys().next().value);
+  }
+  return result;
 }
 
 // Map each canonical weekday index (0=Sun … 6=Sat) to its accepted tokens
