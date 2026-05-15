@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.05.15] - 2026-05-15
+
+### Added
+
+- **view:** Refit mindmap on resize when visible behind agenda
+- **view:** Recenter mindmap on window resize (debounced 200ms)
+- **mobile:** Cache keyboard inset to pan optimistically on new-node edits
+- **mindmap:** "+" add-child button uses done color when node is done
+- **mindmap:** Bezier inherits done color when child is done
+
+### Changed
+
+- **cs:** Shorten "Poslední synchronizace" to "Aktualizace"
+
+### Fixed
+
+- **settings:** Show settings dropdown above Agenda view
+- **mindmap:** Defer done propagation until new child commits
+- **mobile:** Always center edited node, even when already visible
+- **mobile:** Center new-node input above soft keyboard
+- **release:** Create annotated tag so git push --follow-tags actually ships it
+
 ## [v2026.05.14] - 2026-05-14
 
 ### Added
