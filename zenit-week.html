@@ -745,9 +745,11 @@
     gap: 12px;
   }
 
-  #sync-btn {
-    display: none;
+  #sync-btn,
+  #sync-dropdown-signout {
+    display: flex;
     align-items: center;
+    justify-content: center;
     gap: 7px;
     height: 44px;
     padding: 0 16px;
@@ -767,12 +769,16 @@
     z-index: 1;
   }
 
-  #sync-btn:hover {
+  #sync-btn { display: none; }
+
+  #sync-btn:hover,
+  #sync-dropdown-signout:hover {
     color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
 
-  #sync-btn:hover::before {
+  #sync-btn:hover::before,
+  #sync-dropdown-signout:hover::before {
     content: '';
     position: absolute;
     top: 3px; left: 3px; right: 3px; bottom: 3px;
@@ -2842,7 +2848,7 @@ Use that tab — or take over here.</p>
           <div class="settings-separator"></div>
           <div id="sync-dropdown-last-sync">Last sync: —</div>
           <div class="settings-separator"></div>
-          <button class="reset-btn" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out of Google Drive</button>
+          <button id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out of Google Drive</button>
         </div>
       </div>
     </div>
