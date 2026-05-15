@@ -4206,7 +4206,28 @@ function stripDayGroups(label) {
   }).trim();
 }
 
+// Per-render caches for the two metrics functions called dozens of times
+// per node during layout, makeNodeGroup and applyFilters. Cleared at the
+// top of computeLayout (the entry point for every fresh sizing pass).
+const _nodeSizeCache = new Map();
+const _nodeDepthCache = new Map();
+function _clearNodeMetricsCaches() {
+  _nodeSizeCache.clear();
+  _nodeDepthCache.clear();
+}
+
 function getNodeSize(nodeId) {
+  // The actively-edited node reads its label from inlineInput.value, which
+  // changes per keystroke — bypass the cache so size tracks the live input.
+  if (editState && editState.nodeId === nodeId) return _computeNodeSize(nodeId);
+  const cached = _nodeSizeCache.get(nodeId);
+  if (cached !== undefined) return cached;
+  const result = _computeNodeSize(nodeId);
+  _nodeSizeCache.set(nodeId, result);
+  return result;
+}
+
+function _computeNodeSize(nodeId) {
   const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey))) } : findNode(nodeId);
   if (!node) return { w: 0, h: 0 };
 
@@ -7182,6 +7203,9 @@ function polarToCart(cx, cy, dist, angleDeg) {
 }
 
 function computeLayout() {
+  // Fresh sizing pass — clear per-render memoization so structural changes
+  // (label, priority, badges, parent type) and edit-start/-end are reflected.
+  _clearNodeMetricsCaches();
   const positions = {};
   const heights = {};
   const VERTICAL_GAP = 12; // Vertical gap between siblings
@@ -8870,6 +8894,14 @@ function updateNodeUI(nodeId) {
 }
 
 function getNodeDepth(nodeId) {
+  const cached = _nodeDepthCache.get(nodeId);
+  if (cached !== undefined) return cached;
+  const depth = _computeNodeDepth(nodeId);
+  _nodeDepthCache.set(nodeId, depth);
+  return depth;
+}
+
+function _computeNodeDepth(nodeId) {
   if (nodeId === 'center') return 0;
   const node = findNode(nodeId);
   if (!node) return 0;
