@@ -7743,6 +7743,23 @@ function nodeScreenPos(nodeId) {
   };
 }
 
+// Coalesces the mindmap rebuild that lets sibling layout and connected edges
+// track a growing label into one render per animation frame. Without this,
+// every keystroke fired a full SVG rebuild (computeLayout + all node groups +
+// edges + listeners), making typing unusable on low-end hardware.
+let _editRenderScheduled = false;
+function _scheduleEditRender() {
+  if (_editRenderScheduled) return;
+  _editRenderScheduled = true;
+  requestAnimationFrame(() => {
+    _editRenderScheduled = false;
+    // Guard: commit/cancel paths run render() themselves. If the user already
+    // exited the edit before this frame, skip — otherwise we'd render twice
+    // in the same tick.
+    if (editState) render();
+  });
+}
+
 function resizeInlineInput() {
   const nodeId = editState.nodeId;
   const { w, h, fontSize, padX, lineH, totalTextH } = getNodeSize(nodeId);
@@ -7796,7 +7813,7 @@ function resizeInlineInput() {
       inlineInput.style.top  = (sp.y - totalH / 2) + 'px';
     }
   }
-  render();
+  _scheduleEditRender();
 }
 
 let _panAnimToken = 0;
