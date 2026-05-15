@@ -2441,6 +2441,14 @@
   .node-group.subnode-hover .node-rect {
     filter: brightness(0.88);
   }
+  /* While the user is actively wheel/pinch-zooming, freeze hover state. The
+     cursor's hit target can otherwise flip between adjacent nodes on
+     subpixel jitter, retoggling the per-subtree brightness filter every
+     frame. zoomAt sets `.zooming` on #main-svg and clears it ~150 ms after
+     the wheel stream ends. */
+  #main-svg.zooming .node-group {
+    pointer-events: none;
+  }
 
   .node-group[data-id="center"]:hover .node-rect {
     filter: none;
@@ -9606,7 +9614,25 @@ function updateCounter(id, dir) {
 }
 
 function attachNodeListeners() {
-  document.querySelectorAll('.node-group').forEach(g => {
+  // Precompute each subtree's descendant DOM refs once per render. Hover
+  // toggles then walk a small array instead of recursing weekData and
+  // running document.querySelector per descendant.
+  const allGroups = document.querySelectorAll('.node-group');
+  const groupsById = new Map();
+  allGroups.forEach(g => groupsById.set(g.getAttribute('data-id'), g));
+  allGroups.forEach(g => {
+    const id = g.getAttribute('data-id');
+    if (id === 'center') { g._descendantEls = null; return; }
+    const ids = getDescendantIds(id);
+    const els = [];
+    for (let i = 0; i < ids.length; i++) {
+      const el = groupsById.get(ids[i]);
+      if (el) els.push(el);
+    }
+    g._descendantEls = els;
+  });
+
+  allGroups.forEach(g => {
     const id = g.getAttribute('data-id');
 
     // Counter buttons
@@ -9641,18 +9667,16 @@ function attachNodeListeners() {
     g.addEventListener('mouseenter', () => {
       hoveredNodeId = id;
       if (id === 'center') return;
-      const descendants = getDescendantIds(id);
-      descendants.forEach(did => {
-        const el = document.querySelector(`.node-group[data-id="${did}"]`);
-        if (el) el.classList.add('subnode-hover');
-      });
+      const els = g._descendantEls;
+      if (!els) return;
+      for (let i = 0; i < els.length; i++) els[i].classList.add('subnode-hover');
     });
 
     g.addEventListener('mouseleave', () => {
       if (hoveredNodeId === id) hoveredNodeId = null;
-      document.querySelectorAll('.node-group.subnode-hover').forEach(el => {
-        el.classList.remove('subnode-hover');
-      });
+      const els = g._descendantEls;
+      if (!els) return;
+      for (let i = 0; i < els.length; i++) els[i].classList.remove('subnode-hover');
     });
 
     g.addEventListener('pointerdown', (e) => {
@@ -11484,6 +11508,20 @@ function applyAutoLayout() {
   renderIfVisible();
 }
 
+// Mark #main-svg .zooming during an active wheel/pinch zoom stream so CSS can
+// disable pointer-events on node groups — the cursor's effective hit-test can
+// flip between nearby targets on subpixel jitter, retoggling the brightness
+// filter on whole subtrees per frame. Cleared 150 ms after the last zoom call,
+// which spans the gap between wheel events in a typical pinch.
+let _zoomEndTimer = null;
+function _markZooming() {
+  const svg = document.getElementById('main-svg');
+  if (!svg) return;
+  if (!svg.classList.contains('zooming')) svg.classList.add('zooming');
+  clearTimeout(_zoomEndTimer);
+  _zoomEndTimer = setTimeout(() => svg.classList.remove('zooming'), 150);
+}
+
 function zoomAt(cx, cy, factor) {
   const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * factor));
   // Adjust pan so the point under cursor stays fixed
@@ -11491,6 +11529,7 @@ function zoomAt(cx, cy, factor) {
   panY = cy - (cy - panY) * (newZoom / zoom);
   zoom = newZoom;
   applyTransform();
+  _markZooming();
   if (editState) resizeInlineInput();
 }
 
