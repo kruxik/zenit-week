@@ -1981,6 +1981,7 @@
   .agenda-drag-handle:active { cursor: grabbing; }
 
   .agenda-item-dragging { opacity: 0.35; }
+  .agenda-item-done > * { opacity: 0.5; }
   .agenda-item-drop-above .agenda-item { box-shadow: inset 0 2px 0 0 var(--accent, #1ABCFE); }
   .agenda-item-drop-below .agenda-item { box-shadow: inset 0 -2px 0 0 var(--accent, #1ABCFE); }
 
@@ -10493,9 +10494,9 @@ function buildAgendaItem(node, label, opts = {}) {
   const lbl = (label && typeof label === 'object')
     ? label
     : { prefix: '', main: label || node.label || t('todo.noLabel') };
+  if (node.done) item.classList.add('agenda-item-done');
   const labelEl = document.createElement('div');
   labelEl.className = 'daily-log-label';
-  if (node.done) labelEl.style.opacity = '0.5';
   if (lbl.prefix) {
     const prefixEl = document.createElement('span');
     prefixEl.className = 'daily-log-label-prefix';
