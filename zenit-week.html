@@ -1686,6 +1686,15 @@
     display: flex;
     opacity: 1;
   }
+  /* Pinch gestures on agenda should never resize the agenda panel itself.
+     touch-action: pan-x pan-y allows the inner list + day-strip to keep
+     scrolling but stops the browser from interpreting two-finger touch as
+     a page-zoom. The trackpad path (wheel + ctrlKey) is handled in JS so
+     desktop can forward pinch to the mindmap behind. */
+  #agenda-overlay,
+  #agenda-view {
+    touch-action: pan-x pan-y;
+  }
   /* Weak-device path: backdrop-filter blur is the single most GPU-expensive
      effect in this app. The early-init script in <head> tags such devices
      via prefers-reduced-* or RAM/core heuristics; we drop the blur and bump
@@ -11487,6 +11496,26 @@ function zoomAt(cx, cy, factor) {
 
 container.addEventListener('wheel', (e) => {
   e.preventDefault();
+  const rect = container.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.05 : (1 / 1.05);
+  zoomAt(cx, cy, factor);
+}, { passive: false });
+
+// Trackpad pinch on macOS/Windows fires `wheel` with ctrlKey. While agenda is
+// active that event hits the overlay or agenda panel, not the canvas — the
+// browser default would resize the visual viewport (and visibly the agenda
+// panel with it). Intercept at document level:
+//  - Desktop: forward to mindmap zoom so the blurred map behind responds, the
+//    agenda panel stays its own size.
+//  - Mobile (no mindmap visible): just consume the event — no-op.
+// Plain wheel (no modifier) still scrolls the agenda list normally.
+document.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  if (currentView !== 'agenda') return;
+  e.preventDefault();
+  if (window.innerWidth < 768) return;
   const rect = container.getBoundingClientRect();
   const cx = e.clientX - rect.left;
   const cy = e.clientY - rect.top;
