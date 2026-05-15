@@ -1703,6 +1703,14 @@
   html.reduce-effects #map-root .node-rect {
     filter: none;
   }
+  /* Promote #map-root to its own compositor layer so pan/zoom (applied as a
+     CSS transform by applyTransform on this path) is GPU-composited rather
+     than re-rasterizing the SVG. transform-origin pinned to 0,0 to match
+     SVG attribute behavior — applyTransform's pan math assumes it. */
+  html.reduce-effects #map-root {
+    will-change: transform;
+    transform-origin: 0 0;
+  }
 
   .view-toggle-btn {
     display: flex;
@@ -11312,9 +11320,24 @@ function recomputeZoomBounds(fitZoom) {
 }
 
 function applyTransform() {
-  mapRoot.setAttribute('transform',
-    `translate(${panX},${panY}) scale(${zoom})`
-  );
+  // On weak devices: drive pan/zoom via CSS transform + will-change so the
+  // SVG group is promoted to its own compositor layer. The browser then
+  // applies pan/zoom as a GPU matrix op rather than re-rasterizing the
+  // entire SVG every frame. Cost: text/edges can look slightly soft at
+  // extreme zoom because the rasterized layer is reused — acceptable on
+  // the same devices we already tag for reduce-effects.
+  // Capable hardware keeps the SVG `transform` attribute path so high zoom
+  // stays crisp. The two paths are mutually exclusive — keep only one
+  // active to avoid doubled translations.
+  if (document.documentElement.classList.contains('reduce-effects')) {
+    mapRoot.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    if (mapRoot.hasAttribute('transform')) mapRoot.removeAttribute('transform');
+  } else {
+    mapRoot.setAttribute('transform',
+      `translate(${panX},${panY}) scale(${zoom})`
+    );
+    if (mapRoot.style.transform) mapRoot.style.transform = '';
+  }
   document.getElementById('zoom-label').textContent = Math.round(zoom / ZOOM_DEFAULT * 100) + '%';
   const pct = (Math.log(zoom) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
   const fill  = document.getElementById('zoom-fill');
