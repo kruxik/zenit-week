@@ -12396,7 +12396,8 @@ window.addEventListener('resize', () => {
   if (_editJustCommitted) return;
   clearTimeout(_resizeRefitTimer);
   _resizeRefitTimer = setTimeout(() => {
-    if (currentView === 'agenda') return;
+    const canvasEl = document.getElementById('canvas-container');
+    if (canvasEl && getComputedStyle(canvasEl).display === 'none') return;
     fitMindmapView();
   }, 200);
 });
