@@ -12387,17 +12387,18 @@ window.addEventListener('load', async () => {
   });
 });
 
+let _resizeRefitTimer = null;
 window.addEventListener('resize', () => {
-  // Only reset if the map origin has drifted fully off-screen
-  const svg = document.getElementById('main-svg');
-  const w = svg.clientWidth || 800;
-  const h = svg.clientHeight || 600;
-  if (!editState && !_editJustCommitted && (panX < -w || panX > 2 * w || panY < -h || panY > 2 * h)) {
-    resetView();
-  }
   if (typeof editState !== 'undefined' && editState) {
     resizeInlineInput();
+    return;
   }
+  if (_editJustCommitted) return;
+  clearTimeout(_resizeRefitTimer);
+  _resizeRefitTimer = setTimeout(() => {
+    if (currentView === 'agenda') return;
+    fitMindmapView();
+  }, 200);
 });
 </script>
 <div id="custom-tooltip"></div>
