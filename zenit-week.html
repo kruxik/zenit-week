@@ -1695,6 +1695,14 @@
     -webkit-backdrop-filter: none;
     background: var(--overlay-bg);
   }
+  /* Same path — SVG drop-shadow filters (the colored glow around branch nodes
+     and the lift shadow on center) are re-rasterized on every pan/zoom frame
+     and cause visible jank on Chromebook-class GPUs. Strip via CSS so the
+     `filter` attribute set in JS is overridden without touching the render
+     code. Gradients + base colors still carry visual hierarchy. */
+  html.reduce-effects #map-root .node-rect {
+    filter: none;
+  }
 
   .view-toggle-btn {
     display: flex;
