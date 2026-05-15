@@ -10453,7 +10453,7 @@ function renderAgendaStrip() {
   strip.innerHTML = '';
 
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
-  const overdueCount = getOverdueItems().length;
+  const overdueCount = _getOverdueItemsForRender().length;
 
   function addSeparator() {
     const sep = document.createElement('div');
@@ -10698,7 +10698,7 @@ function renderAgendaTabContent() {
 
   let items;
   if (isOverdue) {
-    items = getOverdueItems();
+    items = _getOverdueItemsForRender();
   } else {
     items = getAgendaItems(agendaActiveTab);
   }
@@ -10889,7 +10889,12 @@ function renderAgendaTabContent() {
           lastTouchX = touch.clientX;
           lastTouchY = touch.clientY;
 
-          ghost = el.cloneNode(true);
+          // Clone only the visible .agenda-item, not the full swipe wrapper —
+          // the two swipe-action layers underneath are hidden during drag and
+          // bring two extra SVG <use> instances per ghost. Cheaper to skip them
+          // on weak CPUs.
+          const visibleItem = el.querySelector('.agenda-item');
+          ghost = (visibleItem || el).cloneNode(true);
           ghost.style.cssText = [
             'position:fixed',
             `top:${rect.top}px`,
@@ -11149,6 +11154,15 @@ let _agendaLastOverdueCount = -1;
 let _agendaLastWeekKey = null;
 let _agendaLastLang = null;
 
+// Frame-scoped cache for getOverdueItems(), populated by _renderAgendaFlush
+// and read by both renderAgendaStrip (for the badge count) and
+// renderAgendaTabContent (for the Overdue tab list). Each iterates
+// weekData.nodes + getEffectiveDays — avoid doing it 2-3× per render.
+let _overdueItemsCache = null;
+function _getOverdueItemsForRender() {
+  return _overdueItemsCache !== null ? _overdueItemsCache : getOverdueItems();
+}
+
 function renderAgenda() {
   if (agendaActiveTab === null) {
     agendaActiveTab = new Date().getDay(); // 0=Sun … 6=Sat; matches dayIndex
@@ -11160,19 +11174,24 @@ function renderAgenda() {
 
 function _renderAgendaFlush() {
   _agendaRenderScheduled = false;
-  const overdueCount = getOverdueItems().length;
+  _overdueItemsCache = getOverdueItems();
+  const overdueCount = _overdueItemsCache.length;
   const stripStale = (
     agendaActiveTab        !== _agendaLastTab          ||
     overdueCount           !== _agendaLastOverdueCount ||
     currentWeekKey         !== _agendaLastWeekKey      ||
     currentLang            !== _agendaLastLang
   );
-  if (stripStale) renderAgendaStrip();
-  _agendaLastTab          = agendaActiveTab;
-  _agendaLastOverdueCount = overdueCount;
-  _agendaLastWeekKey      = currentWeekKey;
-  _agendaLastLang         = currentLang;
-  renderAgendaTabContent();
+  try {
+    if (stripStale) renderAgendaStrip();
+    _agendaLastTab          = agendaActiveTab;
+    _agendaLastOverdueCount = overdueCount;
+    _agendaLastWeekKey      = currentWeekKey;
+    _agendaLastLang         = currentLang;
+    renderAgendaTabContent();
+  } finally {
+    _overdueItemsCache = null;
+  }
 }
 
 function switchView(view) {
