@@ -1990,6 +1990,12 @@
     position: relative;
     overflow: hidden;
     border-bottom: 1px solid var(--border-faint);
+    /* Skip layout + paint for rows scrolled outside the viewport.
+       52px ≈ typical row including padding; the placeholder keeps the scroll
+       height stable as rows enter/leave the rendered set. Browsers that don't
+       support content-visibility just paint everything (no regression). */
+    content-visibility: auto;
+    contain-intrinsic-size: 0 52px;
   }
   .agenda-swipe-wrapper:last-child { border-bottom: none; }
   .agenda-swipe-wrapper .daily-log-item { border-bottom: none; }
