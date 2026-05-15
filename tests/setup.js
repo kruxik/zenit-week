@@ -85,6 +85,13 @@ const sandbox = {
     gapi: null,  // populated below
     innerWidth: 1280,
     innerHeight: 768,
+    matchMedia: () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+    }),
   },
   gapi: {
     load: (name, cb) => cb(),
@@ -172,7 +179,9 @@ const sandbox = {
   requestAnimationFrame: () => {},
   setTimeout,
   clearTimeout,
-  Date,
+  // Date getter — re-reads host global on each access so withFrozenDate()
+  // overrides propagate into the VM sandbox.
+  get Date() { return globalThis.Date; },
   indexedDB: fakeIndexedDB,
   _dbMock: {
     objectStoreNames: { contains: () => true },
