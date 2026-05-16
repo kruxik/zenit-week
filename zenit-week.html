@@ -556,31 +556,6 @@
     background: var(--zoom-snapped);
   }
 
-  .reset-btn {
-    background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end));
-    border: 1.5px solid var(--border-subtle);
-    border-radius: 8px;
-    height: 36px;
-    padding: 0 16px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-button);
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    box-shadow: 0 2px 6px var(--shadow-sm);
-  }
-
-  .reset-btn:hover {
-    background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end));
-    border-color: var(--border-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px var(--shadow-md);
-  }
-
   #legend {
     display: flex;
     align-items: center;
@@ -1034,17 +1009,6 @@
     transform: translateX(20px);
   }
 
-
-  .reset-btn.danger {
-    background: var(--bg-surface);
-    color: var(--accent-danger);
-    border: 1px solid var(--accent-danger-border);
-  }
-
-  .reset-btn.danger:hover {
-    background: var(--accent-danger-bg);
-    border-color: var(--accent-danger);
-  }
 
   @media (max-width: 767px) {
     .agenda-item .agenda-action-btn { display: none; }
@@ -2308,13 +2272,39 @@
     border-radius: 8px;
     box-shadow: 0 20px 60px var(--shadow-xl);
     padding: 24px;
-    width: 360px;
+    width: auto;
+    min-width: 360px;
     max-width: calc(100vw - 40px);
     display: flex;
     flex-direction: column;
     gap: 12px;
     transform: translateY(12px);
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #app-confirm-body {
+    max-width: 360px;
+    white-space: pre-line;
+  }
+  #app-confirm-actions .agenda-action-btn,
+  #import-confirm-actions .agenda-action-btn {
+    white-space: nowrap;
+    height: 44px;
+    padding: 0 16px;
+    font-weight: 400;
+  }
+  #app-confirm-actions .agenda-action-btn.danger,
+  #import-confirm-actions .agenda-action-btn.danger {
+    color: var(--accent-danger);
+    border-color: var(--accent-danger-border);
+  }
+  #app-confirm-actions .agenda-action-btn.danger:hover,
+  #import-confirm-actions .agenda-action-btn.danger:hover {
+    color: var(--accent-danger);
+    border-color: var(--accent-danger);
+  }
+  #app-confirm-actions .agenda-action-btn.danger:hover::before,
+  #import-confirm-actions .agenda-action-btn.danger:hover::before {
+    background: var(--accent-danger-bg);
   }
   #app-confirm-overlay.visible #app-confirm-dialog {
     transform: translateY(0);
@@ -3084,8 +3074,9 @@ Use that tab — or take over here.</p>
     <div id="app-confirm-title"></div>
     <div id="app-confirm-body"></div>
     <div id="app-confirm-actions">
-      <button class="reset-btn" id="app-confirm-cancel">Cancel</button>
-      <button class="reset-btn" id="app-confirm-ok">OK</button>
+      <button class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
+      <button class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
+      <button class="agenda-action-btn" id="app-confirm-ok">OK</button>
     </div>
   </div>
 </div>
@@ -3095,8 +3086,8 @@ Use that tab — or take over here.</p>
     <div id="import-confirm-title" data-i18n="settings.importConfirmTitle">Overwrite all data?</div>
     <div id="import-confirm-body" data-i18n="settings.importConfirmBody">This will replace all your current weeks, branches, and settings with the imported file. This cannot be undone.</div>
     <div id="import-confirm-actions">
-      <button class="reset-btn" id="import-confirm-cancel" data-i18n="settings.importConfirmCancel">Cancel</button>
-      <button class="reset-btn danger" id="import-confirm-ok" data-i18n="settings.importConfirmOk">Yes, import</button>
+      <button class="agenda-action-btn" id="import-confirm-cancel" data-i18n="settings.importConfirmCancel">Cancel</button>
+      <button class="agenda-action-btn" id="import-confirm-ok" data-i18n="settings.importConfirmOk">Yes, import</button>
     </div>
   </div>
 </div>
@@ -4678,20 +4669,23 @@ async function handleAuthCode(callback) {
   }
 }
 
-function signOut() {
+async function signOut() {
   stopDrivePoll();
-  if (tokenRenewalTimer) {
-    clearInterval(tokenRenewalTimer);
-    tokenRenewalTimer = null;
+  if (tokenRenewalTimer)        { clearInterval(tokenRenewalTimer);        tokenRenewalTimer = null; }
+  if (syncDebounceTimer)        { clearTimeout(syncDebounceTimer);         syncDebounceTimer = null; }
+  if (colorsSyncDebounceTimer)  { clearTimeout(colorsSyncDebounceTimer);   colorsSyncDebounceTimer = null; }
+
+  // Flush pending uploads BEFORE tearing down auth so no edits are lost
+  if (googleAccessToken) {
+    setSyncStatus('syncing', 'sync.msg.syncing');
+    try {
+      await syncWeekToDrive(currentWeekKey);
+      await syncColorsToDrive();
+    } catch (err) {
+      console.warn('[Drive] Pre-signout flush failed:', err);
+    }
   }
-  if (syncDebounceTimer) {
-    clearTimeout(syncDebounceTimer);
-    syncDebounceTimer = null;
-  }
-  if (colorsSyncDebounceTimer) {
-    clearTimeout(colorsSyncDebounceTimer);
-    colorsSyncDebounceTimer = null;
-  }
+
   colorsSyncedHash = null;
   const stored = getStoredAuth();
   const token  = googleAccessToken;
@@ -4711,6 +4705,44 @@ function signOut() {
   ).catch(() => {});
   revokeToken(token);
   revokeToken(stored?.refresh_token);
+}
+
+// Sign out AND wipe all local USER data (weeks, colors, sync caches, undo/redo).
+// Environment settings (theme, language, view mode, autolayout, migration flag)
+// are preserved so the device retains its UX preferences. Flushes any pending
+// Drive uploads first via signOut(), then deletes the IndexedDB database and
+// reloads the page to boot into a clean default state.
+const SIGNOUT_PRESERVE_KEYS = new Set([
+  'zenit-week-theme',
+  'zenit-week-lang',
+  'zenit-week-view',
+  'zenit-week-autolayout',
+  'zenit-week-storage-migrated',
+]);
+async function signOutAndClear() {
+  await signOut();
+
+  // Close open IDB handle so deleteDatabase doesn't get onblocked
+  if (_db) { try { _db.close(); } catch {} _db = null; }
+  _dbPromise = null;
+
+  try {
+    await new Promise((resolve) => {
+      const req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = req.onerror = req.onblocked = () => resolve();
+    });
+  } catch (err) {
+    console.warn('[clear] IDB delete failed:', err);
+  }
+
+  const keysToWipe = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith('zenit-week-') && !SIGNOUT_PRESERVE_KEYS.has(k)) keysToWipe.push(k);
+  }
+  keysToWipe.forEach(k => localStorage.removeItem(k));
+
+  location.reload();
 }
 
 // ─── TASK-12: Sync status helper ──────────────────────────────────────────────
@@ -5804,6 +5836,11 @@ const TRANSLATIONS = {
     'sync.avatarAria':            'Sync options',
     'sync.lastSyncLabel':         'Last sync',
     'sync.signOut':               'Sign out of Google Drive',
+    'sync.signOutConfirm.title':      'Sign out of Google Drive?',
+    'sync.signOutConfirm.body':       'Your data stays in your Google Drive.\nWhat to do with the local copy on this device?\nAny pending changes will sync before signing out.',
+    'sync.signOutConfirm.keepLocal':  'Keep data',
+    'sync.signOutConfirm.clearLocal': 'Clear & sign out',
+    'app-confirm.cancel':         'Cancel',
     'sync.reconnect':             'Reconnect',
     'sync.badge.disconnected':    'Not connected to Google Drive',
     'sync.badge.connected':       'Synced with Google Drive',
@@ -6008,6 +6045,11 @@ const TRANSLATIONS = {
     'sync.avatarAria':            'Možnosti synchronizace',
     'sync.lastSyncLabel':         'Aktualizace',
     'sync.signOut':               'Odhlásit se z Disku Google',
+    'sync.signOutConfirm.title':      'Odhlásit se z Disku Google?',
+    'sync.signOutConfirm.body':       'Vaše data zůstávají na vašem Disku Google.\nVyberte, co udělat s lokální kopií na tomto zařízení?\nNesynchronizované změny se před odhlášením nahrají.',
+    'sync.signOutConfirm.keepLocal':  'Ponechat data',
+    'sync.signOutConfirm.clearLocal': 'Smazat a odhlásit',
+    'app-confirm.cancel':         'Zrušit',
     'sync.reconnect':             'Připojit znovu',
     'sync.badge.disconnected':    'Nepřipojeno k Disku Google',
     'sync.badge.connected':       'Synchronizováno s Diskem Google',
@@ -9521,7 +9563,6 @@ function _windowKeydownHandler(e) {
         title: t('menu.clearWeek'),
         body: t('confirm.clearWeek'),
         okLabel: t('menu.clearWeek'),
-        danger: true,
         onConfirm: async () => {
           await deleteWeekIDB(currentWeekKey);
           await loadAndRender(currentWeekKey);
@@ -12184,7 +12225,15 @@ document.getElementById('sync-btn').addEventListener('click', () => { startSignI
 
   signoutBtn.addEventListener('click', () => {
     dropdown.classList.remove('visible');
-    signOut();
+    showAppConfirm({
+      title:           t('sync.signOutConfirm.title'),
+      body:            t('sync.signOutConfirm.body'),
+      okLabel:         t('sync.signOutConfirm.keepLocal'),
+      onConfirm:       signOut,
+      secondaryLabel:  t('sync.signOutConfirm.clearLocal'),
+      secondaryDanger: true,
+      onSecondary:     signOutAndClear,
+    });
   });
 
   // Close dropdown on outside click or Escape
@@ -12220,29 +12269,50 @@ window.addEventListener('beforeunload', () => {
 
 // ─── Generic Confirm Dialog ───────────────────────────────────────────────────
 (function() {
-  const overlay    = document.getElementById('app-confirm-overlay');
-  const titleEl    = document.getElementById('app-confirm-title');
-  const bodyEl     = document.getElementById('app-confirm-body');
-  const cancelBtn  = document.getElementById('app-confirm-cancel');
-  const okBtn      = document.getElementById('app-confirm-ok');
-  let _onConfirm   = null;
+  const overlay      = document.getElementById('app-confirm-overlay');
+  const titleEl      = document.getElementById('app-confirm-title');
+  const bodyEl       = document.getElementById('app-confirm-body');
+  const cancelBtn    = document.getElementById('app-confirm-cancel');
+  const secondaryBtn = document.getElementById('app-confirm-secondary');
+  const okBtn        = document.getElementById('app-confirm-ok');
+  let _onConfirm     = null;
+  let _onSecondary   = null;
 
   function closeAppConfirm() {
     overlay.classList.remove('visible');
   }
 
-  window.showAppConfirm = function({ title, body, okLabel = 'OK', danger = false, onConfirm }) {
+  window.showAppConfirm = function({
+    title, body,
+    okLabel = 'OK', danger = false, onConfirm,
+    secondaryLabel = null, secondaryDanger = false, onSecondary = null,
+  }) {
     titleEl.textContent  = title;
     bodyEl.textContent   = body;
     okBtn.textContent    = okLabel;
     okBtn.classList.toggle('danger', danger);
     _onConfirm = onConfirm;
+
+    if (secondaryLabel) {
+      secondaryBtn.textContent = secondaryLabel;
+      secondaryBtn.classList.toggle('danger', secondaryDanger);
+      secondaryBtn.hidden = false;
+      _onSecondary = onSecondary;
+    } else {
+      secondaryBtn.hidden = true;
+      _onSecondary = null;
+    }
+
     overlay.classList.add('visible');
     okBtn.focus();
   };
 
   cancelBtn.addEventListener('click', closeAppConfirm);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAppConfirm(); });
+  secondaryBtn.addEventListener('click', () => {
+    closeAppConfirm();
+    if (_onSecondary) _onSecondary();
+  });
   okBtn.addEventListener('click', () => {
     closeAppConfirm();
     if (_onConfirm) _onConfirm();
