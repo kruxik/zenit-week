@@ -11170,6 +11170,11 @@ function renderAgendaTabContent() {
         dragSrcId = node.id;
         beginAtomicOp();
         e.dataTransfer.effectAllowed = 'move';
+        // Custom drag image: just the .agenda-item, not the wrapper. Wrapper
+        // carries the row-separator border-bottom which would otherwise paint
+        // a stray line under the floating item during the drag.
+        const itemRect = item.getBoundingClientRect();
+        e.dataTransfer.setDragImage(item, e.clientX - itemRect.left, e.clientY - itemRect.top);
         requestAnimationFrame(() => el.classList.add('agenda-item-dragging'));
 
         docDragOver = (ev) => {
