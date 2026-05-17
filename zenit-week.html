@@ -11067,6 +11067,7 @@ function renderAgendaTabContent() {
 
         function initTouchDrag(touch) {
           touchSrcId = node.id;
+          beginAtomicOp();
           const rect = el.getBoundingClientRect();
           touchOffsetY = touch.clientY - rect.top;
           lastTouchX = touch.clientX;
@@ -11121,24 +11122,24 @@ function renderAgendaTabContent() {
           if (ghost) { ghost.remove(); ghost = null; }
           el.classList.remove('agenda-item-dragging');
           clearAgendaDropMarkers();
+          const srcId = touchSrcId;
+          touchSrcId = null;
           const touch = e.changedTouches[0];
-          const t = findAgendaDropTargetByY(touch.clientY, touchSrcId);
+          const t = findAgendaDropTargetByY(touch.clientY, srcId);
           if (t) {
             const current = currentGroupOrder();
-            const fromIdx = current.indexOf(touchSrcId);
+            const fromIdx = current.indexOf(srcId);
             const targetId = t.wrapper.dataset.nodeId;
             if (fromIdx !== -1 && current.indexOf(targetId) !== -1) {
               takeSnapshot();
               current.splice(fromIdx, 1);
               const toIdx = current.indexOf(targetId);
-              current.splice(t.before ? toIdx : toIdx + 1, 0, touchSrcId);
+              current.splice(t.before ? toIdx : toIdx + 1, 0, srcId);
               saveAgendaGroupOrder(tabKey, groupKey, current);
-              touchSrcId = null;
               renderAgenda();
-              return;
             }
           }
-          touchSrcId = null;
+          endAtomicOp();
         }
 
         const handle = el.querySelector('.agenda-drag-handle');
@@ -11167,6 +11168,7 @@ function renderAgendaTabContent() {
       el.addEventListener('dragstart', (e) => {
         if (!mousedownOnHandle) { e.preventDefault(); return; }
         dragSrcId = node.id;
+        beginAtomicOp();
         e.dataTransfer.effectAllowed = 'move';
         requestAnimationFrame(() => el.classList.add('agenda-item-dragging'));
 
@@ -11208,6 +11210,7 @@ function renderAgendaTabContent() {
         cleanupDocDrag();
         dragSrcId = null;
         mousedownOnHandle = false;
+        endAtomicOp();
       });
 
       list.appendChild(el);
