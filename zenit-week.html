@@ -10721,7 +10721,7 @@ function buildAgendaItem(node, label, opts = {}) {
   const lbl = (label && typeof label === 'object')
     ? label
     : { prefix: '', main: label || node.label || t('todo.noLabel') };
-  if (node.done) item.classList.add('agenda-item-done');
+  if (node.done || inDoneSection) item.classList.add('agenda-item-done');
   const labelEl = document.createElement('div');
   labelEl.className = 'daily-log-label';
   if (lbl.prefix) {
