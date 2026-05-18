@@ -2521,15 +2521,60 @@
     fill: rgba(255,255,255,0.25);
   }
 
+  .center-outer-pill {
+    fill: #ECECEC;
+    stroke: #D0D0D0;
+    stroke-width: 1;
+  }
+  html[data-theme="dark"] .center-outer-pill {
+    fill: #262626;
+    stroke: #3a3a3a;
+  }
+
   .week-nav-btn {
     cursor: pointer;
   }
   .week-nav-btn .week-nav-bg {
-    transition: fill 0.2s;
+    fill: transparent;
+    transition: fill 0.15s;
   }
   .week-nav-btn:hover .week-nav-bg {
-    filter: brightness(1.2);
+    fill: rgba(0,0,0,0.06);
   }
+  html[data-theme="dark"] .week-nav-btn:hover .week-nav-bg {
+    fill: rgba(255,255,255,0.08);
+  }
+  .week-nav-btn.today-direction .week-nav-bg {
+    fill: #E8A020;
+  }
+  .week-nav-btn.today-direction:hover .week-nav-bg {
+    fill: #f0b440;
+  }
+  .week-nav-btn .week-nav-text,
+  .week-nav-btn .week-nav-icon {
+    fill: #444444;
+    stroke: #444444;
+  }
+  .week-nav-btn .week-nav-text {
+    stroke: none;
+  }
+  .week-nav-btn .week-nav-icon {
+    fill: none;
+  }
+  html[data-theme="dark"] .week-nav-btn .week-nav-text,
+  html[data-theme="dark"] .week-nav-btn .week-nav-icon {
+    fill: #cccccc;
+    stroke: #cccccc;
+  }
+  html[data-theme="dark"] .week-nav-btn .week-nav-text { stroke: none; }
+  html[data-theme="dark"] .week-nav-btn .week-nav-icon { fill: none; }
+  .week-nav-btn.today-direction .week-nav-text,
+  .week-nav-btn.today-direction .week-nav-icon {
+    fill: #1a1a1a;
+    stroke: #1a1a1a;
+  }
+  .week-nav-btn.today-direction .week-nav-text { stroke: none; }
+  .week-nav-btn.today-direction .week-nav-icon { fill: none; }
 
   #inline-input {
     position: fixed;
@@ -7543,6 +7588,23 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     else if (branch && BRANCH_COLORS[branch]) fillAttr = `url(#node-grad-${branch})`;
   }
 
+  const isDarkTheme = document.documentElement.dataset.theme === 'dark';
+  const btnSymbolColor = isDarkTheme ? '#1a1a1a' : '#ffffff';
+
+  if (isCenter) {
+    // Outer pill wraps middle (week) brick + top/bottom nav bricks — looks
+    // like the bottom Agenda/Mindmap pill: container with an "active" inner.
+    const navBrickH = Math.round(boxH * 0.5);
+    const outerH = boxH + 2 * navBrickH;
+    g.appendChild(svgEl('rect', {
+      class: 'center-outer-pill',
+      x: -boxW / 2, y: -outerH / 2,
+      width: boxW, height: outerH,
+      rx: rx,
+      filter: 'url(#shadow)',
+    }));
+  }
+
   const rect = svgEl('rect', {
     class: 'node-rect',
     x: -boxW / 2, y: -boxH / 2,
@@ -7551,12 +7613,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     fill: fillAttr,
     stroke: borderColor,
     'stroke-width': sw,
-    filter: filterRef,
+    filter: isCenter ? 'none' : filterRef,
   });
   g.appendChild(rect);
-
-  const isDarkTheme = document.documentElement.dataset.theme === 'dark';
-  const btnSymbolColor = isDarkTheme ? '#1a1a1a' : '#ffffff';
 
   // Gear Icon for center node
   if (isCenter) {
@@ -7575,14 +7634,12 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     gearG.appendChild(gearIcon);
     g.appendChild(gearG);
 
-    // Week-nav bricks attached above/below center node
+    // Week-nav bricks attached above/below center node (inside outer pill)
     const twk = todayWeekKey();
     const isPast = currentWeekKey < twk;
     const isFuture = currentWeekKey > twk;
-    const amberColor = '#E8A020';
-    const mutedColor = isDarkTheme ? '#888888' : '#666666';
     const brickH = Math.round(boxH * 0.5);
-    const brickRx = Math.min(rx, brickH / 2);
+    const brickInnerRx = Math.max(0, rx - 4);
     const navIconH = 18;
     const navFontSize = 14;
     const navFontWeight = '600';
@@ -7604,28 +7661,30 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
         class: `week-nav-btn week-nav-${dir}${todayDir ? ' today-direction' : ''}`,
         title: dir === 'prev' ? 'Previous week' : 'Next week',
       });
+      // Inset hit/highlight rect — sits inside the outer pill with small
+      // padding so hover and today-direction states read as inner buttons.
       brickG.appendChild(svgEl('rect', {
         class: 'week-nav-bg',
-        x: -boxW / 2, y: yTop,
-        width: boxW, height: brickH,
-        rx: brickRx,
-        fill: todayDir ? amberColor : mutedColor,
+        x: -boxW / 2 + 3, y: yTop + 3,
+        width: boxW - 6, height: brickH - 6,
+        rx: brickInnerRx,
       }));
       brickG.appendChild(svgEl('use', {
+        class: 'week-nav-icon',
         href: `#icon-${icon}`,
         x: iconCx - navIconH / 2, y: cy - navIconH / 2,
         width: navIconH, height: navIconH,
-        stroke: btnSymbolColor, 'stroke-width': 1.5, fill: 'none',
+        'stroke-width': 1.5, fill: 'none',
         'pointer-events': 'none',
       }));
       const txt = svgEl('text', {
+        class: 'week-nav-text',
         x: textX, y: cy,
         'text-anchor': 'start',
         'dominant-baseline': 'middle',
         'font-family': 'inherit',
         'font-size': navFontSize,
         'font-weight': navFontWeight,
-        fill: btnSymbolColor,
         'pointer-events': 'none',
       });
       txt.textContent = label;
