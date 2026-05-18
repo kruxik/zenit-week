@@ -2481,7 +2481,7 @@
   }
 
   @media (pointer: coarse) {
-    .add-btn, .week-nav-btn { opacity: 1; }
+    .add-btn { opacity: 1; }
   }
 
   .drag-handle {
@@ -2523,14 +2523,6 @@
 
   .week-nav-btn {
     cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  .node-group:hover .week-nav-btn {
-    opacity: 1;
-  }
-  .week-nav-btn.today-direction {
-    opacity: 1;
   }
   .week-nav-btn .week-nav-bg {
     transition: fill 0.2s;
@@ -5662,6 +5654,8 @@ const TRANSLATIONS = {
     'toolbar.today':              'Today',
     'toolbar.prevWeek':           'Previous week',
     'toolbar.nextWeek':           'Next week',
+    'nav.prev':                   'Previous',
+    'nav.next':                   'Next',
     'toolbar.settings':           'Settings',
     'quick_add.placeholder':      'Add a task…',
     'quick_add.submit':           'Add',
@@ -5871,6 +5865,8 @@ const TRANSLATIONS = {
     'toolbar.today':              'Dnes',
     'toolbar.prevWeek':           'Předchozí týden',
     'toolbar.nextWeek':           'Příští týden',
+    'nav.prev':                   'Předchozí',
+    'nav.next':                   'Další',
     'toolbar.settings':           'Nastavení',
     'quick_add.placeholder':      'Přidat úkol…',
     'quick_add.submit':           'Přidat',
@@ -7579,32 +7575,62 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     gearG.appendChild(gearIcon);
     g.appendChild(gearG);
 
-    // Week-nav buttons on top/bottom edges of center node
+    // Week-nav bricks attached above/below center node
     const twk = todayWeekKey();
     const isPast = currentWeekKey < twk;
     const isFuture = currentWeekKey > twk;
     const amberColor = '#E8A020';
-    const weekNavBtnR = 10 * 1.5 * 1.5;
-    const weekNavIconH = 22;
+    const mutedColor = isDarkTheme ? '#888888' : '#666666';
+    const brickH = Math.round(boxH * 0.5);
+    const brickRx = Math.min(rx, brickH / 2);
+    const navIconH = 18;
+    const navFontSize = 14;
+    const navFontWeight = '600';
+    const navGap = 8;
     [
-      { dir: 'prev', icon: 'caret-up',   cy: -boxH / 2, todayDir: isFuture },
-      { dir: 'next', icon: 'caret-down', cy:  boxH / 2, todayDir: isPast   },
-    ].forEach(({ dir, icon, cy, todayDir }) => {
-      const btnColor = todayDir ? amberColor : (document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666');
-      const btnG = svgEl('g', {
+      { dir: 'prev', icon: 'caret-up',   yTop: -boxH / 2 - brickH, todayDir: isFuture, delta: -1 },
+      { dir: 'next', icon: 'caret-down', yTop:  boxH / 2,          todayDir: isPast,   delta: +1 },
+    ].forEach(({ dir, icon, yTop, todayDir, delta }) => {
+      const targetKey = offsetWeek(currentWeekKey, delta);
+      const { week: targetWeek } = parseWeekKey(targetKey);
+      const label = `${t(dir === 'prev' ? 'nav.prev' : 'nav.next')} · ${t('week.short')}${targetWeek}`;
+      const labelW = measureText(label, navFontSize, navFontWeight);
+      const groupW = navIconH + navGap + labelW;
+      const iconCx = -groupW / 2 + navIconH / 2;
+      const textX  = iconCx + navIconH / 2 + navGap;
+      const cy = yTop + brickH / 2;
+
+      const brickG = svgEl('g', {
         class: `week-nav-btn week-nav-${dir}${todayDir ? ' today-direction' : ''}`,
-        transform: `translate(0, ${cy})`,
         title: dir === 'prev' ? 'Previous week' : 'Next week',
       });
-      btnG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: weekNavBtnR, fill: btnColor, class: 'week-nav-bg' }));
-      btnG.appendChild(svgEl('use', {
+      brickG.appendChild(svgEl('rect', {
+        class: 'week-nav-bg',
+        x: -boxW / 2, y: yTop,
+        width: boxW, height: brickH,
+        rx: brickRx,
+        fill: todayDir ? amberColor : mutedColor,
+      }));
+      brickG.appendChild(svgEl('use', {
         href: `#icon-${icon}`,
-        x: -weekNavIconH / 2, y: -weekNavIconH / 2,
-        width: weekNavIconH, height: weekNavIconH,
+        x: iconCx - navIconH / 2, y: cy - navIconH / 2,
+        width: navIconH, height: navIconH,
         stroke: btnSymbolColor, 'stroke-width': 1.5, fill: 'none',
         'pointer-events': 'none',
       }));
-      g.appendChild(btnG);
+      const txt = svgEl('text', {
+        x: textX, y: cy,
+        'text-anchor': 'start',
+        'dominant-baseline': 'middle',
+        'font-family': 'inherit',
+        'font-size': navFontSize,
+        'font-weight': navFontWeight,
+        fill: btnSymbolColor,
+        'pointer-events': 'none',
+      });
+      txt.textContent = label;
+      brickG.appendChild(txt);
+      g.appendChild(brickG);
     });
 
     // "+ Branch" buttons on left and right edges of center node
