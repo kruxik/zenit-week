@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.05.18] - 2026-05-18
+
+### Added
+
+- **root:** Replace hidden nav carets with 3-brick week switcher
+- **sync:** Wipe-on-logout option with env-settings preserved
+
+### Changed
+
+- **mindmap:** Cache subtree refs for hover, freeze hover during zoom
+- **mindmap:** Skip updateSummary when inputs unchanged
+- **mindmap:** Memoize getNodeSize and getNodeDepth per layout
+- **mindmap:** GPU-composited pan/zoom on weak devices
+- **mindmap:** Cache drag node refs + edge data at drag start
+- **mindmap:** Cache measureText results
+- **mindmap:** Drop SVG drop-shadow filters on weak devices
+- **mindmap:** Coalesce per-keystroke render via rAF
+- **agenda:** Lighter drag ghost, memoize overdue per render
+- **agenda:** Drop overlay blur on low-end devices
+- **agenda:** Skip offscreen rows via content-visibility
+- **agenda:** Coalesce renders, surgical focus, cheap hover paint
+
+### Fixed
+
+- **agenda:** Fade partial-tick rows in Done section
+- **agenda:** Hide row separator from drag image
+- **agenda:** Defer Drive merge while dragging items
+- **agenda:** Route pinch to mindmap on desktop, suppress on mobile
+
 ## [v2026.05.15] - 2026-05-15
 
 ### Added
