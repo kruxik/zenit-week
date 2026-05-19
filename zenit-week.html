@@ -10637,10 +10637,13 @@ function addSwipeGesture(item, node) {
       item.style.transition = 'none';
       if (_agendaFocusedEl === item) setAgendaFocus(null);
       clearArmed();
-      // _undoneAction is set on Done-section rows and handles tickRecord /
-      // counter / tickInfo correctly; pending rows fall back to a simple toggle.
+      // _undoneAction (Done-section rows) and _doneAction (pending rows) carry
+      // the same logic the action button uses — tickRecord / counter / tickInfo
+      // routed correctly. Without them swipe would cascade to all children.
       if (typeof item._undoneAction === 'function') {
         item._undoneAction();
+      } else if (typeof item._doneAction === 'function') {
+        item._doneAction();
       } else {
         setStatus(node.id, node.done ? 'undone' : 'done');
         renderAgenda();
@@ -10896,19 +10899,19 @@ function buildAgendaItem(node, label, opts = {}) {
     // Exposed for swipe-right on Done-section rows.
     item._undoneAction = undoneAction;
     btn.addEventListener('click', undoneAction);
-  } else if (cc) {
-    btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
-    btn.addEventListener('click', () => { updateCounter(cc.id, +1); renderAgenda(); });
-  } else if (tickInfo) {
-    btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
-    btn.addEventListener('click', () => {
-      const next = tickInfo.ticks.find(t => !t.done);
-      if (next) setStatus(next.id, 'done');
-      renderAgenda();
-    });
   } else {
     btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
-    btn.addEventListener('click', () => { setStatus(node.id, 'done'); renderAgenda(); });
+    const doneAction = cc
+      ? () => { updateCounter(cc.id, +1); renderAgenda(); }
+      : tickInfo
+        ? () => {
+            const next = tickInfo.ticks.find(t => !t.done);
+            if (next) setStatus(next.id, 'done');
+            renderAgenda();
+          }
+        : () => { setStatus(node.id, 'done'); renderAgenda(); };
+    item._doneAction = doneAction;
+    btn.addEventListener('click', doneAction);
   }
   item.appendChild(btn);
 
