@@ -8,7 +8,7 @@
   "scripts": {
     "validate": "html-validate zenit-week.html",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
-    "tunnel": "dotenv -e .env.local -- sh -c 'ngrok http --domain=${NGROK_DOMAIN:?Set NGROK_DOMAIN in .env.local (see .env.local.example)} 3000'",
+    "tunnel": "dotenv -e .env.local -- sh -c 'ngrok http --url=${NGROK_DOMAIN:?Set NGROK_DOMAIN in .env.local (see .env.local.example)} 3000'",
     "dev:tunnel": "npx -y concurrently -k -n vercel,ngrok -c blue,magenta \"npx vercel dev\" \"npm run tunnel\"",
     "screenshots": "node scripts/screenshots.mjs",
     "hero": "node scripts/hero.mjs",
