@@ -4840,6 +4840,34 @@ function loadGapiAndSync() {
   });
 }
 
+// Stable content signature for merge no-op detection. Strips _ts (LWW
+// bookkeeping) and _editing (transient UI flag), sorts top-level nodes and
+// object keys so two orderings of the same data serialize identically.
+// Children arrays keep insertion order — that order is visually meaningful.
+function _weekContentSig(d) {
+  if (!d) return '';
+  const stripNode = n => {
+    const out = {};
+    for (const k of Object.keys(n).sort()) {
+      if (k === '_ts' || k === '_editing') continue;
+      out[k] = n[k];
+    }
+    return out;
+  };
+  const nodes = (d.nodes || [])
+    .map(stripNode)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const ag = d.agendaOrder || {};
+  const agSorted = {};
+  for (const k of Object.keys(ag).sort()) agSorted[k] = ag[k];
+  return JSON.stringify({
+    nodes,
+    tombstones: [...(d.tombstones || [])].sort(),
+    agendaOrder: agSorted,
+    baseline: d.baseline ?? null,
+  });
+}
+
 // ─── TASK-13: Conflict resolution — last-write-wins per week ─────────────────
 // CRDT merge: LWW per node by _ts, union tombstones, rebuild tree integrity.
 function mergeWeekData(local, remote) {
@@ -4946,10 +4974,18 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
     console.error('[Drive] Failed to write merged data to IndexedDB:', e);
   }
   if (wKey === currentWeekKey) {
+    // Re-render only when the merge actually altered visible content.
+    // measureText() is zoom-aware (intentional, to match SVG paint), so any
+    // post-zoom render re-measures labels at the new effective pixel size and
+    // shifts node positions by sub-pixels. Skipping no-op renders kills the
+    // drift seen after repeated zoom+sync cycles.
+    const changed = _weekContentSig(weekData) !== _weekContentSig(mergedData);
     weekData = mergedData;
     rebuildNodeMap();
-    renderIfVisible();
-    if (currentView === 'agenda') renderAgenda();
+    if (changed) {
+      renderIfVisible();
+      if (currentView === 'agenda') renderAgenda();
+    }
   }
   // Only mark as synced when merged == remote (nothing to push).
   // When scheduleUpload is true, keep lastSyncedHash at its pre-merge value so
