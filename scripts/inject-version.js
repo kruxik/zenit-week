@@ -113,6 +113,13 @@ function runGitDescribe() {
 }
 
 export async function main() {
+  // `vercel dev` runs the build on every startup. Substituting would dirty the
+  // working tree on every restart (footgun before commits). Skip entirely —
+  // the runtime falls back to "dev" when it sees the unsubstituted placeholder.
+  if (process.env.VERCEL_ENV === 'development') {
+    console.log(`[inject-version] dev mode — skipping substitution`);
+    return;
+  }
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const htmlPath = resolve(__dirname, '..', 'zenit-week.html');
   const version = await resolveVersion();
