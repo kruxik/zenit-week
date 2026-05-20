@@ -6,14 +6,46 @@ Thanks for taking a look. Zenit Week aims to stay simple, portable, and visually
 
 1. Clone the repository.
 2. Open `zenit-week.html` in any modern browser — no server required for the app itself.
-3. To work on Google Drive sync locally, run `vercel dev` (you'll need a `.env.local` based on `.env.local.example` for the OAuth client secret).
-4. To run the test suite and HTML validator:
+3. To work on Google Drive sync locally, run `npx vercel dev` (or `vercel dev` if you have the CLI installed globally). You'll need a `.env.local` based on `.env.local.example` for the OAuth client secret. The app will be served at `http://localhost:3000/app` — Google allows OAuth on plain HTTP only for `localhost` / `127.0.0.1`. **Note:** don't add a `dev` npm script that wraps `vercel dev` — Vercel auto-detects it as the project's dev command and recurses into itself.
+4. To test sync from another device (phone, tablet, second laptop) or over HTTPS, use the ngrok tunnel workflow — see [Testing OAuth over HTTPS / cross-device](#testing-oauth-over-https--cross-device) below.
+5. To run the test suite and HTML validator:
 
    ```sh
    npm install         # only needed once
    npm test            # vitest
    npm run validate    # html-validate
    ```
+
+### Testing OAuth over HTTPS / cross-device
+
+`http://localhost` works only on the dev machine itself. To open the app on a phone, tablet, or any other device — or to exercise the HTTPS code path — tunnel `vercel dev` through ngrok with a reserved static domain.
+
+One-time setup:
+
+1. `brew install ngrok` (or download from [ngrok.com](https://ngrok.com)).
+2. Sign up at ngrok.com (free) → grab your auth token → `ngrok config add-authtoken <token>`.
+3. Reserve a static domain at [dashboard.ngrok.com/domains](https://dashboard.ngrok.com/domains) (free tier includes one). You'll get something like `your-name.ngrok-free.dev`.
+4. In your Google Cloud Console OAuth client, add `https://<your-static-domain>/app` to **Authorized redirect URIs** alongside `http://localhost:3000/app`.
+5. Add the domain to your `.env.local` (the tunnel script loads it via `dotenv-cli`):
+
+   ```
+   NGROK_DOMAIN=your-name.ngrok-free.dev
+   ```
+
+Day-to-day:
+
+```sh
+npm run dev:tunnel    # runs `vercel dev` + ngrok together; Ctrl-C stops both
+```
+
+Or in two terminals if you prefer separate logs:
+
+```sh
+npx vercel dev        # terminal 1
+npm run tunnel        # terminal 2
+```
+
+Open `https://<your-static-domain>/app` from any device. The ngrok web inspector at `http://localhost:4040` shows every request — useful for debugging the OAuth round-trip.
 
 ## Principles
 
