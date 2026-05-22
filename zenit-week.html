@@ -11096,18 +11096,38 @@ function renderAgendaTabContent() {
     }
 
     // Picks insertion slot by Y only — ignores X so drag handle slipping out
-    // sideways doesn't kill the reorder. Filters to same group; if pointer is
-    // above/below the group, snaps to first/last slot.
+    // sideways doesn't kill the reorder. Hit-tests the row containing cy:
+    // rows above source's slot map to "before", rows below map to "after",
+    // hovering source itself returns null (no indicator). This avoids the
+    // dead zone where filtering source out of the list left a full-row gap.
     function findAgendaDropTargetByY(cy, srcId) {
-      const wrappers = Array.from(list.querySelectorAll(
+      const all = Array.from(list.querySelectorAll(
         `.agenda-swipe-wrapper[data-group="${CSS.escape(groupKey)}"]`
-      )).filter(w => w.dataset.nodeId !== srcId);
-      if (wrappers.length === 0) return null;
-      for (const w of wrappers) {
-        const r = w.getBoundingClientRect();
-        if (cy < r.top + r.height / 2) return { wrapper: w, before: true };
+      ));
+      if (all.length === 0) return null;
+      const srcIdx = all.findIndex(w => w.dataset.nodeId === srcId);
+
+      let hit = -1;
+      for (let i = 0; i < all.length; i++) {
+        const r = all[i].getBoundingClientRect();
+        if (cy >= r.top && cy <= r.bottom) { hit = i; break; }
       }
-      return { wrapper: wrappers[wrappers.length - 1], before: false };
+      if (hit === -1) {
+        let bestI = 0, bestD = Infinity;
+        for (let i = 0; i < all.length; i++) {
+          const r = all[i].getBoundingClientRect();
+          const d = Math.abs(cy - (r.top + r.bottom) / 2);
+          if (d < bestD) { bestD = d; bestI = i; }
+        }
+        hit = bestI;
+      }
+
+      if (srcIdx === -1) {
+        const r = all[hit].getBoundingClientRect();
+        return { wrapper: all[hit], before: cy < (r.top + r.bottom) / 2 };
+      }
+      if (hit === srcIdx) return null;
+      return { wrapper: all[hit], before: hit < srcIdx };
     }
 
     nodes.forEach(node => {
