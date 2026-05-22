@@ -7858,8 +7858,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     g.appendChild(btnG);
   }
 
-  // Drag handle (skip center, counter, dayChild, inbox)
-  if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.tickChild && !node?.inbox) {
+  // Drag handle (skip center, counter, dayChild, tickChild)
+  if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.tickChild) {
     const dragG = svgEl('g', {
       class: 'drag-handle',
       transform: `translate(0, ${boxH / 2 + 14})`,
