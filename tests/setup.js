@@ -547,6 +547,7 @@ export const {
   // Agenda helpers
   isoWeekPos,
   sortDayChildren,
+  getAgendaAncestorChain,
   getAgendaItems,
   getOverdueItems,
   getAnyDayItems,

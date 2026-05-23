@@ -1408,6 +1408,22 @@
     flex: 0 0 auto;
     white-space: nowrap;
   }
+  .daily-log-label-expanded { display: none; }
+  .daily-log-label[data-expanded="true"] .daily-log-label-prefix,
+  .daily-log-label[data-expanded="true"] .daily-log-label-sep,
+  .daily-log-label[data-expanded="true"] .daily-log-label-main { display: none; }
+  /* Start-truncation trick: container direction:rtl flips visual ellipsis to
+     the left edge; inner bdo dir="ltr" keeps characters in latin order. */
+  .daily-log-label[data-expanded="true"] .daily-log-label-expanded {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    direction: rtl;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .daily-log-time {
     flex-shrink: 0;
@@ -8542,6 +8558,21 @@ function getAnyDayItems() {
   });
 }
 
+// Full ancestor chain from outermost branch down to the immediate parent of
+// the displayed leaf. Excludes the synthetic "center" root. For dayChild
+// rows, the day-parent activity is treated as the leaf so the chain ends at
+// its parent — matching getAgendaNodeLabel's display contract.
+function getAgendaAncestorChain(node) {
+  const leaf = node.dayChild ? findNode(node.parent) : node;
+  const chain = [];
+  let cur = leaf ? findNode(leaf.parent) : null;
+  while (cur && cur.type !== 'center') {
+    chain.unshift(stripDayGroups(cur.label) || cur.label);
+    cur = findNode(cur.parent);
+  }
+  return chain;
+}
+
 function getAgendaNodeLabel(node, includeDayHint = false) {
   const p = findNode(node.parent);
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
@@ -10862,6 +10893,48 @@ function buildAgendaItem(node, label, opts = {}) {
   mainEl.className = 'daily-log-label-main';
   mainEl.textContent = lbl.main;
   labelEl.appendChild(mainEl);
+  // Reveal full ancestor chain: desktop on click, mobile on long-press.
+  // Short taps on mobile do nothing so users can still interact with the row
+  // (swipe / drag / Done button) without accidentally morphing the label.
+  labelEl.dataset.expanded = 'false';
+  const expandedEl = document.createElement('span');
+  expandedEl.className = 'daily-log-label-expanded';
+  const inner = document.createElement('bdo');
+  inner.dir = 'ltr';
+  inner.textContent = [...getAgendaAncestorChain(node), lbl.main].join(' · ');
+  expandedEl.appendChild(inner);
+  labelEl.appendChild(expandedEl);
+  const toggleExpanded = () => {
+    labelEl.dataset.expanded = labelEl.dataset.expanded === 'true' ? 'false' : 'true';
+  };
+  let lpTimer = null;
+  let lpX = 0, lpY = 0;
+  let suppressClick = false;
+  const cancelLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+  labelEl.addEventListener('touchstart', e => {
+    suppressClick = true;
+    const t = e.touches[0];
+    lpX = t.clientX; lpY = t.clientY;
+    lpTimer = setTimeout(() => { lpTimer = null; toggleExpanded(); }, 500);
+  }, { passive: true });
+  labelEl.addEventListener('touchmove', e => {
+    if (!lpTimer) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - lpX) > 10 || Math.abs(t.clientY - lpY) > 10) cancelLp();
+  }, { passive: true });
+  labelEl.addEventListener('touchend', () => {
+    cancelLp();
+    setTimeout(() => { suppressClick = false; }, 600);
+  }, { passive: true });
+  labelEl.addEventListener('touchcancel', () => {
+    cancelLp();
+    suppressClick = false;
+  }, { passive: true });
+  labelEl.addEventListener('click', e => {
+    e.stopPropagation();
+    if (suppressClick) { suppressClick = false; return; }
+    toggleExpanded();
+  });
   item.appendChild(labelEl);
 
   // Unplanned badge
