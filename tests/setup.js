@@ -578,6 +578,15 @@ export const {
   t,
   // Storage
   fnv1a32,
+  // Color picker
+  hexToHsv,
+  hsvToHex,
+  // View switching
+  switchView,
+  // Edge drawing
+  taperedPathD,
+  // Import
+  normalizeImportKey,
   // Quiet Refresh
   parseAssetVersionHeaders,
   buildRestorePayload,
