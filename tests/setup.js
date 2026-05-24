@@ -424,6 +424,11 @@ _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
+_state.getZoom = function() { return zoom; };
+_state.setZoom = function(v) { zoom = v; };
+_state.getPan = function() { return { x: panX, y: panY }; };
+_state.setPan = function(x, y) { panX = x; panY = y; };
+_state.getZoomBounds = function() { return { ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT }; };
 _state.getActiveDayFilter = function() { return activeDayFilter; };
 _state.setAgendaActiveTab = function(v) { agendaActiveTab = v; };
 _state.getAgendaActiveTab = function() { return agendaActiveTab; };
@@ -585,6 +590,9 @@ export const {
   switchView,
   // Edge drawing
   taperedPathD,
+  // Zoom
+  zoomAt,
+  recomputeZoomBounds,
   // Import
   normalizeImportKey,
   // Quiet Refresh
