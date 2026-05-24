@@ -1576,6 +1576,13 @@
     transition: border-color 0.15s;
   }
   #quick-add-input:focus { border-color: var(--accent, #1ABCFE); }
+  #quick-add-input::-webkit-search-cancel-button,
+  #quick-add-input::-webkit-search-decoration,
+  #quick-add-input::-webkit-contacts-auto-fill-button,
+  #quick-add-input::-webkit-credentials-auto-fill-button {
+    display: none !important;
+    -webkit-appearance: none;
+  }
 
   /* ─── Undo / Redo Bar ───────────────────────────────────────────────────── */
   #undo-redo-bar {
@@ -3184,8 +3191,10 @@ Use that tab — or take over here.</p>
 <div id="quick-add-backdrop"></div>
 <div id="quick-add-panel" role="dialog" aria-label="Quick add" aria-modal="true">
   <div id="quick-add-branches" role="group" aria-label="Branch"></div>
-  <input type="text" id="quick-add-input" maxlength="200"
-    data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…" autocomplete="off">
+  <input type="search" id="quick-add-input" maxlength="200"
+    data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…"
+    autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+    enterkeyhint="done">
 </div>
 
 <div id="settings-dropdown">
