@@ -1518,21 +1518,21 @@
     gap: 6px;
     padding: 10px;
   }
-  /* desktop: popup above the pill */
+  /* desktop: popup anchored to bottom-right */
   #quick-add-panel.is-desktop {
-    bottom: 58px;
+    bottom: 12px;
     right: 12px;
     width: 300px;
     border-radius: 8px;
   }
-  /* mobile: slide-up panel, floating above the bottom pill row */
+  /* mobile: slide-up panel anchored to bottom */
   #quick-add-panel.is-mobile {
-    bottom: 66px;
+    bottom: 12px;
     left: 12px;
     right: 12px;
     border-radius: 8px;
     padding-bottom: 10px;
-    transform: translateY(calc(100% + 74px));
+    transform: translateY(calc(100% + 20px));
     transition: transform 0.25s ease;
   }
   #quick-add-panel.is-open {
@@ -1540,6 +1540,11 @@
   }
   #quick-add-panel.is-mobile.is-open {
     transform: translateY(0);
+  }
+  body:has(#quick-add-panel.is-open) #fab-pill,
+  body:has(#quick-add-panel.is-open) #undo-redo-bar,
+  body:has(#quick-add-panel.is-open) #view-toggle-bar {
+    display: none;
   }
 
   #quick-add-branches {
