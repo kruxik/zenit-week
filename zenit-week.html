@@ -1547,21 +1547,23 @@
     flex-wrap: wrap;
     gap: 8px;
   }
-  .qab-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 5px 13px;
-    border-radius: 5px;
-    border: 2px solid;
-    font-size: 10px;
-    font-weight: 700;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: box-shadow 0.15s, opacity 0.15s;
+  #quick-add-panel .agenda-action-btn {
+    height: 36px;
+    padding: 0 16px;
+    font-weight: 400;
   }
-  .qab-pill:not(.selected) { opacity: 0.30; }
-  .qab-pill:not(.selected):hover { opacity: 0.72; }
+  .qab-pill.selected {
+    color: var(--view-btn-active-text);
+  }
+  .qab-pill.selected::before {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px; right: 3px; bottom: 3px;
+    border-radius: 5px;
+    background: var(--view-btn-active-bg);
+    z-index: -1;
+  }
+  .qab-pill-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
   #quick-add-input {
     width: 100%;
@@ -12599,31 +12601,11 @@ document.addEventListener('click', (e) => {
     return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 640;
   }
 
-  function hexToRgba(hex, alpha) {
-    const m = hex.match(/^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-    if (!m) return `rgba(128,128,128,${alpha})`;
-    return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${alpha})`;
-  }
-
-  function applyPillStyles(pill, bc, selected) {
-    const isDark = document.documentElement.dataset.theme === 'dark';
-    const topStop = isDark ? bc.light : '#ffffff';
-    const botStop = isDark ? '#1a1a1a' : bc.light;
-    pill.style.background   = `linear-gradient(to bottom, ${topStop}, ${botStop})`;
-    pill.style.borderColor  = bc.main;
-    pill.style.color        = bc.text;
-    pill.style.boxShadow    = selected
-      ? `0 0 12px ${hexToRgba(bc.main, isDark ? 0.55 : 0.35)}`
-      : 'none';
-    pill.classList.toggle('selected', selected);
-  }
-
   function selectBranch(id) {
     selectedBranchId = id;
     localStorage.setItem(STORAGE_KEY, id);
     branchesRow.querySelectorAll('.qab-pill').forEach(pill => {
-      const bc = BRANCH_COLORS[pill.dataset.id] || { main: '#888', light: '#eee', text: '#444' };
-      applyPillStyles(pill, bc, pill.dataset.id === id);
+      pill.classList.toggle('selected', pill.dataset.id === id);
     });
   }
 
@@ -12633,9 +12615,12 @@ document.addEventListener('click', (e) => {
       const bc = BRANCH_COLORS[b.id] || { main: '#888', light: '#eee', text: '#444' };
       const pill = document.createElement('button');
       pill.type = 'button';
-      pill.className = 'qab-pill';
+      pill.className = 'agenda-action-btn qab-pill';
       pill.dataset.id = b.id;
-      applyPillStyles(pill, bc, false);
+      const dot = document.createElement('span');
+      dot.className = 'qab-pill-dot';
+      dot.style.background = bc.main;
+      pill.appendChild(dot);
       const label = document.createElement('span');
       label.textContent = b.label;
       pill.appendChild(label);
