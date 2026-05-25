@@ -392,60 +392,9 @@
     cursor: pointer;
   }
 
-  .nav-btn {
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    width: 44px;
-    height: 44px;
-    padding: 3px;
-    cursor: pointer;
-    font-size: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-    color: var(--text-subtle);
-    box-shadow: 0 2px 8px var(--shadow-md);
-  }
-
-  .nav-btn:hover {
-    color: var(--text-dim);
-    box-shadow: 0 4px 12px var(--shadow-md);
-  }
-
-  /* Inner-inset hover and active effect */
-  .nav-btn:hover::before, .nav-btn.active::before {
-    content: '';
-    position: absolute;
-    top: 3px; left: 3px; right: 3px; bottom: 3px;
-    border-radius: 5px;
-    z-index: -1;
-  }
-
-  .nav-btn:hover::before {
-    background: var(--bg-hover);
-  }
-
-  .nav-btn.active::before {
-    background: var(--view-btn-active-bg);
-  }
-
-  .nav-btn.active {
-    color: var(--view-btn-active-text);
-  }
-
-  .nav-btn {
-    position: relative;
-    z-index: 1;
-  }
-  .nav-btn .icon, #sync-btn .icon {
+  #sync-btn .icon {
     vertical-align: middle;
   }
-
-  .nav-btn:focus { outline: none; }
 
   #zoom-slider-header {
     display: flex;
