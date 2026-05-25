@@ -12908,6 +12908,9 @@ window.addEventListener('load', async () => {
   summaryPanel.addEventListener('click', () => {
     summaryPanel.classList.toggle('expanded');
   });
+  document.addEventListener('pointerdown', () => {
+    summaryPanel.classList.remove('expanded');
+  });
 
   // Small delay to let SVG lay out before computing center.
   // Always fit the mindmap — even when booting into Agenda — so the canvas
