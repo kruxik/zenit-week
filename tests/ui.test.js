@@ -4,12 +4,12 @@ describe('Internationalization & UI Helpers', () => {
   describe('t(key) translation helper', () => {
     test('returns English translation by default', () => {
       _state.setLang('en');
-      expect(t('toolbar.today')).toBe('Today');
+      expect(t('toolbar.settings')).toBe('Settings');
     });
 
     test('returns Czech translation when language is set to cs', () => {
       _state.setLang('cs');
-      expect(t('toolbar.today')).toBe('Dnes');
+      expect(t('toolbar.settings')).toBe('Nastavení');
     });
 
     test('falls back to English if key is missing in cs', () => {
@@ -17,7 +17,7 @@ describe('Internationalization & UI Helpers', () => {
       // Assuming 'view.sandTitle' is defined in EN but let's verify a known one
       // Actually let's just mock a missing key if possible or use a known one.
       // TRANSLATIONS is a constant so we can't easily inject, but we can check existing ones.
-      expect(t('toolbar.today')).toBe('Dnes');
+      expect(t('toolbar.settings')).toBe('Nastavení');
     });
 
     test('returns the key itself if missing in both languages', () => {
