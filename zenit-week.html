@@ -1164,20 +1164,7 @@
     gap: 8px;
     width: 100%;
   }
-  #cp-cancel, #cp-apply {
-    flex: 1;
-    height: 32px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    transition: background 0.15s;
-  }
-  #cp-cancel { background: var(--bg-muted); color: var(--text-faint); }
-  #cp-cancel:hover { background: var(--border-default); }
-  #cp-apply { background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end)); color: var(--text-button); border: 1.5px solid var(--border-subtle); box-shadow: 0 2px 6px var(--shadow-sm); }
-  #cp-apply:hover { background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end)); border-color: var(--border-hover); }
+  #cp-cancel, #cp-apply { flex: 1; }
 
   #baseline-panel {
     display: none;
@@ -1242,21 +1229,7 @@
     gap: 8px;
     width: 100%;
   }
-
-  #bp-cancel, #bp-apply {
-    flex: 1;
-    height: 32px;
-    border: none;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  #bp-cancel { background: var(--bg-muted); color: var(--text-faint); }
-  #bp-cancel:hover { background: var(--border-default); }
-  #bp-apply { background: linear-gradient(to bottom, var(--btn-bg-start), var(--btn-bg-end)); color: var(--text-button); border: 1.5px solid var(--border-subtle); box-shadow: 0 2px 6px var(--shadow-sm); }
-  #bp-apply:hover { background: linear-gradient(to bottom, var(--btn-bg-hover-start), var(--btn-bg-hover-end)); border-color: var(--border-hover); }
+  #bp-cancel, #bp-apply { flex: 1; }
 
   /* Today Panel */
   /* Agenda done section divider */
@@ -2268,6 +2241,8 @@
   }
   #app-confirm-actions .agenda-action-btn,
   #import-confirm-actions .agenda-action-btn,
+  #bp-buttons .agenda-action-btn,
+  #cp-buttons .agenda-action-btn,
   #settings-dropdown .agenda-action-btn {
     white-space: nowrap;
     height: 36px;
@@ -3066,8 +3041,8 @@ Use that tab — or take over here.</p>
   </div>
   <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
   <div id="bp-buttons">
-    <button id="bp-cancel" data-i18n="baseline.cancel">Cancel</button>
-    <button id="bp-apply" data-i18n="baseline.apply">Apply</button>
+    <button id="bp-cancel" class="agenda-action-btn" data-i18n="baseline.cancel">Cancel</button>
+    <button id="bp-apply" class="agenda-action-btn" data-i18n="baseline.apply">Apply</button>
   </div>
 </div>
 
@@ -3080,8 +3055,8 @@ Use that tab — or take over here.</p>
     <input type="text" id="cp-hex" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
   </div>
   <div id="cp-buttons">
-    <button id="cp-cancel" data-i18n="colorPicker.cancel">Cancel</button>
-    <button id="cp-apply" data-i18n="colorPicker.apply">Apply</button>
+    <button id="cp-cancel" class="agenda-action-btn" data-i18n="colorPicker.cancel">Cancel</button>
+    <button id="cp-apply" class="agenda-action-btn" data-i18n="colorPicker.apply">Apply</button>
   </div>
 </div>
 
