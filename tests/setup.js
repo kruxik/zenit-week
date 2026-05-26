@@ -514,7 +514,6 @@ export const {
   defaultWeekData,
   validateAndRepair,
   // Status-propagation functions
-  addNode,
   startAddNode,
   cancelEdit,
   deleteNode,
@@ -556,7 +555,6 @@ export const {
   getAgendaItems,
   getOverdueItems,
   getAnyDayItems,
-  rescheduleNode,
   computeDayReschedule,
   localDateStr,
   tabDateString,

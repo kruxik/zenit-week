@@ -3,7 +3,7 @@ import {
   commitEdit, migrateDayCounters, transferReusable,
   validateAndRepair, defaultWeekData,
   findNode, rebuildNodeMap, genId,
-  isoWeekPos, getAgendaItems, getOverdueItems, getAnyDayItems, rescheduleNode,
+  isoWeekPos, getAgendaItems, getOverdueItems, getAnyDayItems,
   setStatus, localDateStr, tabDateString,
   _state,
 } from './setup.js';
@@ -632,55 +632,6 @@ describe('getAnyDayItems', () => {
     const c1 = mkCounter('c1', 'work', 'work', 1, 3);
     setUp([branch, c1]);
     expect(getAnyDayItems()).toEqual([]);
-  });
-});
-
-// ─── rescheduleNode ───────────────────────────────────────────────────────────
-
-describe('rescheduleNode', () => {
-  function mkDayChild(id, parentId, dayIndex) {
-    return { id, type: 'activity', dayChild: true, dayIndex,
-      branch: 'work', parent: parentId, label: id,
-      done: false, unplanned: false, children: [], _ts: 0 };
-  }
-
-  test('happy path: moves Mo→Tu when Tu slot is free', () => {
-    const branch = mkBranch('work', ['p1']);
-    const p1 = mkActivity('p1', 'work', 'work', { children: ['mo', 'fr'] });
-    const mo = mkDayChild('mo', 'p1', 1);
-    const fr = mkDayChild('fr', 'p1', 5);
-    setUp([branch, p1, mo, fr]);
-    const result = rescheduleNode('mo', 2);
-    expect(result).toBe(true);
-    const moNode = findNode('mo');
-    expect(moNode.dayIndex).toBe(2);
-    expect(moNode.label).toBe('Tu');
-  });
-
-  test('sibling conflict: returns false, node unchanged', () => {
-    const branch = mkBranch('work', ['p1']);
-    const p1 = mkActivity('p1', 'work', 'work', { children: ['mo', 'tu'] });
-    const mo = mkDayChild('mo', 'p1', 1);
-    const tu = mkDayChild('tu', 'p1', 2);
-    setUp([branch, p1, mo, tu]);
-    const result = rescheduleNode('mo', 2); // Tu already exists
-    expect(result).toBe(false);
-    expect(findNode('mo').dayIndex).toBe(1);
-  });
-
-  test('same day: returns false', () => {
-    const branch = mkBranch('work', ['p1']);
-    const p1 = mkActivity('p1', 'work', 'work', { children: ['mo'] });
-    const mo = mkDayChild('mo', 'p1', 1);
-    setUp([branch, p1, mo]);
-    expect(rescheduleNode('mo', 1)).toBe(false);
-  });
-
-  test('non-dayChild node: returns false', () => {
-    const branch = mkBranch('work', ['p1']);
-    const p1 = mkActivity('p1', 'work', 'work');
-    setUp([branch, p1]);
-    expect(rescheduleNode('p1', 2)).toBe(false);
   });
 });
 

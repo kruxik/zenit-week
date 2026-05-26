@@ -1,5 +1,5 @@
 import {
-  addNode, startAddNode, cancelEdit, commitEdit, deleteNode,
+  startAddNode, cancelEdit, commitEdit, deleteNode,
   setStatus, syncStatusUp, findNode,
   _state,
 } from './setup.js';
@@ -36,12 +36,6 @@ describe('fix #1 – adding a child to a done parent clears parent done', () => 
     const a2 = mkActivity('a2', 'a1',   'work', { done: true, doneAt: 'ts' });
     return [b, a1, a2];
   }
-
-  test('addNode — parent becomes undone immediately', () => {
-    setUp(donedTree());
-    addNode('a1', 'new task');
-    expect(findNode('a1').done).toBe(false);
-  });
 
   test('startAddNode — parent stays done while editing (propagation deferred)', () => {
     setUp(donedTree());

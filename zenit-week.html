@@ -6126,24 +6126,6 @@ function formatWeekLabel(year, week) {
   return `${t('week.word')} ${week}\n(${mStart} - ${mEnd})`;
 }
 
-function formatWeekLabelHTML(year, week) {
-  const { monday, sunday } = getWeekBounds(year, week);
-  const shortLabel = `<span class="wl-short">${t('week.short')} ${week}</span>`;
-  if (currentLang === 'cs') {
-    const months = MONTH_NAMES.cs;
-    const d1 = monday.getUTCDate(), m1 = months[monday.getUTCMonth()];
-    const d2 = sunday.getUTCDate(), m2 = months[sunday.getUTCMonth()];
-    const range = (m1 === m2)
-      ? `${d1}. - ${d2}. ${m1}`
-      : `${d1}. ${m1} - ${d2}. ${m2}`;
-    return `${shortLabel}<span class="wl-full"><b>${t('week.word')} ${week}</b> (${range})</span>`;
-  }
-  const months = MONTH_NAMES.en;
-  const mStart = `${months[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
-  const mEnd   = `${months[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
-  return `${shortLabel}<span class="wl-full"><b>${t('week.word')} ${week}</b> (${mStart} - ${mEnd})</span>`;
-}
-
 function parseWeekKey(key) {
   const [y, w] = key.split('-').map(Number);
   return { year: y, week: w };
@@ -6880,14 +6862,6 @@ function tombstoneNodes(ids) {
   }
 }
 
-function isHighPriority(nodeId) {
-  return getEffectivePriority(nodeId) === 'high';
-}
-
-function isCriticalPriority(nodeId) {
-  return getEffectivePriority(nodeId) === 'critical';
-}
-
 function getEffectivePriority(nodeId) {
   const node = findNode(nodeId);
   return node ? node.priority : null;
@@ -6973,33 +6947,6 @@ function getNodeVisuals(nodeId) {
   };
 }
 
-function addNode(parentId, label) {
-  const parent = findNode(parentId);
-  if (!parent) return;
-  takeSnapshot();
-  const branch = parent.branch || parent.id;
-  const node = {
-    id: genId(),
-    type: 'activity',
-    branch: branch,
-    parent: parentId,
-    label: label,
-    done: false,
-    unplanned: parent.unplanned || false,
-    priority: parent.priority || null,
-    reusable: parent.reusable || false,
-    children: [],
-    _ts: Date.now(),
-  };
-  weekData.nodes.push(node);
-  rebuildNodeMap();
-  parent.children.push(node.id);
-  touchNode(parentId);
-  syncStatusUp(node.id, 'done');
-  saveWeek(currentWeekKey, weekData);
-  render();
-  applyAutoLayout();
-}
 
 // Sync BRANCH_CONFIG sides from weekData after load or structural changes.
 // Prefer the side stored on the node itself; fall back to index-based default
@@ -7082,17 +7029,6 @@ function deleteNode(id) {
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
   if (wasTick && origParentId) renumberTickChildren(origParentId);
-  saveWeek(currentWeekKey, weekData);
-  renderIfVisible();
-  applyAutoLayout();
-}
-
-function renameNode(id, label) {
-  const node = findNode(id);
-  if (!node || !label.trim()) return;
-  takeSnapshot();
-  node.label = label.trim();
-  touchNode(id);
   saveWeek(currentWeekKey, weekData);
   renderIfVisible();
   applyAutoLayout();
@@ -7253,13 +7189,6 @@ function setStatus(id, status) {
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
-function deg2rad(d) { return d * Math.PI / 180; }
-
-function polarToCart(cx, cy, dist, angleDeg) {
-  const r = deg2rad(angleDeg);
-  return { x: cx + dist * Math.cos(r), y: cy + dist * Math.sin(r) };
-}
-
 function computeLayout() {
   // Fresh sizing pass — clear per-render memoization so structural changes
   // (label, priority, badges, parent type) and edit-start/-end are reflected.
@@ -8555,27 +8484,6 @@ function tabDateString(dayIndex) {
   const d = new Date(monday);
   d.setUTCDate(monday.getUTCDate() + offset);
   return localDateStr(d);
-}
-
-// Move a day-leaf to newDayIndex; returns false if sibling conflict or same day
-function rescheduleNode(nodeId, newDayIndex) {
-  const node = findNode(nodeId);
-  if (!node?.dayChild) return false;
-  const parent = findNode(node.parent);
-  if (!parent) return false;
-  if (node.dayIndex === newDayIndex) return false;
-  const siblings = parent.children.map(id => findNode(id)).filter(n => n?.dayChild);
-  if (siblings.some(n => n.id !== nodeId && n.dayIndex === newDayIndex)) return false;
-  takeSnapshot();
-  const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
-  node.dayIndex = newDayIndex;
-  node.label    = langLabels[newDayIndex];
-  node._ts      = Date.now();
-  sortDayChildren(parent);
-  saveWeek(currentWeekKey, weekData);
-  render();
-  renderAgenda();
-  return true;
 }
 
 function startAddNode(parentId) {
