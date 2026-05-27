@@ -446,8 +446,11 @@ _state.resetSyncState = function() {
   lastSyncedHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
+  _undoRedoForcePush = null;
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
 };
+_state.getUndoRedoForcePush = function() { return _undoRedoForcePush; };
+_state.setUndoRedoForcePush = function(v) { _undoRedoForcePush = v; };
 _state.getAccessToken = () => googleAccessToken;
 _state.useRealIDB = function(v) {
   _useMockIDB = !v;
