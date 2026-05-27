@@ -6718,6 +6718,16 @@ async function transferUnfinished() {
         targetParent.children.push(newChildId);
       }
     });
+
+    const oldPos = new Map();
+    oldParent.children.forEach((cid, i) => oldPos.set(cid, i));
+    targetParent.children.sort((a, b) => {
+      const na = weekData.nodes.find(n => n.id === a);
+      const nb = weekData.nodes.find(n => n.id === b);
+      const pa = na?.prevId != null && oldPos.has(na.prevId) ? oldPos.get(na.prevId) : Infinity;
+      const pb = nb?.prevId != null && oldPos.has(nb.prevId) ? oldPos.get(nb.prevId) : Infinity;
+      return pa - pb;
+    });
   });
   rebuildNodeMap();
 
@@ -6841,6 +6851,16 @@ async function transferReusable() {
       if (!targetParent.children.includes(newChildId)) {
         targetParent.children.push(newChildId);
       }
+    });
+
+    const oldPos = new Map();
+    oldParent.children.forEach((cid, i) => oldPos.set(cid, i));
+    targetParent.children.sort((a, b) => {
+      const na = weekData.nodes.find(n => n.id === a);
+      const nb = weekData.nodes.find(n => n.id === b);
+      const pa = na?.prevId != null && oldPos.has(na.prevId) ? oldPos.get(na.prevId) : Infinity;
+      const pb = nb?.prevId != null && oldPos.has(nb.prevId) ? oldPos.get(nb.prevId) : Infinity;
+      return pa - pb;
     });
   });
   rebuildNodeMap();
