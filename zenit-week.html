@@ -1531,16 +1531,15 @@
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     background: var(--glass-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
     box-shadow: 0 2px 8px var(--shadow-md);
-    padding: 8px 16px;
+    padding: 8px 14px;
     z-index: 2500;
     font-size: 13px;
     font-weight: 600;
@@ -1548,22 +1547,20 @@
     user-select: none;
     opacity: 1;
     transition: opacity 0.4s ease;
+    white-space: nowrap;
   }
   #import-progress-toast.fade-out {
     opacity: 0;
   }
-  #import-progress-bar {
-    width: 160px;
-    height: 3px;
-    background: var(--border-subtle);
-    border-radius: 2px;
-    overflow: hidden;
+  #import-progress-icon {
+    font-size: 16px;
+    flex-shrink: 0;
   }
-  #import-progress-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: width 0.15s ease;
+  #import-progress-toast.importing #import-progress-icon {
+    color: var(--accent-warning-text);
+  }
+  #import-progress-toast.complete #import-progress-icon {
+    color: var(--accent-success-text);
   }
 
   /* ─── Import Spinner Overlay ────────────────────────────────────────────── */
@@ -2847,6 +2844,7 @@ Use that tab — or take over here.</p>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
   <symbol id="icon-calendar-week" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M7 14h.013"/><path d="M10.01 14h.005"/><path d="M13.01 14h.005"/><path d="M16.015 14h.005"/><path d="M13.015 17h.005"/><path d="M7.01 17h.005"/><path d="M10.01 17h.005"/></symbol>
   <symbol id="icon-transfer" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 10h-16l5.5 -6"/><path d="M4 14h16l-5.5 6"/></symbol>
+  <symbol id="icon-upload" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 9l5 -5l5 5"/><path d="M12 4l0 12"/></symbol>
   <symbol id="icon-circle-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></symbol>
   <symbol id="icon-circle-dashed" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/></symbol>
   <symbol id="icon-circle-dashed-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/><path d="M9 12l2 2l4 -4"/></symbol>
@@ -3110,8 +3108,8 @@ Use that tab — or take over here.</p>
 </div>
 
 <div id="import-progress-toast" style="display:none">
+  <svg class="icon" id="import-progress-icon" aria-hidden="true"><use href="#icon-upload"/></svg>
   <span id="import-progress-label"></span>
-  <div id="import-progress-bar"><div id="import-progress-fill"></div></div>
 </div>
 
 <div id="view-toggle-bar">
@@ -5738,7 +5736,7 @@ const TRANSLATIONS = {
     'settings.importConfirmCancel':'Cancel',
     'settings.importError':       'Invalid file — could not import.',
     'settings.importReloadHint':  'Data imported — refresh the page to see it.',
-    'import.progress':            'Importing weeks… {current}/{total}',
+    'import.progress':            'Importing week {week}',
     'import.complete':            'Import complete',
     'settings.autoLayout':        'Auto layout',
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
@@ -5939,7 +5937,7 @@ const TRANSLATIONS = {
     'settings.importConfirmCancel':'Zrušit',
     'settings.importError':       'Neplatný soubor — import se nezdařil.',
     'settings.importReloadHint':  'Data importována — obnovte stránku pro zobrazení.',
-    'import.progress':            'Import týdnů… {current}/{total}',
+    'import.progress':            'Import týdne {week}',
     'import.complete':            'Import dokončen',
     'settings.autoLayout':        'Automatické rozvržení',
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
@@ -6464,24 +6462,33 @@ async function exportAllData() {
 
 let _pendingImportData = null;
 let _importInProgress = false;
-let _importDone = 0;
-let _importTotal = 0;
 
-function showImportProgress(current, total) {
+let _importToastTimer = null;
+
+function showImportProgress(weekKey) {
+  clearTimeout(_importToastTimer);
   const toast = document.getElementById('import-progress-toast');
   toast.style.display = '';
-  toast.classList.remove('fade-out');
+  toast.className = 'importing';
+  document.getElementById('import-progress-icon').querySelector('use')
+    .setAttribute('href', '#icon-upload');
   document.getElementById('import-progress-label').textContent =
-    t('import.progress', { current, total });
-  document.getElementById('import-progress-fill').style.width =
-    Math.round((current / total) * 100) + '%';
+    t('import.progress', { week: weekKey });
 }
 
 function hideImportProgress() {
+  clearTimeout(_importToastTimer);
   const toast = document.getElementById('import-progress-toast');
   if (!toast || toast.style.display === 'none') return;
-  toast.classList.add('fade-out');
-  setTimeout(() => { toast.style.display = 'none'; toast.classList.remove('fade-out'); }, 400);
+  toast.className = 'complete';
+  document.getElementById('import-progress-icon').querySelector('use')
+    .setAttribute('href', '#icon-circle-check');
+  document.getElementById('import-progress-label').textContent =
+    t('import.complete');
+  _importToastTimer = setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => { toast.style.display = 'none'; toast.className = ''; }, 400);
+  }, 2000);
 }
 
 // Normalize a key from either old (week-planner-*) or new (zenit-week-*) prefix to zenit-week-*
@@ -6508,8 +6515,7 @@ async function importWeekOnDemand(weekKey) {
   const raw = _pendingImportData.get(weekKey);
   _pendingImportData.delete(weekKey);
   await saveWeekIDB(weekKey, JSON.parse(raw));
-  _importDone++;
-  showImportProgress(_importDone, _importTotal);
+  showImportProgress(weekKey);
   return true;
 }
 
@@ -6592,11 +6598,8 @@ async function importAllData(file) {
 
     _pendingImportData = allWeeks;
     _importInProgress = true;
-    _importDone = 1;
-    _importTotal = allWeeks.size + 1;
-    showImportProgress(_importDone, _importTotal);
-
     const remainingKeys = [...allWeeks.keys()];
+    showImportProgress(remainingKeys[0]);
 
     const importNext = async (i) => {
       if (i >= remainingKeys.length) {
@@ -6611,8 +6614,7 @@ async function importAllData(file) {
         const raw = _pendingImportData.get(wk);
         _pendingImportData.delete(wk);
         await saveWeekIDB(wk, JSON.parse(raw));
-        _importDone++;
-        showImportProgress(_importDone, _importTotal);
+        showImportProgress(wk);
       }
       setTimeout(() => importNext(i + 1), 0);
     };
