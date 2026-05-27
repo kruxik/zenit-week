@@ -12618,7 +12618,8 @@ document.addEventListener('click', (e) => {
       const label = document.createElement('span');
       label.textContent = b.label;
       pill.appendChild(label);
-      pill.addEventListener('click', (e) => { e.stopPropagation(); selectBranch(b.id); input.focus(); });
+      pill.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); selectBranch(b.id); });
+      pill.addEventListener('click', (e) => { e.stopPropagation(); });
       branchesRow.appendChild(pill);
     });
   }
