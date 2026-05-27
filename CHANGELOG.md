@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.05.27] - 2026-05-27
+
+### Added
+
+- **import:** Replace progress bar with icon-based week status toast
+- **import:** Progressive import with background loading and progress toast
+- **summary:** Close expanded drawer on click outside
+- **agenda:** Tap (desktop) / long-press (mobile) label reveals full ancestor path
+
+### Changed
+
+- **i18n:** Remove 13 dead translation keys, add missing confirm.clearWeek
+- **html:** Remove 10 unused SVG icon symbols and orphaned .wl-short/.wl-full CSS
+- **js:** Remove 8 dead functions and their tests
+- **css:** Remove 5 dead selectors (#legend, toolbar .legend-item/.legend-dot, .daily-log-footer-stat, .daily-log-time)
+- **ui:** Unify dialog Cancel/Apply buttons to agenda-action-btn ghost style
+- **css:** Remove dead .nav-btn styles (class unused in DOM)
+- **quick-add:** Restyle branch pills to match standard buttons
+
+### Fixed
+
+- **sync:** Tombstone nodes on Clear Week so Drive sync does not restore them
+- **transfer:** Preserve prev-week child order across sequential unfinished+reusable transfers
+- **import:** Sort tick-children by tickIndex on load so counters display in order
+- **quick-add:** Prevent input border flicker when selecting branch on desktop
+- **import:** Reset agenda tab to today after importing data
+- **agenda:** Reset active tab to today on day rollover when returning to tab
+- **sync:** Prevent Drive sync from overriding undo/redo by force-pushing restored state
+- **reschedule:** Preserve day-child done state when rescheduling sibling days
+- **import:** Match toast-to-pill gap with pill-to-bottom spacing (12px)
+- **import:** Reset zoom/pan to fit content after data import
+- **seo:** Add missing canonical and robots meta tags to terms.html
+- **html:** Restore icon-caret-up/down SVG symbols for week prev/next navigation
+- **html:** Restore icon-circle-half-2 and icon-bolt-off SVG symbols
+- **html:** Restore icon-repeat-off SVG symbol used by Disposable menu item
+- **html:** Add missing icon-circle-dashed SVG symbol for Clear Day Filter menu item
+- **ui:** Unify summary drawer collapsed height to 36px
+- **ui:** Unify sync avatar button size to 36px
+- **ui:** Unify sync button height to 36px
+- **ui:** Unify button height to 36px across settings and confirm dialogs
+- **quick-add:** Anchor panel to bottom and hide nav buttons while open
+- **quick-add:** Use solid panel background matching settings
+- **quick-add:** Use neutral gray focus border instead of accent blue
+- **quick-add:** Suppress mobile keyboard autofill icons on input
+- **mindmap:** Render drag handle on inbox nodes so they're draggable on touch
+- **agenda:** Drop-target hit-tests row containing pointer (no dead zone over source)
+
 ## [v2026.05.20] - 2026-05-20
 
 ### Fixed
