@@ -1524,6 +1524,74 @@
     margin: 0;
   }
 
+  /* ─── Import Progress Toast ───────────────────────────────────────────────── */
+  #import-progress-toast {
+    position: fixed;
+    bottom: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px var(--shadow-md);
+    padding: 8px 16px;
+    z-index: 2500;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    user-select: none;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+  }
+  #import-progress-toast.fade-out {
+    opacity: 0;
+  }
+  #import-progress-bar {
+    width: 160px;
+    height: 3px;
+    background: var(--border-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #import-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.15s ease;
+  }
+
+  /* ─── Import Spinner Overlay ────────────────────────────────────────────── */
+  #import-spinner {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 56px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 900;
+    pointer-events: none;
+  }
+  #import-spinner::after {
+    content: '';
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-subtle);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: import-spin 0.7s linear infinite;
+  }
+  @keyframes import-spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* ─── View Toggle Bar ────────────────────────────────────────────────────── */
   #view-toggle-bar {
     position: fixed;
@@ -3039,6 +3107,11 @@ Use that tab — or take over here.</p>
       <button class="agenda-action-btn danger" id="import-confirm-ok" data-i18n="settings.importConfirmOk">Yes, import</button>
     </div>
   </div>
+</div>
+
+<div id="import-progress-toast" style="display:none">
+  <span id="import-progress-label"></span>
+  <div id="import-progress-bar"><div id="import-progress-fill"></div></div>
 </div>
 
 <div id="view-toggle-bar">
@@ -5665,6 +5738,8 @@ const TRANSLATIONS = {
     'settings.importConfirmCancel':'Cancel',
     'settings.importError':       'Invalid file — could not import.',
     'settings.importReloadHint':  'Data imported — refresh the page to see it.',
+    'import.progress':            'Importing weeks… {current}/{total}',
+    'import.complete':            'Import complete',
     'settings.autoLayout':        'Auto layout',
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
     'view.mindmap':               'Mindmap',
@@ -5864,6 +5939,8 @@ const TRANSLATIONS = {
     'settings.importConfirmCancel':'Zrušit',
     'settings.importError':       'Neplatný soubor — import se nezdařil.',
     'settings.importReloadHint':  'Data importována — obnovte stránku pro zobrazení.',
+    'import.progress':            'Import týdnů… {current}/{total}',
+    'import.complete':            'Import dokončen',
     'settings.autoLayout':        'Automatické rozvržení',
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
     'view.mindmap':               'Mapa',
@@ -6385,11 +6462,55 @@ async function exportAllData() {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+let _pendingImportData = null;
+let _importInProgress = false;
+let _importDone = 0;
+let _importTotal = 0;
+
+function showImportProgress(current, total) {
+  const toast = document.getElementById('import-progress-toast');
+  toast.style.display = '';
+  toast.classList.remove('fade-out');
+  document.getElementById('import-progress-label').textContent =
+    t('import.progress', { current, total });
+  document.getElementById('import-progress-fill').style.width =
+    Math.round((current / total) * 100) + '%';
+}
+
+function hideImportProgress() {
+  const toast = document.getElementById('import-progress-toast');
+  if (!toast || toast.style.display === 'none') return;
+  toast.classList.add('fade-out');
+  setTimeout(() => { toast.style.display = 'none'; toast.classList.remove('fade-out'); }, 400);
+}
+
 // Normalize a key from either old (week-planner-*) or new (zenit-week-*) prefix to zenit-week-*
 function normalizeImportKey(key) {
   if (key.startsWith('week-planner-')) return 'zenit-week-' + key.slice('week-planner-'.length);
   if (key.startsWith('zenit-week-')) return key;
   return null;
+}
+
+function showImportSpinner() {
+  if (document.getElementById('import-spinner')) return;
+  const el = document.createElement('div');
+  el.id = 'import-spinner';
+  document.getElementById('app').appendChild(el);
+}
+
+function hideImportSpinner() {
+  const el = document.getElementById('import-spinner');
+  if (el) el.remove();
+}
+
+async function importWeekOnDemand(weekKey) {
+  if (!_pendingImportData || !_pendingImportData.has(weekKey)) return false;
+  const raw = _pendingImportData.get(weekKey);
+  _pendingImportData.delete(weekKey);
+  await saveWeekIDB(weekKey, JSON.parse(raw));
+  _importDone++;
+  showImportProgress(_importDone, _importTotal);
+  return true;
 }
 
 async function importAllData(file) {
@@ -6405,28 +6526,42 @@ async function importAllData(file) {
       console.error('[zenit-week] Import failed:', err);
       return;
     }
-    // Remove existing zenit-week-* keys first from IDB
+
+    // Wipe existing IDB data
     const weekKeys = await listWeekKeysIDB();
     for (const wk of weekKeys) await deleteWeekIDB(wk);
     await deleteValueIDB(COLORS_STORAGE_KEY);
+
+    // Partition weeks: current week vs rest
+    const currentWk = todayWeekKey();
+    const allWeeks = new Map();
+    let colorsRaw = null;
 
     for (const [key, val] of Object.entries(parsed.data)) {
       const nk = normalizeImportKey(key);
       if (!nk) continue;
       if (nk.startsWith('zenit-week-') && /^\d{4}-\d{2}$/.test(nk.slice(11))) {
-        await saveWeekIDB(nk.slice(11), JSON.parse(val));
+        allWeeks.set(nk.slice(11), val);
       } else if (nk === COLORS_STORAGE_KEY) {
-        await saveValueIDB(COLORS_STORAGE_KEY, JSON.parse(val));
+        colorsRaw = val;
       }
     }
-    // Generate a new reset token — other browsers that see a different token will wipe and resync.
-    // Token is set before import-pending so forcePushAllToDrive can read it.
+
+    // Write colors first so loadBranchColors picks them up
+    if (colorsRaw) await saveValueIDB(COLORS_STORAGE_KEY, JSON.parse(colorsRaw));
+
+    // Write current week first
+    if (allWeeks.has(currentWk)) {
+      await saveWeekIDB(currentWk, JSON.parse(allWeeks.get(currentWk)));
+      allWeeks.delete(currentWk);
+    }
+
+    // Reset token + import-pending flag
     localStorage.setItem('zenit-week-reset-token', genId());
-    // Mark import pending — Drive will be force-pushed on next sign-in or immediately if signed in
     await saveValueIDB('zenit-week-import-pending', '1');
-    // Stop any running poll — prevents it from detecting a resetToken mismatch
     stopDrivePoll();
-    // Re-initialize in-place
+
+    // Re-initialize and render current week immediately
     try {
       undoStack = [];
       redoStack = [];
@@ -6440,14 +6575,49 @@ async function importAllData(file) {
       updateColorDots();
       applyTranslations();
       saveBranchColors();
-      if (googleAccessToken) await forcePushAllToDrive();
       await loadAndRender(todayWeekKey());
       fitMindmapView();
     } catch (reinitErr) {
       console.error('[zenit-week] Import re-init failed:', reinitErr);
       const errEl = document.getElementById('import-error');
       if (errEl) { errEl.style.display = ''; errEl.textContent = t('settings.importReloadHint'); }
+      return;
     }
+
+    // Background-import remaining weeks
+    if (allWeeks.size === 0) {
+      if (googleAccessToken) forcePushAllToDrive();
+      return;
+    }
+
+    _pendingImportData = allWeeks;
+    _importInProgress = true;
+    _importDone = 1;
+    _importTotal = allWeeks.size + 1;
+    showImportProgress(_importDone, _importTotal);
+
+    const remainingKeys = [...allWeeks.keys()];
+
+    const importNext = async (i) => {
+      if (i >= remainingKeys.length) {
+        _pendingImportData = null;
+        _importInProgress = false;
+        hideImportProgress();
+        if (googleAccessToken) forcePushAllToDrive();
+        return;
+      }
+      const wk = remainingKeys[i];
+      if (_pendingImportData && _pendingImportData.has(wk)) {
+        const raw = _pendingImportData.get(wk);
+        _pendingImportData.delete(wk);
+        await saveWeekIDB(wk, JSON.parse(raw));
+        _importDone++;
+        showImportProgress(_importDone, _importTotal);
+      }
+      setTimeout(() => importNext(i + 1), 0);
+    };
+
+    setTimeout(() => importNext(0), 0);
   };
   reader.readAsText(file);
 }
@@ -12181,6 +12351,11 @@ window.addEventListener('pointerup', (e) => {
 // ─── Week navigation ──────────────────────────────────────────────────────────
 async function loadAndRender(wk) {
   currentWeekKey = wk;
+  if (_importInProgress && _pendingImportData && _pendingImportData.has(wk)) {
+    showImportSpinner();
+    await importWeekOnDemand(wk);
+    hideImportSpinner();
+  }
   weekData = await loadWeek(wk);
   rebuildNodeMap();
   syncBranchConfig();
@@ -12206,6 +12381,11 @@ window.addEventListener('hashchange', async () => {
   const target = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
   if (target !== currentWeekKey) {
     currentWeekKey = target;
+    if (_importInProgress && _pendingImportData && _pendingImportData.has(target)) {
+      showImportSpinner();
+      await importWeekOnDemand(target);
+      hideImportSpinner();
+    }
     weekData = await loadWeek(currentWeekKey);
     rebuildNodeMap();
     syncBranchConfig();
