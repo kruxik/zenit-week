@@ -10594,6 +10594,17 @@ let currentView = localStorage.getItem('zenit-week-view') || 'mindmap';
 
 // 'overdue' | 0–6 (dayIndex). null = uninitialised, defaults to today on first open.
 let agendaActiveTab = null;
+let _lastKnownDay = new Date().getDay();
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const now = new Date().getDay();
+  if (now === _lastKnownDay) return;
+  _lastKnownDay = now;
+  agendaActiveTab = null;
+  if (currentView === 'agenda') renderAgenda();
+  else render();
+});
 let hoveredAgendaNode = null;
 
 // Tracks the agenda row currently carrying the .agenda-item-focused class so
