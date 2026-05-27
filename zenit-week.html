@@ -6442,6 +6442,7 @@ async function importAllData(file) {
       saveBranchColors();
       if (googleAccessToken) await forcePushAllToDrive();
       await loadAndRender(todayWeekKey());
+      fitMindmapView();
     } catch (reinitErr) {
       console.error('[zenit-week] Import re-init failed:', reinitErr);
       const errEl = document.getElementById('import-error');
