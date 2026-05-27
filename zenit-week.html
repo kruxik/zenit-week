@@ -6304,6 +6304,20 @@ function validateAndRepair(data) {
   // 4. Garbage collection: remove unreachable nodes
   data.nodes = data.nodes.filter(n => reachable.has(n.id));
 
+  // 5. Sort tick-children and day-children in their parent's children array
+  data.nodes.forEach(n => {
+    if (!Array.isArray(n.children) || n.children.length < 2) return;
+    const hasTickChild = n.children.some(cid => nodeMap.get(cid)?.tickChild);
+    if (hasTickChild) {
+      n.children.sort((aId, bId) => {
+        const a = nodeMap.get(aId), b = nodeMap.get(bId);
+        const ka = !a?.tickChild ? -1 : (a.tickIndex ?? 999);
+        const kb = !b?.tickChild ? -1 : (b.tickIndex ?? 999);
+        return ka - kb;
+      });
+    }
+  });
+
   return data;
 }
 
