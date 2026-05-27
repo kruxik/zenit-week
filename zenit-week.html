@@ -3763,6 +3763,7 @@ let redoStack = [];
 const MAX_UNDO = 100;
 let _applyingSnapshot = false;
 let _nextWeekRawCache = null;
+let _undoRedoForcePush = null;
 
 let nodeMap = new Map();
 
@@ -3829,6 +3830,15 @@ async function _applySnapshot(raw) {
   Object.keys(BRANCH_CONFIG).forEach(b => { delete BRANCH_CONFIG[b]; });
   syncBranchConfig();
   rebuildNodeMap();
+
+  // Undo/redo restores old _ts values on nodes. Without bumping them, the next
+  // Drive sync CRDT merge (LWW by _ts) would resurrect the undone changes from
+  // the remote copy which still has higher _ts. Force-push flag blocks pulls
+  // until the local state reaches Drive.
+  const tsNow = Date.now();
+  for (const n of weekData.nodes) n._ts = tsNow;
+  _undoRedoForcePush = currentWeekKey;
+
   await saveWeek(currentWeekKey, weekData);
 
   // Restore next week's state if the snapshot captured it
@@ -5025,6 +5035,7 @@ function _flushPendingSync() {
 // ─── TASK-11: Load week data from Drive ───────────────────────────────────────
 async function syncWeekFromDrive(wKey) {
   if (!googleAccessToken) return;
+  if (_undoRedoForcePush === wKey) return;
 
   let fileId;
   try {
@@ -5333,9 +5344,16 @@ async function _uploadWeekToDrive(wKey, json) {
 async function syncWeekToDrive(wKey) {
   if (!googleAccessToken) return;
 
-  // Pull-merge-push: fetch Drive content first, CRDT-merge, then upload.
-  // This ensures we never overwrite concurrent changes from another device.
-  await syncWeekFromDrive(wKey);
+  const forcePush = _undoRedoForcePush === wKey;
+  if (forcePush) {
+    _undoRedoForcePush = null;
+    etagCache.delete(wKey);
+    lastSyncedHash.delete(wKey);
+  } else {
+    // Pull-merge-push: fetch Drive content first, CRDT-merge, then upload.
+    // This ensures we never overwrite concurrent changes from another device.
+    await syncWeekFromDrive(wKey);
+  }
 
   // Re-read local after merge (syncWeekFromDrive may have updated it)
   const data = await loadWeekIDB(wKey);
