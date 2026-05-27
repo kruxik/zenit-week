@@ -9737,8 +9737,17 @@ function _windowKeydownHandler(e) {
         body: t('confirm.clearWeek'),
         okLabel: t('menu.clearWeek'),
         onConfirm: async () => {
-          await deleteWeekIDB(currentWeekKey);
-          await loadAndRender(currentWeekKey);
+          const clearIds = weekData.nodes
+            .filter(n => n.type !== 'branch' && n.type !== 'center')
+            .map(n => n.id);
+          tombstoneNodes(clearIds);
+          weekData.nodes = weekData.nodes.filter(n => n.type === 'branch' || n.type === 'center');
+          weekData.nodes.forEach(n => { n.children = []; });
+          rebuildNodeMap();
+          await saveWeek(currentWeekKey, weekData);
+          syncBranchConfig();
+          renderIfVisible();
+          if (currentView === 'agenda') renderAgenda();
         }
       });
       return;
@@ -10490,9 +10499,14 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
 document.getElementById('ctx-clear-week').addEventListener('click', async () => {
   hideContextMenu();
   takeSnapshot();
-  await deleteWeekIDB(currentWeekKey);
-  weekData = await loadWeek(currentWeekKey);
+  const clearIds = weekData.nodes
+    .filter(n => n.type !== 'branch' && n.type !== 'center')
+    .map(n => n.id);
+  tombstoneNodes(clearIds);
+  weekData.nodes = weekData.nodes.filter(n => n.type === 'branch' || n.type === 'center');
+  weekData.nodes.forEach(n => { n.children = []; });
   rebuildNodeMap();
+  await saveWeek(currentWeekKey, weekData);
   syncBranchConfig();
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
