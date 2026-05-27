@@ -8185,6 +8185,11 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false) {
   if (!node || node.type !== 'activity' || node.dayChild) return;
 
   const dayChildIds = (node.children || []).filter(id => findNode(id)?.dayChild);
+  const prevState = new Map();
+  dayChildIds.forEach(id => {
+    const c = findNode(id);
+    if (c) prevState.set(c.dayIndex, { done: c.done, doneAt: c.doneAt });
+  });
   tombstoneNodes(dayChildIds);
   weekData.nodes = weekData.nodes.filter(n => !dayChildIds.includes(n.id));
   node.children = node.children.filter(id => !dayChildIds.includes(id));
@@ -8196,7 +8201,15 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false) {
   if (useChildren) {
     // Multi-day: strip day annotation from label, days live as children
     node.label = stripDayGroups(node.label || '').trim();
-    sortedDays.forEach(d => createDayChild(nodeId, d));
+    sortedDays.forEach(d => {
+      const id = createDayChild(nodeId, d);
+      const prev = prevState.get(d);
+      if (prev?.done) {
+        const child = findNode(id);
+        child.done = true;
+        child.doneAt = prev.doneAt;
+      }
+    });
   } else {
     // 0 or 1 day: annotation in label only, no children
     const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
