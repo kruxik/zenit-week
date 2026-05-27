@@ -6599,6 +6599,7 @@ async function importAllData(file) {
       updateColorDots();
       applyTranslations();
       saveBranchColors();
+      agendaActiveTab = null;
       await loadAndRender(todayWeekKey());
       fitMindmapView();
     } catch (reinitErr) {
