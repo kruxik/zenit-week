@@ -106,7 +106,7 @@ Clickable icons · keyboard shortcut · markdown/rich text · comment history ·
 - [x] **T3** — dirty-check auto-save: `takeSnapshot` → write `comments` → `_ts` bump → persist → undo/redo
 - [x] 🔲 Checkpoint A — review core path
 - [x] **T4** — mind-map indicator icon (display-only, centering math)
-- [ ] **T5** — agenda-row indicator icon (display-only)
-- [ ] 🔲 Checkpoint B — review indicators
+- [x] **T5** — agenda-row indicator icon (display-only)
+- [x] 🔲 Checkpoint B — review indicators
 - [ ] **T6** — `validateAndRepair` tolerance/strip + Drive merge + vitest
 - [ ] 🔲 Checkpoint C — final verification + ship

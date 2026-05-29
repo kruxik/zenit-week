@@ -11258,6 +11258,15 @@ function buildAgendaItem(node, label, opts = {}) {
     item.appendChild(rep);
   }
 
+  // Comment indicator (display-only — signals the row carries a comment)
+  if (node.comments) {
+    const cmt = document.createElement('span');
+    cmt.className = 'daily-log-badge';
+    cmt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;';
+    cmt.innerHTML = iconSvg('message');
+    item.appendChild(cmt);
+  }
+
   // Progress pill for counters (legacy) or tick-children. Per-tick log rows
   // (tickRecord) show the cumulative count at that tick's moment, not the
   // current live total.
