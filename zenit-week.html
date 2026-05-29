@@ -2121,7 +2121,8 @@
   }
 
   /* Mobile: floating "Close" pill replaces the top-right X while help is open */
-  #help-close-bar {
+  #help-close-bar,
+  #comment-close-bar {
     position: fixed;
     bottom: 12px;
     left: 50%;
@@ -2173,6 +2174,148 @@
       display: none;
     }
     body:has(#help-panel.visible) #help-close-bar {
+      display: flex;
+    }
+  }
+
+  /* Comment dialog — mirrors the Help dialog layout (desktop centered panel,
+     mobile full-area with bottom "Close" pill). */
+  #comment-overlay {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 56px);
+    background: var(--overlay-sm);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    z-index: 950;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #comment-overlay.visible {
+    display: flex;
+    opacity: 1;
+  }
+
+  #comment-panel {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    background: var(--bg-surface);
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    z-index: 2000;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+  }
+
+  @media (min-width: 768px) {
+    #comment-panel {
+      top: 61px;
+      left: 50%;
+      right: auto;
+      bottom: 5px;
+      width: 592px;
+      max-width: calc(100vw - 40px);
+      height: calc(100vh - 66px);
+      border-radius: 8px;
+      border: 1px solid var(--border-default);
+      box-shadow: 0 20px 60px var(--shadow-xl);
+      transform: translateX(-50%) translateY(20px);
+    }
+  }
+
+  #comment-panel.visible {
+    display: flex;
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+  }
+
+  @media (min-width: 768px) {
+    #comment-panel.visible {
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  #comment-header {
+    background: var(--bg-surface-subtle);
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  #comment-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #comment-close {
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text-placeholder);
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+  #comment-close:hover { color: var(--text-primary); }
+
+  #comment-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 24px 24px;
+    min-height: 0;
+  }
+  #comment-textarea {
+    flex: 1;
+    width: 100%;
+    resize: none;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 0;
+  }
+  #comment-counter {
+    margin-top: 8px;
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-placeholder);
+    font-variant-numeric: tabular-nums;
+  }
+  #comment-counter.over { color: var(--accent-danger); }
+
+  /* Mobile: hide bottom pill bars while comment dialog open; swap top-X for pill */
+  @media (max-width: 767px) {
+    body:has(#comment-panel.visible) #fab-pill,
+    body:has(#comment-panel.visible) #undo-redo-bar,
+    body:has(#comment-panel.visible) #view-toggle-bar {
+      display: none;
+    }
+    body:has(#comment-panel.visible) #comment-close {
+      display: none;
+    }
+    body:has(#comment-panel.visible) #comment-close-bar {
       display: flex;
     }
   }
@@ -3044,6 +3187,7 @@ Use that tab — or take over here.</p>
   <div class="ctx-item" id="ctx-prio-critical"><svg class="icon" aria-hidden="true"><use href="#icon-flame"/></svg> <span data-i18n="menu.prioCritical">Priority Critical</span></div>
   <div class="ctx-separator" id="ctx-sep-2"></div>
   <div class="ctx-item" id="ctx-rename"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"/></svg> <span data-i18n="menu.rename">Rename</span></div>
+  <div class="ctx-item" id="ctx-comment"><svg class="icon" aria-hidden="true"><use href="#icon-message"/></svg> <span data-i18n="menu.comment">Comment</span></div>
   <div class="ctx-item" id="ctx-add-child"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg> <span data-i18n="menu.addActivity">Add Activity</span></div>
   <div class="ctx-separator" id="ctx-sep-color"></div>
   <div class="ctx-item" id="ctx-change-color"><span id="ctx-color-swatch"></span> <span data-i18n="menu.changeColor">Change color</span></div>
@@ -3335,6 +3479,24 @@ Use that tab — or take over here.</p>
   </button>
 </div>
 
+<div id="comment-overlay"></div>
+<div id="comment-panel">
+  <div id="comment-header">
+    <div id="comment-title"></div>
+    <div id="comment-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
+  </div>
+  <div id="comment-body">
+    <textarea id="comment-textarea" spellcheck="true"></textarea>
+    <div id="comment-counter"></div>
+  </div>
+</div>
+<div id="comment-close-bar">
+  <button type="button" class="help-close-btn" id="comment-close-mobile">
+    <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    <span data-i18n="help.close">Close</span>
+  </button>
+</div>
+
 
 <script id="app">
 'use strict';
@@ -3479,6 +3641,8 @@ const QUIESCENCE_PANEL_IDS = [
   'ctx-reschedule-submenu',
   'help-panel',
   'help-overlay',
+  'comment-panel',
+  'comment-overlay',
   'settings-dropdown',
   'sync-dropdown',
   'color-picker-panel',
@@ -9605,6 +9769,11 @@ function _windowKeydownHandler(e) {
       hideContextMenu();
       return;
     }
+    const commentPanel = document.getElementById('comment-panel');
+    if (commentPanel && commentPanel.classList.contains('visible')) {
+      closeCommentDialog();
+      return;
+    }
     if (settings && settings.classList.contains('visible')) {
       settings.classList.remove('visible');
       const sFab = document.getElementById('fab-settings');
@@ -10048,6 +10217,8 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
   document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda') ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
+  const isCommentable = isActivity && !isTick && !node.dayChild && !node.inbox;
+  document.getElementById('ctx-comment').style.display   = isCommentable ? '' : 'none';
   document.getElementById('ctx-reschedule').style.display = (isStdActivity && !node.done) ? '' : 'none';
 
   // Color change (branch only)
@@ -10611,6 +10782,45 @@ document.getElementById('ctx-rename').addEventListener('click', () => {
   if (currentView === 'agenda') startAgendaRename(id);
   else startRenameNode(id);
 });
+
+document.getElementById('ctx-comment').addEventListener('click', () => {
+  const id = contextTarget;
+  hideContextMenu();
+  if (id) openCommentDialog(id);
+});
+
+// ─── Comment dialog (shell — auto-save wired in T3) ───────────────────────────
+const COMMENT_SOFT_LIMIT = 1000;
+let commentTargetId = null;
+
+function updateCommentCounter() {
+  const ta = document.getElementById('comment-textarea');
+  const counter = document.getElementById('comment-counter');
+  const len = ta.value.length;
+  counter.textContent = `${len} / ${COMMENT_SOFT_LIMIT}`;
+  counter.classList.toggle('over', len > COMMENT_SOFT_LIMIT);
+}
+
+function openCommentDialog(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
+  commentTargetId = nodeId;
+  document.getElementById('comment-title').textContent = node.label || '';
+  const ta = document.getElementById('comment-textarea');
+  ta.value = node.comments || '';
+  updateCommentCounter();
+  document.getElementById('comment-overlay').classList.add('visible');
+  document.getElementById('comment-panel').classList.add('visible');
+  ta.focus();
+}
+
+function closeCommentDialog() {
+  // T2: discard on close. Dirty-check auto-save is added in T3.
+  document.getElementById('comment-overlay').classList.remove('visible');
+  document.getElementById('comment-panel').classList.remove('visible');
+  commentTargetId = null;
+}
+window.closeCommentDialog = closeCommentDialog;
 
 document.getElementById('ctx-add-child').addEventListener('click', () => {
   const id = contextTarget;
@@ -12985,6 +13195,13 @@ window.addEventListener('load', async () => {
   helpOverlay.addEventListener('click', doCloseHelp);
   const helpCloseMobile = document.getElementById('help-close-mobile');
   if (helpCloseMobile) helpCloseMobile.addEventListener('click', doCloseHelp);
+
+  // Comment dialog close wiring
+  document.getElementById('comment-close').addEventListener('click', () => closeCommentDialog());
+  document.getElementById('comment-overlay').addEventListener('click', () => closeCommentDialog());
+  const commentCloseMobile = document.getElementById('comment-close-mobile');
+  if (commentCloseMobile) commentCloseMobile.addEventListener('click', () => closeCommentDialog());
+  document.getElementById('comment-textarea').addEventListener('input', updateCommentCounter);
 
   // Agenda overlay click to close
   const agendaOverlay = document.getElementById('agenda-overlay');

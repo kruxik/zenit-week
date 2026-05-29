@@ -10,6 +10,14 @@ describe('Internationalization', () => {
     expect(t('todo.done')).toBe('Hotovo');
   });
 
+  it('has the node-comment menu label in both languages', () => {
+    _state.setLang('en');
+    expect(t('menu.comment')).toBe('Comment');
+
+    _state.setLang('cs');
+    expect(t('menu.comment')).toBe('Komentář');
+  });
+
   it('updates DOM elements on language change', () => {
     _state.setLang('en');
     // Mock some elements that applyTranslations updates
