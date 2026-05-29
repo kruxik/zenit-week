@@ -6413,6 +6413,13 @@ function validateAndRepair(data) {
       n.val = typeof n.val === 'number' && isFinite(n.val) ? Math.max(0, Math.floor(n.val)) : 0;
       n.max = typeof n.max === 'number' && isFinite(n.max) ? Math.max(1, Math.floor(n.max)) : 1;
     }
+    // Comments live only on activity nodes, as a non-empty string. Strip from
+    // every other case (wrong type, non-string, or empty) — defense-in-depth
+    // against tampered Drive data and to keep the icon gate (!!comments) honest.
+    if (n.comments !== undefined &&
+        !(n.type === 'activity' && typeof n.comments === 'string' && n.comments !== '')) {
+      delete n.comments;
+    }
     // Coerce inbox flag to boolean
     if (n.inbox !== undefined) n.inbox = !!n.inbox;
     // Preserve dayChild/dayIndex — validate dayIndex is a valid weekday index or null

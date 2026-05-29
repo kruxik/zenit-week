@@ -108,5 +108,5 @@ Clickable icons · keyboard shortcut · markdown/rich text · comment history ·
 - [x] **T4** — mind-map indicator icon (display-only, centering math)
 - [x] **T5** — agenda-row indicator icon (display-only)
 - [x] 🔲 Checkpoint B — review indicators
-- [ ] **T6** — `validateAndRepair` tolerance/strip + Drive merge + vitest
-- [ ] 🔲 Checkpoint C — final verification + ship
+- [x] **T6** — `validateAndRepair` tolerance/strip + Drive merge + vitest
+- [x] 🔲 Checkpoint C — final verification + ship
