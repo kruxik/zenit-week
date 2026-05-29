@@ -575,6 +575,8 @@ export const {
   takeSnapshot,
   undo,
   redo,
+  // Node comments
+  planCommentWrite,
   // UI & Action Logic
   showContextMenu,
   hideContextMenu,

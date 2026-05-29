@@ -10814,11 +10814,37 @@ function openCommentDialog(nodeId) {
   ta.focus();
 }
 
+// Decide what a Comment-dialog close should persist.
+//   null   => unchanged: caller skips snapshot + save (no-op close)
+//   ''     => clear an existing comment
+//   string => new/edited comment text
+// No implicit trim — the raw value is compared and stored as-is.
+function planCommentWrite(node, rawValue) {
+  if (!node) return null;
+  const current = node.comments || '';
+  if (rawValue === current) return null;
+  return rawValue;
+}
+
 function closeCommentDialog() {
-  // T2: discard on close. Dirty-check auto-save is added in T3.
+  const id = commentTargetId;
   document.getElementById('comment-overlay').classList.remove('visible');
   document.getElementById('comment-panel').classList.remove('visible');
   commentTargetId = null;
+  if (!id) return;
+
+  const node = findNode(id);
+  if (!node) return;
+  const write = planCommentWrite(node, document.getElementById('comment-textarea').value);
+  if (write === null) return; // unchanged — no snapshot, no _ts bump, no save
+
+  takeSnapshot();             // capture pre-edit state for undo
+  if (write) node.comments = write;
+  else delete node.comments;  // empty clears the field
+  touchNode(id);              // bump _ts for Drive LWW merge
+  saveWeek(currentWeekKey, weekData);
+  if (currentView === 'agenda') renderAgenda();
+  else updateNodeUI(id);
 }
 window.closeCommentDialog = closeCommentDialog;
 

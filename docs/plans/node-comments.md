@@ -103,8 +103,8 @@ Clickable icons · keyboard shortcut · markdown/rich text · comment history ·
 
 - [x] **T1** — `icon-message` symbol + `menu.comment` i18n (EN/CS)
 - [x] **T2** — `#ctx-comment` menu item (activity-only) + Help-style dialog shell (open/close/caption/textarea/counter)
-- [ ] **T3** — dirty-check auto-save: `takeSnapshot` → write `comments` → `_ts` bump → persist → undo/redo
-- [ ] 🔲 Checkpoint A — review core path
+- [x] **T3** — dirty-check auto-save: `takeSnapshot` → write `comments` → `_ts` bump → persist → undo/redo
+- [x] 🔲 Checkpoint A — review core path
 - [ ] **T4** — mind-map indicator icon (display-only, centering math)
 - [ ] **T5** — agenda-row indicator icon (display-only)
 - [ ] 🔲 Checkpoint B — review indicators
