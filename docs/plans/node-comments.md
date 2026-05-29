@@ -101,7 +101,7 @@ Clickable icons · keyboard shortcut · markdown/rich text · comment history ·
 
 ## Todo checklist
 
-- [ ] **T1** — `icon-message` symbol + `menu.comment` i18n (EN/CS)
+- [x] **T1** — `icon-message` symbol + `menu.comment` i18n (EN/CS)
 - [ ] **T2** — `#ctx-comment` menu item (activity-only) + Help-style dialog shell (open/close/caption/textarea/counter)
 - [ ] **T3** — dirty-check auto-save: `takeSnapshot` → write `comments` → `_ts` bump → persist → undo/redo
 - [ ] 🔲 Checkpoint A — review core path
