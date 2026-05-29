@@ -105,7 +105,7 @@ Clickable icons · keyboard shortcut · markdown/rich text · comment history ·
 - [x] **T2** — `#ctx-comment` menu item (activity-only) + Help-style dialog shell (open/close/caption/textarea/counter)
 - [x] **T3** — dirty-check auto-save: `takeSnapshot` → write `comments` → `_ts` bump → persist → undo/redo
 - [x] 🔲 Checkpoint A — review core path
-- [ ] **T4** — mind-map indicator icon (display-only, centering math)
+- [x] **T4** — mind-map indicator icon (display-only, centering math)
 - [ ] **T5** — agenda-row indicator icon (display-only)
 - [ ] 🔲 Checkpoint B — review indicators
 - [ ] **T6** — `validateAndRepair` tolerance/strip + Drive merge + vitest

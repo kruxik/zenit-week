@@ -4478,6 +4478,7 @@ function _computeNodeSize(nodeId) {
         if (node.priority === 'high' || node.priority === 'critical') lineW += nodeBadgeSize + nodeBadgeGap;
         if (node.unplanned) lineW += nodeBadgeSize + nodeBadgeGap;
         if (node.reusable) lineW += nodeBadgeSize + nodeBadgeGap;
+        if (node.comments) lineW += nodeBadgeSize + nodeBadgeGap;
       }
       return Math.max(max, lineW);
     }, 0);
@@ -7970,13 +7971,15 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       && (node.priority === 'high' || node.priority === 'critical');
     const hasUnplannedIcon = node && (isActivity || isBranch) && i === 0 && node.unplanned;
     const hasReusableIcon  = node && isActivity && i === 0 && node.reusable;
+    const hasCommentIcon   = node && isActivity && i === 0 && !!node.comments;
 
-    if (hasPriorityIcon || hasUnplannedIcon || hasReusableIcon) {
+    if (hasPriorityIcon || hasUnplannedIcon || hasReusableIcon || hasCommentIcon) {
       const textOnlyW = measureText(line, fontSize, fontWeight);
       const leftW  = hasPriorityIcon ? badgeSize + badgeGap : 0;
       const rightW = (hasUnplannedIcon ? badgeGap + badgeSize : 0)
-                   + (hasReusableIcon  ? badgeGap + badgeSize : 0);
-      // Center [priorityIcon?][text][boltIcon?][repeatIcon?] as a unit around x=0
+                   + (hasReusableIcon  ? badgeGap + badgeSize : 0)
+                   + (hasCommentIcon   ? badgeGap + badgeSize : 0);
+      // Center [priorityIcon?][text][boltIcon?][repeatIcon?][commentIcon?] around x=0
       const textX = (leftW - rightW) / 2;
       t.setAttribute('x', textX);
 
@@ -8010,6 +8013,19 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
           x: rightCursor,
           y: textY - badgeSize / 2 - fontSize * 0.35,
           style: `color:${textColor};fill:none;stroke:currentColor`,
+        }));
+        rightCursor += badgeSize + badgeGap;
+      }
+
+      if (hasCommentIcon) {
+        // Display-only presence indicator — not interactive (pointer-events:none)
+        g.appendChild(svgEl('use', {
+          href: '#icon-message',
+          width: badgeSize, height: badgeSize,
+          x: rightCursor,
+          y: textY - badgeSize / 2 - fontSize * 0.35,
+          style: `color:${textColor};fill:none;stroke:currentColor`,
+          'pointer-events': 'none',
         }));
       }
     }
@@ -10838,12 +10854,17 @@ function closeCommentDialog() {
   const write = planCommentWrite(node, document.getElementById('comment-textarea').value);
   if (write === null) return; // unchanged — no snapshot, no _ts bump, no save
 
+  const hadComment = !!node.comments;
   takeSnapshot();             // capture pre-edit state for undo
   if (write) node.comments = write;
   else delete node.comments;  // empty clears the field
   touchNode(id);              // bump _ts for Drive LWW merge
   saveWeek(currentWeekKey, weekData);
+
+  // Presence toggle adds/removes the indicator icon (and shifts text centering),
+  // which updateNodeUI can't do surgically — a full render is required then.
   if (currentView === 'agenda') renderAgenda();
+  else if (hadComment !== !!write) render();
   else updateNodeUI(id);
 }
 window.closeCommentDialog = closeCommentDialog;
