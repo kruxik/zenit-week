@@ -3981,6 +3981,7 @@ async function _applySnapshot(raw) {
     weekData = validateAndRepair(snapshot.weekData);
     if (snapshot.branchColors) {
       Object.keys(snapshot.branchColors).forEach(b => {
+        if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
         BRANCH_COLORS[b] = deriveBranchPalette(snapshot.branchColors[b].main);
       });
       // Remove colors for branches no longer in the snapshot
@@ -4143,6 +4144,7 @@ async function loadBranchColors() {
     const saved = await loadValueIDB(COLORS_STORAGE_KEY);
     if (!saved) return;
     Object.keys(saved).forEach(b => {
+      if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
       if (saved[b] && saved[b].main) BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
     });
   } catch(e) {
@@ -4854,7 +4856,7 @@ async function handleAuthCode(callback) {
       redirect_uri:  pending.redirectUri,
     });
     if (tokens.error) {
-      console.warn('[Drive] Token exchange error:', tokens);
+      console.warn('[Drive] Token exchange error:', tokens.error);
       setSyncStatus('error', 'sync.msg.signinFailedNetwork');
       return;
     }
@@ -5244,7 +5246,11 @@ async function syncWeekFromDrive(wKey) {
 
       // CRDT merge: per-node LWW by _ts, union tombstones
       const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
-      const remoteData = migrateCrdt(JSON.parse(remoteJson));
+      const parsedRemote = migrateCrdt(JSON.parse(remoteJson));
+      // Skip merge on a malformed remote rather than letting validateAndRepair
+      // substitute defaultWeekData() (which would inject fresh default branches).
+      if (!parsedRemote || !Array.isArray(parsedRemote.nodes)) return;
+      const remoteData = validateAndRepair(parsedRemote);
       const mergedData = mergeWeekData(localData, remoteData);
       const mergedJson = JSON.stringify(mergedData);
       const mergedHash = fnv1a32(mergedJson);
@@ -6513,6 +6519,7 @@ function migrateCrdt(data) {
   // lose per-key LWW against any freshly-stamped reorder.
   if (data.agendaOrder && typeof data.agendaOrder === 'object') {
     for (const k of Object.keys(data.agendaOrder)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') { delete data.agendaOrder[k]; continue; }
       const v = data.agendaOrder[k];
       if (Array.isArray(v)) {
         data.agendaOrder[k] = { ids: v, ts: 0 };
@@ -6764,12 +6771,20 @@ async function importAllData(file) {
       }
     }
 
+    // Parse a per-key value, returning null (and skipping) on malformed JSON so
+    // one bad entry can't abort the whole import mid-write.
+    const safeParse = (raw) => { try { return JSON.parse(raw); } catch { return null; } };
+
     // Write colors first so loadBranchColors picks them up
-    if (colorsRaw) await saveValueIDB(COLORS_STORAGE_KEY, JSON.parse(colorsRaw));
+    if (colorsRaw) {
+      const parsedColors = safeParse(colorsRaw);
+      if (parsedColors) await saveValueIDB(COLORS_STORAGE_KEY, parsedColors);
+    }
 
     // Write current week first
     if (allWeeks.has(currentWk)) {
-      await saveWeekIDB(currentWk, JSON.parse(allWeeks.get(currentWk)));
+      const parsedWk = safeParse(allWeeks.get(currentWk));
+      if (parsedWk) await saveWeekIDB(currentWk, parsedWk);
       allWeeks.delete(currentWk);
     }
 
@@ -6825,7 +6840,8 @@ async function importAllData(file) {
       if (_pendingImportData && _pendingImportData.has(wk)) {
         const raw = _pendingImportData.get(wk);
         _pendingImportData.delete(wk);
-        await saveWeekIDB(wk, JSON.parse(raw));
+        const parsedWk = safeParse(raw);
+        if (parsedWk) await saveWeekIDB(wk, parsedWk);
         showImportProgress(wk);
       }
       setTimeout(() => importNext(i + 1), 0);
