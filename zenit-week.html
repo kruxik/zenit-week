@@ -6433,6 +6433,10 @@ function validateAndRepair(data) {
       if (typeof n.tickIndex !== 'number' || !Number.isInteger(n.tickIndex) || n.tickIndex < 1) {
         n.tickIndex = 1;
       }
+      // Tick labels are always the canonical step number, never free text.
+      // Coerce here so tampered Drive/import data can't smuggle a string
+      // through label into any renderer (defense-in-depth for XSS).
+      n.label = String(n.tickIndex);
     }
   });
 
