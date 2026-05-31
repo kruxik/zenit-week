@@ -11299,7 +11299,8 @@ function buildAgendaItem(node, label, opts = {}) {
       pillVal = cc ? cc.val : tickInfo.done;
       pillMax = cc ? cc.max : tickInfo.total;
     }
-    pill.innerHTML = `${iconSvg('circle-half-2')} ${pillVal} / ${pillMax}`;
+    pill.innerHTML = iconSvg('circle-half-2');
+    pill.appendChild(document.createTextNode(` ${pillVal} / ${pillMax}`));
     item.appendChild(pill);
   }
 
