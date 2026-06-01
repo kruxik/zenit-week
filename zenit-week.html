@@ -17,9 +17,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#ffffff">
 <title>Zenit Week</title>
+<!-- [html-validate-disable-next element-required-attributes -- href set at runtime by the favicon script below] -->
 <link rel="icon" type="image/svg+xml" id="favicon-svg">
+<!-- [html-validate-disable-next element-required-attributes -- href set at runtime by the favicon script below] -->
 <link rel="icon" type="image/png" sizes="32x32" id="favicon-32">
+<!-- [html-validate-disable-next element-required-attributes -- href set at runtime by the favicon script below] -->
 <link rel="icon" type="image/png" sizes="16x16" id="favicon-16">
+<!-- [html-validate-disable-next element-required-attributes -- href set at runtime by the favicon script below] -->
 <link rel="apple-touch-icon" sizes="180x180" id="favicon-180">
 <script>
 (function () {
@@ -3043,7 +3047,7 @@ Use that tab — or take over here.</p>
     </div>
     <div id="toolbar-right">
       <div id="sync-container">
-        <button id="sync-btn" data-i18n-title="sync.btnTitle" title="Sign in with Google to sync across devices. Your data is stored only in your own Google Drive — Zenit Week never sees or stores it.">
+        <button type="button" id="sync-btn" data-i18n-title="sync.btnTitle" title="Sign in with Google to sync across devices. Your data is stored only in your own Google Drive — Zenit Week never sees or stores it.">
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
             <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
             <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
@@ -3052,9 +3056,10 @@ Use that tab — or take over here.</p>
           </svg>
           <span id="sync-btn-label">Sign in</span>
         </button>
-        <button id="sync-avatar-btn" data-i18n-aria="sync.avatarAria" aria-label="Sync options" aria-haspopup="true">
-          <img id="sync-avatar-img" alt="" referrerpolicy="no-referrer" />
-          <div id="sync-avatar-initials"></div>
+        <button type="button" id="sync-avatar-btn" data-i18n-aria="sync.avatarAria" aria-label="Sync options" aria-haspopup="true">
+          <!-- [html-validate-disable-next element-required-attributes -- src set at runtime by JS once a profile photo is available] -->
+          <img id="sync-avatar-img" alt="" referrerpolicy="no-referrer">
+          <span id="sync-avatar-initials"></span>
         </button>
         <script>
           (function() {
@@ -3074,7 +3079,7 @@ Use that tab — or take over here.</p>
           <div class="settings-separator"></div>
           <div id="sync-dropdown-last-sync">Last sync: —</div>
           <div class="settings-separator"></div>
-          <button id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out of Google Drive</button>
+          <button type="button" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out of Google Drive</button>
         </div>
       </div>
     </div>
@@ -3207,8 +3212,8 @@ Use that tab — or take over here.</p>
   </div>
   <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
   <div id="bp-buttons">
-    <button id="bp-cancel" class="agenda-action-btn" data-i18n="baseline.cancel">Cancel</button>
-    <button id="bp-apply" class="agenda-action-btn" data-i18n="baseline.apply">Apply</button>
+    <button type="button" id="bp-cancel" class="agenda-action-btn" data-i18n="baseline.cancel">Cancel</button>
+    <button type="button" id="bp-apply" class="agenda-action-btn" data-i18n="baseline.apply">Apply</button>
   </div>
 </div>
 
@@ -3221,8 +3226,8 @@ Use that tab — or take over here.</p>
     <input type="text" id="cp-hex" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
   </div>
   <div id="cp-buttons">
-    <button id="cp-cancel" class="agenda-action-btn" data-i18n="colorPicker.cancel">Cancel</button>
-    <button id="cp-apply" class="agenda-action-btn" data-i18n="colorPicker.apply">Apply</button>
+    <button type="button" id="cp-cancel" class="agenda-action-btn" data-i18n="colorPicker.cancel">Cancel</button>
+    <button type="button" id="cp-apply" class="agenda-action-btn" data-i18n="colorPicker.apply">Apply</button>
   </div>
 </div>
 
@@ -3234,9 +3239,9 @@ Use that tab — or take over here.</p>
     <div id="app-confirm-title"></div>
     <div id="app-confirm-body"></div>
     <div id="app-confirm-actions">
-      <button class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
-      <button class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
-      <button class="agenda-action-btn" id="app-confirm-ok">OK</button>
+      <button type="button" class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
+      <button type="button" class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
+      <button type="button" class="agenda-action-btn" id="app-confirm-ok">OK</button>
     </div>
   </div>
 </div>
@@ -3246,8 +3251,8 @@ Use that tab — or take over here.</p>
     <div id="import-confirm-title" data-i18n="settings.importConfirmTitle">Overwrite all data?</div>
     <div id="import-confirm-body" data-i18n="settings.importConfirmBody">This will replace all your current weeks, branches, and settings with the imported file. This cannot be undone.</div>
     <div id="import-confirm-actions">
-      <button class="agenda-action-btn" id="import-confirm-cancel" data-i18n="settings.importConfirmCancel">Cancel</button>
-      <button class="agenda-action-btn danger" id="import-confirm-ok" data-i18n="settings.importConfirmOk">Yes, import</button>
+      <button type="button" class="agenda-action-btn" id="import-confirm-cancel" data-i18n="settings.importConfirmCancel">Cancel</button>
+      <button type="button" class="agenda-action-btn danger" id="import-confirm-ok" data-i18n="settings.importConfirmOk">Yes, import</button>
     </div>
   </div>
 </div>
@@ -3258,12 +3263,12 @@ Use that tab — or take over here.</p>
 </div>
 
 <div id="view-toggle-bar">
-  <button class="view-toggle-btn" id="vtb-agenda">
+  <button type="button" class="view-toggle-btn" id="vtb-agenda">
     <svg class="icon" aria-hidden="true"><use href="#icon-list-details"/></svg>
     <span data-i18n="view.agenda">Agenda</span>
   </button>
   <div class="view-toggle-separator"></div>
-  <button class="view-toggle-btn active" id="vtb-mindmap">
+  <button type="button" class="view-toggle-btn active" id="vtb-mindmap">
     <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-sitemap"/></svg>
     <span data-i18n="view.mindmap">Mindmap</span>
   </button>
@@ -3324,8 +3329,8 @@ Use that tab — or take over here.</p>
     <div class="settings-label" data-i18n="settings.appearance">Appearance</div>
     <div class="theme-toggle-row">
       <span class="theme-label active" id="theme-label-light" data-i18n="settings.light">Light</span>
-      <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" data-i18n-title="settings.toggleDark" title="Toggle dark mode">
-        <div class="theme-toggle-thumb"></div>
+      <button type="button" class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" data-i18n-title="settings.toggleDark" title="Toggle dark mode" data-i18n-aria="settings.toggleDark" aria-label="Toggle dark mode">
+        <span class="theme-toggle-thumb"></span>
       </button>
       <span class="theme-label" id="theme-label-dark" data-i18n="settings.dark">Dark</span>
     </div>
@@ -3334,8 +3339,8 @@ Use that tab — or take over here.</p>
   <div class="settings-section">
     <div class="theme-toggle-row">
       <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
-      <button class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change">
-        <div class="theme-toggle-thumb"></div>
+      <button type="button" class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change" data-i18n-aria="settings.autoLayoutTitle" aria-label="Automatically reset layout after each change">
+        <span class="theme-toggle-thumb"></span>
       </button>
     </div>
   </div>
@@ -3347,8 +3352,8 @@ Use that tab — or take over here.</p>
   <div class="settings-section">
     <div class="settings-label" data-i18n="settings.data">Data</div>
     <div style="display:flex;gap:6px;">
-      <button class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
-      <button class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
+      <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
+      <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
       <input type="file" id="import-file-input" accept=".json" style="display:none;">
     </div>
     <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file — could not import.</div>
@@ -3363,7 +3368,7 @@ Use that tab — or take over here.</p>
     <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="help.title">Help &amp; Hotkeys</div>
     <div id="help-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
   </div>
-  
+
   <div id="help-content">
       <div class="help-section">
         <div class="help-section-title" data-i18n="help.aboutTitle">What it solves</div>
@@ -3468,7 +3473,6 @@ Use that tab — or take over here.</p>
       </div>
 
       <div class="help-version"><span data-i18n="help.appVersion">App version</span>: <span id="app-version">dev</span></div>
-    </div>
   </div>
 </div>
 
@@ -13381,6 +13385,4 @@ window.addEventListener('resize', () => {
 </script>
 </body>
 <!-- bstack-verify: d6b2f4e8c1a30975b4e2d6f8c1a30e79 -->
-</html>
-79 -->
 </html>
