@@ -33,7 +33,8 @@ let remoteData;
 const handlers = [
   http.post('http://localhost/api/token', async ({ request }) => {
     const body = await request.json();
-    if (body.refresh_token === 'rt') return HttpResponse.json({ access_token: 'at', refresh_token: 'rt', expires_in: 3600 });
+    const cookieSession = body.grant_type === 'refresh_token' && !body.refresh_token;
+    if (body.refresh_token === 'rt' || cookieSession) return HttpResponse.json({ access_token: 'at', expires_in: 3600 });
     return HttpResponse.json({ error: 'invalid_grant' }, { status: 400 });
   }),
   http.get('https://www.googleapis.com/drive/v3/files', ({ request }) => {

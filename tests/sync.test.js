@@ -20,10 +20,12 @@ const handlers = [
   // Mock OAuth token exchange
   http.post('http://localhost/api/token', async ({ request }) => {
     const body = await request.json();
-    if (body.refresh_token === 'valid_refresh_token' || body.code === 'valid_code') {
+    // A refresh grant with no body token models the HttpOnly cookie supplying it
+    // server-side (the production path); an explicit token is the migration path.
+    const cookieSession = body.grant_type === 'refresh_token' && !body.refresh_token;
+    if (body.refresh_token === 'valid_refresh_token' || body.code === 'valid_code' || cookieSession) {
       return HttpResponse.json({
         access_token: 'new_access_token',
-        refresh_token: 'new_refresh_token',
         expires_in: 3600
       });
     }
@@ -117,7 +119,7 @@ describe('Google Drive Sync', () => {
     test('silentRefresh updates internal token state', async () => {
       _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
       
-      const ok = await silentRefresh('valid_refresh_token');
+      const ok = await silentRefresh();
       expect(ok).toBe(true);
       
       expect(_state.getAccessToken()).toBe('new_access_token');
@@ -148,7 +150,7 @@ describe('Google Drive Sync', () => {
     test('silentRefresh returns false on invalid token', async () => {
       _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'invalid_token' });
       
-      const ok = await silentRefresh('invalid_token');
+      const ok = await silentRefresh();
       expect(ok).toBe(false);
     });
 

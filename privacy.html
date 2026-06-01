@@ -54,11 +54,11 @@
   <nav><a href="/">← Zenit Week</a></nav>
   <main>
     <h1>Privacy Policy</h1>
-    <p class="meta">Last updated: 12 May 2026</p>
+    <p class="meta">Last updated: 1 June 2026</p>
 
     <div class="tldr">
       <strong>TL;DR</strong>
-      Zenit Week has no servers and stores no user data. Your plans live in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see them. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel, plus an aggregated, cookieless visit count (no personal identifiers) used to size traffic and see which countries the app is used from.
+      Zenit Week has no servers and stores no user data. Your plans live in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see them. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel, plus an aggregated, cookieless visit count (no personal identifiers) used to size traffic and see which countries the app is used from. If you sign in with Google, one strictly-necessary cookie keeps you signed in; we set no advertising or tracking cookies and show no cookie banner.
     </div>
 
     <h2>1. Controller</h2>
@@ -81,9 +81,8 @@
       <li><strong>Planning data</strong> — your weekly mind maps, branches, activities, counters, daily logs.</li>
       <li><strong>Preferences</strong> — theme (light/dark), language (en/cs), branch colors, layout settings.</li>
       <li><strong>Sync state</strong> — internal flags such as a per-device reset token used to avoid overwriting newer data on other devices.</li>
-      <li><strong>Google OAuth refresh token</strong> (only if you sign in with Google) — a long-lived credential issued by Google that allows the app to refresh its access to <em>your own</em> Drive without prompting you again. It grants access only to the app-specific Drive folder described in §4. You can revoke it at any time (see §10).</li>
     </ul>
-    <p>This data never leaves your device unless you explicitly enable Google Drive sync.</p>
+    <p>This data never leaves your device unless you explicitly enable Google Drive sync. If you sign in with Google, a long-lived Google OAuth refresh token is also stored on your device, but in a cookie rather than local storage — see §3.</p>
 
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.2 In your own Google Drive (only if you sign in)</h3>
     <p>If you choose to sign in with Google, the app stores a copy of your planning data inside <em>your own</em> Google Drive, in a private app-specific folder, using the <code>drive.appdata</code> scope. This folder is invisible to other apps and to us. We never read, copy, or process your Drive data on any server.</p>
@@ -92,7 +91,11 @@
     <p>When you open the website, our hosting provider Vercel processes your IP address and standard HTTP request metadata (user agent, referrer, timestamps) for the time strictly necessary to serve the page and operate the OAuth token-exchange endpoint at <code>/api/token</code>. Vercel does not share this with us in identifiable form. See §4 (Service providers) for details.</p>
 
     <h2>3. Cookies and analytics</h2>
-    <p>Zenit Week sets <strong>no cookies</strong> and uses <strong>no advertising or behavioural-tracking technologies</strong>. We do not profile users, do not track you across other websites, and do not use any persistent identifier stored on your device for analytics.</p>
+    <p>Zenit Week uses <strong>no advertising, analytics, or behavioural-tracking cookies</strong>. We do not profile users, do not track you across other websites, and do not use any persistent identifier stored on your device for analytics.</p>
+    <p>The app sets a <strong>single strictly-necessary cookie</strong>, and only if you choose to sign in with Google Drive sync:</p>
+    <ul>
+      <li><code>zw_rt</code> — stores your Google OAuth <strong>refresh token</strong>, a long-lived credential issued by Google that lets the app refresh its access to <em>your own</em> Drive (the app-specific folder described in §4) without prompting you again. It is set by our <code>/api/token</code> endpoint as an <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code> cookie scoped to the <code>/api/token</code> path, so it cannot be read by JavaScript and is sent only to that endpoint. It lasts up to 180 days and is deleted when you sign out. It is used solely to keep you signed in — never for tracking. You can revoke it at any time (see §10).</li>
+    </ul>
     <p>To understand basic, aggregate usage of the site (number of visits, number of page views, and the country a request comes from) we use <strong>Vercel Web Analytics</strong>, a privacy-first, cookieless analytics product provided by our hosting provider Vercel. It runs on:</p>
     <ul>
       <li>the English homepage at <code>/</code>;</li>
@@ -100,14 +103,14 @@
       <li>the application page at <code>/app</code>.</li>
     </ul>
     <p>Vercel Web Analytics works without cookies and without writing anything to <code>localStorage</code>, <code>IndexedDB</code>, or any other client-side storage. To approximate a "unique visitor" for the current day, Vercel derives a short, salted hash from the visitor's IP address and user agent; the salt is rotated daily, so the hash cannot be used to recognise the same visitor across days or correlate visits with any other site. The country is derived from the IP address at request time; the raw IP is discarded after this lookup and is not stored alongside the visit. No URL parameters, form contents, or page content are collected.</p>
-    <p>Because no information is stored on or read from the user's device for this purpose, this processing is not subject to the consent requirement of Article 5(3) of the ePrivacy Directive ("cookie law"), and Zenit Week therefore does not show a cookie banner. The processing of the transient IP address by Vercel is necessary to deliver the site and to produce the aggregate count, and relies on the legal basis of legitimate interest under Article 6(1)(f) GDPR (interest: understanding aggregate use of a free, open-source tool in order to maintain and improve it). You can object to this processing at any time — see §10.</p>
+    <p>Neither of these requires a consent banner. The <code>zw_rt</code> authentication cookie is <strong>strictly necessary</strong> to provide a feature you explicitly request — staying signed in to Google Drive sync — and is therefore exempt from the consent requirement of Article 5(3) of the ePrivacy Directive ("cookie law"); it is set only after you initiate sign-in and is never used for tracking. The Vercel Web Analytics processing stores and reads nothing on your device, so it likewise falls outside Article 5(3). Zenit Week therefore does not show a cookie banner. The transient processing of your IP address by Vercel is necessary to deliver the site and to produce the aggregate count, relying on the legal basis of legitimate interest under Article 6(1)(f) GDPR (interest: understanding aggregate use of a free, open-source tool in order to maintain and improve it). You can object to this processing at any time — see §10.</p>
     <p>The marketing pages (homepage in EN and CS, privacy, terms) load no other third-party scripts. The app page (<code>/app</code>) additionally loads Google's official JavaScript client library (<code>apis.google.com/js/api.js</code>) so that Google Drive sync can work if you choose to sign in. That library does not transmit any data to Google until you initiate sign-in.</p>
 
     <h2>4. Service providers (sub-processors)</h2>
     <p>We rely on the following providers strictly to deliver the service:</p>
     <ul>
       <li>
-        <strong>Vercel Inc.</strong> — static-site hosting, the OAuth token-exchange Edge Function (<code>/api/token</code>), and cookieless aggregate analytics via Vercel Web Analytics (see §3). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
+        <strong>Vercel Inc.</strong> — static-site hosting, the OAuth token-exchange serverless function (<code>/api/token</code>, which also sets the strictly-necessary authentication cookie described in §3), and cookieless aggregate analytics via Vercel Web Analytics (see §3). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
       </li>
       <li>
         <strong>Google LLC</strong> — Google Identity Services and Google Drive APIs, used only when you sign in. Data is stored in <em>your own</em> Drive account, governed by your Google Account terms. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
