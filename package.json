@@ -6,7 +6,7 @@
   "author": "Petr Burian",
   "license": "MIT",
   "scripts": {
-    "validate": "html-validate zenit-week.html",
+    "validate": "html-validate zenit-week.html index.html privacy.html terms.html cs/index.html",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
     "tunnel": "dotenv -e .env.local -- sh -c 'ngrok http --url=${NGROK_DOMAIN:?Set NGROK_DOMAIN in .env.local (see .env.local.example)} 3000'",
     "tunnel:log": "dotenv -e .env.local -- sh -c 'ngrok http --url=${NGROK_DOMAIN:?Set NGROK_DOMAIN in .env.local (see .env.local.example)} --log=stdout --log-format=term --log-level=info 3000'",
