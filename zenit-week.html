@@ -11605,7 +11605,13 @@ function renderAgendaTabContent() {
   // already fired today.
   const anyDayItems = isOverdue ? [] : getAnyDayItems().filter(n => !n.done);
 
-  if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0) {
+  // Pending rows for ticks pinned to this weekday. Their parent never surfaces
+  // via getAgendaItems/getAnyDayItems once every tick is scheduled, so they
+  // must be counted here or a day whose only content is scheduled ticks would
+  // render as empty.
+  const scheduledTickRows = isOverdue ? [] : getScheduledTickRows(agendaActiveTab);
+
+  if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0 && scheduledTickRows.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'daily-log-empty';
     empty.textContent = isOverdue ? t('agenda.emptyOverdue') : t('agenda.emptyDay');
@@ -12048,7 +12054,7 @@ function renderAgendaTabContent() {
         renderGroup(groupsByDay.get(dayIdx), `pending-${dayIdx}`, langFull[dayIdx], buildRow);
       });
   } else {
-    const pendingRows = [...pending.map(toRow), ...getScheduledTickRows(agendaActiveTab)];
+    const pendingRows = [...pending.map(toRow), ...scheduledTickRows];
     const anyRows = anyDayItems.map(n => ({ id: n.id, node: n, anyDay: true }));
     renderGroup(pendingRows, 'pending', t('agenda.scheduled'), buildRow);
     renderDoneSection(done);
