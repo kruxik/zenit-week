@@ -11976,15 +11976,14 @@ function renderAgendaTabContent() {
           t.done && t.doneAt && localDateStr(new Date(t.doneAt)) === tabDate
         );
         if (todayTicks.length > 0) {
-          const allDoneSorted = tickInfo.ticks
-            .filter(t => t.done && t.doneAt)
-            .sort((a, b) => new Date(a.doneAt) - new Date(b.doneAt));
+          // X is the leaf's own number (tickIndex), stable across the whole
+          // lifecycle — pending/scheduled rows use tickIndex too, so a leaf
+          // ticked Done keeps its "2/3" rather than collapsing to "1/3".
           todayTicks.forEach(t => {
-            const position = allDoneSorted.findIndex(at => at.id === t.id) + 1;
             rows.push({
               node: n,
               sortKey: new Date(t.doneAt).getTime(),
-              tickRecord: { tick: t, position, total: tickInfo.total },
+              tickRecord: { tick: t, position: t.tickIndex, total: tickInfo.total },
             });
           });
           return;
