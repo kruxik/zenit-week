@@ -9970,16 +9970,31 @@ function _windowKeydownHandler(e) {
       return;
     }
 
+    // For tick-parent rows hoveredAgendaNode is the parent, but each pending
+    // row maps to a single tick. The wrapper's dataset.nodeId carries the row's
+    // own target (the tick id for tick rows), so done/delete act on that one
+    // tick — not cascade to the whole parent. Mirrors the swipe + context-menu
+    // routing.
+    const focusedItem = document.querySelector('#agenda-tab-content .agenda-item-focused');
+    const rowId = focusedItem?.closest('.agenda-swipe-wrapper')?.dataset.nodeId || node.id;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       navigateAgendaItem(e.key === 'ArrowDown');
     } else if (e.key.toLowerCase() === 'd') {
       e.preventDefault();
-      setStatus(node.id, node.done ? 'undone' : 'done');
-      renderAgenda();
+      // Reuse the row's own done/undone closure (the same one the button and
+      // swipe fire) so counters, Any-day pools and single ticks route correctly.
+      if (focusedItem && typeof focusedItem._undoneAction === 'function') {
+        focusedItem._undoneAction();
+      } else if (focusedItem && typeof focusedItem._doneAction === 'function') {
+        focusedItem._doneAction();
+      } else {
+        setStatus(rowId, findNode(rowId)?.done ? 'undone' : 'done');
+        renderAgenda();
+      }
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      deleteNode(node.id);
+      deleteNode(rowId);
       renderAgenda();
     } else if (e.key === 'Enter') {
       e.preventDefault();
