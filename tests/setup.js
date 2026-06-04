@@ -529,6 +529,8 @@ export const {
   getTickInfo,
   createTickChild,
   sortTickChildren,
+  setTickDay,
+  getScheduledTickRows,
   getPriorityScale,
   getPriorityWeight,
   getDescendantIds,

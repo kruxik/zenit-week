@@ -4461,9 +4461,13 @@ function _computeNodeSize(nodeId) {
     style.rx *= scale;
   }
 
-  let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');  
+  let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
   if (type === 'counter') {
     label = `${node.val || 0}`;
+  } else if (node.tickChild && node.dayIndex != null && !(editState && editState.nodeId === nodeId)) {
+    // Day-scheduled tick leaf shows its weekday alongside the step number.
+    const abbr = (DAY_LABELS[currentLang] ?? DAY_LABELS.en)[node.dayIndex];
+    if (abbr) label = `${label} (${abbr})`;
   }
 
   const lines = label.split('\n');
@@ -4505,7 +4509,10 @@ function _computeNodeSize(nodeId) {
       node.unplanned || node.reusable
     );
     const diameter = node.parent ? getNodeSize(node.parent).h : h;
-    const ovalW = hasBadges
+    // A day-scheduled tick carries a "(Mo)" suffix that must fit, so it widens
+    // to an oval just like a badge-bearing leaf does.
+    const hasDaySuffix = node.tickChild && node.dayIndex != null && !isEditing;
+    const ovalW = (hasBadges || hasDaySuffix)
       ? Math.max(diameter, Math.ceil(textW) + style.padX * 2)
       : diameter;
     return {
@@ -6464,6 +6471,11 @@ function validateAndRepair(data) {
       // Coerce here so tampered Drive/import data can't smuggle a string
       // through label into any renderer (defense-in-depth for XSS).
       n.label = String(n.tickIndex);
+      // Optional per-tick day schedule — same weekday-index contract as dayChild.
+      // Anything not a valid 0–6 integer drops to unscheduled.
+      if (n.dayIndex != null && (typeof n.dayIndex !== 'number' || !Number.isInteger(n.dayIndex) || n.dayIndex < 0 || n.dayIndex > 6)) {
+        delete n.dayIndex;
+      }
     }
   });
 
@@ -8717,6 +8729,21 @@ function sortTickChildren(node) {
   });
 }
 
+// Sets (or clears, when dayIndex is null) the per-tick day schedule. Day lives
+// in a dedicated field — never the label — so renumberTickChildren can rewrite
+// the label freely without dropping the schedule. Caller takes the snapshot.
+// Returns true if the value changed.
+function setTickDay(tickId, dayIndex) {
+  const tick = findNode(tickId);
+  if (!tick || !tick.tickChild) return false;
+  const next = dayIndex == null ? null : dayIndex;
+  if ((tick.dayIndex ?? null) === next) return false;
+  if (next === null) delete tick.dayIndex;
+  else tick.dayIndex = next;
+  touchNode(tickId);
+  return true;
+}
+
 // Picks a representative tick under `parentId` for agenda single-tick ops.
 // Honours agendaTickCtx.specificTickId when set (per-tick log rows in Done).
 // preferPending=true → first not-done tick (used by done/move/delete);
@@ -8807,7 +8834,11 @@ function getOverdueItems(today = new Date()) {
   const result = [];
   weekData.nodes.forEach(n => {
     if (n.type !== 'activity' || n.done) return;
-    if (n.tickChild) return;
+    if (n.tickChild) {
+      // A tick pinned to a past weekday is overdue, just like a day-leaf.
+      if (n.dayIndex != null && isoWeekPos(n.dayIndex) < todayPos) result.push(n);
+      return;
+    }
     if (n.dayChild) {
       if (n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos) result.push(n);
       return;
@@ -8820,12 +8851,42 @@ function getOverdueItems(today = new Date()) {
 }
 
 // Leaf activities with no effective day (own label and no annotated ancestor).
+// A tick-children parent stays here only while it still has an unscheduled,
+// not-yet-done tick — once every remaining tick is pinned to a weekday, those
+// ticks render as their own day rows (getScheduledTickRows) and the aggregate
+// drops out of Any day.
 function getAnyDayItems() {
   return weekData.nodes.filter(n => {
     if (n.type !== 'activity' || n.dayChild || n.tickChild) return false;
-    if (!isLeafActivity(n) && !hasTickChildren(n)) return false;
-    return getEffectiveDays(n).size === 0;
+    if (getEffectiveDays(n).size > 0) return false;
+    if (hasTickChildren(n)) {
+      return (n.children || []).some(cid => {
+        const c = findNode(cid);
+        return c?.tickChild && c.dayIndex == null && !c.done;
+      });
+    }
+    return isLeafActivity(n);
   });
+}
+
+// Pending agenda rows for ticks pinned to a specific weekday. Each scheduled,
+// not-yet-done tick becomes its own row (done ones appear in the Done log of
+// the day they were completed). Returns renderer row descriptors
+// { id, node: parent, tickRecord } so they key by the tick's own id.
+function getScheduledTickRows(dayIndex) {
+  const rows = [];
+  weekData.nodes.forEach(n => {
+    if (!n.tickChild || n.done || n.dayIndex !== dayIndex) return;
+    const parent = findNode(n.parent);
+    if (!parent) return;
+    const ti = getTickInfo(parent);
+    rows.push({
+      id: n.id,
+      node: parent,
+      tickRecord: { tick: n, position: n.tickIndex, total: ti ? ti.total : 1 },
+    });
+  });
+  return rows;
 }
 
 // Full ancestor chain from outermost branch down to the immediate parent of
@@ -10005,7 +10066,19 @@ function _windowKeydownHandler(e) {
   } else if (!e.metaKey && !e.ctrlKey && e.key >= '1' && e.key <= '8') {
     const KEY_TO_DAY = { '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0 };
 
-    if (node.type === 'activity' && !node.dayChild) {
+    if (node.tickChild) {
+      // Per-tick day schedule: 1–7 set/toggle the weekday, 8 clears. Stored in
+      // tick.dayIndex (not the label), so renumbering never drops it.
+      e.preventDefault();
+      const picked = e.key === '8' ? null : KEY_TO_DAY[e.key];
+      const next = (node.dayIndex ?? null) === picked ? null : picked;
+      if ((node.dayIndex ?? null) !== next) {
+        takeSnapshot();
+        setTickDay(id, next);
+        saveWeek(currentWeekKey, weekData);
+        render();
+      }
+    } else if (node.type === 'activity' && !node.dayChild) {
       e.preventDefault();
       const dayChildrenList = (node.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild);
       const hasDayChildren = dayChildrenList.length > 0;
@@ -10283,7 +10356,7 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
   const isCommentable = isActivity && !isTick && !node.dayChild && !node.inbox;
   document.getElementById('ctx-comment').style.display   = isCommentable ? '' : 'none';
-  document.getElementById('ctx-reschedule').style.display = (isStdActivity && !node.done) ? '' : 'none';
+  document.getElementById('ctx-reschedule').style.display = ((isStdActivity || isTick) && !node.done) ? '' : 'none';
 
   // Color change (branch only)
   document.getElementById('ctx-sep-color').style.display    = isBranch ? '' : 'none';
@@ -10582,7 +10655,22 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
     clearTimeout(_hideSubTimer);
     rescheduleSubmenu.innerHTML = '';
     const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
-    const node = findNode(contextTarget);
+    // In the agenda, a tick row's menu targets the parent but the schedule
+    // belongs to a single tick — reschedule that tick, not the parent
+    // (rescheduling the parent would purge its ticks via the "day wins" rule).
+    // A specific tick row carries its id; the Any-day aggregate resolves to the
+    // next unscheduled undone tick (the one its +1 button would advance).
+    let ctxTickId = null;
+    if (currentView === 'agenda' && agendaTickCtx) {
+      if (agendaTickCtx.specificTickId) {
+        ctxTickId = agendaTickCtx.specificTickId;
+      } else {
+        const ti = getTickInfo(findNode(agendaTickCtx.parentId));
+        const next = ti && ti.ticks.find(t => !t.done && t.dayIndex == null);
+        if (next) ctxTickId = next.id;
+      }
+    }
+    const node = ctxTickId ? findNode(ctxTickId) : findNode(contextTarget);
     if (!node) return;
 
     const afterMutation = () => {
@@ -10608,7 +10696,12 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
     };
 
     let assignedDays, targetId, mode;
-    if (node.dayChild) {
+    if (node.tickChild) {
+      // Per-tick schedule: single weekday stored in tick.dayIndex.
+      targetId = node.id;
+      assignedDays = node.dayIndex != null ? new Set([node.dayIndex]) : new Set();
+      mode = 'tick';
+    } else if (node.dayChild) {
       const parent = findNode(node.parent);
       if (!parent) return;
       targetId = parent.id;
@@ -10630,7 +10723,12 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
     nowBtn.textContent = t('menu.now') || 'Now';
     nowBtn.addEventListener('click', e => {
       e.stopPropagation();
-      if (mode === 'leaf') {
+      if (mode === 'tick') {
+        if ((node.dayIndex ?? null) !== todayIdx) {
+          takeSnapshot();
+          setTickDay(targetId, todayIdx);
+        }
+      } else if (mode === 'leaf') {
         if (node.dayIndex !== todayIdx && !assignedDays.has(todayIdx)) {
           applyDayReschedule(targetId, mode, {
             currentDays: assignedDays,
@@ -10652,7 +10750,22 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
     nowSep.className = 'ctx-separator';
     rescheduleSubmenu.appendChild(nowSep);
 
-    if (mode === 'leaf') {
+    if (mode === 'tick') {
+      AGENDA_DAY_ORDER.forEach(dayIdx => {
+        const isAssigned = assignedDays.has(dayIdx);
+        const btn = document.createElement('div');
+        btn.className = 'ctx-item' + (isAssigned ? ' ctx-item-selected' : '');
+        setDayLabel(btn, dayIdx);
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          // Radio toggle: re-picking the assigned day clears it.
+          const next = isAssigned ? null : dayIdx;
+          takeSnapshot();
+          if (setTickDay(targetId, next)) afterMutation();
+        });
+        rescheduleSubmenu.appendChild(btn);
+      });
+    } else if (mode === 'leaf') {
       AGENDA_DAY_ORDER.forEach(dayIdx => {
         const isThis      = node.dayIndex === dayIdx;
         const isAssigned  = assignedDays.has(dayIdx);
@@ -10699,7 +10812,12 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
       clearBtn.textContent = t('menu.clearDay') || 'Any';
       clearBtn.addEventListener('click', e => {
         e.stopPropagation();
-        if (applyDayReschedule(targetId, 'clear', { currentDays: assignedDays })) afterMutation();
+        if (mode === 'tick') {
+          takeSnapshot();
+          if (setTickDay(targetId, null)) afterMutation();
+        } else if (applyDayReschedule(targetId, 'clear', { currentDays: assignedDays })) {
+          afterMutation();
+        }
       });
       rescheduleSubmenu.appendChild(clearBtn);
     }
@@ -11195,6 +11313,9 @@ function buildAgendaItem(node, label, opts = {}) {
   // carries the specific tick-child + its cumulative position so the pill
   // reads "n/total" at the moment of that tick, and Undone targets it.
   const tickRecord = opts.tickRecord || null;
+  // anyDay: the Any-day aggregate row of a tick parent. Its pill and Done
+  // action consider only unscheduled ticks — scheduled ones live on their days.
+  const anyDay = !!opts.anyDay;
   const cc = getCounterChild(node);
   const tickInfo = getTickInfo(node);
   const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
@@ -11332,8 +11453,10 @@ function buildAgendaItem(node, label, opts = {}) {
       pillVal = Math.min((cc.val || 0) + 1, cc.max);
       pillMax = cc.max;
     } else if (!inDoneSection && tickInfo) {
-      // Pending row: show the label of the next undone tick.
-      const nextTick = tickInfo.ticks.find(t => !t.done);
+      // Pending row: show the label of the next undone tick. The Any-day
+      // aggregate counts only ticks not pinned to a weekday.
+      const pool = anyDay ? tickInfo.ticks.filter(t => t.dayIndex == null) : tickInfo.ticks;
+      const nextTick = pool.find(t => !t.done);
       pillVal = nextTick ? nextTick.label : tickInfo.total;
       pillMax = tickInfo.total;
     } else {
@@ -11371,11 +11494,14 @@ function buildAgendaItem(node, label, opts = {}) {
     btn.addEventListener('click', undoneAction);
   } else {
     btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
-    const doneAction = cc
+    const doneAction = tickRecord
+      ? () => { setStatus(tickRecord.tick.id, 'done'); renderAgenda(); }
+      : cc
       ? () => { updateCounter(cc.id, +1); renderAgenda(); }
       : tickInfo
         ? () => {
-            const next = tickInfo.ticks.find(t => !t.done);
+            const pool = anyDay ? tickInfo.ticks.filter(t => t.dayIndex == null) : tickInfo.ticks;
+            const next = pool.find(t => !t.done);
             if (next) setStatus(next.id, 'done');
             renderAgenda();
           }
@@ -11564,8 +11690,12 @@ function renderAgendaTabContent() {
       return { wrapper: all[hit], before: hit < srcIdx };
     }
 
-    nodes.forEach(node => {
-      const item = buildFn(node); // .daily-log-item.agenda-item
+    nodes.forEach(row => {
+      // Rows are { id, node, tickRecord?, anyDay? } descriptors: `id` keys the
+      // row (a tick row keys by its tick id so two ticks of one parent on the
+      // same day don't collide), `node` is the activity rendered.
+      const node = row.node;
+      const item = buildFn(row); // .daily-log-item.agenda-item
 
       // Build swipe wrapper: action areas sit behind the sliding item
       const swipeLeft = document.createElement('div');
@@ -11577,7 +11707,7 @@ function renderAgendaTabContent() {
       const el = document.createElement('div');
       el.className = 'agenda-swipe-wrapper';
       el.dataset.group = groupKey;
-      el.dataset.nodeId = node.id;
+      el.dataset.nodeId = row.id;
       // Native HTML5 DnD opt-in is decided by primary-pointer type so mobile
       // long-press can't engage the broken native drag. On desktop, dragstart
       // gates on whether the mousedown originated on the grip handle.
@@ -11605,7 +11735,7 @@ function renderAgendaTabContent() {
 
         function refreshDropTarget(cx, cy) {
           clearAgendaDropMarkers();
-          const t = findAgendaDropTargetByY(cy, node.id);
+          const t = findAgendaDropTargetByY(cy, row.id);
           if (t) t.wrapper.classList.add(
             t.before ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
         }
@@ -11644,7 +11774,7 @@ function renderAgendaTabContent() {
         }
 
         function initTouchDrag(touch) {
-          touchSrcId = node.id;
+          touchSrcId = row.id;
           beginAtomicOp();
           const rect = el.getBoundingClientRect();
           touchOffsetY = touch.clientY - rect.top;
@@ -11745,7 +11875,7 @@ function renderAgendaTabContent() {
       };
       el.addEventListener('dragstart', (e) => {
         if (!mousedownOnHandle) { e.preventDefault(); return; }
-        dragSrcId = node.id;
+        dragSrcId = row.id;
         beginAtomicOp();
         e.dataTransfer.effectAllowed = 'move';
         // Custom drag image: just the .agenda-item, not the wrapper. Wrapper
@@ -11882,34 +12012,47 @@ function renderAgendaTabContent() {
     makeDragZone(ordered, groupKey, buildFn);
   }
 
+  // Builds a row from a descriptor { id, node, tickRecord?, anyDay? }.
+  const buildRow = row => buildAgendaItem(row.node, getAgendaNodeLabel(row.node), {
+    tickRecord: row.tickRecord,
+    anyDay: row.anyDay,
+  });
+  // Wraps a raw node as a row descriptor; tick nodes resolve to a tick-record
+  // row whose label is the parent and whose id keys on the tick.
+  const toRow = n => {
+    if (n.tickChild) {
+      const parent = findNode(n.parent);
+      const ti = getTickInfo(parent);
+      return { id: n.id, node: parent, tickRecord: { tick: n, position: n.tickIndex, total: ti ? ti.total : 1 } };
+    }
+    return { id: n.id, node: n };
+  };
+
   if (isOverdue) {
     const todayPos = isoWeekPos(new Date().getDay());
     const langFull = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
     const overdueDaysOf = n => {
-      if (n.dayChild) return n.dayIndex != null ? [n.dayIndex] : [];
+      if (n.tickChild || n.dayChild) return n.dayIndex != null ? [n.dayIndex] : [];
       return [...getEffectiveDays(n)].filter(d => isoWeekPos(d) < todayPos);
     };
     const groupsByDay = new Map();
     pending.forEach(n => {
       overdueDaysOf(n).forEach(d => {
         if (!groupsByDay.has(d)) groupsByDay.set(d, []);
-        groupsByDay.get(d).push(n);
+        groupsByDay.get(d).push(toRow(n));
       });
     });
     [...groupsByDay.keys()]
       .sort((a, b) => isoWeekPos(a) - isoWeekPos(b))
       .forEach(dayIdx => {
-        renderGroup(
-          groupsByDay.get(dayIdx),
-          `pending-${dayIdx}`,
-          langFull[dayIdx],
-          n => buildAgendaItem(n, getAgendaNodeLabel(n))
-        );
+        renderGroup(groupsByDay.get(dayIdx), `pending-${dayIdx}`, langFull[dayIdx], buildRow);
       });
   } else {
-    renderGroup(pending,     'pending', t('agenda.scheduled'), n => buildAgendaItem(n, getAgendaNodeLabel(n)));
+    const pendingRows = [...pending.map(toRow), ...getScheduledTickRows(agendaActiveTab)];
+    const anyRows = anyDayItems.map(n => ({ id: n.id, node: n, anyDay: true }));
+    renderGroup(pendingRows, 'pending', t('agenda.scheduled'), buildRow);
     renderDoneSection(done);
-    renderGroup(anyDayItems, 'anyday',  t('agenda.anyDay'),    n => buildAgendaItem(n, getAgendaNodeLabel(n)));
+    renderGroup(anyRows, 'anyday', t('agenda.anyDay'), buildRow);
   }
 }
 

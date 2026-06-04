@@ -4,6 +4,8 @@ import {
   setStatus, isLeafActivity,
   getCounterChild, getTickInfo,
   getAgendaItems, getAnyDayItems,
+  getScheduledTickRows, getOverdueItems,
+  setTickDay,
   computeLayout,
   _state,
 } from './setup.js';
@@ -379,5 +381,78 @@ describe('layout — tick-children zigzag', () => {
     const ticks = tickKids(id);
     // Regular sibling sits below (larger y) than every zigzag tick.
     expect(ticks.every(t => positions['reg1'].y > positions[t.id].y)).toBe(true);
+  });
+});
+
+// ─── Per-tick day scheduling ──────────────────────────────────────────────────
+
+describe('per-tick day scheduling', () => {
+  function setup3x() {
+    const id = setupWithActivity('');
+    triggerCommitEdit(id, 'Pushups 3x', true);
+    return { id, ticks: tickKids(id) };
+  }
+
+  test('setTickDay sets, toggles and clears dayIndex (label untouched)', () => {
+    const { ticks } = setup3x();
+    const t1 = ticks[0];
+
+    expect(setTickDay(t1.id, 1)).toBe(true);
+    expect(findNode(t1.id).dayIndex).toBe(1);
+    expect(findNode(t1.id).label).toBe('1'); // day lives in field, not label
+
+    expect(setTickDay(t1.id, 1)).toBe(false); // no change → no-op
+    expect(setTickDay(t1.id, null)).toBe(true);
+    expect(findNode(t1.id).dayIndex == null).toBe(true);
+  });
+
+  test('setTickDay refuses non-tick nodes', () => {
+    const { id } = setup3x();
+    expect(setTickDay(id, 1)).toBe(false);
+  });
+
+  test('getScheduledTickRows yields a row per pending tick on that day', () => {
+    const { id, ticks } = setup3x();
+    setTickDay(ticks[0].id, 1); // Mon
+    setTickDay(ticks[1].id, 3); // Wed
+
+    const mon = getScheduledTickRows(1);
+    expect(mon).toHaveLength(1);
+    expect(mon[0].id).toBe(ticks[0].id);
+    expect(mon[0].node.id).toBe(id);             // row renders the parent
+    expect(mon[0].tickRecord.position).toBe(1);  // tick number
+    expect(mon[0].tickRecord.total).toBe(3);
+
+    expect(getScheduledTickRows(3)).toHaveLength(1);
+    expect(getScheduledTickRows(2)).toHaveLength(0);
+  });
+
+  test('done ticks drop out of the day row (logged by completion date instead)', () => {
+    const { ticks } = setup3x();
+    setTickDay(ticks[0].id, 1);
+    setStatus(ticks[0].id, 'done');
+    expect(getScheduledTickRows(1)).toHaveLength(0);
+  });
+
+  test('Any-day aggregate hides once every remaining tick is scheduled', () => {
+    const { id, ticks } = setup3x();
+    expect(getAnyDayItems().some(n => n.id === id)).toBe(true);
+
+    setTickDay(ticks[0].id, 1);
+    setTickDay(ticks[1].id, 3);
+    expect(getAnyDayItems().some(n => n.id === id)).toBe(true); // tick 3 still free
+
+    setTickDay(ticks[2].id, 5);
+    expect(getAnyDayItems().some(n => n.id === id)).toBe(false); // all pinned
+  });
+
+  test('a tick on a past weekday is overdue', () => {
+    const { ticks } = setup3x();
+    setTickDay(ticks[0].id, 1); // Mon
+    setTickDay(ticks[1].id, 3); // Wed
+    const wednesday = { getDay: () => 3 }; // isoWeekPos 3
+    const overdue = getOverdueItems(wednesday);
+    expect(overdue.map(n => n.id)).toContain(ticks[0].id); // Mon < Wed
+    expect(overdue.map(n => n.id)).not.toContain(ticks[1].id); // Wed not before Wed
   });
 });
