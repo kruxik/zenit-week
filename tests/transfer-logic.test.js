@@ -118,6 +118,68 @@ describe('Data Transfer', () => {
     expect(games).toHaveLength(2);
   });
 
+  it('keeps manual nodes on top — transferred nodes land below them, not at the top', async () => {
+    const prevWeek = '2026-17';
+    const currWeek = '2026-18';
+    _state.setWeekKey(currWeek);
+
+    // W0: Email/Meeting done, ZenitWeek (last) unfinished
+    _state.setLocalStorage('zenit-week-' + prevWeek, {
+      nodes: [
+        { id: 'center', type: 'center' },
+        { id: 'work', type: 'branch', parent: 'center', label: 'Work', children: ['email', 'mtg', 'zw'] },
+        { id: 'email', type: 'activity', parent: 'work', label: 'Email', done: true, children: [] },
+        { id: 'mtg', type: 'activity', parent: 'work', label: 'Meeting', done: true, children: [] },
+        { id: 'zw', type: 'activity', parent: 'work', label: 'ZenitWeek', done: false, children: [] },
+      ]
+    });
+
+    // W1 already has a manually-created node
+    _state.set({
+      nodes: [
+        { id: 'center', type: 'center' },
+        { id: 'work', type: 'branch', parent: 'center', label: 'Work', children: ['plan'] },
+        { id: 'plan', type: 'activity', parent: 'work', label: 'Planning', children: [] },
+      ]
+    });
+
+    await transferUnfinished();
+    const data = _state.get();
+    const work = data.nodes.find(n => n.id === 'work');
+    const labels = work.children.map(id => data.nodes.find(n => n.id === id).label);
+
+    expect(labels).toEqual(['Planning', 'ZenitWeek']);
+  });
+
+  it('preserves prev-week order among multiple transferred siblings', async () => {
+    const prevWeek = '2026-17';
+    const currWeek = '2026-18';
+    _state.setWeekKey(currWeek);
+
+    _state.setLocalStorage('zenit-week-' + prevWeek, {
+      nodes: [
+        { id: 'center', type: 'center' },
+        { id: 'work', type: 'branch', parent: 'center', label: 'Work', children: ['a', 'b', 'c'] },
+        { id: 'a', type: 'activity', parent: 'work', label: 'A', done: false, children: [] },
+        { id: 'b', type: 'activity', parent: 'work', label: 'B', done: false, children: [] },
+        { id: 'c', type: 'activity', parent: 'work', label: 'C', done: false, children: [] },
+      ]
+    });
+    _state.set({
+      nodes: [
+        { id: 'center', type: 'center' },
+        { id: 'work', type: 'branch', parent: 'center', label: 'Work', children: [] },
+      ]
+    });
+
+    await transferUnfinished();
+    const data = _state.get();
+    const work = data.nodes.find(n => n.id === 'work');
+    const labels = work.children.map(id => data.nodes.find(n => n.id === id).label);
+
+    expect(labels).toEqual(['A', 'B', 'C']);
+  });
+
   it('moves a single node to the next week', async () => {
     const currWeek = '2026-18';
     const nextWeek = '2026-19';

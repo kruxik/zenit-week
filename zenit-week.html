@@ -6994,8 +6994,12 @@ async function transferUnfinished() {
     targetParent.children.sort((a, b) => {
       const na = weekData.nodes.find(n => n.id === a);
       const nb = weekData.nodes.find(n => n.id === b);
-      const pa = na?.prevId != null && oldPos.has(na.prevId) ? oldPos.get(na.prevId) : Infinity;
-      const pb = nb?.prevId != null && oldPos.has(nb.prevId) ? oldPos.get(nb.prevId) : Infinity;
+      // Transferred nodes (matched by prevId) sort by their prev-week position.
+      // Unmatched nodes — those created manually in this week — have no prev-week
+      // position; anchor them to the front so transferred nodes land below them
+      // instead of jumping to the top (stable sort keeps their relative order).
+      const pa = na?.prevId != null && oldPos.has(na.prevId) ? oldPos.get(na.prevId) : -Infinity;
+      const pb = nb?.prevId != null && oldPos.has(nb.prevId) ? oldPos.get(nb.prevId) : -Infinity;
       return pa - pb;
     });
   });
@@ -7135,8 +7139,12 @@ async function transferReusable() {
     targetParent.children.sort((a, b) => {
       const na = weekData.nodes.find(n => n.id === a);
       const nb = weekData.nodes.find(n => n.id === b);
-      const pa = na?.prevId != null && oldPos.has(na.prevId) ? oldPos.get(na.prevId) : Infinity;
-      const pb = nb?.prevId != null && oldPos.has(nb.prevId) ? oldPos.get(nb.prevId) : Infinity;
+      // Transferred nodes (matched by prevId) sort by their prev-week position.
+      // Unmatched nodes — those created manually in this week — have no prev-week
+      // position; anchor them to the front so transferred nodes land below them
+      // instead of jumping to the top (stable sort keeps their relative order).
+      const pa = na?.prevId != null && oldPos.has(na.prevId) ? oldPos.get(na.prevId) : -Infinity;
+      const pb = nb?.prevId != null && oldPos.has(nb.prevId) ? oldPos.get(nb.prevId) : -Infinity;
       return pa - pb;
     });
   });
