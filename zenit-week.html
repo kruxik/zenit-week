@@ -11888,11 +11888,59 @@ function renderAgendaTabContent() {
       // Only Y picks the slot; release anywhere on the page commits.
       let docDragOver = null;
       let docDrop = null;
+      // Edge auto-scroll for the native desktop drag. dragover only fires while
+      // the pointer moves, so a stationary cursor parked at the edge would stall;
+      // a rAF loop seeded with the last dragover Y keeps scrolling regardless.
+      const DOC_SCROLL_EDGE = 100;
+      const DOC_SCROLL_MAX_SPEED = 18;
+      let docScrollRaf = 0;
+      let docScrollSpeed = 0;
+      let lastDocDragY = 0;
+
+      const refreshDocDropTarget = (cy) => {
+        clearAgendaDropMarkers();
+        const t = findAgendaDropTargetByY(cy, dragSrcId);
+        if (t) t.wrapper.classList.add(
+          t.before ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+      };
+
+      const updateDocAutoScroll = (cy) => {
+        const container = document.getElementById('agenda-tab-content');
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        const topDist = cy - rect.top;
+        const botDist = rect.bottom - cy;
+        if (topDist < DOC_SCROLL_EDGE) {
+          docScrollSpeed = -Math.max(2, Math.round((1 - topDist / DOC_SCROLL_EDGE) * DOC_SCROLL_MAX_SPEED));
+        } else if (botDist < DOC_SCROLL_EDGE) {
+          docScrollSpeed = Math.max(2, Math.round((1 - botDist / DOC_SCROLL_EDGE) * DOC_SCROLL_MAX_SPEED));
+        } else {
+          docScrollSpeed = 0;
+        }
+        if (docScrollSpeed !== 0 && !docScrollRaf) {
+          docScrollRaf = requestAnimationFrame(docAutoScrollTick);
+        }
+      };
+
+      function docAutoScrollTick() {
+        docScrollRaf = 0;
+        if (!dragSrcId || docScrollSpeed === 0) return;
+        const container = document.getElementById('agenda-tab-content');
+        if (!container) return;
+        const before = container.scrollTop;
+        container.scrollTop = before + docScrollSpeed;
+        if (container.scrollTop === before) { docScrollSpeed = 0; return; }
+        refreshDocDropTarget(lastDocDragY);
+        docScrollRaf = requestAnimationFrame(docAutoScrollTick);
+      }
+
       const cleanupDocDrag = () => {
         if (docDragOver) document.removeEventListener('dragover', docDragOver);
         if (docDrop) document.removeEventListener('drop', docDrop);
         docDragOver = null;
         docDrop = null;
+        if (docScrollRaf) { cancelAnimationFrame(docScrollRaf); docScrollRaf = 0; }
+        docScrollSpeed = 0;
       };
       el.addEventListener('dragstart', (e) => {
         if (!mousedownOnHandle) { e.preventDefault(); return; }
@@ -11910,10 +11958,9 @@ function renderAgendaTabContent() {
           if (!dragSrcId) return;
           ev.preventDefault();
           if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
-          clearAgendaDropMarkers();
-          const t = findAgendaDropTargetByY(ev.clientY, dragSrcId);
-          if (t) t.wrapper.classList.add(
-            t.before ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+          lastDocDragY = ev.clientY;
+          refreshDocDropTarget(ev.clientY);
+          updateDocAutoScroll(ev.clientY);
         };
         docDrop = (ev) => {
           if (!dragSrcId) return;
