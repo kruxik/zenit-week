@@ -6885,6 +6885,34 @@ async function importAllData(file) {
   reader.readAsText(file);
 }
 
+// --- Transfer reuse matching -------------------------------------------------
+// Decide whether a node copied into a destination week should reuse an existing
+// destination node instead of creating a duplicate. Identity (prevId / same id)
+// always wins. For bridge containers — activity nodes that hold other activities
+// (e.g. "Together") — we also merge by case-insensitive label under the same
+// resolved parent, so a manually recreated container doesn't duplicate when its
+// children are transferred in. Leaves (and counter/tick/day children) never
+// name-merge: only identity matching applies to them.
+const _normLabel = s => (s || '').trim().toLowerCase();
+
+function _isBridgeContainer(source, lookup) {
+  return source.type === 'activity' &&
+    (source.children || []).some(cid => lookup(cid)?.type === 'activity');
+}
+
+function findReuseTarget(source, destNodes, destParentId, lookup) {
+  let hit = destNodes.find(n => n.id === source.id || n.prevId === source.id);
+  if (hit) return hit;
+  if (destParentId != null && _isBridgeContainer(source, lookup)) {
+    const key = _normLabel(source.label);
+    hit = destNodes.find(n =>
+      n.parent === destParentId &&
+      n.type === source.type &&
+      _normLabel(n.label) === key);
+  }
+  return hit || null;
+}
+
 async function transferUnfinished() {
   const prevWeekKey = offsetWeek(currentWeekKey, -1);
   const prevData = await loadWeek(prevWeekKey);
@@ -6893,13 +6921,28 @@ async function transferUnfinished() {
   beginAtomicOp();
   takeSnapshot();
 
+  const prevById = new Map(prevData.nodes.map(n => [n.id, n]));
+  const branchIds = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
+  const lookup = id => prevById.get(id);
+
   const candidates = prevData.nodes.filter(n => !n.done && n.type !== 'branch');
+
+  // Resolve parents before their children so name-merge can match against an
+  // already-mapped destination parent.
+  const depthOf = id => {
+    let d = 0, cur = prevById.get(id);
+    while (cur && !branchIds.has(cur.parent)) { d++; cur = prevById.get(cur.parent); }
+    return d;
+  };
+  candidates.sort((a, b) => depthOf(a.id) - depthOf(b.id));
+
   const oldToNew = new Map();
   const newNodes = [];
 
-  // 1. Create mapping and new node objects
+  // 1. Create mapping and new node objects (top-down)
   candidates.forEach(c => {
-    const existing = weekData.nodes.find(n => n.prevId === c.id);
+    const destParentId = branchIds.has(c.parent) ? c.parent : oldToNew.get(c.parent);
+    const existing = findReuseTarget(c, weekData.nodes, destParentId, lookup);
     if (existing) {
       oldToNew.set(c.id, existing.id);
     } else {
@@ -6927,7 +6970,6 @@ async function transferUnfinished() {
   newNodes.forEach(newNode => weekData.nodes.push(newNode));
 
   // 3. Wire hierarchy by iterating old parent.children arrays to preserve visual order
-  const branchIds = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
   prevData.nodes.forEach(oldParent => {
     if (!oldParent.children?.length) return;
 
@@ -6958,6 +7000,10 @@ async function transferUnfinished() {
     });
   });
   rebuildNodeMap();
+
+  // Merging not-done nodes into an existing (possibly done) parent can flip the
+  // parent's done/unplanned status — resync up from each transferred node.
+  newNodes.forEach(n => { syncStatusUp(n.id, 'done'); syncStatusUp(n.id, 'unplanned'); });
 
   await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
@@ -7018,19 +7064,22 @@ async function transferReusable() {
     }
     return d;
   }
-  const orderedAncestors = [...ancestorIds].sort((a, b) => depthOf(a) - depthOf(b));
-  const allOldIds = [...orderedAncestors, ...candidateIds];
+  // Sort the whole set top-down so a parent is always mapped before its
+  // children — required for name-merge to match against a resolved parent.
+  const allOldIds = [...ancestorIds, ...candidateIds].sort((a, b) => depthOf(a) - depthOf(b));
 
+  const lookup = id => prevById.get(id);
   const oldToNew = new Map();
   const newNodes = [];
 
-  // 4. Create mapping and new node objects
+  // 4. Create mapping and new node objects (top-down)
   allOldIds.forEach(oldId => {
     const c = prevById.get(oldId);
     if (!c) return;
     const isAncestor = ancestorIds.has(oldId);
 
-    const existing = weekData.nodes.find(n => n.prevId === oldId);
+    const destParentId = branches.has(c.parent) ? c.parent : oldToNew.get(c.parent);
+    const existing = findReuseTarget(c, weekData.nodes, destParentId, lookup);
     if (existing) {
       oldToNew.set(oldId, existing.id);
     } else {
@@ -7093,6 +7142,9 @@ async function transferReusable() {
   });
   rebuildNodeMap();
 
+  // Merging into an existing parent can flip its done/unplanned status.
+  newNodes.forEach(n => { syncStatusUp(n.id, 'done'); syncStatusUp(n.id, 'unplanned'); });
+
   await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
   renderIfVisible();
@@ -7134,14 +7186,16 @@ async function moveNodeToNextWeek(nodeId) {
   oldToNew.set(branchId, branchId);
 
   ancestorChain.forEach(ancestor => {
-    if (nextById.has(ancestor.id)) {
-      oldToNew.set(ancestor.id, ancestor.id);
+    const destParentId = oldToNew.get(ancestor.parent) || ancestor.parent;
+    const existing = findReuseTarget(ancestor, nextData.nodes, destParentId, findNode);
+    if (existing) {
+      oldToNew.set(ancestor.id, existing.id);
     } else {
       const shell = {
         ...ancestor,
         id: ancestor.id,
         children: [],
-        parent: oldToNew.get(ancestor.parent) || ancestor.parent,
+        parent: destParentId,
       };
       nextData.nodes.push(shell);
       nextById.set(ancestor.id, shell);
