@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.06.07] - 2026-06-07
+
+### Added
+
+- **agenda:** Schedule quantifier ticks to specific days
+- **security:** Store Google refresh token in HttpOnly cookie instead of localStorage
+- **comments:** ValidateAndRepair tolerance + merge tests (T6)
+- **comments:** Display-only message indicator on agenda rows (T5)
+- **comments:** Display-only message indicator on mind-map nodes (T4)
+- **comments:** Dirty-check auto-save on dialog close (T3)
+- **comments:** Context-menu Comment item + Help-style dialog shell (T2)
+- **comments:** Add icon-message sprite + menu.comment i18n (T1)
+
+### Fixed
+
+- **transfer:** Keep manual nodes on top so transferred nodes don't jump to the top
+- **transfer:** Merge into same-name bridge containers instead of duplicating
+- **agenda:** Add edge auto-scroll to desktop drag reorder
+- **agenda:** Done-section ticks show leaf number not cumulative position
+- **agenda:** Route keyboard done/delete per-row so scheduled ticks don't cascade
+- **agenda:** Count scheduled-tick rows in empty-screen guard
+- **html:** Escape raw ampersand and resolve duplicate id="app"
+- **security:** Harden untrusted-data paths (proto guard, token log, drive/import parse)
+- **security:** Coerce tick-child labels to step number in validateAndRepair
+- **security:** Prevent stored XSS in agenda tick pill (textContent not innerHTML)
+
 ## [v2026.05.27] - 2026-05-27
 
 ### Added
