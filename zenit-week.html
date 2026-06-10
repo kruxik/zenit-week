@@ -208,6 +208,8 @@
     --badge-unplanned-text: #E67700;
     --badge-progress-bg: #e8f0fe;
     --badge-progress-text: #1a73e8;
+    --badge-comment-bg: #f3e8ff;
+    --badge-comment-text: #7b2cbf;
 
     /* Node state colors (kept in sync with getThemeColors() in JS) */
     --node-done-bg: #EBEBEB;
@@ -314,6 +316,8 @@
     --badge-unplanned-text: #ffaa33;
     --badge-progress-bg: #0f1e3a;
     --badge-progress-text: #4da3ff;
+    --badge-comment-bg: #2a1840;
+    --badge-comment-text: #c084fc;
 
     /* Node state colors (kept in sync with getThemeColors() in JS) */
     --node-done-bg: #2c2c2c;
@@ -1275,6 +1279,12 @@
     background: var(--badge-progress-bg);
     color: var(--badge-progress-text);
   }
+  .daily-log-badge.comment {
+    background: var(--badge-comment-bg);
+    color: var(--badge-comment-text);
+  }
+  .agenda-item .daily-log-badge.comment { cursor: pointer; }
+  .agenda-item .daily-log-badge.comment:hover { filter: brightness(1.08); }
 
   .daily-log-label {
     flex: 1;
@@ -11504,12 +11514,17 @@ function buildAgendaItem(node, label, opts = {}) {
     item.appendChild(rep);
   }
 
-  // Comment indicator (display-only — signals the row carries a comment)
+  // Comment indicator — colored badge; click opens the comment dialog.
   if (node.comments) {
     const cmt = document.createElement('span');
-    cmt.className = 'daily-log-badge';
+    cmt.className = 'daily-log-badge comment';
     cmt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;';
     cmt.innerHTML = iconSvg('message');
+    cmt.title = t('menu.comment');
+    cmt.addEventListener('click', e => {
+      e.stopPropagation();
+      openCommentDialog(node.id);
+    });
     item.appendChild(cmt);
   }
 
