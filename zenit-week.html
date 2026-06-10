@@ -10431,7 +10431,7 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
   document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda') ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
-  const isCommentable = isActivity && !isTick && !node.dayChild && !node.inbox;
+  const isCommentable = isActivity && !isTick && !node.dayChild;
   document.getElementById('ctx-comment').style.display   = isCommentable ? '' : 'none';
   document.getElementById('ctx-reschedule').style.display = ((isStdActivity || isTick) && !node.done) ? '' : 'none';
 
