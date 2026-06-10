@@ -2319,14 +2319,11 @@
   }
   #comment-counter.over { color: var(--accent-danger); }
 
-  /* Mobile: hide bottom pill bars while comment dialog open; swap top-X for pill */
+  /* Mobile: hide bottom pill bars while comment dialog open; show bottom pill alongside top-X */
   @media (max-width: 767px) {
     body:has(#comment-panel.visible) #fab-pill,
     body:has(#comment-panel.visible) #undo-redo-bar,
     body:has(#comment-panel.visible) #view-toggle-bar {
-      display: none;
-    }
-    body:has(#comment-panel.visible) #comment-close {
       display: none;
     }
     body:has(#comment-panel.visible) #comment-close-bar {
