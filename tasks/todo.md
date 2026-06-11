@@ -1,0 +1,35 @@
+# TODO — Multi-tab editing (Option B)
+
+Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
+
+## Phase 1 — Unblock
+- [ ] **T1** Retarget single-tab lock → DB-upgrade failsafe
+  - [ ] Remove `ping`/`pong`/`takeover` flow + initial ping (`:3738–3759`)
+  - [ ] Remove takeover button handler
+  - [ ] Keep `tabChannel`; keep `#single-tab-overlay` for `onDbBlocked` only
+  - [ ] Update `blocked.*` i18n copy → transient DB-busy, drop "Use here"
+  - [ ] Verify: two tabs, no overlay; `npm run validate`; no ping/pong/takeover left
+- [ ] **CHECKPOINT A** — human review
+
+## Phase 2 — Signal + converge
+- [ ] **T2** Per-tab origin id + broadcast on save
+  - [ ] `const TAB_ID = genId()` at startup
+  - [ ] `saveWeek` broadcasts `{type:'week-saved', wk, sig, origin}` post-IDB
+  - [ ] Ignore self-originated messages
+- [ ] **T3** Receive → merge current week (keystone)
+  - [ ] No-op when `wk !== currentWeekKey`
+  - [ ] Sig-equality early-out (no-op when converged)
+  - [ ] `mergeWeekData` + `applyRemoteMerge` with correct `scheduleUpload`
+  - [ ] Verify: different weeks independent; same week converges; no echo storm
+- [ ] **CHECKPOINT B** — human review
+
+## Phase 3 — Harden
+- [ ] **T4** Mid-edit / undo safety (verify-and-reuse atomic-op deferral)
+  - [ ] Rename-in-flight + peer save → no lost text
+  - [ ] Undo stack untouched on merge (resolved decision)
+- [ ] **T5** Drive interplay — local-changed merge sets `scheduleUpload`; no double-upload
+- [ ] **T6** vitest: union / `_ts` win / tombstone win / sig no-op / deferral; `npm test` green
+- [ ] **CHECKPOINT C** — human review
+
+## Phase 4 — Optional polish
+- [ ] **T7** "Updated by another tab" cue (silent vs toast) — Open Q1
