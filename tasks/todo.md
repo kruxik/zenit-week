@@ -3,13 +3,13 @@
 Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
 
 ## Phase 1 — Unblock
-- [ ] **T1** Retarget single-tab lock → DB-upgrade failsafe
-  - [ ] Remove `ping`/`pong`/`takeover` flow + initial ping (`:3738–3759`)
-  - [ ] Remove takeover button handler
-  - [ ] Keep `tabChannel`; keep `#single-tab-overlay` for `onDbBlocked` only
-  - [ ] Update `blocked.*` i18n copy → transient DB-busy, drop "Use here"
-  - [ ] Verify: two tabs, no overlay; `npm run validate`; no ping/pong/takeover left
-- [ ] **CHECKPOINT A** — human review
+- [x] **T1** Retarget single-tab lock → DB-upgrade failsafe
+  - [x] Remove `ping`/`pong`/`takeover` flow + initial ping
+  - [x] Remove takeover button handler + button markup + dead CSS
+  - [x] Keep `tabChannel`; keep `#single-tab-overlay` for `onDbBlocked` only
+  - [x] Update `blocked.*` i18n copy → transient DB-busy, drop "Use here" (EN+CS)
+  - [x] Verify: `npm run validate` clean; `npm test` 470/470; no ping/pong/takeover left
+- [ ] **CHECKPOINT A** — human review (manual two-tab check)
 
 ## Phase 2 — Signal + converge
 - [ ] **T2** Per-tab origin id + broadcast on save

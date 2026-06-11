@@ -2923,7 +2923,6 @@
   }
   #single-tab-overlay h1 { font-weight: 400; margin-bottom: 12px; }
   #single-tab-overlay p { opacity: 0.8; max-width: 400px; line-height: 1.5; margin: 0; white-space: pre-line; }
-  #single-tab-overlay .agenda-action-btn { margin-top: 24px; }
 </style>
 <!-- Theme init: runs synchronously before first paint to prevent flash of wrong theme -->
 <script>
@@ -2987,10 +2986,8 @@
 <body class="app-loading">
 <div id="single-tab-overlay">
   <div class="card">
-    <h1 data-i18n="blocked.title">Application Blocked</h1>
-    <p data-i18n="blocked.body">Zenit Week is already open in another tab.
-Use that tab — or take over here.</p>
-    <button id="single-tab-takeover-btn" class="agenda-action-btn" type="button" data-i18n="blocked.useHere">Use here</button>
+    <h1 data-i18n="blocked.title">Storage busy</h1>
+    <p data-i18n="blocked.body">Zenit Week's storage is being upgraded in another tab. This tab will be ready in a moment — try refreshing.</p>
   </div>
 </div>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -3726,7 +3723,12 @@ const _PENDING_OAUTH_CALLBACK = (() => {
   return { code, error, state };
 })();
 
-// ─── Single Tab Enforcement ───────────────────────────────────────────────────
+// ─── Cross-tab channel ────────────────────────────────────────────────────────
+// Multi-tab editing is allowed (Option B — local sync peer). This channel is the
+// local change bus (the `week-saved` signal is wired in a later task). There is no
+// proactive single-tab lock anymore. The blocked overlay below is now only a
+// failsafe for a genuine IndexedDB version-upgrade block (see onDbBlocked) — a
+// rare, transient state, not "already open in another tab".
 const tabChannel = new BroadcastChannel('zenit-week-tabs');
 let _isBlocked = false;
 
@@ -3734,29 +3736,6 @@ function showBlockedOverlay() {
   _isBlocked = true;
   document.getElementById('single-tab-overlay').classList.add('visible');
 }
-
-tabChannel.onmessage = (e) => {
-  if (e.data === 'ping' && !_isBlocked) {
-    tabChannel.postMessage('pong');
-  } else if (e.data === 'pong') {
-    showBlockedOverlay();
-  } else if (e.data === 'takeover') {
-    // Another tab claimed the lock — block this one (do not reload, preserve current view).
-    showBlockedOverlay();
-  }
-};
-
-// Initial check: ping other tabs. If any pong back, block this one.
-tabChannel.postMessage('ping');
-
-// "Use here" button — broadcast takeover, then reload to start with fresh state.
-document.getElementById('single-tab-takeover-btn').addEventListener('click', () => {
-  const btn = document.getElementById('single-tab-takeover-btn');
-  btn.disabled = true;
-  tabChannel.postMessage('takeover');
-  // Small delay so the broadcast lands in other tabs before this one reloads.
-  setTimeout(() => { location.reload(); }, 120);
-});
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
 const DB_NAME = 'zenit-week-db';
@@ -6100,9 +6079,8 @@ const TRANSLATIONS = {
     'help.done':                  'Done',
     'help.close':                 'Close',
     'filter.unscheduled':         'Unscheduled',
-    'blocked.title':              'Application Blocked',
-    'blocked.body':               'Zenit Week is already open in another tab.\nUse that tab — or take over here.',
-    'blocked.useHere':            'Use here',
+    'blocked.title':              'Storage busy',
+    'blocked.body':               'Zenit Week’s storage is being upgraded in another tab. This tab will be ready in a moment — try refreshing.',
     'filter.prefix':              'Filter',
     'filter.off':                 'Filter off',
     'menu.clearDayFilter':        'Clear Day Filter',
@@ -6302,9 +6280,8 @@ const TRANSLATIONS = {
     'help.done':                  'Hotovo',
     'help.close':                 'Zavřít',
     'filter.unscheduled':         'Neplánované',
-    'blocked.title':              'Aplikace je blokována',
-    'blocked.body':               'Zenit Week je již otevřen v jiném panelu.\nPokračujte tam — nebo převezměte zde.',
-    'blocked.useHere':            'Pokračovat zde',
+    'blocked.title':              'Úložiště je zaneprázdněné',
+    'blocked.body':               'Úložiště Zenit Week se aktualizuje v jiném panelu. Tento panel bude za chvíli připraven — zkuste obnovit stránku.',
     'filter.prefix':              'Filtr',
     'filter.off':                 'Filtr vypnut',
     'menu.clearDayFilter':        'Zrušit filtr dne',
