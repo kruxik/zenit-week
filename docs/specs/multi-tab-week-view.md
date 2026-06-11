@@ -65,9 +65,12 @@ On `week-saved` for `wk` from another origin:
       discard the in-progress edit. Reuse `isAtomicOpActive()` deferral — confirm
       label edits are wrapped so `pendingRemoteMerge` holds until `commitEdit`.
 - [ ] A merge that lands on the current week after the user has built an undo
-      stack must leave undo/redo in a defined state. **Decision needed (Open Q1)** —
-      default: keep the local undo stack as-is; a merged change is a new state, not
-      an undoable local action.
+      stack leaves the local undo/redo stack **untouched** (resolved, was Open Q1):
+      a merged change is a new converged state, not an undoable local action, so it
+      pushes no snapshot and clears nothing. Undo continues to replay the local
+      tab's own history. Accepted edge case: an undo can momentarily reintroduce a
+      node the peer deleted — the next save re-runs the merge and the tombstone
+      wins again, so it self-heals.
 - [ ] No merge is applied between a structural mutation and its `saveWeek` (the
       `beginAtomicOp`/`endAtomicOp` window already covers multi-step ops).
 
@@ -113,7 +116,6 @@ Always:
 - Use the custom confirm dialog pattern if any prompt is ever needed (none expected).
 
 Ask first:
-- Undo-after-merge semantics (Open Q1) before implementing D.
 - Any change to the on-disk week record shape (`crdtVersion`, `tombstones`, `_ts`)
   — it's shared with the Drive format.
 
@@ -124,10 +126,8 @@ Never:
   still applies; signals carry only `wk`, `sig`, `origin`).
 
 ## 6. Open Questions
-1. **Undo after a remote merge** — keep local stack untouched (default), or clear
-   redo / snapshot the merged state? Pick before coding section D.
-2. **Visual cue** when another tab changed your current week — silent re-render
+1. **Visual cue** when another tab changed your current week — silent re-render
    (default), subtle flash, or a small "updated" toast?
-3. **Signal payload** — is `_weekContentSig` enough, or also carry `crdtVersion`
+2. **Signal payload** — is `_weekContentSig` enough, or also carry `crdtVersion`
    for cheap pre-load dedup before hitting IDB?
 ```
