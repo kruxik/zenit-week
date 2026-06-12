@@ -10224,10 +10224,12 @@ function _statsDonut(c) {
   const PLAN = 'var(--badge-done-text)';        // planned → green
   const UNPL = 'var(--badge-unplanned-text)';   // unplanned → amber
   const OPEN_OPACITY = 0.32;                     // done = solid, open = faded
+  // Order: all done first (planned, unplanned), then all open — so the completed
+  // portion is one contiguous arc clockwise from the top.
   const segs = [
     { v: c.plannedDone,   color: PLAN, opacity: 1 },
-    { v: c.plannedOpen,   color: PLAN, opacity: OPEN_OPACITY },
     { v: c.unplannedDone, color: UNPL, opacity: 1 },
+    { v: c.plannedOpen,   color: PLAN, opacity: OPEN_OPACITY },
     { v: c.unplannedOpen, color: UNPL, opacity: OPEN_OPACITY },
   ];
   const R = 15.91549; // circumference ≈ 100 → dasharray reads as percent
@@ -10428,10 +10430,11 @@ function _statsBranchRow(branch, c) {
   const bar = document.createElement('div');
   bar.className = 'stats-bar';
   if (total > 0) {
+    // Order matches the donut: all done first (planned, unplanned), then all open.
     const w = (v) => (v / total) * 100;
     bar.appendChild(_statsBarSeg(w(c.plannedDone),   solid, false));
-    bar.appendChild(_statsBarSeg(w(c.plannedOpen),   faded, false));
     bar.appendChild(_statsBarSeg(w(c.unplannedDone), solid, true));
+    bar.appendChild(_statsBarSeg(w(c.plannedOpen),   faded, false));
     bar.appendChild(_statsBarSeg(w(c.unplannedOpen), faded, true));
   }
   row.appendChild(bar);
