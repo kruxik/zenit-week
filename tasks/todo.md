@@ -36,9 +36,12 @@ Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
   - [x] DOM-constructed labels (textContent); zero-task branch → clean empty track
   - [x] i18n EN+CZ (followThrough, unplannedShort, 3 legend labels)
   - [x] Verify: browser 3 + 8 branches, light+dark distinguishable; 8 branches no h-overflow, scrolls; `npm test` 490/490, validate clean
-- [ ] **T5** Section ③ reuse ratio-bar + baseline (weighted)
-  - [ ] Branch share + total-vs-baseline via shared helper weighted lens
-  - [ ] Verify: panel figures == top-box figures; overload color same threshold
+- [x] **T5** Section ③ reuse ratio-bar + baseline (weighted)
+  - [x] Extracted shared `_effortLevel`/`_effortColor`/`_effortTooltipKey` from updateSummary (no dup math)
+  - [x] Load number (effort-colored) + `/ baseline N` + threshold note; branch-share ratio bar reuses `.ratio-segment`
+  - [x] Only weighted-lens section; figures == top box by construction (summary.test green)
+  - [x] i18n EN+CZ (effortBalance, baseline)
+  - [x] Verify: stretch=amber@118, segments 51/29/20 sum 100; browser light; `npm test` 490/490, validate clean
 
 ## Phase 4 — Hardening
 - [ ] **T6** Empty / positive states

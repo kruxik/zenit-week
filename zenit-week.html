@@ -1607,6 +1607,38 @@
       45deg, var(--stats-hatch) 0 1.5px, transparent 1.5px 5px);
   }
 
+  /* ③ Effort & Balance — reuses .ratio-segment; mirrors #ratio-bar container */
+  .stats-balance-load {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .stats-balance-num {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-balance-baseline {
+    font-size: 14px;
+    color: var(--text-placeholder);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-balance-note {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+  }
+  .stats-ratio-bar {
+    display: flex;
+    height: 18px;
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-muted);
+    box-shadow: inset 0 1px 2px var(--shadow-md);
+  }
+
   #quick-add-backdrop {
     display: none;
     position: fixed;
@@ -6335,6 +6367,8 @@ const TRANSLATIONS = {
     'stats.legendUnplannedDone':  'Unplanned · done',
     'stats.legendUnplannedOpen':  'Unplanned · open',
     'stats.followThrough':        'Follow-through by branch',
+    'stats.effortBalance':        'Effort & balance',
+    'stats.baseline':             'baseline',
     'stats.unplannedShort':       'unplanned',
     'stats.legendDone':           'done',
     'stats.legendOpen':           'open',
@@ -6553,6 +6587,8 @@ const TRANSLATIONS = {
     'stats.legendUnplannedDone':  'Neplánováno · splněno',
     'stats.legendUnplannedOpen':  'Neplánováno · zbývá',
     'stats.followThrough':        'Plnění podle větve',
+    'stats.effortBalance':        'Zátěž a rovnováha',
+    'stats.baseline':             'základ',
     'stats.unplannedShort':       'neplánovaných',
     'stats.legendDone':           'splněno',
     'stats.legendOpen':           'zbývá',
@@ -10077,6 +10113,28 @@ function computeWeekStats() {
   return { global, perBranch, leaves };
 }
 
+// Effort-load thresholds: priority-weighted total vs the week's baseline. Shared by the
+// summary box and the Stats panel so their colour/level can never disagree.
+function _effortLevel(total) {
+  const baseline = weekData.baseline || 105;
+  const overload = Math.floor(baseline * 1.33);
+  let level = 'normal';
+  if (total > overload) level = 'overload';
+  else if (total >= baseline + 1) level = 'stretch';
+  return { level, baseline, overload };
+}
+function _effortColor(level) {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  if (level === 'overload') return dark ? '#ff6b5b' : '#d93025';
+  if (level === 'stretch')  return dark ? '#f5a623' : '#f29900';
+  return dark ? '#2ecc71' : '#28a745';
+}
+function _effortTooltipKey(level) {
+  return level === 'overload' ? 'summary.tooltipOverload'
+       : level === 'stretch'  ? 'summary.tooltipStretch'
+       : 'summary.tooltipNormal';
+}
+
 // ─── Stats Panel (Plan vs Reality) ────────────────────────────────────────────
 // Read-only reflection surface. Reads weekData via computeWeekStats() and never
 // mutates it, so opening/closing/refreshing produces no undo entry. Sections ②③④
@@ -10319,10 +10377,61 @@ function _renderStatsBranchesSection(perBranch) {
   });
 }
 
+// ③ Effort & Balance — priority-weighted load vs baseline + branch share of that load.
+// The ONLY weighted-lens section; reuses the shared effort helpers and .ratio-segment.
+function _renderStatsBalanceSection(stats) {
+  const sec = document.getElementById('stats-section-balance');
+  if (!sec) return;
+  sec.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'help-section-title';
+  title.textContent = t('stats.effortBalance');
+  sec.appendChild(title);
+
+  const total = stats.global.weighted.total;
+  const eff = _effortLevel(total);
+
+  const loadRow = document.createElement('div');
+  loadRow.className = 'stats-balance-load';
+  const num = document.createElement('span');
+  num.className = 'stats-balance-num';
+  num.style.color = _effortColor(eff.level);
+  num.textContent = total;
+  loadRow.appendChild(num);
+  const baseline = document.createElement('span');
+  baseline.className = 'stats-balance-baseline';
+  baseline.textContent = `/ ${t('stats.baseline')} ${eff.baseline}`;
+  loadRow.appendChild(baseline);
+  sec.appendChild(loadRow);
+
+  const note = document.createElement('div');
+  note.className = 'stats-balance-note';
+  note.textContent = t(_effortTooltipKey(eff.level));
+  sec.appendChild(note);
+
+  const bar = document.createElement('div');
+  bar.className = 'stats-ratio-bar';
+  const branches = weekData.nodes.filter(n => n.type === 'branch');
+  const totalItems = branches.reduce((acc, b) => acc + (stats.perBranch[b.id] || {}).weighted.total, 0);
+  branches.forEach(b => {
+    const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
+    const bTotal = (stats.perBranch[b.id] || {}).weighted.total;
+    const pct = totalItems === 0 ? (100 / branches.length) : (bTotal / totalItems) * 100;
+    const seg = document.createElement('div');
+    seg.className = 'ratio-segment';
+    seg.style.background = color;
+    seg.style.width = pct + '%';
+    seg.textContent = (pct >= 10) ? Math.round(pct) + '%' : '';
+    bar.appendChild(seg);
+  });
+  sec.appendChild(bar);
+}
+
 function renderStatsPanel() {
   const stats = computeWeekStats();
   _renderStatsDonutSection(stats.global.counts);
   _renderStatsBranchesSection(stats.perBranch);
+  _renderStatsBalanceSection(stats);
 }
 
 function openStatsPanel() {
@@ -10361,18 +10470,9 @@ function updateSummary() {
 
   const mainEl = document.getElementById('summary-main');
   if (mainEl) {
-    const isDarkSummary = document.documentElement.dataset.theme === 'dark';
-    const wBaseline = weekData.baseline || 105;
-    const wOverload = Math.floor(wBaseline * 1.33);
-    let totalColor = isDarkSummary ? '#2ecc71' : '#28a745';
-    let tooltip = t('summary.tooltipNormal');
-    if (global.total > wOverload) {
-      totalColor = isDarkSummary ? '#ff6b5b' : '#d93025';
-      tooltip = t('summary.tooltipOverload');
-    } else if (global.total >= wBaseline + 1) {
-      totalColor = isDarkSummary ? '#f5a623' : '#f29900';
-      tooltip = t('summary.tooltipStretch');
-    }
+    const eff = _effortLevel(global.total);
+    const totalColor = _effortColor(eff.level);
+    const tooltip = t(_effortTooltipKey(eff.level));
 
     mainEl.innerHTML = `<span class="daily-log-footer-badge done">${global.done} <span style="font-weight:400">(${global.percent}&nbsp;%)</span></span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.done')}</span><span class="daily-log-footer-badge" style="background:var(--bg-muted);color:${totalColor}" data-tooltip="${tooltip}">${global.total}</span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.total')}</span>`;
   }
