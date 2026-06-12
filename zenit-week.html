@@ -10645,6 +10645,7 @@ function renderStatsPanel() {
 }
 
 let _statsReturnFocus = null;
+let _statsOpenedViaKey = false;
 function openStatsPanel() {
   const panel = document.getElementById('stats-panel');
   const overlay = document.getElementById('stats-overlay');
@@ -10665,8 +10666,14 @@ function closeStatsPanel() {
   if (panel) panel.classList.remove('visible');
   if (overlay) overlay.classList.remove('visible');
   _statsPanelOpen = false;
-  // a11y: return focus to whatever opened the panel (usually the summary box).
-  if (_statsReturnFocus && typeof _statsReturnFocus.focus === 'function') _statsReturnFocus.focus();
+  // a11y: restore focus to the trigger ONLY when the panel was opened via keyboard
+  // (so keyboard users keep their place). For a mouse-opened panel, drop focus so the
+  // summary box doesn't keep a focus ring after closing.
+  if (_statsOpenedViaKey && _statsReturnFocus && typeof _statsReturnFocus.focus === 'function') {
+    _statsReturnFocus.focus();
+  } else if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur(); // mouse-opened: drop focus so no ring lingers on the box
+  }
   _statsReturnFocus = null;
 }
 
@@ -14573,7 +14580,11 @@ window.addEventListener('load', async () => {
   const summaryPanel = document.getElementById('placeholder-panel');
   const summaryHeader = document.getElementById('summary-header');
   summaryPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
-  summaryHeader.addEventListener('click', openStatsPanel);
+  summaryHeader.addEventListener('click', (e) => {
+    // Keyboard-activated clicks (Enter/Space) report detail 0; mouse clicks report ≥1.
+    _statsOpenedViaKey = e.detail === 0;
+    openStatsPanel();
+  });
 
   // Stats panel close wiring (mirrors the Help panel; native <button>s self-handle keys)
   const statsOverlay = document.getElementById('stats-overlay');
