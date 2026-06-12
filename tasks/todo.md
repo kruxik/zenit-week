@@ -63,7 +63,9 @@ Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
 - [x] **CHECKPOINT C** — human review · **MVP merge candidate**
 
 ## Phase 5 — Fast-follow
-- [ ] **T9** Section ④ desktop-only timeline (Mon→Sun from doneAt/ticks/unplannedAt)
-  - [ ] Hidden on mobile; no dead DOM if deferred
-  - [ ] Verify: buckets match daily-log; hidden on mobile; validate clean
-- [ ] **CHECKPOINT D** — human review · ship fast-follow
+- [x] **T9** Section ④ desktop-only timeline (Mon→Sun from doneAt/ticks/unplannedAt)
+  - [x] Buckets completions (leaf doneAt + counter ticks) and unplanned arrivals by day via `tabDateString`/`localDateStr`
+  - [x] 7 columns Mon→Sun, green/amber bars scaled to weekly max, today column highlighted, per-day title tooltip
+  - [x] Reuses `DAY_LABELS`/`DAY_FULL_NAMES`; hidden on mobile (T7 rule); i18n EN+CZ (theWeek, tlDone, tlUnpl)
+  - [x] Verify: buckets exact (Mon2/Tue1/Wed2+1/Thu2/Fri3-today/Sat-Sun0); mobile-hide rule confirmed; `npm test` 491/491, validate clean
+- [x] **CHECKPOINT D** — human review · ship fast-follow

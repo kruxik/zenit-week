@@ -19,6 +19,7 @@ describe('Internationalization', () => {
       'stats.followThrough', 'stats.effortBalance', 'stats.baseline',
       'stats.unplannedShort', 'stats.legendDone', 'stats.legendOpen', 'stats.legendUnplanned',
       'stats.emptyWeek', 'stats.emptyWeekHint', 'stats.noUnplanned',
+      'stats.theWeek', 'stats.tlDone', 'stats.tlUnpl',
     ];
     for (const lang of ['en', 'cs']) {
       _state.setLang(lang);

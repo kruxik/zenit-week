@@ -1639,6 +1639,43 @@
     box-shadow: inset 0 1px 2px var(--shadow-md);
   }
 
+  /* ④ The Week — Mon→Sun timeline of completions + unplanned arrivals (desktop only) */
+  .stats-timeline {
+    display: flex;
+    gap: 8px;
+  }
+  .stats-tl-day {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .stats-tl-bars {
+    height: 64px;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .stats-tl-bar {
+    width: 10px;
+    border-radius: 3px 3px 0 0;
+  }
+  .stats-tl-done { background: var(--badge-done-text); }
+  .stats-tl-unpl { background: var(--badge-unplanned-text); }
+  .stats-tl-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-placeholder);
+  }
+  .stats-tl-day.today .stats-tl-label {
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+
   /* Mobile lean: keep ① donut+headlines and ③ balance; ② bars stay (already label-free);
      hide ④ timeline; tighten spacing so the story fits one thumb-scroll. */
   @media (max-width: 767px) {
@@ -6401,6 +6438,9 @@ const TRANSLATIONS = {
     'stats.emptyWeek':            'No tasks yet this week',
     'stats.emptyWeekHint':        'Add tasks on the mindmap to see how your week takes shape.',
     'stats.noUnplanned':          'No unplanned tasks this week 👍',
+    'stats.theWeek':              'The week',
+    'stats.tlDone':               'completed',
+    'stats.tlUnpl':               'unplanned arrived',
     'stats.unplannedShort':       'unplanned',
     'stats.legendDone':           'done',
     'stats.legendOpen':           'open',
@@ -6624,6 +6664,9 @@ const TRANSLATIONS = {
     'stats.emptyWeek':            'Tento týden zatím žádné úkoly',
     'stats.emptyWeekHint':        'Přidejte úkoly v myšlenkové mapě a uvidíte, jak týden vypadá.',
     'stats.noUnplanned':          'Tento týden žádné neplánované úkoly 👍',
+    'stats.theWeek':              'Týden',
+    'stats.tlDone':               'splněno',
+    'stats.tlUnpl':               'přibylo neplánovaných',
     'stats.unplannedShort':       'neplánovaných',
     'stats.legendDone':           'splněno',
     'stats.legendOpen':           'zbývá',
@@ -10489,6 +10532,91 @@ function _renderStatsEmpty() {
   sec.appendChild(hint);
 }
 
+// ④ The Week — when work got done (doneAt / counter ticks) and when unplanned tasks
+// appeared (unplannedAt), bucketed Mon→Sun over the viewed week. Desktop-only (hidden
+// on mobile via CSS). Counted over leaves so it matches the rest of the panel.
+function _renderStatsTimelineSection(leaves) {
+  const sec = document.getElementById('stats-section-timeline');
+  if (!sec) return;
+  sec.textContent = '';
+
+  // Mon=1 … Sat=6, Sun=0 → Mon→Sun column order.
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const dates = order.map(idx => tabDateString(idx));
+  const dateToCol = {};
+  dates.forEach((d, i) => { dateToCol[d] = i; });
+  const done = new Array(7).fill(0);
+  const unpl = new Array(7).fill(0);
+  const bump = (arr, iso) => {
+    if (!iso) return;
+    const col = dateToCol[localDateStr(new Date(iso))];
+    if (col !== undefined) arr[col]++;
+  };
+  for (const n of leaves) {
+    if (n.type === 'counter') (n.ticks || []).forEach(t => bump(done, t));
+    else bump(done, n.doneAt);
+    bump(unpl, n.unplannedAt);
+  }
+
+  const title = document.createElement('div');
+  title.className = 'help-section-title';
+  title.textContent = t('stats.theWeek');
+  sec.appendChild(title);
+
+  // legend: completed (green) · unplanned arrived (amber)
+  const legend = document.createElement('div');
+  legend.className = 'stats-bar-legend';
+  [['stats.tlDone', 'var(--badge-done-text)'], ['stats.tlUnpl', 'var(--badge-unplanned-text)']]
+    .forEach(([key, color]) => {
+      const item = document.createElement('div');
+      item.className = 'stats-legend-item';
+      const dot = document.createElement('span');
+      dot.className = 'stats-legend-dot';
+      dot.style.background = color;
+      item.appendChild(dot);
+      const label = document.createElement('span');
+      label.textContent = t(key);
+      item.appendChild(label);
+      legend.appendChild(item);
+    });
+  sec.appendChild(legend);
+
+  const max = Math.max(1, ...done, ...unpl);
+  const MAXH = 56;
+  const barH = (v) => (v <= 0 ? 0 : Math.max(3, Math.round((v / max) * MAXH)));
+  const labels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+  const fullNames = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
+  const todayStr = localDateStr(new Date());
+
+  const strip = document.createElement('div');
+  strip.className = 'stats-timeline';
+  order.forEach((dayIdx, i) => {
+    const col = document.createElement('div');
+    col.className = 'stats-tl-day' + (dates[i] === todayStr ? ' today' : '');
+    col.title = `${fullNames[dayIdx]} — ${done[i]} ${t('stats.tlDone')}, ${unpl[i]} ${t('stats.tlUnpl')}`;
+
+    const bars = document.createElement('div');
+    bars.className = 'stats-tl-bars';
+    const dBar = document.createElement('div');
+    dBar.className = 'stats-tl-bar stats-tl-done';
+    dBar.style.height = barH(done[i]) + 'px';
+    const uBar = document.createElement('div');
+    uBar.className = 'stats-tl-bar stats-tl-unpl';
+    uBar.style.height = barH(unpl[i]) + 'px';
+    bars.appendChild(dBar);
+    bars.appendChild(uBar);
+    col.appendChild(bars);
+
+    const label = document.createElement('div');
+    label.className = 'stats-tl-label';
+    label.textContent = labels[dayIdx];
+    col.appendChild(label);
+
+    strip.appendChild(col);
+  });
+  sec.appendChild(strip);
+}
+
 function renderStatsPanel() {
   const stats = computeWeekStats();
   if (stats.global.counts.total === 0) {
@@ -10498,6 +10626,7 @@ function renderStatsPanel() {
   _renderStatsDonutSection(stats.global.counts);
   _renderStatsBranchesSection(stats.perBranch);
   _renderStatsBalanceSection(stats);
+  _renderStatsTimelineSection(stats.leaves);
 }
 
 let _statsReturnFocus = null;
