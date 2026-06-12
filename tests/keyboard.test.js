@@ -1,4 +1,4 @@
-import { _state } from './setup.js';
+import { _state, openStatsPanel, closeStatsPanel } from './setup.js';
 
 function esc(extra = {}) {
   _state.triggerKeydown({
@@ -22,7 +22,7 @@ describe('ESC key — closes Agenda on desktop', () => {
     _state.getElement('context-menu').classList.remove('visible');
     _state.getElement('settings-dropdown').classList.remove('visible');
     _state.getElement('help-panel').classList.remove('visible');
-    _state.getElement('placeholder-panel').classList.remove('expanded');
+    closeStatsPanel();
   });
 
   test('ESC in agenda on desktop switches to mindmap', () => {
@@ -53,12 +53,14 @@ describe('ESC key — closes Agenda on desktop', () => {
     expect(_state.getCurrentView()).toBe('agenda');
   });
 
-  test('ESC collapses summary panel before acting on agenda', () => {
+  test('ESC closes the stats panel before acting on agenda', () => {
     _state.setCurrentView('agenda');
-    const summary = _state.getElement('placeholder-panel');
-    summary.classList.add('expanded');
+    _state.set({ nodes: [{ id: 'center', type: 'center' }] });
+    openStatsPanel();
+    const panel = _state.getElement('stats-panel');
+    expect(panel.classList.contains('visible')).toBe(true);
     esc();
-    expect(summary.classList.contains('expanded')).toBe(false);
+    expect(panel.classList.contains('visible')).toBe(false);
     expect(_state.getCurrentView()).toBe('agenda');
   });
 

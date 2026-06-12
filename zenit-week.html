@@ -1381,6 +1381,98 @@
   }
 
   /* ─── Quick-Add Panel ───────────────────────────────────────────────────── */
+  /* Stats panel — mirrors the Help dialog layout (desktop centered panel, mobile
+     full-area with a bottom "Close" pill). Opened by clicking the summary box. */
+  #stats-overlay {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 56px);
+    background: var(--overlay-sm);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    z-index: 950;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #stats-overlay.visible { display: flex; opacity: 1; }
+
+  #stats-panel {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    background: var(--bg-surface);
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    z-index: 2000;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+  }
+  @media (min-width: 768px) {
+    #stats-panel {
+      top: 61px;
+      left: 50%;
+      right: auto;
+      bottom: 5px;
+      width: 720px;
+      max-width: calc(100vw - 40px);
+      height: calc(100vh - 66px);
+      border-radius: 8px;
+      border: 1px solid var(--border-default);
+      box-shadow: 0 20px 60px var(--shadow-xl);
+      transform: translateX(-50%) translateY(20px);
+    }
+  }
+  #stats-panel.visible {
+    display: flex;
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+  }
+  @media (min-width: 768px) {
+    #stats-panel.visible { transform: translateX(-50%) translateY(0); }
+  }
+
+  #stats-header {
+    background: var(--bg-surface-subtle);
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+  }
+  #stats-close {
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text-placeholder);
+    transition: color 0.2s;
+    border: none;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    align-items: center;
+  }
+  #stats-close:hover { color: var(--text-primary); }
+
+  #stats-content {
+    padding: 24px;
+    padding-bottom: 80px;
+    flex: 1;
+    overflow-y: auto;
+  }
   #quick-add-backdrop {
     display: none;
     position: fixed;
@@ -2136,7 +2228,8 @@
 
   /* Mobile: floating "Close" pill replaces the top-right X while help is open */
   #help-close-bar,
-  #comment-close-bar {
+  #comment-close-bar,
+  #stats-close-bar {
     position: fixed;
     bottom: 12px;
     left: 50%;
@@ -2188,6 +2281,18 @@
       display: none;
     }
     body:has(#help-panel.visible) #help-close-bar {
+      display: flex;
+    }
+    /* Stats panel: same mobile chrome swap */
+    body:has(#stats-panel.visible) #fab-pill,
+    body:has(#stats-panel.visible) #undo-redo-bar,
+    body:has(#stats-panel.visible) #view-toggle-bar {
+      display: none;
+    }
+    body:has(#stats-panel.visible) #stats-close {
+      display: none;
+    }
+    body:has(#stats-panel.visible) #stats-close-bar {
       display: flex;
     }
   }
@@ -2786,6 +2891,17 @@
     justify-content: center;
     flex-shrink: 0;
     transition: background 0.15s, color 0.15s;
+    /* native <button> reset — it triggers the Stats panel */
+    width: 100%;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  #summary-header:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
   }
 
   #summary-main {
@@ -3158,9 +3274,9 @@
       <g id="map-root"></g>
     </svg>
     <div id="placeholder-panel">
-      <div id="summary-header">
+      <button type="button" id="summary-header" aria-haspopup="dialog" data-i18n-aria="stats.open" aria-label="Open week stats">
         <span id="summary-main"></span>
-      </div>
+      </button>
       <div id="summary-details">
         <div id="ratio-bar"></div>
       </div>
@@ -3366,6 +3482,26 @@
 
 <div id="help-overlay"></div>
 <div id="agenda-overlay"></div>
+
+<div id="stats-overlay"></div>
+<div id="stats-panel" role="dialog" aria-modal="true" aria-labelledby="stats-title">
+  <div id="stats-header">
+    <div id="stats-title" style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="stats.title">Week Stats</div>
+    <button type="button" id="stats-close" aria-label="Close" data-i18n-aria="stats.close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></button>
+  </div>
+  <div id="stats-content">
+    <div id="stats-section-donut" class="help-section"></div>
+    <div id="stats-section-branches" class="help-section"></div>
+    <div id="stats-section-balance" class="help-section"></div>
+    <div id="stats-section-timeline" class="help-section"></div>
+  </div>
+</div>
+<div id="stats-close-bar">
+  <button type="button" class="help-close-btn" id="stats-close-mobile">
+    <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    <span data-i18n="help.close">Close</span>
+  </button>
+</div>
 
 <div id="help-panel">
   <div id="help-header">
@@ -6053,6 +6189,9 @@ const TRANSLATIONS = {
     'todo.undone':                'Undone',
     'todo.noLabel':               '(no label)',
     'todo.total':                 'Total',
+    'stats.title':                'Week Stats',
+    'stats.open':                 'Open week stats',
+    'stats.close':                'Close',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
     'help.aboutTitle':            'What it solves',
@@ -6255,6 +6394,9 @@ const TRANSLATIONS = {
     'todo.undone':                'Nesplněno',
     'todo.noLabel':               '(bez názvu)',
     'todo.total':                 'Celkem',
+    'stats.title':                'Statistika týdne',
+    'stats.open':                 'Otevřít statistiku týdne',
+    'stats.close':                'Zavřít',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
     'help.aboutTitle':            'Co řeší',
@@ -9708,7 +9850,8 @@ function _computeSummarySignature() {
     if (n._editing) continue;
     sig += '|' + n.id + ':' + n.type + ':' + (n.done ? 1 : 0)
          + ':' + (n.val ?? 0) + ':' + (n.max ?? 0)
-         + ':' + (n.priority || '') + ':' + (n.branch || '');
+         + ':' + (n.priority || '') + ':' + (n.branch || '')
+         + ':' + (n.unplanned ? 1 : 0);
   }
   return sig;
 }
@@ -9772,6 +9915,43 @@ function computeWeekStats() {
     perBranch[b.id] = statsOf(leaves.filter(n => n.branch === b.id));
   });
   return { global, perBranch, leaves };
+}
+
+// ─── Stats Panel (Plan vs Reality) ────────────────────────────────────────────
+// Read-only reflection surface. Reads weekData via computeWeekStats() and never
+// mutates it, so opening/closing/refreshing produces no undo entry. Sections ②③④
+// are populated by later tasks; T2 ships the shell + a live ① readout.
+let _statsPanelOpen = false;
+
+function renderStatsPanel() {
+  const stats = computeWeekStats();
+  const donut = document.getElementById('stats-section-donut');
+  if (donut) {
+    donut.textContent = '';
+    const c = stats.global.counts;
+    const line = document.createElement('div');
+    line.style.cssText = 'color:var(--text-secondary);font-size:13px;';
+    line.textContent = `${c.done} / ${c.total} (${c.completionPct}%)`;
+    donut.appendChild(line);
+  }
+}
+
+function openStatsPanel() {
+  const panel = document.getElementById('stats-panel');
+  const overlay = document.getElementById('stats-overlay');
+  if (!panel || !overlay) return;
+  renderStatsPanel();
+  overlay.classList.add('visible');
+  panel.classList.add('visible');
+  _statsPanelOpen = true;
+}
+
+function closeStatsPanel() {
+  const panel = document.getElementById('stats-panel');
+  const overlay = document.getElementById('stats-overlay');
+  if (panel) panel.classList.remove('visible');
+  if (overlay) overlay.classList.remove('visible');
+  _statsPanelOpen = false;
 }
 
 function updateSummary() {
@@ -9881,6 +10061,10 @@ function updateSummary() {
       helpLegend.insertBefore(item, firstNonBranch);
     });
   }
+
+  // Keep the Stats panel in lockstep with the box (only reached when stats changed,
+  // since this function early-returns on an unchanged signature).
+  if (_statsPanelOpen) renderStatsPanel();
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -10036,10 +10220,13 @@ function _windowKeydownHandler(e) {
   if (e.key === 'Escape') {
     const settings = document.getElementById('settings-dropdown');
     const help = document.getElementById('help-overlay');
-    const status = document.getElementById('placeholder-panel');
 
     if (ctxMenu && ctxMenu.classList.contains('visible')) {
       hideContextMenu();
+      return;
+    }
+    if (_statsPanelOpen) {
+      closeStatsPanel();
       return;
     }
     const commentPanel = document.getElementById('comment-panel');
@@ -10060,10 +10247,6 @@ function _windowKeydownHandler(e) {
         helpPanel.classList.remove('visible');
         if (help) help.classList.remove('visible');
       }
-      return;
-    }
-    if (status && status.classList.contains('expanded')) {
-      status.classList.remove('expanded');
       return;
     }
     if (currentView === 'agenda' && window.innerWidth >= 768) {
@@ -13679,15 +13862,20 @@ window.addEventListener('load', async () => {
     });
   }
 
-  // Expandable summary panel
+  // Summary box → opens the Stats panel (replaces the old inline expand).
+  // #summary-header is a native <button>, so Enter/Space open it for free.
   const summaryPanel = document.getElementById('placeholder-panel');
+  const summaryHeader = document.getElementById('summary-header');
   summaryPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
-  summaryPanel.addEventListener('click', () => {
-    summaryPanel.classList.toggle('expanded');
-  });
-  document.addEventListener('pointerdown', () => {
-    summaryPanel.classList.remove('expanded');
-  });
+  summaryHeader.addEventListener('click', openStatsPanel);
+
+  // Stats panel close wiring (mirrors the Help panel; native <button>s self-handle keys)
+  const statsOverlay = document.getElementById('stats-overlay');
+  const statsClose = document.getElementById('stats-close');
+  const statsCloseMobile = document.getElementById('stats-close-mobile');
+  if (statsOverlay) statsOverlay.addEventListener('click', closeStatsPanel);
+  if (statsClose) statsClose.addEventListener('click', closeStatsPanel);
+  if (statsCloseMobile) statsCloseMobile.addEventListener('click', closeStatsPanel);
 
   // Small delay to let SVG lay out before computing center.
   // Always fit the mindmap — even when booting into Agenda — so the canvas

@@ -553,6 +553,8 @@ export const {
   applyBranchColor,
   updateSummary,
   computeWeekStats,
+  openStatsPanel,
+  closeStatsPanel,
   applyTranslations,
   // Agenda helpers
   isoWeekPos,

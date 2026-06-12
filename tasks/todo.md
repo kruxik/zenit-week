@@ -13,12 +13,13 @@ Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
 - [ ] **CHECKPOINT A** — human review (no UI yet)
 
 ## Phase 2 — Shell + entry
-- [ ] **T2** Panel shell + clickable summary-box entry
-  - [ ] Panel container + backdrop (`is-open` pattern); open/close/render fns
-  - [ ] `#placeholder-panel` → button (role, tabindex, aria-label, Enter/Space)
-  - [ ] Esc + backdrop + ✕ close; re-render while open on data change
-  - [ ] No `weekData` mutation, no undo entry on open/close
-  - [ ] Verify: manual open/close + keyboard; `npm run validate` clean
+- [x] **T2** Panel shell + clickable summary-box entry
+  - [x] `#stats-panel` + `#stats-overlay` (help-dialog pattern); `openStatsPanel`/`closeStatsPanel`/`renderStatsPanel`
+  - [x] `#summary-header` → native `<button>` (Enter/Space free); replaces inline expand
+  - [x] Esc + overlay + ✕ + mobile pill close; re-render while open via `updateSummary` hook (added `unplanned` to summary signature)
+  - [x] No `weekData` mutation, no undo entry (verified: undo btn stays disabled across open/close)
+  - [x] i18n `stats.title`/`stats.open`/`stats.close` (EN+CZ); reuse `.help-section`/`.help-close-btn`
+  - [x] Verify: `npm test` 490/490; `npm run validate` clean; browser open/close/keyboard OK
 
 ## Phase 3 — Sections
 - [ ] **T3** Section ① donut + 3 headlines (counts; center = completion %)
