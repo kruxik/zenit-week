@@ -168,6 +168,7 @@
     --accent-warning-text: #E67700;
     --accent-success-bg: #e6f4ea;
     --accent-success-text: #1e8e3e;
+    --stats-hatch: rgba(0,0,0,0.30);
     --accent-progress-bg: #e8f0fe;
 
     /* Zoom slider */
@@ -276,6 +277,7 @@
     --accent-warning-text: #ffaa33;
     --accent-success-bg: #0f2e17;
     --accent-success-text: #2ecc71;
+    --stats-hatch: rgba(255,255,255,0.32);
     --accent-progress-bg: #0f1e3a;
 
     /* Zoom slider */
@@ -1548,6 +1550,61 @@
     font-size: 13px;
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* ② Follow-through — per-branch stacked bars */
+  .stats-bar-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .stats-branch-row { margin-bottom: 14px; }
+  .stats-branch-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+  .stats-branch-name {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 0;
+  }
+  .stats-branch-name span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stats-branch-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .stats-branch-count {
+    font-size: 12px;
+    color: var(--text-placeholder);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .stats-bar {
+    display: flex;
+    height: 16px;
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--border-soft);
+  }
+  .stats-bar-seg { height: 100%; }
+  .stats-seg-hatch {
+    background-image: repeating-linear-gradient(
+      45deg, var(--stats-hatch) 0 1.5px, transparent 1.5px 5px);
   }
 
   #quick-add-backdrop {
@@ -6277,6 +6334,11 @@ const TRANSLATIONS = {
     'stats.legendPlannedOpen':    'Planned · open',
     'stats.legendUnplannedDone':  'Unplanned · done',
     'stats.legendUnplannedOpen':  'Unplanned · open',
+    'stats.followThrough':        'Follow-through by branch',
+    'stats.unplannedShort':       'unplanned',
+    'stats.legendDone':           'done',
+    'stats.legendOpen':           'open',
+    'stats.legendUnplanned':      'unplanned (hatched)',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
     'help.aboutTitle':            'What it solves',
@@ -6490,6 +6552,11 @@ const TRANSLATIONS = {
     'stats.legendPlannedOpen':    'Plánováno · zbývá',
     'stats.legendUnplannedDone':  'Neplánováno · splněno',
     'stats.legendUnplannedOpen':  'Neplánováno · zbývá',
+    'stats.followThrough':        'Plnění podle větve',
+    'stats.unplannedShort':       'neplánovaných',
+    'stats.legendDone':           'splněno',
+    'stats.legendOpen':           'zbývá',
+    'stats.legendUnplanned':      'neplánováno (šrafováno)',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
     'help.aboutTitle':            'Co řeší',
@@ -10118,8 +10185,7 @@ function _statsHeadline(labelKey, pct, rawA, rawB) {
   return row;
 }
 
-function renderStatsPanel() {
-  const c = computeWeekStats().global.counts;
+function _renderStatsDonutSection(c) {
   const donut = document.getElementById('stats-section-donut');
   if (!donut) return;
   donut.textContent = '';
@@ -10152,6 +10218,111 @@ function renderStatsPanel() {
   row.appendChild(headlines);
 
   donut.appendChild(row);
+}
+
+// Branch hue as solid / faded fills (done vs open). Faded uses background-color alpha,
+// NOT CSS opacity, so the unplanned hatch (a separate background-image layer) stays crisp.
+function _statsRgb(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  return { solid: `rgb(${r},${g},${b})`, faded: `rgba(${r},${g},${b},0.4)` };
+}
+
+function _statsBarSeg(widthPct, bgColor, hatch) {
+  const seg = document.createElement('div');
+  seg.className = 'stats-bar-seg' + (hatch ? ' stats-seg-hatch' : '');
+  seg.style.width = widthPct + '%';
+  seg.style.backgroundColor = bgColor;
+  return seg;
+}
+
+// Neutral status legend (solid = done, faded = open, hatched = unplanned) — decodes the
+// shading shared by every branch-tinted bar.
+function _statsStatusLegend() {
+  const items = [
+    { key: 'stats.legendDone',      opacity: 1,   hatch: false },
+    { key: 'stats.legendOpen',      opacity: 0.4, hatch: false },
+    { key: 'stats.legendUnplanned', opacity: 1,   hatch: true  },
+  ];
+  const wrap = document.createElement('div');
+  wrap.className = 'stats-bar-legend';
+  for (const it of items) {
+    const row = document.createElement('div');
+    row.className = 'stats-legend-item';
+    const dot = document.createElement('span');
+    dot.className = 'stats-legend-dot' + (it.hatch ? ' stats-seg-hatch' : '');
+    dot.style.background = 'var(--text-placeholder)';
+    dot.style.opacity = it.opacity;
+    row.appendChild(dot);
+    const label = document.createElement('span');
+    label.textContent = t(it.key);
+    row.appendChild(label);
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function _statsBranchRow(branch, c) {
+  const total = c.total;
+  const done = c.plannedDone + c.unplannedDone;
+  const unpl = c.unplannedDone + c.unplannedOpen;
+  const color = (BRANCH_COLORS[branch.id] || {}).main || '#888';
+  const { solid, faded } = _statsRgb(color);
+
+  const row = document.createElement('div');
+  row.className = 'stats-branch-row';
+
+  const head = document.createElement('div');
+  head.className = 'stats-branch-head';
+  const name = document.createElement('div');
+  name.className = 'stats-branch-name';
+  const dot = document.createElement('div');
+  dot.className = 'stats-branch-dot';
+  dot.style.background = color;
+  name.appendChild(dot);
+  const nameText = document.createElement('span');
+  nameText.textContent = branch.label;
+  name.appendChild(nameText);
+  head.appendChild(name);
+  const count = document.createElement('div');
+  count.className = 'stats-branch-count';
+  count.textContent = `${done} / ${total}`
+    + (unpl > 0 ? ` · ${unpl} ${t('stats.unplannedShort')}` : '');
+  head.appendChild(count);
+  row.appendChild(head);
+
+  const bar = document.createElement('div');
+  bar.className = 'stats-bar';
+  if (total > 0) {
+    const w = (v) => (v / total) * 100;
+    bar.appendChild(_statsBarSeg(w(c.plannedDone),   solid, false));
+    bar.appendChild(_statsBarSeg(w(c.plannedOpen),   faded, false));
+    bar.appendChild(_statsBarSeg(w(c.unplannedDone), solid, true));
+    bar.appendChild(_statsBarSeg(w(c.unplannedOpen), faded, true));
+  }
+  row.appendChild(bar);
+  return row;
+}
+
+function _renderStatsBranchesSection(perBranch) {
+  const sec = document.getElementById('stats-section-branches');
+  if (!sec) return;
+  sec.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'help-section-title';
+  title.textContent = t('stats.followThrough');
+  sec.appendChild(title);
+  sec.appendChild(_statsStatusLegend());
+  weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
+    const c = (perBranch[b.id] || {}).counts
+      || { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
+    sec.appendChild(_statsBranchRow(b, c));
+  });
+}
+
+function renderStatsPanel() {
+  const stats = computeWeekStats();
+  _renderStatsDonutSection(stats.global.counts);
+  _renderStatsBranchesSection(stats.perBranch);
 }
 
 function openStatsPanel() {

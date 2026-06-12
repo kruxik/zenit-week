@@ -29,10 +29,13 @@ Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
   - [x] i18n EN+CZ (planVsReality, 3 headlines, 4 legend labels)
   - [x] Verify: geometry exact (arcs sum 100, headlines = hand-math); browser light+dark professional; empty state clean; `npm test` 490/490, `npm run validate` clean
 - [ ] **CHECKPOINT B** — human review (first visible slice)
-- [ ] **T4** Section ② branch-tinted stacked bars (counts)
-  - [ ] Per-branch bar tinted `BRANCH_COLORS`; done solid / open faded / unplanned hatched
-  - [ ] DOM-constructed labels (no innerHTML w/ branch text); zero-task branch clean
-  - [ ] Verify: manual 3 and 8 branches, light+dark; segments sum to total
+- [x] **T4** Section ② branch-tinted stacked bars (counts)
+  - [x] Per-branch bar tinted `BRANCH_COLORS.main`; done solid / open faded (rgba alpha) / unplanned hatched
+  - [x] Hatch is a separate background-image layer (`--stats-hatch` theme token) so faded segments keep crisp hatch
+  - [x] Neutral status legend (done/open/unplanned); per-branch `done / total · N unplanned` label
+  - [x] DOM-constructed labels (textContent); zero-task branch → clean empty track
+  - [x] i18n EN+CZ (followThrough, unplannedShort, 3 legend labels)
+  - [x] Verify: browser 3 + 8 branches, light+dark distinguishable; 8 branches no h-overflow, scrolls; `npm test` 490/490, validate clean
 - [ ] **T5** Section ③ reuse ratio-bar + baseline (weighted)
   - [ ] Branch share + total-vs-baseline via shared helper weighted lens
   - [ ] Verify: panel figures == top-box figures; overload color same threshold
