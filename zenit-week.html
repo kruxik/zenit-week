@@ -1476,6 +1476,15 @@
     overflow-y: auto;
   }
 
+  /* Hero: two top-aligned columns — Plan vs Reality (left) and The Week (right). */
+  #stats-section-donut {
+    display: flex;
+    align-items: flex-start;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+  .stats-pvr-col { flex: 0 1 auto; }
+
   /* ① Plan vs Reality — donut + headline metrics */
   .stats-donut-row {
     display: flex;
@@ -1525,12 +1534,12 @@
   .stats-headlines {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    flex: 1;
+    gap: 16px;
+    flex: 0 1 auto;
     min-width: 200px;
   }
   .stats-headline-label {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 3px;
@@ -1541,13 +1550,13 @@
     gap: 8px;
   }
   .stats-headline-pct {
-    font-size: 22px;
+    font-size: 26px;
     font-weight: 700;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
   }
   .stats-headline-raw {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
   }
@@ -1643,7 +1652,7 @@
      Each day is a row with two horizontal bars: completed (green) + unplanned arrived (amber). */
   .stats-timeline-col {
     flex: 1;
-    min-width: 190px;
+    min-width: 210px;
     display: flex;
     flex-direction: column;
   }
@@ -1651,14 +1660,14 @@
   .stats-tl-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    height: 20px;
+    gap: 10px;
+    height: 23px;
   }
   .stats-tl-rlabel {
-    width: 20px;
+    width: 22px;
     flex-shrink: 0;
     text-align: right;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
@@ -1672,7 +1681,7 @@
     justify-content: center;
   }
   .stats-tl-hbar {
-    height: 5px;
+    height: 6px;
     border-radius: 0 3px 3px 0;
   }
   .stats-tl-done { background: var(--badge-done-text); }
@@ -1683,6 +1692,8 @@
      hide ④ timeline; tighten spacing so the story fits one thumb-scroll. */
   @media (max-width: 767px) {
     #stats-content { padding: 18px; padding-bottom: 80px; }
+    #stats-section-donut { flex-direction: column; gap: 0; }
+    .stats-pvr-col { width: 100%; }
     .stats-donut-row { gap: 18px; justify-content: center; }
     .stats-headlines { min-width: 0; }
     .stats-timeline-col { display: none; }
@@ -10321,10 +10332,15 @@ function _renderStatsDonutSection(c) {
   if (!donut) return;
   donut.textContent = '';
 
+  // Plan-vs-Reality column (title + donut/headlines). The Week column is appended as a
+  // sibling by _renderStatsTimelineSection, so both column titles top-align.
+  const pvr = document.createElement('div');
+  pvr.className = 'stats-pvr-col';
+
   const title = document.createElement('div');
   title.className = 'help-section-title';
   title.textContent = t('stats.planVsReality');
-  donut.appendChild(title);
+  pvr.appendChild(title);
 
   const plannedTotal = c.plannedDone + c.plannedOpen;
   const unplannedTotal = c.unplannedDone + c.unplannedOpen;
@@ -10348,15 +10364,17 @@ function _renderStatsDonutSection(c) {
     _pct(c.unplannedDone, unplannedTotal), c.unplannedDone, unplannedTotal));
   row.appendChild(headlines);
 
-  donut.appendChild(row);
+  pvr.appendChild(row);
 
   // Positive signal, not a warning: a week with no unplanned work is a good outcome.
   if (c.total > 0 && unplannedTotal === 0) {
     const pos = document.createElement('div');
     pos.className = 'stats-positive';
     pos.textContent = t('stats.noUnplanned');
-    donut.appendChild(pos);
+    pvr.appendChild(pos);
   }
+
+  donut.appendChild(pvr);
 }
 
 // Branch hue as solid / faded fills (done vs open). Faded uses background-color alpha,
@@ -10533,8 +10551,8 @@ function _renderStatsEmpty() {
 // day-list in the 3rd column of the donut row, right of the headlines. Desktop-only
 // (the column is hidden on mobile via CSS). Counted over leaves to match the panel.
 function _renderStatsTimelineSection(leaves) {
-  const row = document.querySelector('#stats-section-donut .stats-donut-row');
-  if (!row) return;
+  const sec = document.getElementById('stats-section-donut');
+  if (!sec) return;
 
   // Mon=1 … Sat=6, Sun=0 → Mon→Sun row order.
   const order = [1, 2, 3, 4, 5, 6, 0];
@@ -10611,7 +10629,7 @@ function _renderStatsTimelineSection(leaves) {
     });
   colEl.appendChild(legend);
 
-  row.appendChild(colEl);
+  sec.appendChild(colEl);
 }
 
 function renderStatsPanel() {
