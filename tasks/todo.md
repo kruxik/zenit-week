@@ -22,10 +22,12 @@ Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
   - [x] Verify: `npm test` 490/490; `npm run validate` clean; browser open/close/keyboard OK
 
 ## Phase 3 — Sections
-- [ ] **T3** Section ① donut + 3 headlines (counts; center = completion %)
-  - [ ] 4-arc SVG donut, div-by-zero guarded, global/branch-independent
-  - [ ] Plan completion / Unplanned load (x/y) / Unplanned completion
-  - [ ] Verify: manual vs hand-computed; light+dark; 3 vs 8 branches identical
+- [x] **T3** Section ① donut + 3 headlines (counts; center = completion %)
+  - [x] 4-arc SVG donut (planned/unplanned × done/open), div-by-zero guarded, global → branch-independent
+  - [x] Plan completion / Unplanned load (x/y) / Unplanned completion + 4-swatch legend
+  - [x] Branch-tinted scheme: green=planned, amber=unplanned; done solid, open faded (0.32)
+  - [x] i18n EN+CZ (planVsReality, 3 headlines, 4 legend labels)
+  - [x] Verify: geometry exact (arcs sum 100, headlines = hand-math); browser light+dark professional; empty state clean; `npm test` 490/490, `npm run validate` clean
 - [ ] **CHECKPOINT B** — human review (first visible slice)
 - [ ] **T4** Section ② branch-tinted stacked bars (counts)
   - [ ] Per-branch bar tinted `BRANCH_COLORS`; done solid / open faded / unplanned hatched

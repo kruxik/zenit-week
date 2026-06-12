@@ -1473,6 +1473,83 @@
     flex: 1;
     overflow-y: auto;
   }
+
+  /* ① Plan vs Reality — donut + headline metrics */
+  .stats-donut-row {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    flex-wrap: wrap;
+  }
+  .stats-donut-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .stats-donut { width: 160px; height: 160px; }
+  .stats-donut-center-num {
+    font-size: 7px;
+    font-weight: 700;
+    fill: var(--text-primary);
+  }
+  .stats-donut-center-sub {
+    font-size: 2.6px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    fill: var(--text-placeholder);
+  }
+  .stats-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 14px;
+  }
+  .stats-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .stats-legend-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .stats-headlines {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .stats-headline-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 3px;
+  }
+  .stats-headline-figures {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .stats-headline-pct {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-headline-raw {
+    font-size: 13px;
+    color: var(--text-placeholder);
+    font-variant-numeric: tabular-nums;
+  }
+
   #quick-add-backdrop {
     display: none;
     position: fixed;
@@ -6192,6 +6269,14 @@ const TRANSLATIONS = {
     'stats.title':                'Week Stats',
     'stats.open':                 'Open week stats',
     'stats.close':                'Close',
+    'stats.planVsReality':        'Plan vs Reality',
+    'stats.planCompletion':       'Plan completion',
+    'stats.unplannedLoad':        'Unplanned load',
+    'stats.unplannedCompletion':  'Unplanned completion',
+    'stats.legendPlannedDone':    'Planned · done',
+    'stats.legendPlannedOpen':    'Planned · open',
+    'stats.legendUnplannedDone':  'Unplanned · done',
+    'stats.legendUnplannedOpen':  'Unplanned · open',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
     'help.aboutTitle':            'What it solves',
@@ -6397,6 +6482,14 @@ const TRANSLATIONS = {
     'stats.title':                'Statistika týdne',
     'stats.open':                 'Otevřít statistiku týdne',
     'stats.close':                'Zavřít',
+    'stats.planVsReality':        'Plán vs realita',
+    'stats.planCompletion':       'Splnění plánu',
+    'stats.unplannedLoad':        'Neplánovaná zátěž',
+    'stats.unplannedCompletion':  'Splnění neplánovaného',
+    'stats.legendPlannedDone':    'Plánováno · splněno',
+    'stats.legendPlannedOpen':    'Plánováno · zbývá',
+    'stats.legendUnplannedDone':  'Neplánováno · splněno',
+    'stats.legendUnplannedOpen':  'Neplánováno · zbývá',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
     'help.aboutTitle':            'Co řeší',
@@ -9923,17 +10016,142 @@ function computeWeekStats() {
 // are populated by later tasks; T2 ships the shell + a live ① readout.
 let _statsPanelOpen = false;
 
-function renderStatsPanel() {
-  const stats = computeWeekStats();
-  const donut = document.getElementById('stats-section-donut');
-  if (donut) {
-    donut.textContent = '';
-    const c = stats.global.counts;
-    const line = document.createElement('div');
-    line.style.cssText = 'color:var(--text-secondary);font-size:13px;';
-    line.textContent = `${c.done} / ${c.total} (${c.completionPct}%)`;
-    donut.appendChild(line);
+const _SVGNS = 'http://www.w3.org/2000/svg';
+function _svgEl(tag, attrs) {
+  const el = document.createElementNS(_SVGNS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+function _pct(part, whole) { return whole > 0 ? Math.round((part / whole) * 100) : 0; }
+
+// Four-arc donut of the global planned/unplanned × done/open split. Center shows
+// overall completion %. Global by design, so branch count never changes its shape.
+function _statsDonut(c) {
+  const PLAN = 'var(--badge-done-text)';        // planned → green
+  const UNPL = 'var(--badge-unplanned-text)';   // unplanned → amber
+  const OPEN_OPACITY = 0.32;                     // done = solid, open = faded
+  const segs = [
+    { v: c.plannedDone,   color: PLAN, opacity: 1 },
+    { v: c.plannedOpen,   color: PLAN, opacity: OPEN_OPACITY },
+    { v: c.unplannedDone, color: UNPL, opacity: 1 },
+    { v: c.unplannedOpen, color: UNPL, opacity: OPEN_OPACITY },
+  ];
+  const R = 15.91549; // circumference ≈ 100 → dasharray reads as percent
+  const svg = _svgEl('svg', {
+    viewBox: '0 0 36 36', class: 'stats-donut', role: 'img',
+    'aria-label': `${c.completionPct}% ${t('todo.done')}`,
+  });
+  svg.appendChild(_svgEl('circle', {
+    cx: 18, cy: 18, r: R, fill: 'none',
+    stroke: 'var(--border-soft)', 'stroke-width': 4,
+  }));
+  const g = _svgEl('g', { transform: 'rotate(-90 18 18)' });
+  let acc = 0;
+  for (const s of segs) {
+    if (c.total <= 0 || s.v <= 0) continue;
+    const p = (s.v / c.total) * 100;
+    g.appendChild(_svgEl('circle', {
+      cx: 18, cy: 18, r: R, fill: 'none',
+      stroke: s.color, 'stroke-width': 4, opacity: s.opacity,
+      'stroke-dasharray': `${p} ${100 - p}`, 'stroke-dashoffset': -acc,
+    }));
+    acc += p;
   }
+  svg.appendChild(g);
+  const num = _svgEl('text', {
+    x: 18, y: 18, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+    class: 'stats-donut-center-num',
+  });
+  num.textContent = `${c.completionPct}%`;
+  svg.appendChild(num);
+  const sub = _svgEl('text', {
+    x: 18, y: 24, 'text-anchor': 'middle', class: 'stats-donut-center-sub',
+  });
+  sub.textContent = t('todo.done');
+  svg.appendChild(sub);
+  return svg;
+}
+
+function _statsLegend() {
+  const PLAN = 'var(--badge-done-text)', UNPL = 'var(--badge-unplanned-text)';
+  const items = [
+    { color: PLAN, opacity: 1,    key: 'stats.legendPlannedDone' },
+    { color: PLAN, opacity: 0.32, key: 'stats.legendPlannedOpen' },
+    { color: UNPL, opacity: 1,    key: 'stats.legendUnplannedDone' },
+    { color: UNPL, opacity: 0.32, key: 'stats.legendUnplannedOpen' },
+  ];
+  const wrap = document.createElement('div');
+  wrap.className = 'stats-legend';
+  for (const it of items) {
+    const row = document.createElement('div');
+    row.className = 'stats-legend-item';
+    const dot = document.createElement('span');
+    dot.className = 'stats-legend-dot';
+    dot.style.background = it.color;
+    dot.style.opacity = it.opacity;
+    row.appendChild(dot);
+    const label = document.createElement('span');
+    label.textContent = t(it.key);
+    row.appendChild(label);
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function _statsHeadline(labelKey, pct, rawA, rawB) {
+  const row = document.createElement('div');
+  const label = document.createElement('div');
+  label.className = 'stats-headline-label';
+  label.textContent = t(labelKey);
+  row.appendChild(label);
+  const figures = document.createElement('div');
+  figures.className = 'stats-headline-figures';
+  const pctEl = document.createElement('span');
+  pctEl.className = 'stats-headline-pct';
+  pctEl.textContent = `${pct}%`;
+  figures.appendChild(pctEl);
+  const raw = document.createElement('span');
+  raw.className = 'stats-headline-raw';
+  raw.textContent = `(${rawA} / ${rawB})`;
+  figures.appendChild(raw);
+  row.appendChild(figures);
+  return row;
+}
+
+function renderStatsPanel() {
+  const c = computeWeekStats().global.counts;
+  const donut = document.getElementById('stats-section-donut');
+  if (!donut) return;
+  donut.textContent = '';
+
+  const title = document.createElement('div');
+  title.className = 'help-section-title';
+  title.textContent = t('stats.planVsReality');
+  donut.appendChild(title);
+
+  const plannedTotal = c.plannedDone + c.plannedOpen;
+  const unplannedTotal = c.unplannedDone + c.unplannedOpen;
+
+  const row = document.createElement('div');
+  row.className = 'stats-donut-row';
+
+  const donutWrap = document.createElement('div');
+  donutWrap.className = 'stats-donut-wrap';
+  donutWrap.appendChild(_statsDonut(c));
+  donutWrap.appendChild(_statsLegend());
+  row.appendChild(donutWrap);
+
+  const headlines = document.createElement('div');
+  headlines.className = 'stats-headlines';
+  headlines.appendChild(_statsHeadline('stats.planCompletion',
+    _pct(c.plannedDone, plannedTotal), c.plannedDone, plannedTotal));
+  headlines.appendChild(_statsHeadline('stats.unplannedLoad',
+    _pct(unplannedTotal, c.total), unplannedTotal, c.total));
+  headlines.appendChild(_statsHeadline('stats.unplannedCompletion',
+    _pct(c.unplannedDone, unplannedTotal), c.unplannedDone, unplannedTotal));
+  row.appendChild(headlines);
+
+  donut.appendChild(row);
 }
 
 function openStatsPanel() {
