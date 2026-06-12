@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { _state, computeWeekStats } from './setup.js';
 
-// T1 — shared statistics helper feeding both the top summary box and the Stats panel.
-// counts lens: one task = one unit, planned/unplanned × done/open.
-// weighted lens: priority-weighted effort (critical=5, high=3, normal=1; counters val/max).
+// T1 (revised) — single priority-weighted lens feeding both the summary box and the
+// Stats panel. Load is split planned/unplanned × done/open and weighted by priority
+// (critical=5, high=3, normal=1); a counter contributes val of its weight as done and
+// (max-val) as open, so partial progress counts fractionally.
 
 const mkBranch = (id) => ({ id, type: 'branch', parent: 'center', children: [] });
 const mkAct = (id, branch, extra = {}) =>
@@ -14,14 +15,13 @@ const mkCounter = (id, branch, val, max, extra = {}) =>
 function setNodes(nodes) {
   _state.reset();
   _state.set({ nodes: [{ id: 'center', type: 'center' }, ...nodes] });
-  // wire each branch's children for the active-children / leaf logic
   const data = _state.get();
   for (const b of data.nodes.filter(n => n.type === 'branch')) {
     b.children = data.nodes.filter(n => n.parent === b.id).map(n => n.id);
   }
 }
 
-describe('computeWeekStats — counts lens', () => {
+describe('computeWeekStats — weighted 2×2 split (normal priority)', () => {
   beforeEach(() => {
     setNodes([
       mkBranch('work'),
@@ -33,66 +33,77 @@ describe('computeWeekStats — counts lens', () => {
     ]);
   });
 
-  it('splits the global 2×2 by count', () => {
-    const c = computeWeekStats().global.counts;
-    expect(c.plannedDone).toBe(1);
-    expect(c.plannedOpen).toBe(2);
-    expect(c.unplannedDone).toBe(1);
-    expect(c.unplannedOpen).toBe(1);
-    expect(c.total).toBe(5);
-    expect(c.done).toBe(2);
-    expect(c.completionPct).toBe(40); // 2/5
+  it('splits the global 2×2 (all normal weight = task counts)', () => {
+    const g = computeWeekStats().global;
+    expect(g.plannedDone).toBe(1);
+    expect(g.plannedOpen).toBe(2);
+    expect(g.unplannedDone).toBe(1);
+    expect(g.unplannedOpen).toBe(1);
+    expect(g.total).toBe(5);
+    expect(g.done).toBe(2);
+    expect(g.percent).toBe(40); // 2/5
   });
 
-  it('reports per-branch counts', () => {
-    const c = computeWeekStats().perBranch.work.counts;
-    expect(c.total).toBe(5);
-    expect(c.unplannedDone + c.unplannedOpen).toBe(2);
+  it('reports per-branch figures', () => {
+    const w = computeWeekStats().perBranch.work;
+    expect(w.total).toBe(5);
+    expect(w.unplannedDone + w.unplannedOpen).toBe(2);
   });
 });
 
-describe('computeWeekStats — counter semantics', () => {
-  it('counts a counter as ONE task, done iff val>=max', () => {
+describe('computeWeekStats — priority weighting', () => {
+  it('weights done/open by priority (critical=5, high=3, normal=1)', () => {
     setNodes([
       mkBranch('work'),
-      mkCounter('c1', 'work', 10, 10), // at max → done
-      mkCounter('c2', 'work', 3, 10),  // partial → open
+      mkAct('a1', 'work', { priority: 'critical', done: true }),  // 5 planned-done
+      mkAct('a2', 'work', { priority: 'high', done: false }),     // 3 planned-open
+      mkAct('a3', 'work', { done: true }),                        // 1 planned-done
     ]);
-    const c = computeWeekStats().global.counts;
-    expect(c.total).toBe(2);
-    expect(c.plannedDone).toBe(1);
-    expect(c.plannedOpen).toBe(1);
+    const g = computeWeekStats().global;
+    expect(g.plannedDone).toBe(6);   // 5 + 1
+    expect(g.plannedOpen).toBe(3);
+    expect(g.total).toBe(9);
+    expect(g.done).toBe(6);
+    expect(g.percent).toBe(67);      // round(6/9)
   });
 
-  it('weights a counter fractionally by val/max', () => {
+  it('weights an unplanned critical task into the unplanned arcs', () => {
+    setNodes([
+      mkBranch('work'),
+      mkAct('a1', 'work', { priority: 'critical', done: false, unplanned: true }),
+    ]);
+    const g = computeWeekStats().global;
+    expect(g.unplannedOpen).toBe(5);
+    expect(g.total).toBe(5);
+    expect(g.done).toBe(0);
+  });
+});
+
+describe('computeWeekStats — counters count fractionally', () => {
+  it('splits a counter into val (done) and max-val (open) of its weight', () => {
     setNodes([mkBranch('work'), mkCounter('c1', 'work', 3, 10)]);
-    const w = computeWeekStats().global.weighted;
-    expect(w.total).toBe(10); // max × weight(1)
-    expect(w.done).toBe(3);   // val × weight(1)
-    expect(w.percent).toBe(30);
+    const g = computeWeekStats().global;
+    expect(g.plannedDone).toBe(3);
+    expect(g.plannedOpen).toBe(7);
+    expect(g.total).toBe(10);
+    expect(g.percent).toBe(30);
   });
 
-  it('treats a degenerate max<=0 counter as one open task', () => {
-    setNodes([mkBranch('work'), mkCounter('c1', 'work', 0, 0)]);
-    const c = computeWeekStats().global.counts;
-    expect(c.total).toBe(1);
-    expect(c.plannedOpen).toBe(1);
-    expect(c.plannedDone).toBe(0);
+  it('scales a counter by priority weight', () => {
+    setNodes([mkBranch('work'), mkCounter('c1', 'work', 3, 10, { priority: 'high' })]);
+    const g = computeWeekStats().global;
+    expect(g.plannedDone).toBe(9);   // 3 × 3
+    expect(g.plannedOpen).toBe(21);  // 7 × 3
+    expect(g.total).toBe(30);
   });
-});
 
-describe('computeWeekStats — weighted lens by priority', () => {
-  it('applies critical=5, high=3, normal=1', () => {
-    setNodes([
-      mkBranch('work'),
-      mkAct('a1', 'work', { priority: 'critical', done: true }),  // 5 done / 5 total
-      mkAct('a2', 'work', { priority: 'high', done: false }),     // 0 / 3
-      mkAct('a3', 'work', { done: true }),                        // 1 / 1
-    ]);
-    const w = computeWeekStats().global.weighted;
-    expect(w.total).toBe(9);            // 5 + 3 + 1
-    expect(w.done).toBe(6);             // 5 + 0 + 1
-    expect(w.percent).toBe(67);         // round(6/9)
+  it('a counter at max is fully done; a degenerate max<=0 counter contributes nothing', () => {
+    setNodes([mkBranch('work'), mkCounter('c1', 'work', 10, 10), mkCounter('c2', 'work', 0, 0)]);
+    const g = computeWeekStats().global;
+    expect(g.plannedDone).toBe(10);
+    expect(g.plannedOpen).toBe(0);
+    expect(g.total).toBe(10);
+    expect(g.percent).toBe(100);
   });
 });
 
@@ -103,44 +114,42 @@ describe('computeWeekStats — structural rules', () => {
       mkAct('a1', 'work', { done: true }),
       mkAct('a2', 'work', { _editing: true }),
     ]);
-    const c = computeWeekStats().global.counts;
-    expect(c.total).toBe(1);
+    expect(computeWeekStats().global.total).toBe(1);
   });
 
-  it('counts only leaves (parent with active children is not a leaf)', () => {
+  it('counts only leaves (a parent with active children is not a leaf)', () => {
     setNodes([
       mkBranch('work'),
       mkAct('p', 'work', { done: false, children: ['child'] }),
       { id: 'child', type: 'activity', branch: 'work', parent: 'p', children: [], done: true },
     ]);
-    // re-wire: branch children should reference 'p' only; 'p' keeps its own child
     const data = _state.get();
     data.nodes.find(n => n.id === 'work').children = ['p'];
-    const c = computeWeekStats().global.counts;
-    expect(c.total).toBe(1);       // only the leaf 'child'
-    expect(c.plannedDone).toBe(1);
+    const g = computeWeekStats().global;
+    expect(g.total).toBe(1);       // only the leaf 'child'
+    expect(g.plannedDone).toBe(1);
   });
 
   it('handles an empty week without dividing by zero', () => {
     setNodes([mkBranch('work')]);
     const g = computeWeekStats().global;
-    expect(g.counts.total).toBe(0);
-    expect(g.counts.completionPct).toBe(0);
-    expect(g.weighted.percent).toBe(0);
+    expect(g.total).toBe(0);
+    expect(g.done).toBe(0);
+    expect(g.percent).toBe(0);
   });
 
   it('gives a branch with no tasks a zeroed entry', () => {
     setNodes([mkBranch('work'), mkBranch('me'), mkAct('a1', 'work', { done: true })]);
     const me = computeWeekStats().perBranch.me;
-    expect(me.counts.total).toBe(0);
-    expect(me.weighted.total).toBe(0);
+    expect(me.total).toBe(0);
+    expect(me.done).toBe(0);
   });
 
   it('reports an all-planned week with zero unplanned', () => {
     setNodes([mkBranch('work'), mkAct('a1', 'work', { done: true }), mkAct('a2', 'work')]);
-    const c = computeWeekStats().global.counts;
-    expect(c.unplannedDone + c.unplannedOpen).toBe(0);
-    expect(c.plannedDone + c.plannedOpen).toBe(2);
+    const g = computeWeekStats().global;
+    expect(g.unplannedDone + g.unplannedOpen).toBe(0);
+    expect(g.plannedDone + g.plannedOpen).toBe(2);
   });
 
   it('reports an all-unplanned week', () => {
@@ -149,9 +158,25 @@ describe('computeWeekStats — structural rules', () => {
       mkAct('a1', 'work', { done: true, unplanned: true }),
       mkAct('a2', 'work', { unplanned: true }),
     ]);
-    const c = computeWeekStats().global.counts;
-    expect(c.plannedDone + c.plannedOpen).toBe(0);
-    expect(c.unplannedDone).toBe(1);
-    expect(c.unplannedOpen).toBe(1);
+    const g = computeWeekStats().global;
+    expect(g.plannedDone + g.plannedOpen).toBe(0);
+    expect(g.unplannedDone).toBe(1);
+    expect(g.unplannedOpen).toBe(1);
+  });
+});
+
+describe('computeWeekStats — box/panel agreement', () => {
+  it('global percent equals weighted done ÷ total (matches the summary box)', () => {
+    setNodes([
+      mkBranch('work'),
+      mkAct('a1', 'work', { priority: 'critical', done: true }), // 5 done
+      mkAct('a2', 'work', { done: false }),                      // 1 open
+      mkCounter('c1', 'work', 2, 4),                             // 2 done / 2 open
+    ]);
+    const g = computeWeekStats().global;
+    // done = 5 + 0 + 2 = 7 ; total = 5 + 1 + 4 = 10
+    expect(g.done).toBe(7);
+    expect(g.total).toBe(10);
+    expect(g.percent).toBe(70);
   });
 });

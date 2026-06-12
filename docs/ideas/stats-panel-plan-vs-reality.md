@@ -73,6 +73,7 @@ Variable branch count mostly *validates* the design rather than stressing it: th
 
 ## Resolved Decisions
 - Layered all-three story; new dedicated panel; donut + stacked bars; live `unplanned` flag (no snapshot).
+- **Metrics: priority-weighted throughout** (①②③). Initially mixed (counts for ①②, weighted for ③); reversed after build when the donut % (counts) diverged from the weighted summary box. Now one consistent lens — donut centre matches the box.
 - Per-branch bars **branch-tinted** with status via shade/opacity (done solid, open faded, unplanned hatched).
 - Timeline (④) is **desktop-only**, fast-follow.
 - Mobile shows donut + headlines + ratio-bar only.

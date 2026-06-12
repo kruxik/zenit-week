@@ -26,19 +26,19 @@ Give the user a dedicated, professional **Stats panel** that answers "how did my
 
 ### F2 — Section ①: Plan vs Reality (hero)
 - A hand-built **SVG donut**, four arcs in fixed order: planned-done, planned-open, unplanned-done, unplanned-open. Center shows **overall completion %** (matches top-box meaning).
-- Three headline metrics beside it, **by task count**:
+- Three headline metrics beside it, **priority-weighted** (revised — see note below):
   - *Plan completion* — planned-done ÷ planned total.
-  - *Unplanned load* — unplanned ÷ all tasks (e.g. "9 / 34").
+  - *Unplanned load* — unplanned ÷ all load (e.g. "59 / 169").
   - *Unplanned completion* — unplanned-done ÷ unplanned total.
-- **AC:** Counts are over **leaf nodes** using the same leaf definition as `updateSummary()` (a node with no active, non-`_editing` children; counters are leaves). Counter "done" = reached `max`; for the donut/headlines a counter counts as **one task**, done iff `val >= max` (count semantics, not fractional — fractional is for weighted section only).
+- **AC:** Computed over **leaf nodes** using the same leaf definition as `updateSummary()` (a node with no active, non-`_editing` children; counters are leaves), **priority-weighted** (critical 5×, high 3×, normal 1×). A counter contributes `val` of its weight as done and `max-val` as open (partial progress counts fractionally), so the donut centre % equals the summary-box %.
 
-  > Open detail to settle in implementation: whether a partially-ticked counter shows as one open task or splits. Default: **one task, done iff at max.** Document the choice in code.
+  > **Revised after T1 (user decision):** the panel originally used task counts for ①② and weighting only for ③ ("mixed metrics"). That produced a donut % that diverged from the weighted summary box (e.g. 53% vs 50%). Per user direction, **①②③ are now all priority-weighted** — one consistent metric, donut matches the box. The headline raw figures are weighted "points", not task counts.
 - **AC:** Donut is **global** (not per-branch) and renders identically for 3 or 8 branches.
 - **AC:** Division-by-zero guarded (empty week → see F6).
 
 ### F3 — Section ②: Follow-through (per-branch stacked bars)
-- One horizontal **stacked bar per live branch**, in branch order, segmented plan-done / plan-open / unplanned-done / unplanned-open, **by task count**.
-- Each bar is **tinted with its branch color** (`BRANCH_COLORS[branch].main`); status encoded by shade/opacity: **done = solid, open = faded, unplanned = hatched** (SVG `<pattern>` or CSS). A compact per-branch count label ("8 done · 3 open · 2 unplanned") sits with the bar.
+- One horizontal **stacked bar per live branch**, in branch order, segmented plan-done / plan-open / unplanned-done / unplanned-open, **priority-weighted** (same lens as ①, revised from task counts).
+- Each bar is **tinted with its branch color** (`BRANCH_COLORS[branch].main`); status encoded by shade/opacity: **done = solid, open = faded, unplanned = hatched** (SVG `<pattern>` or CSS). A compact per-branch label (`done / total · N unplanned`, weighted points) sits with the bar.
 - **AC:** Bars stack vertically and scroll; 8 branches render without overflow/clipping.
 - **AC:** Branch identity (color + label + legend dot) is unambiguous in both themes; done/open/unplanned are visually distinguishable within a single branch hue (verify at 8 branches, both themes).
 - **AC:** A branch with zero leaf tasks renders an empty/zero bar, not a broken one.
@@ -141,7 +141,7 @@ All in `zenit-week.html` — **single-file policy, never split.**
 - Layered all-three story; **new dedicated panel**; **donut + branch-tinted stacked bars**; live `unplanned` flag (no snapshot).
 - **Entry:** clicking the existing summary box opens the panel.
 - **Donut center:** overall completion %.
-- **Metrics:** mixed — counts for ①②, priority-weighted for ③.
+- **Metrics:** priority-weighted throughout ①②③ (revised post-T1; donut centre matches the summary box). Originally mixed counts/weighted — changed per user decision.
 - **Timeline ④:** desktop-only, fast-follow (may merge after F1–F4).
 - **Mobile:** donut + headlines + ratio-bar; compact ②; hide ④.
 

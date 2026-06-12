@@ -10147,41 +10147,32 @@ function computeWeekStats() {
     return activeChildren.length === 0;
   });
 
-  function weightedOf(nodes) {
-    const total = nodes.reduce((acc, n) => {
-      const weight = getPriorityWeight(n.id);
-      if (n.type === 'counter') return acc + (n.max || 0) * weight;
-      return acc + weight;
-    }, 0);
-    const done = nodes.reduce((acc, n) => {
-      const weight = getPriorityWeight(n.id);
-      if (n.type === 'counter') return acc + (n.val || 0) * weight;
-      return acc + (n.done ? weight : 0);
-    }, 0);
-    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { done, total, percent };
-  }
-
-  function countsOf(nodes) {
+  // One priority-weighted lens: load split by planned/unplanned × done/open. Weight is
+  // getPriorityWeight (critical 5×, high 3×, normal 1×); a counter contributes val of its
+  // weight as done and (max-val) as open, so partial progress counts fractionally. total/
+  // done/percent equal the old weighted figures, so the summary box stays identical.
+  function statsOf(nodes) {
     let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0;
     for (const n of nodes) {
-      // Counter counts as one task, done iff it reached its max (degenerate max<=0 = open).
-      const isDone = n.type === 'counter'
-        ? ((n.max || 0) > 0 && (n.val || 0) >= n.max)
-        : !!n.done;
-      if (n.unplanned) {
-        if (isDone) unplannedDone++; else unplannedOpen++;
+      const w = getPriorityWeight(n.id);
+      let doneAmt, openAmt;
+      if (n.type === 'counter') {
+        const max = n.max || 0;
+        const val = Math.min(n.val || 0, max);
+        doneAmt = val * w;
+        openAmt = (max - val) * w;
       } else {
-        if (isDone) plannedDone++; else plannedOpen++;
+        doneAmt = n.done ? w : 0;
+        openAmt = n.done ? 0 : w;
       }
+      if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
+      else { plannedDone += doneAmt; plannedOpen += openAmt; }
     }
-    const total = nodes.length;
+    const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen;
     const done = plannedDone + unplannedDone;
-    const completionPct = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, total, done, completionPct };
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, total, done, percent };
   }
-
-  const statsOf = (nodes) => ({ counts: countsOf(nodes), weighted: weightedOf(nodes) });
 
   const global = statsOf(leaves);
   const perBranch = {};
@@ -10242,7 +10233,7 @@ function _statsDonut(c) {
   const R = 15.91549; // circumference ≈ 100 → dasharray reads as percent
   const svg = _svgEl('svg', {
     viewBox: '0 0 36 36', class: 'stats-donut', role: 'img',
-    'aria-label': `${c.completionPct}% ${t('todo.done')}`,
+    'aria-label': `${c.percent}% ${t('todo.done')}`,
   });
   svg.appendChild(_svgEl('circle', {
     cx: 18, cy: 18, r: R, fill: 'none',
@@ -10265,7 +10256,7 @@ function _statsDonut(c) {
     x: 18, y: 18, 'text-anchor': 'middle', 'dominant-baseline': 'central',
     class: 'stats-donut-center-num',
   });
-  num.textContent = `${c.completionPct}%`;
+  num.textContent = `${c.percent}%`;
   svg.appendChild(num);
   const sub = _svgEl('text', {
     x: 18, y: 24, 'text-anchor': 'middle', class: 'stats-donut-center-sub',
@@ -10457,7 +10448,7 @@ function _renderStatsBranchesSection(perBranch) {
   sec.appendChild(title);
   sec.appendChild(_statsStatusLegend());
   weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
-    const c = (perBranch[b.id] || {}).counts
+    const c = perBranch[b.id]
       || { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
     sec.appendChild(_statsBranchRow(b, c));
   });
@@ -10474,7 +10465,7 @@ function _renderStatsBalanceSection(stats) {
   title.textContent = t('stats.effortBalance');
   sec.appendChild(title);
 
-  const total = stats.global.weighted.total;
+  const total = stats.global.total;
   const eff = _effortLevel(total);
 
   const loadRow = document.createElement('div');
@@ -10498,10 +10489,10 @@ function _renderStatsBalanceSection(stats) {
   const bar = document.createElement('div');
   bar.className = 'stats-ratio-bar';
   const branches = weekData.nodes.filter(n => n.type === 'branch');
-  const totalItems = branches.reduce((acc, b) => acc + (stats.perBranch[b.id] || {}).weighted.total, 0);
+  const totalItems = branches.reduce((acc, b) => acc + (stats.perBranch[b.id] || {}).total, 0);
   branches.forEach(b => {
     const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
-    const bTotal = (stats.perBranch[b.id] || {}).weighted.total;
+    const bTotal = (stats.perBranch[b.id] || {}).total;
     const pct = totalItems === 0 ? (100 / branches.length) : (bTotal / totalItems) * 100;
     const seg = document.createElement('div');
     seg.className = 'ratio-segment';
@@ -10619,11 +10610,11 @@ function _renderStatsTimelineSection(leaves) {
 
 function renderStatsPanel() {
   const stats = computeWeekStats();
-  if (stats.global.counts.total === 0) {
+  if (stats.global.total === 0) {
     _renderStatsEmpty();
     return;
   }
-  _renderStatsDonutSection(stats.global.counts);
+  _renderStatsDonutSection(stats.global);
   _renderStatsBranchesSection(stats.perBranch);
   _renderStatsBalanceSection(stats);
   _renderStatsTimelineSection(stats.leaves);
@@ -10660,15 +10651,14 @@ function updateSummary() {
   if (sig === _lastSummarySig) return;
   _lastSummarySig = sig;
 
-  // Weighted lens drives the box (done/total/percent); shared helper keeps it in lockstep
-  // with the Stats panel.
+  // Shared weighted lens (done/total/percent) keeps the box in lockstep with the panel.
   const stats = computeWeekStats();
-  const global = stats.global.weighted;
+  const global = stats.global;
 
   const liveBranches = weekData.nodes.filter(n => n.type === 'branch');
   const branchStats = {};
   liveBranches.forEach(b => {
-    branchStats[b.id] = stats.perBranch[b.id].weighted;
+    branchStats[b.id] = stats.perBranch[b.id];
   });
 
   const mainEl = document.getElementById('summary-main');
