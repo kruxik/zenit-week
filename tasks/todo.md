@@ -17,12 +17,15 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
   - [x] `saveWeek` broadcasts `{type:'week-saved', wk, sig, origin}` post-IDB
   - [x] `tabChannel.onmessage` skeleton ignores self-originated messages (T3 fills body)
   - [x] Verify: `npm run validate` clean; `npm test` 470/470
-- [ ] **T3** Receive → merge current week (keystone)
-  - [ ] No-op when `wk !== currentWeekKey`
-  - [ ] Sig-equality early-out (no-op when converged)
-  - [ ] `mergeWeekData` + `applyRemoteMerge` with correct `scheduleUpload`
-  - [ ] Verify: different weeks independent; same week converges; no echo storm
-- [ ] **CHECKPOINT B** — human review
+- [x] **T3** Receive → merge current week (keystone)
+  - [x] No-op when `wk !== currentWeekKey`
+  - [x] Sig-equality early-out (no-op when converged; halts echo)
+  - [x] `mergeWeekData` + `applyRemoteMerge` with correct `scheduleUpload`
+  - [x] Re-broadcast at `_commitRemoteMerge` chokepoint (gated on `scheduleUpload`)
+        so the *sender* side also reconverges — fixes a gap in the original plan
+  - [x] Verify: `npm run validate` clean; `npm test` 470/470 (regression)
+  - [ ] Manual (Checkpoint B): two-tab convergence + console quiescence
+- [ ] **CHECKPOINT B** — human review (manual two-tab check)
 
 ## Phase 3 — Harden
 - [ ] **T4** Mid-edit / undo safety (verify-and-reuse atomic-op deferral)

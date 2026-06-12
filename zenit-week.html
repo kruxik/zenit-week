@@ -3740,13 +3740,37 @@ function showBlockedOverlay() {
 }
 
 // Local change bus. A tab broadcasts `week-saved` after persisting a week
-// (see saveWeek); peers showing that week reload + merge (wired in T3).
+// (see saveWeek) or after a merge that produced new content (see
+// _commitRemoteMerge). Peers showing that week reload from the shared IndexedDB
+// and merge via the same CRDT used for Drive sync.
 tabChannel.onmessage = (e) => {
   const msg = e.data;
   if (!msg || typeof msg !== 'object') return;
   if (msg.origin === TAB_ID) return;          // ignore our own echoes
-  // msg.type === 'week-saved' handling is wired in T3.
+  if (msg.type === 'week-saved') onPeerWeekSaved(msg);
 };
+
+// Reconcile a peer tab's save of `wk` into this tab. Mirrors the Drive poll/flush
+// path (loadWeekIDB → mergeWeekData → applyRemoteMerge): a peer tab is just
+// another "remote" over a local transport. Only the displayed week is held in
+// memory and rendered; other weeks already carry the peer's write in the shared
+// IndexedDB, so there is nothing to reconcile for them here.
+async function onPeerWeekSaved(msg) {
+  const wk = msg.wk;
+  if (wk !== currentWeekKey) return;
+  // Cheap convergence dedup: identical content signature means already merged.
+  // This guard also terminates any A→B→A re-broadcast echo.
+  if (msg.sig && msg.sig === _weekContentSig(weekData)) return;
+  const remoteData = await loadWeekIDB(wk);
+  if (!remoteData) return;
+  const mergedData = mergeWeekData(structuredClone(weekData), remoteData);
+  const mergedJson = JSON.stringify(mergedData);
+  const mergedHash = fnv1a32(mergedJson);
+  // scheduleUpload === "the merge produced content the peer's record lacked",
+  // so peers (and Drive) must learn about it; false === fully converged.
+  const scheduleUpload = mergedHash !== fnv1a32(JSON.stringify(remoteData));
+  await applyRemoteMerge(wk, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
+}
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
 const DB_NAME = 'zenit-week-db';
@@ -5157,6 +5181,12 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
     await saveWeekIDB(wKey, mergedData);
   } catch (e) {
     console.error('[Drive] Failed to write merged data to IndexedDB:', e);
+  }
+  // When the merge produced content the source lacked (scheduleUpload), tell peer
+  // tabs so they reconverge. Applies to both local-peer and Drive-pull merges.
+  // Loop-safe: the receiver's sig-equality guard halts once content converges.
+  if (scheduleUpload) {
+    tabChannel.postMessage({ type: 'week-saved', wk: wKey, sig: _weekContentSig(mergedData), origin: TAB_ID });
   }
   if (wKey === currentWeekKey) {
     // Re-render only when the merge actually altered visible content.
