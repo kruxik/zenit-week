@@ -3,13 +3,13 @@
 Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
 
 ## Phase 1 — Foundation
-- [ ] **T1** Extract `computeWeekStats()` + unit tests
-  - [ ] Pure helper → `{ global, perBranch }` with `counts` + `weighted` lenses
-  - [ ] Counter = one task (done iff `val>=max`) in counts; fractional in weighted; `_editing` excluded
-  - [ ] Refactor `updateSummary()` to consume it — byte-identical DOM output
-  - [ ] Export `computeWeekStats` in `tests/setup.js`
-  - [ ] New `tests/stats.test.js` (global/per-branch counts, counter semantics, edge cases)
-  - [ ] Verify: `npm test` green incl. existing `summary.test.js`
+- [x] **T1** Extract `computeWeekStats()` + unit tests
+  - [x] Pure helper → `{ global, perBranch, leaves }` with `counts` + `weighted` lenses
+  - [x] Counter = one task (done iff `val>=max`) in counts; fractional in weighted; `_editing` excluded
+  - [x] Refactor `updateSummary()` to consume it — DOM output unchanged
+  - [x] Export `computeWeekStats` in `tests/setup.js`
+  - [x] New `tests/stats.test.js` (12 tests: global/per-branch counts, counter semantics, edge cases)
+  - [x] Verify: `npm test` 490/490 (incl. `summary.test.js` regression); `npm run validate` clean
 - [ ] **CHECKPOINT A** — human review (no UI yet)
 
 ## Phase 2 — Shell + entry

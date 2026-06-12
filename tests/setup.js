@@ -552,6 +552,7 @@ export const {
   deleteBranch,
   applyBranchColor,
   updateSummary,
+  computeWeekStats,
   applyTranslations,
   // Agenda helpers
   isoWeekPos,

@@ -9713,22 +9713,24 @@ function _computeSummarySignature() {
   return sig;
 }
 
-function updateSummary() {
-  const sig = _computeSummarySignature();
-  if (sig === _lastSummarySig) return;
-  _lastSummarySig = sig;
-  const allNodes = weekData.nodes.filter(n => !n._editing);
-  const leaves = allNodes.filter(n => {
+// Single source of truth for week statistics. Returns two lenses so the top summary
+// box and the Stats panel can never disagree:
+//   counts   — one task = one unit; planned/unplanned × done/open (intuitive narrative)
+//   weighted — priority-weighted effort load; counters fractional val/max (overload story)
+// Leaf = a non-branch/center node with no active (non-_editing) children; counters are
+// leaves. _editing nodes are excluded entirely (mirrors updateSummary).
+function computeWeekStats() {
+  const leaves = weekData.nodes.filter(n => {
+    if (n._editing) return false;
     if (n.type === 'branch' || n.type === 'center') return false;
-    // Only count as leaf if no active children exist
     const activeChildren = (n.children || []).filter(cid => {
       const child = findNode(cid);
       return child && !child._editing;
     });
     return activeChildren.length === 0;
   });
-  
-  function getStats(nodes) {
+
+  function weightedOf(nodes) {
     const total = nodes.reduce((acc, n) => {
       const weight = getPriorityWeight(n.id);
       if (n.type === 'counter') return acc + (n.max || 0) * weight;
@@ -9743,13 +9745,49 @@ function updateSummary() {
     return { done, total, percent };
   }
 
-  const global = getStats(leaves);
+  function countsOf(nodes) {
+    let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0;
+    for (const n of nodes) {
+      // Counter counts as one task, done iff it reached its max (degenerate max<=0 = open).
+      const isDone = n.type === 'counter'
+        ? ((n.max || 0) > 0 && (n.val || 0) >= n.max)
+        : !!n.done;
+      if (n.unplanned) {
+        if (isDone) unplannedDone++; else unplannedOpen++;
+      } else {
+        if (isDone) plannedDone++; else plannedOpen++;
+      }
+    }
+    const total = nodes.length;
+    const done = plannedDone + unplannedDone;
+    const completionPct = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, total, done, completionPct };
+  }
 
-  // Build per-branch stats from live branch list
+  const statsOf = (nodes) => ({ counts: countsOf(nodes), weighted: weightedOf(nodes) });
+
+  const global = statsOf(leaves);
+  const perBranch = {};
+  weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
+    perBranch[b.id] = statsOf(leaves.filter(n => n.branch === b.id));
+  });
+  return { global, perBranch, leaves };
+}
+
+function updateSummary() {
+  const sig = _computeSummarySignature();
+  if (sig === _lastSummarySig) return;
+  _lastSummarySig = sig;
+
+  // Weighted lens drives the box (done/total/percent); shared helper keeps it in lockstep
+  // with the Stats panel.
+  const stats = computeWeekStats();
+  const global = stats.global.weighted;
+
   const liveBranches = weekData.nodes.filter(n => n.type === 'branch');
   const branchStats = {};
   liveBranches.forEach(b => {
-    branchStats[b.id] = getStats(leaves.filter(n => n.branch === b.id));
+    branchStats[b.id] = stats.perBranch[b.id].weighted;
   });
 
   const mainEl = document.getElementById('summary-main');
