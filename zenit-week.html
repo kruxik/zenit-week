@@ -3730,12 +3730,23 @@ const _PENDING_OAUTH_CALLBACK = (() => {
 // failsafe for a genuine IndexedDB version-upgrade block (see onDbBlocked) — a
 // rare, transient state, not "already open in another tab".
 const tabChannel = new BroadcastChannel('zenit-week-tabs');
+// Stable id for this tab, so a tab can ignore the echoes of its own broadcasts.
+const TAB_ID = genId();
 let _isBlocked = false;
 
 function showBlockedOverlay() {
   _isBlocked = true;
   document.getElementById('single-tab-overlay').classList.add('visible');
 }
+
+// Local change bus. A tab broadcasts `week-saved` after persisting a week
+// (see saveWeek); peers showing that week reload + merge (wired in T3).
+tabChannel.onmessage = (e) => {
+  const msg = e.data;
+  if (!msg || typeof msg !== 'object') return;
+  if (msg.origin === TAB_ID) return;          // ignore our own echoes
+  // msg.type === 'week-saved' handling is wired in T3.
+};
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
 const DB_NAME = 'zenit-week-db';
@@ -6663,6 +6674,11 @@ async function saveWeek(wk, data) {
   const persisted = { ...data, nodes: data.nodes.filter(n => !n._editing) };
 
   await saveWeekIDB(wk, persisted);
+
+  // Signal peer tabs that this week's record changed, so any tab showing it can
+  // reload + merge (T3). Carries a content signature for cheap convergence dedup
+  // and our origin so we ignore the echo of our own save.
+  tabChannel.postMessage({ type: 'week-saved', wk, sig: _weekContentSig(persisted), origin: TAB_ID });
 
   // Update cache if this is the next week
   if (wk === offsetWeek(currentWeekKey, 1)) {

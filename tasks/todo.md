@@ -12,10 +12,11 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
 - [ ] **CHECKPOINT A** — human review (manual two-tab check)
 
 ## Phase 2 — Signal + converge
-- [ ] **T2** Per-tab origin id + broadcast on save
-  - [ ] `const TAB_ID = genId()` at startup
-  - [ ] `saveWeek` broadcasts `{type:'week-saved', wk, sig, origin}` post-IDB
-  - [ ] Ignore self-originated messages
+- [x] **T2** Per-tab origin id + broadcast on save
+  - [x] `const TAB_ID = genId()` at startup
+  - [x] `saveWeek` broadcasts `{type:'week-saved', wk, sig, origin}` post-IDB
+  - [x] `tabChannel.onmessage` skeleton ignores self-originated messages (T3 fills body)
+  - [x] Verify: `npm run validate` clean; `npm test` 470/470
 - [ ] **T3** Receive → merge current week (keystone)
   - [ ] No-op when `wk !== currentWeekKey`
   - [ ] Sig-equality early-out (no-op when converged)
