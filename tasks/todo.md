@@ -1,59 +1,55 @@
-# TODO — Multi-tab editing (Option B)
+# TODO — Stats Panel: Plan vs Reality
 
-Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
+Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
 
-## Phase 1 — Unblock
-- [x] **T1** Retarget single-tab lock → DB-upgrade failsafe
-  - [x] Remove `ping`/`pong`/`takeover` flow + initial ping
-  - [x] Remove takeover button handler + button markup + dead CSS
-  - [x] Keep `tabChannel`; keep `#single-tab-overlay` for `onDbBlocked` only
-  - [x] Update `blocked.*` i18n copy → transient DB-busy, drop "Use here" (EN+CS)
-  - [x] Verify: `npm run validate` clean; `npm test` 470/470; no ping/pong/takeover left
-- [ ] **CHECKPOINT A** — human review (manual two-tab check)
+## Phase 1 — Foundation
+- [ ] **T1** Extract `computeWeekStats()` + unit tests
+  - [ ] Pure helper → `{ global, perBranch }` with `counts` + `weighted` lenses
+  - [ ] Counter = one task (done iff `val>=max`) in counts; fractional in weighted; `_editing` excluded
+  - [ ] Refactor `updateSummary()` to consume it — byte-identical DOM output
+  - [ ] Export `computeWeekStats` in `tests/setup.js`
+  - [ ] New `tests/stats.test.js` (global/per-branch counts, counter semantics, edge cases)
+  - [ ] Verify: `npm test` green incl. existing `summary.test.js`
+- [ ] **CHECKPOINT A** — human review (no UI yet)
 
-## Phase 2 — Signal + converge
-- [x] **T2** Per-tab origin id + broadcast on save
-  - [x] `const TAB_ID = genId()` at startup
-  - [x] `saveWeek` broadcasts `{type:'week-saved', wk, sig, origin}` post-IDB
-  - [x] `tabChannel.onmessage` skeleton ignores self-originated messages (T3 fills body)
-  - [x] Verify: `npm run validate` clean; `npm test` 470/470
-- [x] **T3** Receive → merge current week (keystone)
-  - [x] No-op when `wk !== currentWeekKey`
-  - [x] Sig-equality early-out (no-op when converged; halts echo)
-  - [x] `mergeWeekData` + `applyRemoteMerge` with correct `scheduleUpload`
-  - [x] Re-broadcast at `_commitRemoteMerge` chokepoint (gated on `scheduleUpload`)
-        so the *sender* side also reconverges — fixes a gap in the original plan
-  - [x] Verify: `npm run validate` clean; `npm test` 470/470 (regression)
-  - [ ] Manual (Checkpoint B): two-tab convergence + console quiescence
-- [ ] **CHECKPOINT B** — human review (manual two-tab check)
+## Phase 2 — Shell + entry
+- [ ] **T2** Panel shell + clickable summary-box entry
+  - [ ] Panel container + backdrop (`is-open` pattern); open/close/render fns
+  - [ ] `#placeholder-panel` → button (role, tabindex, aria-label, Enter/Space)
+  - [ ] Esc + backdrop + ✕ close; re-render while open on data change
+  - [ ] No `weekData` mutation, no undo entry on open/close
+  - [ ] Verify: manual open/close + keyboard; `npm run validate` clean
 
-## Phase 3 — Harden
-- [x] **T4** Mid-edit / undo safety
-  - [x] Audited all 4 `_editing` sites → all open input inside an atomic op
-        (via `_openInlineInput`/`startAgendaRename` → `beginAtomicOp`)
-  - [x] Made the invariant explicit: `applyRemoteMerge` also defers on
-        `hasEditingNode()`, not only `isAtomicOpActive()` (future-proof)
-  - [x] Confirmed merge path takes no undo snapshot → undo stack untouched
-  - [x] Verify: `npm run validate` clean; `npm test` 470/470
-  - [ ] Manual: rename-in-flight + peer save (no lost text); undo-after-merge
-- [x] **T5** Drive interplay — verified by reuse, no code change needed
-  - [x] Local merge with new content → `scheduleUpload` → `scheduleDriveSync` (5220)
-  - [x] `scheduleDriveSync` is `googleAccessToken`-guarded + 10s-debounced;
-        peer broadcast is immediate (synchronous postMessage)
-  - [x] No double-upload: `syncWeekToDrive` pull-merge-push + hash dedup (5600)
-        skips the 2nd tab's redundant upload — two tabs == two devices
-  - [x] `npm test` 470/470 (no regression from T1–T4)
-- [x] **T6** vitest (`tests/multitab.test.js`, 8 tests) + 3 exports in `setup.js`
-  - [x] Disjoint-edit union + order-independence (convergence)
-  - [x] `_weekContentSig` echo-guard: `_ts`/`_editing` ignored, real change differs
-  - [x] `hasEditingNode` predicate + `applyRemoteMerge` defers a merge mid-edit
-  - [x] union / `_ts` win / tombstone win already covered by `crdt.test.js` (not dup'd)
-  - [x] `npm test` 478/478; `npm run validate` clean
-- [ ] **CHECKPOINT C** — human review (manual matrix from plan §T-manual)
+## Phase 3 — Sections
+- [ ] **T3** Section ① donut + 3 headlines (counts; center = completion %)
+  - [ ] 4-arc SVG donut, div-by-zero guarded, global/branch-independent
+  - [ ] Plan completion / Unplanned load (x/y) / Unplanned completion
+  - [ ] Verify: manual vs hand-computed; light+dark; 3 vs 8 branches identical
+- [ ] **CHECKPOINT B** — human review (first visible slice)
+- [ ] **T4** Section ② branch-tinted stacked bars (counts)
+  - [ ] Per-branch bar tinted `BRANCH_COLORS`; done solid / open faded / unplanned hatched
+  - [ ] DOM-constructed labels (no innerHTML w/ branch text); zero-task branch clean
+  - [ ] Verify: manual 3 and 8 branches, light+dark; segments sum to total
+- [ ] **T5** Section ③ reuse ratio-bar + baseline (weighted)
+  - [ ] Branch share + total-vs-baseline via shared helper weighted lens
+  - [ ] Verify: panel figures == top-box figures; overload color same threshold
 
-## Phase 4 — Optional polish
-- [x] **T7** "Updated from another tab" cue — subtle auto-dismiss toast
-  - [x] Fires only on the current week, when a *peer* merge visibly changes
-        content AND isn't deferred (no announcing an unseen change mid-edit)
-  - [x] `showToast` replaces (no stacking) → rapid peer saves = one refreshed toast
-  - [x] `multitab.updated` i18n added (EN+CS); `npm test` 478/478; validate clean
+## Phase 4 — Hardening
+- [ ] **T6** Empty / positive states
+  - [ ] Empty week clean; tasks-but-none-unplanned → positive message, 0 headlines clean
+  - [ ] Verify: manual empty + all-planned weeks
+- [ ] **T7** Responsive (mobile lean)
+  - [ ] Mobile: ① + headlines + ③ ratio-bar; compact ②; hide ④ (CSS breakpoints only)
+  - [ ] Verify: manual ~375px and ~1280px; no overflow
+- [ ] **T8** Theming / i18n / a11y / validate
+  - [ ] EN+CZ strings via `t()`; full light/dark via tokens; keyboard + SR labels + focus
+  - [ ] Security: no innerHTML/outerHTML/insertAdjacentHTML with weekData-derived values
+  - [ ] Reuse `.agenda-action-btn`; no orphan classes
+  - [ ] Verify: `npm test` + `npm run validate` green; manual F7/F8 matrix
+- [ ] **CHECKPOINT C** — human review · **MVP merge candidate**
+
+## Phase 5 — Fast-follow
+- [ ] **T9** Section ④ desktop-only timeline (Mon→Sun from doneAt/ticks/unplannedAt)
+  - [ ] Hidden on mobile; no dead DOM if deferred
+  - [ ] Verify: buckets match daily-log; hidden on mobile; validate clean
+- [ ] **CHECKPOINT D** — human review · ship fast-follow
