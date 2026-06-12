@@ -1428,7 +1428,7 @@
       left: 50%;
       right: auto;
       bottom: 5px;
-      width: 720px;
+      width: 780px;
       max-width: calc(100vw - 40px);
       height: calc(100vh - 66px);
       border-radius: 8px;
@@ -1479,8 +1479,8 @@
   /* ① Plan vs Reality — donut + headline metrics */
   .stats-donut-row {
     display: flex;
-    align-items: center;
-    gap: 28px;
+    align-items: flex-start;
+    gap: 24px;
     flex-wrap: wrap;
   }
   .stats-donut-wrap {
@@ -1639,42 +1639,45 @@
     box-shadow: inset 0 1px 2px var(--shadow-md);
   }
 
-  /* ④ The Week — Mon→Sun timeline of completions + unplanned arrivals (desktop only) */
-  .stats-timeline {
-    display: flex;
-    gap: 8px;
-  }
-  .stats-tl-day {
+  /* ④ The Week — vertical Mon→Sun timeline placed right of the donut (desktop only).
+     Each day is a row with two horizontal bars: completed (green) + unplanned arrived (amber). */
+  .stats-timeline-col {
     flex: 1;
+    min-width: 190px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 6px;
   }
-  .stats-tl-bars {
-    height: 64px;
-    width: 100%;
+  .stats-timeline-col .help-section-title { margin-bottom: 10px; }
+  .stats-tl-row {
     display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 3px;
-    border-bottom: 1px solid var(--border-soft);
+    align-items: center;
+    gap: 8px;
+    height: 20px;
   }
-  .stats-tl-bar {
-    width: 10px;
-    border-radius: 3px 3px 0 0;
-  }
-  .stats-tl-done { background: var(--badge-done-text); }
-  .stats-tl-unpl { background: var(--badge-unplanned-text); }
-  .stats-tl-label {
+  .stats-tl-rlabel {
+    width: 20px;
+    flex-shrink: 0;
+    text-align: right;
     font-size: 11px;
     font-weight: 600;
     color: var(--text-placeholder);
+    font-variant-numeric: tabular-nums;
   }
-  .stats-tl-day.today .stats-tl-label {
-    color: var(--text-primary);
-    font-weight: 700;
+  .stats-tl-row.today .stats-tl-rlabel { color: var(--text-primary); font-weight: 700; }
+  .stats-tl-rbars {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    justify-content: center;
   }
+  .stats-tl-hbar {
+    height: 5px;
+    border-radius: 0 3px 3px 0;
+  }
+  .stats-tl-done { background: var(--badge-done-text); }
+  .stats-tl-unpl { background: var(--badge-unplanned-text); }
+  .stats-tl-legend { margin-top: 12px; }
 
   /* Mobile lean: keep ① donut+headlines and ③ balance; ② bars stay (already label-free);
      hide ④ timeline; tighten spacing so the story fits one thumb-scroll. */
@@ -1682,7 +1685,7 @@
     #stats-content { padding: 18px; padding-bottom: 80px; }
     .stats-donut-row { gap: 18px; justify-content: center; }
     .stats-headlines { min-width: 0; }
-    #stats-section-timeline { display: none; }
+    .stats-timeline-col { display: none; }
   }
 
   /* Empty / positive states */
@@ -3725,7 +3728,6 @@
     <div id="stats-section-donut" class="help-section"></div>
     <div id="stats-section-branches" class="help-section"></div>
     <div id="stats-section-balance" class="help-section"></div>
-    <div id="stats-section-timeline" class="help-section"></div>
   </div>
 </div>
 <div id="stats-close-bar">
@@ -10509,7 +10511,7 @@ function _renderStatsBalanceSection(stats) {
 
 // Empty week (no tasks at all) → a friendly message instead of zeroed charts.
 function _renderStatsEmpty() {
-  ['stats-section-branches', 'stats-section-balance', 'stats-section-timeline'].forEach(id => {
+  ['stats-section-branches', 'stats-section-balance'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = '';
   });
@@ -10527,14 +10529,14 @@ function _renderStatsEmpty() {
 }
 
 // ④ The Week — when work got done (doneAt / counter ticks) and when unplanned tasks
-// appeared (unplannedAt), bucketed Mon→Sun over the viewed week. Desktop-only (hidden
-// on mobile via CSS). Counted over leaves so it matches the rest of the panel.
+// appeared (unplannedAt), bucketed Mon→Sun over the viewed week. Rendered as a vertical
+// day-list in the 3rd column of the donut row, right of the headlines. Desktop-only
+// (the column is hidden on mobile via CSS). Counted over leaves to match the panel.
 function _renderStatsTimelineSection(leaves) {
-  const sec = document.getElementById('stats-section-timeline');
-  if (!sec) return;
-  sec.textContent = '';
+  const row = document.querySelector('#stats-section-donut .stats-donut-row');
+  if (!row) return;
 
-  // Mon=1 … Sat=6, Sun=0 → Mon→Sun column order.
+  // Mon=1 … Sat=6, Sun=0 → Mon→Sun row order.
   const order = [1, 2, 3, 4, 5, 6, 0];
   const dates = order.map(idx => tabDateString(idx));
   const dateToCol = {};
@@ -10552,14 +10554,48 @@ function _renderStatsTimelineSection(leaves) {
     bump(unpl, n.unplannedAt);
   }
 
+  const colEl = document.createElement('div');
+  colEl.className = 'stats-timeline-col';
+
   const title = document.createElement('div');
   title.className = 'help-section-title';
   title.textContent = t('stats.theWeek');
-  sec.appendChild(title);
+  colEl.appendChild(title);
+
+  const max = Math.max(1, ...done, ...unpl);
+  const barW = (v) => (v <= 0 ? 0 : Math.max(6, (v / max) * 100));
+  const labels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+  const fullNames = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
+  const todayStr = localDateStr(new Date());
+
+  order.forEach((dayIdx, i) => {
+    const r = document.createElement('div');
+    r.className = 'stats-tl-row' + (dates[i] === todayStr ? ' today' : '');
+    r.title = `${fullNames[dayIdx]} — ${done[i]} ${t('stats.tlDone')}, ${unpl[i]} ${t('stats.tlUnpl')}`;
+
+    const lab = document.createElement('div');
+    lab.className = 'stats-tl-rlabel';
+    lab.textContent = labels[dayIdx];
+    r.appendChild(lab);
+
+    const bars = document.createElement('div');
+    bars.className = 'stats-tl-rbars';
+    const dBar = document.createElement('div');
+    dBar.className = 'stats-tl-hbar stats-tl-done';
+    dBar.style.width = barW(done[i]) + '%';
+    const uBar = document.createElement('div');
+    uBar.className = 'stats-tl-hbar stats-tl-unpl';
+    uBar.style.width = barW(unpl[i]) + '%';
+    bars.appendChild(dBar);
+    bars.appendChild(uBar);
+    r.appendChild(bars);
+
+    colEl.appendChild(r);
+  });
 
   // legend: completed (green) · unplanned arrived (amber)
   const legend = document.createElement('div');
-  legend.className = 'stats-bar-legend';
+  legend.className = 'stats-bar-legend stats-tl-legend';
   [['stats.tlDone', 'var(--badge-done-text)'], ['stats.tlUnpl', 'var(--badge-unplanned-text)']]
     .forEach(([key, color]) => {
       const item = document.createElement('div');
@@ -10573,42 +10609,9 @@ function _renderStatsTimelineSection(leaves) {
       item.appendChild(label);
       legend.appendChild(item);
     });
-  sec.appendChild(legend);
+  colEl.appendChild(legend);
 
-  const max = Math.max(1, ...done, ...unpl);
-  const MAXH = 56;
-  const barH = (v) => (v <= 0 ? 0 : Math.max(3, Math.round((v / max) * MAXH)));
-  const labels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
-  const fullNames = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
-  const todayStr = localDateStr(new Date());
-
-  const strip = document.createElement('div');
-  strip.className = 'stats-timeline';
-  order.forEach((dayIdx, i) => {
-    const col = document.createElement('div');
-    col.className = 'stats-tl-day' + (dates[i] === todayStr ? ' today' : '');
-    col.title = `${fullNames[dayIdx]} — ${done[i]} ${t('stats.tlDone')}, ${unpl[i]} ${t('stats.tlUnpl')}`;
-
-    const bars = document.createElement('div');
-    bars.className = 'stats-tl-bars';
-    const dBar = document.createElement('div');
-    dBar.className = 'stats-tl-bar stats-tl-done';
-    dBar.style.height = barH(done[i]) + 'px';
-    const uBar = document.createElement('div');
-    uBar.className = 'stats-tl-bar stats-tl-unpl';
-    uBar.style.height = barH(unpl[i]) + 'px';
-    bars.appendChild(dBar);
-    bars.appendChild(uBar);
-    col.appendChild(bars);
-
-    const label = document.createElement('div');
-    label.className = 'stats-tl-label';
-    label.textContent = labels[dayIdx];
-    col.appendChild(label);
-
-    strip.appendChild(col);
-  });
-  sec.appendChild(strip);
+  row.appendChild(colEl);
 }
 
 function renderStatsPanel() {

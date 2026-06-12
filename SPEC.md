@@ -49,9 +49,10 @@ Give the user a dedicated, professional **Stats panel** that answers "how did my
 - **AC:** This is the **only** section using weighted load; numbers match what the top box would show for the same week.
 - **AC:** No duplication of the weighting math — factor a shared helper if reuse requires it (see §4).
 
-### F5 — Section ④: The Week (timeline) — DESKTOP ONLY, fast-follow
-- Mon→Sun strip from `doneAt` / counter `ticks[]` / `unplannedAt`, showing per day: completions and unplanned arrivals.
-- **AC:** Hidden entirely on mobile (CSS breakpoint). May land **after** F1–F4 are verified; not required for the panel's first merge. If deferred, leave a clearly-marked placeholder-free omission (no dead DOM).
+### F5 — Section ④: The Week (timeline) — DESKTOP ONLY
+- Mon→Sun view from `doneAt` / counter `ticks[]` / `unplannedAt`, showing per day: completions and unplanned arrivals.
+- **Layout (revised):** rendered as a **vertical day-list in the 3rd column of the hero/donut row** (right of the headlines), filling the otherwise-empty desktop space — not a full-width strip at the bottom. Each day is a row: 2-letter label + two horizontal bars (green completed, amber unplanned arrived), scaled to the week's busiest day, today's row bolded. Desktop panel widened to 780px to fit the third column.
+- **AC:** Hidden entirely on mobile (the `.stats-timeline-col` column is `display:none` < 768px; the donut row collapses to donut + headlines). No dead DOM.
 
 ### F6 — Empty / positive states
 - No tasks at all → friendly empty state, no broken charts.
