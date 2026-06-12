@@ -28,9 +28,14 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
 - [ ] **CHECKPOINT B** — human review (manual two-tab check)
 
 ## Phase 3 — Harden
-- [ ] **T4** Mid-edit / undo safety (verify-and-reuse atomic-op deferral)
-  - [ ] Rename-in-flight + peer save → no lost text
-  - [ ] Undo stack untouched on merge (resolved decision)
+- [x] **T4** Mid-edit / undo safety
+  - [x] Audited all 4 `_editing` sites → all open input inside an atomic op
+        (via `_openInlineInput`/`startAgendaRename` → `beginAtomicOp`)
+  - [x] Made the invariant explicit: `applyRemoteMerge` also defers on
+        `hasEditingNode()`, not only `isAtomicOpActive()` (future-proof)
+  - [x] Confirmed merge path takes no undo snapshot → undo stack untouched
+  - [x] Verify: `npm run validate` clean; `npm test` 470/470
+  - [ ] Manual: rename-in-flight + peer save (no lost text); undo-after-merge
 - [ ] **T5** Drive interplay — local-changed merge sets `scheduleUpload`; no double-upload
 - [ ] **T6** vitest: union / `_ts` win / tombstone win / sig no-op / deferral; `npm test` green
 - [ ] **CHECKPOINT C** — human review

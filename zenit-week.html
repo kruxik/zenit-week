@@ -5166,10 +5166,19 @@ function mergeWeekData(local, remote) {
   }
 }
 
-// Apply a CRDT-merged result — defer if any atomic operation is in progress.
+// True while the displayed week has a node with an open inline editor.
+function hasEditingNode() {
+  return !!(weekData && Array.isArray(weekData.nodes) && weekData.nodes.some(n => n._editing));
+}
+
+// Apply a CRDT-merged result — defer while an edit is in flight on the current
+// week. Every edit path opens an inline input inside an atomic op
+// (isAtomicOpActive), but we also check hasEditingNode() directly so the
+// invariant "never re-render over an open editor" holds even if a future edit
+// path forgets to wrap beginAtomicOp. Deferral is re-merged by _flushPendingMerge
+// when the op ends (commitEdit/cancelEdit → endAtomicOp).
 async function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData) {
-  if (isAtomicOpActive() && wKey === currentWeekKey) {
-    // Atomic op in progress — store remote data for re-merge once the op finishes
+  if (wKey === currentWeekKey && (isAtomicOpActive() || hasEditingNode())) {
     pendingRemoteMerge = { wKey, remoteData };
     return;
   }
