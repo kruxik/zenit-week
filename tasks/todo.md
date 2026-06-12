@@ -52,4 +52,8 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
 - [ ] **CHECKPOINT C** — human review (manual matrix from plan §T-manual)
 
 ## Phase 4 — Optional polish
-- [ ] **T7** "Updated by another tab" cue (silent vs toast) — Open Q1
+- [x] **T7** "Updated from another tab" cue — subtle auto-dismiss toast
+  - [x] Fires only on the current week, when a *peer* merge visibly changes
+        content AND isn't deferred (no announcing an unseen change mid-edit)
+  - [x] `showToast` replaces (no stacking) → rapid peer saves = one refreshed toast
+  - [x] `multitab.updated` i18n added (EN+CS); `npm test` 478/478; validate clean

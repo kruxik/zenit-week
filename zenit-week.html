@@ -3769,7 +3769,14 @@ async function onPeerWeekSaved(msg) {
   // scheduleUpload === "the merge produced content the peer's record lacked",
   // so peers (and Drive) must learn about it; false === fully converged.
   const scheduleUpload = mergedHash !== fnv1a32(JSON.stringify(remoteData));
+  // Cue only when the merge visibly changes the current week AND applies now
+  // (applyRemoteMerge defers under the same condition while an edit is open, so
+  // we don't announce a change the user can't yet see). showToast replaces, so
+  // rapid peer saves refresh one short toast rather than stacking.
+  const willChange = _weekContentSig(mergedData) !== _weekContentSig(weekData);
+  const willDefer = isAtomicOpActive() || hasEditingNode();
   await applyRemoteMerge(wk, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
+  if (willChange && !willDefer) showToast(t('multitab.updated'), 2500);
 }
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
@@ -6131,6 +6138,7 @@ const TRANSLATIONS = {
     'filter.unscheduled':         'Unscheduled',
     'blocked.title':              'Storage busy',
     'blocked.body':               'Zenit Week’s storage is being upgraded in another tab. This tab will be ready in a moment — try refreshing.',
+    'multitab.updated':           'Updated from another tab',
     'filter.prefix':              'Filter',
     'filter.off':                 'Filter off',
     'menu.clearDayFilter':        'Clear Day Filter',
@@ -6332,6 +6340,7 @@ const TRANSLATIONS = {
     'filter.unscheduled':         'Neplánované',
     'blocked.title':              'Úložiště je zaneprázdněné',
     'blocked.body':               'Úložiště Zenit Week se aktualizuje v jiném panelu. Tento panel bude za chvíli připraven — zkuste obnovit stránku.',
+    'multitab.updated':           'Aktualizováno z jiného panelu',
     'filter.prefix':              'Filtr',
     'filter.off':                 'Filtr vypnut',
     'menu.clearDayFilter':        'Zrušit filtr dne',
