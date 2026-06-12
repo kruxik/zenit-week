@@ -43,8 +43,13 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
   - [x] No double-upload: `syncWeekToDrive` pull-merge-push + hash dedup (5600)
         skips the 2nd tab's redundant upload — two tabs == two devices
   - [x] `npm test` 470/470 (no regression from T1–T4)
-- [ ] **T6** vitest: union / `_ts` win / tombstone win / sig no-op / deferral; `npm test` green
-- [ ] **CHECKPOINT C** — human review
+- [x] **T6** vitest (`tests/multitab.test.js`, 8 tests) + 3 exports in `setup.js`
+  - [x] Disjoint-edit union + order-independence (convergence)
+  - [x] `_weekContentSig` echo-guard: `_ts`/`_editing` ignored, real change differs
+  - [x] `hasEditingNode` predicate + `applyRemoteMerge` defers a merge mid-edit
+  - [x] union / `_ts` win / tombstone win already covered by `crdt.test.js` (not dup'd)
+  - [x] `npm test` 478/478; `npm run validate` clean
+- [ ] **CHECKPOINT C** — human review (manual matrix from plan §T-manual)
 
 ## Phase 4 — Optional polish
 - [ ] **T7** "Updated by another tab" cue (silent vs toast) — Open Q1

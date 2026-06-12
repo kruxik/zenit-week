@@ -570,6 +570,10 @@ export const {
   // CRDT & Sync
   mergeWeekData,
   migrateCrdt,
+  // Multi-tab (Option B) — local sync peer
+  _weekContentSig,
+  hasEditingNode,
+  applyRemoteMerge,
   // Transfers
   transferUnfinished,
   moveNodeToNextWeek,
