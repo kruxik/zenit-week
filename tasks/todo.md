@@ -49,9 +49,10 @@ Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
   - [x] All-planned (unplanned 0) → green positive pill "No unplanned tasks 👍"; donut planned-only; 0-headlines clean (div-by-zero guarded)
   - [x] i18n EN+CZ (emptyWeek, emptyWeekHint, noUnplanned)
   - [x] Verify: browser empty + all-planned states; `npm test` 490/490, validate clean
-- [ ] **T7** Responsive (mobile lean)
-  - [ ] Mobile: ① + headlines + ③ ratio-bar; compact ②; hide ④ (CSS breakpoints only)
-  - [ ] Verify: manual ~375px and ~1280px; no overflow
+- [x] **T7** Responsive (mobile lean)
+  - [x] `@media (max-width:767px)`: tighten padding/gaps, donut row wraps, headlines shrink, hide ④ timeline
+  - [x] ② bars already label-free (compact); panel mobile chrome (full-area + bottom Close pill) from T2
+  - [x] Verify: browser mobile (all of ①②③, timeline hidden, bottom pill) + desktop unaffected; `npm test` 490/490, validate clean
 - [ ] **T8** Theming / i18n / a11y / validate
   - [ ] EN+CZ strings via `t()`; full light/dark via tokens; keyboard + SR labels + focus
   - [ ] Security: no innerHTML/outerHTML/insertAdjacentHTML with weekData-derived values
