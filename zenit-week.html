@@ -1639,6 +1639,26 @@
     box-shadow: inset 0 1px 2px var(--shadow-md);
   }
 
+  /* Empty / positive states */
+  .stats-empty-hint {
+    text-align: center;
+    color: var(--text-placeholder);
+    font-size: 12.5px;
+    margin-top: -20px;
+  }
+  .stats-positive {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    background: var(--badge-done-bg);
+    color: var(--badge-done-text);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
   #quick-add-backdrop {
     display: none;
     position: fixed;
@@ -6369,6 +6389,9 @@ const TRANSLATIONS = {
     'stats.followThrough':        'Follow-through by branch',
     'stats.effortBalance':        'Effort & balance',
     'stats.baseline':             'baseline',
+    'stats.emptyWeek':            'No tasks yet this week',
+    'stats.emptyWeekHint':        'Add tasks on the mindmap to see how your week takes shape.',
+    'stats.noUnplanned':          'No unplanned tasks this week 👍',
     'stats.unplannedShort':       'unplanned',
     'stats.legendDone':           'done',
     'stats.legendOpen':           'open',
@@ -6589,6 +6612,9 @@ const TRANSLATIONS = {
     'stats.followThrough':        'Plnění podle větve',
     'stats.effortBalance':        'Zátěž a rovnováha',
     'stats.baseline':             'základ',
+    'stats.emptyWeek':            'Tento týden zatím žádné úkoly',
+    'stats.emptyWeekHint':        'Přidejte úkoly v myšlenkové mapě a uvidíte, jak týden vypadá.',
+    'stats.noUnplanned':          'Tento týden žádné neplánované úkoly 👍',
     'stats.unplannedShort':       'neplánovaných',
     'stats.legendDone':           'splněno',
     'stats.legendOpen':           'zbývá',
@@ -10276,6 +10302,14 @@ function _renderStatsDonutSection(c) {
   row.appendChild(headlines);
 
   donut.appendChild(row);
+
+  // Positive signal, not a warning: a week with no unplanned work is a good outcome.
+  if (c.total > 0 && unplannedTotal === 0) {
+    const pos = document.createElement('div');
+    pos.className = 'stats-positive';
+    pos.textContent = t('stats.noUnplanned');
+    donut.appendChild(pos);
+  }
 }
 
 // Branch hue as solid / faded fills (done vs open). Faded uses background-color alpha,
@@ -10427,8 +10461,31 @@ function _renderStatsBalanceSection(stats) {
   sec.appendChild(bar);
 }
 
+// Empty week (no tasks at all) → a friendly message instead of zeroed charts.
+function _renderStatsEmpty() {
+  ['stats-section-branches', 'stats-section-balance', 'stats-section-timeline'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
+  const sec = document.getElementById('stats-section-donut');
+  if (!sec) return;
+  sec.textContent = '';
+  const msg = document.createElement('div');
+  msg.className = 'daily-log-empty';
+  msg.textContent = t('stats.emptyWeek');
+  sec.appendChild(msg);
+  const hint = document.createElement('div');
+  hint.className = 'stats-empty-hint';
+  hint.textContent = t('stats.emptyWeekHint');
+  sec.appendChild(hint);
+}
+
 function renderStatsPanel() {
   const stats = computeWeekStats();
+  if (stats.global.counts.total === 0) {
+    _renderStatsEmpty();
+    return;
+  }
   _renderStatsDonutSection(stats.global.counts);
   _renderStatsBranchesSection(stats.perBranch);
   _renderStatsBalanceSection(stats);

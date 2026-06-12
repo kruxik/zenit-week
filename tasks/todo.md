@@ -44,9 +44,11 @@ Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
   - [x] Verify: stretch=amber@118, segments 51/29/20 sum 100; browser light; `npm test` 490/490, validate clean
 
 ## Phase 4 — Hardening
-- [ ] **T6** Empty / positive states
-  - [ ] Empty week clean; tasks-but-none-unplanned → positive message, 0 headlines clean
-  - [ ] Verify: manual empty + all-planned weeks
+- [x] **T6** Empty / positive states
+  - [x] Empty week (total 0) → friendly message + hint (reuses `.daily-log-empty`); other sections cleared, no charts
+  - [x] All-planned (unplanned 0) → green positive pill "No unplanned tasks 👍"; donut planned-only; 0-headlines clean (div-by-zero guarded)
+  - [x] i18n EN+CZ (emptyWeek, emptyWeekHint, noUnplanned)
+  - [x] Verify: browser empty + all-planned states; `npm test` 490/490, validate clean
 - [ ] **T7** Responsive (mobile lean)
   - [ ] Mobile: ① + headlines + ③ ratio-bar; compact ②; hide ④ (CSS breakpoints only)
   - [ ] Verify: manual ~375px and ~1280px; no overflow
