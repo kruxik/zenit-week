@@ -36,7 +36,13 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/multi-tab-week-view.md`
   - [x] Confirmed merge path takes no undo snapshot → undo stack untouched
   - [x] Verify: `npm run validate` clean; `npm test` 470/470
   - [ ] Manual: rename-in-flight + peer save (no lost text); undo-after-merge
-- [ ] **T5** Drive interplay — local-changed merge sets `scheduleUpload`; no double-upload
+- [x] **T5** Drive interplay — verified by reuse, no code change needed
+  - [x] Local merge with new content → `scheduleUpload` → `scheduleDriveSync` (5220)
+  - [x] `scheduleDriveSync` is `googleAccessToken`-guarded + 10s-debounced;
+        peer broadcast is immediate (synchronous postMessage)
+  - [x] No double-upload: `syncWeekToDrive` pull-merge-push + hash dedup (5600)
+        skips the 2nd tab's redundant upload — two tabs == two devices
+  - [x] `npm test` 470/470 (no regression from T1–T4)
 - [ ] **T6** vitest: union / `_ts` win / tombstone win / sig no-op / deferral; `npm test` green
 - [ ] **CHECKPOINT C** — human review
 
