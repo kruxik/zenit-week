@@ -10,6 +10,26 @@ describe('Internationalization', () => {
     expect(t('todo.done')).toBe('Hotovo');
   });
 
+  it('has every Stats panel key in both languages', () => {
+    const statsKeys = [
+      'stats.title', 'stats.open', 'stats.close', 'stats.planVsReality',
+      'stats.planCompletion', 'stats.unplannedLoad', 'stats.unplannedCompletion',
+      'stats.legendPlannedDone', 'stats.legendPlannedOpen',
+      'stats.legendUnplannedDone', 'stats.legendUnplannedOpen',
+      'stats.followThrough', 'stats.effortBalance', 'stats.baseline',
+      'stats.unplannedShort', 'stats.legendDone', 'stats.legendOpen', 'stats.legendUnplanned',
+      'stats.emptyWeek', 'stats.emptyWeekHint', 'stats.noUnplanned',
+    ];
+    for (const lang of ['en', 'cs']) {
+      _state.setLang(lang);
+      for (const k of statsKeys) {
+        const v = t(k);
+        expect(v, `${k} missing/blank in ${lang}`).toBeTruthy();
+        expect(v, `${k} not translated in ${lang}`).not.toBe(k);
+      }
+    }
+  });
+
   it('has the node-comment menu label in both languages', () => {
     _state.setLang('en');
     expect(t('menu.comment')).toBe('Comment');

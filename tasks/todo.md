@@ -53,12 +53,14 @@ Plan: `tasks/plan.md` · Spec: `SPEC.md` · Branch: `feature/stats-panel`
   - [x] `@media (max-width:767px)`: tighten padding/gaps, donut row wraps, headlines shrink, hide ④ timeline
   - [x] ② bars already label-free (compact); panel mobile chrome (full-area + bottom Close pill) from T2
   - [x] Verify: browser mobile (all of ①②③, timeline hidden, bottom pill) + desktop unaffected; `npm test` 490/490, validate clean
-- [ ] **T8** Theming / i18n / a11y / validate
-  - [ ] EN+CZ strings via `t()`; full light/dark via tokens; keyboard + SR labels + focus
-  - [ ] Security: no innerHTML/outerHTML/insertAdjacentHTML with weekData-derived values
-  - [ ] Reuse `.agenda-action-btn`; no orphan classes
-  - [ ] Verify: `npm test` + `npm run validate` green; manual F7/F8 matrix
-- [ ] **CHECKPOINT C** — human review · **MVP merge candidate**
+- [x] **T8** Theming / i18n / a11y / validate
+  - [x] i18n: EN+CZ parity (21 keys each, diffed) + new automated parity test in i18n.test.js
+  - [x] Theming: stats CSS uses only tokens; light+dark verified across all sections
+  - [x] Security: zero innerHTML/outerHTML/insertAdjacentHTML with weekData-derived values (textContent/createElementNS)
+  - [x] a11y: dialog roles+labels, role=img donut, native buttons, focus management (trigger→close→trigger), Esc/keyboard
+  - [x] Reuse: native buttons + `.help-close-btn`; no orphan button classes
+  - [x] Verify: `npm test` 491/491; `npm run validate` clean; full F7/F8 matrix (themes × widths × 3/8 branches × empty/unplanned)
+- [x] **CHECKPOINT C** — human review · **MVP merge candidate**
 
 ## Phase 5 — Fast-follow
 - [ ] **T9** Section ④ desktop-only timeline (Mon→Sun from doneAt/ticks/unplannedAt)

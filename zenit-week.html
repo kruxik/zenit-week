@@ -10500,6 +10500,7 @@ function renderStatsPanel() {
   _renderStatsBalanceSection(stats);
 }
 
+let _statsReturnFocus = null;
 function openStatsPanel() {
   const panel = document.getElementById('stats-panel');
   const overlay = document.getElementById('stats-overlay');
@@ -10508,6 +10509,10 @@ function openStatsPanel() {
   overlay.classList.add('visible');
   panel.classList.add('visible');
   _statsPanelOpen = true;
+  // a11y: remember the trigger and move focus into the dialog.
+  _statsReturnFocus = document.activeElement;
+  const closeBtn = document.getElementById('stats-close');
+  if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
 }
 
 function closeStatsPanel() {
@@ -10516,6 +10521,9 @@ function closeStatsPanel() {
   if (panel) panel.classList.remove('visible');
   if (overlay) overlay.classList.remove('visible');
   _statsPanelOpen = false;
+  // a11y: return focus to whatever opened the panel (usually the summary box).
+  if (_statsReturnFocus && typeof _statsReturnFocus.focus === 'function') _statsReturnFocus.focus();
+  _statsReturnFocus = null;
 }
 
 function updateSummary() {
