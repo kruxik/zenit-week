@@ -399,6 +399,10 @@ _state.setWeekKey = function(k) { currentWeekKey = k; };
 _state.getWeekKey = function() { return currentWeekKey; };
 _state.reset     = function() { undoStack = []; redoStack = []; };
 _state.getUndoStack = function() { return undoStack; };
+_state.getNextWeekRawCache = function() { return _nextWeekRawCache; };
+_state.setNextWeekRawCache = function(v) { _nextWeekRawCache = v; };
+_state.refreshNextWeekCache = function() { return refreshNextWeekCache(); };
+_state.moveNodeToNextWeek = function(id) { return moveNodeToNextWeek(id); };
 _state.setLang   = function(l) { 
   currentLang = l; 
   localStorage.setItem('zenit-week-lang', l);
@@ -446,11 +450,13 @@ _state.resetSyncState = function() {
   lastSyncedHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
-  _undoRedoForcePush = null;
+  _undoRedoForcePush = new Set();
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
 };
 _state.getUndoRedoForcePush = function() { return _undoRedoForcePush; };
-_state.setUndoRedoForcePush = function(v) { _undoRedoForcePush = v; };
+_state.setUndoRedoForcePush = function(v) {
+  _undoRedoForcePush = (v == null) ? new Set() : (v instanceof Set ? v : new Set([v]));
+};
 _state.getAccessToken = () => googleAccessToken;
 _state.useRealIDB = function(v) {
   _useMockIDB = !v;

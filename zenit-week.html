@@ -4042,7 +4042,7 @@ function isAppQuiescent(state) {
   if (state.hasEditingNode)      return { quiescent: false, reason: 'editing' };
   if (state.isPanning)           return { quiescent: false, reason: 'panning' };
   if (state.atomicOpsDepth > 0)  return { quiescent: false, reason: 'atomic-op' };
-  if (state.pendingUploadKey)    return { quiescent: false, reason: 'pending-upload' };
+  if (state.pendingUploadCount)  return { quiescent: false, reason: 'pending-upload' };
   if (state.openPanel)           return { quiescent: false, reason: `panel:${state.openPanel}` };
   return { quiescent: true, reason: null };
 }
@@ -4057,7 +4057,7 @@ function _collectQuiescenceState() {
     hasEditingNode:   weekData && weekData.nodes ? weekData.nodes.some(n => n._editing) : false,
     isPanning:        isPanning,
     atomicOpsDepth:   _atomicOpsDepth,
-    pendingUploadKey: _pendingUploadKey,
+    pendingUploadCount: _pendingUploadKeys.size,
     openPanel,
   };
 }
@@ -4341,7 +4341,22 @@ let redoStack = [];
 const MAX_UNDO = 100;
 let _applyingSnapshot = false;
 let _nextWeekRawCache = null;
-let _undoRedoForcePush = null;
+// Set of week keys whose local state was just restored by undo/redo and must
+// reach Drive without first pulling (which would resurrect the undone change).
+// A single op can touch two weeks (e.g. moveNodeToNextWeek), so this is a Set.
+let _undoRedoForcePush = new Set();
+
+// Tombstone every node that exists in `liveIds` but is missing from `data` so a
+// later Drive pull-merge (tombstone union + LWW) can't resurrect it. Mutates
+// data.tombstones in place.
+function _tombstoneRemovedNodes(data, liveIds) {
+  if (!data) return;
+  if (!Array.isArray(data.tombstones)) data.tombstones = [];
+  const present = new Set((data.nodes || []).map(n => n.id));
+  for (const id of liveIds) {
+    if (!present.has(id) && !data.tombstones.includes(id)) data.tombstones.push(id);
+  }
+}
 
 let nodeMap = new Map();
 
@@ -4378,6 +4393,15 @@ function takeSnapshot() {
 
 async function _applySnapshot(raw) {
   const snapshot = JSON.parse(raw);
+
+  // Capture the live (pre-restore) node ids of every week this snapshot will
+  // overwrite, BEFORE we mutate anything. Nodes present now but absent in the
+  // restored data must be tombstoned, or a Drive pull-merge resurrects them.
+  const prevCurrentWeekKey = currentWeekKey;
+  const primaryKey = snapshot.weekKey || prevCurrentWeekKey;
+  const livePrimaryIds = (primaryKey === prevCurrentWeekKey && weekData?.nodes)
+    ? new Set(weekData.nodes.map(n => n.id))
+    : new Set((((await loadWeekIDB(primaryKey)) || {}).nodes || []).map(n => n.id));
 
   // Switch to the week this snapshot was taken on, without clearing the stacks
   if (snapshot.weekKey && snapshot.weekKey !== currentWeekKey) {
@@ -4416,17 +4440,39 @@ async function _applySnapshot(raw) {
   // until the local state reaches Drive.
   const tsNow = Date.now();
   for (const n of weekData.nodes) n._ts = tsNow;
-  _undoRedoForcePush = currentWeekKey;
+  _tombstoneRemovedNodes(weekData, livePrimaryIds);
+  _undoRedoForcePush.add(currentWeekKey);
 
   await saveWeek(currentWeekKey, weekData);
 
-  // Restore next week's state if the snapshot captured it
+  // Restore next week's state if the snapshot captured it. This week is also
+  // force-pushed and gets tombstones for nodes the restore drops (e.g. undoing
+  // a moveNodeToNextWeek must un-resurrect the copy it placed in the next week).
   if (snapshot.nextWeekKey) {
-    _nextWeekRawCache = snapshot.nextWeekRaw;
-    if (snapshot.nextWeekRaw === null) {
+    const liveNextIds = new Set(
+      (((await loadWeekIDB(snapshot.nextWeekKey)) || {}).nodes || []).map(n => n.id)
+    );
+    if (snapshot.nextWeekRaw === null && liveNextIds.size === 0) {
+      // Next week didn't exist before and has no live nodes — clean delete.
       await deleteWeekIDB(snapshot.nextWeekKey);
+      _nextWeekRawCache = null;
     } else {
-      await saveWeekIDB(snapshot.nextWeekKey, JSON.parse(snapshot.nextWeekRaw));
+      // Either the snapshot captured next-week content, or the op created next-week
+      // nodes we must tombstone (force-push an empty-but-tombstoned record so Drive
+      // can't resurrect them).
+      const restoredNext = snapshot.nextWeekRaw === null
+        ? { nodes: [], tombstones: [] }
+        : JSON.parse(snapshot.nextWeekRaw);
+      if (!Array.isArray(restoredNext.tombstones)) restoredNext.tombstones = [];
+      if (!Array.isArray(restoredNext.nodes)) restoredNext.nodes = [];
+      _tombstoneRemovedNodes(restoredNext, liveNextIds);
+      for (const n of restoredNext.nodes) n._ts = tsNow;
+      restoredNext.savedAt = Date.now();
+      restoredNext.crdtVersion = (restoredNext.crdtVersion || 0) + 1;
+      _undoRedoForcePush.add(snapshot.nextWeekKey);
+      await saveWeekIDB(snapshot.nextWeekKey, restoredNext);
+      _nextWeekRawCache = JSON.stringify(restoredNext);
+      scheduleDriveSync(snapshot.nextWeekKey);
     }
   }
 
@@ -4954,7 +5000,7 @@ let googleAccessToken = null;   // current OAuth access token string
 let driveFileIdCache = new Map(); // weekKey → Drive file ID
 let lastSyncedHash = new Map();   // weekKey → FNV-1a hash of last uploaded JSON
 let etagCache = new Map();        // weekKey → ETag from last Drive pull
-let syncDebounceTimer = null;
+let syncDebounceTimers = new Map(); // wKey → debounce timer id (per-week)
 let colorsSyncDebounceTimer = null;
 let colorsSyncedHash = null;
 let tokenRenewalTimer = null;
@@ -5306,7 +5352,7 @@ async function handleAuthCode(callback) {
 async function signOut() {
   stopDrivePoll();
   if (tokenRenewalTimer)        { clearInterval(tokenRenewalTimer);        tokenRenewalTimer = null; }
-  if (syncDebounceTimer)        { clearTimeout(syncDebounceTimer);         syncDebounceTimer = null; }
+  clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer)  { clearTimeout(colorsSyncDebounceTimer);   colorsSyncDebounceTimer = null; }
 
   // Flush pending uploads BEFORE tearing down auth so no edits are lost
@@ -5645,17 +5691,17 @@ function isAtomicOpActive() {
 
 function _flushPendingSync() {
   _flushPendingMerge();
-  if (_pendingUploadKey) {
-    const wk = _pendingUploadKey;
-    _pendingUploadKey = null;
-    scheduleDriveSync(wk);
+  if (_pendingUploadKeys.size) {
+    const keys = [..._pendingUploadKeys];
+    _pendingUploadKeys.clear();
+    keys.forEach(wk => scheduleDriveSync(wk));
   }
 }
 
 // ─── TASK-11: Load week data from Drive ───────────────────────────────────────
 async function syncWeekFromDrive(wKey) {
   if (!googleAccessToken) return;
-  if (_undoRedoForcePush === wKey) return;
+  if (_undoRedoForcePush.has(wKey)) return;
 
   let fileId;
   try {
@@ -5968,9 +6014,9 @@ async function _uploadWeekToDrive(wKey, json) {
 async function syncWeekToDrive(wKey) {
   if (!googleAccessToken) return;
 
-  const forcePush = _undoRedoForcePush === wKey;
+  const forcePush = _undoRedoForcePush.has(wKey);
   if (forcePush) {
-    _undoRedoForcePush = null;
+    _undoRedoForcePush.delete(wKey);
     etagCache.delete(wKey);
     lastSyncedHash.delete(wKey);
   } else {
@@ -6082,18 +6128,28 @@ async function forcePushAllToDrive() {
   startDrivePoll(currentWeekKey);
 }
 
-// Resets the 10-second debounce timer; called from saveWeek()
+// Resets the 10-second debounce timer; called from saveWeek().
+// Timers are per-week — a single op can save more than one week (e.g.
+// moveNodeToNextWeek saves both the source and destination week), and a shared
+// timer would let the later schedule cancel the earlier week's upload.
 function scheduleDriveSync(wKey) {
   if (!googleAccessToken) return;
   if (isAtomicOpActive()) {
-    _pendingUploadKey = wKey;
+    _pendingUploadKeys.add(wKey);
     return;
   }
-  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
-  syncDebounceTimer = setTimeout(() => {
-    syncDebounceTimer = null;
+  const existing = syncDebounceTimers.get(wKey);
+  if (existing) clearTimeout(existing);
+  syncDebounceTimers.set(wKey, setTimeout(() => {
+    syncDebounceTimers.delete(wKey);
     syncWeekToDrive(wKey);
-  }, 10000);
+  }, 10000));
+}
+
+// Clear every pending per-week debounce timer (used on sign-out / tab-hide).
+function clearAllSyncDebounceTimers() {
+  syncDebounceTimers.forEach(t => clearTimeout(t));
+  syncDebounceTimers.clear();
 }
 
 async function syncColorsToDrive() {
@@ -6309,7 +6365,7 @@ let currentViewLevel = 'full'; // 'full' | 'pebbles' | 'rocks'
 let activeDayFilter = null;   // null | 0–6 | 'unscheduled'
 
 let _atomicOpsDepth = 0;    // nesting counter; Drive sync deferred while > 0
-let _pendingUploadKey = null; // wKey deferred by an active atomic op
+let _pendingUploadKeys = new Set(); // wKeys deferred by an active atomic op
 
 let dragState = {
   activeNodeId: null,
@@ -7138,6 +7194,15 @@ async function loadWeek(wk) {
     } catch(e) { /* fall through to plain defaults */ }
   }
   return defaultWeekData();
+}
+
+// Reload _nextWeekRawCache from IDB for the current week's next week. Call
+// whenever currentWeekKey changes so undo/redo snapshots capture the correct
+// next-week blob (see _applySnapshot's next-week restore).
+async function refreshNextWeekCache() {
+  const nextWeekKey = offsetWeek(currentWeekKey, 1);
+  const nextWeekData = await loadWeekIDB(nextWeekKey);
+  _nextWeekRawCache = nextWeekData ? JSON.stringify(nextWeekData) : null;
 }
 
 async function saveWeek(wk, data) {
@@ -14059,6 +14124,10 @@ window.addEventListener('hashchange', async () => {
     weekData = await loadWeek(currentWeekKey);
     rebuildNodeMap();
     syncBranchConfig();
+    // Refresh the next-week cache for the new current week. Without this the
+    // cache keeps the previous week's "next week" data, and any later undo/redo
+    // snapshot would write that stale blob into the wrong next-week record.
+    await refreshNextWeekCache();
     renderIfVisible();
     if (currentView === 'agenda') renderAgenda();
     if (googleAccessToken) startDrivePoll(currentWeekKey);
@@ -14106,9 +14175,12 @@ document.addEventListener('visibilitychange', () => {
   if (!googleAccessToken) return;
   if (document.visibilityState === 'hidden') {
     stopDrivePoll();
-    if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
+    // Flush every week with a pending debounce, not just the current one — a
+    // move/transfer may have left the next week queued.
+    const pendingWeeks = new Set([...syncDebounceTimers.keys(), currentWeekKey]);
+    clearAllSyncDebounceTimers();
     if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
-    syncWeekToDrive(currentWeekKey);
+    pendingWeeks.forEach(wk => syncWeekToDrive(wk));
     syncColorsToDrive();
   } else {
     syncWeekFromDrive(currentWeekKey); // pull before next edit

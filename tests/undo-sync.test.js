@@ -94,7 +94,7 @@ describe('Undo/redo vs Drive sync', () => {
 
     await undo();
 
-    expect(_state.getUndoRedoForcePush()).toBe(WK);
+    expect(_state.getUndoRedoForcePush().has(WK)).toBe(true);
   });
 
   test('redo sets _undoRedoForcePush flag', async () => {
@@ -110,7 +110,7 @@ describe('Undo/redo vs Drive sync', () => {
     _state.setUndoRedoForcePush(null);
     await redo();
 
-    expect(_state.getUndoRedoForcePush()).toBe(WK);
+    expect(_state.getUndoRedoForcePush().has(WK)).toBe(true);
   });
 
   test('undo bumps _ts on all restored nodes', async () => {
@@ -172,7 +172,7 @@ describe('Undo/redo vs Drive sync', () => {
 
     expect(uploadedBody).toContain('local_only');
     expect(uploadedBody).not.toContain('remote_only');
-    expect(_state.getUndoRedoForcePush()).toBeNull();
+    expect(_state.getUndoRedoForcePush().has(WK)).toBe(false);
   });
 
   test('pollDriveMeta does not resurrect undone changes when flag is set', async () => {

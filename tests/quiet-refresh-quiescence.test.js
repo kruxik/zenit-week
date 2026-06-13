@@ -6,7 +6,7 @@ function allClearState(overrides = {}) {
     hasEditingNode:   false,
     isPanning:        false,
     atomicOpsDepth:   0,
-    pendingUploadKey: null,
+    pendingUploadCount: 0,
     openPanel:        null,
     ...overrides,
   };
@@ -35,7 +35,7 @@ describe('isAppQuiescent', () => {
   });
 
   it('defers while a Drive upload is pending', () => {
-    expect(isAppQuiescent(allClearState({ pendingUploadKey: '2026-19' })))
+    expect(isAppQuiescent(allClearState({ pendingUploadCount: 1 })))
       .toEqual({ quiescent: false, reason: 'pending-upload' });
   });
 
@@ -54,7 +54,7 @@ describe('isAppQuiescent', () => {
   it('reports atomic-op before pending-upload when both are true', () => {
     const r = isAppQuiescent(allClearState({
       atomicOpsDepth: 1,
-      pendingUploadKey: '2026-20',
+      pendingUploadCount: 1,
     }));
     expect(r.reason).toBe('atomic-op');
   });
@@ -63,7 +63,7 @@ describe('isAppQuiescent', () => {
     expect(isAppQuiescent(allClearState({ atomicOpsDepth: 0 })).quiescent).toBe(true);
   });
 
-  it('treats null pendingUploadKey as clear', () => {
-    expect(isAppQuiescent(allClearState({ pendingUploadKey: null })).quiescent).toBe(true);
+  it('treats zero pendingUploadCount as clear', () => {
+    expect(isAppQuiescent(allClearState({ pendingUploadCount: 0 })).quiescent).toBe(true);
   });
 });
