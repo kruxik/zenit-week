@@ -129,3 +129,44 @@ describe('undo keeps the displayed week (does not jump to the action week)', () 
     expect(_state.getWeekKey()).toBe(VIEW);
   });
 });
+
+describe('undo of a single-week op does not force-push the untouched next week', () => {
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.clearIDBStore();
+    _state.reset();
+    _state.resetSyncState();
+  });
+
+  test('next week is left untouched (no clobbering of concurrent next-week edits)', async () => {
+    const CUR = '2030-10', NEXT = '2030-11';
+
+    // A next week that the operation never touches.
+    const nextRecord = {
+      nodes: [mkBranch('work', ['nx']),
+        { id: 'nx', type: 'activity', parent: 'work', branch: 'work', label: 'NextItem', children: [], done: false, _ts: 5000 }],
+      tombstones: [],
+    };
+    await saveWeekIDB(NEXT, nextRecord);
+
+    _state.setWeekKey(CUR);
+    _state.set({ nodes: [mkBranch('work', ['a1']),
+      { id: 'a1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 100 }],
+      tombstones: [] });
+    _state.setNextWeekRawCache(JSON.stringify(nextRecord));
+
+    // Snapshot, then make a current-week-only edit.
+    takeSnapshot();
+    _state.set({ nodes: [mkBranch('work', ['a1', 'a2']),
+      { id: 'a1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 100 },
+      { id: 'a2', type: 'activity', parent: 'work', branch: 'work', label: 'a2', children: [], done: false, _ts: 200 }],
+      tombstones: [] });
+
+    await undo();
+
+    expect(_state.getUndoRedoForcePush().has(CUR)).toBe(true);
+    expect(_state.getUndoRedoForcePush().has(NEXT)).toBe(false);
+    // Next week record is byte-for-byte unchanged (no _ts bump, no rewrite).
+    expect(await _state.loadWeekIDB(NEXT)).toEqual(nextRecord);
+  });
+});

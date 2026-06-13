@@ -4430,28 +4430,35 @@ async function _applySnapshot(raw) {
   _undoRedoForcePush.add(primaryKey);
   await saveWeek(primaryKey, restoredPrimary);
 
-  // ── Next week (force-push + tombstone dropped nodes; e.g. undoing a move) ──
+  // ── Next week ─────────────────────────────────────────────────────────────
+  // Only rewrite the next week when the snapshot's version actually differs from
+  // what's on disk. Most undos (single-week edits, transfers) never touch the
+  // next week — rewriting it would force-push (skipping the merge) and could
+  // clobber a concurrent next-week edit from another device. When it DID change
+  // (e.g. undoing a moveNodeToNextWeek), force-push + tombstone the dropped nodes.
   let restoredNext = null;
-  let nextDeleted = false;
+  let nextWritten = false;
   if (snapshot.nextWeekKey) {
-    const liveNextNodes = ((await loadWeekIDB(snapshot.nextWeekKey)) || {}).nodes || [];
-    if (snapshot.nextWeekRaw === null && liveNextNodes.length === 0) {
-      // Next week didn't exist before and has no live nodes — clean delete.
-      await deleteWeekIDB(snapshot.nextWeekKey);
-      nextDeleted = true;
-    } else {
+    const liveNextRecord = (await loadWeekIDB(snapshot.nextWeekKey)) || null;
+    const liveNextNodes = liveNextRecord?.nodes || [];
+    const nothingToRestore = snapshot.nextWeekRaw === null && liveNextNodes.length === 0;
+    if (!nothingToRestore) {
       restoredNext = snapshot.nextWeekRaw === null
         ? { nodes: [], tombstones: [] }
         : JSON.parse(snapshot.nextWeekRaw);
       if (!Array.isArray(restoredNext.tombstones)) restoredNext.tombstones = [];
       if (!Array.isArray(restoredNext.nodes)) restoredNext.nodes = [];
-      _tombstoneRemovedNodes(restoredNext, liveNextNodes);
-      for (const n of restoredNext.nodes) n._ts = tsNow;
-      restoredNext.savedAt = Date.now();
-      restoredNext.crdtVersion = (restoredNext.crdtVersion || 0) + 1;
-      _undoRedoForcePush.add(snapshot.nextWeekKey);
-      await saveWeekIDB(snapshot.nextWeekKey, restoredNext);
-      scheduleDriveSync(snapshot.nextWeekKey);
+      const liveSig = liveNextRecord ? _weekContentSig(liveNextRecord) : ' none';
+      if (_weekContentSig(restoredNext) !== liveSig) {
+        _tombstoneRemovedNodes(restoredNext, liveNextNodes);
+        for (const n of restoredNext.nodes) n._ts = tsNow;
+        restoredNext.savedAt = Date.now();
+        restoredNext.crdtVersion = (restoredNext.crdtVersion || 0) + 1;
+        _undoRedoForcePush.add(snapshot.nextWeekKey);
+        await saveWeekIDB(snapshot.nextWeekKey, restoredNext);
+        scheduleDriveSync(snapshot.nextWeekKey);
+        nextWritten = true;
+      }
     }
   }
 
@@ -4474,11 +4481,11 @@ async function _applySnapshot(raw) {
   // ── Refresh the in-memory copy of the week that is actually on screen ──────
   if (viewWeek === primaryKey) {
     weekData = restoredPrimary;
-  } else if (viewWeek === snapshot.nextWeekKey) {
-    weekData = nextDeleted ? await loadWeek(viewWeek) : restoredNext;
+  } else if (viewWeek === snapshot.nextWeekKey && nextWritten) {
+    weekData = restoredNext;
   } else {
-    // The displayed week wasn't touched by this snapshot — keep it as is.
-    weekData = (await loadWeekIDB(viewWeek)) || weekData;
+    // Displayed week wasn't rewritten by this snapshot — reload it as-is.
+    weekData = await loadWeek(viewWeek);
   }
   await refreshNextWeekCache();
 
