@@ -4346,15 +4346,18 @@ let _nextWeekRawCache = null;
 // A single op can touch two weeks (e.g. moveNodeToNextWeek), so this is a Set.
 let _undoRedoForcePush = new Set();
 
-// Tombstone every node that exists in `liveIds` but is missing from `data` so a
-// later Drive pull-merge (tombstone union + LWW) can't resurrect it. Mutates
-// data.tombstones in place.
-function _tombstoneRemovedNodes(data, liveIds) {
+// Tombstone every live node that is missing from `data` so a later Drive
+// pull-merge (tombstone union + LWW) can't resurrect it. Branch nodes are never
+// tombstoned — they're structural, shared across weeks, and re-created by
+// validateAndRepair; a branch tombstone would let a merge permanently delete it.
+// Mutates data.tombstones in place.
+function _tombstoneRemovedNodes(data, liveNodes) {
   if (!data) return;
   if (!Array.isArray(data.tombstones)) data.tombstones = [];
   const present = new Set((data.nodes || []).map(n => n.id));
-  for (const id of liveIds) {
-    if (!present.has(id) && !data.tombstones.includes(id)) data.tombstones.push(id);
+  for (const n of liveNodes) {
+    if (n.type === 'branch') continue;
+    if (!present.has(n.id) && !data.tombstones.includes(n.id)) data.tombstones.push(n.id);
   }
 }
 
@@ -4399,9 +4402,9 @@ async function _applySnapshot(raw) {
   // restored data must be tombstoned, or a Drive pull-merge resurrects them.
   const prevCurrentWeekKey = currentWeekKey;
   const primaryKey = snapshot.weekKey || prevCurrentWeekKey;
-  const livePrimaryIds = (primaryKey === prevCurrentWeekKey && weekData?.nodes)
-    ? new Set(weekData.nodes.map(n => n.id))
-    : new Set((((await loadWeekIDB(primaryKey)) || {}).nodes || []).map(n => n.id));
+  const livePrimaryNodes = (primaryKey === prevCurrentWeekKey && weekData?.nodes)
+    ? weekData.nodes.slice()
+    : (((await loadWeekIDB(primaryKey)) || {}).nodes || []);
 
   // Switch to the week this snapshot was taken on, without clearing the stacks
   if (snapshot.weekKey && snapshot.weekKey !== currentWeekKey) {
@@ -4440,7 +4443,7 @@ async function _applySnapshot(raw) {
   // until the local state reaches Drive.
   const tsNow = Date.now();
   for (const n of weekData.nodes) n._ts = tsNow;
-  _tombstoneRemovedNodes(weekData, livePrimaryIds);
+  _tombstoneRemovedNodes(weekData, livePrimaryNodes);
   _undoRedoForcePush.add(currentWeekKey);
 
   await saveWeek(currentWeekKey, weekData);
@@ -4449,10 +4452,8 @@ async function _applySnapshot(raw) {
   // force-pushed and gets tombstones for nodes the restore drops (e.g. undoing
   // a moveNodeToNextWeek must un-resurrect the copy it placed in the next week).
   if (snapshot.nextWeekKey) {
-    const liveNextIds = new Set(
-      (((await loadWeekIDB(snapshot.nextWeekKey)) || {}).nodes || []).map(n => n.id)
-    );
-    if (snapshot.nextWeekRaw === null && liveNextIds.size === 0) {
+    const liveNextNodes = ((await loadWeekIDB(snapshot.nextWeekKey)) || {}).nodes || [];
+    if (snapshot.nextWeekRaw === null && liveNextNodes.length === 0) {
       // Next week didn't exist before and has no live nodes — clean delete.
       await deleteWeekIDB(snapshot.nextWeekKey);
       _nextWeekRawCache = null;
@@ -4465,7 +4466,7 @@ async function _applySnapshot(raw) {
         : JSON.parse(snapshot.nextWeekRaw);
       if (!Array.isArray(restoredNext.tombstones)) restoredNext.tombstones = [];
       if (!Array.isArray(restoredNext.nodes)) restoredNext.nodes = [];
-      _tombstoneRemovedNodes(restoredNext, liveNextIds);
+      _tombstoneRemovedNodes(restoredNext, liveNextNodes);
       for (const n of restoredNext.nodes) n._ts = tsNow;
       restoredNext.savedAt = Date.now();
       restoredNext.crdtVersion = (restoredNext.crdtVersion || 0) + 1;
@@ -14094,6 +14095,12 @@ async function loadAndRender(wk) {
   weekData = await loadWeek(wk);
   rebuildNodeMap();
   syncBranchConfig();
+  // Keep the next-week cache aligned with the week we just navigated to. This is
+  // the primary navigation path (prev/next buttons); the hashchange handler
+  // no-ops here because we set currentWeekKey ourselves above. Without this the
+  // cache holds the previous week's "next week", so a later move/undo snapshot
+  // restores the wrong next-week record (duplication / failed un-resurrect).
+  await refreshNextWeekCache();
   if (wk === todayWeekKey()) {
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   } else {

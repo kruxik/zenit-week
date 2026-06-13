@@ -32,6 +32,22 @@ describe('Bug A — refreshNextWeekCache tracks the current week', () => {
     await _state.refreshNextWeekCache();
     expect(_state.getNextWeekRawCache()).toBeNull();
   });
+
+  // The regression that caused the user-reported bug: prev/next navigation goes
+  // through loadAndRender (not the hashchange handler), so the cache refresh must
+  // live there. Drive the real navigation function and confirm the cache aligns
+  // with the week we landed on — not the week we left.
+  test('navigation via loadAndRender refreshes the cache for the new week', async () => {
+    const next = { nodes: [mkBranch('work')], tombstones: [] };
+    await _state.saveWeekIDB('2099-02', next);
+    _state.setLocalStorage('zenit-week-2099-01', { nodes: [mkBranch('work')], tombstones: [] });
+
+    // Land on a stale value, then navigate — loadAndRender must overwrite it.
+    _state.setNextWeekRawCache(JSON.stringify({ nodes: [mkBranch('stale')], tombstones: [] }));
+    await _state.loadAndRender('2099-01');
+
+    expect(JSON.parse(_state.getNextWeekRawCache())).toEqual(next);
+  });
 });
 
 describe('Bug B — undo of a move un-resurrects the next-week copy', () => {
@@ -71,6 +87,9 @@ describe('Bug B — undo of a move un-resurrects the next-week copy', () => {
     // The moved-in copy is gone AND tombstoned so a Drive merge can't bring it back.
     expect(restoredNext.nodes.some(n => n.id === 'moved1')).toBe(false);
     expect(restoredNext.tombstones).toContain('moved1');
+    // Structural branches must never be tombstoned (a branch tombstone lets a
+    // Drive merge permanently delete it).
+    expect(restoredNext.tombstones).not.toContain('work');
     // Both touched weeks are force-pushed (no pull-before-push that would resurrect).
     expect(_state.getUndoRedoForcePush().has(WK)).toBe(true);
     expect(_state.getUndoRedoForcePush().has(NEXT)).toBe(true);

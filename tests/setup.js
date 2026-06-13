@@ -403,6 +403,7 @@ _state.getNextWeekRawCache = function() { return _nextWeekRawCache; };
 _state.setNextWeekRawCache = function(v) { _nextWeekRawCache = v; };
 _state.refreshNextWeekCache = function() { return refreshNextWeekCache(); };
 _state.moveNodeToNextWeek = function(id) { return moveNodeToNextWeek(id); };
+_state.loadAndRender = function(wk) { return loadAndRender(wk); };
 _state.setLang   = function(l) { 
   currentLang = l; 
   localStorage.setItem('zenit-week-lang', l);
