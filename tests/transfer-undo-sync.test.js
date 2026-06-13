@@ -4,7 +4,7 @@
 //   Bug B: undo of a cross-week move must tombstone the copy it placed in the
 //          next week, and force-push that week, or a Drive pull-merge resurrects it.
 import { describe, test, expect, beforeEach } from 'vitest';
-import { takeSnapshot, undo, _state } from './setup.js';
+import { takeSnapshot, undo, saveWeekIDB, _state } from './setup.js';
 
 const mkBranch = (id, children = []) =>
   ({ id, type: 'branch', branch: id, label: id, children, side: 'left', _ts: 0 });
@@ -93,5 +93,39 @@ describe('Bug B — undo of a move un-resurrects the next-week copy', () => {
     // Both touched weeks are force-pushed (no pull-before-push that would resurrect).
     expect(_state.getUndoRedoForcePush().has(WK)).toBe(true);
     expect(_state.getUndoRedoForcePush().has(NEXT)).toBe(true);
+  });
+});
+
+describe('undo keeps the displayed week (does not jump to the action week)', () => {
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.clearIDBStore();
+    _state.reset();
+    _state.resetSyncState();
+  });
+
+  test('undoing an action taken on another week leaves the view where it is', async () => {
+    const ACTED = '2026-05';   // where the snapshot was taken
+    const VIEW  = '2026-06';   // where the user is now looking
+
+    // Take a snapshot while "on" the acted-upon week.
+    _state.setWeekKey(ACTED);
+    _state.set({ nodes: [mkBranch('work', ['a1']),
+      { id: 'a1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 100 }],
+      tombstones: [] });
+    _state.setNextWeekRawCache(null);
+    takeSnapshot();
+    _state.set({ nodes: [mkBranch('work')], tombstones: ['a1'] });
+
+    // Navigate to a different week (the user "switches" before undoing).
+    await saveWeekIDB(VIEW, { nodes: [mkBranch('work')], tombstones: [] });
+    _state.setWeekKey(VIEW);
+    _state.set({ nodes: [mkBranch('work')], tombstones: [] });
+    _state.setNextWeekRawCache(null);
+
+    await undo();
+
+    // The view must stay on VIEW, not jump back to ACTED.
+    expect(_state.getWeekKey()).toBe(VIEW);
   });
 });

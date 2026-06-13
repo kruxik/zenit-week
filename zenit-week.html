@@ -4396,72 +4396,51 @@ function takeSnapshot() {
 
 async function _applySnapshot(raw) {
   const snapshot = JSON.parse(raw);
+  // Undo/redo must NOT move the user to another week. The snapshot's data is
+  // restored into the correct week records (in IDB), but whatever week is on
+  // screen stays on screen — we only reload its in-memory copy at the end.
+  const viewWeek = currentWeekKey;
+  const tsNow = Date.now();
 
-  // Capture the live (pre-restore) node ids of every week this snapshot will
-  // overwrite, BEFORE we mutate anything. Nodes present now but absent in the
-  // restored data must be tombstoned, or a Drive pull-merge resurrects them.
-  const prevCurrentWeekKey = currentWeekKey;
-  const primaryKey = snapshot.weekKey || prevCurrentWeekKey;
-  const livePrimaryNodes = (primaryKey === prevCurrentWeekKey && weekData?.nodes)
+  // Legacy snapshots stored only { nodes: [...] } and always describe the
+  // displayed week; modern snapshots carry weekKey + weekData.
+  const primaryKey = snapshot.weekKey || viewWeek;
+  const restoredPrimary = validateAndRepair(snapshot.nodes ? snapshot : snapshot.weekData);
+
+  // Restore branch colors (global, not per-week)
+  if (snapshot.branchColors) {
+    Object.keys(snapshot.branchColors).forEach(b => {
+      if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
+      BRANCH_COLORS[b] = deriveBranchPalette(snapshot.branchColors[b].main);
+    });
+    Object.keys(BRANCH_COLORS).forEach(b => {
+      if (!snapshot.branchColors[b]) delete BRANCH_COLORS[b];
+    });
+    saveBranchColors();
+  }
+
+  // ── Primary week (where the action happened) ──────────────────────────────
+  // Bump _ts so the next Drive merge (LWW by _ts) keeps the restored values,
+  // tombstone nodes the restore drops, and force-push (block pull-before-push).
+  const livePrimaryNodes = (primaryKey === viewWeek && weekData?.nodes)
     ? weekData.nodes.slice()
     : (((await loadWeekIDB(primaryKey)) || {}).nodes || []);
+  for (const n of restoredPrimary.nodes) n._ts = tsNow;
+  _tombstoneRemovedNodes(restoredPrimary, livePrimaryNodes);
+  _undoRedoForcePush.add(primaryKey);
+  await saveWeek(primaryKey, restoredPrimary);
 
-  // Switch to the week this snapshot was taken on, without clearing the stacks
-  if (snapshot.weekKey && snapshot.weekKey !== currentWeekKey) {
-    _applyingSnapshot = true;
-    currentWeekKey = snapshot.weekKey;
-    location.hash = snapshot.weekKey;
-    _applyingSnapshot = false;
-  }
-
-  // Support legacy snapshots that contain only weekData (plain object with nodes array)
-  if (snapshot.nodes) {
-    weekData = validateAndRepair(snapshot);
-  } else {
-    weekData = validateAndRepair(snapshot.weekData);
-    if (snapshot.branchColors) {
-      Object.keys(snapshot.branchColors).forEach(b => {
-        if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
-        BRANCH_COLORS[b] = deriveBranchPalette(snapshot.branchColors[b].main);
-      });
-      // Remove colors for branches no longer in the snapshot
-      Object.keys(BRANCH_COLORS).forEach(b => {
-        if (!snapshot.branchColors[b]) delete BRANCH_COLORS[b];
-      });
-      saveBranchColors();
-    }
-  }
-  // Rebuild BRANCH_CONFIG from the restored node data (node.side is now authoritative).
-  // syncBranchConfig reads node.side and overwrites BRANCH_CONFIG fully.
-  Object.keys(BRANCH_CONFIG).forEach(b => { delete BRANCH_CONFIG[b]; });
-  syncBranchConfig();
-  rebuildNodeMap();
-
-  // Undo/redo restores old _ts values on nodes. Without bumping them, the next
-  // Drive sync CRDT merge (LWW by _ts) would resurrect the undone changes from
-  // the remote copy which still has higher _ts. Force-push flag blocks pulls
-  // until the local state reaches Drive.
-  const tsNow = Date.now();
-  for (const n of weekData.nodes) n._ts = tsNow;
-  _tombstoneRemovedNodes(weekData, livePrimaryNodes);
-  _undoRedoForcePush.add(currentWeekKey);
-
-  await saveWeek(currentWeekKey, weekData);
-
-  // Restore next week's state if the snapshot captured it. This week is also
-  // force-pushed and gets tombstones for nodes the restore drops (e.g. undoing
-  // a moveNodeToNextWeek must un-resurrect the copy it placed in the next week).
+  // ── Next week (force-push + tombstone dropped nodes; e.g. undoing a move) ──
+  let restoredNext = null;
+  let nextDeleted = false;
   if (snapshot.nextWeekKey) {
     const liveNextNodes = ((await loadWeekIDB(snapshot.nextWeekKey)) || {}).nodes || [];
     if (snapshot.nextWeekRaw === null && liveNextNodes.length === 0) {
       // Next week didn't exist before and has no live nodes — clean delete.
       await deleteWeekIDB(snapshot.nextWeekKey);
-      _nextWeekRawCache = null;
+      nextDeleted = true;
     } else {
-      // Either the snapshot captured next-week content, or the op created next-week
-      // nodes we must tombstone (force-push an empty-but-tombstoned record so Drive
-      // can't resurrect them).
-      const restoredNext = snapshot.nextWeekRaw === null
+      restoredNext = snapshot.nextWeekRaw === null
         ? { nodes: [], tombstones: [] }
         : JSON.parse(snapshot.nextWeekRaw);
       if (!Array.isArray(restoredNext.tombstones)) restoredNext.tombstones = [];
@@ -4472,7 +4451,6 @@ async function _applySnapshot(raw) {
       restoredNext.crdtVersion = (restoredNext.crdtVersion || 0) + 1;
       _undoRedoForcePush.add(snapshot.nextWeekKey);
       await saveWeekIDB(snapshot.nextWeekKey, restoredNext);
-      _nextWeekRawCache = JSON.stringify(restoredNext);
       scheduleDriveSync(snapshot.nextWeekKey);
     }
   }
@@ -4493,20 +4471,48 @@ async function _applySnapshot(raw) {
     applyTranslations();
   }
 
+  // ── Refresh the in-memory copy of the week that is actually on screen ──────
+  if (viewWeek === primaryKey) {
+    weekData = restoredPrimary;
+  } else if (viewWeek === snapshot.nextWeekKey) {
+    weekData = nextDeleted ? await loadWeek(viewWeek) : restoredNext;
+  } else {
+    // The displayed week wasn't touched by this snapshot — keep it as is.
+    weekData = (await loadWeekIDB(viewWeek)) || weekData;
+  }
+  await refreshNextWeekCache();
+
+  // Rebuild BRANCH_CONFIG from the displayed week's node.side (authoritative).
+  Object.keys(BRANCH_CONFIG).forEach(b => { delete BRANCH_CONFIG[b]; });
+  syncBranchConfig();
+  rebuildNodeMap();
+
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
   window.dispatchEvent(new CustomEvent('snapshotApplied'));
 }
 
-function _currentSnapshot() {
-  const nextKey = offsetWeek(currentWeekKey, +1);
+// Build a snapshot of `wk`'s current state (for the redo/undo counter-stack).
+// Reads the displayed week from memory and any other week from IDB.
+async function _currentSnapshot(wk = currentWeekKey) {
+  const nextKey = offsetWeek(wk, +1);
+  const data = (wk === currentWeekKey && weekData?.nodes)
+    ? weekData
+    : (await loadWeekIDB(wk)) || { nodes: [] };
+  let nextRaw;
+  if (wk === currentWeekKey) {
+    nextRaw = _nextWeekRawCache;
+  } else {
+    const nd = await loadWeekIDB(nextKey);
+    nextRaw = nd ? JSON.stringify(nd) : null;
+  }
   return JSON.stringify({
-    weekKey:       currentWeekKey,
-    weekData,
+    weekKey:       wk,
+    weekData:      data,
     branchColors:  JSON.parse(JSON.stringify(BRANCH_COLORS)),
     branchConfig:  JSON.parse(JSON.stringify(BRANCH_CONFIG)),
     nextWeekKey:   nextKey,
-    nextWeekRaw:   _nextWeekRawCache,
+    nextWeekRaw:   nextRaw,
     theme:         localStorage.getItem('zenit-week-theme'),
     lang:          localStorage.getItem('zenit-week-lang'),
   });
@@ -4514,15 +4520,19 @@ function _currentSnapshot() {
 
 async function undo() {
   if (undoStack.length === 0) return;
-  redoStack.push(_currentSnapshot());
-  await _applySnapshot(undoStack.pop());
+  const raw = undoStack.pop();
+  const wk = JSON.parse(raw).weekKey || currentWeekKey;
+  redoStack.push(await _currentSnapshot(wk));
+  await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
 
 async function redo() {
   if (redoStack.length === 0) return;
-  undoStack.push(_currentSnapshot());
-  await _applySnapshot(redoStack.pop());
+  const raw = redoStack.pop();
+  const wk = JSON.parse(raw).weekKey || currentWeekKey;
+  undoStack.push(await _currentSnapshot(wk));
+  await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
 
