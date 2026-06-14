@@ -7204,7 +7204,11 @@ async function loadWeek(wk) {
             );
           }
         });
-        const newWeek = { nodes: prevBranches.map(b => ({ ...b, children: [] })) };
+        const newWeek = {
+          nodes: prevBranches.map(b => ({ ...b, children: [] })),
+          tombstones: [],
+          crdtVersion: 0,
+        };
         if (prevData.baseline) newWeek.baseline = prevData.baseline;
         return newWeek;
       }
