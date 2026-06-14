@@ -7875,6 +7875,15 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
     pruneTarget = findNode(pruneParentId);
   }
 
+  // After pruning, the surviving ancestor lost a whole child subtree — re-derive
+  // its done/unplanned from remaining children. The 7857 re-sync missed this case
+  // because the moved node's direct parent was emptied and pruned away, so its
+  // grandparent (which may now have all-done children) was never recomputed.
+  if (pruneTarget && pruneTarget.type === 'activity' && pruneTarget.children.length > 0) {
+    syncStatusUp(pruneTarget.children[0], 'done');
+    syncStatusUp(pruneTarget.children[0], 'unplanned');
+  }
+
   // 7. If a tick-child was moved, renumber surviving ticks on both sides so
   //    indices stay contiguous (1..N) in each week.
   if (node.tickChild) {
