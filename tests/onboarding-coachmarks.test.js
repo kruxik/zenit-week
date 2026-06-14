@@ -54,9 +54,10 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     expect(isHintSeen('hover-keys')).toBe(true);
   });
 
-  it('counter and days hints are registered', () => {
+  it('counter, days and views hints are registered', () => {
     expect(shouldShowHint('counter')).toBe(true);
     expect(shouldShowHint('days')).toBe(true);
+    expect(shouldShowHint('views')).toBe(true);
   });
 
   describe('magicHintId (counter/days trigger logic)', () => {

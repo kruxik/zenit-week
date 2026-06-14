@@ -6610,6 +6610,7 @@ const TRANSLATIONS = {
     'tips.hoverIntro':            'Hover a task, then press:',
     'tips.counter':               'Nice — that became a counter. End a task with a number + “x” (e.g. “3x”) to split it into check-off steps.',
     'tips.days':                  'Scheduled! Add days in parentheses — “(mo, we)” or “(daily)” — to place a task across the week.',
+    'tips.views':                 'Two views of your week: switch Mindmap ⇄ Agenda. In Mindmap, Rocks · Pebbles · Sand zoom from the big picture to full detail.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
@@ -6851,6 +6852,7 @@ const TRANSLATIONS = {
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
     'tips.counter':               'Super — vznikl počítací úkol. Zakončete název číslem s „x“ (např. „3x“) a rozdělí se na odškrtávací kroky.',
     'tips.days':                  'Naplánováno! Přidejte dny v závorce — „(po, st)“ nebo „(denně)“ — a úkol se rozmístí po týdnu.',
+    'tips.views':                 'Dva pohledy na týden: přepínejte Mapa ⇄ Agenda. V mapě Kameny · Oblázky · Písek přiblíží od celku k detailu.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
     'view.mindmap':               'Mapa',
@@ -14932,6 +14934,7 @@ const HINTS = {
   },
   'counter': { textKey: 'tips.counter' },
   'days':    { textKey: 'tips.days' },
+  'views':   { textKey: 'tips.views' },
 };
 
 // Which magic-feature hint (if any) a node now qualifies for, based on the
@@ -15167,6 +15170,12 @@ window.addEventListener('load', async () => {
   // View toggle bar
   document.getElementById('vtb-mindmap').addEventListener('click', () => switchView('mindmap'));
   document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
+
+  // Coachmark: teach the view controls on first hover of either bar.
+  const _viewToggleBar = document.getElementById('view-toggle-bar');
+  if (_viewToggleBar) _viewToggleBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewToggleBar));
+  const _viewLevelBar = document.getElementById('view-level-bar');
+  if (_viewLevelBar) _viewLevelBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewLevelBar));
   switchView(currentView); // apply persisted view (renders canvas or agenda)
 
   // Position the default-zoom marker on the track
