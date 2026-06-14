@@ -13569,6 +13569,12 @@ function zoomAt(cx, cy, factor) {
   applyTransform();
   _markZooming();
   if (editState) resizeInlineInput();
+  // Zooming mid-drag: re-place the grabbed node now so it tracks the cursor on
+  // the wheel event itself, not only on the next pointermove.
+  if (dragState.activeNodeId) {
+    updateDraggedVisuals(dragState.lastClientX, dragState.lastClientY);
+    updateDragTarget(dragState.lastClientX, dragState.lastClientY);
+  }
 }
 
 container.addEventListener('wheel', (e) => {
@@ -13634,10 +13640,18 @@ container.addEventListener('pointerdown', (e) => {
 const DRAG_EDGE = 80;          // px from container edge that triggers autoscroll
 const DRAG_MAX_SPEED = 16;     // max pan speed in px/frame at the very edge
 
+// World-space drag delta: cursor's current world pos minus its world pos at
+// grab. Reads the live panX/panY/zoom, so zoom/pan changes during the drag are
+// absorbed automatically and the node tracks the cursor exactly.
+function dragWorldDelta(clientX, clientY) {
+  const cwX = (clientX - dragState.rectLeft - panX) / zoom;
+  const cwY = (clientY - dragState.rectTop  - panY) / zoom;
+  return { dx: cwX - dragState.cursorStartWorldX, dy: cwY - dragState.cursorStartWorldY };
+}
+
 function updateDraggedVisuals(clientX, clientY) {
   if (!dragState.activeNodeId) return;
-  const dx = (clientX - dragState.startX) / zoom;
-  const dy = (clientY - dragState.startY) / zoom;
+  const { dx, dy } = dragWorldDelta(clientX, clientY);
 
   // Move dragged node groups via cached refs — no querySelector per frame.
   const initialPositions = dragState.initialPositions;
@@ -13691,9 +13705,8 @@ function dragAutoScrollTick() {
   if (vx === 0 && vy === 0) return;
   panX += vx;
   panY += vy;
-  // Compensate so cursor stays over the dragged node while we pan
-  dragState.startX += vx;
-  dragState.startY += vy;
+  // No manual compensation needed: updateDraggedVisuals recomputes from the
+  // live panX/panY each frame, so the node stays under the cursor as we pan.
   applyTransform();
   updateDraggedVisuals(dragState.lastClientX, dragState.lastClientY);
   updateDragTarget(dragState.lastClientX, dragState.lastClientY);
@@ -13715,8 +13728,7 @@ function rectOverlapArea(a, b) {
 function currentDragRect(cx, cy) {
   const p = dragState.layoutPositions[dragState.activeNodeId];
   if (!p) return null;
-  const dx = (cx - dragState.startX) / zoom;
-  const dy = (cy - dragState.startY) / zoom;
+  const { dx, dy } = dragWorldDelta(cx, cy);
   return { x: p.x + dx, y: p.y + dy, w: p.w, h: p.h };
 }
 
@@ -13837,9 +13849,18 @@ window.addEventListener('pointermove', (e) => {
         });
       });
       beginAtomicOp();
+      // Anchor the drag in WORLD space, not screen space. We record where the
+      // cursor sits in world coords at grab time; every frame we recompute the
+      // cursor's *current* world pos from the live panX/panY/zoom and move the
+      // subtree by the difference. This stays correct even if the view zooms or
+      // pans mid-drag (wheel zoom, pinch, edge autoscroll) — the node stays
+      // glued under the cursor instead of drifting.
+      const rect0 = container.getBoundingClientRect();
       dragState = {
         activeNodeId: id,
-        startX: originX, startY: originY,
+        rectLeft: rect0.left, rectTop: rect0.top,
+        cursorStartWorldX: (originX - rect0.left - panX) / zoom,
+        cursorStartWorldY: (originY - rect0.top  - panY) / zoom,
         initialPositions,
         nodeEls,
         edges,
