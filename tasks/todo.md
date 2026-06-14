@@ -4,12 +4,12 @@ Plan: `tasks/plan.md` · Spec: `docs/specs/onboarding-part-a-playground.md`
 Order is strict: **S1 → S2 → S3 → S4** (each builds on the prior). Check off only when AC + verification pass.
 
 ## S1 — Seed embedding + first-run loader
-- [ ] T1.1 — `scripts/inject-playground-seed.mjs`: read `assets/playground-seed.json` → write into delimited constant block in `zenit-week.html`; wire into `build` npm script.
-- [ ] T1.2 — Add `/* PLAYGROUND_SEED_START/END */` block + `const PLAYGROUND_SEED`; run inject to populate.
-- [ ] T1.3 — `maybeSeedPlayground()` in init (`:~14550`): trigger (empty DB ∨ `#playground`) + safety gate + `zenit-week-onboarded` flag.
-- [ ] T1.4 — Build seeded week: weekKey=today, stamp `_demo:true` + fresh `_ts`, `tombstones:[]`, `crdtVersion:0`, apply branch colors, `saveWeekIDB`, set flag, strip `#playground`.
-- [ ] T1.5 — `tests/onboarding-seed.test.js`: empty→seed, populated→no-op, `#playground` gate, flag blocks re-seed, nodes carry `_demo`.
-- [ ] T1.6 — `npm test` + `npm run validate` green.
+- [x] T1.1 — `scripts/inject-playground-seed.mjs`: read `assets/playground-seed.json` → write into delimited constant block in `zenit-week.html`; wire into `build` npm script.
+- [x] T1.2 — Add `/* PLAYGROUND_SEED_START/END */` block + `const PLAYGROUND_SEED`; run inject to populate (46 nodes, 4 colors).
+- [x] T1.3 — `maybeSeedPlayground()` in init: trigger (empty DB ∨ `#playground`) + safety gate + `zenit-week-onboarded` flag.
+- [x] T1.4 — Build seeded week: weekKey=today, stamp `_demo:true` + fresh `_ts`, `tombstones:[]`, `crdtVersion:0`, apply branch colors, `saveWeekIDB`, set flag, strip `#playground`.
+- [x] T1.5 — `tests/onboarding-seed.test.js`: empty→seed, populated→no-op, `#playground` gate, flag blocks re-seed, nodes carry `_demo`, colors applied, no-clobber (6 tests).
+- [x] T1.6 — `npm test` (505) + `npm run validate` green.
 - [ ] **C1 checkpoint** — fresh-open browser; confirm aha; tune seed content if needed.
 
 ## S2 — `_demo` drop-on-touch

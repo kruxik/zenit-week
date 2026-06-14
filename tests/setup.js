@@ -513,6 +513,7 @@ export const deleteValueIDB = (...args) => sandbox.deleteValueIDB(...args);
 export const loadWeek = (...args) => sandbox.loadWeek(...args);
 export const saveWeek = (...args) => sandbox.saveWeek(...args);
 export const runMigrationIfNeeded = (...args) => sandbox.runMigrationIfNeeded(...args);
+export const maybeSeedPlayground = (...args) => sandbox.maybeSeedPlayground(...args);
 
 export const {
   getISOWeek,

@@ -16,7 +16,7 @@
     "hero:svg": "node scripts/hero-svg.mjs",
     "og": "node scripts/og-image.mjs",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
-    "build": "node scripts/inject-version.js",
+    "build": "node scripts/inject-playground-seed.mjs && node scripts/inject-version.js",
     "release": "node scripts/release.mjs",
     "release:notes": "node scripts/extract-release-notes.mjs"
   },
