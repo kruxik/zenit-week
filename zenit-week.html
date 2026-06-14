@@ -5663,6 +5663,13 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
   } catch (e) {
     console.error('[Drive] Failed to write merged data to IndexedDB:', e);
   }
+  // Keep the next-week snapshot cache in sync with what just landed in IDB.
+  // saveWeek refreshes this (see saveWeek), but Drive-poll/peer merges write
+  // via saveWeekIDB and bypass it. A stale cache makes undo/redo restore an
+  // outdated next-week blob and tombstone live nodes the merge just pulled in.
+  if (wKey === offsetWeek(currentWeekKey, 1)) {
+    _nextWeekRawCache = JSON.stringify(mergedData);
+  }
   // When the merge produced content the source lacked (scheduleUpload), tell peer
   // tabs so they reconverge. Applies to both local-peer and Drive-pull merges.
   // Loop-safe: the receiver's sig-equality guard halts once content converges.
