@@ -20,11 +20,11 @@ Order is strict: **S1 → S2 → S3 → S4** (each builds on the prior). Check o
 - [x] T2.5 — `npm test` (511) + `npm run validate` green.
 
 ## S3 — Manual cleanup ("Clear example tasks")
-- [ ] T3.1 — Cleanup fn: snapshot → tombstone+remove `_demo` nodes (keep branches) → rebuild/save/render.
-- [ ] T3.2 — Help-panel entry (`.agenda-action-btn`) via `showAppConfirm({danger:true})`.
-- [ ] T3.3 — i18n EN+CS: `onboarding.clearExample`, `clearConfirmTitle`, `clearConfirmBody`, `clearConfirmOk`.
-- [ ] T3.4 — Tests: touch 2 → cleanup removes only untouched demo, branches intact, undo restores.
-- [ ] T3.5 — `npm test` + `npm run validate` green.
+- [x] T3.1 — `clearExampleTasks()`: removes only fully-untouched demo *subtrees* (never branches, never orphans a touched child) → snapshot/tombstone/save/render. + `hasDemoActivityNodes()` / `_subtreeAllDemo()` helpers.
+- [x] T3.2 — Help-panel section `#help-onboarding-section` (`.agenda-action-btn.danger`), shown only while demo tasks remain, via `showAppConfirm({danger:true})`.
+- [x] T3.3 — i18n EN+CS: `onboarding.clearTitle`, `clearHelpBody`, `clearExample`, `clearConfirmTitle`, `clearConfirmBody`, `clearConfirmOk`.
+- [x] T3.4 — `tests/onboarding-cleanup.test.js`: partial-subtree retention, branches kept, child-array detach, undo restores, no-op, branch-ignoring count (6 tests).
+- [x] T3.5 — `npm test` (517) + `npm run validate` green.
 - [ ] **C2 checkpoint** — browser: play→cleanup→undo loop.
 
 ## S4 — Gentle auto-nudge banner

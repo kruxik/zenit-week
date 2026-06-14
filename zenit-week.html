@@ -2778,6 +2778,13 @@
     padding: 0 16px;
     font-weight: 400;
   }
+  /* Respect the hidden attribute — .agenda-action-btn sets its own display,
+     which would otherwise override [hidden]{display:none} and show an empty
+     secondary button on confirms that don't use one. */
+  #app-confirm-actions .agenda-action-btn[hidden],
+  #import-confirm-actions .agenda-action-btn[hidden] {
+    display: none;
+  }
   #app-confirm-actions .agenda-action-btn.danger,
   #import-confirm-actions .agenda-action-btn.danger {
     color: var(--accent-danger);
@@ -3755,6 +3762,14 @@
   </div>
 
   <div id="help-content">
+      <div class="help-section" id="help-onboarding-section" hidden>
+        <div class="help-section-title" data-i18n="onboarding.clearTitle">Example week</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary); margin-bottom: 10px;">
+          <span data-i18n="onboarding.clearHelpBody">This week was started from an example. Edit anything to make it yours — then clear what's left.</span>
+        </div>
+        <button type="button" class="agenda-action-btn danger" id="help-clear-example" data-i18n="onboarding.clearExample">Clear example tasks</button>
+      </div>
+
       <div class="help-section">
         <div class="help-section-title" data-i18n="help.aboutTitle">What it solves</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
@@ -6533,6 +6548,12 @@ const TRANSLATIONS = {
     'stats.legendUnplanned':      'unplanned (hatched)',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
+    'onboarding.clearTitle':      'Example week',
+    'onboarding.clearHelpBody':   "This week was started from an example. Edit anything to make it yours — then clear what's left.",
+    'onboarding.clearExample':    'Clear example tasks',
+    'onboarding.clearConfirmTitle': 'Clear example tasks?',
+    'onboarding.clearConfirmBody':  'This removes the remaining example tasks you haven’t touched. Anything you edited or added stays. You can undo this.',
+    'onboarding.clearConfirmOk':  'Clear',
     'help.aboutTitle':            'What it solves',
     'help.aboutP1':               'Most planners are flat lists — checklists or todos.',
     'help.aboutP2Lead':           'Rocks first',
@@ -6759,6 +6780,12 @@ const TRANSLATIONS = {
     'stats.legendUnplanned':      'neplánováno (šrafováno)',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
+    'onboarding.clearTitle':      'Ukázkový týden',
+    'onboarding.clearHelpBody':   'Tento týden začal jako ukázka. Cokoli upravte, ať je váš — a pak zbytek smažte.',
+    'onboarding.clearExample':    'Smazat ukázkové úkoly',
+    'onboarding.clearConfirmTitle': 'Smazat ukázkové úkoly?',
+    'onboarding.clearConfirmBody':  'Odebere zbývající ukázkové úkoly, kterých jste se nedotkli. Co jste upravili nebo přidali, zůstane. Akci lze vrátit zpět.',
+    'onboarding.clearConfirmOk':  'Smazat',
     'help.aboutTitle':            'Co řeší',
     'help.aboutP1':               'Většina plánovačů je jen plochý seznam — checklist nebo todo.',
     'help.aboutP2Lead':           'Velké kameny první',
@@ -14614,6 +14641,45 @@ async function maybeSeedPlayground() {
   return true;
 }
 
+// True when the current week still holds untouched example (seed) tasks —
+// i.e. non-branch nodes that retain the _demo flag. Drives the Help cleanup
+// entry's visibility and the auto-nudge (S4). Branches are never counted.
+function hasDemoActivityNodes() {
+  return (weekData.nodes || []).some(n => n._demo && n.type !== 'branch');
+}
+
+// True when n and its entire subtree are untouched demo nodes (no branch, no
+// node the user has touched). Such a subtree is safe to remove wholesale.
+function _subtreeAllDemo(id) {
+  const n = findNode(id);
+  if (!n || n.type === 'branch' || !n._demo) return false;
+  return (n.children || []).every(_subtreeAllDemo);
+}
+
+// "Clear example tasks" — removes only fully-untouched demo subtrees. Branches
+// always survive (even if emptied); any subtree containing a node the user
+// touched is kept so their work is never lost. Snapshot-undoable. Returns the
+// number of nodes removed. See docs/specs/onboarding-part-a-playground.md.
+function clearExampleTasks() {
+  const removed = new Set();
+  (weekData.nodes || []).forEach(n => {
+    if (n.type !== 'branch' && n._demo && _subtreeAllDemo(n.id)) removed.add(n.id);
+  });
+  if (removed.size === 0) return 0;
+
+  takeSnapshot();
+  tombstoneNodes([...removed]);
+  weekData.nodes = weekData.nodes.filter(n => !removed.has(n.id));
+  weekData.nodes.forEach(n => {
+    if (Array.isArray(n.children)) n.children = n.children.filter(id => !removed.has(id));
+  });
+  rebuildNodeMap();
+  saveWeek(currentWeekKey, weekData);
+  render();
+  if (typeof updateSummary === 'function') updateSummary();
+  return removed.size;
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', async () => {
   await openDB();
@@ -14702,9 +14768,29 @@ window.addEventListener('load', async () => {
   const helpClose = document.getElementById('help-close');
 
   const doOpenHelp = () => {
+    // Show the "Clear example tasks" entry only while untouched seed tasks remain.
+    const onboardingSection = document.getElementById('help-onboarding-section');
+    if (onboardingSection) onboardingSection.hidden = !hasDemoActivityNodes();
     helpOverlay.classList.add('visible');
     helpPanel.classList.add('visible');
   };
+
+  const clearExampleBtn = document.getElementById('help-clear-example');
+  if (clearExampleBtn) {
+    clearExampleBtn.addEventListener('click', () => {
+      showAppConfirm({
+        title: t('onboarding.clearConfirmTitle'),
+        body: t('onboarding.clearConfirmBody'),
+        okLabel: t('onboarding.clearConfirmOk'),
+        danger: true,
+        onConfirm: () => {
+          clearExampleTasks();
+          const section = document.getElementById('help-onboarding-section');
+          if (section) section.hidden = !hasDemoActivityNodes();
+        },
+      });
+    });
+  }
 
   const doCloseHelp = () => {
     helpOverlay.classList.remove('visible');

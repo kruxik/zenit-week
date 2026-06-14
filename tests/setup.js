@@ -590,6 +590,9 @@ export const {
   moveNodeToNextWeek,
   // Onboarding _demo drop-on-touch
   touchNode,
+  // Onboarding cleanup
+  clearExampleTasks,
+  hasDemoActivityNodes,
   // History
   takeSnapshot,
   undo,
