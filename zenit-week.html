@@ -6608,6 +6608,8 @@ const TRANSLATIONS = {
     'settings.tips':              'Show tips',
     'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
     'tips.hoverIntro':            'Hover a task, then press:',
+    'tips.counter':               'Nice — that became a counter. End a task with a number + “x” (e.g. “3x”) to split it into check-off steps.',
+    'tips.days':                  'Scheduled! Add days in parentheses — “(mo, we)” or “(daily)” — to place a task across the week.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
@@ -6847,6 +6849,8 @@ const TRANSLATIONS = {
     'settings.tips':              'Zobrazovat tipy',
     'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
+    'tips.counter':               'Super — vznikl počítací úkol. Zakončete název číslem s „x“ (např. „3x“) a rozdělí se na odškrtávací kroky.',
+    'tips.days':                  'Naplánováno! Přidejte dny v závorce — „(po, st)“ nebo „(denně)“ — a úkol se rozmístí po týdnu.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
     'view.mindmap':               'Mapa',
@@ -9994,6 +9998,10 @@ function commitEdit(followUp = 'auto') {
 
     saveWeek(currentWeekKey, weekData);
     renderIfVisible();
+
+    // Teachable moment: first time a node gains tick (counter) or day children,
+    // surface the matching tip anchored to that node.
+    maybeShowMagicHint(nodeId);
 
     // Hold atomic op across the chained startAddNode so a remote-merge flush
     // can't fire between this commit and the next _openInlineInput. Without
@@ -14904,6 +14912,9 @@ function maybePlaygroundNudge() {
 let _tipsEnabled = true;        // global "Show tips" setting (default on)
 let _tipsSeen = {};             // { [hintId]: true } — persisted
 let _coachmarkVisible = false;  // single coachmark on screen at a time
+let _coachmarkAnchorEl = null;  // element the bubble points at
+let _coachmarkAnchorId = null;  // its node-group data-id (re-queried after re-render)
+let _coachmarkRaf = null;       // rAF handle for live repositioning
 
 // Hint registry. Each entry is either { textKey } for a plain-text hint, or
 // { introKey, keys: [{ k, labelKey }] } to render kbd rows like the Help panel.
@@ -14919,7 +14930,30 @@ const HINTS = {
       { k: 'Del',   labelKey: 'help.delete' },
     ],
   },
+  'counter': { textKey: 'tips.counter' },
+  'days':    { textKey: 'tips.days' },
 };
+
+// Which magic-feature hint (if any) a node now qualifies for, based on the
+// children applyMagicLabel just created. Pure — used by the commitEdit trigger.
+function magicHintId(node) {
+  if (!node) return null;
+  const kids = (node.children || []).map(findNode).filter(Boolean);
+  if (kids.some(n => n.tickChild)) return 'counter';
+  if (kids.some(n => n.dayChild)) return 'days';          // multi-day → day-children
+  if (parseTodoDays(node.label || '').size >= 1) return 'days'; // single-day inline token
+  return null;
+}
+
+// Fire the counter/days hint for a just-committed node, anchored to its element.
+function maybeShowMagicHint(nodeId) {
+  const id = magicHintId(findNode(nodeId));
+  if (!id) return;
+  // Node ids are genId() UUIDs (selector-safe) — mirror the existing
+  // .node-group[data-id=…] lookups, which don't use CSS.escape.
+  const el = document.querySelector(`.node-group[data-id="${nodeId}"]`);
+  if (el) maybeShowHint(id, el);
+}
 
 function tipsEnabled() { return _tipsEnabled; }
 function isHintSeen(id) { return !!_tipsSeen[id]; }
@@ -14992,6 +15026,39 @@ function renderCoachmarkContent(hint) {
   }
 }
 
+// Re-resolve the anchor element each frame: a full render() rebuilds node
+// groups, so prefer a fresh lookup by data-id over the (possibly stale) ref.
+function _resolveCoachmarkAnchor() {
+  if (_coachmarkAnchorId) {
+    const byId = document.querySelector(`.node-group[data-id="${_coachmarkAnchorId}"]`);
+    if (byId) return byId;
+  }
+  return _coachmarkAnchorEl;
+}
+
+// Keep the bubble glued to its anchor while it moves (pan, zoom, auto-layout
+// animation). Stops when dismissed or the anchored node disappears.
+function startCoachmarkTracking() {
+  cancelCoachmarkTracking();
+  if (typeof requestAnimationFrame !== 'function') return;
+  const tick = () => {
+    if (!_coachmarkVisible) { _coachmarkRaf = null; return; }
+    const cm = document.getElementById('coachmark');
+    const el = _resolveCoachmarkAnchor();
+    if (!cm || !el || el.isConnected === false) { hideCoachmark(); return; }
+    positionCoachmark(cm, el);
+    _coachmarkRaf = requestAnimationFrame(tick);
+  };
+  _coachmarkRaf = requestAnimationFrame(tick);
+}
+
+function cancelCoachmarkTracking() {
+  if (_coachmarkRaf != null && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(_coachmarkRaf);
+  }
+  _coachmarkRaf = null;
+}
+
 function showCoachmark(id, anchorEl) {
   const cm = document.getElementById('coachmark');
   const hint = HINTS[id];
@@ -15000,14 +15067,20 @@ function showCoachmark(id, anchorEl) {
   cm._hintId = id;
   cm.hidden = false;
   _coachmarkVisible = true;
-  // Position after layout so getBoundingClientRect is accurate.
+  _coachmarkAnchorEl = anchorEl;
+  _coachmarkAnchorId = (anchorEl && anchorEl.dataset && anchorEl.dataset.id) || null;
+  // Position now, then track so it follows the node as the canvas moves.
   positionCoachmark(cm, anchorEl);
+  startCoachmarkTracking();
 }
 
 function hideCoachmark() {
+  cancelCoachmarkTracking();
   const cm = document.getElementById('coachmark');
   if (cm) { cm.hidden = true; cm._hintId = null; }
   _coachmarkVisible = false;
+  _coachmarkAnchorEl = null;
+  _coachmarkAnchorId = null;
 }
 
 // Mark the visible hint seen and dismiss it (Got it / Esc).

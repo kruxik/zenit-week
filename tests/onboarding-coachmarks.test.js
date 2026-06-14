@@ -6,6 +6,7 @@ import {
   isHintSeen,
   markHintSeen,
   shouldShowHint,
+  magicHintId,
 } from './setup.js';
 
 describe('Coachmark hints — engine + seam (PB1)', () => {
@@ -51,5 +52,34 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     markHintSeen('hover-keys');
     markHintSeen('hover-keys');
     expect(isHintSeen('hover-keys')).toBe(true);
+  });
+
+  it('counter and days hints are registered', () => {
+    expect(shouldShowHint('counter')).toBe(true);
+    expect(shouldShowHint('days')).toBe(true);
+  });
+
+  describe('magicHintId (counter/days trigger logic)', () => {
+    const mk = (overrides) => ({ id: 'x', type: 'activity', children: ['c'], ...overrides });
+
+    it('returns "counter" when a child is a tickChild', () => {
+      _state.set({ nodes: [mk(), { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] }] });
+      expect(magicHintId(_state.get().nodes[0])).toBe('counter');
+    });
+
+    it('returns "days" when a child is a dayChild', () => {
+      _state.set({ nodes: [mk(), { id: 'c', type: 'activity', parent: 'x', dayChild: true, dayIndex: 0, children: [] }] });
+      expect(magicHintId(_state.get().nodes[0])).toBe('days');
+    });
+
+    it('returns "days" for a single-day inline token (no day-children)', () => {
+      _state.set({ nodes: [mk({ children: [], label: 'Workout (tu)' })] });
+      expect(magicHintId(_state.get().nodes[0])).toBe('days');
+    });
+
+    it('returns null for a plain task', () => {
+      _state.set({ nodes: [mk({ children: [], label: 'Workout' })] });
+      expect(magicHintId(_state.get().nodes[0])).toBe(null);
+    });
   });
 });

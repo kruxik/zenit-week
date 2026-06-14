@@ -607,6 +607,7 @@ export const {
   isHintSeen,
   markHintSeen,
   shouldShowHint,
+  magicHintId,
   // History
   takeSnapshot,
   undo,
