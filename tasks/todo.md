@@ -13,11 +13,11 @@ Order is strict: **S1 → S2 → S3 → S4** (each builds on the prior). Check o
 - [ ] **C1 checkpoint** — fresh-open browser; confirm aha; tune seed content if needed.
 
 ## S2 — `_demo` drop-on-touch
-- [ ] T2.1 — `clearDemo(nodeId)` helper.
-- [ ] T2.2 — Hook mutators: rename commit, move/drag, done, unplanned, priority, counter tick, add-child/add-node (+ `clearDemo(parent)`).
-- [ ] T2.3 — Verify color/theme/zoom/pan are NOT touches.
-- [ ] T2.4 — Tests: one case per mutator drops flag; untouched node keeps it.
-- [ ] T2.5 — `npm test` green.
+- [x] T2.1 — Implemented inside `touchNode(id, opts)` (the universal per-node mutation hook) rather than a separate helper — auto-covers all 37 mutation sites + future ones.
+- [x] T2.2 — All mutators covered via `touchNode`: rename, move/drag, done, unplanned, priority, counter tick, add-child (touches parent; new node never gets `_demo`).
+- [x] T2.3 — Bulk recenter-all (`:13854`) exempted via `touchNode(id,{keepDemo:true})`; color/theme/zoom/pan don't call `touchNode`.
+- [x] T2.4 — `tests/onboarding-demo-touch.test.js`: touchNode drop + keepDemo + isolation + done/priority/unplanned mutators (6 tests).
+- [x] T2.5 — `npm test` (511) + `npm run validate` green.
 
 ## S3 — Manual cleanup ("Clear example tasks")
 - [ ] T3.1 — Cleanup fn: snapshot → tombstone+remove `_demo` nodes (keep branches) → rebuild/save/render.

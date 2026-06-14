@@ -588,6 +588,8 @@ export const {
   // Transfers
   transferUnfinished,
   moveNodeToNextWeek,
+  // Onboarding _demo drop-on-touch
+  touchNode,
   // History
   takeSnapshot,
   undo,

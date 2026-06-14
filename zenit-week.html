@@ -7907,9 +7907,16 @@ function findNode(id) {
   return nodeMap.get(id);
 }
 
-function touchNode(id) {
+// Marks a node as user-modified: bumps _ts for Drive LWW merge and, for
+// onboarding seed nodes, drops the _demo flag so the node is now the user's own
+// (and survives "Clear example tasks"). Pass { keepDemo: true } for bulk layout
+// operations (e.g. recenter-all) that touch every node without the user
+// actually claiming each one. See docs/specs/onboarding-part-a-playground.md.
+function touchNode(id, opts) {
   const node = findNode(id);
-  if (node) node._ts = Date.now();
+  if (!node) return;
+  node._ts = Date.now();
+  if (node._demo && !(opts && opts.keepDemo)) delete node._demo;
 }
 
 function tombstoneNodes(ids) {
@@ -13851,7 +13858,7 @@ window.addEventListener('pointerup', (e) => {
       if (panX !== panStartPanX || panY !== panStartPanY) {
         takeSnapshot();
         weekData.nodes.forEach(n => {
-          if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchNode(n.id); }
+          if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchNode(n.id, { keepDemo: true }); }
         });
         saveWeek(currentWeekKey, weekData);
         render();
