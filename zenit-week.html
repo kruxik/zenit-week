@@ -578,6 +578,58 @@
   }
   #view-level-toast.visible { opacity: 1; }
 
+  /* Onboarding nudge — gentle, actionable banner offering to clear leftover
+     example tasks once the user has started their own week. */
+  #playground-nudge {
+    position: fixed;
+    bottom: 68px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: min(92vw, 480px);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    padding: 10px 12px 10px 16px;
+    box-shadow: 0 4px 16px var(--shadow-md);
+    z-index: 3000;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  #playground-nudge.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+  #playground-nudge-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  #playground-nudge-actions .agenda-action-btn {
+    white-space: nowrap;
+    height: 32px;
+    padding: 0 12px;
+    font-weight: 400;
+  }
+  #playground-nudge-actions .agenda-action-btn.danger {
+    color: var(--accent-danger);
+    border-color: var(--accent-danger-border);
+  }
+  #playground-nudge-actions .agenda-action-btn.danger:hover {
+    color: var(--accent-danger);
+    border-color: var(--accent-danger);
+  }
+  #playground-nudge-actions .agenda-action-btn.danger:hover::before {
+    background: var(--accent-danger-bg);
+  }
+
   .view-level-btn {
     display: flex;
     flex-direction: column;
@@ -3542,6 +3594,14 @@
 </div>
 
 <div id="view-level-toast"></div>
+
+<div id="playground-nudge" role="status" aria-live="polite">
+  <span id="playground-nudge-text" data-i18n="onboarding.nudge">Done exploring? Clear the example tasks and keep your own — you can also do this anytime in Settings → Help.</span>
+  <span id="playground-nudge-actions">
+    <button type="button" class="agenda-action-btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Dismiss</button>
+    <button type="button" class="agenda-action-btn danger" id="playground-nudge-clear" data-i18n="onboarding.clearExample">Clear example tasks</button>
+  </span>
+</div>
 
 <div id="context-menu">
   <div class="ctx-item" id="ctx-current-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.currentWeek">Current Week</span></div>
@@ -6554,6 +6614,8 @@ const TRANSLATIONS = {
     'onboarding.clearConfirmTitle': 'Clear example tasks?',
     'onboarding.clearConfirmBody':  'This removes the remaining example tasks you haven’t touched. Anything you edited or added stays. You can undo this.',
     'onboarding.clearConfirmOk':  'Clear',
+    'onboarding.nudge':           'Done exploring? Clear the example tasks and keep your own — you can also do this anytime in Settings → Help.',
+    'onboarding.nudgeDismiss':    'Dismiss',
     'help.aboutTitle':            'What it solves',
     'help.aboutP1':               'Most planners are flat lists — checklists or todos.',
     'help.aboutP2Lead':           'Rocks first',
@@ -6786,6 +6848,8 @@ const TRANSLATIONS = {
     'onboarding.clearConfirmTitle': 'Smazat ukázkové úkoly?',
     'onboarding.clearConfirmBody':  'Odebere zbývající ukázkové úkoly, kterých jste se nedotkli. Co jste upravili nebo přidali, zůstane. Akci lze vrátit zpět.',
     'onboarding.clearConfirmOk':  'Smazat',
+    'onboarding.nudge':           'Hotovo s prozkoumáváním? Smažte ukázkové úkoly a nechte si jen své — kdykoli to lze i v Nastavení → Nápověda.',
+    'onboarding.nudgeDismiss':    'Zavřít',
     'help.aboutTitle':            'Co řeší',
     'help.aboutP1':               'Většina plánovačů je jen plochý seznam — checklist nebo todo.',
     'help.aboutP2Lead':           'Velké kameny první',
@@ -7276,6 +7340,10 @@ async function saveWeek(wk, data) {
   }
 
   scheduleDriveSync(wk);
+
+  // Onboarding: once the user has made the on-screen week their own, gently
+  // offer to clear leftover example tasks.
+  if (wk === currentWeekKey) maybePlaygroundNudge();
 }
 
 async function exportAllData() {
@@ -14680,11 +14748,52 @@ function clearExampleTasks() {
   return removed.size;
 }
 
+// ─── Onboarding nudge ────────────────────────────────────────────────────────
+let _playgroundNudgeDone = false;   // persisted: user dismissed or cleared
+let _playgroundNudgeShown = false;  // already surfaced this session
+
+// Count of the user's own committed tasks in the current week: non-branch,
+// non-demo, and not an in-progress placeholder (_editing). Excluding _editing
+// means an empty placeholder created on commit doesn't inflate the count.
+function playgroundUserNodeCount() {
+  return (weekData.nodes || []).filter(n => n.type !== 'branch' && !n._demo && !n._editing).length;
+}
+
+// Threshold of the user's own saved tasks before we offer cleanup.
+const PLAYGROUND_NUDGE_THRESHOLD = 5;
+
+// Show the nudge once the user has clearly started their own week (enough of
+// their own saved tasks) while untouched example tasks still remain — once only.
+function shouldShowPlaygroundNudge() {
+  return !_playgroundNudgeDone
+      && !_playgroundNudgeShown
+      && hasDemoActivityNodes()
+      && playgroundUserNodeCount() >= PLAYGROUND_NUDGE_THRESHOLD;
+}
+
+function dismissPlaygroundNudge(persist) {
+  _playgroundNudgeShown = true;
+  const banner = document.getElementById('playground-nudge');
+  if (banner) banner.classList.remove('visible');
+  if (persist) {
+    _playgroundNudgeDone = true;
+    saveValueIDB('zenit-week-playground-nudged', true);
+  }
+}
+
+function maybePlaygroundNudge() {
+  if (!shouldShowPlaygroundNudge()) return;
+  _playgroundNudgeShown = true;
+  const banner = document.getElementById('playground-nudge');
+  if (banner) banner.classList.add('visible');
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', async () => {
   await openDB();
   await runMigrationIfNeeded();
   await maybeSeedPlayground();
+  try { _playgroundNudgeDone = !!(await loadValueIDB('zenit-week-playground-nudged')); } catch (e) { /* not nudged yet */ }
 
   currentLang = localStorage.getItem('zenit-week-lang') || detectBrowserLang();
   loadBranchColors();
@@ -14774,6 +14883,18 @@ window.addEventListener('load', async () => {
     helpOverlay.classList.add('visible');
     helpPanel.classList.add('visible');
   };
+
+  const nudgeDismissBtn = document.getElementById('playground-nudge-dismiss');
+  if (nudgeDismissBtn) {
+    nudgeDismissBtn.addEventListener('click', () => dismissPlaygroundNudge(true));
+  }
+  const nudgeClearBtn = document.getElementById('playground-nudge-clear');
+  if (nudgeClearBtn) {
+    nudgeClearBtn.addEventListener('click', () => {
+      clearExampleTasks();
+      dismissPlaygroundNudge(true);
+    });
+  }
 
   const clearExampleBtn = document.getElementById('help-clear-example');
   if (clearExampleBtn) {

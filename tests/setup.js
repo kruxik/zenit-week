@@ -444,6 +444,8 @@ _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
 _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
+_state.resetPlaygroundNudge = function() { _playgroundNudgeDone = false; _playgroundNudgeShown = false; };
+_state.setPlaygroundNudgeDone = function(v) { _playgroundNudgeDone = v; };
 _state.resetSyncState = function() {
   googleAccessToken = null;
   _gapiInitialized = false;
@@ -593,6 +595,10 @@ export const {
   // Onboarding cleanup
   clearExampleTasks,
   hasDemoActivityNodes,
+  // Onboarding nudge
+  shouldShowPlaygroundNudge,
+  playgroundUserNodeCount,
+  dismissPlaygroundNudge,
   // History
   takeSnapshot,
   undo,

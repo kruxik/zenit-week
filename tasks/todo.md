@@ -28,10 +28,10 @@ Order is strict: **S1 → S2 → S3 → S4** (each builds on the prior). Check o
 - [ ] **C2 checkpoint** — browser: play→cleanup→undo loop.
 
 ## S4 — Gentle auto-nudge banner
-- [ ] T4.1 — Threshold logic: ≥3 real user nodes AND ≥1 demo remaining.
-- [ ] T4.2 — Dismissible banner: message + Clear (runs S3) + Dismiss.
-- [ ] T4.3 — Once-only `zenit-week-playground-nudged` flag.
-- [ ] T4.4 — i18n EN+CS: `onboarding.nudge`, `onboarding.nudgeDismiss`.
-- [ ] T4.5 — Tests: 2 nodes→no nudge; 3+demo→nudge; flag set→no nudge.
-- [ ] T4.6 — `npm test` + `npm run validate` green.
+- [x] T4.1 — `shouldShowPlaygroundNudge()`: ≥5 user nodes (non-branch, non-demo, **non-`_editing`**) AND ≥1 demo remaining; `playgroundUserNodeCount()` helper. Trigger hooked into `saveWeek` (current week only). Threshold 5 + placeholder exclusion per review.
+- [x] T4.2 — `#playground-nudge` banner: message + Clear (runs cleanup) + Dismiss; styled like existing toasts.
+- [x] T4.3 — Once-only: in-session `_playgroundNudgeShown` + persisted `zenit-week-playground-nudged` flag (loaded at boot).
+- [x] T4.4 — i18n EN+CS: `onboarding.nudge`, `onboarding.nudgeDismiss`.
+- [x] T4.5 — `tests/onboarding-nudge.test.js`: count, <3→none, 3+demo→nudge, no-demo→none, flag→none, post-dismiss→none (6 tests).
+- [x] T4.6 — `npm test` (523) + `npm run validate` green.
 - [ ] **C3 checkpoint (final)** — full first-run journey on clean profile; sign-off.
