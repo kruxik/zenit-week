@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.06.14] - 2026-06-14
+
+### Added
+
+- Poll Drive for current week ±1 so adjacent weeks stay fresh
+- Accept Czech "hned" as a (now) magic day token alias
+- **undo:** Keep undo/redo on the current week instead of jumping to the action week
+- **stats:** Move The Week timeline into a vertical 3rd column of the hero row
+- **stats:** Add desktop-only Mon→Sun week timeline (T9)
+- **stats:** Focus management + i18n parity test, hardening pass (T8)
+- **stats:** Mobile-lean responsive layout, hide timeline on phones (T7)
+- **stats:** Friendly empty + positive (no-unplanned) states (T6)
+- **stats:** Add Effort & Balance section, share baseline helpers (T5)
+- **stats:** Branch-tinted follow-through bars with status shading (T4)
+- **stats:** Build Plan-vs-Reality donut + headline metrics (T3)
+- **stats:** Add Stats panel shell, open from summary box (T2)
+- **stats:** Extract shared computeWeekStats() helper feeding summary box (T1)
+- **multitab:** Subtle toast cue when another tab updates the current week (T7)
+- **multitab:** Guard in-flight edits explicitly via hasEditingNode in applyRemoteMerge (T4)
+- **multitab:** Reconcile peer week-saved via CRDT merge, reconverge sender (T3)
+- **multitab:** Add per-tab id and week-saved broadcast on save (T2)
+- **multitab:** Drop proactive single-tab lock, keep overlay as DB-upgrade failsafe (T1)
+- **agenda:** Make comment badge colored and clickable to open dialog
+
+### Fixed
+
+- Anchor node drag in world space so it tracks cursor during mid-drag zoom/pan
+- Read settings blob from IndexedDB in syncColorsToDrive so theme/lang/colors sync to Drive
+- Re-sync grandparent done status when moving nested last-undone child to next week
+- Keep stats hero columns side by side on wider translations
+- Route "tomorrow"-tagged items added on Sunday to next week
+- Remove stray NUL byte in _applySnapshot sentinel
+- **loadWeek:** Initialize tombstones/crdtVersion on inherited new weeks
+- **move:** Give next-week branch/ancestor shells clean state
+- **undo:** Only force-push the next week when it actually changed
+- **sync:** Refresh next-week cache on loadAndRender; don't tombstone branches
+- **sync:** Stop transfer/undo from duplicating & resurrecting nodes across weeks
+- **stats:** No focus ring left on summary box after mouse-open + ESC close
+- **stats:** Top-align Plan-vs-Reality & The Week columns, tighten gap, bump fonts
+- **stats:** Order donut/bar segments done-first (planned, unplanned) then open
+- **stats:** Make Plan-vs-Reality + branch bars priority-weighted to match the box
+- **comment:** Keep top-right X visible on mobile so close stays reachable above keyboard
+- **comment:** Allow comments on Inbox nodes
+
 ## [v2026.06.07] - 2026-06-07
 
 ### Added
