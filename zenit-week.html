@@ -4339,7 +4339,6 @@ function iconSvg(name) {
 let undoStack = [];
 let redoStack = [];
 const MAX_UNDO = 100;
-let _applyingSnapshot = false;
 let _nextWeekRawCache = null;
 // Set of week keys whose local state was just restored by undo/redo and must
 // reach Drive without first pulling (which would resurrect the undone change).
@@ -14135,7 +14134,6 @@ async function loadAndRender(wk) {
 }
 
 window.addEventListener('hashchange', async () => {
-  if (_applyingSnapshot) return;
   const hashWeek = location.hash.slice(1);
   const target = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
   if (target !== currentWeekKey) {
