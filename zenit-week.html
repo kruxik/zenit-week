@@ -4844,6 +4844,24 @@ function resolveMagicDayTokens(label, now = new Date()) {
   });
 }
 
+// True when freezing this label would resolve a relative-day token to a weekday
+// that belongs to the *next* ISO week rather than the current one. ISO weeks run
+// Monday→Sunday, so the only crossing case is "tomorrow"/"zítra" evaluated on a
+// Sunday (tomorrow = Monday, the first day of next week). "today"/"now" never
+// cross — they resolve to the current day, still inside this week. Callers use
+// this to relocate a freshly-tagged node to next week (see submitQuickAdd /
+// commitEdit); otherwise it would freeze to "(Mo)" and land on the long-past
+// Monday of the current week instead of next Monday as the user intended.
+function magicTokenResolvesToNextWeek(label, now = new Date()) {
+  if (now.getDay() !== 0) return false; // 0 = Sunday; only Sunday's tomorrow crosses
+  const groups = (label || '').match(/\(([^)]+)\)/g);
+  if (!groups) return false;
+  return groups.some(g => {
+    const tokens = g.slice(1, -1).split(/[\s,]+/).map(tk => tk.toLowerCase()).filter(Boolean);
+    return tokens.some(tk => SCHED_TOMORROW_TOKENS.has(tk));
+  });
+}
+
 // Returns true when the label has a "now"/"teď" token inside any (…) group.
 // Used to trigger agenda-pinning *before* resolveMagicDayTokens overwrites it.
 function hasNowToken(label) {
@@ -6484,6 +6502,7 @@ const TRANSLATIONS = {
     'menu.reusable':              'Reusable',
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
+    'toast.movedToNextWeek':      'Added to next week',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
     'menu.prioCritical':          'Priority Critical',
@@ -6710,6 +6729,7 @@ const TRANSLATIONS = {
     'menu.reusable':              'Opakované',
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
+    'toast.movedToNextWeek':      'Přidáno do příštího týdne',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
     'menu.prioCritical':          'Priorita Kritická',
@@ -7722,12 +7742,15 @@ async function transferReusable() {
   applyAutoLayout();
 }
 
-async function moveNodeToNextWeek(nodeId) {
+async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
 
   beginAtomicOp();
-  takeSnapshot();
+  // Callers that already captured an undo snapshot before mutating (e.g. a
+  // freshly-added node being relocated for a "tomorrow"-on-Sunday tag) pass
+  // takeSnap:false so one undo reverses the whole add+move, not just the move.
+  if (takeSnap) takeSnapshot();
 
   const nextKey = offsetWeek(currentWeekKey, +1);
   const nextData = await loadWeek(nextKey);
@@ -9780,6 +9803,10 @@ function commitEdit(followUp = 'auto') {
     return;
   }
 
+  // Detect before applyMagicLabel freezes the token away: a new node tagged
+  // "tomorrow" on a Sunday belongs to next week, not this week's past Monday.
+  const crossesNextWeek = isNew && magicTokenResolvesToNextWeek(label);
+
   const node = findNode(nodeId);
   if (node) {
     node.label = label;
@@ -9797,6 +9824,19 @@ function commitEdit(followUp = 'auto') {
       }
     } else if (node.type !== 'branch') {
       applyMagicLabel(nodeId);
+    }
+
+    if (crossesNextWeek && node.type === 'activity') {
+      // "tomorrow" on a Sunday froze to "(Mo)" — relocate to next week. The
+      // node's add was already snapshotted by startAddNode, so skip move's own
+      // snapshot. Hold the atomic op (opened in _openInlineInput) open until the
+      // async move + saves finish, then close it — and skip the follow-up
+      // sibling/child chain, which the user didn't ask for when tagging tomorrow.
+      moveNodeToNextWeek(nodeId, { takeSnap: false }).finally(() => {
+        showToast(t('toast.movedToNextWeek'));
+        endAtomicOp();
+      });
+      return;
     }
 
     // Done status propagation for newly added children was deferred from
@@ -14386,9 +14426,13 @@ document.addEventListener('click', (e) => {
     backdrop.classList.remove('is-open');
   }
 
-  function submitQuickAdd() {
+  async function submitQuickAdd() {
     const label = input.value.trim();
     if (!label || !selectedBranchId) return;
+
+    // Detect before applyMagicLabel freezes the token away: "tomorrow" on a
+    // Sunday belongs to next week, not this week's long-past Monday.
+    const crossesNextWeek = magicTokenResolvesToNextWeek(label);
 
     // Create inbox node
     takeSnapshot();
@@ -14417,7 +14461,16 @@ document.addEventListener('click', (e) => {
     // Apply day-token + Nx-counter rules — same logic as commitEdit.
     applyMagicLabel(node.id);
 
-    saveWeek(currentWeekKey, weekData);
+    if (crossesNextWeek) {
+      // Node was created in this week then frozen to "(Mo)"; relocate the whole
+      // node to next week where that Monday actually lives. The snapshot above
+      // already captured pre-add state, so skip move's own snapshot (one undo
+      // reverses the add+move). move() saves both weeks and re-renders.
+      await moveNodeToNextWeek(node.id, { takeSnap: false });
+      showToast(t('toast.movedToNextWeek'));
+    } else {
+      saveWeek(currentWeekKey, weekData);
+    }
     renderIfVisible();
     if (currentView === 'agenda') renderAgenda();
 
