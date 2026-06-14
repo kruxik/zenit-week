@@ -646,6 +646,9 @@
   }
   #coachmark[hidden] { display: none; }
   #coachmark-text { margin-bottom: 10px; white-space: pre-line; }
+  #coachmark-text .coachmark-intro { margin-bottom: 8px; }
+  #coachmark-text .help-row { margin-bottom: 6px; }
+  #coachmark-text .help-row:last-child { margin-bottom: 0; }
   #coachmark-footer {
     display: flex;
     align-items: center;
@@ -6604,7 +6607,7 @@ const TRANSLATIONS = {
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
     'settings.tips':              'Show tips',
     'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
-    'tips.hoverKeys':             'Hover a task, then press:\nEnter — rename\nTab — add\nD — done\nU — unplanned\nDel — remove',
+    'tips.hoverIntro':            'Hover a task, then press:',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
@@ -6843,7 +6846,7 @@ const TRANSLATIONS = {
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
     'settings.tips':              'Zobrazovat tipy',
     'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
-    'tips.hoverKeys':             'Najeďte na úkol, pak stiskněte:\nEnter — přejmenovat\nTab — přidat\nD — hotovo\nU — neplánováno\nDel — smazat',
+    'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
     'view.mindmap':               'Mapa',
@@ -14902,9 +14905,20 @@ let _tipsEnabled = true;        // global "Show tips" setting (default on)
 let _tipsSeen = {};             // { [hintId]: true } — persisted
 let _coachmarkVisible = false;  // single coachmark on screen at a time
 
-// Hint registry. Each entry: { textKey }. Triggers live at the call sites.
+// Hint registry. Each entry is either { textKey } for a plain-text hint, or
+// { introKey, keys: [{ k, labelKey }] } to render kbd rows like the Help panel.
+// Triggers live at the call sites.
 const HINTS = {
-  'hover-keys': { textKey: 'tips.hoverKeys' },
+  'hover-keys': {
+    introKey: 'tips.hoverIntro',
+    keys: [
+      { k: 'Enter', labelKey: 'help.rename' },
+      { k: 'Tab',   labelKey: 'help.add' },
+      { k: 'D',     labelKey: 'help.toggleDone' },
+      { k: 'U',     labelKey: 'help.toggleUnplanned' },
+      { k: 'Del',   labelKey: 'help.delete' },
+    ],
+  },
 };
 
 function tipsEnabled() { return _tipsEnabled; }
@@ -14948,11 +14962,41 @@ function positionCoachmark(cm, anchorEl) {
   }
 }
 
-function showCoachmark(id, text, anchorEl) {
-  const cm = document.getElementById('coachmark');
+// Build the coachmark body from a hint definition. Plain hints set text; key
+// hints render an intro line + Help-style `<span>label</span> <kbd>key</kbd>`
+// rows. DOM-built (no innerHTML) per the XSS rule.
+function renderCoachmarkContent(hint) {
   const textEl = document.getElementById('coachmark-text');
-  if (!cm || !textEl) return;
-  textEl.textContent = text;
+  if (!textEl) return;
+  while (textEl.firstChild) textEl.removeChild(textEl.firstChild);
+  if (hint.keys) {
+    if (hint.introKey) {
+      const intro = document.createElement('div');
+      intro.className = 'coachmark-intro';
+      intro.textContent = t(hint.introKey);
+      textEl.appendChild(intro);
+    }
+    hint.keys.forEach(({ k, labelKey }) => {
+      const row = document.createElement('div');
+      row.className = 'help-row';
+      const label = document.createElement('span');
+      label.textContent = t(labelKey);
+      const kbd = document.createElement('kbd');
+      kbd.textContent = k;
+      row.appendChild(label);
+      row.appendChild(kbd);
+      textEl.appendChild(row);
+    });
+  } else {
+    textEl.textContent = t(hint.textKey);
+  }
+}
+
+function showCoachmark(id, anchorEl) {
+  const cm = document.getElementById('coachmark');
+  const hint = HINTS[id];
+  if (!cm || !hint) return;
+  renderCoachmarkContent(hint);
   cm._hintId = id;
   cm.hidden = false;
   _coachmarkVisible = true;
@@ -14976,7 +15020,7 @@ function dismissCoachmark() {
 // Entry point from trigger sites.
 function maybeShowHint(id, anchorEl) {
   if (!anchorEl || !shouldShowHint(id)) return;
-  showCoachmark(id, t(HINTS[id].textKey), anchorEl);
+  showCoachmark(id, anchorEl);
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
