@@ -446,6 +446,8 @@ _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
 _state.resetPlaygroundNudge = function() { _playgroundNudgeDone = false; _playgroundNudgeShown = false; };
 _state.setPlaygroundNudgeDone = function(v) { _playgroundNudgeDone = v; };
+_state.resetTips = function() { _tipsEnabled = true; _tipsSeen = {}; _coachmarkVisible = false; };
+_state.setCoachmarkVisible = function(v) { _coachmarkVisible = v; };
 _state.resetSyncState = function() {
   googleAccessToken = null;
   _gapiInitialized = false;
@@ -599,6 +601,12 @@ export const {
   shouldShowPlaygroundNudge,
   playgroundUserNodeCount,
   dismissPlaygroundNudge,
+  // Coachmark hints (Part B)
+  tipsEnabled,
+  setTipsEnabled,
+  isHintSeen,
+  markHintSeen,
+  shouldShowHint,
   // History
   takeSnapshot,
   undo,

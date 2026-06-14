@@ -630,6 +630,60 @@
     background: var(--accent-danger-bg);
   }
 
+  /* Coachmark — anchored just-in-time tip bubble (Part B). */
+  #coachmark {
+    position: fixed;
+    z-index: 3200;
+    max-width: min(86vw, 320px);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    box-shadow: 0 6px 22px var(--shadow-md);
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-primary);
+  }
+  #coachmark[hidden] { display: none; }
+  #coachmark-text { margin-bottom: 10px; white-space: pre-line; }
+  #coachmark-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  #coachmark-tip-off {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  #coachmark-footer .agenda-action-btn {
+    white-space: nowrap;
+    height: 30px;
+    padding: 0 12px;
+    font-weight: 400;
+    flex-shrink: 0;
+  }
+  /* Arrow — points down at the anchor (default, bubble above the target). */
+  #coachmark-arrow {
+    position: absolute;
+    bottom: -7px;
+    width: 12px;
+    height: 12px;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-default);
+    border-bottom: 1px solid var(--border-default);
+    transform: translateX(-50%) rotate(45deg);
+  }
+  /* Bubble below the target — arrow points up. */
+  #coachmark.below #coachmark-arrow {
+    bottom: auto;
+    top: -7px;
+    border-right: none;
+    border-bottom: none;
+    border-left: 1px solid var(--border-default);
+    border-top: 1px solid var(--border-default);
+  }
+
   .view-level-btn {
     display: flex;
     flex-direction: column;
@@ -3603,6 +3657,15 @@
   </span>
 </div>
 
+<div id="coachmark" role="dialog" aria-live="polite" hidden>
+  <div id="coachmark-text"></div>
+  <div id="coachmark-footer">
+    <span id="coachmark-tip-off" data-i18n="tips.disableHint">Turn tips off in Settings.</span>
+    <button type="button" class="agenda-action-btn" id="coachmark-got-it" data-i18n="tips.gotIt">Got it</button>
+  </div>
+  <div id="coachmark-arrow"></div>
+</div>
+
 <div id="context-menu">
   <div class="ctx-item" id="ctx-current-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.currentWeek">Current Week</span></div>
   <div class="ctx-separator" id="ctx-sep-current-week"></div>
@@ -3773,6 +3836,15 @@
     <div class="theme-toggle-row">
       <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
       <button type="button" class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change" data-i18n-aria="settings.autoLayoutTitle" aria-label="Automatically reset layout after each change">
+        <span class="theme-toggle-thumb"></span>
+      </button>
+    </div>
+  </div>
+  <div class="settings-separator"></div>
+  <div class="settings-section">
+    <div class="theme-toggle-row">
+      <span class="settings-label" data-i18n="settings.tips">Show tips</span>
+      <button type="button" class="theme-toggle" id="tips-toggle" role="switch" aria-checked="true" data-i18n-title="settings.tipsTitle" title="Show just-in-time tips for first-time actions" data-i18n-aria="settings.tipsTitle" aria-label="Show just-in-time tips for first-time actions">
         <span class="theme-toggle-thumb"></span>
       </button>
     </div>
@@ -6530,6 +6602,11 @@ const TRANSLATIONS = {
     'import.complete':            'Import complete',
     'settings.autoLayout':        'Auto layout',
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
+    'settings.tips':              'Show tips',
+    'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
+    'tips.hoverKeys':             'Hover a task, then press:\nEnter — rename\nTab — add\nD — done\nU — unplanned\nDel — remove',
+    'tips.gotIt':                 'Got it',
+    'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
     'view.agenda':                'Agenda',
     'agenda.overdue':             'Overdue',
@@ -6764,6 +6841,11 @@ const TRANSLATIONS = {
     'import.complete':            'Import dokončen',
     'settings.autoLayout':        'Automatické rozvržení',
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
+    'settings.tips':              'Zobrazovat tipy',
+    'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
+    'tips.hoverKeys':             'Najeďte na úkol, pak stiskněte:\nEnter — přejmenovat\nTab — přidat\nD — hotovo\nU — neplánováno\nDel — smazat',
+    'tips.gotIt':                 'Rozumím',
+    'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
     'view.mindmap':               'Mapa',
     'view.agenda':                'Agenda',
     'agenda.overdue':             'Zpožděné',
@@ -11456,6 +11538,8 @@ function attachNodeListeners() {
     g.addEventListener('mouseenter', () => {
       hoveredNodeId = id;
       if (id === 'center') return;
+      const hn = findNode(id);
+      if (hn && (hn.type === 'activity' || hn.type === 'counter')) maybeShowHint('hover-keys', g);
       const els = g._descendantEls;
       if (!els) return;
       for (let i = 0; i < els.length; i++) els[i].classList.add('subnode-hover');
@@ -14592,6 +14676,27 @@ document.getElementById('autolayout-toggle').addEventListener('click', () => {
 
 syncAutoLayoutToggleUI();
 
+// ─── Tips toggle + coachmark dismissal ────────────────────────────────────────
+function syncTipsToggleUI() {
+  const toggle = document.getElementById('tips-toggle');
+  if (toggle) toggle.setAttribute('aria-checked', _tipsEnabled ? 'true' : 'false');
+}
+const tipsToggle = document.getElementById('tips-toggle');
+if (tipsToggle) {
+  tipsToggle.addEventListener('click', () => {
+    setTipsEnabled(!_tipsEnabled);
+    syncTipsToggleUI();
+  });
+}
+// Initial sync runs in Init after the persisted tips state loads (the let
+// declarations live later in the file, so don't read them at top level here).
+
+const coachmarkGotIt = document.getElementById('coachmark-got-it');
+if (coachmarkGotIt) coachmarkGotIt.addEventListener('click', dismissCoachmark);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && _coachmarkVisible) dismissCoachmark();
+});
+
 // ─── Lang select ──────────────────────────────────────────────────────────────
 document.getElementById('lang-select').addEventListener('change', e => {
   setLanguage(e.target.value);
@@ -14788,12 +14893,104 @@ function maybePlaygroundNudge() {
   if (banner) banner.classList.add('visible');
 }
 
+// ─── Coachmark hints (Part B) ─────────────────────────────────────────────────
+// Just-in-time tips shown once per hint, anchored to the relevant element.
+// Storage is local-first behind this seam (tipsEnabled / isHintSeen / mark…);
+// cross-device Drive sync attaches here later. See
+// docs/specs/onboarding-part-b-coachmarks.md.
+let _tipsEnabled = true;        // global "Show tips" setting (default on)
+let _tipsSeen = {};             // { [hintId]: true } — persisted
+let _coachmarkVisible = false;  // single coachmark on screen at a time
+
+// Hint registry. Each entry: { textKey }. Triggers live at the call sites.
+const HINTS = {
+  'hover-keys': { textKey: 'tips.hoverKeys' },
+};
+
+function tipsEnabled() { return _tipsEnabled; }
+function isHintSeen(id) { return !!_tipsSeen[id]; }
+
+function markHintSeen(id) {
+  if (_tipsSeen[id]) return;
+  _tipsSeen[id] = true;
+  saveValueIDB('zenit-week-tips-seen', _tipsSeen);
+}
+
+function setTipsEnabled(on) {
+  _tipsEnabled = !!on;
+  saveValueIDB('zenit-week-tips-enabled', _tipsEnabled);
+  if (!_tipsEnabled) hideCoachmark();
+}
+
+// Pure gate — fire iff tips on, none showing, hint unseen, and registered.
+function shouldShowHint(id) {
+  return _tipsEnabled && !_coachmarkVisible && !isHintSeen(id) && !!HINTS[id];
+}
+
+function positionCoachmark(cm, anchorEl) {
+  const r = anchorEl.getBoundingClientRect();
+  const cmRect = cm.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const margin = 8;
+  // Prefer above the anchor; flip below if not enough room.
+  const below = r.top - cmRect.height - 12 < margin;
+  const top = below ? r.bottom + 12 : r.top - cmRect.height - 12;
+  let left = r.left + r.width / 2 - cmRect.width / 2;
+  left = Math.max(margin, Math.min(left, vw - cmRect.width - margin));
+  cm.style.top = `${Math.max(margin, Math.min(top, vh - cmRect.height - margin))}px`;
+  cm.style.left = `${left}px`;
+  cm.classList.toggle('below', below);
+  // Arrow points at the anchor's horizontal center, clamped to the bubble.
+  const arrow = document.getElementById('coachmark-arrow');
+  if (arrow) {
+    const ax = r.left + r.width / 2 - left;
+    arrow.style.left = `${Math.max(14, Math.min(ax, cmRect.width - 14))}px`;
+  }
+}
+
+function showCoachmark(id, text, anchorEl) {
+  const cm = document.getElementById('coachmark');
+  const textEl = document.getElementById('coachmark-text');
+  if (!cm || !textEl) return;
+  textEl.textContent = text;
+  cm._hintId = id;
+  cm.hidden = false;
+  _coachmarkVisible = true;
+  // Position after layout so getBoundingClientRect is accurate.
+  positionCoachmark(cm, anchorEl);
+}
+
+function hideCoachmark() {
+  const cm = document.getElementById('coachmark');
+  if (cm) { cm.hidden = true; cm._hintId = null; }
+  _coachmarkVisible = false;
+}
+
+// Mark the visible hint seen and dismiss it (Got it / Esc).
+function dismissCoachmark() {
+  const cm = document.getElementById('coachmark');
+  if (cm && cm._hintId) markHintSeen(cm._hintId);
+  hideCoachmark();
+}
+
+// Entry point from trigger sites.
+function maybeShowHint(id, anchorEl) {
+  if (!anchorEl || !shouldShowHint(id)) return;
+  showCoachmark(id, t(HINTS[id].textKey), anchorEl);
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', async () => {
   await openDB();
   await runMigrationIfNeeded();
   await maybeSeedPlayground();
   try { _playgroundNudgeDone = !!(await loadValueIDB('zenit-week-playground-nudged')); } catch (e) { /* not nudged yet */ }
+  try {
+    const en = await loadValueIDB('zenit-week-tips-enabled');
+    _tipsEnabled = (en === undefined || en === null) ? true : !!en;
+    _tipsSeen = (await loadValueIDB('zenit-week-tips-seen')) || {};
+  } catch (e) { /* defaults: tips on, none seen */ }
+  if (typeof syncTipsToggleUI === 'function') syncTipsToggleUI();
 
   currentLang = localStorage.getItem('zenit-week-lang') || detectBrowserLang();
   loadBranchColors();
