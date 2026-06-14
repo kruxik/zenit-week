@@ -608,6 +608,7 @@ export const {
   markHintSeen,
   shouldShowHint,
   magicHintId,
+  replayTips,
   // History
   takeSnapshot,
   undo,

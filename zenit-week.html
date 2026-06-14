@@ -3851,6 +3851,7 @@
         <span class="theme-toggle-thumb"></span>
       </button>
     </div>
+    <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay" style="width:100%;margin-top:8px;">Replay tips</button>
   </div>
   <div class="settings-separator"></div>
   <div class="settings-section">
@@ -6607,6 +6608,8 @@ const TRANSLATIONS = {
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
     'settings.tips':              'Show tips',
     'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
+    'settings.tipsReplay':        'Replay tips',
+    'settings.tipsReplayDone':    'Tips reset — they’ll show again.',
     'tips.hoverIntro':            'Hover a task, then press:',
     'tips.counter':               'Nice — that became a counter. End a task with a number + “x” (e.g. “3x”) to split it into check-off steps.',
     'tips.days':                  'Scheduled! Add days in parentheses — “(mo, we)” or “(daily)” — to place a task across the week.',
@@ -6849,6 +6852,8 @@ const TRANSLATIONS = {
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
     'settings.tips':              'Zobrazovat tipy',
     'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
+    'settings.tipsReplay':        'Přehrát tipy znovu',
+    'settings.tipsReplayDone':    'Tipy resetovány — zobrazí se znovu.',
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
     'tips.counter':               'Super — vznikl počítací úkol. Zakončete název číslem s „x“ (např. „3x“) a rozdělí se na odškrtávací kroky.',
     'tips.days':                  'Naplánováno! Přidejte dny v závorce — „(po, st)“ nebo „(denně)“ — a úkol se rozmístí po týdnu.',
@@ -14701,6 +14706,17 @@ if (tipsToggle) {
     syncTipsToggleUI();
   });
 }
+const tipsReplayBtn = document.getElementById('tips-replay-btn');
+if (tipsReplayBtn) {
+  tipsReplayBtn.addEventListener('click', () => {
+    replayTips();
+    syncTipsToggleUI();
+    // Close settings so the next first-time action can surface a tip.
+    settingsDropdown.classList.remove('visible');
+    settingsFab.classList.remove('active');
+    if (typeof showToast === 'function') showToast(t('settings.tipsReplayDone'));
+  });
+}
 // Initial sync runs in Init after the persisted tips state loads (the let
 // declarations live later in the file, so don't read them at top level here).
 
@@ -14971,6 +14987,13 @@ function setTipsEnabled(on) {
   _tipsEnabled = !!on;
   saveValueIDB('zenit-week-tips-enabled', _tipsEnabled);
   if (!_tipsEnabled) hideCoachmark();
+}
+
+// Clear all seen-flags so every hint can appear again; re-enable tips if off.
+function replayTips() {
+  _tipsSeen = {};
+  saveValueIDB('zenit-week-tips-seen', _tipsSeen);
+  if (!_tipsEnabled) setTipsEnabled(true);
 }
 
 // Pure gate — fire iff tips on, none showing, hint unseen, and registered.

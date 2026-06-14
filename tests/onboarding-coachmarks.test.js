@@ -7,6 +7,7 @@ import {
   markHintSeen,
   shouldShowHint,
   magicHintId,
+  replayTips,
 } from './setup.js';
 
 describe('Coachmark hints — engine + seam (PB1)', () => {
@@ -52,6 +53,17 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     markHintSeen('hover-keys');
     markHintSeen('hover-keys');
     expect(isHintSeen('hover-keys')).toBe(true);
+  });
+
+  it('replayTips clears seen-flags and re-enables tips', () => {
+    markHintSeen('hover-keys');
+    markHintSeen('counter');
+    setTipsEnabled(false);
+    replayTips();
+    expect(isHintSeen('hover-keys')).toBe(false);
+    expect(isHintSeen('counter')).toBe(false);
+    expect(tipsEnabled()).toBe(true);
+    expect(shouldShowHint('hover-keys')).toBe(true);
   });
 
   it('counter, days and views hints are registered', () => {
