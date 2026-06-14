@@ -6192,13 +6192,14 @@ function clearAllSyncDebounceTimers() {
 
 async function syncColorsToDrive() {
   if (!googleAccessToken) return;
-  const json = localStorage.getItem(COLORS_STORAGE_KEY);
-  if (!json) return;
+  // Settings blob lives in IndexedDB (saveBranchColors → saveValueIDB), never localStorage.
+  const stored = await loadValueIDB(COLORS_STORAGE_KEY);
+  if (!stored) return;
+  const json = JSON.stringify(stored);
   const hash = fnv1a32(json);
   if (colorsSyncedHash === hash) return;
   setSyncStatus('syncing', 'sync.msg.syncing');
-  let savedAt = 0;
-  try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
+  const savedAt = stored.savedAt ?? 0;
   const MAX_RETRIES = 3;
   let delay = 1000;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
