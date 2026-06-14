@@ -4447,7 +4447,7 @@ async function _applySnapshot(raw) {
         : JSON.parse(snapshot.nextWeekRaw);
       if (!Array.isArray(restoredNext.tombstones)) restoredNext.tombstones = [];
       if (!Array.isArray(restoredNext.nodes)) restoredNext.nodes = [];
-      const liveSig = liveNextRecord ? _weekContentSig(liveNextRecord) : ' none';
+      const liveSig = liveNextRecord ? _weekContentSig(liveNextRecord) : null;
       if (_weekContentSig(restoredNext) !== liveSig) {
         _tombstoneRemovedNodes(restoredNext, liveNextNodes);
         for (const n of restoredNext.nodes) n._ts = tsNow;
