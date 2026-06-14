@@ -1,179 +1,126 @@
-# Plan — Stats Panel: Plan vs Reality
+# Plan — Onboarding Part A: Seed Playground
 
-> Spec: `SPEC.md` · Idea: `docs/ideas/stats-panel-plan-vs-reality.md`
-> Branch: `feature/stats-panel` · Single file: `zenit-week.html`
-> Task list: `tasks/todo.md`
-> (Previous feature — multi-tab editing — shipped; this file repurposed. History in git.)
+Source spec: [`docs/specs/onboarding-part-a-playground.md`](../docs/specs/onboarding-part-a-playground.md)
+Seed content: [`assets/playground-seed.json`](../assets/playground-seed.json)
+Task list: `tasks/todo.md` · Single file: `zenit-week.html`
 
-## Code anchors (verified)
-- Current stats: `updateSummary()` `zenit-week.html:~9716` — leaf detection, `getStats()`
-  (priority-weighted, counters fractional `val/max`), per-branch loop, baseline color
-  (`wBaseline`/`wOverload`), ratio-bar rebuild.
-- Summary box markup `#placeholder-panel` / `#summary-header` / `#summary-details` /
-  `#ratio-bar`: `:3160–3167`; styles `:2770–2820`.
-- Helpers to reuse: `getPriorityWeight` `:7409`, `findNode` (O(1) `nodeMap`),
-  `BRANCH_COLORS[branch].main`, `t(key)` + `TRANSLATIONS` (EN `:~6000`, CZ `:~6200`).
-- Panel pattern (`is-open` open/close, Esc, backdrop): Quick-add `:13320–13412`.
-- Icon sprite sheet (add `<symbol>` if needed): `:~2994–3045`.
-- Day-key data for timeline (T9): `doneAt`, counter `ticks[]`, `unplannedAt` — same
-  fields the daily-log uses.
-- Button reuse: `.agenda-action-btn` only (no orphan classes).
-- Test harness: `tests/setup.js` extracts `<script id="app-script">` into a VM, exports
-  destructured top-level fns (list ~`:525`); add `computeWeekStats` there.
-  Regression guard: `tests/summary.test.js` must stay green after T1.
+## Principles
+- **Vertical slices.** Each task delivers one complete, testable path (loader→render, edit→flag-drop, action→cleanup, threshold→nudge) — not horizontal layers.
+- **Single-file policy.** All app code lands in `zenit-week.html`. Only the build/inject script is separate.
+- **Each slice ships with:** code + EN/CS i18n (where user-visible) + vitest coverage. `npm test` and `npm run validate` green before commit.
 
 ## Dependency graph
 ```
-T1 computeWeekStats() + tests           [FOUNDATION — single source of truth]
+S1 Seed embedding + loader  ── foundational (creates _demo nodes on disk)
         │
-   ── T2 panel shell + clickable summary-box entry ──  [shared infra]
-        │
-   ┌────┼────────────┬──────────────┐
-   ▼    ▼            ▼              │
-  T3   T4           T5             │
- ① donut  ② branch   ③ ratio-bar    │
- +headlines  bars     +baseline    │
-   └────┴────────────┘             │
-            ▼
-        T6 empty / positive states
-            ▼
-        T7 responsive (mobile lean)
-            ▼
-        T8 theming / i18n / a11y / validate   ◀── MVP MERGE CANDIDATE
-            ▼
-        T9 ④ desktop-only timeline   ◀── FAST-FOLLOW (separate merge OK)
+        ├──> S2 _demo drop-on-touch   (needs _demo nodes to be meaningful)
+        │            │
+        │            └──> S3 Manual cleanup (Help)  (distinguishes touched vs untouched)
+        │                          │
+        └──────────────────────────┴──> S4 Auto-nudge banner  (counts user nodes; triggers S3)
 ```
-T1 is the linchpin; T2 is shared infra; T3–T5 are independent slices.
+Strict order: **S1 → S2 → S3 → S4.** No parallelism (each builds on the prior). i18n is added inside the slice that introduces the string.
 
-## Checkpoints
-- **CP-A** (after T1): `npm test` green — new `computeWeekStats` tests **and** existing
-  `summary.test.js` pass (proves extraction didn't move the top-box numbers). No UI yet.
-- **CP-B** (after T3): panel opens from the box; donut + headlines correct on canonical
-  data, light + dark. First visible end-to-end slice.
-- **CP-C** (after T8): full F7/F8 matrix manual pass (themes × widths × 3/8 branches ×
-  empty/unplanned); `npm test` + `npm run validate` green. **MVP merge candidate.**
-- **CP-D** (after T9): timeline verified desktop-only, hidden on mobile.
-
----
-
-## Phase 1 — Foundation
-
-### T1 · Extract `computeWeekStats()` + unit tests
-Pure top-level `computeWeekStats()` → `{ global, perBranch }`, each with **both** lenses:
-- `counts`: `{ plannedDone, plannedOpen, unplannedDone, unplannedOpen, total, done,
-  completionPct }` — counter = **one task**, done iff `val>=max`; `_editing` excluded;
-  leaf = no active non-`_editing` children (same predicate as `updateSummary`).
-- `weighted`: `{ done, total, percent }` — priority-weighted, counters fractional
-  `val/max` (identical math to today).
-Refactor `updateSummary()` to consume it with **byte-identical** DOM output. Add
-`computeWeekStats` to the `tests/setup.js` export destructure.
-
-Acceptance:
-- [ ] SPEC F2/F3 count semantics + F4 weight semantics implemented in one helper.
-- [ ] `updateSummary` output unchanged (top box identical).
-Verify:
-- [ ] New `tests/stats.test.js`: global + per-branch counts; counter (counts vs weighted);
-      `_editing` exclusion; empty week; branch-with-no-tasks; all-planned; all-unplanned;
-      priority weighting.
-- [ ] `npm test` → `summary.test.js` **and** new tests green.
-
-**CHECKPOINT A** — human review. No UI yet.
+## Key code anchors (verified)
+- Boot init: `zenit-week.html:14548` (`window.addEventListener('load')`), seed hook after `runMigrationIfNeeded()` (`:14550`), before `loadAndRender(initialWeek)` (`:14598`).
+- Empty-DB check: `listWeekKeysIDB()` `:4228`. Save week: `saveWeekIDB()` `:4207`. Misc flags: `saveValueIDB`/`loadValueIDB` `:4250`/`:4261`.
+- New-week shape (`tombstones`/`crdtVersion`): `loadWeek()` `:7207`. `todayWeekKey()` `:6960`.
+- Colors: `saveBranchColors` / `COLORS_STORAGE_KEY` (`zenit-week-colors` in misc); palette `BRANCH_COLOR_PALETTE` `:4553` (Growth green `#0ACF83`).
+- Mutators for `_demo` drop: inline-input commit `_openInlineInput` `:9712`; move/drag drop handler; done/unplanned setters (D/U keys + ctx menu); priority setter; counter tick; add-child/add-node; (delete = N/A).
+- Snapshot/undo chokepoint: `takeSnapshot()` `:4369` (node-agnostic — do NOT use for per-node drop).
+- Confirm dialog: `showAppConfirm({title,body,okLabel,danger,onConfirm})`. Buttons: `.agenda-action-btn`.
+- Help panel: `#help-panel` / `#help-content` (`:2831`). Build script: `scripts/inject-version.js`, npm `build`.
 
 ---
 
-## Phase 2 — Shell + entry
+## S1 — Seed embedding + first-run loader  *(the spine; delivers the aha)*
+**Goal:** Empty DB (or `#playground`) → current week boots fully populated from the seed, with Growth green.
 
-### T2 · Panel shell + clickable summary-box entry
-- New panel container + backdrop using the `is-open` pattern (Quick-add `:13336`).
-- `openStatsPanel()` / `closeStatsPanel()` / `renderStatsPanel()` (empty section slots).
-- `#placeholder-panel` becomes a button: role, `tabindex`, `aria-label`, `Enter`/`Space`
-  open; replace inline expand with open-panel.
-- `Esc` + backdrop + ✕ close; re-render while open on data change.
+Subtasks:
+1. **Inject step.** New `scripts/inject-playground-seed.mjs` reads `assets/playground-seed.json` and writes it into a delimited constant block in `zenit-week.html` (e.g. between `/* PLAYGROUND_SEED_START */` … `/* PLAYGROUND_SEED_END */`). Wire into the `build` npm script (alongside `inject-version`). Pattern mirrors `scripts/inject-version.js`.
+2. **Seed constant.** Add the placeholder block + `const PLAYGROUND_SEED = {…}` in `zenit-week.html`; run the inject step to populate it.
+3. **`maybeSeedPlayground()`** in init flow (`:~14550`): trigger (empty DB ∨ `#playground`) + safety gate (current week absent in IDB) + idempotency flag `zenit-week-onboarded`.
+4. Build week: `weekKey=todayWeekKey()`, stamp `_demo:true` + fresh `_ts` per node, `tombstones:[]`, `crdtVersion:0`; apply seed branch colors; `saveWeekIDB`; set flag; strip `#playground` via `history.replaceState`.
 
-Acceptance:
-- [ ] SPEC F1. Open/close never mutates `weekData`, creates **no undo entry**.
-Verify:
-- [ ] Manual: click/keyboard opens; Esc/backdrop/✕ close; edit while open → refresh;
-      undo stack unchanged after open/close. `npm run validate` clean.
+**Acceptance criteria**
+- Fresh profile → first load shows full seeded mindmap; agenda + summary/balance populated, no user action.
+- Reload → no re-seed, no duplicate nodes, URL has no `#playground`.
+- Existing user with data for current week + `#playground` → not clobbered, no seed.
+- Growth renders `#0ACF83`; work/family/me default colors.
 
----
+**Verification**
+- `tests/onboarding-seed.test.js` (fake-indexeddb): seeds on empty; no-op on populated; `#playground` gate; flag blocks re-seed; nodes carry `_demo` + correct weekKey.
+- Manual: clear IndexedDB → open `zenit-week.html` → see populated week; reload → stable.
+- `npm test` + `npm run validate` green.
 
-## Phase 3 — Sections (vertical slices)
-
-### T3 · Section ① Plan vs Reality (donut + 3 headlines)
-SVG donut, 4 arcs fixed order (planned-done, planned-open, unplanned-done,
-unplanned-open), center = overall completion %. Three count headlines: Plan completion,
-Unplanned load (`x / y`), Unplanned completion. From `computeWeekStats().global.counts`.
-Acceptance: [ ] SPEC F2; global/branch-independent; div-by-zero guarded.
-Verify: [ ] Manual — arcs + center % + headlines match hand-computed; light + dark;
-identical at 3 vs 8 branches.
-
-**CHECKPOINT B** — human review (first visible slice).
-
-### T4 · Section ② Follow-through (branch-tinted stacked bars)
-One stacked bar per live branch (branch order), 4 status segments by count, tinted with
-`BRANCH_COLORS[branch].main`; status via shade/opacity (done solid / open faded /
-unplanned hatched — SVG `<pattern>` or CSS); per-branch count label. DOM-construct
-labels (no `innerHTML` with branch text).
-Acceptance: [ ] SPEC F3; 8 branches scroll, no clip; statuses distinct within one hue
-both themes; zero-task branch = clean empty bar.
-Verify: [ ] Manual at 3 and 8 branches, light + dark; segments sum to branch total.
-
-### T5 · Section ③ Effort & Balance (reuse ratio-bar + baseline)
-Branch share of **weighted** load + total-vs-baseline via `computeWeekStats().*.weighted`
-+ existing baseline/stretch/overload color + tooltip logic. Reuse, no re-impl.
-Acceptance: [ ] SPEC F4; numbers equal top box; only weighted section in panel.
-Verify: [ ] Manual — balance figures = top-box figures; overload color flips same threshold.
+**■ Checkpoint C1 (human):** open the app fresh, confirm the seeded week *feels* like an aha. Tune `playground-seed.json` content if needed before proceeding.
 
 ---
 
-## Phase 4 — Hardening
+## S2 — `_demo` drop-on-touch
+**Goal:** The moment the user makes a seed node theirs, it stops being demo scaffolding.
 
-### T6 · Empty / positive states
-Empty week → friendly empty state, no broken charts. Tasks-but-none-unplanned →
-positive message ("No unplanned tasks this week 👍"); donut shows planned only;
-unplanned headlines read 0 cleanly.
-Acceptance: [ ] SPEC F6. Verify: [ ] Manual — empty + all-planned weeks render clean.
+Subtasks:
+1. `clearDemo(nodeId)` helper (`delete n._demo`; caller's existing `saveWeek` persists).
+2. Call from each mutator (for the affected node): rename commit; move/drag drop; done toggle; unplanned toggle; priority change; counter tick; add-child/add-node (new node never gets `_demo`; also `clearDemo(parentId)`).
+3. Confirm color/theme/zoom/pan are NOT treated as touches.
 
-### T7 · Responsive (mobile lean)
-CSS breakpoints only. Mobile: keep ① + headlines + ③ ratio-bar; compact ② (bar +
-counts, no inline labels); hide ④. Desktop: all.
-Acceptance: [ ] SPEC F7, ~375px and ~1280px. Verify: [ ] Manual both widths; no overflow.
+**Acceptance criteria**
+- Each listed edit removes `_demo` from the affected node (and parent for add-child); persisted to IDB.
+- Untouched nodes retain `_demo`.
 
-### T8 · Theming / i18n / a11y / validate
-All strings → `TRANSLATIONS` EN + CZ via `t()`; full light/dark via tokens; keyboard +
-SR labels + focus management; security sweep: zero `innerHTML`/`outerHTML`/`insertAdjacentHTML`
-with `weekData`-derived values; reuse `.agenda-action-btn`, no orphan classes.
-Acceptance: [ ] SPEC F8 + boundaries.
-Verify: [ ] `npm test` + `npm run validate` green; manual F7/F8 matrix; grep new-code
-`innerHTML` = static only.
-
-**CHECKPOINT C** — human review. **MVP merge candidate** (F1–F8 minus timeline).
+**Verification**
+- Extend test file: one unit case per mutator asserting flag dropped; one asserting untouched node keeps it.
+- Manual: rename a demo node, reload → flag gone (verify via cleanup leaving it).
+- `npm test` green.
 
 ---
 
-## Phase 5 — Fast-follow
+## S3 — Manual cleanup ("Clear example tasks")
+**Goal:** One action removes only untouched demo nodes; branches and user work survive; undoable.
 
-### T9 · Section ④ The Week timeline (DESKTOP-ONLY)
-Mon→Sun strip from `doneAt` / counter `ticks[]` / `unplannedAt`: per-day completions +
-unplanned arrivals. Hidden on mobile; no dead DOM if shipped later. May merge after F1–F8.
-Acceptance: [ ] SPEC F5. Verify: [ ] Manual — buckets match daily-log; hidden on mobile;
-validate clean.
+Subtasks:
+1. Cleanup fn: `takeSnapshot()` → tombstone + remove nodes where `_demo===true` (skip branches) → `rebuildNodeMap` → `saveWeek` → `render`.
+2. Permanent entry in Help panel (`.agenda-action-btn`), routed through `showAppConfirm({danger:true})`.
+3. i18n: `onboarding.clearExample`, `clearConfirmTitle`, `clearConfirmBody`, `clearConfirmOk` (EN + CS).
 
-**CHECKPOINT D** — human review. Ship fast-follow.
+**Acceptance criteria**
+- Removes exactly the `_demo` activity/counter nodes; all 4 branches remain even if emptied; user-touched/created nodes remain.
+- Undoable (Ctrl/⌘+Z restores removed nodes).
+- No native dialogs; EN/CS present.
+
+**Verification**
+- Test: seed → touch 2 nodes → cleanup → only untouched demo gone, branches intact, snapshot restores.
+- Manual: run from Help, confirm dialog, verify result + undo.
+- `npm test` + `npm run validate` green.
+
+**■ Checkpoint C2 (human):** verify full play→cleanup→undo loop in browser.
 
 ---
 
-## Risks & mitigations
-- **Top box drifts after T1** → `summary.test.js` fails loudly = intended guardrail.
-- **Counter-in-counts ambiguity** → default "one task, done iff at max"; confirm in T3.
-- **Unplanned shading legibility at 8 hues / dark mode** → pick hatch vs opacity in T4.
-- **Scope creep** → no snapshot model, no cross-week, no export/edit (SPEC "Never").
+## S4 — Gentle auto-nudge banner
+**Goal:** Once the user has clearly started their own week, gently offer cleanup — once.
 
-## Out of scope (SPEC §7)
-Plan-snapshot/frozen-baseline data model · cross-week/historical analytics · export/share ·
-editing from panel · browser-native dialogs · orphan button classes · file split.
+Subtasks:
+1. Threshold logic: real user nodes (non-`_demo`, minus original branch count) ≥ 3 **and** ≥1 `_demo` node remains.
+2. Non-blocking dismissible banner/toast: message + **Clear** (runs S3) + **Dismiss**.
+3. Once-only: `zenit-week-playground-nudged` flag in misc; never re-show after dismiss/action.
+4. i18n: `onboarding.nudge`, `onboarding.nudgeDismiss` (EN + CS).
 
-## Workflow
-Each task ends with a one-line commit message + "Should I add and commit?" (project rule).
-Atomic commit per task on `feature/stats-panel`.
+**Acceptance criteria**
+- Fires once when threshold met with demo remaining; never reappears after dismiss/action.
+- Clear button runs cleanup (S3); dismiss sets flag.
+
+**Verification**
+- Test: threshold gate (2 user nodes → no nudge; 3 + demo → nudge; flag set → no nudge).
+- Manual: seed → add 3 nodes → banner appears → dismiss → reload → no banner.
+- `npm test` + `npm run validate` green.
+
+**■ Checkpoint C3 (human, final):** end-to-end first-run journey on a clean profile; sign-off to ship Part A.
+
+---
+
+## Out of scope (later builds)
+- Part B progressive coachmarks.
+- Settings-based playground re-entry / tuning.
+- Landing-page changes.
