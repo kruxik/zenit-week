@@ -7734,7 +7734,9 @@ async function moveNodeToNextWeek(nodeId) {
   if (!nextById.has(branchId)) {
     const branchNode = findNode(branchId);
     if (branchNode) {
-      const branchCopy = { ...branchNode, children: [] };
+      // Neutral _ts (like a default branch) so this structurally-created branch
+      // never LWW-overrides a genuinely-edited branch label/color on another device.
+      const branchCopy = { ...branchNode, children: [], _ts: 0 };
       nextData.nodes.push(branchCopy);
       nextById.set(branchId, branchCopy);
     }
@@ -7758,12 +7760,20 @@ async function moveNodeToNextWeek(nodeId) {
     if (existing) {
       oldToNew.set(ancestor.id, existing.id);
     } else {
+      // A bridging shell only exists to hold the moved node in the new week — it
+      // must not inherit the source week's completion/priority bookkeeping.
       const shell = {
         ...ancestor,
         id: ancestor.id,
         children: [],
         parent: destParentId,
+        done: false,
+        unplanned: false,
+        _ts: Date.now(),
       };
+      delete shell.doneAt;
+      delete shell.unplannedAt;
+      delete shell.reusable;
       nextData.nodes.push(shell);
       nextById.set(ancestor.id, shell);
       oldToNew.set(ancestor.id, ancestor.id);
