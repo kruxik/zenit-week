@@ -1481,9 +1481,10 @@
     display: flex;
     align-items: flex-start;
     gap: 30px;
-    flex-wrap: wrap;
+    /* Keep both columns side by side; the timeline yields width before wrapping. */
+    flex-wrap: nowrap;
   }
-  .stats-pvr-col { flex: 0 1 auto; }
+  .stats-pvr-col { flex: 0 1 auto; min-width: 0; }
 
   /* ① Plan vs Reality — donut + headline metrics */
   .stats-donut-row {
@@ -1651,8 +1652,10 @@
   /* ④ The Week — vertical Mon→Sun timeline placed right of the donut (desktop only).
      Each day is a row with two horizontal bars: completed (green) + unplanned arrived (amber). */
   .stats-timeline-col {
-    flex: 1;
-    min-width: 210px;
+    /* Less critical than Plan vs Reality: shrink (down to 0) rather than wrap below it
+       when wider translations crowd the row. */
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
   }
