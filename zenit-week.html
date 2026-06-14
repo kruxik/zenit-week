@@ -6314,18 +6314,24 @@ async function pollDriveMeta(wKey) {
       }
     }
 
-    // Week file hash check — skip if file not yet in Drive
-    const fileId = driveFileIdCache.get(wKey);
-    if (!fileId) return;
-    const resp = await authFetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`
-    );
-    if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
-    if (!resp.ok) return;
-    const { appProperties } = await resp.json();
-    const remoteHash = appProperties?.contentHash;
-    if (remoteHash && remoteHash !== String(lastSyncedHash.get(wKey))) {
-      await syncWeekFromDrive(wKey); // hash changed — download + CRDT merge
+    // Week file hash check for the current week ±1. At week boundaries the user
+    // works with two weeks intensively (prev+current early week, current+next
+    // late week); keeping the neighbours fresh in IDB means switching weeks shows
+    // up-to-date data immediately instead of stale-until-next-poll. Cache-only
+    // file-id lookup never creates files, so non-existent neighbours cost nothing.
+    for (const k of [offsetWeek(wKey, -1), wKey, offsetWeek(wKey, 1)]) {
+      const fileId = driveFileIdCache.get(k);
+      if (!fileId) continue;
+      const resp = await authFetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`
+      );
+      if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
+      if (!resp.ok) continue;
+      const { appProperties } = await resp.json();
+      const remoteHash = appProperties?.contentHash;
+      if (remoteHash && remoteHash !== String(lastSyncedHash.get(k))) {
+        await syncWeekFromDrive(k); // hash changed — download + CRDT merge
+      }
     }
   } catch { /* silent — next poll will retry */ }
 }
