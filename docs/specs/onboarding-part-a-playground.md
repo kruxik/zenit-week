@@ -29,7 +29,7 @@ Hook a new `await maybeSeedPlayground()` into the init flow at `zenit-week.html:
 `maybeSeedPlayground()` does:
 1. Evaluate the trigger + safety gate (§2). Bail if not seeding.
 2. Load `assets/playground-seed.json`.
-   - The app runs from `file://` and as a deployed page. **Embed the seed as a JS constant in `zenit-week.html`** (Single File Policy — `fetch` of a sibling file fails under `file://`). The JSON file remains the editable source of truth; a build/inject step (or manual paste) mirrors it into the constant. *(Decision flagged for build — see §8.)*
+   - The app runs from `file://` and as a deployed page. **Embed the seed as a JS constant in `zenit-week.html`** (Single File Policy — `fetch` of a sibling file fails under `file://`). The JSON file remains the editable source of truth; the build inject step mirrors it into the constant (see §8).
 3. Build the week object:
    - `weekKey = todayWeekKey()`.
    - For every node: stamp `_demo: true` and a fresh `_ts = Date.now()`. Keep existing ids (seed ids are unique and self-consistent).
@@ -67,7 +67,7 @@ A "touched" node = any of the above. Color/theme/zoom/pan changes are **not** to
 Removes only nodes still carrying `_demo: true`, preserving everything the user touched or created.
 
 ### 5a. Manual action
-- An action (placement: TBD — Help panel and/or a transient banner button) labeled e.g. **"Clear example tasks"**.
+- A permanent entry in the Help panel labeled e.g. **"Clear example tasks"** (plus the transient banner button in §5b).
 - Routes through `showAppConfirm({ title, body, okLabel, danger:true, onConfirm })` (no native dialogs).
 - On confirm: `takeSnapshot()` (so it's undoable), then `tombstoneNodes()` + remove all nodes where `_demo === true` (and their now-empty branch? — **no**: keep branches; a branch the user kept tasks under stays, an all-demo branch's children vanish but the branch remains, matching "keep structure they saw"). Then `rebuildNodeMap()`, `saveWeek()`, `render()`.
 - After cleanup, set `zenit-week-onboarded` already true; nothing re-seeds.
@@ -94,10 +94,10 @@ Buttons reuse `.agenda-action-btn`; confirm uses the existing danger variant tok
 7. Growth branch renders green (`#0ACF83`); work/family/me keep default colors.
 8. EN + CS strings present; `npm test` and `npm run validate` pass.
 
-## 8. Open decisions for build
-- **Seed embedding mechanism:** inline constant vs. a build-inject step that reads `assets/playground-seed.json` into `zenit-week.html`. Recommend a tiny inject step (mirrors `scripts/inject-version.js` pattern) so the JSON stays the single editable source. Confirm before implementing.
-- **Cleanup UI placement:** banner only, Help entry only, or both. Recommend transient banner (tied to the nudge) **plus** a permanent entry in Help so it's findable after dismiss.
-- **Branch handling on cleanup:** confirm branches are always preserved even if all their children were demo (spec assumes yes).
+## 8. Build decisions (confirmed)
+- **Seed embedding mechanism:** ✅ **Inject step.** A tiny script (mirroring `scripts/inject-version.js`) reads `assets/playground-seed.json` and writes it into a constant in `zenit-week.html` at build time. The JSON file remains the single editable source of truth. Add it to the `build` npm script.
+- **Cleanup UI placement:** ✅ **Banner + Help entry.** Transient nudge banner with a Clear button (§5b), **plus** a permanent entry in the Help panel (§5a) so the action is findable after the banner is dismissed.
+- **Branch handling on cleanup:** ✅ **Always keep branches.** Cleanup removes only `_demo` activity/counter nodes; all four branches (Family/Work/Me/Growth) survive even if every child was demo. Preserves the structure the user saw.
 
 ## 9. Test plan (vitest)
 Add `tests/onboarding-seed.test.js` (uses existing `fake-indexeddb`):
