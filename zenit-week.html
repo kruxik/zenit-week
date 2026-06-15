@@ -8295,7 +8295,18 @@ function setStatus(id, status) {
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
+// View level → minimum node depth that is hidden. Nodes at depth >= this are
+// pruned from the layout entirely (no position, no reserved height), so visible
+// parents pack tightly together. Shared with applyFilters so both agree.
+// Depths: center=0, branch=1, activity=2, sub-task/counter=3, …
+function viewLevelHideDepth(level = currentViewLevel) {
+  if (level === 'pebbles') return 3; // hide deep sub-tasks
+  if (level === 'rocks')   return 2; // show only branches
+  return Infinity;                   // 'full' (Sand) — show everything
+}
+
 function computeLayout() {
+  const hideDepth = viewLevelHideDepth();
   // Fresh sizing pass — clear per-render memoization so structural changes
   // (label, priority, badges, parent type) and edit-start/-end are reflected.
   _clearNodeMetricsCaches();
@@ -8371,7 +8382,7 @@ function computeLayout() {
     const activeChildren = sortedChildren((node.children || []).filter(cid => {
       const child = findNode(cid);
       const isChildActiveEdit = editState && editState.nodeId === cid;
-      return child && (!child._editing || isChildActiveEdit);
+      return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
     }));
 
     if (activeChildren.length === 0) {
@@ -8440,7 +8451,7 @@ function computeLayout() {
       const activeChildren = (node.children || []).filter(cid => {
         const child = findNode(cid);
         const isChildActiveEdit = editState && editState.nodeId === cid;
-        return child && (!child._editing || isChildActiveEdit);
+        return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
       });
       if (activeChildren.length > 0) {
         layoutChildren(bid, finalX, finalY, side, w, 0);
@@ -8457,7 +8468,7 @@ function computeLayout() {
     const activeChildren = sortedChildren((node.children || []).filter(cid => {
       const child = findNode(cid);
       const isChildActiveEdit = editState && editState.nodeId === cid;
-      return child && (!child._editing || isChildActiveEdit);
+      return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
     }));
 
     if (activeChildren.length === 0) return;
@@ -10262,26 +10273,20 @@ function applyFilters() {
   const linesLayer = document.getElementById('lines-layer');
   if (!nodesLayer || !linesLayer) return;
 
-  let fadeThreshold;
-  if (currentViewLevel === 'full')         fadeThreshold = Infinity;
-  else if (currentViewLevel === 'pebbles') fadeThreshold = 3;
-  else /* rocks */                         fadeThreshold = 2;
-
+  // View-level (Rocks/Pebbles/Sand) hiding is handled in computeLayout: pruned
+  // nodes get no position and are never rendered, so only the day filter and
+  // virtual-done state remain to apply here.
   nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
     const id = g.dataset.id;
-    const depthOpacity = getNodeDepth(id) >= fadeThreshold ? 0.15 : 1;
-    const dayOpacity   = getDayFilterOpacity(id);
-    const final = Math.min(depthOpacity, dayOpacity);
-    g.style.opacity = final === 1 ? '' : String(final);
-    applyVirtualDoneUI(id, final === 1 && isVirtuallyDone(id));
+    const dayOpacity = getDayFilterOpacity(id);
+    g.style.opacity = dayOpacity === 1 ? '' : String(dayOpacity);
+    applyVirtualDoneUI(id, dayOpacity === 1 && isVirtuallyDone(id));
   });
 
   linesLayer.querySelectorAll('path[data-to]').forEach(path => {
     const toId = path.getAttribute('data-to');
-    const depthOpacity = getNodeDepth(toId) >= fadeThreshold ? 0.15 : 1;
-    const dayOpacity   = getDayFilterOpacity(toId);
-    const final = Math.min(depthOpacity, dayOpacity);
-    path.style.opacity = final === 1 ? '' : String(final);
+    const dayOpacity = getDayFilterOpacity(toId);
+    path.style.opacity = dayOpacity === 1 ? '' : String(dayOpacity);
   });
 }
 
@@ -14145,14 +14150,124 @@ document.getElementById('logo').addEventListener('click', resetView);
 // ─── View Level Bar ────────────────────────────────────────────────────────────
 document.getElementById('view-level-bar').addEventListener('pointerdown', e => e.stopPropagation());
 
-document.querySelectorAll('.view-level-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const level = btn.dataset.level;
-    if (level === currentViewLevel) return;
-    currentViewLevel = level;
-    document.querySelectorAll('.view-level-btn').forEach(b => b.classList.toggle('active', b.dataset.level === level));
-    applyFilters();
+// Switch Rocks/Pebbles/Sand. Deeper nodes are pruned from the layout entirely
+// (computeLayout), so a full render() is needed to repack the survivors — unlike
+// the old opacity-only fade. The visible nodes then slide from their previous
+// positions into the tighter packing so the level change reads as a motion.
+const VIEW_SLIDE_MS = 300;
+function switchViewLevel(level) {
+  if (level === currentViewLevel) return;
+  // Snapshot positions at the *current* level — the slide origin.
+  const fromPos = computeLayout();
+  currentViewLevel = level;
+  document.querySelectorAll('.view-level-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.level === level));
+  render(); // rebuilds the SVG with the repacked (new-level) layout
+  // reduce-effects already folds in prefers-reduced-motion (set at load).
+  if (document.documentElement.classList.contains('reduce-effects')) return;
+  animateViewSlide(fromPos);
+}
+
+// Slide each surviving node from its previous position to the freshly rendered
+// one and move its connecting edges in lockstep. Edges are static bezier paths,
+// so a transform tween can't bend them — instead we re-derive each path's two
+// endpoints every frame from the same eased progress that drives the nodes, and
+// rebuild the `d` (and its gradient coords). Newly revealed nodes/edges grow out
+// of their nearest still-visible ancestor. One rAF loop drives everything so
+// nodes and lines share a clock and never drift apart.
+function animateViewSlide(fromPos) {
+  const nodesLayer = document.getElementById('nodes-layer');
+  const linesLayer = document.getElementById('lines-layer');
+  if (!nodesLayer || typeof nodesLayer.querySelectorAll !== 'function') return;
+  if (typeof requestAnimationFrame !== 'function') return;
+  const toPos = computeLayout(); // matches what render() just drew (new level)
+  const originFor = (id) => {
+    let cur = findNode(id);
+    while (cur) {
+      if (fromPos[cur.id]) return fromPos[cur.id];
+      cur = findNode(cur.parent);
+    }
+    return fromPos['center'] || { x: 0, y: 0 };
+  };
+
+  // Node tweens: from old (or ancestor origin) center → new center.
+  const nodeTweens = [];
+  nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
+    const to = toPos[g.dataset.id];
+    if (!to) return;
+    const appearing = !fromPos[g.dataset.id];
+    const from = appearing ? originFor(g.dataset.id) : fromPos[g.dataset.id];
+    if (!appearing && from.x === to.x && from.y === to.y) return;
+    nodeTweens.push({ g, fx: from.x, fy: from.y, tx: to.x, ty: to.y, appearing });
   });
+
+  // Edge tweens: each endpoint shifts by exactly how far its node moved, so the
+  // start endpoint = final endpoint + (oldNodeCenter − newNodeCenter). The
+  // ±width/2 offset baked into the final endpoint is constant, so this holds.
+  const defsEl = document.querySelector('#map-root defs');
+  const centerC = { x: 0, y: 0 };
+  const edgeTweens = [];
+  if (linesLayer) linesLayer.querySelectorAll('path[data-to]').forEach(p => {
+    const fromId = p.getAttribute('data-from');
+    const toId = p.getAttribute('data-to');
+    const fx1 = +p.getAttribute('data-x1'), fy1 = +p.getAttribute('data-y1');
+    const fx2 = +p.getAttribute('data-x2'), fy2 = +p.getAttribute('data-y2');
+    const sws = +p.getAttribute('data-sw-start'), swe = +p.getAttribute('data-sw-end');
+    if ([fx1, fy1, fx2, fy2, sws, swe].some(Number.isNaN)) return;
+    const pOld = fromId === 'center' ? centerC : (fromPos[fromId] || originFor(fromId));
+    const pNew = fromId === 'center' ? centerC : (toPos[fromId] || pOld);
+    const cOld = fromPos[toId] || originFor(toId);
+    const cNew = toPos[toId] || cOld;
+    const sx1 = fx1 + (pOld.x - pNew.x), sy1 = fy1 + (pOld.y - pNew.y);
+    const sx2 = fx2 + (cOld.x - cNew.x), sy2 = fy2 + (cOld.y - cNew.y);
+    const appearing = !fromPos[toId];
+    if (!appearing && sx1 === fx1 && sy1 === fy1 && sx2 === fx2 && sy2 === fy2) return;
+    const grad = defsEl && defsEl.querySelector(`#grad-${fromId || 'c'}-${toId || 'c'}`);
+    edgeTweens.push({ p, grad, sx1, sy1, sx2, sy2, fx1, fy1, fx2, fy2, sws, swe, appearing });
+  });
+
+  if (!nodeTweens.length && !edgeTweens.length) return;
+
+  const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const setEdge = (ed, x1, y1, x2, y2) => {
+    ed.p.setAttribute('d', taperedPathD(x1, y1, x2, y2, ed.sws, ed.swe));
+    if (ed.grad) {
+      ed.grad.setAttribute('x1', x1); ed.grad.setAttribute('y1', y1);
+      ed.grad.setAttribute('x2', x2); ed.grad.setAttribute('y2', y2);
+    }
+  };
+  let t0 = null;
+  const frame = (now) => {
+    if (t0 === null) t0 = now;
+    const raw = Math.min(1, (now - t0) / VIEW_SLIDE_MS);
+    const e = ease(raw);
+    nodeTweens.forEach(n => {
+      n.g.setAttribute('transform', `translate(${n.fx + (n.tx - n.fx) * e},${n.fy + (n.ty - n.fy) * e})`);
+      if (n.appearing) n.g.style.opacity = String(raw);
+    });
+    edgeTweens.forEach(ed => {
+      setEdge(ed,
+        ed.sx1 + (ed.fx1 - ed.sx1) * e, ed.sy1 + (ed.fy1 - ed.sy1) * e,
+        ed.sx2 + (ed.fx2 - ed.sx2) * e, ed.sy2 + (ed.fy2 - ed.sy2) * e);
+      if (ed.appearing) ed.p.style.opacity = String(raw);
+    });
+    if (raw < 1) { requestAnimationFrame(frame); return; }
+    // Settle on exact final geometry and drop transient inline styles.
+    nodeTweens.forEach(n => {
+      n.g.setAttribute('transform', `translate(${n.tx},${n.ty})`);
+      if (n.appearing) n.g.style.opacity = '';
+    });
+    edgeTweens.forEach(ed => {
+      setEdge(ed, ed.fx1, ed.fy1, ed.fx2, ed.fy2);
+      if (ed.appearing) ed.p.style.opacity = '';
+    });
+    applyFilters(); // re-settle day-filter opacity we may have overwritten
+  };
+  requestAnimationFrame(frame);
+}
+
+document.querySelectorAll('.view-level-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchViewLevel(btn.dataset.level));
 });
 
 // ─── Branch swipe → cycle view level (mobile) ─────────────────────────────────
@@ -14163,11 +14278,7 @@ let _toastTimer = null;
 const _toast = document.getElementById('view-level-toast');
 
 function _setViewLevel(level) {
-  currentViewLevel = level;
-  document.querySelectorAll('.view-level-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.level === level)
-  );
-  applyFilters();
+  switchViewLevel(level); // repack + animate + button state
   _toast.textContent = VIEW_LEVEL_LABELS[level];
   _toast.classList.add('visible');
   clearTimeout(_toastTimer);
