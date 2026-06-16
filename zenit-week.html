@@ -10636,14 +10636,15 @@ function _renderStatsBranchesSection(perBranch) {
   title.className = 'help-section-title';
   title.textContent = t('stats.followThrough');
   sec.appendChild(title);
-  const hasUnplanned = Object.values(perBranch).some(
-    c => (c.unplannedDone + c.unplannedOpen) > 0);
-  sec.appendChild(_statsStatusLegend(hasUnplanned));
   weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
     const c = perBranch[b.id]
       || { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
     sec.appendChild(_statsBranchRow(b, c));
   });
+  // Legend below the bars, mirroring Plan vs Reality where the legend sits under the donut.
+  const hasUnplanned = Object.values(perBranch).some(
+    c => (c.unplannedDone + c.unplannedOpen) > 0);
+  sec.appendChild(_statsStatusLegend(hasUnplanned));
 }
 
 // ③ Effort & Balance — priority-weighted load vs baseline + branch share of that load.
