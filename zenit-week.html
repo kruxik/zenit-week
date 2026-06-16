@@ -10448,14 +10448,18 @@ function _statsDonut(c) {
   return svg;
 }
 
-function _statsLegend() {
+function _statsLegend(hasUnplanned) {
   const PLAN = 'var(--badge-done-text)', UNPL = 'var(--badge-unplanned-text)';
   const items = [
     { color: PLAN, opacity: 1,    key: 'stats.legendPlannedDone' },
     { color: PLAN, opacity: 0.32, key: 'stats.legendPlannedOpen' },
-    { color: UNPL, opacity: 1,    key: 'stats.legendUnplannedDone' },
-    { color: UNPL, opacity: 0.32, key: 'stats.legendUnplannedOpen' },
   ];
+  if (hasUnplanned) {
+    items.push(
+      { color: UNPL, opacity: 1,    key: 'stats.legendUnplannedDone' },
+      { color: UNPL, opacity: 0.32, key: 'stats.legendUnplannedOpen' },
+    );
+  }
   const wrap = document.createElement('div');
   wrap.className = 'stats-legend';
   for (const it of items) {
@@ -10511,6 +10515,7 @@ function _renderStatsDonutSection(c) {
 
   const plannedTotal = c.plannedDone + c.plannedOpen;
   const unplannedTotal = c.unplannedDone + c.unplannedOpen;
+  const hasUnplanned = unplannedTotal > 0;
 
   const row = document.createElement('div');
   row.className = 'stats-donut-row';
@@ -10518,28 +10523,23 @@ function _renderStatsDonutSection(c) {
   const donutWrap = document.createElement('div');
   donutWrap.className = 'stats-donut-wrap';
   donutWrap.appendChild(_statsDonut(c));
-  donutWrap.appendChild(_statsLegend());
+  donutWrap.appendChild(_statsLegend(hasUnplanned));
   row.appendChild(donutWrap);
 
   const headlines = document.createElement('div');
   headlines.className = 'stats-headlines';
   headlines.appendChild(_statsHeadline('stats.planCompletion',
     _pct(c.plannedDone, plannedTotal), c.plannedDone, plannedTotal));
-  headlines.appendChild(_statsHeadline('stats.unplannedLoad',
-    _pct(unplannedTotal, c.total), unplannedTotal, c.total));
-  headlines.appendChild(_statsHeadline('stats.unplannedCompletion',
-    _pct(c.unplannedDone, unplannedTotal), c.unplannedDone, unplannedTotal));
+  // Unplanned headlines are meaningless with no unplanned work — hide them entirely.
+  if (hasUnplanned) {
+    headlines.appendChild(_statsHeadline('stats.unplannedLoad',
+      _pct(unplannedTotal, c.total), unplannedTotal, c.total));
+    headlines.appendChild(_statsHeadline('stats.unplannedCompletion',
+      _pct(c.unplannedDone, unplannedTotal), c.unplannedDone, unplannedTotal));
+  }
   row.appendChild(headlines);
 
   pvr.appendChild(row);
-
-  // Positive signal, not a warning: a week with no unplanned work is a good outcome.
-  if (c.total > 0 && unplannedTotal === 0) {
-    const pos = document.createElement('div');
-    pos.className = 'stats-positive';
-    pos.textContent = t('stats.noUnplanned');
-    pvr.appendChild(pos);
-  }
 
   donut.appendChild(pvr);
 }
@@ -10561,12 +10561,12 @@ function _statsBarSeg(widthPct, bgColor, hatch) {
 
 // Neutral status legend (solid = done, faded = open, hatched = unplanned) — decodes the
 // shading shared by every branch-tinted bar.
-function _statsStatusLegend() {
+function _statsStatusLegend(hasUnplanned) {
   const items = [
     { key: 'stats.legendDone',      opacity: 1,   hatch: false },
     { key: 'stats.legendOpen',      opacity: 0.4, hatch: false },
-    { key: 'stats.legendUnplanned', opacity: 1,   hatch: true  },
   ];
+  if (hasUnplanned) items.push({ key: 'stats.legendUnplanned', opacity: 1, hatch: true });
   const wrap = document.createElement('div');
   wrap.className = 'stats-bar-legend';
   for (const it of items) {
@@ -10636,7 +10636,9 @@ function _renderStatsBranchesSection(perBranch) {
   title.className = 'help-section-title';
   title.textContent = t('stats.followThrough');
   sec.appendChild(title);
-  sec.appendChild(_statsStatusLegend());
+  const hasUnplanned = Object.values(perBranch).some(
+    c => (c.unplannedDone + c.unplannedOpen) > 0);
+  sec.appendChild(_statsStatusLegend(hasUnplanned));
   weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
     const c = perBranch[b.id]
       || { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
