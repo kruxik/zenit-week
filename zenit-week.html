@@ -1688,16 +1688,25 @@
   .stats-tl-unpl { background: var(--badge-unplanned-text); }
   .stats-tl-legend { margin-top: 12px; }
 
-  /* Mobile lean: keep ① donut+headlines and ③ balance; ② bars stay (already label-free);
-     hide ④ timeline; tighten spacing so the story fits one thumb-scroll. */
+  /* Mobile lean: drop ④ timeline and collapse ① to two columns — donut (+ legend stacked
+     one item per line) on the left, completion headlines on the right; ② bars and ③ balance
+     stay. Tightened spacing so the story fits one thumb-scroll. */
   @media (max-width: 767px) {
     #stats-content { padding: 18px; padding-bottom: 80px; }
-    #stats-section-donut { flex-direction: column; gap: 18px; }
+    #stats-section-donut { gap: 14px; }
+    .stats-legend { grid-template-columns: 1fr; }
+    /* Shrink the donut so two columns fit on ~360px phones (e.g. Galaxy S22). */
+    .stats-donut { width: 120px; height: 120px; }
+    .stats-timeline-col { display: none; }
+  }
+
+  /* Only the narrowest screens can't fit two columns → stack donut over headlines. */
+  @media (max-width: 359px) {
+    #stats-section-donut { flex-direction: column; }
     .stats-pvr-col,
     .stats-headlines-col { width: 100%; }
-    /* The headlines spacer title is only for desktop top-alignment; reclaim its space. */
+    /* The headlines spacer title only exists for top-alignment; reclaim its space. */
     .stats-headlines-col > .help-section-title { display: none; }
-    .stats-timeline-col { display: none; }
   }
 
   /* Empty / positive states */
