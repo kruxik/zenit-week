@@ -1484,15 +1484,13 @@
     /* Keep both columns side by side; the timeline yields width before wrapping. */
     flex-wrap: nowrap;
   }
-  .stats-pvr-col { flex: 0 1 auto; min-width: 0; }
+  /* Each of the three top-row sections (donut · headlines · week) takes one third. */
+  .stats-pvr-col,
+  .stats-headlines-col { flex: 1 1 0; min-width: 0; }
+  /* Center the headlines block within its third. */
+  .stats-headlines-col { display: flex; flex-direction: column; align-items: center; }
 
   /* ① Plan vs Reality — donut + headline metrics */
-  .stats-donut-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 24px;
-    flex-wrap: wrap;
-  }
   .stats-donut-wrap {
     display: flex;
     flex-direction: column;
@@ -1536,8 +1534,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    flex: 0 1 auto;
-    min-width: 200px;
+    min-width: 0;
   }
   .stats-headline-label {
     font-size: 13px;
@@ -1695,10 +1692,11 @@
      hide ④ timeline; tighten spacing so the story fits one thumb-scroll. */
   @media (max-width: 767px) {
     #stats-content { padding: 18px; padding-bottom: 80px; }
-    #stats-section-donut { flex-direction: column; gap: 0; }
-    .stats-pvr-col { width: 100%; }
-    .stats-donut-row { gap: 18px; justify-content: center; }
-    .stats-headlines { min-width: 0; }
+    #stats-section-donut { flex-direction: column; gap: 18px; }
+    .stats-pvr-col,
+    .stats-headlines-col { width: 100%; }
+    /* The headlines spacer title is only for desktop top-alignment; reclaim its space. */
+    .stats-headlines-col > .help-section-title { display: none; }
     .stats-timeline-col { display: none; }
   }
 
@@ -10503,8 +10501,12 @@ function _renderStatsDonutSection(c) {
   if (!donut) return;
   donut.textContent = '';
 
-  // Plan-vs-Reality column (title + donut/headlines). The Week column is appended as a
-  // sibling by _renderStatsTimelineSection, so both column titles top-align.
+  const plannedTotal = c.plannedDone + c.plannedOpen;
+  const unplannedTotal = c.unplannedDone + c.unplannedOpen;
+  const hasUnplanned = unplannedTotal > 0;
+
+  // Three equal-width columns: ① donut, ② completion headlines, ③ the week (appended as a
+  // sibling by _renderStatsTimelineSection). Each takes one third; tops align via titles.
   const pvr = document.createElement('div');
   pvr.className = 'stats-pvr-col';
 
@@ -10513,18 +10515,21 @@ function _renderStatsDonutSection(c) {
   title.textContent = t('stats.planVsReality');
   pvr.appendChild(title);
 
-  const plannedTotal = c.plannedDone + c.plannedOpen;
-  const unplannedTotal = c.unplannedDone + c.unplannedOpen;
-  const hasUnplanned = unplannedTotal > 0;
-
-  const row = document.createElement('div');
-  row.className = 'stats-donut-row';
-
   const donutWrap = document.createElement('div');
   donutWrap.className = 'stats-donut-wrap';
   donutWrap.appendChild(_statsDonut(c));
   donutWrap.appendChild(_statsLegend(hasUnplanned));
-  row.appendChild(donutWrap);
+  pvr.appendChild(donutWrap);
+  donut.appendChild(pvr);
+
+  // ② Completion headlines as their own third. A spacer title keeps its content top-aligned
+  // with the titled donut/week columns without inventing a redundant heading.
+  const headlinesCol = document.createElement('div');
+  headlinesCol.className = 'stats-headlines-col';
+  const spacer = document.createElement('div');
+  spacer.className = 'help-section-title';
+  spacer.textContent = ' ';
+  headlinesCol.appendChild(spacer);
 
   const headlines = document.createElement('div');
   headlines.className = 'stats-headlines';
@@ -10537,11 +10542,8 @@ function _renderStatsDonutSection(c) {
     headlines.appendChild(_statsHeadline('stats.unplannedCompletion',
       _pct(c.unplannedDone, unplannedTotal), c.unplannedDone, unplannedTotal));
   }
-  row.appendChild(headlines);
-
-  pvr.appendChild(row);
-
-  donut.appendChild(pvr);
+  headlinesCol.appendChild(headlines);
+  donut.appendChild(headlinesCol);
 }
 
 // Branch hue as solid / faded fills (done vs open). Faded uses background-color alpha,
