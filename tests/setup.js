@@ -429,6 +429,8 @@ _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
+_state.setViewLevel = function(v) { currentViewLevel = v; };
+_state.getViewLevel = function() { return currentViewLevel; };
 _state.getZoom = function() { return zoom; };
 _state.setZoom = function(v) { zoom = v; };
 _state.getPan = function() { return { x: panX, y: panY }; };
@@ -551,6 +553,7 @@ export const {
   parseTodoDays,
   stripDayGroups,
   resolveMagicDayTokens,
+  magicTokenResolvesToNextWeek,
   hasNowToken,
   pinToTopOfTodayAgenda,
   commitEdit,

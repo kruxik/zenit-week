@@ -1590,17 +1590,16 @@
     display: flex;
     align-items: flex-start;
     gap: 30px;
-    flex-wrap: wrap;
+    /* Keep both columns side by side; the timeline yields width before wrapping. */
+    flex-wrap: nowrap;
   }
-  .stats-pvr-col { flex: 0 1 auto; }
+  /* Each of the three top-row sections (donut · headlines · week) takes one third. */
+  .stats-pvr-col,
+  .stats-headlines-col { flex: 1 1 0; min-width: 0; }
+  /* Center the headlines block within its third. */
+  .stats-headlines-col { display: flex; flex-direction: column; align-items: center; }
 
   /* ① Plan vs Reality — donut + headline metrics */
-  .stats-donut-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 24px;
-    flex-wrap: wrap;
-  }
   .stats-donut-wrap {
     display: flex;
     flex-direction: column;
@@ -1644,8 +1643,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    flex: 0 1 auto;
-    min-width: 200px;
+    min-width: 0;
   }
   .stats-headline-label {
     font-size: 13px;
@@ -1760,8 +1758,10 @@
   /* ④ The Week — vertical Mon→Sun timeline placed right of the donut (desktop only).
      Each day is a row with two horizontal bars: completed (green) + unplanned arrived (amber). */
   .stats-timeline-col {
-    flex: 1;
-    min-width: 210px;
+    /* Less critical than Plan vs Reality: shrink (down to 0) rather than wrap below it
+       when wider translations crowd the row. */
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
   }
@@ -1797,15 +1797,25 @@
   .stats-tl-unpl { background: var(--badge-unplanned-text); }
   .stats-tl-legend { margin-top: 12px; }
 
-  /* Mobile lean: keep ① donut+headlines and ③ balance; ② bars stay (already label-free);
-     hide ④ timeline; tighten spacing so the story fits one thumb-scroll. */
+  /* Mobile lean: drop ④ timeline and collapse ① to two columns — donut (+ legend stacked
+     one item per line) on the left, completion headlines on the right; ② bars and ③ balance
+     stay. Tightened spacing so the story fits one thumb-scroll. */
   @media (max-width: 767px) {
     #stats-content { padding: 18px; padding-bottom: 80px; }
-    #stats-section-donut { flex-direction: column; gap: 0; }
-    .stats-pvr-col { width: 100%; }
-    .stats-donut-row { gap: 18px; justify-content: center; }
-    .stats-headlines { min-width: 0; }
+    #stats-section-donut { gap: 14px; }
+    .stats-legend { grid-template-columns: 1fr; }
+    /* Shrink the donut so two columns fit on ~360px phones (e.g. Galaxy S22). */
+    .stats-donut { width: 120px; height: 120px; }
     .stats-timeline-col { display: none; }
+  }
+
+  /* Only the narrowest screens can't fit two columns → stack donut over headlines. */
+  @media (max-width: 359px) {
+    #stats-section-donut { flex-direction: column; }
+    .stats-pvr-col,
+    .stats-headlines-col { width: 100%; }
+    /* The headlines spacer title only exists for top-alignment; reclaim its space. */
+    .stats-headlines-col > .help-section-title { display: none; }
   }
 
   /* Empty / positive states */
@@ -4922,7 +4932,7 @@ const SCHED_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
 // the node to the top of today's agenda group — see pinToTopOfTodayAgenda.
 const SCHED_TODAY_TOKENS = new Set(['today', 'dnes']);
 const SCHED_TOMORROW_TOKENS = new Set(['tomorrow', 'zítra', 'zitra']);
-const SCHED_NOW_TOKENS = new Set(['now', 'teď', 'ted']);
+const SCHED_NOW_TOKENS = new Set(['now', 'teď', 'ted', 'hned']);
 
 // Canonical day labels per language (0=Sun … 6=Sat)
 const DAY_LABELS = {
@@ -4992,6 +5002,24 @@ function resolveMagicDayTokens(label, now = new Date()) {
       return part;
     }).join('');
     return changed ? `(${rebuilt})` : match;
+  });
+}
+
+// True when freezing this label would resolve a relative-day token to a weekday
+// that belongs to the *next* ISO week rather than the current one. ISO weeks run
+// Monday→Sunday, so the only crossing case is "tomorrow"/"zítra" evaluated on a
+// Sunday (tomorrow = Monday, the first day of next week). "today"/"now" never
+// cross — they resolve to the current day, still inside this week. Callers use
+// this to relocate a freshly-tagged node to next week (see submitQuickAdd /
+// commitEdit); otherwise it would freeze to "(Mo)" and land on the long-past
+// Monday of the current week instead of next Monday as the user intended.
+function magicTokenResolvesToNextWeek(label, now = new Date()) {
+  if (now.getDay() !== 0) return false; // 0 = Sunday; only Sunday's tomorrow crosses
+  const groups = (label || '').match(/\(([^)]+)\)/g);
+  if (!groups) return false;
+  return groups.some(g => {
+    const tokens = g.slice(1, -1).split(/[\s,]+/).map(tk => tk.toLowerCase()).filter(Boolean);
+    return tokens.some(tk => SCHED_TOMORROW_TOKENS.has(tk));
   });
 }
 
@@ -5793,6 +5821,13 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
   } catch (e) {
     console.error('[Drive] Failed to write merged data to IndexedDB:', e);
   }
+  // Keep the next-week snapshot cache in sync with what just landed in IDB.
+  // saveWeek refreshes this (see saveWeek), but Drive-poll/peer merges write
+  // via saveWeekIDB and bypass it. A stale cache makes undo/redo restore an
+  // outdated next-week blob and tombstone live nodes the merge just pulled in.
+  if (wKey === offsetWeek(currentWeekKey, 1)) {
+    _nextWeekRawCache = JSON.stringify(mergedData);
+  }
   // When the merge produced content the source lacked (scheduleUpload), tell peer
   // tabs so they reconverge. Applies to both local-peer and Drive-pull merges.
   // Loop-safe: the receiver's sig-equality guard halts once content converges.
@@ -6322,13 +6357,14 @@ function clearAllSyncDebounceTimers() {
 
 async function syncColorsToDrive() {
   if (!googleAccessToken) return;
-  const json = localStorage.getItem(COLORS_STORAGE_KEY);
-  if (!json) return;
+  // Settings blob lives in IndexedDB (saveBranchColors → saveValueIDB), never localStorage.
+  const stored = await loadValueIDB(COLORS_STORAGE_KEY);
+  if (!stored) return;
+  const json = JSON.stringify(stored);
   const hash = fnv1a32(json);
   if (colorsSyncedHash === hash) return;
   setSyncStatus('syncing', 'sync.msg.syncing');
-  let savedAt = 0;
-  try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
+  const savedAt = stored.savedAt ?? 0;
   const MAX_RETRIES = 3;
   let delay = 1000;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -6443,18 +6479,24 @@ async function pollDriveMeta(wKey) {
       }
     }
 
-    // Week file hash check — skip if file not yet in Drive
-    const fileId = driveFileIdCache.get(wKey);
-    if (!fileId) return;
-    const resp = await authFetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`
-    );
-    if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
-    if (!resp.ok) return;
-    const { appProperties } = await resp.json();
-    const remoteHash = appProperties?.contentHash;
-    if (remoteHash && remoteHash !== String(lastSyncedHash.get(wKey))) {
-      await syncWeekFromDrive(wKey); // hash changed — download + CRDT merge
+    // Week file hash check for the current week ±1. At week boundaries the user
+    // works with two weeks intensively (prev+current early week, current+next
+    // late week); keeping the neighbours fresh in IDB means switching weeks shows
+    // up-to-date data immediately instead of stale-until-next-poll. Cache-only
+    // file-id lookup never creates files, so non-existent neighbours cost nothing.
+    for (const k of [offsetWeek(wKey, -1), wKey, offsetWeek(wKey, 1)]) {
+      const fileId = driveFileIdCache.get(k);
+      if (!fileId) continue;
+      const resp = await authFetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`
+      );
+      if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
+      if (!resp.ok) continue;
+      const { appProperties } = await resp.json();
+      const remoteHash = appProperties?.contentHash;
+      if (remoteHash && remoteHash !== String(lastSyncedHash.get(k))) {
+        await syncWeekFromDrive(k); // hash changed — download + CRDT merge
+      }
     }
   } catch { /* silent — next poll will retry */ }
 }
@@ -6645,6 +6687,7 @@ const TRANSLATIONS = {
     'menu.reusable':              'Reusable',
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
+    'toast.movedToNextWeek':      'Added to next week',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
     'menu.prioCritical':          'Priority Critical',
@@ -6889,6 +6932,7 @@ const TRANSLATIONS = {
     'menu.reusable':              'Opakované',
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
+    'toast.movedToNextWeek':      'Přidáno do příštího týdne',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
     'menu.prioCritical':          'Priorita Kritická',
@@ -7007,7 +7051,7 @@ const TRANSLATIONS = {
     'help.relativeDayB':          ' — při uložení se zapíše konkrétní zkratka dne.',
     'help.nowDayA':               'Právě teď: ',
     'help.nowDayKey':             '(teď)',
-    'help.nowDayB':               ' — jako (dnes), a navíc připne položku na začátek dnešní agendy.',
+    'help.nowDayB':               ' nebo (hned) — jako (dnes), a navíc připne položku na začátek dnešní agendy.',
     'help.countersTitle':         'Magická počítadla',
     'help.countersDescA':         'Přidejte ',
     'help.countersDescKey':       'Nx',
@@ -7913,12 +7957,15 @@ async function transferReusable() {
   applyAutoLayout();
 }
 
-async function moveNodeToNextWeek(nodeId) {
+async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
 
   beginAtomicOp();
-  takeSnapshot();
+  // Callers that already captured an undo snapshot before mutating (e.g. a
+  // freshly-added node being relocated for a "tomorrow"-on-Sunday tag) pass
+  // takeSnap:false so one undo reverses the whole add+move, not just the move.
+  if (takeSnap) takeSnapshot();
 
   const nextKey = offsetWeek(currentWeekKey, +1);
   const nextData = await loadWeek(nextKey);
@@ -8038,6 +8085,15 @@ async function moveNodeToNextWeek(nodeId) {
     weekData.nodes = weekData.nodes.filter(n => n.id !== pruneTarget.id);
     rebuildNodeMap();
     pruneTarget = findNode(pruneParentId);
+  }
+
+  // After pruning, the surviving ancestor lost a whole child subtree — re-derive
+  // its done/unplanned from remaining children. The 7857 re-sync missed this case
+  // because the moved node's direct parent was emptied and pruned away, so its
+  // grandparent (which may now have all-done children) was never recomputed.
+  if (pruneTarget && pruneTarget.type === 'activity' && pruneTarget.children.length > 0) {
+    syncStatusUp(pruneTarget.children[0], 'done');
+    syncStatusUp(pruneTarget.children[0], 'unplanned');
   }
 
   // 7. If a tick-child was moved, renumber surviving ticks on both sides so
@@ -8444,7 +8500,18 @@ function setStatus(id, status) {
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
+// View level → minimum node depth that is hidden. Nodes at depth >= this are
+// pruned from the layout entirely (no position, no reserved height), so visible
+// parents pack tightly together. Shared with applyFilters so both agree.
+// Depths: center=0, branch=1, activity=2, sub-task/counter=3, …
+function viewLevelHideDepth(level = currentViewLevel) {
+  if (level === 'pebbles') return 3; // hide deep sub-tasks
+  if (level === 'rocks')   return 2; // show only branches
+  return Infinity;                   // 'full' (Sand) — show everything
+}
+
 function computeLayout() {
+  const hideDepth = viewLevelHideDepth();
   // Fresh sizing pass — clear per-render memoization so structural changes
   // (label, priority, badges, parent type) and edit-start/-end are reflected.
   _clearNodeMetricsCaches();
@@ -8520,7 +8587,7 @@ function computeLayout() {
     const activeChildren = sortedChildren((node.children || []).filter(cid => {
       const child = findNode(cid);
       const isChildActiveEdit = editState && editState.nodeId === cid;
-      return child && (!child._editing || isChildActiveEdit);
+      return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
     }));
 
     if (activeChildren.length === 0) {
@@ -8589,7 +8656,7 @@ function computeLayout() {
       const activeChildren = (node.children || []).filter(cid => {
         const child = findNode(cid);
         const isChildActiveEdit = editState && editState.nodeId === cid;
-        return child && (!child._editing || isChildActiveEdit);
+        return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
       });
       if (activeChildren.length > 0) {
         layoutChildren(bid, finalX, finalY, side, w, 0);
@@ -8606,7 +8673,7 @@ function computeLayout() {
     const activeChildren = sortedChildren((node.children || []).filter(cid => {
       const child = findNode(cid);
       const isChildActiveEdit = editState && editState.nodeId === cid;
-      return child && (!child._editing || isChildActiveEdit);
+      return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
     }));
 
     if (activeChildren.length === 0) return;
@@ -9978,6 +10045,10 @@ function commitEdit(followUp = 'auto') {
     return;
   }
 
+  // Detect before applyMagicLabel freezes the token away: a new node tagged
+  // "tomorrow" on a Sunday belongs to next week, not this week's past Monday.
+  const crossesNextWeek = isNew && magicTokenResolvesToNextWeek(label);
+
   const node = findNode(nodeId);
   if (node) {
     node.label = label;
@@ -9995,6 +10066,19 @@ function commitEdit(followUp = 'auto') {
       }
     } else if (node.type !== 'branch') {
       applyMagicLabel(nodeId);
+    }
+
+    if (crossesNextWeek && node.type === 'activity') {
+      // "tomorrow" on a Sunday froze to "(Mo)" — relocate to next week. The
+      // node's add was already snapshotted by startAddNode, so skip move's own
+      // snapshot. Hold the atomic op (opened in _openInlineInput) open until the
+      // async move + saves finish, then close it — and skip the follow-up
+      // sibling/child chain, which the user didn't ask for when tagging tomorrow.
+      moveNodeToNextWeek(nodeId, { takeSnap: false }).finally(() => {
+        showToast(t('toast.movedToNextWeek'));
+        endAtomicOp();
+      });
+      return;
     }
 
     // Done status propagation for newly added children was deferred from
@@ -10398,26 +10482,20 @@ function applyFilters() {
   const linesLayer = document.getElementById('lines-layer');
   if (!nodesLayer || !linesLayer) return;
 
-  let fadeThreshold;
-  if (currentViewLevel === 'full')         fadeThreshold = Infinity;
-  else if (currentViewLevel === 'pebbles') fadeThreshold = 3;
-  else /* rocks */                         fadeThreshold = 2;
-
+  // View-level (Rocks/Pebbles/Sand) hiding is handled in computeLayout: pruned
+  // nodes get no position and are never rendered, so only the day filter and
+  // virtual-done state remain to apply here.
   nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
     const id = g.dataset.id;
-    const depthOpacity = getNodeDepth(id) >= fadeThreshold ? 0.15 : 1;
-    const dayOpacity   = getDayFilterOpacity(id);
-    const final = Math.min(depthOpacity, dayOpacity);
-    g.style.opacity = final === 1 ? '' : String(final);
-    applyVirtualDoneUI(id, final === 1 && isVirtuallyDone(id));
+    const dayOpacity = getDayFilterOpacity(id);
+    g.style.opacity = dayOpacity === 1 ? '' : String(dayOpacity);
+    applyVirtualDoneUI(id, dayOpacity === 1 && isVirtuallyDone(id));
   });
 
   linesLayer.querySelectorAll('path[data-to]').forEach(path => {
     const toId = path.getAttribute('data-to');
-    const depthOpacity = getNodeDepth(toId) >= fadeThreshold ? 0.15 : 1;
-    const dayOpacity   = getDayFilterOpacity(toId);
-    const final = Math.min(depthOpacity, dayOpacity);
-    path.style.opacity = final === 1 ? '' : String(final);
+    const dayOpacity = getDayFilterOpacity(toId);
+    path.style.opacity = dayOpacity === 1 ? '' : String(dayOpacity);
   });
 }
 
@@ -10579,14 +10657,18 @@ function _statsDonut(c) {
   return svg;
 }
 
-function _statsLegend() {
+function _statsLegend(hasUnplanned) {
   const PLAN = 'var(--badge-done-text)', UNPL = 'var(--badge-unplanned-text)';
   const items = [
     { color: PLAN, opacity: 1,    key: 'stats.legendPlannedDone' },
     { color: PLAN, opacity: 0.32, key: 'stats.legendPlannedOpen' },
-    { color: UNPL, opacity: 1,    key: 'stats.legendUnplannedDone' },
-    { color: UNPL, opacity: 0.32, key: 'stats.legendUnplannedOpen' },
   ];
+  if (hasUnplanned) {
+    items.push(
+      { color: UNPL, opacity: 1,    key: 'stats.legendUnplannedDone' },
+      { color: UNPL, opacity: 0.32, key: 'stats.legendUnplannedOpen' },
+    );
+  }
   const wrap = document.createElement('div');
   wrap.className = 'stats-legend';
   for (const it of items) {
@@ -10630,8 +10712,12 @@ function _renderStatsDonutSection(c) {
   if (!donut) return;
   donut.textContent = '';
 
-  // Plan-vs-Reality column (title + donut/headlines). The Week column is appended as a
-  // sibling by _renderStatsTimelineSection, so both column titles top-align.
+  const plannedTotal = c.plannedDone + c.plannedOpen;
+  const unplannedTotal = c.unplannedDone + c.unplannedOpen;
+  const hasUnplanned = unplannedTotal > 0;
+
+  // Three equal-width columns: ① donut, ② completion headlines, ③ the week (appended as a
+  // sibling by _renderStatsTimelineSection). Each takes one third; tops align via titles.
   const pvr = document.createElement('div');
   pvr.className = 'stats-pvr-col';
 
@@ -10640,39 +10726,35 @@ function _renderStatsDonutSection(c) {
   title.textContent = t('stats.planVsReality');
   pvr.appendChild(title);
 
-  const plannedTotal = c.plannedDone + c.plannedOpen;
-  const unplannedTotal = c.unplannedDone + c.unplannedOpen;
-
-  const row = document.createElement('div');
-  row.className = 'stats-donut-row';
-
   const donutWrap = document.createElement('div');
   donutWrap.className = 'stats-donut-wrap';
   donutWrap.appendChild(_statsDonut(c));
-  donutWrap.appendChild(_statsLegend());
-  row.appendChild(donutWrap);
+  donutWrap.appendChild(_statsLegend(hasUnplanned));
+  pvr.appendChild(donutWrap);
+  donut.appendChild(pvr);
+
+  // ② Completion headlines as their own third. A spacer title keeps its content top-aligned
+  // with the titled donut/week columns without inventing a redundant heading.
+  const headlinesCol = document.createElement('div');
+  headlinesCol.className = 'stats-headlines-col';
+  const spacer = document.createElement('div');
+  spacer.className = 'help-section-title';
+  spacer.textContent = ' ';
+  headlinesCol.appendChild(spacer);
 
   const headlines = document.createElement('div');
   headlines.className = 'stats-headlines';
   headlines.appendChild(_statsHeadline('stats.planCompletion',
     _pct(c.plannedDone, plannedTotal), c.plannedDone, plannedTotal));
-  headlines.appendChild(_statsHeadline('stats.unplannedLoad',
-    _pct(unplannedTotal, c.total), unplannedTotal, c.total));
-  headlines.appendChild(_statsHeadline('stats.unplannedCompletion',
-    _pct(c.unplannedDone, unplannedTotal), c.unplannedDone, unplannedTotal));
-  row.appendChild(headlines);
-
-  pvr.appendChild(row);
-
-  // Positive signal, not a warning: a week with no unplanned work is a good outcome.
-  if (c.total > 0 && unplannedTotal === 0) {
-    const pos = document.createElement('div');
-    pos.className = 'stats-positive';
-    pos.textContent = t('stats.noUnplanned');
-    pvr.appendChild(pos);
+  // Unplanned headlines are meaningless with no unplanned work — hide them entirely.
+  if (hasUnplanned) {
+    headlines.appendChild(_statsHeadline('stats.unplannedLoad',
+      _pct(unplannedTotal, c.total), unplannedTotal, c.total));
+    headlines.appendChild(_statsHeadline('stats.unplannedCompletion',
+      _pct(c.unplannedDone, unplannedTotal), c.unplannedDone, unplannedTotal));
   }
-
-  donut.appendChild(pvr);
+  headlinesCol.appendChild(headlines);
+  donut.appendChild(headlinesCol);
 }
 
 // Branch hue as solid / faded fills (done vs open). Faded uses background-color alpha,
@@ -10692,12 +10774,12 @@ function _statsBarSeg(widthPct, bgColor, hatch) {
 
 // Neutral status legend (solid = done, faded = open, hatched = unplanned) — decodes the
 // shading shared by every branch-tinted bar.
-function _statsStatusLegend() {
+function _statsStatusLegend(hasUnplanned) {
   const items = [
     { key: 'stats.legendDone',      opacity: 1,   hatch: false },
     { key: 'stats.legendOpen',      opacity: 0.4, hatch: false },
-    { key: 'stats.legendUnplanned', opacity: 1,   hatch: true  },
   ];
+  if (hasUnplanned) items.push({ key: 'stats.legendUnplanned', opacity: 1, hatch: true });
   const wrap = document.createElement('div');
   wrap.className = 'stats-bar-legend';
   for (const it of items) {
@@ -10767,12 +10849,15 @@ function _renderStatsBranchesSection(perBranch) {
   title.className = 'help-section-title';
   title.textContent = t('stats.followThrough');
   sec.appendChild(title);
-  sec.appendChild(_statsStatusLegend());
   weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
     const c = perBranch[b.id]
       || { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
     sec.appendChild(_statsBranchRow(b, c));
   });
+  // Legend below the bars, mirroring Plan vs Reality where the legend sits under the donut.
+  const hasUnplanned = Object.values(perBranch).some(
+    c => (c.unplannedDone + c.unplannedOpen) > 0);
+  sec.appendChild(_statsStatusLegend(hasUnplanned));
 }
 
 // ③ Effort & Balance — priority-weighted load vs baseline + branch share of that load.
@@ -13720,6 +13805,12 @@ function zoomAt(cx, cy, factor) {
   applyTransform();
   _markZooming();
   if (editState) resizeInlineInput();
+  // Zooming mid-drag: re-place the grabbed node now so it tracks the cursor on
+  // the wheel event itself, not only on the next pointermove.
+  if (dragState.activeNodeId) {
+    updateDraggedVisuals(dragState.lastClientX, dragState.lastClientY);
+    updateDragTarget(dragState.lastClientX, dragState.lastClientY);
+  }
 }
 
 container.addEventListener('wheel', (e) => {
@@ -13785,10 +13876,18 @@ container.addEventListener('pointerdown', (e) => {
 const DRAG_EDGE = 80;          // px from container edge that triggers autoscroll
 const DRAG_MAX_SPEED = 16;     // max pan speed in px/frame at the very edge
 
+// World-space drag delta: cursor's current world pos minus its world pos at
+// grab. Reads the live panX/panY/zoom, so zoom/pan changes during the drag are
+// absorbed automatically and the node tracks the cursor exactly.
+function dragWorldDelta(clientX, clientY) {
+  const cwX = (clientX - dragState.rectLeft - panX) / zoom;
+  const cwY = (clientY - dragState.rectTop  - panY) / zoom;
+  return { dx: cwX - dragState.cursorStartWorldX, dy: cwY - dragState.cursorStartWorldY };
+}
+
 function updateDraggedVisuals(clientX, clientY) {
   if (!dragState.activeNodeId) return;
-  const dx = (clientX - dragState.startX) / zoom;
-  const dy = (clientY - dragState.startY) / zoom;
+  const { dx, dy } = dragWorldDelta(clientX, clientY);
 
   // Move dragged node groups via cached refs — no querySelector per frame.
   const initialPositions = dragState.initialPositions;
@@ -13842,9 +13941,8 @@ function dragAutoScrollTick() {
   if (vx === 0 && vy === 0) return;
   panX += vx;
   panY += vy;
-  // Compensate so cursor stays over the dragged node while we pan
-  dragState.startX += vx;
-  dragState.startY += vy;
+  // No manual compensation needed: updateDraggedVisuals recomputes from the
+  // live panX/panY each frame, so the node stays under the cursor as we pan.
   applyTransform();
   updateDraggedVisuals(dragState.lastClientX, dragState.lastClientY);
   updateDragTarget(dragState.lastClientX, dragState.lastClientY);
@@ -13866,8 +13964,7 @@ function rectOverlapArea(a, b) {
 function currentDragRect(cx, cy) {
   const p = dragState.layoutPositions[dragState.activeNodeId];
   if (!p) return null;
-  const dx = (cx - dragState.startX) / zoom;
-  const dy = (cy - dragState.startY) / zoom;
+  const { dx, dy } = dragWorldDelta(cx, cy);
   return { x: p.x + dx, y: p.y + dy, w: p.w, h: p.h };
 }
 
@@ -13988,9 +14085,18 @@ window.addEventListener('pointermove', (e) => {
         });
       });
       beginAtomicOp();
+      // Anchor the drag in WORLD space, not screen space. We record where the
+      // cursor sits in world coords at grab time; every frame we recompute the
+      // cursor's *current* world pos from the live panX/panY/zoom and move the
+      // subtree by the difference. This stays correct even if the view zooms or
+      // pans mid-drag (wheel zoom, pinch, edge autoscroll) — the node stays
+      // glued under the cursor instead of drifting.
+      const rect0 = container.getBoundingClientRect();
       dragState = {
         activeNodeId: id,
-        startX: originX, startY: originY,
+        rectLeft: rect0.left, rectTop: rect0.top,
+        cursorStartWorldX: (originX - rect0.left - panX) / zoom,
+        cursorStartWorldY: (originY - rect0.top  - panY) / zoom,
         initialPositions,
         nodeEls,
         edges,
@@ -14262,14 +14368,124 @@ document.getElementById('logo').addEventListener('click', resetView);
 // ─── View Level Bar ────────────────────────────────────────────────────────────
 document.getElementById('view-level-bar').addEventListener('pointerdown', e => e.stopPropagation());
 
-document.querySelectorAll('.view-level-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const level = btn.dataset.level;
-    if (level === currentViewLevel) return;
-    currentViewLevel = level;
-    document.querySelectorAll('.view-level-btn').forEach(b => b.classList.toggle('active', b.dataset.level === level));
-    applyFilters();
+// Switch Rocks/Pebbles/Sand. Deeper nodes are pruned from the layout entirely
+// (computeLayout), so a full render() is needed to repack the survivors — unlike
+// the old opacity-only fade. The visible nodes then slide from their previous
+// positions into the tighter packing so the level change reads as a motion.
+const VIEW_SLIDE_MS = 300;
+function switchViewLevel(level) {
+  if (level === currentViewLevel) return;
+  // Snapshot positions at the *current* level — the slide origin.
+  const fromPos = computeLayout();
+  currentViewLevel = level;
+  document.querySelectorAll('.view-level-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.level === level));
+  render(); // rebuilds the SVG with the repacked (new-level) layout
+  // reduce-effects already folds in prefers-reduced-motion (set at load).
+  if (document.documentElement.classList.contains('reduce-effects')) return;
+  animateViewSlide(fromPos);
+}
+
+// Slide each surviving node from its previous position to the freshly rendered
+// one and move its connecting edges in lockstep. Edges are static bezier paths,
+// so a transform tween can't bend them — instead we re-derive each path's two
+// endpoints every frame from the same eased progress that drives the nodes, and
+// rebuild the `d` (and its gradient coords). Newly revealed nodes/edges grow out
+// of their nearest still-visible ancestor. One rAF loop drives everything so
+// nodes and lines share a clock and never drift apart.
+function animateViewSlide(fromPos) {
+  const nodesLayer = document.getElementById('nodes-layer');
+  const linesLayer = document.getElementById('lines-layer');
+  if (!nodesLayer || typeof nodesLayer.querySelectorAll !== 'function') return;
+  if (typeof requestAnimationFrame !== 'function') return;
+  const toPos = computeLayout(); // matches what render() just drew (new level)
+  const originFor = (id) => {
+    let cur = findNode(id);
+    while (cur) {
+      if (fromPos[cur.id]) return fromPos[cur.id];
+      cur = findNode(cur.parent);
+    }
+    return fromPos['center'] || { x: 0, y: 0 };
+  };
+
+  // Node tweens: from old (or ancestor origin) center → new center.
+  const nodeTweens = [];
+  nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
+    const to = toPos[g.dataset.id];
+    if (!to) return;
+    const appearing = !fromPos[g.dataset.id];
+    const from = appearing ? originFor(g.dataset.id) : fromPos[g.dataset.id];
+    if (!appearing && from.x === to.x && from.y === to.y) return;
+    nodeTweens.push({ g, fx: from.x, fy: from.y, tx: to.x, ty: to.y, appearing });
   });
+
+  // Edge tweens: each endpoint shifts by exactly how far its node moved, so the
+  // start endpoint = final endpoint + (oldNodeCenter − newNodeCenter). The
+  // ±width/2 offset baked into the final endpoint is constant, so this holds.
+  const defsEl = document.querySelector('#map-root defs');
+  const centerC = { x: 0, y: 0 };
+  const edgeTweens = [];
+  if (linesLayer) linesLayer.querySelectorAll('path[data-to]').forEach(p => {
+    const fromId = p.getAttribute('data-from');
+    const toId = p.getAttribute('data-to');
+    const fx1 = +p.getAttribute('data-x1'), fy1 = +p.getAttribute('data-y1');
+    const fx2 = +p.getAttribute('data-x2'), fy2 = +p.getAttribute('data-y2');
+    const sws = +p.getAttribute('data-sw-start'), swe = +p.getAttribute('data-sw-end');
+    if ([fx1, fy1, fx2, fy2, sws, swe].some(Number.isNaN)) return;
+    const pOld = fromId === 'center' ? centerC : (fromPos[fromId] || originFor(fromId));
+    const pNew = fromId === 'center' ? centerC : (toPos[fromId] || pOld);
+    const cOld = fromPos[toId] || originFor(toId);
+    const cNew = toPos[toId] || cOld;
+    const sx1 = fx1 + (pOld.x - pNew.x), sy1 = fy1 + (pOld.y - pNew.y);
+    const sx2 = fx2 + (cOld.x - cNew.x), sy2 = fy2 + (cOld.y - cNew.y);
+    const appearing = !fromPos[toId];
+    if (!appearing && sx1 === fx1 && sy1 === fy1 && sx2 === fx2 && sy2 === fy2) return;
+    const grad = defsEl && defsEl.querySelector(`#grad-${fromId || 'c'}-${toId || 'c'}`);
+    edgeTweens.push({ p, grad, sx1, sy1, sx2, sy2, fx1, fy1, fx2, fy2, sws, swe, appearing });
+  });
+
+  if (!nodeTweens.length && !edgeTweens.length) return;
+
+  const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const setEdge = (ed, x1, y1, x2, y2) => {
+    ed.p.setAttribute('d', taperedPathD(x1, y1, x2, y2, ed.sws, ed.swe));
+    if (ed.grad) {
+      ed.grad.setAttribute('x1', x1); ed.grad.setAttribute('y1', y1);
+      ed.grad.setAttribute('x2', x2); ed.grad.setAttribute('y2', y2);
+    }
+  };
+  let t0 = null;
+  const frame = (now) => {
+    if (t0 === null) t0 = now;
+    const raw = Math.min(1, (now - t0) / VIEW_SLIDE_MS);
+    const e = ease(raw);
+    nodeTweens.forEach(n => {
+      n.g.setAttribute('transform', `translate(${n.fx + (n.tx - n.fx) * e},${n.fy + (n.ty - n.fy) * e})`);
+      if (n.appearing) n.g.style.opacity = String(raw);
+    });
+    edgeTweens.forEach(ed => {
+      setEdge(ed,
+        ed.sx1 + (ed.fx1 - ed.sx1) * e, ed.sy1 + (ed.fy1 - ed.sy1) * e,
+        ed.sx2 + (ed.fx2 - ed.sx2) * e, ed.sy2 + (ed.fy2 - ed.sy2) * e);
+      if (ed.appearing) ed.p.style.opacity = String(raw);
+    });
+    if (raw < 1) { requestAnimationFrame(frame); return; }
+    // Settle on exact final geometry and drop transient inline styles.
+    nodeTweens.forEach(n => {
+      n.g.setAttribute('transform', `translate(${n.tx},${n.ty})`);
+      if (n.appearing) n.g.style.opacity = '';
+    });
+    edgeTweens.forEach(ed => {
+      setEdge(ed, ed.fx1, ed.fy1, ed.fx2, ed.fy2);
+      if (ed.appearing) ed.p.style.opacity = '';
+    });
+    applyFilters(); // re-settle day-filter opacity we may have overwritten
+  };
+  requestAnimationFrame(frame);
+}
+
+document.querySelectorAll('.view-level-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchViewLevel(btn.dataset.level));
 });
 
 // ─── Branch swipe → cycle view level (mobile) ─────────────────────────────────
@@ -14280,11 +14496,7 @@ let _toastTimer = null;
 const _toast = document.getElementById('view-level-toast');
 
 function _setViewLevel(level) {
-  currentViewLevel = level;
-  document.querySelectorAll('.view-level-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.level === level)
-  );
-  applyFilters();
+  switchViewLevel(level); // repack + animate + button state
   _toast.textContent = VIEW_LEVEL_LABELS[level];
   _toast.classList.add('visible');
   clearTimeout(_toastTimer);
@@ -14590,9 +14802,13 @@ document.addEventListener('click', (e) => {
     backdrop.classList.remove('is-open');
   }
 
-  function submitQuickAdd() {
+  async function submitQuickAdd() {
     const label = input.value.trim();
     if (!label || !selectedBranchId) return;
+
+    // Detect before applyMagicLabel freezes the token away: "tomorrow" on a
+    // Sunday belongs to next week, not this week's long-past Monday.
+    const crossesNextWeek = magicTokenResolvesToNextWeek(label);
 
     // Create inbox node
     takeSnapshot();
@@ -14621,7 +14837,16 @@ document.addEventListener('click', (e) => {
     // Apply day-token + Nx-counter rules — same logic as commitEdit.
     applyMagicLabel(node.id);
 
-    saveWeek(currentWeekKey, weekData);
+    if (crossesNextWeek) {
+      // Node was created in this week then frozen to "(Mo)"; relocate the whole
+      // node to next week where that Monday actually lives. The snapshot above
+      // already captured pre-add state, so skip move's own snapshot (one undo
+      // reverses the add+move). move() saves both weeks and re-renders.
+      await moveNodeToNextWeek(node.id, { takeSnap: false });
+      showToast(t('toast.movedToNextWeek'));
+    } else {
+      saveWeek(currentWeekKey, weekData);
+    }
     renderIfVisible();
     if (currentView === 'agenda') renderAgenda();
 
