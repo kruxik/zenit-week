@@ -11028,21 +11028,59 @@ async function _renderStatsTrendSection() {
   const chart = document.createElement('div');
   chart.className = 'stats-trend-chart';
 
-  const draw = () => {
+  // Morph state: the per-week numeric buckets last painted, so a lens switch tweens
+  // FROM the currently shown shape (not from zero). Null buckets become flat columns.
+  const ZERO = { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
+  let prevShape = null;   // [{...buckets}] per week, length === rawWeeks.length
+  let animId = 0;
+  const lerpShape = (a, b, e) => b.map((bw, i) => {
+    const aw = a[i];
+    const m = (k) => aw[k] + (bw[k] - aw[k]) * e;
+    const s = { plannedDone: m('plannedDone'), plannedOpen: m('plannedOpen'),
+                unplannedDone: m('unplannedDone'), unplannedOpen: m('unplannedOpen') };
+    s.total = s.plannedDone + s.plannedOpen + s.unplannedDone + s.unplannedOpen;
+    return s;
+  });
+  const paintSvg = (shape) => {
+    const weeks = rawWeeks.map((w, i) => ({ week: w.week, stats: shape[i] }));
+    const svg = _buildCfdSvg(weeks);
+    const old = chart.querySelector('svg');
+    if (old) chart.replaceChild(svg, old); else chart.insertBefore(svg, chart.firstChild);
+  };
+
+  const draw = (animate) => {
+    cancelAnimationFrame(animId);
     chart.textContent = '';
-    const weeks = rawWeeks.map(w => ({
-      week: w.week, stats: _weekCompletion(w.data, _cfdBranch),
-    }));
+    const weeks = rawWeeks.map(w => ({ week: w.week, stats: _weekCompletion(w.data, _cfdBranch) }));
     if (weeks.filter(w => w.stats).length < 2) {
       const note = document.createElement('div');
       note.className = 'stats-trend-note';
       note.textContent = t('stats.trendNoData');
       chart.appendChild(note);
+      prevShape = null;
       return;
     }
-    chart.appendChild(_buildCfdSvg(weeks));
+    const target = weeks.map(w => w.stats || ZERO);
+    chart.appendChild(_buildCfdSvg(weeks)); // final frame (also the no-anim result)
     const hasUnplanned = weeks.some(w => w.stats && (w.stats.unplannedDone + w.stats.unplannedOpen) > 0);
     chart.appendChild(_statsLegend(hasUnplanned));
+
+    const reduce = document.documentElement.classList.contains('reduce-effects');
+    if (animate && prevShape && !reduce) {
+      // Tween the areas from the previously shown shape to the new one. Grid/labels
+      // are regenerated each frame from the interpolated values so the scale stays
+      // consistent with the morphing areas. easeOutCubic.
+      const from = prevShape, dur = 420;
+      let start = null;
+      const step = (ts) => {
+        if (start === null) start = ts;
+        const e = Math.min(1, (ts - start) / dur);
+        paintSvg(lerpShape(from, target, 1 - Math.pow(1 - e, 3)));
+        if (e < 1) animId = requestAnimationFrame(step);
+      };
+      animId = requestAnimationFrame(step);
+    }
+    prevShape = target;
   };
 
   const makeChip = (id, label, dotColor) => {
@@ -11063,7 +11101,7 @@ async function _renderStatsTrendSection() {
       _cfdBranch = id;
       switcher.querySelectorAll('.qab-pill').forEach(p =>
         p.classList.toggle('selected', (p.dataset.id || null) === (id || null)));
-      draw();
+      draw(true);
     });
     return chip;
   };
@@ -11076,7 +11114,7 @@ async function _renderStatsTrendSection() {
   sec.appendChild(switcher);
   sec.appendChild(chart);
 
-  draw();
+  draw(false); // first render: no animation
 }
 
 function renderStatsPanel() {
