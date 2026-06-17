@@ -1688,6 +1688,36 @@
   .stats-tl-unpl { background: var(--badge-unplanned-text); }
   .stats-tl-legend { margin-top: 12px; }
 
+  /* ⑤ 4-week trend — completion % sparkline across the last four ISO weeks. */
+  .stats-trend-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .stats-trend-sub {
+    color: var(--text-faint);
+    font-size: 12.5px;
+    margin: 2px 0 6px;
+  }
+  .stats-trend-delta {
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    flex: none;
+  }
+  .stats-trend-delta.up   { color: var(--badge-done-text); }
+  .stats-trend-delta.down { color: var(--accent-danger); }
+  .stats-trend-delta.flat { color: var(--text-faint); }
+  .stats-trend-svg { width: 100%; height: auto; display: block; margin-top: 4px; }
+  #stats-section-trend .stats-legend { margin-top: 10px; }
+  .stats-trend-note {
+    color: var(--text-placeholder);
+    font-size: 12.5px;
+    text-align: center;
+    padding: 8px 0;
+  }
+
   /* Mobile lean: drop ④ timeline and collapse ① to two columns — donut (+ legend stacked
      one item per line) on the left, completion headlines on the right; ② bars and ③ balance
      stay. Tightened spacing so the story fits one thumb-scroll. */
@@ -3749,6 +3779,7 @@
     <div id="stats-section-donut" class="help-section"></div>
     <div id="stats-section-branches" class="help-section"></div>
     <div id="stats-section-balance" class="help-section"></div>
+    <div id="stats-section-trend" class="help-section"></div>
   </div>
 </div>
 <div id="stats-close-bar">
@@ -6574,6 +6605,10 @@ const TRANSLATIONS = {
     'stats.legendDone':           'done',
     'stats.legendOpen':           'open',
     'stats.legendUnplanned':      'unplanned (hatched)',
+    'stats.trendTitle':           '4-week cumulative flow',
+    'stats.trendSub':             'weighted load by state across the last four weeks',
+    'stats.trendNoData':          'No earlier weeks to compare yet.',
+    'stats.trendWeek':            'week',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
     'help.aboutTitle':            'What it solves',
@@ -6801,6 +6836,10 @@ const TRANSLATIONS = {
     'stats.legendDone':           'splněno',
     'stats.legendOpen':           'zbývá',
     'stats.legendUnplanned':      'neplánováno (šrafováno)',
+    'stats.trendTitle':           'Kumulativní tok za 4 týdny',
+    'stats.trendSub':             'vážená zátěž podle stavu za poslední čtyři týdny',
+    'stats.trendNoData':          'Zatím není s čím srovnávat.',
+    'stats.trendWeek':            'týden',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
     'help.aboutTitle':            'Co řeší',
@@ -10710,7 +10749,7 @@ function _renderStatsBalanceSection(stats) {
 
 // Empty week (no tasks at all) → a friendly message instead of zeroed charts.
 function _renderStatsEmpty() {
-  ['stats-section-branches', 'stats-section-balance'].forEach(id => {
+  ['stats-section-branches', 'stats-section-balance', 'stats-section-trend'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = '';
   });
@@ -10813,6 +10852,176 @@ function _renderStatsTimelineSection(leaves) {
   sec.appendChild(colEl);
 }
 
+// ⑤ 4-Week Cumulative Flow ──────────────────────────────────────────────────────
+// Weighted planned/unplanned × done/open split for an arbitrary week's data object.
+// Self-contained — does NOT use the global nodeMap, so it works on historical weeks
+// loaded straight from IDB. Mirrors computeWeekStats()'s statsOf() exactly (critical
+// 5×, high 3×, normal 1×; counters count fractionally). Returns null for blank weeks.
+function _weekCompletion(data) {
+  if (!data || !Array.isArray(data.nodes)) return null;
+  const byId = new Map(data.nodes.map(n => [n.id, n]));
+  const weightOf = (n) => n.priority === 'critical' ? 5 : n.priority === 'high' ? 3 : 1;
+  let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0;
+  for (const n of data.nodes) {
+    if (n._editing || n.type === 'branch' || n.type === 'center') continue;
+    const hasActiveChild = (n.children || []).some(cid => {
+      const c = byId.get(cid);
+      return c && !c._editing;
+    });
+    if (hasActiveChild) continue; // count leaves only, matching computeWeekStats()
+    const w = weightOf(n);
+    let doneAmt, openAmt;
+    if (n.type === 'counter') {
+      const max = n.max || 0;
+      const val = Math.min(n.val || 0, max);
+      doneAmt = val * w; openAmt = (max - val) * w;
+    } else {
+      doneAmt = n.done ? w : 0; openAmt = n.done ? 0 : w;
+    }
+    if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
+    else { plannedDone += doneAmt; plannedOpen += openAmt; }
+  }
+  const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen;
+  if (total <= 0) return null; // blank week → an empty column in the diagram
+  const done = plannedDone + unplannedDone;
+  return { plannedDone, plannedOpen, unplannedDone, unplannedOpen,
+           total, done, percent: Math.round((done / total) * 100) };
+}
+
+// Cumulative Flow Diagram across the last four ISO weeks (oldest → current). Each
+// week is one column; the four weighted buckets (planned/unplanned × done/open) are
+// stacked as filled areas, done at the bottom — so the bottom band's growth reads as
+// "more got finished" and the total height reads as weekly load. Colours mirror the
+// donut (green = planned, amber = unplanned; solid = done, faded = open).
+// Async: prior weeks come from IDB; the current week uses live weekData so unsaved
+// edits show immediately. Blank weeks pinch to the baseline (an empty column).
+// Rendered fire-and-forget by renderStatsPanel().
+const _CFD_BANDS = [
+  { key: 'plannedDone',   color: 'var(--badge-done-text)',      opacity: 1    },
+  { key: 'unplannedDone', color: 'var(--badge-unplanned-text)', opacity: 1    },
+  { key: 'plannedOpen',   color: 'var(--badge-done-text)',      opacity: 0.32 },
+  { key: 'unplannedOpen', color: 'var(--badge-unplanned-text)', opacity: 0.32 },
+];
+
+async function _renderStatsTrendSection(currentStats) {
+  const sec = document.getElementById('stats-section-trend');
+  if (!sec) return;
+
+  const keys = [-3, -2, -1, 0].map(d => offsetWeek(currentWeekKey, d));
+  const weeks = await Promise.all(keys.map(async (wk, i) => {
+    const last = i === keys.length - 1;
+    const stats = last
+      ? (currentStats.total > 0 ? currentStats : null)
+      : _weekCompletion(await loadWeekIDB(wk));
+    return { week: parseWeekKey(wk).week, stats };
+  }));
+
+  // Panel may have closed (or moved to another week) while we awaited IDB.
+  if (!_statsPanelOpen) return;
+  sec.textContent = '';
+
+  const head = document.createElement('div');
+  head.className = 'stats-trend-head';
+  const title = document.createElement('div');
+  title.className = 'help-section-title';
+  title.textContent = t('stats.trendTitle');
+  head.appendChild(title);
+
+  // Delta chip = completion % of the current week vs the most recent earlier week
+  // with data — a one-glance "are we finishing more?" read above the diagram.
+  const cur = weeks[weeks.length - 1].stats;
+  let prev = null;
+  for (let i = weeks.length - 2; i >= 0; i--) {
+    if (weeks[i].stats) { prev = weeks[i].stats; break; }
+  }
+  if (cur && prev) {
+    const diff = cur.percent - prev.percent;
+    const delta = document.createElement('div');
+    delta.className = 'stats-trend-delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat');
+    delta.textContent = (diff > 0 ? '▲ +' : diff < 0 ? '▼ ' : '→ ') + diff + '%';
+    head.appendChild(delta);
+  }
+  sec.appendChild(head);
+
+  const sub = document.createElement('div');
+  sub.className = 'stats-trend-sub';
+  sub.textContent = t('stats.trendSub');
+  sec.appendChild(sub);
+
+  // Need at least two weeks with data to draw a flow; otherwise a friendly note.
+  if (weeks.filter(w => w.stats).length < 2) {
+    const note = document.createElement('div');
+    note.className = 'stats-trend-note';
+    note.textContent = t('stats.trendNoData');
+    sec.appendChild(note);
+    return;
+  }
+
+  // Geometry: full-width columns with small insets so week labels never clip.
+  const W = 320, H = 150, n = weeks.length;
+  const PAD_T = 14, PAD_B = 22, PAD_X = 18;
+  const plotH = H - PAD_T - PAD_B;
+  const innerW = W - 2 * PAD_X;
+  const maxY = Math.max(...weeks.map(w => w.stats ? w.stats.total : 0)) || 1;
+  const x = (i) => PAD_X + innerW * (i / (n - 1));
+  const y = (v) => PAD_T + (1 - v / maxY) * plotH;
+  const valOf = (w, key) => (w.stats ? (w.stats[key] || 0) : 0);
+
+  const svg = _svgEl('svg', {
+    viewBox: `0 0 ${W} ${H}`, class: 'stats-trend-svg', role: 'img',
+    'aria-label': t('stats.trendSub'),
+  });
+
+  // Faint vertical guide at each week, plus the 0 baseline.
+  weeks.forEach((w, i) => {
+    svg.appendChild(_svgEl('line', {
+      x1: x(i), x2: x(i), y1: PAD_T, y2: y(0),
+      stroke: 'var(--border-soft)', 'stroke-width': 1,
+    }));
+  });
+  svg.appendChild(_svgEl('line', {
+    x1: PAD_X, x2: W - PAD_X, y1: y(0), y2: y(0),
+    stroke: 'var(--border-soft)', 'stroke-width': 1,
+  }));
+
+  // Stacked areas, bottom band first. Each band is a ribbon between the running
+  // cumulative top of the band below and its own cumulative top.
+  let lower = weeks.map(() => 0);
+  for (const band of _CFD_BANDS) {
+    const upper = weeks.map((w, i) => lower[i] + valOf(w, band.key));
+    const top = upper.map((v, i) => `${x(i)},${y(v)}`);
+    const bot = lower.map((v, i) => `${x(i)},${y(v)}`).reverse();
+    svg.appendChild(_svgEl('path', {
+      d: `M${top.join('L')}L${bot.join('L')}Z`,
+      fill: band.color, opacity: band.opacity,
+    }));
+    lower = upper;
+  }
+
+  // Scope line — crisp top edge of the stack (total weighted load each week).
+  svg.appendChild(_svgEl('polyline', {
+    points: weeks.map((w, i) => `${x(i)},${y(valOf(w, 'total'))}`).join(' '),
+    fill: 'none', stroke: 'var(--text-faint)', 'stroke-width': 1.25,
+    'stroke-linejoin': 'round', opacity: 0.55,
+  }));
+
+  // Week labels along the bottom (always shown — keeps the axis calendar-accurate).
+  weeks.forEach((w, i) => {
+    const wlab = _svgEl('text', {
+      x: x(i), y: H - 6, 'text-anchor': 'middle',
+      fill: 'var(--text-faint)', 'font-size': 11, 'font-weight': 600,
+    });
+    wlab.textContent = 'W' + w.week;
+    svg.appendChild(wlab);
+  });
+
+  sec.appendChild(svg);
+
+  // Reuse the donut's planned/unplanned × done/open legend to decode the bands.
+  const hasUnplanned = weeks.some(w => w.stats && (w.stats.unplannedDone + w.stats.unplannedOpen) > 0);
+  sec.appendChild(_statsLegend(hasUnplanned));
+}
+
 function renderStatsPanel() {
   const stats = computeWeekStats();
   if (stats.global.total === 0) {
@@ -10823,6 +11032,7 @@ function renderStatsPanel() {
   _renderStatsBranchesSection(stats.perBranch);
   _renderStatsBalanceSection(stats);
   _renderStatsTimelineSection(stats.leaves);
+  _renderStatsTrendSection(stats.global); // async; fills #stats-section-trend when IDB resolves
 }
 
 let _statsReturnFocus = null;

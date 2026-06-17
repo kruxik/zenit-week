@@ -563,6 +563,7 @@ export const {
   applyBranchColor,
   updateSummary,
   computeWeekStats,
+  _weekCompletion,
   openStatsPanel,
   closeStatsPanel,
   applyTranslations,
