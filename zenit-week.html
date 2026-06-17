@@ -1688,27 +1688,12 @@
   .stats-tl-unpl { background: var(--badge-unplanned-text); }
   .stats-tl-legend { margin-top: 12px; }
 
-  /* ⑤ 4-week trend — completion % sparkline across the last four ISO weeks. */
-  .stats-trend-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-  }
+  /* ⑤ 4-week cumulative flow diagram across the last four ISO weeks. */
   .stats-trend-sub {
     color: var(--text-faint);
     font-size: 12.5px;
     margin: 2px 0 6px;
   }
-  .stats-trend-delta {
-    font-size: 14px;
-    font-weight: 700;
-    white-space: nowrap;
-    flex: none;
-  }
-  .stats-trend-delta.up   { color: var(--badge-done-text); }
-  .stats-trend-delta.down { color: var(--accent-danger); }
-  .stats-trend-delta.flat { color: var(--text-faint); }
   .stats-trend-svg { width: 100%; height: auto; display: block; margin-top: 4px; }
   #stats-section-trend .stats-legend { margin-top: 10px; }
   .stats-trend-note {
@@ -10920,28 +10905,10 @@ async function _renderStatsTrendSection(currentStats) {
   if (!_statsPanelOpen) return;
   sec.textContent = '';
 
-  const head = document.createElement('div');
-  head.className = 'stats-trend-head';
   const title = document.createElement('div');
   title.className = 'help-section-title';
   title.textContent = t('stats.trendTitle');
-  head.appendChild(title);
-
-  // Delta chip = completion % of the current week vs the most recent earlier week
-  // with data — a one-glance "are we finishing more?" read above the diagram.
-  const cur = weeks[weeks.length - 1].stats;
-  let prev = null;
-  for (let i = weeks.length - 2; i >= 0; i--) {
-    if (weeks[i].stats) { prev = weeks[i].stats; break; }
-  }
-  if (cur && prev) {
-    const diff = cur.percent - prev.percent;
-    const delta = document.createElement('div');
-    delta.className = 'stats-trend-delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat');
-    delta.textContent = (diff > 0 ? '▲ +' : diff < 0 ? '▼ ' : '→ ') + diff + '%';
-    head.appendChild(delta);
-  }
-  sec.appendChild(head);
+  sec.appendChild(title);
 
   const sub = document.createElement('div');
   sub.className = 'stats-trend-sub';
