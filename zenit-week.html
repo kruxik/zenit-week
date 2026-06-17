@@ -1694,6 +1694,12 @@
     font-size: 12.5px;
     margin: 2px 0 6px;
   }
+  .stats-trend-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0 2px;
+  }
   .stats-trend-svg { width: 100%; height: auto; display: block; margin-top: 4px; }
   #stats-section-trend .stats-legend { margin-top: 10px; }
   .stats-trend-note {
@@ -6594,6 +6600,7 @@ const TRANSLATIONS = {
     'stats.trendSub':             'Weighted load by state across the last four weeks.',
     'stats.trendNoData':          'No earlier weeks to compare yet.',
     'stats.trendWeek':            'week',
+    'stats.trendTotal':           'Total',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
     'help.aboutTitle':            'What it solves',
@@ -6825,6 +6832,7 @@ const TRANSLATIONS = {
     'stats.trendSub':             'Vážená zátěž podle stavu za poslední čtyři týdny.',
     'stats.trendNoData':          'Zatím není s čím srovnávat.',
     'stats.trendWeek':            'týden',
+    'stats.trendTotal':           'Celkem',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
     'help.aboutTitle':            'Co řeší',
@@ -10842,13 +10850,16 @@ function _renderStatsTimelineSection(leaves) {
 // Self-contained — does NOT use the global nodeMap, so it works on historical weeks
 // loaded straight from IDB. Mirrors computeWeekStats()'s statsOf() exactly (critical
 // 5×, high 3×, normal 1×; counters count fractionally). Returns null for blank weeks.
-function _weekCompletion(data) {
+// branchId (optional) restricts the count to one branch — drives the CFD's per-branch
+// view; omit it (or pass null) for the Total across all branches.
+function _weekCompletion(data, branchId) {
   if (!data || !Array.isArray(data.nodes)) return null;
   const byId = new Map(data.nodes.map(n => [n.id, n]));
   const weightOf = (n) => n.priority === 'critical' ? 5 : n.priority === 'high' ? 3 : 1;
   let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0;
   for (const n of data.nodes) {
     if (n._editing || n.type === 'branch' || n.type === 'center') continue;
+    if (branchId && n.branch !== branchId) continue;
     const hasActiveChild = (n.children || []).some(cid => {
       const c = byId.get(cid);
       return c && !c._editing;
@@ -10888,44 +10899,13 @@ const _CFD_BANDS = [
   { key: 'unplannedOpen', color: 'var(--badge-unplanned-text)', opacity: 0.32 },
 ];
 
-async function _renderStatsTrendSection(currentStats) {
-  const sec = document.getElementById('stats-section-trend');
-  if (!sec) return;
+// Selected CFD lens: null = Total (all branches), otherwise a branch id. Persists
+// across panel opens within the session; reset to Total if the branch disappears.
+let _cfdBranch = null;
 
-  const keys = [-3, -2, -1, 0].map(d => offsetWeek(currentWeekKey, d));
-  const weeks = await Promise.all(keys.map(async (wk, i) => {
-    const last = i === keys.length - 1;
-    const stats = last
-      ? (currentStats.total > 0 ? currentStats : null)
-      : _weekCompletion(await loadWeekIDB(wk));
-    return { week: parseWeekKey(wk).week, stats };
-  }));
-
-  // Panel may have closed (or moved to another week) while we awaited IDB.
-  if (!_statsPanelOpen) return;
-  sec.textContent = '';
-
-  const title = document.createElement('div');
-  title.className = 'help-section-title';
-  title.textContent = t('stats.trendTitle');
-  sec.appendChild(title);
-
-  const sub = document.createElement('div');
-  sub.className = 'stats-trend-sub';
-  sub.textContent = t('stats.trendSub');
-  sec.appendChild(sub);
-
-  // Need at least two weeks with data to draw a flow; otherwise a friendly note.
-  if (weeks.filter(w => w.stats).length < 2) {
-    const note = document.createElement('div');
-    note.className = 'stats-trend-note';
-    note.textContent = t('stats.trendNoData');
-    sec.appendChild(note);
-    return;
-  }
-
-  // Geometry: a left gutter holds the Y-axis (load) labels; the right inset keeps the
-  // last week label from clipping.
+// Builds the stacked-area SVG for one lens. `weeks` is [{week, stats|null}] already
+// filtered/computed for the chosen branch. Returns the <svg> element.
+function _buildCfdSvg(weeks) {
   const W = 320, H = 150, n = weeks.length;
   const PAD_T = 14, PAD_B = 22, PAD_L = 28, PAD_R = 12;
   const plotH = H - PAD_T - PAD_B;
@@ -11008,11 +10988,95 @@ async function _renderStatsTrendSection(currentStats) {
     svg.appendChild(wlab);
   });
 
-  sec.appendChild(svg);
+  return svg;
+}
 
-  // Reuse the donut's planned/unplanned × done/open legend to decode the bands.
-  const hasUnplanned = weeks.some(w => w.stats && (w.stats.unplannedDone + w.stats.unplannedOpen) > 0);
-  sec.appendChild(_statsLegend(hasUnplanned));
+async function _renderStatsTrendSection() {
+  const sec = document.getElementById('stats-section-trend');
+  if (!sec) return;
+
+  // Raw week data, fetched once: current week from live weekData (reflects unsaved
+  // edits), the prior three from IDB. The branch lens then recomputes from these
+  // synchronously, so switching views needs no further IDB reads.
+  const keys = [-3, -2, -1, 0].map(d => offsetWeek(currentWeekKey, d));
+  const rawWeeks = await Promise.all(keys.map(async (wk, i) => {
+    const last = i === keys.length - 1;
+    return { week: parseWeekKey(wk).week, data: last ? weekData : await loadWeekIDB(wk) };
+  }));
+
+  // Panel may have closed (or moved to another week) while we awaited IDB.
+  if (!_statsPanelOpen) return;
+  sec.textContent = '';
+
+  const title = document.createElement('div');
+  title.className = 'help-section-title';
+  title.textContent = t('stats.trendTitle');
+  sec.appendChild(title);
+
+  const sub = document.createElement('div');
+  sub.className = 'stats-trend-sub';
+  sub.textContent = t('stats.trendSub');
+  sec.appendChild(sub);
+
+  // Lens switcher: Total + one chip per current-week branch (reuses the quick-add
+  // branch-pill styling). If the remembered branch no longer exists, fall back to Total.
+  const branches = weekData.nodes.filter(b => b.type === 'branch');
+  if (_cfdBranch && !branches.some(b => b.id === _cfdBranch)) _cfdBranch = null;
+
+  const switcher = document.createElement('div');
+  switcher.className = 'stats-trend-switch';
+  const chart = document.createElement('div');
+  chart.className = 'stats-trend-chart';
+
+  const draw = () => {
+    chart.textContent = '';
+    const weeks = rawWeeks.map(w => ({
+      week: w.week, stats: _weekCompletion(w.data, _cfdBranch),
+    }));
+    if (weeks.filter(w => w.stats).length < 2) {
+      const note = document.createElement('div');
+      note.className = 'stats-trend-note';
+      note.textContent = t('stats.trendNoData');
+      chart.appendChild(note);
+      return;
+    }
+    chart.appendChild(_buildCfdSvg(weeks));
+    const hasUnplanned = weeks.some(w => w.stats && (w.stats.unplannedDone + w.stats.unplannedOpen) > 0);
+    chart.appendChild(_statsLegend(hasUnplanned));
+  };
+
+  const makeChip = (id, label, dotColor) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'agenda-action-btn qab-pill' + (_cfdBranch === id ? ' selected' : '');
+    chip.dataset.id = id == null ? '' : id;
+    if (dotColor) {
+      const dot = document.createElement('span');
+      dot.className = 'qab-pill-dot';
+      dot.style.background = dotColor;
+      chip.appendChild(dot);
+    }
+    const text = document.createElement('span');
+    text.textContent = label;
+    chip.appendChild(text);
+    chip.addEventListener('click', () => {
+      _cfdBranch = id;
+      switcher.querySelectorAll('.qab-pill').forEach(p =>
+        p.classList.toggle('selected', (p.dataset.id || null) === (id || null)));
+      draw();
+    });
+    return chip;
+  };
+
+  switcher.appendChild(makeChip(null, t('stats.trendTotal'), null));
+  branches.forEach(b => {
+    const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
+    switcher.appendChild(makeChip(b.id, b.label, color));
+  });
+  sec.appendChild(switcher);
+  sec.appendChild(chart);
+
+  draw();
 }
 
 function renderStatsPanel() {
@@ -11025,7 +11089,7 @@ function renderStatsPanel() {
   _renderStatsBranchesSection(stats.perBranch);
   _renderStatsBalanceSection(stats);
   _renderStatsTimelineSection(stats.leaves);
-  _renderStatsTrendSection(stats.global); // async; fills #stats-section-trend when IDB resolves
+  _renderStatsTrendSection(); // async; fills #stats-section-trend when IDB resolves
 }
 
 let _statsReturnFocus = null;

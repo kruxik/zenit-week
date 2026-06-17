@@ -59,6 +59,25 @@ describe('_weekCompletion (4-week CFD)', () => {
     });
   });
 
+  it('restricts the count to one branch when branchId is given', () => {
+    const data = { nodes: [
+      { id: 'center', type: 'center' },
+      { id: 'work', type: 'branch', parent: 'center', children: ['w1'] },
+      { id: 'family', type: 'branch', parent: 'center', children: ['f1', 'f2'] },
+      { id: 'w1', type: 'activity', branch: 'work', parent: 'work', done: true },
+      { id: 'f1', type: 'activity', branch: 'family', parent: 'family', priority: 'high', done: true },
+      { id: 'f2', type: 'activity', branch: 'family', parent: 'family', done: false },
+    ] };
+    // Total: work(1 done) + family(3 done + 1 open) = total 5, done 4 → 80%
+    expect(_weekCompletion(data)).toMatchObject({ total: 5, done: 4, percent: 80 });
+    // Work only: 1 done → 100%
+    expect(_weekCompletion(data, 'work')).toMatchObject({ total: 1, done: 1, percent: 100 });
+    // Family only: 3 done + 1 open → 75%
+    expect(_weekCompletion(data, 'family')).toMatchObject({ total: 4, done: 3, percent: 75 });
+    // Branch with no tasks → null (empty column)
+    expect(_weekCompletion(data, 'me')).toBe(null);
+  });
+
   it('ignores nodes being edited', () => {
     const data = { nodes: [
       { id: 'center', type: 'center' },
