@@ -207,6 +207,9 @@
     --badge-done-text: #1e8e3e;
     --badge-unplanned-bg: #FFF9DB;
     --badge-unplanned-text: #E67700;
+    /* Stats-panel accent — modern green/orange, shared by the donut, The Week and the CFD */
+    --stats-plan: #15C9A0;
+    --stats-unplan: #F5A524;
     --badge-progress-bg: #e8f0fe;
     --badge-progress-text: #1a73e8;
     --badge-comment-bg: #f3e8ff;
@@ -316,6 +319,9 @@
     --badge-done-text: #2ecc71;
     --badge-unplanned-bg: #332600;
     --badge-unplanned-text: #ffaa33;
+    /* Stats-panel accent — modern green/orange, shared by the donut, The Week and the CFD */
+    --stats-plan: #34E6BE;
+    --stats-unplan: #FFB54D;
     --badge-progress-bg: #0f1e3a;
     --badge-progress-text: #4da3ff;
     --badge-comment-bg: #2a1840;
@@ -1684,8 +1690,8 @@
     height: 6px;
     border-radius: 0 3px 3px 0;
   }
-  .stats-tl-done { background: var(--badge-done-text); }
-  .stats-tl-unpl { background: var(--badge-unplanned-text); }
+  .stats-tl-done { background: var(--stats-plan); }
+  .stats-tl-unpl { background: var(--stats-unplan); }
   .stats-tl-legend { margin-top: 12px; }
 
   /* ⑤ 4-week cumulative flow diagram across the last four ISO weeks. */
@@ -10440,8 +10446,8 @@ function _pct(part, whole) { return whole > 0 ? Math.round((part / whole) * 100)
 // Four-arc donut of the global planned/unplanned × done/open split. Center shows
 // overall completion %. Global by design, so branch count never changes its shape.
 function _statsDonut(c) {
-  const PLAN = 'var(--badge-done-text)';        // planned → green
-  const UNPL = 'var(--badge-unplanned-text)';   // unplanned → amber
+  const PLAN = 'var(--stats-plan)';        // planned → green
+  const UNPL = 'var(--stats-unplan)';      // unplanned → amber
   const OPEN_OPACITY = 0.32;                     // done = solid, open = faded
   // Order: all done first (planned, unplanned), then all open — so the completed
   // portion is one contiguous arc clockwise from the top.
@@ -10488,7 +10494,7 @@ function _statsDonut(c) {
 }
 
 function _statsLegend(hasUnplanned) {
-  const PLAN = 'var(--badge-done-text)', UNPL = 'var(--badge-unplanned-text)';
+  const PLAN = 'var(--stats-plan)', UNPL = 'var(--stats-unplan)';
   const items = [
     { color: PLAN, opacity: 1,    key: 'stats.legendPlannedDone' },
     { color: PLAN, opacity: 0.32, key: 'stats.legendPlannedOpen' },
@@ -10827,7 +10833,7 @@ function _renderStatsTimelineSection(leaves) {
   // legend: completed (green) · unplanned arrived (amber)
   const legend = document.createElement('div');
   legend.className = 'stats-bar-legend stats-tl-legend';
-  [['stats.tlDone', 'var(--badge-done-text)'], ['stats.tlUnpl', 'var(--badge-unplanned-text)']]
+  [['stats.tlDone', 'var(--stats-plan)'], ['stats.tlUnpl', 'var(--stats-unplan)']]
     .forEach(([key, color]) => {
       const item = document.createElement('div');
       item.className = 'stats-legend-item';
@@ -10893,10 +10899,10 @@ function _weekCompletion(data, branchId) {
 // edits show immediately. Blank weeks pinch to the baseline (an empty column).
 // Rendered fire-and-forget by renderStatsPanel().
 const _CFD_BANDS = [
-  { key: 'plannedDone',   color: 'var(--badge-done-text)',      opacity: 1    },
-  { key: 'unplannedDone', color: 'var(--badge-unplanned-text)', opacity: 1    },
-  { key: 'plannedOpen',   color: 'var(--badge-done-text)',      opacity: 0.32 },
-  { key: 'unplannedOpen', color: 'var(--badge-unplanned-text)', opacity: 0.32 },
+  { key: 'plannedDone',   color: 'var(--stats-plan)',   opacity: 1    },
+  { key: 'unplannedDone', color: 'var(--stats-unplan)', opacity: 1    },
+  { key: 'plannedOpen',   color: 'var(--stats-plan)',   opacity: 0.32 },
+  { key: 'unplannedOpen', color: 'var(--stats-unplan)', opacity: 0.32 },
 ];
 
 // Selected CFD lens: null = Total (all branches), otherwise a branch id. Persists
