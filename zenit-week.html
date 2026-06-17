@@ -10994,43 +10994,42 @@ async function _renderStatsTrendSection(currentStats) {
     'stroke-linejoin': 'round', opacity: 0.55,
   }));
 
-  // Helper grid — drawn AFTER the areas so dotted guides stay readable over the fills.
-  // Round-capped near-zero dashes render as crisp dots.
-  const dotted = (attrs, op) => _svgEl('line', {
-    ...attrs, stroke: 'var(--text-faint)', 'stroke-width': 1,
-    'stroke-linecap': 'round', 'stroke-dasharray': '0.5 3.5', opacity: op,
+  // Helper grid — drawn AFTER the areas so the guides float over the fills, but kept
+  // as faint hairlines (sub-pixel width, low opacity) so they read as a whisper, not
+  // a cage. Solid, not dotted: thin + transparent looks cleaner than dots on fills.
+  const hair = (attrs, op) => _svgEl('line', {
+    ...attrs, stroke: 'var(--text-faint)', 'stroke-width': 0.375, opacity: op,
   });
+  const axisLabel = (val, yv, bold) => {
+    const lab = _svgEl('text', {
+      x: PAD_L - 5, y: yv + 3, 'text-anchor': 'end',
+      fill: 'var(--text-faint)', 'font-size': 8.5,
+      'fill-opacity': bold ? 0.85 : 0.55, 'font-weight': bold ? 600 : 400,
+    });
+    lab.textContent = String(val);
+    svg.appendChild(lab);
+  };
 
-  // Horizontal load gridlines every 50 weighted points, plus a bolder line at the peak.
-  // Step lines that sit too close to the peak line are dropped so labels never collide.
+  // Horizontal load gridlines every 50 weighted points, plus a slightly firmer peak
+  // line. Step lines too close to the peak are dropped so labels never collide.
   const STEP = 50;
   const levels = [];
   for (let v = STEP; v < maxY - STEP * 0.35; v += STEP) levels.push({ v, peak: false });
   levels.push({ v: maxY, peak: true });
   for (const lv of levels) {
-    svg.appendChild(dotted(
+    svg.appendChild(hair(
       { x1: PAD_L, x2: W - PAD_R, y1: y(lv.v), y2: y(lv.v) },
-      lv.peak ? 0.75 : 0.5,
+      lv.peak ? 0.3 : 0.16,
     ));
-    const lab = _svgEl('text', {
-      x: PAD_L - 5, y: y(lv.v) + 3, 'text-anchor': 'end',
-      fill: 'var(--text-faint)', 'font-size': 9, 'font-weight': lv.peak ? 700 : 400,
-    });
-    lab.textContent = Math.round(lv.v);
-    svg.appendChild(lab);
+    axisLabel(Math.round(lv.v), y(lv.v), lv.peak);
   }
 
-  // Vertical guide at each week, plus the 0 baseline.
+  // Vertical guide at each week (faintest layer), plus the 0 baseline.
   weeks.forEach((w, i) => {
-    svg.appendChild(dotted({ x1: x(i), x2: x(i), y1: PAD_T, y2: y(0) }, 0.5));
+    svg.appendChild(hair({ x1: x(i), x2: x(i), y1: PAD_T, y2: y(0) }, 0.12));
   });
-  svg.appendChild(dotted({ x1: PAD_L, x2: W - PAD_R, y1: y(0), y2: y(0) }, 0.5));
-  const zeroLab = _svgEl('text', {
-    x: PAD_L - 5, y: y(0) + 3, 'text-anchor': 'end',
-    fill: 'var(--text-faint)', 'font-size': 9,
-  });
-  zeroLab.textContent = '0';
-  svg.appendChild(zeroLab);
+  svg.appendChild(hair({ x1: PAD_L, x2: W - PAD_R, y1: y(0), y2: y(0) }, 0.3));
+  axisLabel(0, y(0), false);
 
   // Week labels along the bottom (always shown — keeps the axis calendar-accurate).
   weeks.forEach((w, i) => {
