@@ -10957,13 +10957,14 @@ async function _renderStatsTrendSection(currentStats) {
     return;
   }
 
-  // Geometry: full-width columns with small insets so week labels never clip.
+  // Geometry: a left gutter holds the Y-axis (load) labels; the right inset keeps the
+  // last week label from clipping.
   const W = 320, H = 150, n = weeks.length;
-  const PAD_T = 14, PAD_B = 22, PAD_X = 18;
+  const PAD_T = 14, PAD_B = 22, PAD_L = 28, PAD_R = 12;
   const plotH = H - PAD_T - PAD_B;
-  const innerW = W - 2 * PAD_X;
+  const innerW = W - PAD_L - PAD_R;
   const maxY = Math.max(...weeks.map(w => w.stats ? w.stats.total : 0)) || 1;
-  const x = (i) => PAD_X + innerW * (i / (n - 1));
+  const x = (i) => PAD_L + innerW * (i / (n - 1));
   const y = (v) => PAD_T + (1 - v / maxY) * plotH;
   const valOf = (w, key) => (w.stats ? (w.stats[key] || 0) : 0);
 
@@ -10972,17 +10973,57 @@ async function _renderStatsTrendSection(currentStats) {
     'aria-label': t('stats.trendSub'),
   });
 
-  // Faint vertical guide at each week, plus the 0 baseline.
+  // Vertical week guides fade in from top to baseline via a gradient (userSpaceOnUse
+  // so the stops track the actual line extent, not a degenerate zero-width bbox).
+  const defs = _svgEl('defs');
+  const grad = _svgEl('linearGradient', {
+    id: 'cfd-vline', gradientUnits: 'userSpaceOnUse',
+    x1: 0, y1: PAD_T, x2: 0, y2: y(0),
+  });
+  grad.appendChild(_svgEl('stop', { offset: '0%',   'stop-color': 'var(--text-faint)', 'stop-opacity': 0.04 }));
+  grad.appendChild(_svgEl('stop', { offset: '100%', 'stop-color': 'var(--text-faint)', 'stop-opacity': 0.45 }));
+  defs.appendChild(grad);
+  svg.appendChild(defs);
+
+  // Horizontal load gridlines every 50 weighted points, plus a solid line at the peak.
+  // Step lines that sit too close to the peak line are dropped so labels never collide.
+  const STEP = 50;
+  const levels = [];
+  for (let v = STEP; v < maxY - STEP * 0.35; v += STEP) levels.push({ v, peak: false });
+  levels.push({ v: maxY, peak: true });
+  for (const lv of levels) {
+    const line = _svgEl('line', {
+      x1: PAD_L, x2: W - PAD_R, y1: y(lv.v), y2: y(lv.v),
+      stroke: lv.peak ? 'var(--text-faint)' : 'var(--border-soft)', 'stroke-width': 1,
+    });
+    if (!lv.peak) { line.setAttribute('stroke-dasharray', '2 3'); line.setAttribute('opacity', '0.8'); }
+    else { line.setAttribute('opacity', '0.5'); }
+    svg.appendChild(line);
+    const lab = _svgEl('text', {
+      x: PAD_L - 5, y: y(lv.v) + 3, 'text-anchor': 'end',
+      fill: 'var(--text-faint)', 'font-size': 9, 'font-weight': lv.peak ? 700 : 400,
+    });
+    lab.textContent = Math.round(lv.v);
+    svg.appendChild(lab);
+  }
+
+  // Vertical guide at each week, plus the 0 baseline.
   weeks.forEach((w, i) => {
     svg.appendChild(_svgEl('line', {
       x1: x(i), x2: x(i), y1: PAD_T, y2: y(0),
-      stroke: 'var(--border-soft)', 'stroke-width': 1,
+      stroke: 'url(#cfd-vline)', 'stroke-width': 1,
     }));
   });
   svg.appendChild(_svgEl('line', {
-    x1: PAD_X, x2: W - PAD_X, y1: y(0), y2: y(0),
+    x1: PAD_L, x2: W - PAD_R, y1: y(0), y2: y(0),
     stroke: 'var(--border-soft)', 'stroke-width': 1,
   }));
+  const zeroLab = _svgEl('text', {
+    x: PAD_L - 5, y: y(0) + 3, 'text-anchor': 'end',
+    fill: 'var(--text-faint)', 'font-size': 9,
+  });
+  zeroLab.textContent = '0';
+  svg.appendChild(zeroLab);
 
   // Stacked areas, bottom band first. Each band is a ribbon between the running
   // cumulative top of the band below and its own cumulative top.
