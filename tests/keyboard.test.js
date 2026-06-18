@@ -53,7 +53,7 @@ describe('ESC key — closes Agenda on desktop', () => {
     expect(_state.getCurrentView()).toBe('agenda');
   });
 
-  test('ESC closes the stats panel before acting on agenda', () => {
+  test('ESC closes the stats panel and lands on the default mindmap view', () => {
     _state.setCurrentView('agenda');
     _state.set({ nodes: [{ id: 'center', type: 'center' }] });
     openStatsPanel();
@@ -61,7 +61,8 @@ describe('ESC key — closes Agenda on desktop', () => {
     expect(panel.classList.contains('visible')).toBe(true);
     esc();
     expect(panel.classList.contains('visible')).toBe(false);
-    expect(_state.getCurrentView()).toBe('agenda');
+    // Stats is a transient overlay; leaving it returns to the default view.
+    expect(_state.getCurrentView()).toBe('mindmap');
   });
 
   test('ESC does nothing when editState is active', () => {

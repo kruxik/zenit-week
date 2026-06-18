@@ -1443,6 +1443,7 @@
       transform: translateX(-50%) translateY(20px);
     }
   }
+  #stats-panel:focus { outline: none; } /* programmatic focus (S hotkey) shows no ring */
   #stats-panel.visible {
     display: flex;
     opacity: 1;
@@ -1462,19 +1463,6 @@
     border-bottom: 1px solid var(--border-soft);
     flex-shrink: 0;
   }
-  #stats-close {
-    cursor: pointer;
-    font-size: 18px;
-    color: var(--text-placeholder);
-    transition: color 0.2s;
-    border: none;
-    background: transparent;
-    padding: 0;
-    display: flex;
-    align-items: center;
-  }
-  #stats-close:hover { color: var(--text-primary); }
-
   #stats-content {
     padding: 24px;
     padding-bottom: 80px;
@@ -2093,6 +2081,18 @@
     color: var(--view-btn-active-text);
   }
 
+  /* While the Stats panel is open, the Stats segment owns the active highlight
+     regardless of the persisted data-view; Agenda/Mindmap drop to idle. */
+  body:has(#stats-panel.visible) #vtb-agenda,
+  body:has(#stats-panel.visible) #vtb-mindmap {
+    background: none;
+    color: var(--text-subtle);
+  }
+  body:has(#stats-panel.visible) #vtb-stats {
+    background: var(--view-btn-active-bg);
+    color: var(--view-btn-active-text);
+  }
+
   @media (max-width: 767px) {
     .view-toggle-btn { width: 36px; height: 36px; padding: 0; gap: 0; }
     .view-toggle-btn span { display: none; }
@@ -2522,8 +2522,7 @@
 
   /* Mobile: floating "Close" pill replaces the top-right X while help is open */
   #help-close-bar,
-  #comment-close-bar,
-  #stats-close-bar {
+  #comment-close-bar {
     position: fixed;
     bottom: 12px;
     left: 50%;
@@ -2577,17 +2576,11 @@
     body:has(#help-panel.visible) #help-close-bar {
       display: flex;
     }
-    /* Stats panel: same mobile chrome swap */
+    /* Stats panel: hide FAB + undo/redo on mobile, but keep the view-toggle
+       pill visible so the user can leave Stats by tapping Mindmap/Agenda. */
     body:has(#stats-panel.visible) #fab-pill,
-    body:has(#stats-panel.visible) #undo-redo-bar,
-    body:has(#stats-panel.visible) #view-toggle-bar {
+    body:has(#stats-panel.visible) #undo-redo-bar {
       display: none;
-    }
-    body:has(#stats-panel.visible) #stats-close {
-      display: none;
-    }
-    body:has(#stats-panel.visible) #stats-close-bar {
-      display: flex;
     }
   }
 
@@ -3402,6 +3395,7 @@
 </div>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
+  <symbol id="icon-chart-donut" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></symbol>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
   <symbol id="icon-calendar-week" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M7 14h.013"/><path d="M10.01 14h.005"/><path d="M13.01 14h.005"/><path d="M16.015 14h.005"/><path d="M13.015 17h.005"/><path d="M7.01 17h.005"/><path d="M10.01 17h.005"/></symbol>
   <symbol id="icon-transfer" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 10h-16l5.5 -6"/><path d="M4 14h16l-5.5 6"/></symbol>
@@ -3686,6 +3680,11 @@
     <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-sitemap"/></svg>
     <span data-i18n="view.mindmap">Mindmap</span>
   </button>
+  <div class="view-toggle-separator"></div>
+  <button type="button" class="view-toggle-btn" id="vtb-stats" aria-haspopup="dialog">
+    <svg class="icon" aria-hidden="true"><use href="#icon-chart-donut"/></svg>
+    <span data-i18n="view.stats">Stats</span>
+  </button>
 </div>
 
 
@@ -3778,10 +3777,9 @@
 <div id="agenda-overlay"></div>
 
 <div id="stats-overlay"></div>
-<div id="stats-panel" role="dialog" aria-modal="true" aria-labelledby="stats-title">
+<div id="stats-panel" role="dialog" aria-modal="true" aria-labelledby="stats-title" tabindex="-1">
   <div id="stats-header">
     <div id="stats-title" style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="stats.title">Week Stats</div>
-    <button type="button" id="stats-close" aria-label="Close" data-i18n-aria="stats.close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></button>
   </div>
   <div id="stats-content">
     <div id="stats-section-donut" class="help-section"></div>
@@ -3789,12 +3787,6 @@
     <div id="stats-section-balance" class="help-section"></div>
     <div id="stats-section-trend" class="help-section"></div>
   </div>
-</div>
-<div id="stats-close-bar">
-  <button type="button" class="help-close-btn" id="stats-close-mobile">
-    <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
-    <span data-i18n="help.close">Close</span>
-  </button>
 </div>
 
 <div id="help-panel">
@@ -3847,6 +3839,7 @@
         <div class="help-section-title" data-i18n="help.viewsTitle">Views &amp; general</div>
         <div class="help-row"><span data-i18n="help.mindmapView">Mindmap view</span> <kbd>M</kbd></div>
         <div class="help-row"><span data-i18n="help.agendaView">Agenda view</span> <kbd>A</kbd></div>
+        <div class="help-row"><span data-i18n="help.statsView">Stats view</span> <kbd>S</kbd></div>
         <div class="help-row"><span data-i18n="help.escClose">Close panel / menu</span> <kbd>Esc</kbd></div>
         <div class="help-row"><span data-i18n="help.filterDay">Filter day</span> <span><kbd>1</kbd>–<kbd>7</kbd></span></div>
         <div class="help-row"><span data-i18n="filter.unscheduled">Unscheduled</span> <kbd>8</kbd></div>
@@ -6538,6 +6531,7 @@ const TRANSLATIONS = {
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
     'view.mindmap':               'Mindmap',
     'view.agenda':                'Agenda',
+    'view.stats':                 'Stats',
     'agenda.overdue':             'Overdue',
     'agenda.emptyDay':            'No tasks for this day.',
     'agenda.emptyOverdue':        'No overdue tasks.',
@@ -6660,6 +6654,7 @@ const TRANSLATIONS = {
     'help.viewsTitle':            'Views & general',
     'help.mindmapView':           'Mindmap view',
     'help.agendaView':            'Agenda view',
+    'help.statsView':             'Stats view',
     'help.escClose':              'Close panel / menu',
     'help.filterDay':             'Filter day',
     'help.undo':                  'Undo',
@@ -6771,6 +6766,7 @@ const TRANSLATIONS = {
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
     'view.mindmap':               'Mapa',
     'view.agenda':                'Agenda',
+    'view.stats':                 'Statistika',
     'agenda.overdue':             'Zpožděné',
     'agenda.emptyDay':            'Pro tento den žádné úkoly.',
     'agenda.emptyOverdue':        'Žádné zpožděné úkoly.',
@@ -6893,6 +6889,7 @@ const TRANSLATIONS = {
     'help.viewsTitle':            'Pohledy a obecné',
     'help.mindmapView':           'Pohled Myšlenková mapa',
     'help.agendaView':            'Pohled Agenda',
+    'help.statsView':             'Pohled Statistika',
     'help.escClose':              'Zavřít panel / menu',
     'help.filterDay':             'Filtr dne',
     'help.undo':                  'Zpět',
@@ -11181,25 +11178,27 @@ function openStatsPanel() {
   overlay.classList.add('visible');
   panel.classList.add('visible');
   _statsPanelOpen = true;
-  // a11y: remember the trigger and move focus into the dialog.
+  // a11y: remember the trigger and move focus into the dialog (the panel itself,
+  // since there is no longer a dedicated close button).
   _statsReturnFocus = document.activeElement;
-  const closeBtn = document.getElementById('stats-close');
-  if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+  if (typeof panel.focus === 'function') panel.focus();
 }
 
+// Pure hide — does NOT change the underlying view. Callers that want to "leave
+// Stats" route through switchView('mindmap'), which closes the panel and lands
+// the user on the default view (matching the Agenda Esc/click-away pattern).
 function closeStatsPanel() {
   const panel = document.getElementById('stats-panel');
   const overlay = document.getElementById('stats-overlay');
   if (panel) panel.classList.remove('visible');
   if (overlay) overlay.classList.remove('visible');
   _statsPanelOpen = false;
-  // a11y: restore focus to the trigger ONLY when the panel was opened via keyboard
-  // (so keyboard users keep their place). For a mouse-opened panel, drop focus so the
-  // summary box doesn't keep a focus ring after closing.
+  // a11y: restore focus to the trigger when opened via keyboard; otherwise drop
+  // focus so no ring lingers on the pill/box.
   if (_statsOpenedViaKey && _statsReturnFocus && typeof _statsReturnFocus.focus === 'function') {
     _statsReturnFocus.focus();
   } else if (document.activeElement && typeof document.activeElement.blur === 'function') {
-    document.activeElement.blur(); // mouse-opened: drop focus so no ring lingers on the box
+    document.activeElement.blur();
   }
   _statsReturnFocus = null;
 }
@@ -11448,10 +11447,19 @@ function _windowKeydownHandler(e) {
     if (key === 'a' || key === 'm') {
       if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
         const targetView = key === 'a' ? 'agenda' : 'mindmap';
-        if (currentView !== targetView) {
+        if (_statsPanelOpen || currentView !== targetView) {
           e.preventDefault();
           switchView(targetView);
         }
+        return;
+      }
+    }
+    if (key === 's') {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        // Toggle: open over the current view, or leave to the default (mindmap).
+        if (_statsPanelOpen) switchView('mindmap');
+        else { _statsOpenedViaKey = true; openStatsPanel(); }
         return;
       }
     }
@@ -11466,7 +11474,7 @@ function _windowKeydownHandler(e) {
       return;
     }
     if (_statsPanelOpen) {
-      closeStatsPanel();
+      switchView('mindmap'); // leave Stats → default view
       return;
     }
     const commentPanel = document.getElementById('comment-panel');
@@ -13750,6 +13758,9 @@ function _renderAgendaFlush() {
 }
 
 function switchView(view) {
+  // Stats is a transient overlay over either view; leaving for Agenda/Mindmap
+  // (or returning to the default via Esc/click-away) closes it.
+  if (_statsPanelOpen) closeStatsPanel();
   currentView = view;
   localStorage.setItem('zenit-week-view', view);
   document.documentElement.dataset.view = view;
@@ -15178,6 +15189,11 @@ window.addEventListener('load', async () => {
   // View toggle bar
   document.getElementById('vtb-mindmap').addEventListener('click', () => switchView('mindmap'));
   document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
+  document.getElementById('vtb-stats').addEventListener('click', () => {
+    // Toggle: open over the current view, or leave to the default (mindmap).
+    if (_statsPanelOpen) switchView('mindmap');
+    else { _statsOpenedViaKey = false; openStatsPanel(); }
+  });
   switchView(currentView); // apply persisted view (renders canvas or agenda)
 
   // Position the default-zoom marker on the track
@@ -15254,24 +15270,15 @@ window.addEventListener('load', async () => {
     });
   }
 
-  // Summary box → opens the Stats panel (replaces the old inline expand).
-  // #summary-header is a native <button>, so Enter/Space open it for free.
+  // Mini-stats box: the Stats opener now lives in the view-toggle pill, so the
+  // box is display-only (kept for now, not yet removed). Still swallow pointerdown
+  // so a click on it doesn't start a canvas pan.
   const summaryPanel = document.getElementById('placeholder-panel');
-  const summaryHeader = document.getElementById('summary-header');
   summaryPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
-  summaryHeader.addEventListener('click', (e) => {
-    // Keyboard-activated clicks (Enter/Space) report detail 0; mouse clicks report ≥1.
-    _statsOpenedViaKey = e.detail === 0;
-    openStatsPanel();
-  });
 
-  // Stats panel close wiring (mirrors the Help panel; native <button>s self-handle keys)
+  // Stats panel close wiring: clicking the backdrop leaves Stats → default view.
   const statsOverlay = document.getElementById('stats-overlay');
-  const statsClose = document.getElementById('stats-close');
-  const statsCloseMobile = document.getElementById('stats-close-mobile');
-  if (statsOverlay) statsOverlay.addEventListener('click', closeStatsPanel);
-  if (statsClose) statsClose.addEventListener('click', closeStatsPanel);
-  if (statsCloseMobile) statsCloseMobile.addEventListener('click', closeStatsPanel);
+  if (statsOverlay) statsOverlay.addEventListener('click', () => switchView('mindmap'));
 
   // Small delay to let SVG lay out before computing center.
   // Always fit the mindmap — even when booting into Agenda — so the canvas
