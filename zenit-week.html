@@ -195,9 +195,6 @@
     --overlay-bg: rgba(0,0,0,0.40);
     --overlay-sm: rgba(0,0,0,0.30);
 
-    /* Tooltip */
-    --tooltip-bg: #3c4043;
-    --tooltip-text: #ffffff;
 
     /* Keyboard shortcut keys */
     --kbd-bg: #f1f3f4;
@@ -307,9 +304,6 @@
     --overlay-bg: rgba(0,0,0,0.65);
     --overlay-sm: rgba(0,0,0,0.50);
 
-    /* Tooltip */
-    --tooltip-bg: #e8e8e8;
-    --tooltip-text: #111111;
 
     /* Keyboard shortcut keys */
     --kbd-bg: #2a2a2a;
@@ -1623,7 +1617,7 @@
       45deg, var(--stats-hatch) 0 1.5px, transparent 1.5px 5px);
   }
 
-  /* ③ Effort & Balance — reuses .ratio-segment; mirrors #ratio-bar container */
+  /* ③ Effort & Balance — reuses the shared .ratio-segment */
   .stats-balance-load {
     display: flex;
     align-items: baseline;
@@ -3128,117 +3122,7 @@
     pointer-events: none;
   }
 
-  /* Placeholder Panel (Expandable Drawer) */
-  #placeholder-panel {
-    position: fixed;
-    top: 66px;
-    left: 0;
-    right: 0;
-    margin-inline: auto;
-    width: fit-content;
-    max-width: calc(100vw - 16px);
-    min-width: 260px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-default);
-    border-radius: 8px;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-button);
-    box-shadow: 0 4px 12px var(--shadow-md);
-    z-index: 1000;
-    cursor: pointer;
-    user-select: none;
-    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    max-height: 36px;
-  }
-
-  #placeholder-panel:hover:not(.expanded) #summary-header {
-    background: var(--bg-hover);
-    color: var(--text-dim);
-  }
-
-  #placeholder-panel.expanded {
-    max-height: 400px;
-    border-radius: 8px;
-  }
-
-  #summary-header {
-    height: 34px;
-    padding: 0 11px;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: background 0.15s, color 0.15s;
-    /* native <button> reset — it triggers the Stats panel */
-    width: 100%;
-    border: none;
-    background: transparent;
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-  }
-  #summary-header:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 2px;
-  }
-
-  #summary-main {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  #summary-details {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    opacity: 0;
-    transition: opacity 0.2s;
-    padding: 12px 14px;
-    border-top: 1px solid var(--border-soft);
-    pointer-events: none;
-  }
-
-  #placeholder-panel.expanded #summary-details {
-    opacity: 1;
-    pointer-events: all;
-  }
-
-  .branch-stat {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
-
-  .branch-name {
-    font-weight: 700;
-    color: var(--text-button);
-    min-width: 85px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* Ratio Bar */
-  #ratio-bar {
-    display: flex;
-    height: 18px;
-    width: 100%;
-    border-radius: 8px;
-    overflow: hidden;
-    margin: 0;
-    background: var(--bg-muted);
-    box-shadow: inset 0 1px 2px var(--shadow-md);
-  }
+  /* Branch ratio segment — shared by the Stats panel's Effort & Balance bar. */
   .ratio-segment {
     height: 100%;
     display: flex;
@@ -3251,32 +3135,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-shadow: 0 1px 1px rgba(0,0,0,0.2);
-  }
-
-  /* Custom Tooltip */
-  #custom-tooltip {
-    position: fixed;
-    background: var(--tooltip-bg);
-    color: var(--tooltip-text);
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    pointer-events: none;
-    z-index: 3000;
-    box-shadow: 0 4px 15px var(--shadow-lg);
-    opacity: 0;
-    transform: translateY(10px);
-    transition: opacity 0.15s, transform 0.15s;
-    white-space: nowrap;
-    max-width: 320px;
-    line-height: 1.4;
-    text-align: center;
-  }
-
-  #custom-tooltip.visible {
-    opacity: 1;
-    transform: translateY(0);
   }
 
   .icon {
@@ -3292,8 +3150,7 @@
     flex-shrink: 0;
   }
 
-  body.app-loading #main-svg,
-  body.app-loading #placeholder-panel {
+  body.app-loading #main-svg {
     opacity: 0;
   }
 
@@ -3559,14 +3416,6 @@
       </defs>
       <g id="map-root"></g>
     </svg>
-    <div id="placeholder-panel">
-      <button type="button" id="summary-header" aria-haspopup="dialog" data-i18n-aria="stats.open" aria-label="Open week stats">
-        <span id="summary-main"></span>
-      </button>
-      <div id="summary-details">
-        <div id="ratio-bar"></div>
-      </div>
-    </div>
   </div>
   <div id="agenda-view">
     <div id="agenda-day-strip"></div>
@@ -6580,10 +6429,7 @@ const TRANSLATIONS = {
     'todo.done':                  'Done',
     'todo.undone':                'Undone',
     'todo.noLabel':               '(no label)',
-    'todo.total':                 'Total',
     'stats.title':                'Week Stats',
-    'stats.open':                 'Open week stats',
-    'stats.close':                'Close',
     'stats.planVsReality':        'Plan vs Reality',
     'stats.planCompletion':       'Plan completion',
     'stats.unplannedLoad':        'Unplanned load',
@@ -6815,10 +6661,7 @@ const TRANSLATIONS = {
     'todo.done':                  'Hotovo',
     'todo.undone':                'Nesplněno',
     'todo.noLabel':               '(bez názvu)',
-    'todo.total':                 'Celkem',
     'stats.title':                'Statistika týdne',
-    'stats.open':                 'Otevřít statistiku týdne',
-    'stats.close':                'Zavřít',
     'stats.planVsReality':        'Plán vs realita',
     'stats.planCompletion':       'Splnění plánu',
     'stats.unplannedLoad':        'Neplánovaná zátěž',
@@ -11175,80 +11018,15 @@ function renderStatsPanel() {
 function openStatsPanel()  { switchView('stats'); }
 function closeStatsPanel() { if (currentView === 'stats') switchView('mindmap'); }
 
+// Refreshes branch-derived UI on structural/status change: the Help panel's
+// branch legend and, while it's the active view, the Stats panel. (The old
+// top-of-mindmap mini-stats box this also fed has been removed.)
 function updateSummary() {
   const sig = _computeSummarySignature();
   if (sig === _lastSummarySig) return;
   _lastSummarySig = sig;
 
-  // Shared weighted lens (done/total/percent) keeps the box in lockstep with the panel.
-  const stats = computeWeekStats();
-  const global = stats.global;
-
   const liveBranches = weekData.nodes.filter(n => n.type === 'branch');
-  const branchStats = {};
-  liveBranches.forEach(b => {
-    branchStats[b.id] = stats.perBranch[b.id];
-  });
-
-  const mainEl = document.getElementById('summary-main');
-  if (mainEl) {
-    const eff = _effortLevel(global.total);
-    const totalColor = _effortColor(eff.level);
-    const tooltip = t(_effortTooltipKey(eff.level));
-
-    mainEl.innerHTML = `<span class="daily-log-footer-badge done">${global.done} <span style="font-weight:400">(${global.percent}&nbsp;%)</span></span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.done')}</span><span class="daily-log-footer-badge" style="background:var(--bg-muted);color:${totalColor}" data-tooltip="${tooltip}">${global.total}</span><span style="color:var(--text-faint);font-size:13px;font-weight:600">${t('todo.total')}</span>`;
-  }
-
-  // Rebuild branch stat rows dynamically
-  const detailsEl = document.getElementById('summary-details');
-  if (detailsEl) {
-    // Remove existing branch-stat rows; keep ratio-bar
-    detailsEl.querySelectorAll('.branch-stat').forEach(el => el.remove());
-    const ratioBar = document.getElementById('ratio-bar');
-
-    liveBranches.forEach(b => {
-      const s = branchStats[b.id];
-      const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
-      const row = document.createElement('div');
-      row.className = 'branch-stat';
-
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'branch-name';
-      const dot = document.createElement('div');
-      dot.className = 'legend-dot';
-      dot.style.background = color;
-      dot.dataset.branchDot = b.id;
-      nameSpan.appendChild(dot);
-      nameSpan.appendChild(document.createTextNode(b.label + ':'));
-
-      const statSpan = document.createElement('span');
-      statSpan.id = 'stat-' + b.id;
-      statSpan.textContent = `${s.done} (${s.percent} %) / ${s.total}`;
-
-      row.appendChild(nameSpan);
-      row.appendChild(statSpan);
-      detailsEl.insertBefore(row, ratioBar);
-    });
-
-    // Rebuild ratio bar segments
-    if (ratioBar) {
-      ratioBar.innerHTML = '';
-      const totalItems = liveBranches.reduce((acc, b) => acc + branchStats[b.id].total, 0);
-      liveBranches.forEach(b => {
-        const color = (BRANCH_COLORS[b.id] || {}).main || '#888';
-        const pct = totalItems === 0
-          ? (100 / liveBranches.length)
-          : (branchStats[b.id].total / totalItems) * 100;
-        const seg = document.createElement('div');
-        seg.className = 'ratio-segment';
-        seg.id = `ratio-${b.id}`;
-        seg.style.background = color;
-        seg.style.width = pct + '%';
-        seg.textContent = (pct >= 10) ? Math.round(pct) + '%' : '';
-        ratioBar.appendChild(seg);
-      });
-    }
-  }
 
   // Rebuild help-legend branch items
   const helpLegend = document.getElementById('help-legend');
@@ -11273,8 +11051,8 @@ function updateSummary() {
     });
   }
 
-  // Keep the Stats panel in lockstep with the box (only reached when stats changed,
-  // since this function early-returns on an unchanged signature).
+  // Keep the Stats panel current (only reached when stats changed, since this
+  // function early-returns on an unchanged signature).
   if (_statsPanelOpen) renderStatsPanel();
 }
 
@@ -15263,12 +15041,6 @@ window.addEventListener('load', async () => {
     });
   }
 
-  // Mini-stats box: the Stats opener now lives in the view-toggle pill, so the
-  // box is display-only (kept for now, not yet removed). Still swallow pointerdown
-  // so a click on it doesn't start a canvas pan.
-  const summaryPanel = document.getElementById('placeholder-panel');
-  summaryPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
-
   // Stats panel close wiring: clicking the backdrop leaves Stats → default view.
   const statsOverlay = document.getElementById('stats-overlay');
   if (statsOverlay) statsOverlay.addEventListener('click', () => switchView('mindmap'));
@@ -15284,22 +15056,6 @@ window.addEventListener('load', async () => {
     else               fitMindmapView();
   });
 
-  // Custom tooltip logic
-  const tooltipEl = document.getElementById('custom-tooltip');
-  document.body.addEventListener('pointermove', (e) => {
-    const trigger = e.target.closest('.summary-trigger');
-    if (trigger) {
-      tooltipEl.textContent = trigger.getAttribute('data-tooltip');
-      tooltipEl.classList.add('visible');
-      const rect = trigger.getBoundingClientRect();
-      // Position above the element
-      tooltipEl.style.left = (rect.left + rect.width / 2) + 'px';
-      tooltipEl.style.top = (rect.top - 12) + 'px';
-      tooltipEl.style.transform = 'translate(-50%, -100%)';
-    } else {
-      tooltipEl.classList.remove('visible');
-    }
-  });
 });
 
 let _resizeRefitTimer = null;
@@ -15317,7 +15073,6 @@ window.addEventListener('resize', () => {
   }, 200);
 });
 </script>
-<div id="custom-tooltip"></div>
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   (function () {

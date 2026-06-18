@@ -12,7 +12,7 @@ describe('Internationalization', () => {
 
   it('has every Stats panel key in both languages', () => {
     const statsKeys = [
-      'stats.title', 'stats.open', 'stats.close', 'stats.planVsReality',
+      'stats.title', 'stats.planVsReality',
       'stats.planCompletion', 'stats.unplannedLoad', 'stats.unplannedCompletion',
       'stats.legCatPlanned', 'stats.legCatUnplanned',
       'stats.legDone', 'stats.legOpen', 'stats.weekPrefix',
