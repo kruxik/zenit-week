@@ -10927,13 +10927,17 @@ function _buildCfdSvg(weeks) {
   });
 
   // Stacked areas, bottom band first. Each band is a ribbon between the running
-  // cumulative top of the band below and its own cumulative top.
+  // cumulative top of the band below and its own cumulative top. Wrapped in a group
+  // at 70% opacity so the fills sit back a touch — grid, axes and the scope line stay
+  // at full strength.
+  const areas = _svgEl('g', { opacity: 0.7 });
+  svg.appendChild(areas);
   let lower = weeks.map(() => 0);
   for (const band of _CFD_BANDS) {
     const upper = weeks.map((w, i) => lower[i] + valOf(w, band.key));
     const top = upper.map((v, i) => `${x(i)},${y(v)}`);
     const bot = lower.map((v, i) => `${x(i)},${y(v)}`).reverse();
-    svg.appendChild(_svgEl('path', {
+    areas.appendChild(_svgEl('path', {
       d: `M${top.join('L')}L${bot.join('L')}Z`,
       fill: band.color, opacity: band.opacity,
     }));
