@@ -10931,7 +10931,11 @@ let _cfdBranch = null;
 // Builds the stacked-area SVG for one lens. `weeks` is [{week, stats|null}] already
 // filtered/computed for the chosen branch. Returns the <svg> element.
 function _buildCfdSvg(weeks) {
-  const W = 320, H = 100, n = weeks.length;
+  // The SVG scales to its container width keeping the viewBox aspect ratio. On a
+  // narrow (mobile) panel the desktop H=100 renders too short, so use a taller
+  // viewBox below the 768px panel breakpoint — width-driven text size is
+  // unchanged, only the plot grows taller.
+  const W = 320, H = window.innerWidth < 768 ? 150 : 100, n = weeks.length;
   const PAD_T = 14, PAD_B = 22, PAD_L = 28, PAD_R = 12;
   const plotH = H - PAD_T - PAD_B;
   const innerW = W - PAD_L - PAD_R;
