@@ -2092,6 +2092,12 @@
     background: var(--view-btn-active-bg);
     color: var(--view-btn-active-text);
   }
+  /* The FAB pill (Settings + add) sits below the Stats panel by default
+     (z 1000 vs 2000); lift it above so the full bottom chrome stays usable,
+     matching the undo/redo bar and view pill (z 2500). */
+  body:has(#stats-panel.visible) #fab-pill {
+    z-index: 2500;
+  }
 
   @media (max-width: 767px) {
     .view-toggle-btn { width: 36px; height: 36px; padding: 0; gap: 0; }
@@ -2576,12 +2582,8 @@
     body:has(#help-panel.visible) #help-close-bar {
       display: flex;
     }
-    /* Stats panel: hide FAB + undo/redo on mobile, but keep the view-toggle
-       pill visible so the user can leave Stats by tapping Mindmap/Agenda. */
-    body:has(#stats-panel.visible) #fab-pill,
-    body:has(#stats-panel.visible) #undo-redo-bar {
-      display: none;
-    }
+    /* Stats panel keeps the full bottom chrome (FAB, undo/redo, view pill)
+       visible, like Agenda — it's a transient view, not a modal. */
   }
 
   /* Comment dialog — mirrors the Help dialog layout (desktop centered panel,
