@@ -1519,8 +1519,19 @@
   }
   .stats-legend {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 14px;
+    grid-template-columns: auto 1fr;
+    gap: 5px 10px;
+    align-items: center;
+  }
+  .stats-legend-cat {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .stats-legend-states {
+    display: flex;
+    gap: 14px;
   }
   .stats-legend-item {
     display: flex;
@@ -6585,10 +6596,10 @@ const TRANSLATIONS = {
     'stats.planCompletion':       'Plan completion',
     'stats.unplannedLoad':        'Unplanned load',
     'stats.unplannedCompletion':  'Unplanned completion',
-    'stats.legendPlannedDone':    'Planned · done',
-    'stats.legendPlannedOpen':    'Planned · open',
-    'stats.legendUnplannedDone':  'Unplanned · done',
-    'stats.legendUnplannedOpen':  'Unplanned · open',
+    'stats.legCatPlanned':        'Planned',
+    'stats.legCatUnplanned':      'Unplanned',
+    'stats.legDone':              'Done',
+    'stats.legOpen':              'Open',
     'stats.followThrough':        'Follow-through by branch',
     'stats.effortBalance':        'Effort & balance',
     'stats.baseline':             'baseline',
@@ -6606,6 +6617,7 @@ const TRANSLATIONS = {
     'stats.trendSub':             'Weighted load by state across the last four weeks.',
     'stats.trendNoData':          'No earlier weeks to compare yet.',
     'stats.trendWeek':            'week',
+    'stats.weekPrefix':           'W',
     'stats.trendTotal':           'Total',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
@@ -6817,10 +6829,10 @@ const TRANSLATIONS = {
     'stats.planCompletion':       'Splnění plánu',
     'stats.unplannedLoad':        'Neplánovaná zátěž',
     'stats.unplannedCompletion':  'Splnění neplánovaného',
-    'stats.legendPlannedDone':    'Plánováno · splněno',
-    'stats.legendPlannedOpen':    'Plánováno · zbývá',
-    'stats.legendUnplannedDone':  'Neplánováno · splněno',
-    'stats.legendUnplannedOpen':  'Neplánováno · zbývá',
+    'stats.legCatPlanned':        'Plánováno',
+    'stats.legCatUnplanned':      'Neplánováno',
+    'stats.legDone':              'Splněno',
+    'stats.legOpen':              'Zbývá',
     'stats.followThrough':        'Plnění podle větve',
     'stats.effortBalance':        'Zátěž a rovnováha',
     'stats.baseline':             'základ',
@@ -6834,10 +6846,11 @@ const TRANSLATIONS = {
     'stats.legendDone':           'splněno',
     'stats.legendOpen':           'zbývá',
     'stats.legendUnplanned':      'neplánováno (šrafováno)',
-    'stats.trendTitle':           'Kumulativní tok za 4 týdny',
+    'stats.trendTitle':           'Kumulativní 4 týdenní přehled',
     'stats.trendSub':             'Vážená zátěž podle stavu za poslední čtyři týdny.',
     'stats.trendNoData':          'Zatím není s čím srovnávat.',
     'stats.trendWeek':            'týden',
+    'stats.weekPrefix':           'T',
     'stats.trendTotal':           'Celkem',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
@@ -10493,32 +10506,43 @@ function _statsDonut(c) {
   return svg;
 }
 
+// Grouped legend: one row per category ("Planned: ● Done  ◐ Open"), so the words
+// "Planned"/"Unplanned" appear once instead of being repeated per state. Laid out as a
+// two-column grid (category | states) so the Done/Open swatches align across rows
+// regardless of how wide the category label is in the current language.
 function _statsLegend(hasUnplanned) {
   const PLAN = 'var(--stats-plan)', UNPL = 'var(--stats-unplan)';
-  const items = [
-    { color: PLAN, opacity: 1,    key: 'stats.legendPlannedDone' },
-    { color: PLAN, opacity: 0.32, key: 'stats.legendPlannedOpen' },
+  const cats = [{ color: PLAN, key: 'stats.legCatPlanned' }];
+  if (hasUnplanned) cats.push({ color: UNPL, key: 'stats.legCatUnplanned' });
+  const states = [
+    { key: 'stats.legDone', opacity: 1 },
+    { key: 'stats.legOpen', opacity: 0.32 },
   ];
-  if (hasUnplanned) {
-    items.push(
-      { color: UNPL, opacity: 1,    key: 'stats.legendUnplannedDone' },
-      { color: UNPL, opacity: 0.32, key: 'stats.legendUnplannedOpen' },
-    );
-  }
+
   const wrap = document.createElement('div');
   wrap.className = 'stats-legend';
-  for (const it of items) {
-    const row = document.createElement('div');
-    row.className = 'stats-legend-item';
-    const dot = document.createElement('span');
-    dot.className = 'stats-legend-dot';
-    dot.style.background = it.color;
-    dot.style.opacity = it.opacity;
-    row.appendChild(dot);
-    const label = document.createElement('span');
-    label.textContent = t(it.key);
-    row.appendChild(label);
-    wrap.appendChild(row);
+  for (const cat of cats) {
+    const catLabel = document.createElement('span');
+    catLabel.className = 'stats-legend-cat';
+    catLabel.textContent = t(cat.key) + ':';
+    wrap.appendChild(catLabel);
+
+    const group = document.createElement('span');
+    group.className = 'stats-legend-states';
+    for (const st of states) {
+      const item = document.createElement('span');
+      item.className = 'stats-legend-item';
+      const dot = document.createElement('span');
+      dot.className = 'stats-legend-dot';
+      dot.style.background = cat.color;
+      dot.style.opacity = st.opacity;
+      item.appendChild(dot);
+      const label = document.createElement('span');
+      label.textContent = t(st.key);
+      item.appendChild(label);
+      group.appendChild(item);
+    }
+    wrap.appendChild(group);
   }
   return wrap;
 }
@@ -10994,7 +11018,7 @@ function _buildCfdSvg(weeks) {
       x: x(i), y: H - 6, 'text-anchor': 'middle',
       fill: 'var(--text-faint)', 'font-size': 11, 'font-weight': 600,
     });
-    wlab.textContent = 'W' + w.week;
+    wlab.textContent = t('stats.weekPrefix') + w.week;
     svg.appendChild(wlab);
   });
 

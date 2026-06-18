@@ -14,8 +14,8 @@ describe('Internationalization', () => {
     const statsKeys = [
       'stats.title', 'stats.open', 'stats.close', 'stats.planVsReality',
       'stats.planCompletion', 'stats.unplannedLoad', 'stats.unplannedCompletion',
-      'stats.legendPlannedDone', 'stats.legendPlannedOpen',
-      'stats.legendUnplannedDone', 'stats.legendUnplannedOpen',
+      'stats.legCatPlanned', 'stats.legCatUnplanned',
+      'stats.legDone', 'stats.legOpen', 'stats.weekPrefix',
       'stats.followThrough', 'stats.effortBalance', 'stats.baseline',
       'stats.unplannedShort', 'stats.legendDone', 'stats.legendOpen', 'stats.legendUnplanned',
       'stats.emptyWeek', 'stats.emptyWeekHint', 'stats.noUnplanned',
