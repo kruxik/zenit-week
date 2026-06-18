@@ -1422,7 +1422,11 @@
     overflow: hidden;
     display: none;
     flex-direction: column;
-    z-index: 2000;
+    /* Mobile: a full-area opaque view layer that sits BELOW the bottom chrome
+       (FAB z1000, undo/redo + view pill z2500), mirroring the Agenda panel, so
+       Settings / + / navigation stay tappable. Desktop lifts to 2000 to float
+       over the blurred map. */
+    z-index: 800;
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
     opacity: 0;
     pointer-events: none;
@@ -1441,9 +1445,9 @@
       border: 1px solid var(--border-default);
       box-shadow: 0 20px 60px var(--shadow-xl);
       transform: translateX(-50%) translateY(20px);
+      z-index: 2000;
     }
   }
-  #stats-panel:focus { outline: none; } /* programmatic focus (S hotkey) shows no ring */
   #stats-panel.visible {
     display: flex;
     opacity: 1;
@@ -1815,6 +1819,11 @@
   body:has(#quick-add-panel.is-open) #view-toggle-bar {
     display: none;
   }
+  /* In Stats the desktop panel floats at z2000; lift the quick-add popup above
+     it (and its backdrop over it) so "+" opens an interactive input, not one
+     buried behind the panel. */
+  html[data-view="stats"] #quick-add-backdrop { z-index: 2550; }
+  html[data-view="stats"] #quick-add-panel    { z-index: 2560; }
 
   #quick-add-branches {
     display: flex;
@@ -2081,24 +2090,6 @@
     color: var(--view-btn-active-text);
   }
 
-  /* While the Stats panel is open, the Stats segment owns the active highlight
-     regardless of the persisted data-view; Agenda/Mindmap drop to idle. */
-  body:has(#stats-panel.visible) #vtb-agenda,
-  body:has(#stats-panel.visible) #vtb-mindmap {
-    background: none;
-    color: var(--text-subtle);
-  }
-  body:has(#stats-panel.visible) #vtb-stats {
-    background: var(--view-btn-active-bg);
-    color: var(--view-btn-active-text);
-  }
-  /* The FAB pill (Settings + add) sits below the Stats panel by default
-     (z 1000 vs 2000); lift it above so the full bottom chrome stays usable,
-     matching the undo/redo bar and view pill (z 2500). */
-  body:has(#stats-panel.visible) #fab-pill {
-    z-index: 2500;
-  }
-
   @media (max-width: 767px) {
     .view-toggle-btn { width: 36px; height: 36px; padding: 0; gap: 0; }
     .view-toggle-btn span { display: none; }
@@ -2132,12 +2123,17 @@
   /* View-toggle pill: highlight the persisted view's button on first paint.
      ID-based selectors override the static .active class in markup. */
   html[data-view="agenda"]  #vtb-agenda,
-  html[data-view="mindmap"] #vtb-mindmap {
+  html[data-view="mindmap"] #vtb-mindmap,
+  html[data-view="stats"]   #vtb-stats {
     background: var(--view-btn-active-bg);
     color: var(--view-btn-active-text);
   }
   html[data-view="agenda"]  #vtb-mindmap,
-  html[data-view="mindmap"] #vtb-agenda {
+  html[data-view="agenda"]  #vtb-stats,
+  html[data-view="mindmap"] #vtb-agenda,
+  html[data-view="mindmap"] #vtb-stats,
+  html[data-view="stats"]   #vtb-agenda,
+  html[data-view="stats"]   #vtb-mindmap {
     background: none;
     color: var(--text-subtle);
   }
@@ -3779,7 +3775,7 @@
 <div id="agenda-overlay"></div>
 
 <div id="stats-overlay"></div>
-<div id="stats-panel" role="dialog" aria-modal="true" aria-labelledby="stats-title" tabindex="-1">
+<div id="stats-panel">
   <div id="stats-header">
     <div id="stats-title" style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="stats.title">Week Stats</div>
   </div>
@@ -11170,40 +11166,10 @@ function renderStatsPanel() {
   _renderStatsTrendSection(); // async; fills #stats-section-trend when IDB resolves
 }
 
-let _statsReturnFocus = null;
-let _statsOpenedViaKey = false;
-function openStatsPanel() {
-  const panel = document.getElementById('stats-panel');
-  const overlay = document.getElementById('stats-overlay');
-  if (!panel || !overlay) return;
-  renderStatsPanel();
-  overlay.classList.add('visible');
-  panel.classList.add('visible');
-  _statsPanelOpen = true;
-  // a11y: remember the trigger and move focus into the dialog (the panel itself,
-  // since there is no longer a dedicated close button).
-  _statsReturnFocus = document.activeElement;
-  if (typeof panel.focus === 'function') panel.focus();
-}
-
-// Pure hide — does NOT change the underlying view. Callers that want to "leave
-// Stats" route through switchView('mindmap'), which closes the panel and lands
-// the user on the default view (matching the Agenda Esc/click-away pattern).
-function closeStatsPanel() {
-  const panel = document.getElementById('stats-panel');
-  const overlay = document.getElementById('stats-overlay');
-  if (panel) panel.classList.remove('visible');
-  if (overlay) overlay.classList.remove('visible');
-  _statsPanelOpen = false;
-  // a11y: restore focus to the trigger when opened via keyboard; otherwise drop
-  // focus so no ring lingers on the pill/box.
-  if (_statsOpenedViaKey && _statsReturnFocus && typeof _statsReturnFocus.focus === 'function') {
-    _statsReturnFocus.focus();
-  } else if (document.activeElement && typeof document.activeElement.blur === 'function') {
-    document.activeElement.blur();
-  }
-  _statsReturnFocus = null;
-}
+// Stats is a peer view; open/close are thin shims over switchView so existing
+// callers (keyboard, pill, tests) keep working. Leaving Stats lands on mindmap.
+function openStatsPanel()  { switchView('stats'); }
+function closeStatsPanel() { if (currentView === 'stats') switchView('mindmap'); }
 
 function updateSummary() {
   const sig = _computeSummarySignature();
@@ -11459,9 +11425,8 @@ function _windowKeydownHandler(e) {
     if (key === 's') {
       if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
-        // Toggle: open over the current view, or leave to the default (mindmap).
-        if (_statsPanelOpen) switchView('mindmap');
-        else { _statsOpenedViaKey = true; openStatsPanel(); }
+        // Toggle Stats; leaving lands on the default (mindmap).
+        switchView(currentView === 'stats' ? 'mindmap' : 'stats');
         return;
       }
     }
@@ -12661,7 +12626,9 @@ const mapRoot   = document.getElementById('map-root');
 const isMobile = navigator.maxTouchPoints > 0;
 
 // ─── View state ───────────────────────────────────────────────────────────────
-let currentView = localStorage.getItem('zenit-week-view') || 'mindmap';
+// Only mindmap/agenda are persisted; Stats is never restored on load (the
+// pre-paint script only knows those two), so coerce anything else to mindmap.
+let currentView = localStorage.getItem('zenit-week-view') === 'agenda' ? 'agenda' : 'mindmap';
 
 // 'overdue' | 0–6 (dayIndex). null = uninitialised, defaults to today on first open.
 let agendaActiveTab = null;
@@ -13759,55 +13726,72 @@ function _renderAgendaFlush() {
   }
 }
 
+// Mindmap, Agenda and Stats are peer views. Each switch fully owns the three
+// content layers (canvas, agenda panel, stats panel) so no hidden view stays
+// "live" behind another — the source of the earlier stale-control bugs.
+// Stats is intentionally NOT persisted: returning to the app lands on the last
+// real content view (the pre-paint script only knows agenda/mindmap).
 function switchView(view) {
-  // Stats is a transient overlay over either view; leaving for Agenda/Mindmap
-  // (or returning to the default via Esc/click-away) closes it.
-  if (_statsPanelOpen) closeStatsPanel();
   currentView = view;
-  localStorage.setItem('zenit-week-view', view);
+  if (view !== 'stats') localStorage.setItem('zenit-week-view', view);
   document.documentElement.dataset.view = view;
-  const canvasEl  = document.getElementById('canvas-container');
-  const agendaEl  = document.getElementById('agenda-view');
-  const overlayEl = document.getElementById('agenda-overlay');
-  const btnMM     = document.getElementById('vtb-mindmap');
-  const btnAG     = document.getElementById('vtb-agenda');
-  const isDesktop = window.innerWidth >= 768;
+  const canvasEl   = document.getElementById('canvas-container');
+  const agendaEl   = document.getElementById('agenda-view');
+  const overlayEl  = document.getElementById('agenda-overlay');
+  const statsEl    = document.getElementById('stats-panel');
+  const statsOvEl  = document.getElementById('stats-overlay');
+  const btnMM      = document.getElementById('vtb-mindmap');
+  const btnAG      = document.getElementById('vtb-agenda');
+  const btnST      = document.getElementById('vtb-stats');
+  const isDesktop  = window.innerWidth >= 768;
 
-  if (view === 'agenda') {
-    canvasEl.style.display = isDesktop ? '' : 'none';
-    agendaEl.classList.add('active');
-    if (overlayEl) overlayEl.classList.toggle('visible', isDesktop);
-    btnMM.classList.remove('active');
-    btnAG.classList.add('active');
+  const isStats  = view === 'stats';
+  const isAgenda = view === 'agenda';
+
+  // Pill highlight
+  btnMM.classList.toggle('active', view === 'mindmap');
+  btnAG.classList.toggle('active', isAgenda);
+  btnST.classList.toggle('active', isStats);
+
+  // Agenda layer
+  agendaEl.classList.toggle('active', isAgenda);
+  if (overlayEl) overlayEl.classList.toggle('visible', isAgenda && isDesktop);
+
+  // Stats layer (overlay blur is desktop-only; the mobile panel is full-area & opaque)
+  _statsPanelOpen = isStats;
+  statsEl.classList.toggle('visible', isStats);
+  if (statsOvEl) statsOvEl.classList.toggle('visible', isStats && isDesktop);
+
+  // Canvas: visible in mindmap, and behind the desktop blur of agenda/stats
+  canvasEl.style.display = (isAgenda || isStats) && !isDesktop ? 'none' : '';
+
+  if (isAgenda) {
     renderAgenda();
-    if (isDesktop) render(); // Ensure mindmap is rendered in background
+    if (isDesktop) render(); // keep the background map fresh behind the blur
+  } else if (isStats) {
+    renderStatsPanel();
+    if (isDesktop) render();
   } else {
-    canvasEl.style.display = '';
-    agendaEl.classList.remove('active');
-    if (overlayEl) overlayEl.classList.remove('visible');
-    btnMM.classList.add('active');
-    btnAG.classList.remove('active');
     render();
   }
 }
 
-// Ensure layout updates on resize if agenda view is active
+// Ensure layout updates on resize for the overlay views (agenda / stats), which
+// hide the canvas on mobile but float over a blurred map on desktop.
 window.addEventListener('resize', () => {
-  if (currentView === 'agenda') {
-    const canvasEl = document.getElementById('canvas-container');
-    const overlayEl = document.getElementById('agenda-overlay');
-    const isDesktop = window.innerWidth >= 768;
-    
-    const targetDisplay = isDesktop ? '' : 'none';
-    if (canvasEl.style.display !== targetDisplay) {
-      canvasEl.style.display = targetDisplay;
-      if (isDesktop) render();
-    }
-    
-    if (overlayEl) {
-      overlayEl.classList.toggle('visible', isDesktop);
-    }
+  if (currentView !== 'agenda' && currentView !== 'stats') return;
+  const canvasEl = document.getElementById('canvas-container');
+  const isDesktop = window.innerWidth >= 768;
+
+  const targetDisplay = isDesktop ? '' : 'none';
+  if (canvasEl.style.display !== targetDisplay) {
+    canvasEl.style.display = targetDisplay;
+    if (isDesktop) render();
   }
+
+  const overlayEl = document.getElementById(
+    currentView === 'agenda' ? 'agenda-overlay' : 'stats-overlay');
+  if (overlayEl) overlayEl.classList.toggle('visible', isDesktop);
 });
 
 // Zoom bounds are dynamic: ZOOM_DEFAULT tracks fit-to-screen for the current
@@ -13919,6 +13903,10 @@ async function resetView() {
     renderAgenda();
     return;
   }
+
+  // From Stats the logo is "home": leave to the mindmap, then reset it to the
+  // current week at the default zoom (falls through to the mindmap reset below).
+  if (currentView === 'stats') switchView('mindmap');
 
   activeDayFilter = null;
   if (currentWeekKey !== todayWeekKey()) {
@@ -15192,9 +15180,8 @@ window.addEventListener('load', async () => {
   document.getElementById('vtb-mindmap').addEventListener('click', () => switchView('mindmap'));
   document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
   document.getElementById('vtb-stats').addEventListener('click', () => {
-    // Toggle: open over the current view, or leave to the default (mindmap).
-    if (_statsPanelOpen) switchView('mindmap');
-    else { _statsOpenedViaKey = false; openStatsPanel(); }
+    // Toggle Stats; leaving lands on the default (mindmap).
+    switchView(currentView === 'stats' ? 'mindmap' : 'stats');
   });
   switchView(currentView); // apply persisted view (renders canvas or agenda)
 

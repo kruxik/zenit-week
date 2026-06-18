@@ -24,9 +24,12 @@ function elementStub() {
       add: (c) => classes.add(c),
       remove: (c) => classes.delete(c),
       contains: (c) => classes.has(c),
-      toggle: (c) => {
-        if (classes.has(c)) classes.delete(c);
-        else classes.add(c);
+      toggle: (c, force) => {
+        // Honor the optional force argument like the real DOMTokenList.
+        const add = force === undefined ? !classes.has(c) : !!force;
+        if (add) classes.add(c);
+        else classes.delete(c);
+        return add;
       }
     },
     style: {},
