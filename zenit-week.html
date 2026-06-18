@@ -11013,6 +11013,8 @@ function _buildCfdSvg(weeks) {
   axisLabel(0, y(0), false);
 
   // Week labels along the bottom (always shown — keeps the axis calendar-accurate).
+  // The current (last) week gets a blue dot beneath its label, mirroring the Agenda's
+  // current-day marker.
   weeks.forEach((w, i) => {
     const wlab = _svgEl('text', {
       x: x(i), y: H - 6, 'text-anchor': 'middle',
@@ -11020,6 +11022,11 @@ function _buildCfdSvg(weeks) {
     });
     wlab.textContent = t('stats.weekPrefix') + w.week;
     svg.appendChild(wlab);
+    if (i === n - 1) {
+      svg.appendChild(_svgEl('circle', {
+        cx: x(i), cy: H - 2.5, r: 1.6, fill: 'var(--accent-primary)',
+      }));
+    }
   });
 
   return svg;
