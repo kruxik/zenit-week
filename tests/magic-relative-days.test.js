@@ -186,7 +186,7 @@ describe('(now) pins to top of today\'s agenda group', () => {
     expect(order.ids).toEqual(['a1', 'a2']);
   });
 
-  test('done node prepended to done group, not pending', () => {
+  test('pin targets the scheduled-day pending group, never a done group', () => {
     setUpT([
       mkBranchT('me', ['a1']),
       mkActivityT('a1', 'me', 'me', { done: true }),
@@ -194,9 +194,12 @@ describe('(now) pins to top of today\'s agenda group', () => {
 
     withFrozenDate(THURSDAY, () => triggerCommitEditT('a1', 'Workout (now)'));
 
+    // The Done section is chronological (no manual order), so pins always land
+    // on the day's pending group — harmless for a done node, and it surfaces on
+    // top once re-opened.
     const orders = _state.get().agendaOrder || {};
-    expect(orders['4-done']?.ids).toEqual(['a1']);
-    expect(orders['4-pending']?.ids ?? []).not.toContain('a1');
+    expect(orders['4-pending']?.ids).toEqual(['a1']);
+    expect(orders['4-done']).toBeUndefined();
   });
 
   test('label is also frozen to (Th) — same as (today)', () => {
@@ -205,27 +208,28 @@ describe('(now) pins to top of today\'s agenda group', () => {
     expect(findNode('a1').label).toBe('Workout (Th)');
   });
 
-  test('cross-week edit does NOT pin', () => {
+  test('cross-week edit pins within that week, keyed to the scheduled day', () => {
     // Edit a node in a DIFFERENT week than real-world today.
     // todayWeekKey is stubbed in test setup to fall back to currentWeekKey
     // when no override is set — so to simulate "today is W20, editing W22"
-    // we set the override explicitly.
+    // we set the override explicitly. agendaOrder is per-week (stored in that
+    // week's data), so pinning the scheduled day (Th) is well-defined and the
+    // node tops W22's Thursday tab; only the (current-week-only) overdue group
+    // is skipped.
     setUpT([mkBranchT('me', ['a1']), mkActivityT('a1', 'me', 'me')], '2026-22');
     _state.setTodayWeekKey('2026-20');
     try {
       withFrozenDate(THURSDAY, () => triggerCommitEditT('a1', 'Workout (now)'));
-      // Label still freezes
       expect(findNode('a1').label).toBe('Workout (Th)');
-      // No agendaOrder entry created
       const orders = _state.get().agendaOrder || {};
-      expect(orders['4-pending']).toBeUndefined();
-      expect(orders['4-done']).toBeUndefined();
+      expect(orders['4-pending']?.ids).toEqual(['a1']);
+      expect(orders['overdue-pending-4']).toBeUndefined();
     } finally {
       _state.clearTodayWeekKeyOverride();
     }
   });
 
-  test('mixed (now, mo) freezes both tokens; pins only on today\'s tab', () => {
+  test('mixed (now, mo) freezes both tokens; pins on both scheduled days', () => {
     setUpT([mkBranchT('me', ['a1']), mkActivityT('a1', 'me', 'me')], CURRENT_WEEK);
     withFrozenDate(THURSDAY, () => triggerCommitEditT('a1', 'Run (now, mo)'));
     // Multi-day annotation: applyMagicLabel strips the group and creates day-children
@@ -234,10 +238,13 @@ describe('(now) pins to top of today\'s agenda group', () => {
     expect(a1.label).toBe('Run');
     const dayChildren = a1.children.map(findNode).filter(n => n?.dayChild);
     expect(dayChildren.map(n => n.dayIndex).sort()).toEqual([1, 4]);
-    // Pinning still targets today (Th = index 4) only — Monday tab unaffected
+    // Under option (b) the pin generalizes to every scheduled day (Mon=1 and
+    // Th=4), not just today. The pin runs before the day-children are split out,
+    // so it keys on the parent id — harmless: renderGroup ignores ids absent
+    // from a group, reproducing the priority default there.
     const orders = _state.get().agendaOrder;
+    expect(orders['1-pending']?.ids).toEqual(['a1']);
     expect(orders['4-pending']?.ids).toEqual(['a1']);
-    expect(orders['1-pending']).toBeUndefined();
   });
 
   test('re-edit moves node back to top, deduped', () => {

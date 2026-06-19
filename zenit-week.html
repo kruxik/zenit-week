@@ -4657,7 +4657,7 @@ Object.entries(SCHED_DAY_TOKENS).forEach(([day, tokens]) => {
 const SCHED_DAILY_TOKENS = new Set(['daily', 'denně', 'denne']);
 // Magic relative-day tokens — frozen to a concrete day abbr at edit-commit time
 // (see resolveMagicDayTokens / applyMagicLabel). "now"/"teď" additionally pins
-// the node to the top of today's agenda group — see pinToTopOfTodayAgenda.
+// the node to the top of its agenda group(s) — see pinToTopOfAgenda.
 const SCHED_TODAY_TOKENS = new Set(['today', 'dnes']);
 const SCHED_TOMORROW_TOKENS = new Set(['tomorrow', 'zítra', 'zitra']);
 const SCHED_NOW_TOKENS = new Set(['now', 'teď', 'ted', 'hned']);
@@ -4769,18 +4769,88 @@ function hasNowToken(label) {
 // state. Skipped when the current week is not the real-world current ISO week
 // (cross-week edit) — the pinning would write into a week the user isn't
 // viewing as "today" and is therefore meaningless.
-function pinToTopOfTodayAgenda(nodeId) {
-  if (currentWeekKey !== todayWeekKey()) return;
+// Every { tabKey, groupKey, rowId } agenda row this activity contributes as a
+// pending item: its scheduled day(s) and, on the current week, any past day's
+// overdue group; or all 7 day tabs' Any-day section for an unscheduled leaf.
+// rowId is the id the row is keyed by — the node itself, or a day-/tick-child
+// for split tasks (a day-split parent isn't a row; its children are). The Done
+// section has no manual order (it's chronological), so it never appears here.
+// Slightly over-inclusive is fine: applyAgendaOrder ignores ids not actually
+// present in a group. Drives pin / restore below.
+function agendaRowsForNode(node) {
+  if (!node || node.type !== 'activity') return [];
+  const rows = [];
+  const onCurrentWeek = currentWeekKey === todayWeekKey();
+  const todayPos = isoWeekPos(new Date().getDay());
+  const pendingOn = (rowId, d) => {
+    if (d == null) return;
+    rows.push({ tabKey: d, groupKey: 'pending', rowId });
+    if (onCurrentWeek && isoWeekPos(d) < todayPos) {
+      rows.push({ tabKey: 'overdue', groupKey: `pending-${d}`, rowId });
+    }
+  };
+  if (node.tickChild) {            // a scheduled tick is its own row
+    pendingOn(node.id, node.dayIndex);
+    return rows;
+  }
+  if (node.dayChild) {
+    pendingOn(node.id, node.dayIndex);
+    return rows;
+  }
+  const dayKids = (node.children || []).map(findNode).filter(c => c?.dayChild);
+  if (dayKids.length) {            // day-split parent → its children are the rows
+    dayKids.forEach(c => pendingOn(c.id, c.dayIndex));
+    return rows;
+  }
+  if (!isLeafActivity(node) && !hasTickChildren(node)) return rows;
+  const days = getEffectiveDays(node);
+  if (days.size > 0) {
+    days.forEach(d => pendingOn(node.id, d));
+    // Ticks pinned to a weekday render as their own rows alongside the parent.
+    (node.children || []).map(findNode).forEach(c => {
+      if (c?.tickChild && c.dayIndex != null && !c.done) pendingOn(c.id, c.dayIndex);
+    });
+  } else {
+    for (let d = 0; d < 7; d++) rows.push({ tabKey: d, groupKey: 'anyday', rowId: node.id });
+  }
+  return rows;
+}
+
+// Moves a node (and its day-/tick-child rows) to the front of every agenda
+// group it appears in. Used when a node is bumped to high/critical priority
+// (and by the "now" reschedule): it surfaces at the top of each day — and
+// overdue — list even where the user has a manual order, which they can then
+// drag to override. A group with no manual order gains a fresh one seeded with
+// just this row; renderGroup keeps the rest priority-sorted below. ts → Drive LWW.
+function pinToTopOfAgenda(nodeId) {
   const node = findNode(nodeId);
   if (!node) return;
-  const todayIdx = new Date().getDay();
-  const group = node.done ? 'done' : 'pending';
-  const key = `${todayIdx}-${group}`;
   if (!weekData.agendaOrder) weekData.agendaOrder = {};
-  const existing = weekData.agendaOrder[key];
-  const oldIds = Array.isArray(existing) ? existing : (existing?.ids ?? []);
-  const filtered = oldIds.filter(id => id !== nodeId);
-  weekData.agendaOrder[key] = { ids: [nodeId, ...filtered], ts: Date.now() };
+  const ts = Date.now();
+  for (const { tabKey, groupKey, rowId } of agendaRowsForNode(node)) {
+    const key = `${tabKey}-${groupKey}`;
+    const existing = weekData.agendaOrder[key];
+    const oldIds = Array.isArray(existing) ? existing : (existing?.ids ?? []);
+    weekData.agendaOrder[key] = { ids: [rowId, ...oldIds.filter(id => id !== rowId)], ts };
+  }
+}
+
+// On undone, return a row to the top of any *manually ordered* group it rejoins
+// but was pruned from — completing a task, then reordering that group, drops
+// the now-done id from the saved order (the drag rebuilds order from the
+// pending rows only). No-op when the group has no manual order (priority
+// default places it) or still lists the id (its old slot is preserved).
+function restoreToAgendaOrder(nodeId) {
+  const node = findNode(nodeId);
+  if (!node || !weekData.agendaOrder) return;
+  const ts = Date.now();
+  for (const { tabKey, groupKey, rowId } of agendaRowsForNode(node)) {
+    const key = `${tabKey}-${groupKey}`;
+    const existing = weekData.agendaOrder[key];
+    const oldIds = Array.isArray(existing) ? existing : (existing?.ids ?? []);
+    if (oldIds.length === 0 || oldIds.includes(rowId)) continue;
+    weekData.agendaOrder[key] = { ids: [rowId, ...oldIds], ts };
+  }
 }
 
 // Strips only (…) groups that are valid day-pattern groups from a label.
@@ -8145,6 +8215,7 @@ function setStatus(id, status) {
     touchNode(id);
     setDescendants(id, 'undone');
     syncStatusUp(id, 'done');
+    restoreToAgendaOrder(id);
   } else if (status === 'unplanned') {
     node.unplanned = true;
     node.unplannedAt = new Date().toISOString();
@@ -8164,12 +8235,14 @@ function setStatus(id, status) {
     node.priority = newVal;
     touchNode(id);
     setPriorityDescendants(id, newVal);
+    if (newVal) pinToTopOfAgenda(id);
     fullRenderNeeded = true;
   } else if (status === 'prio-critical') {
     const newVal = (node.priority === 'critical') ? null : 'critical';
     node.priority = newVal;
     touchNode(id);
     setPriorityDescendants(id, newVal);
+    if (newVal) pinToTopOfAgenda(id);
     fullRenderNeeded = true;
   } else if (status === 'prio-normal') {
     node.priority = null;
@@ -9148,7 +9221,7 @@ function applyMagicLabel(nodeId) {
     node.label = resolved;
     touchNode(nodeId);
   }
-  if (wantsPin) pinToTopOfTodayAgenda(nodeId);
+  if (wantsPin) pinToTopOfAgenda(nodeId);
   const label = node.label || '';
   const parsedDays = parseTodoDays(label);
   // Existing day-children promote the node to multi-day mode regardless of
@@ -12098,7 +12171,7 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
           setActivityDays(targetId, new Set([todayIdx]), false);
         }
       }
-      pinToTopOfTodayAgenda(targetId);
+      pinToTopOfAgenda(targetId);
       afterMutation();
     });
     rescheduleSubmenu.appendChild(nowBtn);
@@ -13415,9 +13488,24 @@ function renderAgendaTabContent() {
   }
 
   function renderGroup(nodes, groupKey, dividerLabel, buildFn) {
-    const ordered = applyAgendaOrder(nodes, loadAgendaGroupOrder(tabKey, groupKey));
-    // Higher priority always wins within a group; stable sort preserves user drag order within each priority bucket.
-    ordered.sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
+    const saved = loadAgendaGroupOrder(tabKey, groupKey);
+    let ordered;
+    if (saved.length === 0) {
+      // No manual order yet → priority-first is the default arrangement.
+      ordered = [...nodes].sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
+    } else {
+      // User has ordered this group: placed items keep their saved slots
+      // verbatim — priority no longer reshuffles them. Items not in the saved
+      // order (new tasks, or ones that rejoined without a pin) are appended
+      // below, priority-sorted among themselves. The explicit top cases —
+      // priority bump and undone-return — are handled by pinToTopOfAgenda /
+      // restoreToAgendaOrder, which seed the saved order directly.
+      const set = new Set(saved);
+      const placed = applyAgendaOrder(nodes.filter(n => set.has(n.id)), saved);
+      const fresh = nodes.filter(n => !set.has(n.id))
+        .sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
+      ordered = [...placed, ...fresh];
+    }
     // No write-back here — saving on every render bumps the order's timestamp
     // without user intent, which lets later renders on other devices clobber
     // a fresh reorder via LWW. The drag-drop handlers are the only writers.
