@@ -8865,20 +8865,33 @@ function nodeScreenPos(nodeId) {
 // track a growing label into one render per animation frame. Without this,
 // every keystroke fired a full SVG rebuild (computeLayout + all node groups +
 // edges + listeners), making typing unusable on low-end hardware.
-let _editRenderScheduled = false;
-function _scheduleEditRender() {
-  if (_editRenderScheduled) return;
-  _editRenderScheduled = true;
-  requestAnimationFrame(() => {
-    _editRenderScheduled = false;
-    // Guard: commit/cancel paths run render() themselves. If the user already
-    // exited the edit before this frame, skip — otherwise we'd render twice
-    // in the same tick.
+// Debounced full reflow during editing. resizeInlineInput() sizes/positions the
+// input overlay per keystroke (cheap), but the underlying SVG reflow (full
+// teardown + computeLayout + rebuild of all nodes/edges) is expensive on large
+// trees. The edited node is hidden in the SVG anyway, so the only thing the
+// reflow updates mid-edit is sibling positions shifting to make room — that can
+// wait until the user pauses typing. Fires once typing settles (~130ms idle).
+let _editRenderTimer = null;
+const EDIT_RENDER_DEBOUNCE_MS = 130;
+function _scheduleEditRender(immediate = false) {
+  clearTimeout(_editRenderTimer);
+  _editRenderTimer = null;
+  // Opening the editor (esp. a new node) must reflow now, or the input overlay
+  // visibly overlaps siblings until the debounce fires. Ongoing keystrokes
+  // debounce — the layout slot is already reserved, so reflow can wait for a pause.
+  if (immediate) {
     if (editState) render();
-  });
+    return;
+  }
+  _editRenderTimer = setTimeout(() => {
+    _editRenderTimer = null;
+    // Guard: commit/cancel paths run render() themselves. If the user already
+    // exited the edit, skip — otherwise we'd render redundantly.
+    if (editState) render();
+  }, EDIT_RENDER_DEBOUNCE_MS);
 }
 
-function resizeInlineInput() {
+function resizeInlineInput(immediate = false) {
   const nodeId = editState.nodeId;
   const { w, h, fontSize, padX, lineH, totalTextH } = getNodeSize(nodeId);
   const { sw, visualRx } = getNodeVisuals(nodeId);
@@ -8931,7 +8944,7 @@ function resizeInlineInput() {
       inlineInput.style.top  = (sp.y - totalH / 2) + 'px';
     }
   }
-  _scheduleEditRender();
+  _scheduleEditRender(immediate);
 }
 
 let _panAnimToken = 0;
@@ -9700,7 +9713,7 @@ function _openInlineInput(nodeId, isNew) {
   }
   inlineInput.style.display      = 'block';
 
-  resizeInlineInput();
+  resizeInlineInput(true);
 
   // preventScroll keeps the browser from auto-scrolling the body to bring the
   // focused input into view — we manage canvas pan ourselves once the soft
@@ -9850,7 +9863,7 @@ inlineInput.addEventListener('keydown', (e) => {
 
   e.stopPropagation();
 });
-inlineInput.addEventListener('input', resizeInlineInput);
+inlineInput.addEventListener('input', () => resizeInlineInput());
 inlineInput.addEventListener('blur', () => { if (editState) commitEdit(); });
 // Prevent clicks inside input from bubbling to canvas
 inlineInput.addEventListener('pointerdown', (e) => e.stopPropagation());
