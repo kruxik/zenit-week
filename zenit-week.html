@@ -364,6 +364,11 @@
     overflow: hidden;
     height: 100vh;
     height: 100dvh;
+    /* Block browser pinch-zoom app-wide; panels inherit this floor so two-finger
+       gestures can't scale the viewport. touch-action intersects down the tree,
+       so only the mindmap canvas opts stricter (touch-action: none) to run its
+       own JS zoom. Any new panel is restricted automatically. */
+    touch-action: pan-x pan-y;
   }
 
   #app {
