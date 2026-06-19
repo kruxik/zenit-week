@@ -1403,7 +1403,7 @@
 
   #stats-panel {
     position: fixed;
-    top: 56px;
+    top: 0; /* Scope B: rises behind the toolbar so content scrolls under it */
     left: 0;
     right: 0;
     bottom: 0;
@@ -1428,16 +1428,19 @@
   }
   @media (min-width: 768px) {
     #stats-panel {
-      top: 61px;
+      top: 0; /* Scope B: rises behind the toolbar; header re-anchored at 56px */
       left: 50%;
       right: auto;
       bottom: 5px;
       width: 780px;
       max-width: calc(100vw - 40px);
-      height: calc(100vh - 66px);
+      height: calc(100vh - 5px);
       border-radius: 8px;
       border: 1px solid var(--border-default);
       box-shadow: 0 20px 60px var(--shadow-xl);
+      background: var(--glass-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       transform: translateX(-50%) translateY(20px);
       z-index: 2000;
     }
@@ -1452,21 +1455,36 @@
     #stats-panel.visible { transform: translateX(-50%) translateY(0); }
   }
 
+  /* Scope B: glass header floats at the toolbar's bottom edge (56px); content
+     scrolls under BOTH the header and the toolbar above it. */
   #stats-header {
-    background: var(--bg-surface-subtle);
-    padding: 20px 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    height: 60px;
+    padding: 0 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid var(--border-soft);
-    flex-shrink: 0;
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    z-index: 2;
   }
   #stats-content {
     padding: 24px;
+    padding-top: 136px; /* 56px toolbar + 60px header + 20px gap */
     padding-bottom: 80px;
     flex: 1;
     overflow-y: auto;
+    /* Scroll region runs full-height behind the glass header/toolbar so content
+       scrolls under them; a native scrollbar would span that whole height, so
+       hide it (matches the day-strip). */
+    scrollbar-width: none;
   }
+  #stats-content::-webkit-scrollbar { display: none; }
 
   /* Hero: two top-aligned columns — Plan vs Reality (left) and The Week (right). */
   #stats-section-donut {
@@ -1716,7 +1734,7 @@
      one item per line) on the left, completion headlines on the right; ② bars and ③ balance
      stay. Tightened spacing so the story fits one thumb-scroll. */
   @media (max-width: 767px) {
-    #stats-content { padding: 18px; padding-bottom: 80px; }
+    #stats-content { padding: 18px; padding-top: 136px; padding-bottom: 80px; } /* 56px toolbar + 60px header + 20px gap (matches desktop offset) */
     #stats-section-donut { gap: 14px; }
     .stats-legend { grid-template-columns: 1fr; }
     /* Shrink the donut so two columns fit on ~360px phones (e.g. Galaxy S22). */
@@ -2135,7 +2153,7 @@
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
   #agenda-view {
     position: absolute;
-    top: 56px;
+    top: 0; /* Scope B: rises behind the toolbar; day-strip re-anchored at 56px */
     left: 0;
     right: 0;
     bottom: 0;
@@ -2152,7 +2170,7 @@
   @media (min-width: 768px) {
     #agenda-view {
       position: fixed;
-      top: 61px;
+      top: 0; /* Scope B: rises behind the toolbar; day-strip re-anchored at 56px */
       left: 50%;
       right: auto;
       bottom: 5px;
@@ -2161,7 +2179,9 @@
       border-radius: 8px;
       border: 1px solid var(--border-default);
       box-shadow: 0 20px 60px var(--shadow-xl);
-      background: var(--bg-surface);
+      background: var(--glass-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       transform: translateX(-50%) translateY(20px);
       opacity: 0;
       pointer-events: none;
@@ -2180,6 +2200,8 @@
     display: flex;
   }
 
+  /* Scope B: glass day-strip floats at the toolbar's bottom edge (56px); items
+     scroll under BOTH the day-strip and the toolbar above it. */
   #agenda-day-strip {
     display: flex;
     align-items: center;
@@ -2190,8 +2212,14 @@
     padding: 0 8px;
     gap: 2px;
     border-bottom: 1px solid var(--border-default);
-    background: var(--bg-surface);
-    flex-shrink: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    z-index: 2;
     scrollbar-width: none;
   }
   #agenda-day-strip::-webkit-scrollbar { display: none; }
@@ -2303,8 +2331,14 @@
     width: 100%;
     min-width: 0;
     padding: 0;
+    padding-top: 104px; /* 56px toolbar + 48px day-strip; items scroll under both */
     padding-bottom: 66px;
+    /* Full-height scroll region behind the glass day-strip/toolbar; hide the
+       native scrollbar that would otherwise span behind them (matches the
+       day-strip). */
+    scrollbar-width: none;
   }
+  #agenda-tab-content::-webkit-scrollbar { display: none; }
 
   @media (min-width: 768px) {
     #agenda-tab-content {
