@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.06.22] - 2026-06-22
+
+### Added
+
+- Agenda remembers manual task order; priority only sorts unordered groups
+- Add Stats segment to view pill (S hotkey), drop stats close button
+- Mark current week with a blue dot under the CFD axis label
+- Morph CFD between lenses on click (from previous shape, no first-render anim)
+- Add Total/per-branch lens switcher to the 4-week CFD
+- Drop ambiguous CFD delta chip; rely on the visual trend
+- Add gradient week guides and 50-point horizontal gridlines to CFD
+- Replace 4-week sparkline with stacked-area cumulative flow diagram
+- Lay out top stats sections as three equal-width columns, center the middle
+- Hide unplanned stats and legends when week has no unplanned tasks
+- Collapse deep nodes in Rocks/Pebbles and slide nodes + edges together
+
+### Changed
+
+- Remove the top-of-mindmap mini-stats box and its dead code
+- Make Stats a real peer view so toolbar controls work correctly
+- Group stats legend by category, fix Czech CFD title + week axis prefix
+
+### Fixed
+
+- Block browser pinch-zoom app-wide; only mindmap zooms (touch-action floor on body)
+- Reflow immediately when opening node editor so new item doesn't overlap siblings
+- Keep full bottom navigation visible while Stats panel is open
+- Shrink mobile donut to 120px so two-column stats fit on 360px phones
+- Move follow-through legend below branch bars to match Plan vs Reality
+- Refresh next-week snapshot cache on Drive/peer merge to prevent undo tombstoning live nodes
+
 ## [v2026.06.14] - 2026-06-14
 
 ### Added
