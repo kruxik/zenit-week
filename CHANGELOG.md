@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.06.22.1] - 2026-06-22
+
+### Fixed
+
+- Solid Stats/Agenda panel content so mindmap no longer bleeds through (light theme)
+
 ## [v2026.06.22] - 2026-06-22
 
 ### Added
