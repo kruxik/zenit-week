@@ -13944,6 +13944,9 @@ function dragWorldDelta(clientX, clientY) {
 
 function updateDraggedVisuals(clientX, clientY) {
   if (!dragState.activeNodeId) return;
+  // A live branch flip re-renders + re-pins the node under the cursor; bail
+  // this frame so we don't translate now-stale element refs.
+  if (maybeFlipDraggedBranch(clientX, clientY)) return;
   const { dx, dy } = dragWorldDelta(clientX, clientY);
 
   // Move dragged node groups via cached refs — no querySelector per frame.
@@ -13969,6 +13972,121 @@ function updateDraggedVisuals(clientX, clientY) {
       grad.setAttribute('x2', nx2); grad.setAttribute('y2', ny2);
     }
   }
+}
+
+// Cache the dragged subtree's DOM refs, layout positions, and edge geometry,
+// then (re)build dragState. Called at drag start and again after a live branch
+// mirror-flip re-renders the subtree mid-drag. The drag is anchored in WORLD
+// space, not screen space: the cursor's world position at (anchorClientX,
+// anchorClientY) becomes the zero point for the per-frame translate, so the
+// grabbed node stays glued under the cursor even as the view zooms/pans
+// (wheel, pinch, edge autoscroll) or the subtree is re-rendered on a flip.
+function cacheDragSubtree(id, anchorClientX, anchorClientY, lastClientX, lastClientY) {
+  const positions = computeLayout();
+  const idsToDrag = [id, ...getDescendantIds(id)];
+  const initialPositions = {};
+  // Cache the dragged node group elements once; pointermove fires 60-100×/s
+  // and document.querySelector per id per frame is wasted DOM work.
+  const nodeEls = {};
+  idsToDrag.forEach(idToDrag => {
+    const p = positions[idToDrag];
+    if (p) initialPositions[idToDrag] = { x: p.x, y: p.y };
+    const el = document.querySelector(`.node-group[data-id="${idToDrag}"]`);
+    if (el) {
+      nodeEls[idToDrag] = el;
+      el.style.transition = 'none';
+      el.setAttribute('pointer-events', 'none');
+      el.style.opacity = '0.4';
+      document.getElementById('nodes-layer').appendChild(el);
+    }
+  });
+  const topLines = document.getElementById('top-lines-layer');
+  // Build the edge cache in the same pass we move affected edges to the top
+  // layer. Each entry holds DOM refs (path + gradient), dragged-endpoint flags,
+  // and the parsed base coords — updateDraggedVisuals just adds dx/dy.
+  const edges = [];
+  document.querySelectorAll('#lines-layer path').forEach(path => {
+    const fromId = path.getAttribute('data-from');
+    const toId = path.getAttribute('data-to');
+    const isFromDragging = !!initialPositions[fromId];
+    const isToDragging   = !!initialPositions[toId];
+    if (!isFromDragging && !isToDragging) return;
+    path.style.opacity = '0.4';
+    topLines.appendChild(path);
+    edges.push({
+      pathEl: path,
+      gradEl: document.getElementById(`grad-${fromId}-${toId}`),
+      isFromDragging, isToDragging,
+      x1: parseFloat(path.getAttribute('data-x1')),
+      y1: parseFloat(path.getAttribute('data-y1')),
+      x2: parseFloat(path.getAttribute('data-x2')),
+      y2: parseFloat(path.getAttribute('data-y2')),
+      swStart: parseFloat(path.getAttribute('data-sw-start')),
+      swEnd:   parseFloat(path.getAttribute('data-sw-end')),
+    });
+  });
+  const rect0 = container.getBoundingClientRect();
+  dragState = {
+    activeNodeId: id,
+    rectLeft: rect0.left, rectTop: rect0.top,
+    cursorStartWorldX: (anchorClientX - rect0.left - panX) / zoom,
+    cursorStartWorldY: (anchorClientY - rect0.top  - panY) / zoom,
+    initialPositions,
+    nodeEls,
+    edges,
+    layoutPositions: positions,
+    descendantSet: new Set(idsToDrag),
+    // Carry over live autoscroll/target state so a mid-drag re-cache (flip)
+    // doesn't orphan a scheduled rAF or drop the hover target.
+    targetId: dragState.targetId || null,
+    vx: dragState.vx || 0, vy: dragState.vy || 0, rafId: dragState.rafId || 0,
+    lastClientX, lastClientY,
+  };
+  document.getElementById('main-svg').classList.add('dragging-active');
+}
+
+// Live "mirror" for a branch dragged across the root's vertical centerline
+// (world x = 0). When the cursor moves into the opposite half, flip the
+// branch's side and re-render so its whole subtree splays the other way —
+// matching what the drop (handleNodeDrop, svgX < 0) will finalize. Returns
+// true if a flip happened (caller should bail out of the current frame; the
+// re-cache already re-pinned the node under the cursor).
+function maybeFlipDraggedBranch(clientX, clientY) {
+  const id = dragState.activeNodeId;
+  if (!id) return false;
+  const node = findNode(id);
+  if (!node || node.type !== 'branch') return false;
+
+  const pointerWorldX = (clientX - dragState.rectLeft - panX) / zoom;
+  const newSide = pointerWorldX < 0 ? 'left' : 'right';
+  if (newSide === node.side) return false;
+
+  // Where the branch box sits right now (glued under the cursor) — keep it
+  // there after the mirrored relayout so only the orientation flips.
+  const base = dragState.initialPositions[id];
+  const { dx, dy } = dragWorldDelta(clientX, clientY);
+  const curWorldX = base.x + dx;
+  const curWorldY = base.y + dy;
+
+  node.side = newSide;
+  if (BRANCH_CONFIG[id]) BRANCH_CONFIG[id].side = newSide;
+  // Clear subtree offsets so children re-splay naturally on the new side.
+  getDescendantIds(id).forEach(cid => {
+    const c = findNode(cid);
+    if (c) { c.offX = 0; c.offY = 0; touchNode(cid); }
+  });
+
+  // Pin the branch to its current world position after the mirrored layout.
+  node.offX = 0; node.offY = 0;
+  const nat = computeLayout()[id];
+  if (nat) { node.offX = curWorldX - nat.x; node.offY = curWorldY - nat.y; }
+  touchNode(id);
+
+  render();
+  // Re-establish drag caches against the freshly mirrored DOM, anchored at the
+  // current cursor so dragging continues seamlessly from here.
+  cacheDragSubtree(id, clientX, clientY, clientX, clientY);
+  return true;
 }
 
 function updateDragAutoScroll(cx, cy) {
@@ -14097,73 +14215,10 @@ window.addEventListener('pointermove', (e) => {
     if (Math.hypot(dx, dy) > 5) {
       const { id, startX: originX, startY: originY } = pendingDrag;
       pendingDrag = null;
-      const positions = computeLayout();
-      const idsToDrag = [id, ...getDescendantIds(id)];
-      const initialPositions = {};
-      // Cache the dragged node group elements once; pointermove fires 60-100×/s
-      // and document.querySelector per id per frame is wasted DOM work.
-      const nodeEls = {};
-      idsToDrag.forEach(idToDrag => {
-        const p = positions[idToDrag];
-        if (p) initialPositions[idToDrag] = { x: p.x, y: p.y };
-        const el = document.querySelector(`.node-group[data-id="${idToDrag}"]`);
-        if (el) {
-          nodeEls[idToDrag] = el;
-          el.style.transition = 'none';
-          el.setAttribute('pointer-events', 'none');
-          el.style.opacity = '0.4';
-          document.getElementById('nodes-layer').appendChild(el);
-        }
-      });
-      const topLines = document.getElementById('top-lines-layer');
-      // Build the edge cache in the same pass we move affected edges to the
-      // top layer. Each entry holds: DOM refs (path + gradient), the dragged-
-      // endpoint flags, and the numeric base coordinates already parsed —
-      // updateDraggedVisuals just adds dx/dy and writes back.
-      const edges = [];
-      document.querySelectorAll('#lines-layer path').forEach(path => {
-        const fromId = path.getAttribute('data-from');
-        const toId = path.getAttribute('data-to');
-        const isFromDragging = !!initialPositions[fromId];
-        const isToDragging   = !!initialPositions[toId];
-        if (!isFromDragging && !isToDragging) return;
-        path.style.opacity = '0.4';
-        topLines.appendChild(path);
-        edges.push({
-          pathEl: path,
-          gradEl: document.getElementById(`grad-${fromId}-${toId}`),
-          isFromDragging, isToDragging,
-          x1: parseFloat(path.getAttribute('data-x1')),
-          y1: parseFloat(path.getAttribute('data-y1')),
-          x2: parseFloat(path.getAttribute('data-x2')),
-          y2: parseFloat(path.getAttribute('data-y2')),
-          swStart: parseFloat(path.getAttribute('data-sw-start')),
-          swEnd:   parseFloat(path.getAttribute('data-sw-end')),
-        });
-      });
       beginAtomicOp();
-      // Anchor the drag in WORLD space, not screen space. We record where the
-      // cursor sits in world coords at grab time; every frame we recompute the
-      // cursor's *current* world pos from the live panX/panY/zoom and move the
-      // subtree by the difference. This stays correct even if the view zooms or
-      // pans mid-drag (wheel zoom, pinch, edge autoscroll) — the node stays
-      // glued under the cursor instead of drifting.
-      const rect0 = container.getBoundingClientRect();
-      dragState = {
-        activeNodeId: id,
-        rectLeft: rect0.left, rectTop: rect0.top,
-        cursorStartWorldX: (originX - rect0.left - panX) / zoom,
-        cursorStartWorldY: (originY - rect0.top  - panY) / zoom,
-        initialPositions,
-        nodeEls,
-        edges,
-        layoutPositions: positions,
-        descendantSet: new Set([id, ...getDescendantIds(id)]),
-        targetId: null,
-        vx: 0, vy: 0, rafId: 0,
-        lastClientX: e.clientX, lastClientY: e.clientY,
-      };
-      document.getElementById('main-svg').classList.add('dragging-active');
+      // Anchor the drag in WORLD space at the grab point, then cache the subtree
+      // DOM/edge refs. See cacheDragSubtree for the world-anchor rationale.
+      cacheDragSubtree(id, originX, originY, e.clientX, e.clientY);
     }
   }
 
