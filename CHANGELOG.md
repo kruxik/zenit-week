@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.06.24] - 2026-06-24
+
+### Added
+
+- Live mirror-flip branch when dragged across root centerline
+
+### Fixed
+
+- Base colors sync identity on content hash, not raw JSON
+- Stop Drive sync ping-pong by hashing canonical content, not raw JSON
+
 ## [v2026.06.22.1] - 2026-06-22
 
 ### Fixed
