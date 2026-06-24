@@ -454,6 +454,7 @@ _state.resetSyncState = function() {
   _gapiInitialized = false;
   driveFileIdCache.clear();
   lastSyncedHash.clear();
+  lastSeenRemoteHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
   _undoRedoForcePush = new Set();

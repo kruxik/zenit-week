@@ -285,3 +285,69 @@ describe('Drive sync E2E — clean pull does not ping-pong', () => {
     expect(mediaFetchCount).toBe(0);
   });
 });
+
+// A file last uploaded by an OLD app version carries an appProperty contentHash
+// computed by a now-replaced hashing scheme (e.g. raw-JSON fnv1a32). Its content is
+// byte-for-byte what we already hold, so the merge is a no-op and never re-uploads
+// to rewrite the appProperty. Without a "remote hash we last reconciled" guard, the
+// poll would compare that stale hash against our canonical hash forever and
+// re-download the file every cycle — a read-only download storm.
+describe('Drive sync E2E — legacy-scheme appProperty self-heals (no download storm)', () => {
+  const WK = '2026-01';
+  const FILE_ID = 'file_id_2026_01';
+
+  const remoteMedia = sampleWeek();
+  // The stored appProperty hash deliberately does NOT match weekContentHash(content),
+  // mimicking a value written by a previous hashing scheme.
+  const canonical = String(weekContentHash(normalizeAsPulled(remoteMedia)));
+  const legacyHash = canonical + '_legacy';
+
+  let patchCount = 0;
+  let mediaFetchCount = 0;
+
+  const server = setupServer(
+    http.post('http://localhost/api/token', () =>
+      HttpResponse.json({ access_token: 'new_access_token', expires_in: 3600 })
+    ),
+    http.get('https://www.googleapis.com/drive/v3/files/:fileId', ({ params, request }) => {
+      if (params.fileId !== FILE_ID) return new HttpResponse(null, { status: 404 });
+      const url = new URL(request.url);
+      if (url.searchParams.get('alt') === 'media') {
+        mediaFetchCount++;
+        return HttpResponse.json(remoteMedia);
+      }
+      return HttpResponse.json({ id: FILE_ID, appProperties: { contentHash: legacyHash } });
+    }),
+    http.patch('https://www.googleapis.com/upload/drive/v3/files/:fileId', () => {
+      patchCount++;
+      return HttpResponse.json({ id: FILE_ID });
+    })
+  );
+
+  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  afterAll(() => server.close());
+
+  beforeEach(async () => {
+    server.resetHandlers();
+    _state.resetSyncState();
+    _state.clearLocalStorage();
+    _state.clearIDBStore();
+    patchCount = 0;
+    mediaFetchCount = 0;
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+    await attemptSilentRestore();
+    _state.setDriveFileId(WK, FILE_ID);
+    await _state.saveWeekIDB(WK, clone(remoteMedia)); // local already holds the remote content
+  });
+  afterEach(() => { _state.resetSyncState(); });
+
+  test('poll converges: at most one reconciling download, then quiet, never re-uploads', async () => {
+    await syncWeekFromDrive(WK); // initial pull (sets lastSyncedHash to canonical)
+    await pollDriveMeta(WK);      // first poll reconciles the legacy hash once
+    mediaFetchCount = 0;
+    await pollDriveMeta(WK);      // subsequent polls must not re-download
+    await pollDriveMeta(WK);
+    expect(mediaFetchCount).toBe(0);
+    expect(patchCount).toBe(0);   // identical content — never corrects the appProperty by re-upload
+  });
+});

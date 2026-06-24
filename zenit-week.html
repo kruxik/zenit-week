@@ -5024,6 +5024,7 @@ let lastSignedOutLabelKey = 'sync.btnLabel';
 let googleAccessToken = null;   // current OAuth access token string
 let driveFileIdCache = new Map(); // weekKey → Drive file ID
 let lastSyncedHash = new Map();   // weekKey → FNV-1a hash of last uploaded JSON
+let lastSeenRemoteHash = new Map(); // weekKey → Drive appProperty contentHash the poll last reconciled (may be a legacy raw-JSON hash; decouples poll convergence from our canonical lastSyncedHash)
 let etagCache = new Map();        // weekKey → ETag from last Drive pull
 let syncDebounceTimers = new Map(); // wKey → debounce timer id (per-week)
 let colorsSyncDebounceTimer = null;
@@ -5400,6 +5401,7 @@ async function signOut() {
   if (window.gapi?.client) gapi.client.setToken(null);
   driveFileIdCache.clear();
   lastSyncedHash.clear();
+  lastSeenRemoteHash.clear();
   etagCache.clear();
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
   showSignedOutButton('sync.btnLabel');
@@ -5943,6 +5945,10 @@ async function initDriveSync() {
     for (const wKey of new Set([...driveMap.keys(), ...localMap.keys()])) {
       const driveEntry  = driveMap.get(wKey);
       const localHash   = localMap.get(wKey) ?? null;
+      // Record the remote hash init reconciles so the background poll treats it as
+      // already-seen (prevents a needless re-download on the first poll, and stops
+      // legacy-scheme appProperties from re-downloading every cycle thereafter).
+      if (driveEntry?.contentHash) lastSeenRemoteHash.set(wKey, driveEntry.contentHash);
       if (!localHash) {
         toMerge.push(wKey);  // Drive-only — download into local
       } else if (!driveEntry) {
@@ -6155,6 +6161,7 @@ async function forcePushAllToDrive() {
   stopDrivePoll();
   driveFileIdCache.clear();
   lastSyncedHash.clear();
+  lastSeenRemoteHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
 
@@ -6359,8 +6366,17 @@ async function pollDriveMeta(wKey) {
       if (!resp.ok) continue;
       const { appProperties } = await resp.json();
       const remoteHash = appProperties?.contentHash;
-      if (remoteHash && remoteHash !== String(lastSyncedHash.get(k))) {
+      // Download only when the remote hash matches neither our canonical content
+      // hash (we already hold this content) nor the remote hash we last reconciled.
+      // The latter guards files whose appProperty was written by an older hashing
+      // scheme: the content is identical, so the merge is a no-op that never
+      // re-uploads to correct the appProperty — without this the file would
+      // re-download every poll forever (read-only download storm).
+      if (remoteHash &&
+          remoteHash !== String(lastSyncedHash.get(k)) &&
+          remoteHash !== lastSeenRemoteHash.get(k)) {
         await syncWeekFromDrive(k); // hash changed — download + CRDT merge
+        lastSeenRemoteHash.set(k, remoteHash);
       }
     }
   } catch { /* silent — next poll will retry */ }
@@ -6382,6 +6398,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   // Clear sync caches so initDriveSync fetches fresh
   driveFileIdCache.clear();
   lastSyncedHash.clear();
+  lastSeenRemoteHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
   setSyncStatus('syncing', 'sync.msg.resyncing');
