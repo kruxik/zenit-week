@@ -39,7 +39,7 @@ No account is required. No tracking. Your data never touches Zenit Week's infras
 - **Daily log** — completed and ticked activities collected with timestamps and branch dots.
 - **Light & dark theme** — respects `prefers-color-scheme` on first load.
 - **Languages** — English and Čeština, with browser-language detection and a dismissable suggestion banner.
-- **Optional Google Drive sync** — your own Drive, scope `drive.appdata` only, one file per week, never our servers. Conflict resolution by last-write-wins with CRDT tombstones, auto-polled every 30s.
+- **Optional Google Drive sync** — your own Drive, scope `drive.appdata` only, one file per week, never our servers. Conflict resolution by last-write-wins with CRDT tombstones, auto-polled every 10s.
 - **Undo / Redo** — 100 levels.
 - **Export & import** — full backup as JSON.
 - **Touch-friendly** — pinch to zoom, swipe an agenda item right to mark done, left for options.

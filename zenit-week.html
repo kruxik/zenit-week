@@ -5034,7 +5034,7 @@ let _refreshPromise = null;       // deduplicates concurrent 401 refresh attempt
 let _gapiInitialized = false;     // true after first loadGapiAndSync completes setup
 let _isFirstConnection = false;   // true when this browser has never synced with Drive before
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
-let _pollTimer = null;          // setInterval handle for 30s background metadata poll
+let _pollTimer = null;          // setInterval handle for 10s background metadata poll
 const POLL_INTERVAL_MS = 10_000;
 let pendingRemoteMerge = null;  // { wKey, mergedData, mergedJson, mergedHash, scheduleUpload }
 let googleUserEmail = '';
@@ -14785,7 +14785,7 @@ document.addEventListener('visibilitychange', () => {
   } else {
     syncWeekFromDrive(currentWeekKey); // pull before next edit
     syncColorsFromDrive();
-    startDrivePoll(currentWeekKey);   // restart 30s poll
+    startDrivePoll(currentWeekKey);   // restart 10s poll
   }
 });
 
