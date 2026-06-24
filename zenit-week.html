@@ -6016,6 +6016,22 @@ function weekContentHash(data) {
   return fnv1a32(_weekContentSig(data));
 }
 
+// Canonical content signature for the colors/settings blob.
+// saveBranchColors stamps a fresh savedAt on every write and serializes branch
+// keys in BRANCH_COLORS insertion order (which can differ per device), so a raw
+// JSON hash flags "changed" even when the actual settings are identical — that
+// re-uploads/re-downloads colors needlessly across devices. Stripping savedAt and
+// sorting keys makes the hash content-only, the colors analogue of weekContentHash.
+function colorsContentHash(data) {
+  if (!data || typeof data !== 'object') return fnv1a32(JSON.stringify(data));
+  const out = {};
+  for (const k of Object.keys(data).sort()) {
+    if (k === 'savedAt') continue;
+    out[k] = data[k];
+  }
+  return fnv1a32(JSON.stringify(out));
+}
+
 // Raw multipart PATCH to Drive — no pull, no merge. Returns true on success.
 async function _uploadWeekToDrive(wKey, json) {
   let savedAt = 0, parsed = null;
@@ -6093,9 +6109,10 @@ async function _uploadColorsToDrive(resetToken) {
   // Use stored colors if available, otherwise a minimal stub so resetToken always reaches Drive.
   const data = await loadValueIDB(COLORS_STORAGE_KEY);
   const json = data ? JSON.stringify(data) : JSON.stringify({ savedAt: Date.now() });
-  const hash = fnv1a32(json);
-  let savedAt = 0;
-  try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
+  let savedAt = 0, parsed = null;
+  try { parsed = JSON.parse(json); savedAt = parsed.savedAt ?? 0; } catch { /* ignore */ }
+  // contentHash written to Drive is content-only so every device agrees on it.
+  const hash = parsed ? colorsContentHash(parsed) : fnv1a32(json);
   const MAX_RETRIES = 3;
   let delay = 1000;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -6204,7 +6221,7 @@ async function syncColorsToDrive() {
   const stored = await loadValueIDB(COLORS_STORAGE_KEY);
   if (!stored) return;
   const json = JSON.stringify(stored);
-  const hash = fnv1a32(json);
+  const hash = colorsContentHash(stored);
   if (colorsSyncedHash === hash) return;
   setSyncStatus('syncing', 'sync.msg.syncing');
   const savedAt = stored.savedAt ?? 0;
@@ -6255,6 +6272,7 @@ async function syncColorsFromDrive() {
     const remoteJson = await resp.text();
     if (!remoteJson.trim()) return;
     const remoteData = JSON.parse(remoteJson);
+    const remoteHash = colorsContentHash(remoteData);
     const remoteSavedAt = remoteData.savedAt ?? 0;
     const localData = await loadValueIDB(COLORS_STORAGE_KEY);
     const localSavedAt = localData?.savedAt ?? 0;
@@ -6277,9 +6295,13 @@ async function syncColorsFromDrive() {
       updateSvgFilters();
       renderIfVisible();
       if (currentView === 'agenda') renderAgenda();
-      colorsSyncedHash = fnv1a32(remoteJson);
+      colorsSyncedHash = remoteHash;
       lastSyncedAt = Date.now();
       updateDropdownSyncTime();
+    } else if (colorsContentHash(localData || {}) === remoteHash) {
+      // Remote is not newer but content is identical — mark synced so the 10s
+      // poll stops re-downloading an unchanged colors file every cycle.
+      colorsSyncedHash = remoteHash;
     }
   } catch (err) {
     console.error('[Drive] syncColorsFromDrive error:', err);

@@ -21,6 +21,7 @@ import { http, HttpResponse } from 'msw';
 import {
   _state,
   weekContentHash,
+  colorsContentHash,
   _weekContentSig,
   mergeWeekData,
   validateAndRepair,
@@ -164,6 +165,59 @@ describe('Drive sync — content-hash convergence (ping-pong guard)', () => {
       expect(_weekContentSig(roundTripped)).toBe(_weekContentSig(merged));
       expect(weekContentHash(roundTripped)).toBe(weekContentHash(merged));
     });
+  });
+});
+
+describe('Colors sync — content-hash convergence', () => {
+  // Shape produced by saveBranchColors(): savedAt + per-branch {main} + theme + lang.
+  const sampleColors = () => ({
+    savedAt: 1000,
+    work: { main: '#F24E1E' },
+    family: { main: '#A259FF' },
+    me: { main: '#1ABCFE' },
+    theme: 'light',
+    lang: 'en',
+  });
+
+  test('savedAt does not affect the colors hash', () => {
+    const a = sampleColors();
+    const b = { ...clone(a), savedAt: 999999 };
+    expect(colorsContentHash(b)).toBe(colorsContentHash(a));
+  });
+
+  test('branch key order does not affect the colors hash', () => {
+    const a = sampleColors();
+    // Reinsert keys in a different order (simulates a device whose BRANCH_COLORS
+    // was built in a different sequence).
+    const b = {};
+    for (const k of Object.keys(a).reverse()) b[k] = a[k];
+    expect(colorsContentHash(b)).toBe(colorsContentHash(a));
+  });
+
+  test('changing a branch color changes the hash', () => {
+    const a = sampleColors();
+    const b = clone(a);
+    b.work.main = '#000000';
+    expect(colorsContentHash(b)).not.toBe(colorsContentHash(a));
+  });
+
+  test('changing theme changes the hash', () => {
+    const a = sampleColors();
+    const b = { ...clone(a), theme: 'dark' };
+    expect(colorsContentHash(b)).not.toBe(colorsContentHash(a));
+  });
+
+  test('changing language changes the hash', () => {
+    const a = sampleColors();
+    const b = { ...clone(a), lang: 'cs' };
+    expect(colorsContentHash(b)).not.toBe(colorsContentHash(a));
+  });
+
+  test('identical settings with different savedAt converge (no needless re-upload)', () => {
+    // Device A uploaded with savedAt T1; device B re-saves identical settings at T2.
+    const a = { ...sampleColors(), savedAt: 1000 };
+    const b = { ...sampleColors(), savedAt: 2000 };
+    expect(colorsContentHash(a)).toBe(colorsContentHash(b));
   });
 });
 

@@ -613,6 +613,7 @@ export const {
   // Storage
   fnv1a32,
   weekContentHash,
+  colorsContentHash,
   // Color picker
   hexToHsv,
   hsvToHex,
