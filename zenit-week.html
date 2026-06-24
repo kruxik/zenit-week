@@ -4066,10 +4066,10 @@ async function onPeerWeekSaved(msg) {
   if (!remoteData) return;
   const mergedData = mergeWeekData(structuredClone(weekData), remoteData);
   const mergedJson = JSON.stringify(mergedData);
-  const mergedHash = fnv1a32(mergedJson);
+  const mergedHash = weekContentHash(mergedData);
   // scheduleUpload === "the merge produced content the peer's record lacked",
   // so peers (and Drive) must learn about it; false === fully converged.
-  const scheduleUpload = mergedHash !== fnv1a32(JSON.stringify(remoteData));
+  const scheduleUpload = mergedHash !== weekContentHash(remoteData);
   // Cue only when the merge visibly changes the current week AND applies now
   // (applyRemoteMerge defers under the same condition while an edit is open, so
   // we don't announce a change the user can't yet see). showToast replaces, so
@@ -5700,8 +5700,8 @@ async function _flushPendingMerge() {
     : (await loadWeekIDB(wKey)) || { nodes: [] };
   const mergedData = mergeWeekData(localData, remoteData);
   const mergedJson = JSON.stringify(mergedData);
-  const mergedHash = fnv1a32(mergedJson);
-  const scheduleUpload = mergedHash !== fnv1a32(JSON.stringify(remoteData));
+  const mergedHash = weekContentHash(mergedData);
+  const scheduleUpload = mergedHash !== weekContentHash(remoteData);
   await _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
 }
 
@@ -5783,8 +5783,8 @@ async function syncWeekFromDrive(wKey) {
       const remoteData = validateAndRepair(parsedRemote);
       const mergedData = mergeWeekData(localData, remoteData);
       const mergedJson = JSON.stringify(mergedData);
-      const mergedHash = fnv1a32(mergedJson);
-      const scheduleUpload = mergedHash !== fnv1a32(remoteJson);
+      const mergedHash = weekContentHash(mergedData);
+      const scheduleUpload = mergedHash !== weekContentHash(remoteData);
 
       await applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
       return;
@@ -5927,7 +5927,9 @@ async function initDriveSync() {
       const m = key?.match(/^zenit-week-(\d{4}-\d{2})$/);
       if (!m) continue;
       const raw = localStorage.getItem(key);
-      localMap.set(m[1], raw ? fnv1a32(raw) : null);
+      let lh = null;
+      if (raw) { try { lh = weekContentHash(JSON.parse(raw)); } catch { lh = fnv1a32(raw); } }
+      localMap.set(m[1], lh);
     }
 
     // Step 3 — classify every week
@@ -6004,11 +6006,23 @@ function fnv1a32(str) {
   return hash;
 }
 
+// Sync identity for a week: hash of the canonical content signature, NOT the raw
+// JSON. mergeWeekData bumps crdtVersion/savedAt on every merge and JSON key order
+// is unstable, so a raw-byte hash differs after every merge even when nothing
+// changed — that drove an endless pull→merge→upload ping-pong across devices.
+// _weekContentSig strips _ts/_editing/crdtVersion/savedAt and sorts, so identical
+// content yields an identical hash on every device → sync converges.
+function weekContentHash(data) {
+  return fnv1a32(_weekContentSig(data));
+}
+
 // Raw multipart PATCH to Drive — no pull, no merge. Returns true on success.
 async function _uploadWeekToDrive(wKey, json) {
-  const hash = fnv1a32(json);
-  let savedAt = 0;
-  try { savedAt = JSON.parse(json).savedAt ?? 0; } catch { /* ignore */ }
+  let savedAt = 0, parsed = null;
+  try { parsed = JSON.parse(json); savedAt = parsed.savedAt ?? 0; } catch { /* ignore */ }
+  // contentHash written to Drive is the content-signature hash so every device
+  // agrees on it regardless of crdtVersion/savedAt/key-order churn.
+  const hash = parsed ? weekContentHash(parsed) : fnv1a32(json);
 
   const MAX_RETRIES = 5;
   let delay = 1000;
@@ -6062,7 +6076,7 @@ async function syncWeekToDrive(wKey) {
   if (!data) return;
   const json = JSON.stringify(data);
 
-  const hash = fnv1a32(json);
+  const hash = weekContentHash(data);
   if (lastSyncedHash.get(wKey) === hash) return; // no change after merge — skip upload
 
   setSyncStatus('syncing', 'sync.msg.syncing');
