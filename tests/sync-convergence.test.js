@@ -351,3 +351,57 @@ describe('Drive sync E2E — legacy-scheme appProperty self-heals (no download s
     expect(patchCount).toBe(0);   // identical content — never corrects the appProperty by re-upload
   });
 });
+
+// The colors/settings file has the same legacy-appProperty failure mode as week
+// files, on a separate poll branch. A colors file written by an older hashing
+// scheme advertises a contentHash that never matches colorsSyncedHash (canonical),
+// and syncColorsFromDrive only ever rewrites colorsSyncedHash to canonical — it
+// never re-uploads to correct the appProperty — so the poll re-downloaded it every
+// cycle. lastSeenRemoteColorsHash breaks that loop.
+describe('Colors sync E2E — legacy-scheme appProperty self-heals (no download storm)', () => {
+  const COLORS_FILE_ID = 'file_id_colors';
+  const remoteColors = { savedAt: 5000, work: { main: '#F24E1E' }, family: { main: '#A259FF' }, me: { main: '#1ABCFE' }, theme: 'light', lang: 'en' };
+  const legacyHash = colorsContentHash(remoteColors) + '_legacy';
+
+  let colorsMediaFetchCount = 0;
+
+  const server = setupServer(
+    http.post('http://localhost/api/token', () =>
+      HttpResponse.json({ access_token: 'new_access_token', expires_in: 3600 })
+    ),
+    http.get('https://www.googleapis.com/drive/v3/files/:fileId', ({ params, request }) => {
+      if (params.fileId !== COLORS_FILE_ID) return new HttpResponse(null, { status: 404 });
+      const url = new URL(request.url);
+      if (url.searchParams.get('alt') === 'media') {
+        colorsMediaFetchCount++;
+        return HttpResponse.json(remoteColors);
+      }
+      return HttpResponse.json({ id: COLORS_FILE_ID, appProperties: { contentHash: legacyHash } });
+    })
+  );
+
+  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  afterAll(() => server.close());
+
+  beforeEach(async () => {
+    server.resetHandlers();
+    _state.resetSyncState();
+    _state.clearLocalStorage();
+    _state.clearIDBStore();
+    colorsMediaFetchCount = 0;
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+    await attemptSilentRestore();
+    // Point the poll at the colors file but configure NO week files, so the poll
+    // exercises only the colors branch.
+    _state.setDriveFileId('colors', COLORS_FILE_ID);
+  });
+  afterEach(() => { _state.resetSyncState(); });
+
+  test('poll converges: colors reconciles once, then stops re-downloading', async () => {
+    await pollDriveMeta('2026-01'); // first poll reconciles the legacy colors hash
+    colorsMediaFetchCount = 0;
+    await pollDriveMeta('2026-01'); // subsequent polls must not re-download colors
+    await pollDriveMeta('2026-01');
+    expect(colorsMediaFetchCount).toBe(0);
+  });
+});

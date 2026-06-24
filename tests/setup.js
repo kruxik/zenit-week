@@ -457,6 +457,7 @@ _state.resetSyncState = function() {
   lastSeenRemoteHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
+  lastSeenRemoteColorsHash = null;
   _undoRedoForcePush = new Set();
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
 };

@@ -5029,6 +5029,7 @@ let etagCache = new Map();        // weekKey → ETag from last Drive pull
 let syncDebounceTimers = new Map(); // wKey → debounce timer id (per-week)
 let colorsSyncDebounceTimer = null;
 let colorsSyncedHash = null;
+let lastSeenRemoteColorsHash = null; // Drive appProperty contentHash the poll last reconciled for colors (may be a legacy raw-JSON hash; same decoupling as lastSeenRemoteHash for weeks)
 let tokenRenewalTimer = null;
 let _tokenReceivedAt = 0;         // epoch ms when current access token was obtained
 let _refreshPromise = null;       // deduplicates concurrent 401 refresh attempts
@@ -5393,6 +5394,7 @@ async function signOut() {
   }
 
   colorsSyncedHash = null;
+  lastSeenRemoteColorsHash = null;
   const stored = getStoredAuth();
   const token  = googleAccessToken;
   googleAccessToken = null;
@@ -6164,6 +6166,7 @@ async function forcePushAllToDrive() {
   lastSeenRemoteHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
+  lastSeenRemoteColorsHash = null;
 
   setSyncStatus('syncing', 'sync.msg.uploadingImport');
 
@@ -6345,8 +6348,15 @@ async function pollDriveMeta(wKey) {
           return; // stop current poll cycle — initDriveSync takes over
         }
         const remoteColorsHash = cProps?.contentHash;
-        if (remoteColorsHash && remoteColorsHash !== colorsSyncedHash) {
+        // Same legacy-hash guard as the week poll: skip when the remote hash matches
+        // either our canonical colors hash or the remote hash we last reconciled.
+        // A colors file written by an older hashing scheme is otherwise re-downloaded
+        // every cycle (identical content → no re-upload ever corrects the appProperty).
+        if (remoteColorsHash &&
+            remoteColorsHash !== colorsSyncedHash &&
+            remoteColorsHash !== lastSeenRemoteColorsHash) {
           await syncColorsFromDrive();
+          lastSeenRemoteColorsHash = remoteColorsHash;
         }
       }
     }
@@ -6401,6 +6411,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   lastSeenRemoteHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
+  lastSeenRemoteColorsHash = null;
   setSyncStatus('syncing', 'sync.msg.resyncing');
   await initDriveSync();
   startDrivePoll(currentWeekKey);
