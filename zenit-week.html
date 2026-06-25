@@ -5682,6 +5682,12 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
     const changed = _weekContentSig(weekData) !== _weekContentSig(mergedData);
     weekData = mergedData;
     rebuildNodeMap();
+    // Refresh BRANCH_CONFIG from the merged node.side — computeLayout reads a
+    // branch's left/right side from BRANCH_CONFIG, not the node, so a remote
+    // side change (branch dragged across the centerline on another device)
+    // wouldn't render without this. node.offY is read live, which is why the
+    // vertical position synced but the side didn't.
+    syncBranchConfig();
     if (changed) {
       renderIfVisible();
       if (currentView === 'agenda') renderAgenda();

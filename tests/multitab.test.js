@@ -1,4 +1,4 @@
-import { mergeWeekData, _weekContentSig, hasEditingNode, applyRemoteMerge, _state } from './setup.js';
+import { mergeWeekData, _weekContentSig, hasEditingNode, applyRemoteMerge, _state, BRANCH_CONFIG } from './setup.js';
 
 // Multi-tab editing (Option B — local sync peer). The CRDT merge itself is
 // covered by crdt.test.js; these tests pin the feature-specific properties:
@@ -72,6 +72,28 @@ describe('Multi-tab (Option B) — local sync peer', () => {
       // Deferred: the open editor survives and nothing was written to IDB.
       expect(hasEditingNode()).toBe(true);
       expect(_state.getIDBStore()['week-2026-01']).toBeUndefined();
+    });
+  });
+
+  describe('branch side propagation through merge', () => {
+    const branch = (id, side, ts) => ({ id, parent: 'center', branch: id, type: 'branch', label: id, children: [], side, _ts: ts });
+
+    test('a remote branch side-flip refreshes BRANCH_CONFIG (not just node.offY)', async () => {
+      // computeLayout reads a branch's left/right from BRANCH_CONFIG, not the node.
+      // A remote side change must refresh BRANCH_CONFIG or the branch renders on
+      // its stale side — the bug where vertical position synced but side did not.
+      _state.setWeekKey('2026-01');
+      _state.clearIDBStore();
+      const local = { nodes: [branch('work', 'right', 100)], tombstones: [], savedAt: 1000, crdtVersion: 1 };
+      _state.set(local);
+      BRANCH_CONFIG.work = { side: 'right' }; // stale, as it would be before the merge
+
+      // Peer dragged 'work' across the centerline → side 'left', newer _ts.
+      const remote = { nodes: [branch('work', 'left', 200)], tombstones: [], savedAt: 2000, crdtVersion: 2 };
+      const merged = mergeWeekData(local, remote);
+      await applyRemoteMerge('2026-01', merged, JSON.stringify(merged), 1, false, remote);
+
+      expect(BRANCH_CONFIG.work.side).toBe('left');
     });
   });
 });

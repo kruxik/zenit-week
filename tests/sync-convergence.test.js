@@ -44,6 +44,9 @@ const clone = (o) => structuredClone(o);
 // A small but realistic week: default branches + one activity with a counter child.
 function sampleWeek() {
   const data = defaultWeekData();
+  // A real synced week always carries node.side (syncBranchConfig backfills it on
+  // load). Set it explicitly so merges don't mutate the branches mid-test.
+  data.nodes.filter((n) => n.type === 'branch').forEach((b, i) => { b.side = i === 0 ? 'left' : 'right'; });
   const work = data.nodes.find((n) => n.id === 'work');
   work.children.push('act1');
   data.nodes.push({ id: 'act1', type: 'activity', branch: 'work', label: 'Ship it', parent: 'work', children: ['cnt1'], _ts: 1000 });

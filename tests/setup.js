@@ -381,7 +381,8 @@ render = () => {};
 applyAutoLayout = () => {};
 updateColorDots = () => {};
 updateSvgFilters = () => {};
-syncBranchConfig = () => {};
+// syncBranchConfig is pure data (reads node.side → BRANCH_CONFIG, backfills side);
+// kept real so tests exercise branch-side propagation through merges.
 updateThemeColor = () => {};
 scheduleColorsSync = () => {};
 isAtomicOpActive = () => false;
