@@ -5038,6 +5038,11 @@ let _isFirstConnection = false;   // true when this browser has never synced wit
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
 let _pollTimer = null;          // setInterval handle for 10s background metadata poll
 const POLL_INTERVAL_MS = 10_000;
+let _changesPageToken = null;   // Drive Changes API cursor (null = needs re-baseline); only used when the change-feed flag is on
+// Experimental: drain the Drive Changes API once per cycle instead of GETting
+// appProperties per file. Off by default; flip in console with
+// localStorage.setItem('zenit-week-sync-changes-feed','1') to A/B in the browser.
+function _useChangeFeed() { return localStorage.getItem('zenit-week-sync-changes-feed') === '1'; }
 let pendingRemoteMerge = null;  // { wKey, mergedData, mergedJson, mergedHash, scheduleUpload }
 let googleUserEmail = '';
 let googleUserPhoto = '';
@@ -5404,6 +5409,7 @@ async function signOut() {
   driveFileIdCache.clear();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
+  _changesPageToken = null;
   etagCache.clear();
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
   showSignedOutButton('sync.btnLabel');
@@ -6164,6 +6170,7 @@ async function forcePushAllToDrive() {
   driveFileIdCache.clear();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
+  _changesPageToken = null;
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
@@ -6392,6 +6399,86 @@ async function pollDriveMeta(wKey) {
   } catch { /* silent — next poll will retry */ }
 }
 
+// ─── Experimental: Drive Changes API poll (behind _useChangeFeed flag) ────────
+// Maps a Drive appDataFolder filename back to its sync key: a week key, 'colors',
+// or null when the file is not ours. getDriveFileId names every file
+// `zenit-week-<key>.json`, so 'colors' yields `zenit-week-colors.json`.
+function _wKeyForDriveFileName(name) {
+  const m = /^zenit-week-(.+)\.json$/.exec(name || '');
+  if (!m) return null;
+  const key = m[1];
+  if (key === 'colors') return 'colors';
+  return /^\d{4}-\d{2}$/.test(key) ? key : null;
+}
+
+// One changes.list drain per cycle replaces the per-file appProperties GETs:
+// Drive reports which appDataFolder files changed since our cursor, and the
+// payload carries appProperties so we reuse the same self-echo hash guards
+// (lastSyncedHash / lastSeenRemoteHash) without a separate content download to
+// decide. Lazily baselines the cursor on the first tick. wKey param is unused —
+// the feed names every changed file directly, so no current±1 prefetch needed.
+async function pollDriveChanges(_wKey) {
+  if (!googleAccessToken) return;
+  try {
+    if (!_changesPageToken) {
+      const startResp = await authFetch(
+        'https://www.googleapis.com/drive/v3/changes/startPageToken?supportsAllDrives=false'
+      );
+      if (startResp.status === 401) return;
+      if (!startResp.ok) return;
+      _changesPageToken = (await startResp.json()).startPageToken || null;
+      return; // baseline only — next tick drains changes since this point
+    }
+
+    let token = _changesPageToken;
+    while (token) {
+      const url = new URL('https://www.googleapis.com/drive/v3/changes');
+      url.searchParams.set('pageToken', token);
+      url.searchParams.set('spaces', 'appDataFolder');
+      url.searchParams.set('includeRemoved', 'false');
+      url.searchParams.set('fields',
+        'newStartPageToken,nextPageToken,changes(removed,fileId,file(id,name,appProperties))');
+
+      const resp = await authFetch(url.toString());
+      if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
+      if (resp.status === 404 || resp.status === 410) {
+        // Cursor expired/invalid — re-baseline and let a full reconcile catch up.
+        _changesPageToken = null;
+        await initDriveSync();
+        return;
+      }
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      for (const ch of data.changes || []) {
+        if (ch.removed) continue; // local deletion handling is out of scope (matches pollDriveMeta)
+        const k = _wKeyForDriveFileName(ch.file?.name);
+        if (!k) continue;
+        const remoteHash = ch.file?.appProperties?.contentHash;
+        if (!remoteHash) continue;
+        if (k === 'colors') {
+          // Same legacy-hash + self-echo guard as the metadata poll.
+          if (remoteHash !== colorsSyncedHash && remoteHash !== lastSeenRemoteColorsHash) {
+            await syncColorsFromDrive();
+            lastSeenRemoteColorsHash = remoteHash;
+          }
+        } else if (remoteHash !== String(lastSyncedHash.get(k)) &&
+                   remoteHash !== lastSeenRemoteHash.get(k)) {
+          // The change payload already carries the file id — seed the cache so
+          // syncWeekFromDrive skips a getDriveFileId lookup (and can't create a
+          // placeholder for a week the feed just told us exists).
+          if (ch.fileId) driveFileIdCache.set(k, ch.fileId);
+          await syncWeekFromDrive(k);
+          lastSeenRemoteHash.set(k, remoteHash);
+        }
+      }
+
+      if (data.newStartPageToken) { _changesPageToken = data.newStartPageToken; token = null; }
+      else token = data.nextPageToken || null; // paginate within this drain
+    }
+  } catch { /* silent — next poll will retry */ }
+}
+
 // Called when poll detects a resetToken mismatch — wipe local weeks and resync everything from Drive.
 async function _handleResetTokenMismatch(remoteResetToken) {
   stopDrivePoll();
@@ -6409,6 +6496,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   driveFileIdCache.clear();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
+  _changesPageToken = null;
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
@@ -6419,7 +6507,10 @@ async function _handleResetTokenMismatch(remoteResetToken) {
 
 function startDrivePoll(wKey) {
   stopDrivePoll();
-  _pollTimer = setInterval(() => pollDriveMeta(wKey), POLL_INTERVAL_MS);
+  _pollTimer = setInterval(() => {
+    if (_useChangeFeed()) pollDriveChanges(wKey);
+    else pollDriveMeta(wKey);
+  }, POLL_INTERVAL_MS);
 }
 
 function stopDrivePoll() {

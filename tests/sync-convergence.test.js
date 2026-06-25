@@ -31,7 +31,10 @@ import {
   syncWeekFromDrive,
   syncWeekToDrive,
   pollDriveMeta,
+  pollDriveChanges,
 } from './setup.js';
+
+const CHANGE_FEED_FLAG = 'zenit-week-sync-changes-feed';
 
 const GOOGLE_AUTH_STORAGE_KEY = 'zenit-week-google-auth';
 
@@ -403,5 +406,90 @@ describe('Colors sync E2E — legacy-scheme appProperty self-heals (no download 
     await pollDriveMeta('2026-01'); // subsequent polls must not re-download colors
     await pollDriveMeta('2026-01');
     expect(colorsMediaFetchCount).toBe(0);
+  });
+});
+
+// Experimental Changes-API poll (behind the zenit-week-sync-changes-feed flag).
+// One changes.list drain per cycle replaces per-file appProperties GETs. These pin
+// the contract: baseline-then-drain, react once to a reported change, suppress the
+// echo of our own uploads, and stay quiet when nothing changed.
+describe('Drive sync E2E — Changes API poll (flagged)', () => {
+  const WK = '2026-01';
+  const FILE_ID = 'file_id_2026_01';
+  const remoteMedia = sampleWeek();
+  const remoteHash = String(weekContentHash(normalizeAsPulled(remoteMedia)));
+
+  let mediaFetchCount = 0;
+  let startTokenCalls = 0;
+  let changesPayload = { newStartPageToken: '1001', changes: [] };
+
+  const server = setupServer(
+    http.post('http://localhost/api/token', () =>
+      HttpResponse.json({ access_token: 'new_access_token', expires_in: 3600 })
+    ),
+    http.get('https://www.googleapis.com/drive/v3/changes/startPageToken', () => {
+      startTokenCalls++;
+      return HttpResponse.json({ startPageToken: '1000' });
+    }),
+    http.get('https://www.googleapis.com/drive/v3/changes', () => HttpResponse.json(changesPayload)),
+    http.get('https://www.googleapis.com/drive/v3/files/:fileId', ({ params, request }) => {
+      if (params.fileId !== FILE_ID) return new HttpResponse(null, { status: 404 });
+      const url = new URL(request.url);
+      if (url.searchParams.get('alt') === 'media') {
+        mediaFetchCount++;
+        return HttpResponse.json(remoteMedia);
+      }
+      return HttpResponse.json({ id: FILE_ID, appProperties: { contentHash: remoteHash } });
+    })
+  );
+
+  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  afterAll(() => server.close());
+
+  beforeEach(async () => {
+    server.resetHandlers();
+    _state.resetSyncState();
+    _state.clearLocalStorage();
+    _state.clearIDBStore();
+    mediaFetchCount = 0;
+    startTokenCalls = 0;
+    changesPayload = { newStartPageToken: '1001', changes: [] };
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+    _state.setLocalStorage(CHANGE_FEED_FLAG, 1); // JSON.stringify(1) === '1' → flag on
+    await attemptSilentRestore();
+    _state.setDriveFileId(WK, FILE_ID);
+    await _state.saveWeekIDB(WK, clone(remoteMedia));
+  });
+  afterEach(() => { _state.resetSyncState(); });
+
+  // A change event whose appProperties carries this week file.
+  const weekChange = (hash) => ({
+    newStartPageToken: '1002',
+    changes: [{ removed: false, fileId: FILE_ID, file: { id: FILE_ID, name: `zenit-week-${WK}.json`, appProperties: { contentHash: hash } } }],
+  });
+
+  test('first tick only baselines the cursor — no changes processed, no download', async () => {
+    await pollDriveChanges(WK);
+    expect(startTokenCalls).toBe(1);
+    expect(mediaFetchCount).toBe(0);
+  });
+
+  test('a reported change with a new hash downloads once; an empty drain stays quiet', async () => {
+    await pollDriveChanges(WK);          // baseline
+    changesPayload = weekChange(remoteHash + '_remote'); // a genuinely different remote hash
+    await pollDriveChanges(WK);          // drains the change → one download
+    expect(mediaFetchCount).toBe(1);
+    changesPayload = { newStartPageToken: '1003', changes: [] }; // nothing new
+    await pollDriveChanges(WK);
+    await pollDriveChanges(WK);
+    expect(mediaFetchCount).toBe(1);     // no further downloads
+  });
+
+  test('own-upload echo is suppressed (remote hash == lastSyncedHash)', async () => {
+    await pollDriveChanges(WK);          // baseline
+    _state.setLastSyncedHash(WK, remoteHash); // simulate: we just uploaded this content
+    changesPayload = weekChange(remoteHash);  // Drive echoes our own write back
+    await pollDriveChanges(WK);
+    expect(mediaFetchCount).toBe(0);     // recognised as our own content — no re-download
   });
 });

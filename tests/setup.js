@@ -70,6 +70,8 @@ function elementStub() {
 // window.addEventListener is stubbed so the 'load' callback never fires.
 const sandbox = {
   crypto: globalThis.crypto,
+  URL: globalThis.URL,
+  URLSearchParams: globalThis.URLSearchParams,
   fetch: (url, options) => {
     const finalUrl = (typeof url === 'string' && url.startsWith('/'))
       ? `http://localhost${url}`
@@ -458,6 +460,7 @@ _state.resetSyncState = function() {
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  _changesPageToken = null;
   _undoRedoForcePush = new Set();
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
 };
@@ -640,6 +643,7 @@ export const {
   syncWeekFromDrive,
   syncWeekToDrive,
   pollDriveMeta,
+  pollDriveChanges,
   silentRefresh,
   exchangeToken,
   _state,
