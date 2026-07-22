@@ -3740,6 +3740,7 @@
           </span>
         </div>
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.multipleDaysA">Multiple days: </span><strong data-i18n="help.multipleDaysKey">(mo, we, fr)</strong><span data-i18n="help.multipleDaysB"> — spaces or commas both work.</span></div>
+        <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.rangeDaysA">Range: </span><strong data-i18n="help.rangeDaysKey">(mo-we)</strong><span data-i18n="help.rangeDaysB"> — expands to Mon, Tue, Wed.</span></div>
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.everyDayA">Every day: type </span><strong data-i18n="help.everyDayKey">(daily)</strong><span data-i18n="help.everyDayB"> and it expands to all 7 days.</span></div>
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.relativeDayA">Relative: </span><strong data-i18n="help.relativeDayKey">(today)</strong><span data-i18n="help.relativeDayMid"> or </span><strong data-i18n="help.relativeDayKey2">(tomorrow)</strong><span data-i18n="help.relativeDayB"> — frozen to the actual weekday when you save.</span></div>
         <div class="help-row" style="display:block; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.nowDayA">Right now: </span><strong data-i18n="help.nowDayKey">(now)</strong><span data-i18n="help.nowDayB"> — like (today), and pins the item to the top of today's agenda.</span></div>
@@ -4704,23 +4705,57 @@ const DAY_FULL_NAMES = {
   cs: { 0:'Neděle', 1:'Pondělí', 2:'Úterý', 3:'Středa', 4:'Čtvrtek', 5:'Pátek', 6:'Sobota' },
 };
 
+// Expands an ISO-week day-range token ("mo-we") into an array of weekday
+// indices in Mon→Sun order, inclusive. Returns null if the token is not a
+// well-formed "<day>-<day>" pair of known day abbrs. Wraps around the week
+// end, so "fr-mo" yields Fri, Sat, Sun, Mon.
+function expandDayRange(tok) {
+  const parts = tok.split('-');
+  if (parts.length !== 2) return null;
+  const [a, b] = parts;
+  if (!(a in SCHED_TOKEN_MAP) || !(b in SCHED_TOKEN_MAP)) return null;
+  const endPos = isoWeekPos(SCHED_TOKEN_MAP[b]);
+  const out = [];
+  let pos = isoWeekPos(SCHED_TOKEN_MAP[a]);
+  while (true) {
+    out.push(pos === 7 ? 0 : pos); // ISO pos 7 (Sun) → weekday index 0
+    if (pos === endPos) break;
+    pos = pos === 7 ? 1 : pos + 1;
+  }
+  return out;
+}
+
+// Parses a single (…) group's inner text into a Set of weekday indices (0–6),
+// or null when the group is not a valid day pattern. A group is valid when it
+// is the daily indicator, or every token is a known day abbr or an ISO-week
+// range ("mo-we"). Any unknown token disqualifies the whole group.
+function parseDayGroup(inner) {
+  // Collapse whitespace around a range dash so "mo - we" == "mo-we".
+  const tokens = inner.trim().replace(/\s*-\s*/g, '-').split(/[\s,]+/).map(tok => tok.toLowerCase()).filter(Boolean);
+  if (tokens.length === 0) return null;
+  if (tokens.length === 1 && SCHED_DAILY_TOKENS.has(tokens[0])) {
+    const all = new Set();
+    for (let d = 0; d <= 6; d++) all.add(d);
+    return all;
+  }
+  const days = new Set();
+  for (const tok of tokens) {
+    if (tok in SCHED_TOKEN_MAP) { days.add(SCHED_TOKEN_MAP[tok]); continue; }
+    const range = expandDayRange(tok);
+    if (!range) return null;
+    range.forEach(d => days.add(d));
+  }
+  return days;
+}
+
 // Returns the Set of weekday indices (0–6) declared in a label's (…) groups.
-// A group is recognised when every token is a known day abbr, or it's a daily indicator.
 function parseTodoDays(label) {
   const days = new Set();
   const groups = label.match(/\(([^)]+)\)/g);
   if (!groups) return days;
   groups.forEach(group => {
-    const inner = group.slice(1, -1).trim();
-    const tokens = inner.split(/[\s,]+/).map(tok => tok.toLowerCase()).filter(Boolean);
-    if (tokens.length === 0) return;
-    if (tokens.length === 1 && SCHED_DAILY_TOKENS.has(tokens[0])) {
-      for (let d = 0; d <= 6; d++) days.add(d);
-      return;
-    }
-    if (tokens.every(tok => tok in SCHED_TOKEN_MAP)) {
-      tokens.forEach(tok => days.add(SCHED_TOKEN_MAP[tok]));
-    }
+    const parsed = parseDayGroup(group.slice(1, -1));
+    if (parsed) parsed.forEach(d => days.add(d));
   });
   return days;
 }
@@ -4888,12 +4923,8 @@ function restoreToAgendaOrder(nodeId) {
 // Non-day groups like "(v3)" are preserved.
 function stripDayGroups(label) {
   return label.replace(/\s*\([^)]+\)/g, match => {
-    const inner = match.slice(match.indexOf('(') + 1, -1).trim();
-    const tokens = inner.split(/[\s,]+/).map(t => t.toLowerCase()).filter(Boolean);
-    if (!tokens.length) return match;
-    if (tokens.length === 1 && SCHED_DAILY_TOKENS.has(tokens[0])) return '';
-    if (tokens.every(t => t in SCHED_TOKEN_MAP)) return '';
-    return match;
+    const inner = match.slice(match.indexOf('(') + 1, -1);
+    return parseDayGroup(inner) ? '' : match;
   }).trim();
 }
 
@@ -6773,6 +6804,9 @@ const TRANSLATIONS = {
     'help.multipleDaysA':         'Multiple days: ',
     'help.multipleDaysKey':       '(mo, we, fr)',
     'help.multipleDaysB':         ' — spaces or commas both work.',
+    'help.rangeDaysA':            'Range: ',
+    'help.rangeDaysKey':          '(mo-we)',
+    'help.rangeDaysB':            ' — expands to Mon, Tue, Wed.',
     'help.everyDayA':             'Every day: type ',
     'help.everyDayKey':           '(daily)',
     'help.everyDayB':             ' and it expands to all 7 days.',
@@ -7005,6 +7039,9 @@ const TRANSLATIONS = {
     'help.multipleDaysA':         'Více dní: ',
     'help.multipleDaysKey':       '(po, st, pá)',
     'help.multipleDaysB':         ' — mezery i čárky fungují.',
+    'help.rangeDaysA':            'Rozsah: ',
+    'help.rangeDaysKey':          '(po-st)',
+    'help.rangeDaysB':            ' — rozbalí se na po, út, st.',
     'help.everyDayA':             'Každý den: napište ',
     'help.everyDayKey':           '(denně)',
     'help.everyDayB':             ' a rozšíří se na všech 7 dnů.',
