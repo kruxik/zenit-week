@@ -10275,18 +10275,19 @@ function syncStatusUp(nodeId, prop) {
   if (siblings.length === 0) return;
   const allTrue = siblings.every(s => s[prop]);
 
-  if (parent[prop] !== allTrue) {
-    if (parent.type !== 'branch') {
-      parent[prop] = allTrue;
-      touchNode(parent.id);
-      if (prop === 'done') {
-        if (allTrue) { parent.doneAt = new Date().toISOString(); parent.donedOn = localDateStr(); }
-        else { delete parent.doneAt; delete parent.donedOn; }
-        updateNodeUI(parent.id);
-      } else if (prop === 'unplanned') {
-        if (allTrue) parent.unplannedAt = new Date().toISOString();
-        else delete parent.unplannedAt;
-      }
+  // Branch nodes participate too: a branch whose activities are all done is
+  // itself done. Coerce with !! so nodes that never carried the flag (branches
+  // are created without done/unplanned) don't count as a change on first sync.
+  if (!!parent[prop] !== allTrue) {
+    parent[prop] = allTrue;
+    touchNode(parent.id);
+    if (prop === 'done') {
+      if (allTrue) { parent.doneAt = new Date().toISOString(); parent.donedOn = localDateStr(); }
+      else { delete parent.doneAt; delete parent.donedOn; }
+      updateNodeUI(parent.id);
+    } else if (prop === 'unplanned') {
+      if (allTrue) parent.unplannedAt = new Date().toISOString();
+      else delete parent.unplannedAt;
     }
     syncStatusUp(parent.id, prop);
   }

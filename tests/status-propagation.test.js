@@ -270,3 +270,81 @@ describe('fix #7 – any child becomes planned → parent loses unplannedAt', ()
     expect(findNode('a1').unplannedAt).toBeUndefined();
   });
 });
+
+// ─── Branch nodes participate in status propagation ──────────────────────────
+
+describe('branch done propagation', () => {
+  test('branch becomes done when all its activities are done', () => {
+    const b  = mkBranch('work', ['a1', 'a2']);
+    const a1 = mkActivity('a1', 'work', 'work', { done: true, doneAt: 'ts' });
+    const a2 = mkActivity('a2', 'work', 'work', { done: false });
+    setUp([b, a1, a2]);
+
+    setStatus('a2', 'done');
+
+    expect(findNode('work').done).toBe(true);
+    expect(findNode('work').doneAt).toBeDefined();
+  });
+
+  test('branch reverts to undone when a child is undone again', () => {
+    const b  = mkBranch('work', ['a1', 'a2']);
+    const a1 = mkActivity('a1', 'work', 'work', { done: true, doneAt: 'ts' });
+    const a2 = mkActivity('a2', 'work', 'work', { done: true, doneAt: 'ts' });
+    setUp([b, a1, a2]);
+    syncStatusUp('a1', 'done');
+    expect(findNode('work').done).toBe(true);
+
+    setStatus('a2', 'undone');
+
+    expect(findNode('work').done).toBe(false);
+    expect(findNode('work').doneAt).toBeUndefined();
+  });
+
+  test('done rolls up through a nested subtree to the branch', () => {
+    const b  = mkBranch('work', ['a1']);
+    const a1 = mkActivity('a1', 'work', 'work', { done: false, children: ['a2'] });
+    const a2 = mkActivity('a2', 'a1',   'work', { done: false });
+    setUp([b, a1, a2]);
+
+    setStatus('a2', 'done');
+
+    expect(findNode('a1').done).toBe(true);
+    expect(findNode('work').done).toBe(true);
+  });
+
+  test('a counter reaching max marks its branch done', () => {
+    const b  = mkBranch('work', ['a1']);
+    const a1 = mkActivity('a1', 'work', 'work', { done: false, children: ['c1'] });
+    const c1 = mkCounter('c1', 'a1', 'work', 3, 3);
+    setUp([b, a1, c1]);
+
+    syncStatusUp('c1', 'done');
+
+    expect(findNode('a1').done).toBe(true);
+    expect(findNode('work').done).toBe(true);
+  });
+
+  test('an empty branch never becomes done', () => {
+    const b   = mkBranch('work', ['a1']);
+    const b2  = mkBranch('me', []);
+    const a1  = mkActivity('a1', 'work', 'work', { done: false });
+    setUp([b, b2, a1]);
+
+    setStatus('a1', 'done');
+
+    expect(findNode('work').done).toBe(true);
+    expect(findNode('me').done).toBeUndefined();
+  });
+
+  test('unplanned rolls up to the branch too', () => {
+    const b  = mkBranch('work', ['a1', 'a2']);
+    const a1 = mkActivity('a1', 'work', 'work', { unplanned: true, unplannedAt: 'ts' });
+    const a2 = mkActivity('a2', 'work', 'work', { unplanned: false });
+    setUp([b, a1, a2]);
+
+    setStatus('a2', 'unplanned');
+
+    expect(findNode('work').unplanned).toBe(true);
+    expect(findNode('work').unplannedAt).toBeDefined();
+  });
+});
