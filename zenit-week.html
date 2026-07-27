@@ -4394,6 +4394,35 @@ function takeSnapshot() {
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
 
+// Record which node ids an operation just placed in the next week, on the
+// snapshot that the next undo will restore. Called after the fact because
+// takeSnapshot runs before the operation knows what it will create.
+//
+// The target is always the top of the undo stack: operations that took their own
+// snapshot pushed it moments ago, and those running with takeSnap:false (an add
+// that relocates itself to next week) belong to the snapshot the add pushed.
+// Additions accumulate, so one undo reverses the whole add-then-move.
+function _noteNextWeekAdditions(nextWeekKey, addedIds) {
+  if (!addedIds?.length || undoStack.length === 0) return;
+  const i = undoStack.length - 1;
+  let snap;
+  try { snap = JSON.parse(undoStack[i]); } catch { return; }
+  if (snap.nextWeekKey !== nextWeekKey) return;
+  snap.nextWeekAdded = [...new Set([...(snap.nextWeekAdded || []), ...addedIds])];
+  undoStack[i] = JSON.stringify(snap);
+}
+
+// Carry an operation's next-week additions onto the counter-snapshot pushed to
+// the opposite stack, so redo re-inserts exactly what undo removed (and back).
+function _withNextWeekAdded(rawSnapshot, addedIds) {
+  if (!addedIds?.length) return rawSnapshot;
+  try {
+    const s = JSON.parse(rawSnapshot);
+    s.nextWeekAdded = [...addedIds];
+    return JSON.stringify(s);
+  } catch { return rawSnapshot; }
+}
+
 async function _applySnapshot(raw) {
   const snapshot = JSON.parse(raw);
   // Undo/redo must NOT move the user to another week. The snapshot's data is
@@ -4436,36 +4465,94 @@ async function _applySnapshot(raw) {
   });
 
   // ── Next week ─────────────────────────────────────────────────────────────
-  // Only rewrite the next week when the snapshot's version actually differs from
-  // what's on disk. Most undos (single-week edits, transfers) never touch the
-  // next week — rewriting it would force-push (skipping the merge) and could
-  // clobber a concurrent next-week edit from another device. When it DID change
-  // (e.g. undoing a moveNodeToNextWeek), force-push + tombstone the dropped nodes.
+  // Reverse only what this operation did to the next week, node by node.
+  //
+  // This used to restore the snapshot's whole copy of the next week and tombstone
+  // every live node missing from it. That is not "undo one transfer" — it rolls
+  // the entire week back to whatever it looked like when the snapshot was taken
+  // and permanently destroys everything added since, from any device. When the
+  // snapshot predated the week existing at all, "roll back" meant "empty it":
+  // one undo replaced a populated week with zero nodes and a list of tombstones.
+  //
+  // moveNodeToNextWeek now records the ids it placed there (see
+  // _noteNextWeekAdditions), and only those ids are touched. The rule is
+  // symmetric, so the same code serves undo and redo: for each recorded id, make
+  // the live record agree with this snapshot — drop it if the snapshot lacks it,
+  // re-insert it from the snapshot if the snapshot has it. Every other node in
+  // that week is left exactly as it is.
   let restoredNext = null;
   let nextWritten = false;
-  if (snapshot.nextWeekKey) {
+  const nextAdded = Array.isArray(snapshot.nextWeekAdded) ? snapshot.nextWeekAdded : [];
+  if (snapshot.nextWeekKey && nextAdded.length) {
     await withWeekLock(snapshot.nextWeekKey, async () => {
-      const liveNextRecord = (await loadWeekIDB(snapshot.nextWeekKey)) || null;
-      const liveNextNodes = liveNextRecord?.nodes || [];
-      const nothingToRestore = snapshot.nextWeekRaw === null && liveNextNodes.length === 0;
-      if (nothingToRestore) return;
-      restoredNext = snapshot.nextWeekRaw === null
-        ? { nodes: [], tombstones: [] }
-        : JSON.parse(snapshot.nextWeekRaw);
-      if (!Array.isArray(restoredNext.tombstones)) restoredNext.tombstones = [];
-      if (!Array.isArray(restoredNext.nodes)) restoredNext.nodes = [];
-      for (const n of restoredNext.nodes) n._ts = tsNow;
-      _preserveRemoteNodes(restoredNext, liveNextNodes, _remoteOriginIds.get(snapshot.nextWeekKey));
-      // Compared after preserving: if carrying the remote nodes across makes the
-      // restore identical to what is already stored, there is nothing to write.
-      const liveSig = liveNextRecord ? _weekContentSig(liveNextRecord) : null;
-      if (_weekContentSig(restoredNext) !== liveSig) {
-        _tombstoneRemovedNodes(restoredNext, liveNextNodes);
-        restoredNext.savedAt = Date.now();
-        restoredNext.crdtVersion = (restoredNext.crdtVersion || 0) + 1;
+      const liveNext = (await loadWeekIDB(snapshot.nextWeekKey)) || { nodes: [], tombstones: [] };
+      if (!Array.isArray(liveNext.nodes)) liveNext.nodes = [];
+      if (!Array.isArray(liveNext.tombstones)) liveNext.tombstones = [];
+      const beforeSig = _weekContentSig(liveNext);
+
+      let snapNext = { nodes: [] };
+      if (snapshot.nextWeekRaw) {
+        try { snapNext = JSON.parse(snapshot.nextWeekRaw); } catch { snapNext = { nodes: [] }; }
+      }
+      const snapById = new Map((snapNext.nodes || []).map(n => [n.id, n]));
+      let liveById = new Map(liveNext.nodes.map(n => [n.id, n]));
+
+      // Drop the ids this operation added that the snapshot does not have.
+      const toDrop = new Set(nextAdded.filter(id => !snapById.has(id) && liveById.has(id)));
+      // A bridging container that still holds children the operation did not add
+      // must stay — removing it would orphan a later transfer's work. Repeat
+      // until stable so reprieving a container also reprieves its ancestors.
+      for (let changed = true; changed; ) {
+        changed = false;
+        for (const id of [...toDrop]) {
+          const n = liveById.get(id);
+          if ((n.children || []).some(c => liveById.has(c) && !toDrop.has(c))) {
+            toDrop.delete(id);
+            changed = true;
+          }
+        }
+      }
+      if (toDrop.size) {
+        liveNext.nodes = liveNext.nodes.filter(n => !toDrop.has(n.id));
+        liveNext.nodes.forEach(n => {
+          if (Array.isArray(n.children)) n.children = n.children.filter(c => !toDrop.has(c));
+        });
+        for (const id of toDrop) {
+          if (!liveNext.tombstones.includes(id)) liveNext.tombstones.push(id);
+        }
+        liveById = new Map(liveNext.nodes.map(n => [n.id, n]));
+      }
+
+      // Re-insert the ids this operation added that the snapshot does have (redo).
+      // Iterated so a container lands before the children hanging off it.
+      const toAdd = nextAdded.filter(id => snapById.has(id) && !liveById.has(id));
+      for (let progress = true; progress; ) {
+        progress = false;
+        for (const id of toAdd) {
+          if (liveById.has(id)) continue;
+          const src = snapById.get(id);
+          const parent = liveById.get(src.parent);
+          if (!parent) continue; // parent not placed yet, or gone for good
+          const copy = { ...src, _ts: tsNow };
+          copy.children = (src.children || []).filter(c => snapById.has(c));
+          liveNext.nodes.push(copy);
+          liveById.set(id, copy);
+          if (!Array.isArray(parent.children)) parent.children = [];
+          if (!parent.children.includes(id)) parent.children.push(id);
+          // Clear the tombstone the matching undo wrote, or this node dies again
+          // on the next merge.
+          liveNext.tombstones = liveNext.tombstones.filter(t => t !== id);
+          progress = true;
+        }
+      }
+
+      if (_weekContentSig(liveNext) !== beforeSig) {
+        liveNext.savedAt = Date.now();
+        liveNext.crdtVersion = (liveNext.crdtVersion || 0) + 1;
         _undoRedoForcePush.add(snapshot.nextWeekKey);
-        await saveWeekIDB(snapshot.nextWeekKey, restoredNext);
+        await saveWeekIDB(snapshot.nextWeekKey, liveNext);
         scheduleDriveSync(snapshot.nextWeekKey);
+        restoredNext = liveNext;
         nextWritten = true;
       }
     });
@@ -4537,8 +4624,9 @@ async function _currentSnapshot(wk = currentWeekKey) {
 async function undo() {
   if (undoStack.length === 0) return;
   const raw = undoStack.pop();
-  const wk = JSON.parse(raw).weekKey || currentWeekKey;
-  redoStack.push(await _currentSnapshot(wk));
+  const snap = JSON.parse(raw);
+  const wk = snap.weekKey || currentWeekKey;
+  redoStack.push(_withNextWeekAdded(await _currentSnapshot(wk), snap.nextWeekAdded));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -4546,8 +4634,9 @@ async function undo() {
 async function redo() {
   if (redoStack.length === 0) return;
   const raw = redoStack.pop();
-  const wk = JSON.parse(raw).weekKey || currentWeekKey;
-  undoStack.push(await _currentSnapshot(wk));
+  const snap = JSON.parse(raw);
+  const wk = snap.weekKey || currentWeekKey;
+  undoStack.push(_withNextWeekAdded(await _currentSnapshot(wk), snap.nextWeekAdded));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -8112,6 +8201,9 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
     // 3. Build oldToNew map; create missing ancestor shells in next week
     const oldToNew = new Map();
     oldToNew.set(branchId, branchId);
+    // Everything this move creates in the destination, so undo can reverse
+    // exactly this move instead of rolling the whole week back.
+    const addedIds = [];
 
     ancestorChain.forEach(ancestor => {
       const destParentId = oldToNew.get(ancestor.parent) || ancestor.parent;
@@ -8136,6 +8228,7 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
         nextData.nodes.push(shell);
         nextById.set(ancestor.id, shell);
         oldToNew.set(ancestor.id, ancestor.id);
+        addedIds.push(ancestor.id);
         const shellParentInNext = nextById.get(shell.parent);
         if (shellParentInNext && !shellParentInNext.children.includes(ancestor.id)) {
           shellParentInNext.children.push(ancestor.id);
@@ -8160,6 +8253,7 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
       };
       nextData.nodes.push(newNode);
       nextById.set(newId, newNode);
+      addedIds.push(newId);
     });
 
     // Wire node into its parent in next week
@@ -8196,7 +8290,7 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
     }
 
     await saveWeek(nextKey, nextData);
-    return { subtreeIds, originalParentId: live.parent, tickChild: !!live.tickChild };
+    return { subtreeIds, originalParentId: live.parent, tickChild: !!live.tickChild, addedIds };
   });
 
   // Destination write never happened — leave the source week exactly as it was.
@@ -8205,7 +8299,8 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
     return;
   }
 
-  const { subtreeIds, originalParentId, tickChild } = placed;
+  const { subtreeIds, originalParentId, tickChild, addedIds } = placed;
+  _noteNextWeekAdditions(nextKey, addedIds);
 
   // 5. Remove subtree from current week. Safe only here: the destination copy is
   //    committed, so these tombstones can never outlive their replacement.
