@@ -5616,6 +5616,7 @@ async function signOut() {
   _isFirstConnection = false;
   if (window.gapi?.client) gapi.client.setToken(null);
   driveFileIdCache.clear();
+  _driveFileMissSince.clear();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
   _changesPageToken = null;
@@ -5959,7 +5960,12 @@ function _flushPendingSync() {
 }
 
 // ─── TASK-11: Load week data from Drive ───────────────────────────────────────
-async function syncWeekFromDrive(wKey) {
+// force:true skips the If-None-Match header. The ETag cache is a bandwidth
+// optimisation for polling, where a 304 correctly means "nothing new". It is the
+// wrong answer immediately before an upload: that pull exists to guarantee we
+// merge the true current remote before overwriting it, and a conditional request
+// answers from what we last saw rather than from what is there now.
+async function syncWeekFromDrive(wKey, { force = false } = {}) {
   if (!googleAccessToken) return;
   if (_undoRedoForcePush.has(wKey)) return;
 
@@ -5977,7 +5983,7 @@ async function syncWeekFromDrive(wKey) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const fetchHeaders = {};
-      const etag = etagCache.get(wKey);
+      const etag = force ? null : etagCache.get(wKey);
       if (etag) fetchHeaders['If-None-Match'] = etag;
 
       const resp = await authFetch(
@@ -6051,6 +6057,42 @@ async function driveApiRequest(config) {
       throw err;
     }
   }
+}
+
+// Lookup-only counterpart to getDriveFileId: returns the file id if the week
+// already exists in Drive, or null. Never creates a file, so it is safe to call
+// speculatively from the poll.
+//
+// Rate-limited per key: a week that has no Drive file yet would otherwise cost a
+// search request every 10s forever. A negative result is retried at most once
+// every RETRY_MS; a positive one populates driveFileIdCache and never repeats.
+const _driveFileMissSince = new Map();
+const _DRIVE_LOOKUP_RETRY_MS = 5 * 60 * 1000;
+async function findDriveFileId(wKey) {
+  if (driveFileIdCache.has(wKey)) return driveFileIdCache.get(wKey);
+  const lastMiss = _driveFileMissSince.get(wKey);
+  if (lastMiss && Date.now() - lastMiss < _DRIVE_LOOKUP_RETRY_MS) return null;
+  try {
+    const resp = await driveApiRequest({
+      path: 'https://www.googleapis.com/drive/v3/files',
+      method: 'GET',
+      params: {
+        spaces: 'appDataFolder',
+        q: `name = 'zenit-week-${wKey}.json'`,
+        fields: 'files(id)',
+      },
+    });
+    const id = resp.result?.files?.[0]?.id ?? null;
+    if (id) {
+      driveFileIdCache.set(wKey, id);
+      _driveFileMissSince.delete(wKey);
+      return id;
+    }
+  } catch (err) {
+    console.warn(`[Drive] findDriveFileId(${wKey}) failed:`, err);
+  }
+  _driveFileMissSince.set(wKey, Date.now());
+  return null;
 }
 
 // Returns Drive file ID for a week key, creating the file if absent
@@ -6320,8 +6362,9 @@ async function syncWeekToDrive(wKey) {
     lastSyncedHash.delete(wKey);
   } else {
     // Pull-merge-push: fetch Drive content first, CRDT-merge, then upload.
-    // This ensures we never overwrite concurrent changes from another device.
-    await syncWeekFromDrive(wKey);
+    // This ensures we never overwrite concurrent changes from another device —
+    // which only holds if the pull is unconditional (see syncWeekFromDrive).
+    await syncWeekFromDrive(wKey, { force: true });
   }
 
   // Re-read local after merge (syncWeekFromDrive may have updated it)
@@ -6401,6 +6444,7 @@ async function forcePushAllToDrive() {
 
   stopDrivePoll();
   driveFileIdCache.clear();
+  _driveFileMissSince.clear();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
   _changesPageToken = null;
@@ -6604,10 +6648,15 @@ async function pollDriveMeta(wKey) {
     // Week file hash check for the current week ±1. At week boundaries the user
     // works with two weeks intensively (prev+current early week, current+next
     // late week); keeping the neighbours fresh in IDB means switching weeks shows
-    // up-to-date data immediately instead of stale-until-next-poll. Cache-only
-    // file-id lookup never creates files, so non-existent neighbours cost nothing.
+    // up-to-date data immediately instead of stale-until-next-poll.
+    //
+    // This used to read driveFileIdCache directly and skip anything absent, so a
+    // week another device had created but this one had never fetched stayed
+    // invisible until the next sign-in. findDriveFileId looks it up without
+    // creating anything, and rate-limits misses so a genuinely non-existent
+    // neighbour doesn't cost a request every cycle.
     for (const k of [offsetWeek(wKey, -1), wKey, offsetWeek(wKey, 1)]) {
-      const fileId = driveFileIdCache.get(k);
+      const fileId = await findDriveFileId(k);
       if (!fileId) continue;
       const resp = await authFetch(
         `https://www.googleapis.com/drive/v3/files/${fileId}?fields=appProperties`
@@ -6717,24 +6766,52 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   stopDrivePoll();
   // Adopt the remote reset token so we don't loop
   localStorage.setItem('zenit-week-reset-token', remoteResetToken);
-  // Wipe all user-data keys — keep only auth state and the new reset token
-  const AUTH_KEYS = new Set([GOOGLE_AUTH_STORAGE_KEY, 'zenit-week-migrated', 'zenit-week-reset-token']);
+  // Wipe all user-data keys — keep only auth state, the new reset token, and the
+  // storage-migration marker (wiping that re-runs a migration that has nothing
+  // left to migrate). The key name here used to be 'zenit-week-migrated', which
+  // matches nothing, so the marker was wiped on every reset.
+  const KEEP_KEYS = new Set([
+    GOOGLE_AUTH_STORAGE_KEY,
+    'zenit-week-storage-migrated',
+    'zenit-week-reset-token',
+  ]);
   const keysToWipe = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key?.startsWith('zenit-week-') && !AUTH_KEYS.has(key)) keysToWipe.push(key);
+    if (key?.startsWith('zenit-week-') && !KEEP_KEYS.has(key)) keysToWipe.push(key);
   }
   keysToWipe.forEach(k => localStorage.removeItem(k));
+  // Week records and the settings blob live in IndexedDB. Wiping only
+  // localStorage left every week in place, so a reset triggered from another
+  // device silently did nothing — initDriveSync then merged the "reset" Drive
+  // content back into the data the reset was meant to discard.
+  try {
+    for (const wk of await listWeekKeysIDB()) await deleteWeekIDB(wk);
+    await deleteValueIDB(COLORS_STORAGE_KEY);
+    await deleteValueIDB('zenit-week-import-pending');
+  } catch (e) {
+    console.error('[Drive] reset: failed to clear local IndexedDB:', e);
+  }
   // Clear sync caches so initDriveSync fetches fresh
   driveFileIdCache.clear();
+  _driveFileMissSince.clear();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
   _changesPageToken = null;
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  _remoteOriginIds.clear();
+  // The undo stack describes data that no longer exists; replaying it would
+  // write the discarded content straight back.
+  undoStack = [];
+  redoStack = [];
+  if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
   setSyncStatus('syncing', 'sync.msg.resyncing');
   await initDriveSync();
+  // Re-read the displayed week: it was just deleted and re-fetched underneath us,
+  // so the in-memory copy still holds the discarded data.
+  await loadAndRender(currentWeekKey);
   startDrivePoll(currentWeekKey);
 }
 
@@ -7492,7 +7569,19 @@ function validateAndRepair(data) {
   }
   roots.forEach(rid => collect(rid, null));
 
-  // 4. Garbage collection: remove unreachable nodes
+  // 4. Garbage collection: remove unreachable nodes.
+  // This is the last place a node can leave the data with no tombstone and no
+  // trace — a merge cannot tell the result from "never existed". Dropping a node
+  // here always means something upstream wired it wrongly, so say so loudly:
+  // silence is what let a broken cross-week copy look like a clean delete.
+  const dropped = data.nodes.filter(n => !reachable.has(n.id));
+  if (dropped.length) {
+    console.warn(
+      `[zenit-week] validateAndRepair: dropped ${dropped.length} unreachable node(s) —` +
+      ' not reachable from any branch, so they were removed without a tombstone.',
+      dropped.map(n => ({ id: n.id, type: n.type, label: n.label, parent: n.parent }))
+    );
+  }
   data.nodes = data.nodes.filter(n => reachable.has(n.id));
 
   // 5. Sort tick-children and day-children in their parent's children array

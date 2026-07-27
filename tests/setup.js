@@ -224,18 +224,18 @@ silentRefresh = async function(token) {
 };
 
 const _origSyncWeekFromDrive = syncWeekFromDrive;
-syncWeekFromDrive = async function(wk) {
-  return _origSyncWeekFromDrive(wk);
+syncWeekFromDrive = async function(...args) {
+  return _origSyncWeekFromDrive(...args);
 };
 
 const _origSyncWeekToDrive = syncWeekToDrive;
-syncWeekToDrive = async function(wk) {
-  return _origSyncWeekToDrive(wk);
+syncWeekToDrive = async function(...args) {
+  return _origSyncWeekToDrive(...args);
 };
 
 const _origPollDriveMeta = pollDriveMeta;
-pollDriveMeta = async function(wk) {
-  return _origPollDriveMeta(wk);
+pollDriveMeta = async function(...args) {
+  return _origPollDriveMeta(...args);
 };
 
 const _origMergeWeekData = mergeWeekData;
@@ -468,6 +468,10 @@ _state.setUndoRedoForcePush = function(v) {
   _undoRedoForcePush = (v == null) ? new Set() : (v instanceof Set ? v : new Set([v]));
 };
 _state.getAccessToken = () => googleAccessToken;
+_state.setAccessToken = (t) => { googleAccessToken = t; };
+_state.takeSnapshot = function() { return takeSnapshot(); };
+_state.handleResetTokenMismatch = function(tok) { return _handleResetTokenMismatch(tok); };
+_state.getDriveFileMissKeys = function() { return [..._driveFileMissSince.keys()]; };
 _state.useRealIDB = function(v) {
   _useMockIDB = !v;
   _db = null;
