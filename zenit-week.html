@@ -4063,22 +4063,26 @@ async function onPeerWeekSaved(msg) {
   // Cheap convergence dedup: identical content signature means already merged.
   // This guard also terminates any A→B→A re-broadcast echo.
   if (msg.sig && msg.sig === _weekContentSig(weekData)) return;
-  const remoteData = await loadWeekIDB(wk);
-  if (!remoteData) return;
-  const mergedData = mergeWeekData(structuredClone(weekData), remoteData);
-  const mergedJson = JSON.stringify(mergedData);
-  const mergedHash = weekContentHash(mergedData);
-  // scheduleUpload === "the merge produced content the peer's record lacked",
-  // so peers (and Drive) must learn about it; false === fully converged.
-  const scheduleUpload = mergedHash !== weekContentHash(remoteData);
-  // Cue only when the merge visibly changes the current week AND applies now
-  // (applyRemoteMerge defers under the same condition while an edit is open, so
-  // we don't announce a change the user can't yet see). showToast replaces, so
-  // rapid peer saves refresh one short toast rather than stacking.
-  const willChange = _weekContentSig(mergedData) !== _weekContentSig(weekData);
-  const willDefer = isAtomicOpActive() || hasEditingNode();
-  await applyRemoteMerge(wk, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
-  if (willChange && !willDefer) showToast(t('multitab.updated'), 2500);
+  // Same read-merge-write critical section as the Drive pull path.
+  const outcome = await withWeekLock(wk, async () => {
+    const remoteData = await loadWeekIDB(wk);
+    if (!remoteData) return null;
+    const mergedData = mergeWeekData(structuredClone(weekData), remoteData);
+    const mergedJson = JSON.stringify(mergedData);
+    const mergedHash = weekContentHash(mergedData);
+    // scheduleUpload === "the merge produced content the peer's record lacked",
+    // so peers (and Drive) must learn about it; false === fully converged.
+    const scheduleUpload = mergedHash !== weekContentHash(remoteData);
+    // Cue only when the merge visibly changes the current week AND applies now
+    // (applyRemoteMerge defers under the same condition while an edit is open, so
+    // we don't announce a change the user can't yet see). showToast replaces, so
+    // rapid peer saves refresh one short toast rather than stacking.
+    const willChange = _weekContentSig(mergedData) !== _weekContentSig(weekData);
+    const willDefer = isAtomicOpActive() || hasEditingNode();
+    await applyRemoteMerge(wk, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
+    return { willChange, willDefer };
+  });
+  if (outcome?.willChange && !outcome.willDefer) showToast(t('multitab.updated'), 2500);
 }
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
@@ -4144,6 +4148,31 @@ async function saveWeekIDB(wk, data) {
       reject(err);
     }
   });
+}
+
+// ─── Per-week write lock ──────────────────────────────────────────────────────
+// A week record is a single blob that several independent flows read, mutate and
+// write back: cross-week transfers, Drive pull-merges, peer-tab merges and
+// undo/redo restores. Every one of them yields (IndexedDB, network) between its
+// read and its write, so without serialization the last writer silently drops
+// everything the others committed in between — and a transfer that lost its
+// destination write has already tombstoned the node in the source week, making
+// the loss permanent and unmergeable.
+//
+// Locks are keyed by week key and NOT re-entrant: never call withWeekLock for a
+// key already held further up the same call chain. Held sections must therefore
+// stay leaf-level — they may call saveWeek/scheduleDriveSync (which only queue
+// work) but must not call syncWeekToDrive/syncWeekFromDrive.
+const _weekLocks = new Map();
+function withWeekLock(wk, fn) {
+  const prev = _weekLocks.get(wk) || Promise.resolve();
+  const run = prev.then(fn, fn);
+  // Chain on a swallowed copy so one rejection doesn't poison later waiters,
+  // and drop the entry once this is the tail to keep the map from growing.
+  const tail = run.catch(() => {});
+  _weekLocks.set(wk, tail);
+  tail.then(() => { if (_weekLocks.get(wk) === tail) _weekLocks.delete(wk); });
+  return run;
 }
 
 async function listWeekKeysIDB() {
@@ -4342,13 +4371,15 @@ async function _applySnapshot(raw) {
   // ── Primary week (where the action happened) ──────────────────────────────
   // Bump _ts so the next Drive merge (LWW by _ts) keeps the restored values,
   // tombstone nodes the restore drops, and force-push (block pull-before-push).
-  const livePrimaryNodes = (primaryKey === viewWeek && weekData?.nodes)
-    ? weekData.nodes.slice()
-    : (((await loadWeekIDB(primaryKey)) || {}).nodes || []);
-  for (const n of restoredPrimary.nodes) n._ts = tsNow;
-  _tombstoneRemovedNodes(restoredPrimary, livePrimaryNodes);
-  _undoRedoForcePush.add(primaryKey);
-  await saveWeek(primaryKey, restoredPrimary);
+  await withWeekLock(primaryKey, async () => {
+    const livePrimaryNodes = (primaryKey === viewWeek && weekData?.nodes)
+      ? weekData.nodes.slice()
+      : (((await loadWeekIDB(primaryKey)) || {}).nodes || []);
+    for (const n of restoredPrimary.nodes) n._ts = tsNow;
+    _tombstoneRemovedNodes(restoredPrimary, livePrimaryNodes);
+    _undoRedoForcePush.add(primaryKey);
+    await saveWeek(primaryKey, restoredPrimary);
+  });
 
   // ── Next week ─────────────────────────────────────────────────────────────
   // Only rewrite the next week when the snapshot's version actually differs from
@@ -4359,10 +4390,11 @@ async function _applySnapshot(raw) {
   let restoredNext = null;
   let nextWritten = false;
   if (snapshot.nextWeekKey) {
-    const liveNextRecord = (await loadWeekIDB(snapshot.nextWeekKey)) || null;
-    const liveNextNodes = liveNextRecord?.nodes || [];
-    const nothingToRestore = snapshot.nextWeekRaw === null && liveNextNodes.length === 0;
-    if (!nothingToRestore) {
+    await withWeekLock(snapshot.nextWeekKey, async () => {
+      const liveNextRecord = (await loadWeekIDB(snapshot.nextWeekKey)) || null;
+      const liveNextNodes = liveNextRecord?.nodes || [];
+      const nothingToRestore = snapshot.nextWeekRaw === null && liveNextNodes.length === 0;
+      if (nothingToRestore) return;
       restoredNext = snapshot.nextWeekRaw === null
         ? { nodes: [], tombstones: [] }
         : JSON.parse(snapshot.nextWeekRaw);
@@ -4379,7 +4411,7 @@ async function _applySnapshot(raw) {
         scheduleDriveSync(snapshot.nextWeekKey);
         nextWritten = true;
       }
-    }
+    });
   }
 
   // Restore theme if snapshot captured it
@@ -5737,19 +5769,21 @@ async function _flushPendingMerge() {
   if (!pendingRemoteMerge) return;
   const { wKey, remoteData } = pendingRemoteMerge;
   pendingRemoteMerge = null;
-  // For the displayed week, weekData is freshest — saveWeek writes IDB async
-  // and is not awaited by all callers, so the disk can lag in-memory state.
-  // Reading IDB here would lose any node added to weekData since the last
-  // completed write (e.g. the follow-up node from a chained commitEdit).
-  // Other weeks aren't held in memory; IDB is authoritative for them.
-  const localData = (wKey === currentWeekKey)
-    ? structuredClone(weekData)
-    : (await loadWeekIDB(wKey)) || { nodes: [] };
-  const mergedData = mergeWeekData(localData, remoteData);
-  const mergedJson = JSON.stringify(mergedData);
-  const mergedHash = weekContentHash(mergedData);
-  const scheduleUpload = mergedHash !== weekContentHash(remoteData);
-  await _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+  await withWeekLock(wKey, async () => {
+    // For the displayed week, weekData is freshest — saveWeek writes IDB async
+    // and is not awaited by all callers, so the disk can lag in-memory state.
+    // Reading IDB here would lose any node added to weekData since the last
+    // completed write (e.g. the follow-up node from a chained commitEdit).
+    // Other weeks aren't held in memory; IDB is authoritative for them.
+    const localData = (wKey === currentWeekKey)
+      ? structuredClone(weekData)
+      : (await loadWeekIDB(wKey)) || { nodes: [] };
+    const mergedData = mergeWeekData(localData, remoteData);
+    const mergedJson = JSON.stringify(mergedData);
+    const mergedHash = weekContentHash(mergedData);
+    const scheduleUpload = mergedHash !== weekContentHash(remoteData);
+    await _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+  });
 }
 
 function beginAtomicOp() {
@@ -5821,19 +5855,23 @@ async function syncWeekFromDrive(wKey) {
       const remoteJson = (await resp.text()).trim();
       if (!remoteJson) return; // empty file — nothing to merge
 
-      // CRDT merge: per-node LWW by _ts, union tombstones
-      const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
       const parsedRemote = migrateCrdt(JSON.parse(remoteJson));
       // Skip merge on a malformed remote rather than letting validateAndRepair
       // substitute defaultWeekData() (which would inject fresh default branches).
       if (!parsedRemote || !Array.isArray(parsedRemote.nodes)) return;
       const remoteData = validateAndRepair(parsedRemote);
-      const mergedData = mergeWeekData(localData, remoteData);
-      const mergedJson = JSON.stringify(mergedData);
-      const mergedHash = weekContentHash(mergedData);
-      const scheduleUpload = mergedHash !== weekContentHash(remoteData);
 
-      await applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
+      // CRDT merge: per-node LWW by _ts, union tombstones. Read-merge-write is
+      // one critical section — a transfer or peer merge committing between the
+      // read and the write would be silently overwritten by the merge result.
+      await withWeekLock(wKey, async () => {
+        const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
+        const mergedData = mergeWeekData(localData, remoteData);
+        const mergedJson = JSON.stringify(mergedData);
+        const mergedHash = weekContentHash(mergedData);
+        const scheduleUpload = mergedHash !== weekContentHash(remoteData);
+        await applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
+      });
       return;
 
     } catch (err) {
@@ -5967,16 +6005,16 @@ async function initDriveSync() {
     const driveWeeks = await listAllDriveWeekFiles();
     const driveMap = new Map(driveWeeks.map(({ wKey, savedAt, contentHash }) => [wKey, { savedAt, contentHash }]));
 
-    // Step 2 — local content hashes (zero API calls)
+    // Step 2 — local content hashes (zero API calls). Week records live in
+    // IndexedDB; the localStorage copies are deleted by runMigrationIfNeeded, so
+    // scanning localStorage here yielded an empty map — which silently disabled
+    // the local-only → upload branch below and stranded whole weeks (typically a
+    // future week populated by a transfer) on one device forever.
     const localMap = new Map();
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      const m = key?.match(/^zenit-week-(\d{4}-\d{2})$/);
-      if (!m) continue;
-      const raw = localStorage.getItem(key);
-      let lh = null;
-      if (raw) { try { lh = weekContentHash(JSON.parse(raw)); } catch { lh = fnv1a32(raw); } }
-      localMap.set(m[1], lh);
+    for (const wKey of await listWeekKeysIDB()) {
+      if (!/^\d{4}-\d{2}$/.test(wKey)) continue;
+      const data = await loadWeekIDB(wKey);
+      localMap.set(wKey, data ? weekContentHash(data) : null);
     }
 
     // Step 3 — classify every week
@@ -7965,94 +8003,144 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
   if (takeSnap) takeSnapshot();
 
   const nextKey = offsetWeek(currentWeekKey, +1);
-  const nextData = await loadWeek(nextKey);
-  const nextById = new Map(nextData.nodes.map(n => [n.id, n]));
 
-  // 1. Ensure the branch exists in next week (same id)
-  const branchId = node.branch;
-  if (!nextById.has(branchId)) {
-    const branchNode = findNode(branchId);
-    if (branchNode) {
-      // Neutral _ts (like a default branch) so this structurally-created branch
-      // never LWW-overrides a genuinely-edited branch label/color on another device.
-      const branchCopy = { ...branchNode, children: [], _ts: 0 };
-      nextData.nodes.push(branchCopy);
-      nextById.set(branchId, branchCopy);
-    }
-  }
+  // Steps 1–4 build the destination copy and run under the next-week lock, which
+  // re-reads the record from storage *inside* the lock. Concurrent transfers,
+  // Drive pull-merges and peer-tab merges write the same record; reading it
+  // before them and writing after would drop everything they committed. The
+  // source week is stripped only once this write has resolved (step 5 onward) —
+  // a failed destination write must never leave the node tombstoned here and
+  // absent there.
+  const placed = await withWeekLock(nextKey, async () => {
+    // Re-resolve under the lock: a queued transfer may have moved it already.
+    const live = findNode(nodeId);
+    if (!live || live.type !== 'activity') return null;
 
-  // 2. Collect activity ancestors between branch and node (top-down order)
-  const ancestorChain = [];
-  let cur = findNode(node.parent);
-  while (cur && cur.type === 'activity') {
-    ancestorChain.unshift(cur);
-    cur = findNode(cur.parent);
-  }
+    const nextData = await loadWeek(nextKey);
+    const nextById = new Map(nextData.nodes.map(n => [n.id, n]));
 
-  // 3. Build oldToNew map; create missing ancestor shells in next week
-  const oldToNew = new Map();
-  oldToNew.set(branchId, branchId);
-
-  ancestorChain.forEach(ancestor => {
-    const destParentId = oldToNew.get(ancestor.parent) || ancestor.parent;
-    const existing = findReuseTarget(ancestor, nextData.nodes, destParentId, findNode);
-    if (existing) {
-      oldToNew.set(ancestor.id, existing.id);
-    } else {
-      // A bridging shell only exists to hold the moved node in the new week — it
-      // must not inherit the source week's completion/priority bookkeeping.
-      const shell = {
-        ...ancestor,
-        id: ancestor.id,
-        children: [],
-        parent: destParentId,
-        done: false,
-        unplanned: false,
-        _ts: Date.now(),
-      };
-      delete shell.doneAt;
-      delete shell.unplannedAt;
-      delete shell.reusable;
-      nextData.nodes.push(shell);
-      nextById.set(ancestor.id, shell);
-      oldToNew.set(ancestor.id, ancestor.id);
-      const parentInNext = nextById.get(shell.parent);
-      if (parentInNext && !parentInNext.children.includes(ancestor.id)) {
-        parentInNext.children.push(ancestor.id);
+    // 1. Ensure the branch exists in next week (same id)
+    const branchId = live.branch;
+    if (!nextById.has(branchId)) {
+      const branchNode = findNode(branchId);
+      if (branchNode) {
+        // Neutral _ts (like a default branch) so this structurally-created branch
+        // never LWW-overrides a genuinely-edited branch label/color on another device.
+        const branchCopy = { ...branchNode, children: [], _ts: 0 };
+        nextData.nodes.push(branchCopy);
+        nextById.set(branchId, branchCopy);
       }
     }
+
+    // 2. Collect activity ancestors between branch and node (top-down order)
+    const ancestorChain = [];
+    let cur = findNode(live.parent);
+    while (cur && cur.type === 'activity') {
+      ancestorChain.unshift(cur);
+      cur = findNode(cur.parent);
+    }
+
+    // 3. Build oldToNew map; create missing ancestor shells in next week
+    const oldToNew = new Map();
+    oldToNew.set(branchId, branchId);
+
+    ancestorChain.forEach(ancestor => {
+      const destParentId = oldToNew.get(ancestor.parent) || ancestor.parent;
+      const existing = findReuseTarget(ancestor, nextData.nodes, destParentId, findNode);
+      if (existing) {
+        oldToNew.set(ancestor.id, existing.id);
+      } else {
+        // A bridging shell only exists to hold the moved node in the new week — it
+        // must not inherit the source week's completion/priority bookkeeping.
+        const shell = {
+          ...ancestor,
+          id: ancestor.id,
+          children: [],
+          parent: destParentId,
+          done: false,
+          unplanned: false,
+          _ts: Date.now(),
+        };
+        delete shell.doneAt;
+        delete shell.unplannedAt;
+        delete shell.reusable;
+        nextData.nodes.push(shell);
+        nextById.set(ancestor.id, shell);
+        oldToNew.set(ancestor.id, ancestor.id);
+        const shellParentInNext = nextById.get(shell.parent);
+        if (shellParentInNext && !shellParentInNext.children.includes(ancestor.id)) {
+          shellParentInNext.children.push(ancestor.id);
+        }
+      }
+    });
+
+    // 4. Assign new ids to full subtree (node + descendants)
+    const subtreeIds = [nodeId, ...getDescendantIds(nodeId)];
+    const subtreeNodes = subtreeIds.map(id => findNode(id)).filter(Boolean);
+    subtreeNodes.forEach(n => oldToNew.set(n.id, genId()));
+
+    // Copy subtree into nextData with wired parent/children
+    subtreeNodes.forEach(n => {
+      const newId = oldToNew.get(n.id);
+      const newNode = {
+        ...n,
+        id: newId,
+        parent: oldToNew.get(n.parent) || n.parent,
+        children: n.children.map(cid => oldToNew.get(cid)).filter(Boolean),
+        _ts: Date.now(),
+      };
+      nextData.nodes.push(newNode);
+      nextById.set(newId, newNode);
+    });
+
+    // Wire node into its parent in next week
+    const nodeParentIdInNext = oldToNew.get(live.parent) || live.parent;
+    const parentInNext = nextById.get(nodeParentIdInNext);
+    const nodeNewId = oldToNew.get(nodeId);
+    // No destination parent means the copy would sit outside every branch's
+    // children chain — validateAndRepair GCs unreachable nodes on the next load,
+    // so committing it and then tombstoning the source would destroy the node.
+    // Abort with the source week untouched instead.
+    if (!parentInNext) {
+      console.error('[zenit-week] moveNodeToNextWeek: no destination parent for', nodeId, '— move aborted');
+      return null;
+    }
+    if (!parentInNext.children.includes(nodeNewId)) {
+      parentInNext.children.push(nodeNewId);
+    }
+
+    // 4b. Renumber the destination's tick-children so indices stay contiguous
+    //     (1..N). The source side is renumbered after removal, in step 7.
+    if (live.tickChild) {
+      const nextTicks = (parentInNext.children || [])
+        .map(cid => nextById.get(cid))
+        .filter(n => n?.tickChild)
+        .sort((a, b) => (a.tickIndex || 0) - (b.tickIndex || 0));
+      nextTicks.forEach((t, i) => {
+        const newIdx = i + 1;
+        if (t.tickIndex !== newIdx) {
+          t.tickIndex = newIdx;
+          t.label = String(newIdx);
+          t._ts = Date.now();
+        }
+      });
+    }
+
+    await saveWeek(nextKey, nextData);
+    return { subtreeIds, originalParentId: live.parent, tickChild: !!live.tickChild };
   });
 
-  // 4. Assign new ids to full subtree (node + descendants)
-  const subtreeIds = [nodeId, ...getDescendantIds(nodeId)];
-  const subtreeNodes = subtreeIds.map(id => findNode(id)).filter(Boolean);
-  subtreeNodes.forEach(n => oldToNew.set(n.id, genId()));
-
-  // Copy subtree into nextData with wired parent/children
-  subtreeNodes.forEach(n => {
-    const newId = oldToNew.get(n.id);
-    const newNode = {
-      ...n,
-      id: newId,
-      parent: oldToNew.get(n.parent) || n.parent,
-      children: n.children.map(cid => oldToNew.get(cid)).filter(Boolean),
-      _ts: Date.now(),
-    };
-    nextData.nodes.push(newNode);
-    nextById.set(newId, newNode);
-  });
-
-  // Wire node into its parent in next week
-  const nodeParentIdInNext = oldToNew.get(node.parent) || node.parent;
-  const parentInNext = nextById.get(nodeParentIdInNext);
-  const nodeNewId = oldToNew.get(nodeId);
-  if (parentInNext && !parentInNext.children.includes(nodeNewId)) {
-    parentInNext.children.push(nodeNewId);
+  // Destination write never happened — leave the source week exactly as it was.
+  if (!placed) {
+    endAtomicOp();
+    return;
   }
 
-  // 5. Remove subtree from current week
+  const { subtreeIds, originalParentId, tickChild } = placed;
+
+  // 5. Remove subtree from current week. Safe only here: the destination copy is
+  //    committed, so these tombstones can never outlive their replacement.
   const toRemove = new Set(subtreeIds);
-  const originalParentId = node.parent;
   const originalParent = findNode(originalParentId);
   if (originalParent) {
     originalParent.children = originalParent.children.filter(c => !toRemove.has(c));
@@ -8093,28 +8181,11 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
     syncStatusUp(pruneTarget.children[0], 'unplanned');
   }
 
-  // 7. If a tick-child was moved, renumber surviving ticks on both sides so
-  //    indices stay contiguous (1..N) in each week.
-  if (node.tickChild) {
-    if (findNode(originalParentId)) renumberTickChildren(originalParentId);
-    const nextParent = nextById.get(nodeParentIdInNext);
-    if (nextParent) {
-      const nextTicks = (nextParent.children || [])
-        .map(cid => nextById.get(cid))
-        .filter(n => n?.tickChild)
-        .sort((a, b) => (a.tickIndex || 0) - (b.tickIndex || 0));
-      nextTicks.forEach((t, i) => {
-        const newIdx = i + 1;
-        if (t.tickIndex !== newIdx) {
-          t.tickIndex = newIdx;
-          t.label = String(newIdx);
-          t._ts = Date.now();
-        }
-      });
-    }
-  }
+  // 7. If a tick-child was moved, renumber the surviving ticks on this side so
+  //    indices stay contiguous (1..N). The destination side was renumbered in
+  //    step 4b, inside the lock.
+  if (tickChild && findNode(originalParentId)) renumberTickChildren(originalParentId);
 
-  await saveWeek(nextKey, nextData);
   await saveWeek(currentWeekKey, weekData);
   endAtomicOp();
   renderIfVisible();

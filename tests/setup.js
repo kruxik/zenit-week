@@ -596,6 +596,7 @@ export const {
   // CRDT & Sync
   mergeWeekData,
   migrateCrdt,
+  withWeekLock,
   // Multi-tab (Option B) — local sync peer
   _weekContentSig,
   hasEditingNode,
