@@ -502,6 +502,25 @@ _state.setDriveFileId = function(wk, id) {
 _state.setLastSyncedHash = function(wk, hash) {
   lastSyncedHash.set(wk, hash);
 };
+// Viewport vars are module-level \`let\`s; tests that convert client → world
+// coordinates need to pin them (zoom defaults to 0.6).
+_state.setViewport = function({ panX: px = 0, panY: py = 0, zoom: z = 1 } = {}) {
+  panX = px; panY = py; zoom = z;
+};
+// dragState is a module-level \`let\`, so it is invisible on the sandbox object.
+// Expose a setter so drag/drop tests can stage a drag without real pointer events.
+_state.setDragState = function(patch) {
+  dragState = {
+    activeNodeId: null,
+    startX: 0, startY: 0,
+    rectLeft: 0, rectTop: 0,
+    cursorStartWorldX: 0, cursorStartWorldY: 0,
+    initialPositions: {},
+    layoutPositions: {},
+    descendantSet: new Set(),
+    ...patch,
+  };
+};
 
 // Initialize app state
 currentLang = 'en';
@@ -603,6 +622,8 @@ export const {
   _weekContentSig,
   hasEditingNode,
   applyRemoteMerge,
+  // Drag & drop
+  handleNodeDrop,
   // Transfers
   transferUnfinished,
   moveNodeToNextWeek,

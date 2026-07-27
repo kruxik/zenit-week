@@ -14865,7 +14865,14 @@ function handleNodeDrop(mouseX, mouseY) {
     // Set new parent
     const newParent = findNode(targetParentId);
     node.parent = targetParentId;
-    node.branch = newParent.branch || newParent.id;
+    const newBranch = newParent.branch || newParent.id;
+    node.branch = newBranch;
+    // Rebinding across branches must repaint the whole subtree: colors, summary
+    // stats and CFD filters all read each node's own `branch`, not its parent's.
+    getDescendantIds(nodeId).forEach(cid => {
+      const c = findNode(cid);
+      if (c && c.branch !== newBranch) { c.branch = newBranch; touchNode(cid); }
+    });
     delete node.inbox; // promote from inbox to permanent map node
     newParent.children.push(nodeId);
     touchNode(targetParentId);
