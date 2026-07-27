@@ -248,45 +248,15 @@ applyRemoteMerge = function(w, d, j, h, s, r) {
   return _origApplyRemoteMerge(w, d, j, h, s, r);
 };
 
-// Sync overrides for tests because existing tests are synchronous
-loadWeek = function(wk) {
-  const raw = localStorage.getItem('zenit-week-' + wk);
-  if (raw) {
-    try {
-      const data = JSON.parse(raw);
-      return migrateCrdt(validateAndRepair(migrateDayCounters(data)));
-    } catch(e) {}
-  }
-  const prevWk = offsetWeek(wk, -1);
-  const prevRaw = localStorage.getItem('zenit-week-' + prevWk);
-  if (prevRaw) {
-    try {
-      const prevData = JSON.parse(prevRaw);
-      const prevBranches = (prevData.nodes || []).filter(n => n.type === 'branch');
-      if (prevBranches.length > 0) {
-        prevBranches.forEach(b => {
-          if (!BRANCH_COLORS[b.id]) {
-            BRANCH_COLORS[b.id] = deriveBranchPalette((BRANCH_COLORS[b.id] || {}).main || pickBranchColor());
-          }
-        });
-        const newWeek = { nodes: prevBranches.map(b => ({ ...b, children: [] })) };
-        if (prevData.baseline) newWeek.baseline = prevData.baseline;
-        return newWeek;
-      }
-    } catch(e) {}
-  }
-  return defaultWeekData();
-};
-
-saveWeek = function(wk, data) {
-  data.savedAt = Date.now();
-  data.crdtVersion = (data.crdtVersion || 0) + 1;
-  if (!Array.isArray(data.tombstones)) data.tombstones = [];
-  localStorage.setItem('zenit-week-' + wk, JSON.stringify(data));
-};
-
 // Mock IDB functions by default to keep existing tests synchronous and stable.
-// persistence.test.js will opt-out of this by setting _state.useRealIDB(true).
+// Opt out with _state.useRealIDB(true) — required for anything testing the
+// async read-modify-write behaviour of week records, since the synchronous
+// localStorage stand-ins below make those look atomic.
+//
+// The _real* captures MUST come before any override: capturing them afterwards
+// meant useRealIDB(true) restored the IDB primitives but left loadWeek/saveWeek
+// pointing at the localStorage stand-ins, so "real IDB" tests still wrote to
+// localStorage. The overrides are applied by the updateIDBMethods() call below.
 let _useMockIDB = true;
 
 const _realOpenDB = openDB;
@@ -409,6 +379,7 @@ _state.getNextWeekRawCache = function() { return _nextWeekRawCache; };
 _state.setNextWeekRawCache = function(v) { _nextWeekRawCache = v; };
 _state.refreshNextWeekCache = function() { return refreshNextWeekCache(); };
 _state.moveNodeToNextWeek = function(id) { return moveNodeToNextWeek(id); };
+_state.withWeekLock = function(wk, fn) { return withWeekLock(wk, fn); };
 _state.loadAndRender = function(wk) { return loadAndRender(wk); };
 _state.setLang   = function(l) { 
   currentLang = l; 
