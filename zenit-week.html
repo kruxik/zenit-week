@@ -4067,7 +4067,9 @@ async function onPeerWeekSaved(msg) {
   const outcome = await withWeekLock(wk, async () => {
     const remoteData = await loadWeekIDB(wk);
     if (!remoteData) return null;
-    const mergedData = mergeWeekData(structuredClone(weekData), remoteData);
+    const localData = structuredClone(weekData);
+    const mergedData = mergeWeekData(localData, remoteData);
+    _recordRemoteArrivals(wk, localData, mergedData);
     const mergedJson = JSON.stringify(mergedData);
     const mergedHash = weekContentHash(mergedData);
     // scheduleUpload === "the merge produced content the peer's record lacked",
@@ -4310,6 +4312,55 @@ function _tombstoneRemovedNodes(data, liveNodes) {
   }
 }
 
+// weekKey → ids that a merge pulled in from elsewhere (Drive or a peer tab) and
+// that were not in the local record beforehand. Session-scoped, never persisted:
+// it exists only so undo/redo can tell "content the local user just created"
+// apart from "content another device sent us".
+const _remoteOriginIds = new Map();
+
+function _recordRemoteArrivals(wKey, localData, mergedData) {
+  const before = new Set((localData?.nodes || []).map(n => n.id));
+  let set = _remoteOriginIds.get(wKey);
+  for (const n of (mergedData?.nodes || [])) {
+    if (before.has(n.id)) continue;
+    if (!set) { set = new Set(); _remoteOriginIds.set(wKey, set); }
+    set.add(n.id);
+  }
+}
+
+// An undo snapshot is a picture of one week taken before a *local* edit. Nodes
+// another device sent us since then are not part of what the user is undoing:
+// dropping them deletes a peer's work, and _tombstoneRemovedNodes would then
+// make that deletion permanent on every device. Carry them across the restore so
+// they survive and stay un-tombstoned. Nodes the local edit created are still
+// removed and tombstoned, so a later pull cannot resurrect them.
+//
+// Reattachment is best-effort and iterated so whole subtrees come along; a node
+// whose parent the undo genuinely removed cannot be placed and is left to the
+// normal tombstone path.
+function _preserveRemoteNodes(data, liveNodes, protectedIds) {
+  if (!data || !protectedIds || protectedIds.size === 0) return;
+  const byId = new Map((data.nodes || []).map(n => [n.id, n]));
+  const liveById = new Map(liveNodes.map(n => [n.id, n]));
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const id of protectedIds) {
+      if (byId.has(id)) continue;
+      const live = liveById.get(id);
+      if (!live || live.type === 'branch') continue;
+      const parent = byId.get(live.parent);
+      if (!parent) continue; // parent not restored (yet) — retry on the next pass
+      const copy = { ...live };
+      data.nodes.push(copy);
+      byId.set(id, copy);
+      if (!Array.isArray(parent.children)) parent.children = [];
+      if (!parent.children.includes(id)) parent.children.push(id);
+      progress = true;
+    }
+  }
+}
+
 let nodeMap = new Map();
 
 function rebuildNodeMap() {
@@ -4375,7 +4426,10 @@ async function _applySnapshot(raw) {
     const livePrimaryNodes = (primaryKey === viewWeek && weekData?.nodes)
       ? weekData.nodes.slice()
       : (((await loadWeekIDB(primaryKey)) || {}).nodes || []);
+    // Bump _ts first so only the snapshot's own nodes win the next LWW merge —
+    // preserved remote nodes keep the timestamp their originating device gave them.
     for (const n of restoredPrimary.nodes) n._ts = tsNow;
+    _preserveRemoteNodes(restoredPrimary, livePrimaryNodes, _remoteOriginIds.get(primaryKey));
     _tombstoneRemovedNodes(restoredPrimary, livePrimaryNodes);
     _undoRedoForcePush.add(primaryKey);
     await saveWeek(primaryKey, restoredPrimary);
@@ -4400,10 +4454,13 @@ async function _applySnapshot(raw) {
         : JSON.parse(snapshot.nextWeekRaw);
       if (!Array.isArray(restoredNext.tombstones)) restoredNext.tombstones = [];
       if (!Array.isArray(restoredNext.nodes)) restoredNext.nodes = [];
+      for (const n of restoredNext.nodes) n._ts = tsNow;
+      _preserveRemoteNodes(restoredNext, liveNextNodes, _remoteOriginIds.get(snapshot.nextWeekKey));
+      // Compared after preserving: if carrying the remote nodes across makes the
+      // restore identical to what is already stored, there is nothing to write.
       const liveSig = liveNextRecord ? _weekContentSig(liveNextRecord) : null;
       if (_weekContentSig(restoredNext) !== liveSig) {
         _tombstoneRemovedNodes(restoredNext, liveNextNodes);
-        for (const n of restoredNext.nodes) n._ts = tsNow;
         restoredNext.savedAt = Date.now();
         restoredNext.crdtVersion = (restoredNext.crdtVersion || 0) + 1;
         _undoRedoForcePush.add(snapshot.nextWeekKey);
@@ -5365,7 +5422,7 @@ async function onTokensReceived(accessToken) {
     // Token renewal: GAPI already initialized, just update the token
     if (window.gapi?.client) gapi.client.setToken({ access_token: googleAccessToken });
     // If an import happened while signed out, force-push on token renewal
-    if (localStorage.getItem('zenit-week-import-pending')) forcePushAllToDrive();
+    isImportPending().then(pending => { if (pending) forcePushAllToDrive(); });
   }
 }
 
@@ -5779,6 +5836,7 @@ async function _flushPendingMerge() {
       ? structuredClone(weekData)
       : (await loadWeekIDB(wKey)) || { nodes: [] };
     const mergedData = mergeWeekData(localData, remoteData);
+    _recordRemoteArrivals(wKey, localData, mergedData);
     const mergedJson = JSON.stringify(mergedData);
     const mergedHash = weekContentHash(mergedData);
     const scheduleUpload = mergedHash !== weekContentHash(remoteData);
@@ -5867,6 +5925,7 @@ async function syncWeekFromDrive(wKey) {
       await withWeekLock(wKey, async () => {
         const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
         const mergedData = mergeWeekData(localData, remoteData);
+        _recordRemoteArrivals(wKey, localData, mergedData);
         const mergedJson = JSON.stringify(mergedData);
         const mergedHash = weekContentHash(mergedData);
         const scheduleUpload = mergedHash !== weekContentHash(remoteData);
@@ -5992,7 +6051,7 @@ async function listAllDriveWeekFiles() {
 //   Step 4b — process rest sorted by proximity to today, 5 concurrent
 async function initDriveSync() {
   // If an import is pending, bypass normal reconciliation — local is source of truth
-  if (localStorage.getItem('zenit-week-import-pending')) {
+  if (await isImportPending()) {
     await forcePushAllToDrive();
     return;
   }
@@ -6233,6 +6292,16 @@ async function _uploadColorsToDrive(resetToken) {
     }
   }
   return false;
+}
+
+// The import-pending flag lives in IndexedDB — importAllData writes it with
+// saveValueIDB and forcePushAllToDrive clears it with deleteValueIDB. Every
+// reader used to call localStorage.getItem, which always returned null, so an
+// import never triggered the force-push that makes local data authoritative on
+// Drive: the imported weeks were then merged against whatever Drive already held.
+async function isImportPending() {
+  try { return !!(await loadValueIDB('zenit-week-import-pending')); }
+  catch { return false; }
 }
 
 // Force-push all local weeks to Drive without pulling first.
@@ -14937,7 +15006,7 @@ async function loadAndRender(wk) {
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
   if (googleAccessToken) {
-    if (localStorage.getItem('zenit-week-import-pending')) {
+    if (await isImportPending()) {
       forcePushAllToDrive();
     } else {
       startDrivePoll(wk);
@@ -15004,18 +15073,24 @@ document.getElementById('sync-btn').addEventListener('click', () => { startSignI
   });
 })();
 
+// Upload every week with a pending debounce, not just the displayed one. A
+// transfer queues the *next* week too, and nothing else ever uploads a week the
+// user isn't looking at — dropping it here strands that week on this device.
+function flushAllPendingSyncToDrive() {
+  if (!googleAccessToken) return;
+  const pendingWeeks = new Set([...syncDebounceTimers.keys(), currentWeekKey]);
+  clearAllSyncDebounceTimers();
+  if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
+  pendingWeeks.forEach(wk => syncWeekToDrive(wk));
+  syncColorsToDrive();
+}
+
 // Flush pending sync when tab hides; pull + restart poll on tab restore
 document.addEventListener('visibilitychange', () => {
   if (!googleAccessToken) return;
   if (document.visibilityState === 'hidden') {
     stopDrivePoll();
-    // Flush every week with a pending debounce, not just the current one — a
-    // move/transfer may have left the next week queued.
-    const pendingWeeks = new Set([...syncDebounceTimers.keys(), currentWeekKey]);
-    clearAllSyncDebounceTimers();
-    if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
-    pendingWeeks.forEach(wk => syncWeekToDrive(wk));
-    syncColorsToDrive();
+    flushAllPendingSyncToDrive();
   } else {
     syncWeekFromDrive(currentWeekKey); // pull before next edit
     syncColorsFromDrive();
@@ -15023,13 +15098,16 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Secondary best-effort flush on tab close (desktop only; not relied upon as sole mechanism)
-window.addEventListener('beforeunload', () => {
+// Secondary best-effort flush on tab close. Both events are wired because
+// neither is universally reliable: beforeunload is skipped on mobile, pagehide
+// is the one iOS actually fires when the app is backgrounded or swiped away.
+// Re-running the flush is harmless — syncWeekToDrive no-ops on an unchanged hash.
+function _flushOnTeardown() {
   stopDrivePoll();
-  if (!googleAccessToken) return;
-  syncWeekToDrive(currentWeekKey);
-  syncColorsToDrive();
-});
+  flushAllPendingSyncToDrive();
+}
+window.addEventListener('beforeunload', _flushOnTeardown);
+window.addEventListener('pagehide', _flushOnTeardown);
 
 // ─── Generic Confirm Dialog ───────────────────────────────────────────────────
 (function() {

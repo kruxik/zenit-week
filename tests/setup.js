@@ -463,9 +463,36 @@ _state.resetSyncState = function() {
   lastSeenRemoteColorsHash = null;
   _changesPageToken = null;
   _undoRedoForcePush = new Set();
+  _remoteOriginIds.clear();
+  clearAllSyncDebounceTimers();
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
 };
 _state.getUndoRedoForcePush = function() { return _undoRedoForcePush; };
+_state.recordRemoteArrivals = function(wk, local, merged) { _recordRemoteArrivals(wk, local, merged); };
+_state.getRemoteOriginIds = function(wk) { return _remoteOriginIds.get(wk) || null; };
+_state.clearRemoteOriginIds = function() { _remoteOriginIds.clear(); };
+_state.isImportPending = function() { return isImportPending(); };
+_state.flushAllPendingSyncToDrive = function() { return flushAllPendingSyncToDrive(); };
+_state.getSyncDebounceTimerKeys = function() { return [...syncDebounceTimers.keys()]; };
+_state.setSyncDebounceTimer = function(wk) {
+  syncDebounceTimers.set(wk, setTimeout(() => {}, 60000));
+};
+// Run fn with a signed-in token and syncWeekToDrive/syncColorsToDrive replaced
+// by recorders, so teardown-flush tests can assert which weeks were pushed.
+_state.withStubbedUploads = async function(collector, fn) {
+  const prevToken = googleAccessToken;
+  const prevWeek = syncWeekToDrive;
+  const prevColors = syncColorsToDrive;
+  googleAccessToken = 'test-token';
+  syncWeekToDrive = async (wk) => { collector.push(wk); };
+  syncColorsToDrive = async () => {};
+  try { return await fn(); }
+  finally {
+    googleAccessToken = prevToken;
+    syncWeekToDrive = prevWeek;
+    syncColorsToDrive = prevColors;
+  }
+};
 _state.setUndoRedoForcePush = function(v) {
   _undoRedoForcePush = (v == null) ? new Set() : (v instanceof Set ? v : new Set([v]));
 };
