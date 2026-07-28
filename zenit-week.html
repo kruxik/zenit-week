@@ -4,14 +4,23 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="
   default-src  'none';
-  script-src   'self' 'unsafe-inline' https://apis.google.com https://vercel.live;
+  script-src   'self'
+               'sha256-S898NuOveUJcNiHnB0IzK+tNkwBpCZyFVgp/8bYT15w='
+               'sha256-Y+82jK1htj+LRGINk8nVHvUIpfKyEkBhaHi3JjWCgi8='
+               'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
+               'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
+               'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
+               'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
+               'sha256-9tucHLwTG6wYQuCB/Yh8w8SvFMadcZ561Q09ufjKj0o='
+               'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo='
+               https://apis.google.com;
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
   style-src    'unsafe-inline';
   manifest-src 'self' data:;
   base-uri     'none';
   object-src   'none';
-  frame-src    https://content.googleapis.com https://vercel.live;
+  frame-src    https://content.googleapis.com;
   form-action  'none';
 ">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
