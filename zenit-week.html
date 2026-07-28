@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-yjmDzukWRS5VPYGIAqSZ2zgrQ+BjR/EkWnE7Rr8Gu30='
+               'sha256-eV+XfKDzRbhggYA0rCaXtv/7TJ+SE2U9ij+VcAVBvNQ='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo='
                https://apis.google.com;
   connect-src  'self' https://*.googleapis.com;
@@ -5440,6 +5440,9 @@ function purgeLegacyRefreshToken() {
   // Never migrated: the record grants nothing anymore. Drop it and revoke the
   // credential via the proxy so it can't outlive the app on Google's side.
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+  // Transitional — the proxy retires revoke_legacy on 2026-11-01 (410 from then
+  // on, swallowed here). Delete this call after that date; the removeItem above
+  // is the part that must stay.
   exchangeToken({ grant_type: 'revoke_legacy', refresh_token: legacy }).catch(() => {});
 }
 

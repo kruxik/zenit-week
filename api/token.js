@@ -12,6 +12,14 @@ const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 const REFRESH_COOKIE = 'zw_rt';
 const COOKIE_MAX_AGE = 180 * 24 * 60 * 60; // 180 days
 
+// revoke_legacy is transitional: it relays a caller-supplied token to Google
+// with no session of its own, so it is an open (if harmless) relay. It stays
+// only long enough for stragglers to open the app once after the cookie
+// change (2026-07-28). Past this date it answers 410 and the whole action —
+// plus purgeLegacyRefreshToken()'s network call in zenit-week.html — should
+// be deleted outright.
+const LEGACY_REVOKE_SUNSET = Date.parse('2026-11-01T00:00:00Z');
+
 function readCookie(req, name) {
   const header = req.headers.cookie;
   if (!header) return null;
@@ -67,6 +75,7 @@ export default async function handler(req, res) {
   // in localStorage from before the cookie change. The cookie is untouched —
   // this token is not a session here, just a credential to retire.
   if (grant_type === 'revoke_legacy') {
+    if (Date.now() >= LEGACY_REVOKE_SUNSET) return res.status(410).json({ error: 'gone' });
     if (typeof refresh_token === 'string' && refresh_token) {
       try {
         await fetch(GOOGLE_REVOKE_URL, {
