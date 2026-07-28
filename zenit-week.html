@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-0ILqBqXGAVaF1IM59/zia3mFgYJTBp437OF011O/mcY='
+               'sha256-JYFxKe6bRVZ8E+390VzK3qYlJy2tiIK4tG0rQASHyLk='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -5458,12 +5458,18 @@ function initGoogleAuth() {
   // Proactively refresh when user returns to a tab that may have been hidden >50 min
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
+    if (!getStoredAuth()?.hasSession) return;
+    // A pending retry means the last attempt failed softly — don't wait it out.
+    if (_refreshRetryTimer) { _retryRefreshNow(); return; }
     if (!googleAccessToken) return;
-    const stored = getStoredAuth();
-    if (!stored?.hasSession) return;
     if (Date.now() - _tokenReceivedAt > 50 * 60 * 1000) {
-      silentRefresh().then(ok => { if (!ok) _handleAuthExpiry(); });
+      silentRefresh().then(_handleRefreshResult);
     }
+  });
+
+  // Back online after a soft failure — retry immediately rather than on backoff.
+  window.addEventListener('online', () => {
+    if (_refreshRetryTimer) _retryRefreshNow();
   });
 }
 
@@ -5484,7 +5490,10 @@ async function exchangeToken(params) {
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(params),
   });
-  return resp.json();
+  // Revoke answers 204 with no body — tolerate that, and keep the status so
+  // callers can tell a rejected grant from a proxy hiccup.
+  const data = await resp.json().catch(() => ({}));
+  return { ...data, _status: resp.status };
 }
 
 function getStoredAuth() {
@@ -5503,40 +5512,97 @@ async function attemptSilentRestore() {
       photoLink:    stored.photoLink    || '',
     });
   }
-  const ok = await silentRefresh();
-  if (!ok) {
-    localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
-    showSignedOutButton('sync.reconnect');
-    setSyncStatus('disconnected', 'sync.msg.sessionExpired');
-  }
+  // Leave 'disconnected' before refreshing: setSyncStatus drops 'error' while
+  // disconnected, which would hide a soft failure's reconnecting badge.
+  setSyncStatus('syncing', 'sync.msg.syncing');
+  _handleRefreshResult(await silentRefresh());
 }
 
+// A refresh fails in two very different ways. HARD: the grant itself was
+// rejected — the refresh cookie is gone or dead, so the session really is over.
+// SOFT: no verdict ever arrived — offline, proxy 5xx, Google rate-limit, or the
+// document navigating away mid-request (a fast reload aborts the in-flight
+// call). Only a hard failure may clear the stored session; treating a soft one
+// as expiry is what signed people out when they refreshed twice in a row.
+const REFRESH_OK   = 'ok';
+const REFRESH_HARD = 'hard';
+const REFRESH_SOFT = 'soft';
+// Grant-level errors that mean the refresh cookie is unusable. Anything else —
+// 429, 5xx, a thrown fetch — leaves the session's fate unknown, so it is soft.
+const HARD_REFRESH_ERRORS = new Set([
+  'invalid_grant', 'invalid_client', 'unauthorized_client',
+  'unsupported_grant_type', 'missing_params',
+]);
+const REFRESH_RETRY_DELAYS = [5000, 20000, 60000, 300000];
+let _refreshRetryTimer = null;
+let _refreshRetryIndex = 0;
+
 async function _doSilentRefresh() {
+  let tokens;
   try {
     // The refresh token lives in an HttpOnly cookie the proxy reads; it is
     // never held by JS, so nothing token-shaped is sent from here.
-    const tokens = await exchangeToken({ client_id: GOOGLE_CLIENT_ID, grant_type: 'refresh_token' });
-    if (tokens.error) return false;
-    await onTokensReceived(tokens.access_token);
-    return true;
+    tokens = await exchangeToken({ client_id: GOOGLE_CLIENT_ID, grant_type: 'refresh_token' });
   } catch {
-    return false;
+    return REFRESH_SOFT; // never reached the proxy — says nothing about the session
   }
+  if (tokens.error || !tokens.access_token) {
+    return HARD_REFRESH_ERRORS.has(tokens.error) ? REFRESH_HARD : REFRESH_SOFT;
+  }
+  try {
+    await onTokensReceived(tokens.access_token);
+  } catch (err) {
+    // The token is in hand; a failing Drive session start reports itself.
+    console.warn('[Drive] Session start after refresh failed:', err);
+  }
+  return REFRESH_OK;
 }
 
-async function silentRefresh() {
+// Resolves to REFRESH_OK | REFRESH_HARD | REFRESH_SOFT — concurrent callers
+// join the one attempt in flight.
+function silentRefresh() {
   if (!_refreshPromise) {
     _refreshPromise = _doSilentRefresh().finally(() => { _refreshPromise = null; });
   }
   return _refreshPromise;
 }
 
-// Called when a token refresh fails — stop poll, clear state, prompt reconnect
+function _retryRefreshNow() {
+  if (_refreshRetryTimer) { clearTimeout(_refreshRetryTimer); _refreshRetryTimer = null; }
+  if (!getStoredAuth()?.hasSession) return;
+  silentRefresh().then(_handleRefreshResult);
+}
+
+function _scheduleRefreshRetry() {
+  if (_refreshRetryTimer) return;
+  const idx   = Math.min(_refreshRetryIndex++, REFRESH_RETRY_DELAYS.length - 1);
+  _refreshRetryTimer = setTimeout(_retryRefreshNow, REFRESH_RETRY_DELAYS[idx]);
+}
+
+function _cancelRefreshRetry() {
+  if (_refreshRetryTimer) { clearTimeout(_refreshRetryTimer); _refreshRetryTimer = null; }
+  _refreshRetryIndex = 0;
+}
+
+// Turns a refresh verdict into UI + follow-up. Returns true when a token arrived.
+function _handleRefreshResult(result) {
+  if (result === REFRESH_OK)   return true;   // onTokensReceived cleared the retry
+  if (result === REFRESH_HARD) { _handleAuthExpiry(); return false; }
+  // Soft: keep the stored session and the avatar, and keep trying.
+  setSyncStatus('error', 'sync.msg.reconnecting');
+  _scheduleRefreshRetry();
+  return false;
+}
+
+// Called when the session is definitively gone — stop poll, clear state,
+// forget the stored session marker, prompt reconnect.
 function _handleAuthExpiry() {
   stopDrivePoll();
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
+  _cancelRefreshRetry();
   googleAccessToken = null;
   _driveSessionStarted = false;
+  localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
   showSignedOutButton('sync.reconnect');
   setSyncStatus('disconnected', 'sync.msg.sessionExpired');
 }
@@ -5553,8 +5619,7 @@ async function authFetch(url, options = {}) {
 
   const stored = getStoredAuth();
   if (!stored?.hasSession) { _handleAuthExpiry(); return resp; }
-  const ok = await silentRefresh();
-  if (!ok) { _handleAuthExpiry(); return resp; }
+  if (!_handleRefreshResult(await silentRefresh())) return resp;
   return fetch(url, withAuth(options));
 }
 
@@ -5562,14 +5627,14 @@ async function authFetch(url, options = {}) {
 async function onTokensReceived(accessToken) {
   googleAccessToken = accessToken;
   _tokenReceivedAt  = Date.now();
+  _cancelRefreshRetry();   // a token is in hand — nothing left to retry
 
   // Schedule silent token renewal every 55 min (tokens expire at 60 min)
   if (tokenRenewalTimer) clearInterval(tokenRenewalTimer);
   tokenRenewalTimer = setInterval(async () => {
     const stored = getStoredAuth();
     if (!stored?.hasSession) return;
-    const ok = await silentRefresh();
-    if (!ok) _handleAuthExpiry();
+    _handleRefreshResult(await silentRefresh());
   }, 55 * 60 * 1000);
 
   setSyncStatus('connected', 'sync.msg.connected');
@@ -7208,6 +7273,7 @@ const TRANSLATIONS = {
     'sync.badge.error':           'Sync error',
     'sync.msg.completingSignin':  'Completing sign-in…',
     'sync.msg.sessionExpired':    'Session expired — click to reconnect',
+    'sync.msg.reconnecting':      'Connection lost — reconnecting…',
     'sync.msg.connected':         'Connected to Google Drive',
     'sync.msg.signinFailedNetwork': 'Sign-in failed — check your connection and try again',
     'sync.msg.signinFailedSecurity':'Sign-in failed — security check failed, try again',
@@ -7443,6 +7509,7 @@ const TRANSLATIONS = {
     'sync.badge.error':           'Chyba synchronizace',
     'sync.msg.completingSignin':  'Dokončuji přihlášení…',
     'sync.msg.sessionExpired':    'Relace vypršela — klikněte pro opětovné připojení',
+    'sync.msg.reconnecting':      'Spojení ztraceno — připojuji znovu…',
     'sync.msg.connected':         'Připojeno k Disku Google',
     'sync.msg.signinFailedNetwork': 'Přihlášení selhalo — zkontrolujte připojení a zkuste to znovu',
     'sync.msg.signinFailedSecurity':'Přihlášení selhalo — selhala bezpečnostní kontrola, zkuste to znovu',

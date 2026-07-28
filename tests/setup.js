@@ -334,6 +334,7 @@ startDriveSession = () => {};
 onTokensReceived = async (token) => {
   googleAccessToken = token;
   _tokenReceivedAt = Date.now();
+  _cancelRefreshRetry();   // mirrors the real one — a token ends the retry loop
 };
 forcePushAllToDrive = () => {};
 initDriveSync = () => Promise.resolve();
@@ -409,7 +410,11 @@ _state.resetSyncState = function() {
   _remoteOriginIds.clear();
   clearAllSyncDebounceTimers();
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
+  _cancelRefreshRetry();
+  syncStatus = 'disconnected';
 };
+_state.getSyncStatus = function() { return syncStatus; };
+_state.hasRefreshRetryPending = function() { return _refreshRetryTimer !== null; };
 _state.getUndoRedoForcePush = function() { return _undoRedoForcePush; };
 _state.recordRemoteArrivals = function(wk, local, merged) { _recordRemoteArrivals(wk, local, merged); };
 _state.getRemoteOriginIds = function(wk) { return _remoteOriginIds.get(wk) || null; };

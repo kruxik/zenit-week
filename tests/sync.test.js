@@ -120,10 +120,10 @@ describe('Google Drive Sync', () => {
 
     test('silentRefresh updates internal token state', async () => {
       _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
-      
-      const ok = await silentRefresh();
-      expect(ok).toBe(true);
-      
+
+      const result = await silentRefresh();
+      expect(result).toBe('ok');
+
       expect(_state.getAccessToken()).toBe('new_access_token');
     });
 
@@ -155,12 +155,18 @@ describe('Google Drive Sync', () => {
         HttpResponse.json({ error: 'invalid_grant' }, { status: 400 }))
     );
 
-    test('silentRefresh returns false on invalid token', async () => {
+    test('silentRefresh reports a hard failure on a rejected grant', async () => {
       _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
       rejectRefresh();
 
-      const ok = await silentRefresh();
-      expect(ok).toBe(false);
+      expect(await silentRefresh()).toBe('hard');
+    });
+
+    test('silentRefresh reports a soft failure when the call never lands', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+      server.use(http.post('http://localhost/api/token', () => HttpResponse.error()));
+
+      expect(await silentRefresh()).toBe('soft');
     });
 
     test('attemptSilentRestore clears localStorage on failure', async () => {
@@ -171,6 +177,45 @@ describe('Google Drive Sync', () => {
       
       expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBeUndefined();
       expect(_state.getAccessToken()).toBeNull();
+      expect(_state.hasRefreshRetryPending()).toBe(false);
+    });
+
+    // No verdict ever arrived. A fast reload aborts the in-flight token call,
+    // and the proxy answers 500 when it cannot reach Google — neither means the
+    // refresh cookie is dead, so the stored session must survive.
+    const softFailures = {
+      'an aborted request':  () => HttpResponse.error(),
+      'a proxy 5xx':         () => HttpResponse.json({ error: 'token_exchange_failed' }, { status: 500 }),
+      'a Google rate limit': () => HttpResponse.json({ error: 'rate_limit_exceeded' },  { status: 429 }),
+    };
+
+    for (const [label, respond] of Object.entries(softFailures)) {
+      test(`attemptSilentRestore keeps the session after ${label}`, async () => {
+        const auth = { hasSession: true, email: 'test@ex.com' };
+        _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, auth);
+        server.use(http.post('http://localhost/api/token', respond));
+
+        await attemptSilentRestore();
+
+        expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBe(JSON.stringify(auth));
+        expect(_state.getSyncStatus()).toBe('error');
+        expect(_state.hasRefreshRetryPending()).toBe(true);
+      });
+    }
+
+    test('a retried refresh reconnects and stops the retry loop', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true, email: 'test@ex.com' });
+      server.use(http.post('http://localhost/api/token', () => HttpResponse.error()));
+
+      await attemptSilentRestore();
+      expect(_state.hasRefreshRetryPending()).toBe(true);
+
+      server.resetHandlers();
+      const result = await silentRefresh();
+
+      expect(result).toBe('ok');
+      expect(_state.getAccessToken()).toBe('new_access_token');
+      expect(_state.hasRefreshRetryPending()).toBe(false);
     });
   });
 
