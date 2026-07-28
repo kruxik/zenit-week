@@ -21,6 +21,18 @@
       ]
     },
     {
+      "source": "/:page(index\\.html|privacy|privacy\\.html|terms|terms\\.html)?",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'none'; script-src 'self' 'sha256-rHnRK2ddyx7kqhqnZ/6ZVfX3QU/NTJyrf4ZOViK5Q6k=' 'sha256-rbTaSdDD+Sd+K8IZ66VS79bdI78bN8AwXXyN0/lD5fY='; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'none'" }
+      ]
+    },
+    {
+      "source": "/cs/:page(index\\.html)?",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'none'; script-src 'self' 'sha256-rHnRK2ddyx7kqhqnZ/6ZVfX3QU/NTJyrf4ZOViK5Q6k=' 'sha256-rbTaSdDD+Sd+K8IZ66VS79bdI78bN8AwXXyN0/lD5fY='; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'none'" }
+      ]
+    },
+    {
       "source": "/zenit-week.html",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }

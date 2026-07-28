@@ -27,6 +27,10 @@ export function extractInlineScripts(html) {
   const bodies = [];
   for (const [, attrs, body] of html.matchAll(SCRIPT_REGEX)) {
     if (/\bsrc\s*=/i.test(attrs)) continue;
+    // Data blocks (application/ld+json) never execute, so CSP neither blocks
+    // them nor needs a hash for them.
+    const type = /\btype\s*=\s*["']?([^"'\s>]+)/i.exec(attrs)?.[1];
+    if (type && !/^(text\/javascript|module)$/i.test(type)) continue;
     bodies.push(body);
   }
   return bodies;
