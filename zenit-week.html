@@ -11,16 +11,15 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-eV+XfKDzRbhggYA0rCaXtv/7TJ+SE2U9ij+VcAVBvNQ='
-               'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo='
-               https://apis.google.com;
+               'sha256-0ILqBqXGAVaF1IM59/zia3mFgYJTBp437OF011O/mcY='
+               'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
   style-src    'unsafe-inline';
   manifest-src 'self' data:;
   base-uri     'none';
   object-src   'none';
-  frame-src    https://content.googleapis.com;
+  frame-src    'none';
   form-action  'none';
 ">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3233,7 +3232,6 @@
     document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#111111' : '#ffffff';
   })();
 </script>
-<script async defer src="https://apis.google.com/js/api.js"></script>
 <!-- Auth init: runs synchronously before first paint to prevent sign-in button flash -->
 <script>
   (function() {
@@ -5303,7 +5301,7 @@ let lastSeenRemoteColorsHash = null; // Drive appProperty contentHash the poll l
 let tokenRenewalTimer = null;
 let _tokenReceivedAt = 0;         // epoch ms when current access token was obtained
 let _refreshPromise = null;       // deduplicates concurrent 401 refresh attempts
-let _gapiInitialized = false;     // true after first loadGapiAndSync completes setup
+let _driveSessionStarted = false; // true after startDriveSession has run for this sign-in
 let _isFirstConnection = false;   // true when this browser has never synced with Drive before
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
 let _pollTimer = null;          // setInterval handle for 10s background metadata poll
@@ -5538,7 +5536,7 @@ function _handleAuthExpiry() {
   stopDrivePoll();
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
   googleAccessToken = null;
-  _gapiInitialized  = false;
+  _driveSessionStarted = false;
   showSignedOutButton('sync.reconnect');
   setSyncStatus('disconnected', 'sync.msg.sessionExpired');
 }
@@ -5576,12 +5574,11 @@ async function onTokensReceived(accessToken) {
 
   setSyncStatus('connected', 'sync.msg.connected');
 
-  if (!_gapiInitialized) {
-    _gapiInitialized = true;
-    loadGapiAndSync(); // init GAPI + full Drive seed (first sign-in only)
+  if (!_driveSessionStarted) {
+    _driveSessionStarted = true;
+    startDriveSession(); // avatar + full Drive seed (first sign-in only)
   } else {
-    // Token renewal: GAPI already initialized, just update the token
-    if (window.gapi?.client) gapi.client.setToken({ access_token: googleAccessToken });
+    // Token renewal: authFetch reads googleAccessToken directly, nothing to update.
     // If an import happened while signed out, force-push on token renewal
     isImportPending().then(pending => { if (pending) forcePushAllToDrive(); });
   }
@@ -5683,9 +5680,8 @@ async function signOut() {
   lastSeenRemoteColorsHash = null;
   const token  = googleAccessToken;
   googleAccessToken = null;
-  _gapiInitialized  = false;
+  _driveSessionStarted = false;
   _isFirstConnection = false;
-  if (window.gapi?.client) gapi.client.setToken(null);
   driveFileIdCache.clear();
   _driveFileMissSince.clear();
   lastSyncedHash.clear();
@@ -5760,41 +5756,34 @@ function setSyncStatus(status, messageKey) {
   dot.title = key ? t(key) : '';
 }
 
-// ─── TASK-08: Load GAPI client and initiate first sync ────────────────────────
-function loadGapiAndSync() {
-  if (!window.gapi) {
-    // GAPI script not yet executed — retry shortly
-    setTimeout(loadGapiAndSync, 300);
-    return;
-  }
-  gapi.load('client', async () => {
-    try {
-      await gapi.client.init({});
-      gapi.client.setToken({ access_token: googleAccessToken });
-
-      // Fetch user info via Drive about (works with drive.appdata scope)
-      const aboutResp = await gapi.client.request({
-        path: 'https://www.googleapis.com/drive/v3/about',
-        params: { fields: 'user(displayName,emailAddress,photoLink)' },
-      });
-      const user = aboutResp.result?.user;
-      showSignedInAvatar(user);
-      // Cache user info so avatar renders instantly on next page load
-      const storedAuth = getStoredAuth();
-      if (storedAuth) {
-        storedAuth.email       = user?.emailAddress || '';
-        storedAuth.displayName = user?.displayName  || '';
-        storedAuth.photoLink   = user?.photoLink    || '';
-        localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(storedAuth));
-      }
-      setSyncStatus('connected', 'sync.msg.synced');
-      await initDriveSync(); // TASK-09 — list all files + 3-phase seed
-      startDrivePoll(currentWeekKey);
-    } catch (err) {
-      console.error('[Drive] GAPI init error:', err);
-      setSyncStatus('error', 'sync.msg.initFailedRetry');
+// ─── TASK-08: First-sync session bootstrap ────────────────────────────────────
+// Runs once per sign-in: fetches the user profile for the avatar, seeds all
+// weeks from Drive, and starts the poll. Plain authenticated REST throughout —
+// no Google client library is loaded, so the CSP stays hash-only.
+async function startDriveSession() {
+  try {
+    // Fetch user info via Drive about (works with drive.appdata scope)
+    const aboutResp = await driveApiRequest({
+      path: 'https://www.googleapis.com/drive/v3/about',
+      params: { fields: 'user(displayName,emailAddress,photoLink)' },
+    });
+    const user = aboutResp.result?.user;
+    showSignedInAvatar(user);
+    // Cache user info so avatar renders instantly on next page load
+    const storedAuth = getStoredAuth();
+    if (storedAuth) {
+      storedAuth.email       = user?.emailAddress || '';
+      storedAuth.displayName = user?.displayName  || '';
+      storedAuth.photoLink   = user?.photoLink    || '';
+      localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(storedAuth));
     }
-  });
+    setSyncStatus('connected', 'sync.msg.synced');
+    await initDriveSync(); // TASK-09 — list all files + 3-phase seed
+    startDrivePoll(currentWeekKey);
+  } catch (err) {
+    console.error('[Drive] First sync init error:', err);
+    setSyncStatus('error', 'sync.msg.initFailedRetry');
+  }
 }
 
 // Stable content signature for merge no-op detection. Strips _ts (LWW
@@ -6109,22 +6098,34 @@ async function syncWeekFromDrive(wKey, { force = false } = {}) {
 
 // ─── TASK-09: Find or create per-week Drive file ──────────────────────────────
 
-// Exponential backoff with jitter; retries on 429/503, up to 5 attempts
+// Authenticated Drive REST request. Exponential backoff with jitter; retries on
+// 429/503, up to 5 attempts. Resolves to { status, result } with result the
+// parsed JSON body (null when empty); rejects with an Error carrying .status
+// and .result — the same shapes gapi.client.request gave callers. 401 recovery
+// (one silent refresh + retry) comes from authFetch.
 async function driveApiRequest(config) {
   const MAX_RETRIES = 5;
   let delay = 1000;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      return await gapi.client.request(config);
-    } catch (err) {
-      const status = err?.status ?? err?.result?.error?.code;
-      if ((status === 429 || status === 503) && attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
-        delay *= 2;
-        continue;
-      }
-      throw err;
+    const url = new URL(config.path);
+    Object.entries(config.params || {}).forEach(([k, v]) => url.searchParams.append(k, v));
+    const resp = await authFetch(url.toString(), {
+      method:  config.method || 'GET',
+      headers: config.headers,
+      body:    config.body,
+    });
+    let result = null;
+    try { result = await resp.json(); } catch { /* 204 / empty body */ }
+    if (resp.ok) return { status: resp.status, result };
+    if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
+      await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+      delay *= 2;
+      continue;
     }
+    const err = new Error(`[Drive] ${config.method || 'GET'} ${url.pathname} → HTTP ${resp.status}`);
+    err.status = resp.status;
+    err.result = result;
+    throw err;
   }
 }
 
@@ -15709,7 +15710,7 @@ window.addEventListener('load', async () => {
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   await bootstrapColorsSettings();
   updateSvgFilters();
-  initGoogleAuth(); // no-op if GIS not yet loaded; onGoogleLibraryLoad handles that case
+  initGoogleAuth(); // legacy-token purge, OAuth callback handling, silent session restore
   const isStandalone =
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
     window.navigator.standalone === true;

@@ -37,7 +37,7 @@ export function hashScript(body) {
 }
 
 export function buildScriptSrc(html, { allowVercelLive = false } = {}) {
-  const sources = ["'self'", ...extractInlineScripts(html).map(hashScript), 'https://apis.google.com'];
+  const sources = ["'self'", ...extractInlineScripts(html).map(hashScript)];
   if (allowVercelLive) sources.push(VERCEL_LIVE);
   // One source per line, aligned under the directive name — the hash list is
   // far too long to stay readable on a single line.
@@ -51,8 +51,11 @@ export function applyCsp(html, { allowVercelLive = false } = {}) {
   return html
     .replace(SCRIPT_SRC_DIRECTIVE, (_m, head, _body, tail) => `${head}${scriptSrc}${tail}`)
     .replace(FRAME_SRC_DIRECTIVE, (_m, head, body, tail) => {
-      const frames = body.split(/\s+/).filter(s => s && s !== VERCEL_LIVE);
+      // 'none' is a placeholder, not a source — it must stand alone, so strip
+      // it whenever a real source joins the list and restore it when none do.
+      const frames = body.split(/\s+/).filter(s => s && s !== VERCEL_LIVE && s !== "'none'");
       if (allowVercelLive) frames.push(VERCEL_LIVE);
+      if (!frames.length) frames.push("'none'");
       return `${head}${frames.join(' ')}${tail}`;
     });
 }

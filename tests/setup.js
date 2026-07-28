@@ -87,7 +87,6 @@ const sandbox = {
     dispatchEvent: () => {},
     location: { origin: 'http://localhost', pathname: '/' },
     fetch: null, // populated below
-    gapi: null,  // populated below
     innerWidth: 1280,
     innerHeight: 768,
     matchMedia: () => ({
@@ -97,32 +96,6 @@ const sandbox = {
       addListener: () => {},
       removeListener: () => {},
     }),
-  },
-  gapi: {
-    load: (name, cb) => cb(),
-    client: {
-      init: () => Promise.resolve(),
-      setToken: () => {},
-      request: async (config) => {
-        const url = new URL(config.path);
-        if (config.params) {
-          Object.entries(config.params).forEach(([k, v]) => url.searchParams.append(k, v));
-        }
-        const resp = await globalThis.fetch(url.toString(), {
-          method: config.method,
-          headers: config.headers,
-          body: config.body,
-        });
-        const result = await resp.json();
-        if (!resp.ok) {
-          const error = new Error('GAPI Error');
-          error.status = resp.status;
-          error.result = { error: { code: resp.status, message: result.error?.message } };
-          throw error;
-        }
-        return { result };
-      }
-    }
   },
   BroadcastChannel: class {
     constructor() {}
@@ -207,7 +180,6 @@ const sandbox = {
   _state: {},
 };
 sandbox.window.fetch = sandbox.fetch;
-sandbox.window.gapi = sandbox.gapi;
 
 vm.createContext(sandbox);
 
@@ -358,7 +330,7 @@ scheduleColorsSync = () => {};
 isAtomicOpActive = () => false;
 stopDrivePoll = () => {};
 startDrivePoll = () => {};
-loadGapiAndSync = () => {};
+startDriveSession = () => {};
 onTokensReceived = async (token) => {
   googleAccessToken = token;
   _tokenReceivedAt = Date.now();
@@ -425,7 +397,7 @@ _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
 _state.resetSyncState = function() {
   googleAccessToken = null;
-  _gapiInitialized = false;
+  _driveSessionStarted = false;
   driveFileIdCache.clear();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
