@@ -114,7 +114,7 @@ The app uses both `localStorage` and `IndexedDB`:
 | `zenit-week-lang` | `en` or `cs`. |
 | `zenit-week-colors` | Per-branch color overrides. |
 | `zenit-week-autolayout` | `true` / `false`. |
-| `zenit-week-google-auth` | Google OAuth refresh token (only after sign-in). |
+| `zenit-week-google-auth` | Session marker + cached profile (only after sign-in). The refresh token lives in the HttpOnly `zw_rt` cookie, never here. |
 | `zenit-week-reset-token` | Per-device token for sync conflict resolution. |
 | `zenit-week-storage-migrated` | One-shot migration flag. |
 

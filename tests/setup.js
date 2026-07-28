@@ -671,6 +671,7 @@ export const {
   pollDriveChanges,
   silentRefresh,
   exchangeToken,
+  purgeLegacyRefreshToken,
   _state,
 } = sandbox;
 

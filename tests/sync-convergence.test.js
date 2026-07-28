@@ -269,7 +269,7 @@ describe('Drive sync E2E — clean pull does not ping-pong', () => {
     patchCount = 0;
     mediaFetchCount = 0;
     // Authenticate and point the cache at the remote file.
-    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
     await attemptSilentRestore();
     _state.setDriveFileId(WK, FILE_ID);
     // Local already holds the same content as remote (the steady state).
@@ -340,7 +340,7 @@ describe('Drive sync E2E — legacy-scheme appProperty self-heals (no download s
     _state.clearIDBStore();
     patchCount = 0;
     mediaFetchCount = 0;
-    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
     await attemptSilentRestore();
     _state.setDriveFileId(WK, FILE_ID);
     await _state.saveWeekIDB(WK, clone(remoteMedia)); // local already holds the remote content
@@ -395,7 +395,7 @@ describe('Colors sync E2E — legacy-scheme appProperty self-heals (no download 
     _state.clearLocalStorage();
     _state.clearIDBStore();
     colorsMediaFetchCount = 0;
-    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
     await attemptSilentRestore();
     // Point the poll at the colors file but configure NO week files, so the poll
     // exercises only the colors branch.
@@ -457,7 +457,7 @@ describe('Drive sync E2E — Changes API poll (flagged)', () => {
     mediaFetchCount = 0;
     startTokenCalls = 0;
     changesPayload = { newStartPageToken: '1001', changes: [] };
-    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
     _state.setLocalStorage(CHANGE_FEED_FLAG, 1); // JSON.stringify(1) === '1' → flag on
     await attemptSilentRestore();
     _state.setDriveFileId(WK, FILE_ID);

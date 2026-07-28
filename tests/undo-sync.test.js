@@ -33,8 +33,8 @@ let remoteData;
 const handlers = [
   http.post('http://localhost/api/token', async ({ request }) => {
     const body = await request.json();
-    const cookieSession = body.grant_type === 'refresh_token' && !body.refresh_token;
-    if (body.refresh_token === 'rt' || cookieSession) return HttpResponse.json({ access_token: 'at', expires_in: 3600 });
+    // Refresh grants carry no body token — the HttpOnly cookie supplies it.
+    if (body.grant_type === 'refresh_token') return HttpResponse.json({ access_token: 'at', expires_in: 3600 });
     return HttpResponse.json({ error: 'invalid_grant' }, { status: 400 });
   }),
   http.get('https://www.googleapis.com/drive/v3/files', ({ request }) => {
@@ -70,7 +70,7 @@ afterEach(() => { server.resetHandlers(); _state.resetSyncState(); });
 afterAll(() => server.close());
 
 async function authAndLink() {
-  _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'rt' });
+  _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
   await attemptSilentRestore();
   _state.setDriveFileId(WK, 'fid');
 }

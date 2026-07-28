@@ -3230,7 +3230,7 @@
   (function() {
     try {
       var a = JSON.parse(localStorage.getItem('zenit-week-google-auth') || 'null');
-      if (a && (a.hasSession || a.refresh_token)) document.documentElement.classList.add('zw-has-session');
+      if (a && a.hasSession) document.documentElement.classList.add('zw-has-session');
       // Sign-in is about to complete via redirect — suppress sign-in button flash
       if (location.search && new URLSearchParams(location.search).get('code')) {
         document.documentElement.classList.add('zw-has-session');
@@ -5361,9 +5361,31 @@ function showSignedOutButton(labelKey = 'sync.btnLabel') {
   lastSyncedAt = null;
 }
 
+// Legacy cleanup: before the HttpOnly-cookie change the refresh token was kept
+// in localStorage in plaintext. The proxy no longer accepts a body-supplied
+// token, so any lingering copy is unusable — purge it on every load (not only
+// when a migration round-trip succeeds) and revoke it server-side, best effort.
+function purgeLegacyRefreshToken() {
+  const stored = getStoredAuth();
+  if (!stored?.refresh_token) return;
+  const legacy = stored.refresh_token;
+  if (stored.hasSession) {
+    // A cookie session already exists (the migration wrote the marker but the
+    // key survived) — drop the plaintext copy only, don't kill a live session.
+    delete stored.refresh_token;
+    localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(stored));
+    return;
+  }
+  // Never migrated: the record grants nothing anymore. Drop it and revoke the
+  // credential via the proxy so it can't outlive the app on Google's side.
+  localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+  exchangeToken({ grant_type: 'revoke_legacy', refresh_token: legacy }).catch(() => {});
+}
+
 function initGoogleAuth() {
   // Migration: remove legacy flag replaced by GOOGLE_AUTH_STORAGE_KEY
   localStorage.removeItem('zenit-week-had-google-session');
+  purgeLegacyRefreshToken();
   if (_PENDING_OAUTH_CALLBACK) {
     setSyncStatus('syncing', 'sync.msg.completingSignin');
     handleAuthCode(_PENDING_OAUTH_CALLBACK);
@@ -5376,7 +5398,7 @@ function initGoogleAuth() {
     if (document.visibilityState !== 'visible') return;
     if (!googleAccessToken) return;
     const stored = getStoredAuth();
-    if (!stored?.hasSession && !stored?.refresh_token) return;
+    if (!stored?.hasSession) return;
     if (Date.now() - _tokenReceivedAt > 50 * 60 * 1000) {
       silentRefresh().then(ok => { if (!ok) _handleAuthExpiry(); });
     }
@@ -5410,7 +5432,7 @@ function getStoredAuth() {
 // ─── Silent session restore on app load ───────────────────────────────────────
 async function attemptSilentRestore() {
   const stored = getStoredAuth();
-  if (!stored?.hasSession && !stored?.refresh_token) return;
+  if (!stored?.hasSession) return;
   // Show avatar immediately with cached user info — no visible flash on reload
   if (stored.email) {
     showSignedInAvatar({
@@ -5429,24 +5451,10 @@ async function attemptSilentRestore() {
 
 async function _doSilentRefresh() {
   try {
-    // The refresh token normally lives in an HttpOnly cookie the proxy reads.
-    const stored = getStoredAuth();
-    const params = { client_id: GOOGLE_CLIENT_ID, grant_type: 'refresh_token' };
-    // TODO: remove after 2026-07-28 — legacy localStorage refresh-token migration.
-    // A plaintext token from before the cookie change is sent once so the proxy
-    // can move it into the HttpOnly cookie, then purged. After the date, delete
-    // this block and the `stored?.refresh_token` fallbacks in the session-gate
-    // checks (attemptSilentRestore, authFetch, the renewal timer, visibilitychange)
-    // and the legacy `revokeToken(stored?.refresh_token)` call in signOut().
-    if (stored?.refresh_token) params.refresh_token = stored.refresh_token;
-    const tokens = await exchangeToken(params);
+    // The refresh token lives in an HttpOnly cookie the proxy reads; it is
+    // never held by JS, so nothing token-shaped is sent from here.
+    const tokens = await exchangeToken({ client_id: GOOGLE_CLIENT_ID, grant_type: 'refresh_token' });
     if (tokens.error) return false;
-    if (stored?.refresh_token) {
-      // Migrated into the HttpOnly cookie — drop the plaintext copy from JS storage.
-      delete stored.refresh_token;
-      stored.hasSession = true;
-      localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(stored));
-    }
     await onTokensReceived(tokens.access_token);
     return true;
   } catch {
@@ -5482,7 +5490,7 @@ async function authFetch(url, options = {}) {
   if (resp.status !== 401) return resp;
 
   const stored = getStoredAuth();
-  if (!stored?.hasSession && !stored?.refresh_token) { _handleAuthExpiry(); return resp; }
+  if (!stored?.hasSession) { _handleAuthExpiry(); return resp; }
   const ok = await silentRefresh();
   if (!ok) { _handleAuthExpiry(); return resp; }
   return fetch(url, withAuth(options));
@@ -5497,7 +5505,7 @@ async function onTokensReceived(accessToken) {
   if (tokenRenewalTimer) clearInterval(tokenRenewalTimer);
   tokenRenewalTimer = setInterval(async () => {
     const stored = getStoredAuth();
-    if (!stored?.hasSession && !stored?.refresh_token) return;
+    if (!stored?.hasSession) return;
     const ok = await silentRefresh();
     if (!ok) _handleAuthExpiry();
   }, 55 * 60 * 1000);
@@ -5609,7 +5617,6 @@ async function signOut() {
 
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
-  const stored = getStoredAuth();
   const token  = googleAccessToken;
   googleAccessToken = null;
   _gapiInitialized  = false;
@@ -5631,8 +5638,6 @@ async function signOut() {
   revokeToken(token);
   // Revoke + clear the HttpOnly refresh cookie server-side (JS can't read it).
   exchangeToken({ grant_type: 'revoke' }).catch(() => {});
-  // Legacy: revoke any plaintext refresh token still lingering in localStorage.
-  revokeToken(stored?.refresh_token);
 }
 
 // Sign out AND wipe all local USER data (weeks, colors, sync caches, undo/redo).
