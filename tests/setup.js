@@ -644,6 +644,10 @@ export const {
   fnv1a32,
   weekContentHash,
   colorsContentHash,
+  sanitizeColorsData,
+  loadBranchColors,
+  saveBranchColors,
+  bootstrapColorsSettings,
   // Color picker
   hexToHsv,
   hsvToHex,
@@ -667,6 +671,7 @@ export const {
   driveApiRequest,
   syncWeekFromDrive,
   syncWeekToDrive,
+  syncColorsFromDrive,
   pollDriveMeta,
   pollDriveChanges,
   silentRefresh,

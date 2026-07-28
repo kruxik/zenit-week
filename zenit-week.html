@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-9tucHLwTG6wYQuCB/Yh8w8SvFMadcZ561Q09ufjKj0o='
+               'sha256-yjmDzukWRS5VPYGIAqSZ2zgrQ+BjR/EkWnE7Rr8Gu30='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo='
                https://apis.google.com;
   connect-src  'self' https://*.googleapis.com;
@@ -4723,13 +4723,41 @@ function reloadBranchPalettes() {
   });
 }
 
+// Branch ids are genId() UUIDs or the legacy 'work' / 'family' / 'me' names.
+const BRANCH_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+// Whitelists the colors/settings blob. Week data has validateAndRepair; this is
+// the same guard for the other synced file, which arrives from Drive or a JSON
+// import and is otherwise unchecked. Branch ids end up inside DOM selectors
+// (`[data-branch-dot="…"]`, `[data-branch="…"]`), where an unconstrained string
+// throws and kills every later color update, and `main` feeds hexToRgb, where a
+// non-hex value silently poisons the palette with NaN. Anything unrecognised is
+// dropped rather than repaired — a bad colors file has no salvageable intent.
+function sanitizeColorsData(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  if (Number.isFinite(raw.savedAt)) out.savedAt = raw.savedAt;
+  if (raw.theme === 'light' || raw.theme === 'dark') out.theme = raw.theme;
+  if (typeof raw.lang === 'string' && Object.prototype.hasOwnProperty.call(TRANSLATIONS, raw.lang)) {
+    out.lang = raw.lang;
+  }
+  Object.keys(raw).forEach(b => {
+    if (b === 'savedAt' || b === 'theme' || b === 'lang') return;
+    if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
+    if (!BRANCH_ID_RE.test(b)) return;
+    const main = raw[b] && raw[b].main;
+    if (typeof main === 'string' && HEX_COLOR_RE.test(main)) out[b] = { main };
+  });
+  return out;
+}
+
 async function loadBranchColors() {
   try {
-    const saved = await loadValueIDB(COLORS_STORAGE_KEY);
-    if (!saved) return;
+    const saved = sanitizeColorsData(await loadValueIDB(COLORS_STORAGE_KEY));
     Object.keys(saved).forEach(b => {
-      if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
-      if (saved[b] && saved[b].main) BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
+      if (b === 'savedAt' || b === 'theme' || b === 'lang') return;
+      BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
     });
   } catch(e) {
     console.warn('[zenit-week] Failed to load branch colors from IndexedDB:', e);
@@ -4745,6 +4773,30 @@ async function saveBranchColors() {
   toSave.lang  = currentLang || 'en';
   await saveValueIDB(COLORS_STORAGE_KEY, toSave);
   scheduleColorsSync();
+}
+
+// Colors files written before theme/lang joined the blob lack those fields; fill
+// them in once so the next Drive sync carries them to other devices.
+//
+// This used to read the blob from localStorage, where the IndexedDB migration
+// deletes it — so the check missed on every start and re-saved unconditionally.
+// Paired with an un-awaited loadBranchColors() in init, that wrote the *default*
+// palette back over the stored one, and a custom branch color survived exactly
+// one refresh (in-memory) before reverting. Read the blob where it actually
+// lives, and only write when a field is genuinely absent.
+async function bootstrapColorsSettings() {
+  let stored = null;
+  try {
+    stored = await loadValueIDB(COLORS_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[zenit-week] Failed to read colors for settings bootstrap:', e);
+  }
+  if (stored && stored.theme && stored.lang) return;
+  // Re-run the (idempotent) load first: saveBranchColors() writes whatever
+  // BRANCH_COLORS holds right now, so without this it depends on the caller
+  // having awaited the load — the ordering that broke above.
+  await loadBranchColors();
+  await saveBranchColors();
 }
 
 function updateColorDots() {
@@ -6579,8 +6631,12 @@ async function syncColorsFromDrive() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const remoteJson = await resp.text();
     if (!remoteJson.trim()) return;
-    const remoteData = JSON.parse(remoteJson);
-    const remoteHash = colorsContentHash(remoteData);
+    // Hash the file as it arrived — colorsSyncedHash is compared against the
+    // remote appProperties contentHash, so it must describe the raw bytes, not
+    // what survives sanitisation.
+    const rawRemote = JSON.parse(remoteJson);
+    const remoteHash = colorsContentHash(rawRemote);
+    const remoteData = sanitizeColorsData(rawRemote);
     const remoteSavedAt = remoteData.savedAt ?? 0;
     const localData = await loadValueIDB(COLORS_STORAGE_KEY);
     const localSavedAt = localData?.savedAt ?? 0;
@@ -7905,7 +7961,7 @@ async function importAllData(file) {
     // Write colors first so loadBranchColors picks them up
     if (colorsRaw) {
       const parsedColors = safeParse(colorsRaw);
-      if (parsedColors) await saveValueIDB(COLORS_STORAGE_KEY, parsedColors);
+      if (parsedColors) await saveValueIDB(COLORS_STORAGE_KEY, sanitizeColorsData(parsedColors));
     }
 
     // Write current week first
@@ -15644,15 +15700,11 @@ window.addEventListener('load', async () => {
   await runMigrationIfNeeded();
 
   currentLang = localStorage.getItem('zenit-week-lang') || detectBrowserLang();
-  loadBranchColors();
+  // Must be awaited: bootstrapColorsSettings() may write BRANCH_COLORS straight
+  // back out, and doing that before the stored palette lands overwrites it.
+  await loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
-  // One-time bootstrap: if stored colors file is missing theme/lang, write them now
-  // so the next Drive sync carries them to other devices.
-  try {
-    const colorsRaw = localStorage.getItem(COLORS_STORAGE_KEY);
-    const colorsObj = colorsRaw ? JSON.parse(colorsRaw) : null;
-    if (!colorsObj || !colorsObj.theme || !colorsObj.lang) saveBranchColors();
-  } catch { saveBranchColors(); }
+  await bootstrapColorsSettings();
   updateSvgFilters();
   initGoogleAuth(); // no-op if GIS not yet loaded; onGoogleLibraryLoad handles that case
   const isStandalone =
