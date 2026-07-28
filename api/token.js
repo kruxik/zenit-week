@@ -26,8 +26,8 @@ function readCookie(req, name) {
 }
 
 function isLocalHost(req) {
-  const host = req.headers.host || '';
-  return host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  const host = (req.headers.host || '').toLowerCase();
+  return /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
 }
 
 function setRefreshCookie(req, res, token) {
