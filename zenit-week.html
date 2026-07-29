@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-plC1HA+G20WeDuJ0NNotGguAanu3hwIaLVr+t+JxB8k='
+               'sha256-hl6T0qR9Wg4igu1Pv7TMZPwM5U9UAkrQOQ9+24qf68k='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -9094,6 +9094,60 @@ function computeLayout() {
     });
   }
 
+  // Children that take part in this layout pass: skip nodes being edited
+  // elsewhere and anything the current view level hides.
+  function activeChildIds(nodeId) {
+    const node = findNode(nodeId);
+    return (node?.children || []).filter(cid => {
+      const child = findNode(cid);
+      const isChildActiveEdit = editState && editState.nodeId === cid;
+      return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
+    });
+  }
+
+  // Inbox items hang off their branch with no bezier and get promoted by being
+  // dragged onto a real parent, so every one has to stay visible and grabbable
+  // — collapsing the overflow would break that. Instead pack the leaf ones into
+  // a grid: a plain column of 12 spans ~900px and shoves the next branch on
+  // that side several hundred px down, because inbox items count toward the
+  // branch's height budget in calcHeight.
+  const nodeInboxGridMetrics = {};
+
+  function getInboxGridMetrics(nodeId) {
+    if (nodeId in nodeInboxGridMetrics) return nodeInboxGridMetrics[nodeId];
+    const node = findNode(nodeId);
+    if (!node || node.type !== 'branch') return nodeInboxGridMetrics[nodeId] = null;
+
+    // An inbox item with children (day leaf, counter) extends sideways and
+    // would run into the next column — those stay in the standard column.
+    const gridKids = activeChildIds(nodeId).filter(cid => {
+      const c = findNode(cid);
+      return c?.inbox && activeChildIds(cid).length === 0;
+    });
+    if (gridKids.length < 3) return nodeInboxGridMetrics[nodeId] = null;
+
+    const cols = gridKids.length <= 6 ? 2 : 3;
+    let maxW = 0;
+    let maxH = 0;
+    gridKids.forEach(cid => {
+      const { w, h } = getNodeSize(cid);
+      maxW = Math.max(maxW, w);
+      maxH = Math.max(maxH, h);
+    });
+    // One shared column width aligns every inner edge — sizing each node by its
+    // own width is what turns the current column into a staircase.
+    const colW = maxW + VERTICAL_GAP * 2;
+    const rowH = maxH + VERTICAL_GAP * 2;
+    return nodeInboxGridMetrics[nodeId] = {
+      ids: gridKids,
+      set: new Set(gridKids),
+      cols,
+      colW,
+      rowH,
+      totalH: Math.ceil(gridKids.length / cols) * rowH,
+    };
+  }
+
   // Calculate total height of each subtree
   function calcHeight(nodeId) {
     const node = findNode(nodeId);
@@ -9105,11 +9159,7 @@ function computeLayout() {
     const { h: nodeH } = getNodeSize(nodeId);
     const selfH = nodeH + VERTICAL_GAP * getPriorityScale(nodeId);
 
-    const activeChildren = sortedChildren((node.children || []).filter(cid => {
-      const child = findNode(cid);
-      const isChildActiveEdit = editState && editState.nodeId === cid;
-      return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
-    }));
+    const activeChildren = sortedChildren(activeChildIds(nodeId));
 
     if (activeChildren.length === 0) {
       heights[nodeId] = selfH;
@@ -9119,8 +9169,25 @@ function computeLayout() {
     let h = 0;
     const isBranch = node.type === 'branch';
     const zig = getZigZagMetrics(nodeId);
+    const grid = getInboxGridMetrics(nodeId);
 
-    if (zig) {
+    // Sum a run of siblings stacked in the standard column, including the
+    // depth-0 breathing room between them.
+    function columnHeight(kids) {
+      return kids.reduce((acc, cid, i) => {
+        let sum = acc + heights[cid];
+        if (isBranch && i < kids.length - 1) {
+          const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(kids[i + 1]));
+          sum += VERTICAL_GAP * 2 * neighborScale;
+        }
+        return sum;
+      }, 0);
+    }
+
+    if (grid) {
+      activeChildren.forEach(calcHeight);
+      h = columnHeight(activeChildren.filter(cid => !grid.set.has(cid))) + grid.totalH;
+    } else if (zig) {
       activeChildren.forEach(calcHeight);
       // Regular (non-zig) siblings stack above the zigzag block in a standard column.
       const regularsH = activeChildren.reduce((acc, cid) => {
@@ -9129,13 +9196,8 @@ function computeLayout() {
       }, 0);
       h = regularsH + zig.totalH;
     } else {
-      activeChildren.forEach((cid, i) => {
-        h += calcHeight(cid);
-        if (isBranch && i < activeChildren.length - 1) {
-          const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(activeChildren[i + 1]));
-          h += VERTICAL_GAP * 2 * neighborScale;
-        }
-      });
+      activeChildren.forEach(calcHeight);
+      h = columnHeight(activeChildren);
     }
 
     heights[nodeId] = Math.max(h, selfH);
@@ -9174,12 +9236,7 @@ function computeLayout() {
       
       positions[bid] = { x: finalX, y: finalY, w, h, side };
       
-      const activeChildren = (node.children || []).filter(cid => {
-        const child = findNode(cid);
-        const isChildActiveEdit = editState && editState.nodeId === cid;
-        return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
-      });
-      if (activeChildren.length > 0) {
+      if (activeChildIds(bid).length > 0) {
         layoutChildren(bid, finalX, finalY, side, w, 0);
       }
       currentY += nodeH + BRANCH_GAP;
@@ -9191,15 +9248,12 @@ function computeLayout() {
     const isActiveEdit = editState && editState.nodeId === nodeId;
     if (!node || (node._editing && !isActiveEdit)) return;
 
-    const activeChildren = sortedChildren((node.children || []).filter(cid => {
-      const child = findNode(cid);
-      const isChildActiveEdit = editState && editState.nodeId === cid;
-      return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
-    }));
+    const activeChildren = sortedChildren(activeChildIds(nodeId));
 
     if (activeChildren.length === 0) return;
 
     const zig = getZigZagMetrics(nodeId);
+    const grid = getInboxGridMetrics(nodeId);
     const dir = side === 'left' ? -1 : 1;
 
     const isZigKid = (cid) => {
@@ -9207,8 +9261,35 @@ function computeLayout() {
       return c?.dayChild || c?.tickChild;
     };
 
+    // Standard vertical column — the plain path, plus whatever siblings the
+    // zigzag and inbox-grid blocks leave behind. Returns the y it ended at.
+    function placeColumn(kids, startY) {
+      let y = startY;
+      kids.forEach((cid, i) => {
+        const child = findNode(cid);
+        const childH = heights[cid];
+        const { w, h } = getNodeSize(cid);
+        const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
+        const x = parentX + dir * (parentW / 2 + childGap + w / 2);
+        const cy = y + childH / 2;
+        y += childH;
+        if (depth === 0 && i < kids.length - 1) {
+          const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(kids[i + 1]));
+          y += VERTICAL_GAP * 2 * neighborScale;
+        }
+        const finalX = x + (child.offX || 0);
+        const finalY = cy + (child.offY || 0);
+        positions[cid] = { x: finalX, y: finalY, w, h, side };
+        layoutChildren(cid, finalX, finalY, side, w, depth + 1);
+      });
+      return y;
+    }
+
     let childrenH = 0;
-    if (zig) {
+    if (grid) {
+      childrenH = activeChildren.reduce((acc, cid) => grid.set.has(cid) ? acc : acc + heights[cid], 0)
+        + grid.totalH;
+    } else if (zig) {
       const regularsH = activeChildren.reduce((acc, cid) => {
         return isZigKid(cid) ? acc : acc + heights[cid];
       }, 0);
@@ -9218,6 +9299,28 @@ function computeLayout() {
     }
 
     let currentY = parentY - childrenH / 2;
+
+    if (grid) {
+      // Placed activities keep the column; the inbox tray sits below it, since
+      // sortedChildren already pushes inbox items last.
+      currentY = placeColumn(activeChildren.filter(cid => !grid.set.has(cid)), currentY);
+      const groupBaseX = parentX + dir * (parentW / 2 + (depth === 0 ? 200 : 134));
+      grid.ids.forEach((cid, i) => {
+        const child = findNode(cid);
+        const { w, h } = getNodeSize(cid);
+        // Fill outward-in on the left so the tray still reads left-to-right;
+        // columns grow away from the branch, which would otherwise reverse it.
+        const slot = i % grid.cols;
+        const col = side === 'left' ? grid.cols - 1 - slot : slot;
+        const row = Math.floor(i / grid.cols);
+        // Offset by w/2 off a shared column edge, so inner edges line up
+        // regardless of label length.
+        const x = groupBaseX + dir * (col * grid.colW + w / 2);
+        const y = currentY + row * grid.rowH + grid.rowH / 2;
+        positions[cid] = { x: x + (child.offX || 0), y: y + (child.offY || 0), w, h, side };
+      });
+      return;
+    }
 
     if (zig) {
       // Zigzag block placed first (top). Index `di` counts only zig-kids so
@@ -9240,43 +9343,11 @@ function computeLayout() {
       // Snap to reserved zig block bottom so non-zig siblings below don't overlap.
       currentY = zigStartY + zig.totalH;
       // Standard column for non-zig siblings (placed below the zigzag block).
-      activeChildren.filter(cid => !isZigKid(cid)).forEach(cid => {
-        const child = findNode(cid);
-        const childH = heights[cid];
-        const { w, h } = getNodeSize(cid);
-        const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
-        const x = parentX + dir * (parentW / 2 + childGap + w / 2);
-        const y = currentY + childH / 2;
-        currentY += childH;
-        const finalX = x + (child.offX || 0);
-        const finalY = y + (child.offY || 0);
-        positions[cid] = { x: finalX, y: finalY, w, h, side };
-        layoutChildren(cid, finalX, finalY, side, w, depth + 1);
-      });
+      placeColumn(activeChildren.filter(cid => !isZigKid(cid)), currentY);
       return;
     }
 
-    activeChildren.forEach((cid, i) => {
-      const childH = heights[cid];
-      const { w, h } = getNodeSize(cid);
-      const child = findNode(cid);
-
-      const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
-
-      const x = parentX + dir * (parentW / 2 + childGap + w / 2);
-      const y = currentY + childH / 2;
-      currentY += childH;
-      if (depth === 0 && i < activeChildren.length - 1) {
-        const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(activeChildren[i + 1]));
-        currentY += VERTICAL_GAP * 2 * neighborScale;
-      }
-
-      const finalX = x + (child.offX || 0);
-      const finalY = y + (child.offY || 0);
-
-      positions[cid] = { x: finalX, y: finalY, w, h, side };
-      layoutChildren(cid, finalX, finalY, side, w, depth + 1);
-    });
+    placeColumn(activeChildren, currentY);
   }
 
   layoutSide(leftBranches, 'left');
