@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-zEjsTbrOJ/JVsdmDJEVSqDD4n9NSjaqS290uWV2QD7Q='
+               'sha256-plC1HA+G20WeDuJ0NNotGguAanu3hwIaLVr+t+JxB8k='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -15673,10 +15673,15 @@ document.addEventListener('click', (e) => {
     populateBranches();
     selectedBranchId = null;
 
-    // Re-select last used branch if still valid
+    // Re-select last used branch if still valid, else fall back to the first
+    // one so Enter always stores something — a submit with no branch picked is
+    // a silent no-op, which reads as a broken panel.
     const saved = localStorage.getItem(STORAGE_KEY);
+    const fallback = weekData.nodes.find(n => n.type === 'branch');
     if (saved && weekData.nodes.find(n => n.id === saved && n.type === 'branch')) {
       selectBranch(saved);
+    } else if (fallback) {
+      selectBranch(fallback.id);
     }
 
     panel.classList.add('is-open');
