@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-TscL3SRdqVwSJMTwpkiEIsLaNaV9ZiU8CtrRsr4DG7I='
+               'sha256-zEjsTbrOJ/JVsdmDJEVSqDD4n9NSjaqS290uWV2QD7Q='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -7602,6 +7602,9 @@ function applyTranslations() {
   });
   document.querySelectorAll('[data-i18n-aria]').forEach(el => {
     el.setAttribute('aria-label', t(el.dataset.i18nAria));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
   });
   refreshSyncUiText();
   const sel = document.getElementById('lang-select');
@@ -15592,9 +15595,6 @@ document.addEventListener('click', (e) => {
   // How many just-added items the receipt strip echoes back before the oldest
   // scrolls off. Keeps the panel compact next to a mobile keyboard.
   const RECENT_MAX = 4;
-
-  // Apply placeholder translation (not handled by applyTranslations)
-  input.placeholder = t('quick_add.placeholder');
 
   let selectedBranchId = null;
 
