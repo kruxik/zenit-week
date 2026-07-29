@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-JYFxKe6bRVZ8E+390VzK3qYlJy2tiIK4tG0rQASHyLk='
+               'sha256-MLU/lywFCG8NlwskMFsD3fZP2OwCoWvu8gTDucWa1nY='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -1869,6 +1869,56 @@
   }
   .qab-pill-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
+  #quick-add-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  #quick-add-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-subtle);
+  }
+  #quick-add-header .help-close-btn {
+    height: 28px;
+    padding: 0 8px;
+  }
+
+  /* Receipt strip — the panel stays open after a submit, so each stored item
+     is echoed here instead of firing a toast (the toast is a single slot and
+     sits at bottom:68px, right on top of this panel). */
+  #quick-add-recent {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #quick-add-recent:empty { display: none; }
+  .qab-recent-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--text-dim);
+    animation: qab-recent-in 0.25s ease;
+  }
+  .qab-recent-item > span:nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .qab-recent-note {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--text-subtle);
+  }
+  @keyframes qab-recent-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: none; }
+  }
+
   #quick-add-input {
     width: 100%;
     box-sizing: border-box;
@@ -3595,7 +3645,15 @@
 
 <div id="quick-add-backdrop"></div>
 <div id="quick-add-panel" role="dialog" aria-label="Quick add" aria-modal="true">
+  <div id="quick-add-header">
+    <span id="quick-add-title" data-i18n="quick_add.title">Quick add</span>
+    <button type="button" class="help-close-btn" id="quick-add-close"
+      data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+      <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    </button>
+  </div>
   <div id="quick-add-branches" role="group" aria-label="Branch"></div>
+  <div id="quick-add-recent" role="status" aria-live="polite"></div>
   <input type="search" id="quick-add-input" maxlength="200"
     data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…"
     autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
@@ -7059,6 +7117,7 @@ const TRANSLATIONS = {
     'nav.next':                   'Next',
     'toolbar.settings':           'Settings',
     'quick_add.placeholder':      'Add a task…',
+    'quick_add.title':            'Quick add',
     'week.word':                  'Week',
     'week.short':                 'W',
     'settings.appearance':        'Theme',
@@ -7295,6 +7354,7 @@ const TRANSLATIONS = {
     'nav.next':                   'Další',
     'toolbar.settings':           'Nastavení',
     'quick_add.placeholder':      'Přidat úkol…',
+    'quick_add.title':            'Rychlé přidání',
     'week.word':                  'Týden',
     'week.short':                 'T',
     'settings.appearance':        'Téma',
@@ -15524,8 +15584,14 @@ document.addEventListener('click', (e) => {
   const panel        = document.getElementById('quick-add-panel');
   const backdrop     = document.getElementById('quick-add-backdrop');
   const branchesRow  = document.getElementById('quick-add-branches');
+  const recentRow    = document.getElementById('quick-add-recent');
+  const closeBtn     = document.getElementById('quick-add-close');
   const input        = document.getElementById('quick-add-input');
   const fabAdd       = document.getElementById('fab-add');
+
+  // How many just-added items the receipt strip echoes back before the oldest
+  // scrolls off. Keeps the panel compact next to a mobile keyboard.
+  const RECENT_MAX = 4;
 
   // Apply placeholder translation (not handled by applyTranslations)
   input.placeholder = t('quick_add.placeholder');
@@ -15565,6 +15631,34 @@ document.addEventListener('click', (e) => {
     });
   }
 
+  // Echo a stored item back into the panel. The label is the *resolved* one —
+  // read after applyMagicLabel — so the user sees the frozen day token and the
+  // counter split, not just what they typed.
+  function addRecent(label, branchId, movedToNextWeek) {
+    const bc = BRANCH_COLORS[branchId] || { main: '#888' };
+    const item = document.createElement('div');
+    item.className = 'qab-recent-item';
+
+    const dot = document.createElement('span');
+    dot.className = 'qab-pill-dot';
+    dot.style.background = bc.main;
+    item.appendChild(dot);
+
+    const text = document.createElement('span');
+    text.textContent = label;
+    item.appendChild(text);
+
+    if (movedToNextWeek) {
+      const note = document.createElement('span');
+      note.className = 'qab-recent-note';
+      note.textContent = '→ ' + t('menu.nextWeek');
+      item.appendChild(note);
+    }
+
+    recentRow.prepend(item);
+    while (recentRow.children.length > RECENT_MAX) recentRow.lastElementChild.remove();
+  }
+
   function openQuickAdd() {
     if (isMobile()) {
       panel.classList.remove('is-desktop');
@@ -15586,6 +15680,9 @@ document.addEventListener('click', (e) => {
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     input.value = '';
+    // The receipt is session-scoped — a fresh open starts a fresh strip, so the
+    // panel never grows into a history log.
+    recentRow.innerHTML = '';
     requestAnimationFrame(() => input.focus());
   }
 
@@ -15629,20 +15726,27 @@ document.addEventListener('click', (e) => {
     // Apply day-token + Nx-counter rules — same logic as commitEdit.
     applyMagicLabel(node.id);
 
+    // Capture before the possible move — after it the node lives in next week's
+    // data and findNode() no longer resolves it.
+    const storedLabel = findNode(node.id)?.label || node.label;
+
     if (crossesNextWeek) {
       // Node was created in this week then frozen to "(Mo)"; relocate the whole
       // node to next week where that Monday actually lives. The snapshot above
       // already captured pre-add state, so skip move's own snapshot (one undo
       // reverses the add+move). move() saves both weeks and re-renders.
       await moveNodeToNextWeek(node.id, { takeSnap: false });
-      showToast(t('toast.movedToNextWeek'));
     } else {
       saveWeek(currentWeekKey, weekData);
     }
     renderIfVisible();
     if (currentView === 'agenda') renderAgenda();
 
-    closeQuickAdd();
+    // Stay open for the next item: the receipt strip confirms the store, and
+    // keeping focus means the mobile keyboard never dismisses between entries.
+    addRecent(storedLabel, selectedBranchId, crossesNextWeek);
+    input.value = '';
+    if (panel.classList.contains('is-open')) input.focus();
   }
 
   // ── Event listeners ──
@@ -15658,8 +15762,16 @@ document.addEventListener('click', (e) => {
     }
   });
 
+  closeBtn.addEventListener('click', (e) => { e.stopPropagation(); closeQuickAdd(); });
+
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); submitQuickAdd(); }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Enter on an empty field is the keyboard-only way out now that a submit
+      // no longer closes the panel.
+      if (!input.value.trim()) closeQuickAdd();
+      else submitQuickAdd();
+    }
     if (e.key === 'Escape') { e.preventDefault(); closeQuickAdd(); }
   });
 
