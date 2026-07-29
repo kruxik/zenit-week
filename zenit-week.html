@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-MLU/lywFCG8NlwskMFsD3fZP2OwCoWvu8gTDucWa1nY='
+               'sha256-TscL3SRdqVwSJMTwpkiEIsLaNaV9ZiU8CtrRsr4DG7I='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -1915,7 +1915,7 @@
     color: var(--text-subtle);
   }
   @keyframes qab-recent-in {
-    from { opacity: 0; transform: translateY(-4px); }
+    from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: none; }
   }
 
@@ -15655,8 +15655,10 @@ document.addEventListener('click', (e) => {
       item.appendChild(note);
     }
 
-    recentRow.prepend(item);
-    while (recentRow.children.length > RECENT_MAX) recentRow.lastElementChild.remove();
+    // FIFO — oldest first, newest lands directly above the input, so the strip
+    // reads in the order the items were typed.
+    recentRow.append(item);
+    while (recentRow.children.length > RECENT_MAX) recentRow.firstElementChild.remove();
   }
 
   function openQuickAdd() {
