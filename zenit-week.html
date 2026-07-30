@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-hl6T0qR9Wg4igu1Pv7TMZPwM5U9UAkrQOQ9+24qf68k='
+               'sha256-DZsHSx8S8sdfO3ipnl6gAcbYFtvwYdAm5GPvG3wMjLU='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -1718,7 +1718,26 @@
   .stats-tl-unpl { background: var(--stats-unplan); }
   .stats-tl-legend { margin-top: 12px; }
 
-  /* ⑤ 4-week cumulative flow diagram across the last four ISO weeks. */
+  /* ⑤ Cumulative flow diagram across the last 4 / 8 / 12 ISO weeks. */
+  .stats-trend-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .stats-trend-head .help-section-title { margin-bottom: 0; }
+  .stats-trend-range {
+    display: flex;
+    gap: 4px;
+  }
+  .stats-trend-range .agenda-action-btn {
+    height: 24px;
+    padding: 0 8px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
   .stats-trend-sub {
     color: var(--text-faint);
     font-size: 12.5px;
@@ -7215,8 +7234,11 @@ const TRANSLATIONS = {
     'stats.legendDone':           'done',
     'stats.legendOpen':           'open',
     'stats.legendUnplanned':      'unplanned (hatched)',
-    'stats.trendTitle':           '4-week cumulative flow',
-    'stats.trendSub':             'Weighted load by state across the last four weeks.',
+    'stats.trendTitle':           '{n}-week cumulative flow',
+    'stats.trendSub':             'Weighted load by state across the last {n} weeks.',
+    'stats.trendSubMany':         'Weighted load by state across the last {n} weeks.',
+    'stats.trendRange':           '{n}W',
+    'stats.trendRangeAria':       'Show the last {n} weeks',
     'stats.trendNoData':          'No earlier weeks to compare yet.',
     'stats.trendWeek':            'week',
     'stats.weekPrefix':           'W',
@@ -7452,8 +7474,11 @@ const TRANSLATIONS = {
     'stats.legendDone':           'splněno',
     'stats.legendOpen':           'zbývá',
     'stats.legendUnplanned':      'neplánováno (šrafováno)',
-    'stats.trendTitle':           'Kumulativní 4 týdenní přehled',
-    'stats.trendSub':             'Vážená zátěž podle stavu za poslední čtyři týdny.',
+    'stats.trendTitle':           'Kumulativní {n} týdenní přehled',
+    'stats.trendSub':             'Vážená zátěž podle stavu za poslední {n} týdny.',
+    'stats.trendSubMany':         'Vážená zátěž podle stavu za posledních {n} týdnů.',
+    'stats.trendRange':           '{n}T',
+    'stats.trendRangeAria':       'Zobrazit posledních {n} týdnů',
     'stats.trendNoData':          'Zatím není s čím srovnávat.',
     'stats.trendWeek':            'týden',
     'stats.weekPrefix':           'T',
@@ -11628,7 +11653,7 @@ function _renderStatsTimelineSection(leaves) {
   sec.appendChild(colEl);
 }
 
-// ⑤ 4-Week Cumulative Flow ──────────────────────────────────────────────────────
+// ⑤ Cumulative Flow (4 / 8 / 12 weeks) ──────────────────────────────────────────────────────
 // Weighted planned/unplanned × done/open split for an arbitrary week's data object.
 // Self-contained — does NOT use the global nodeMap, so it works on historical weeks
 // loaded straight from IDB. Mirrors computeWeekStats()'s statsOf() exactly (critical
@@ -11667,7 +11692,7 @@ function _weekCompletion(data, branchId) {
            total, done, percent: Math.round((done / total) * 100) };
 }
 
-// Cumulative Flow Diagram across the last four ISO weeks (oldest → current). Each
+// Cumulative Flow Diagram across the last N ISO weeks (oldest → current). Each
 // week is one column; the four weighted buckets (planned/unplanned × done/open) are
 // stacked as filled areas, done at the bottom — so the bottom band's growth reads as
 // "more got finished" and the total height reads as weekly load. Colours mirror the
@@ -11685,6 +11710,16 @@ const _CFD_BANDS = [
 // Selected CFD lens: null = Total (all branches), otherwise a branch id. Persists
 // across panel opens within the session; reset to Total if the branch disappears.
 let _cfdBranch = null;
+
+// Selected CFD span in weeks. The section always fetches the widest range once and
+// slices its tail, so switching costs no IDB reads. Session-scoped like _cfdBranch.
+const _CFD_RANGES = [4, 8, 12];
+const _CFD_MAX_RANGE = _CFD_RANGES[_CFD_RANGES.length - 1];
+let _cfdRange = _CFD_RANGES[0];
+
+// Czech needs a different plural for 5+ ("posledních 8 týdnů" vs "poslední 4 týdny");
+// English uses the same sentence for both keys.
+const _cfdSubText = (n) => t(n >= 5 ? 'stats.trendSubMany' : 'stats.trendSub', { n });
 
 // Builds the stacked-area SVG for one lens. `weeks` is [{week, stats|null}] already
 // filtered/computed for the chosen branch. Returns the <svg> element.
@@ -11704,7 +11739,7 @@ function _buildCfdSvg(weeks) {
 
   const svg = _svgEl('svg', {
     viewBox: `0 0 ${W} ${H}`, class: 'stats-trend-svg', role: 'img',
-    'aria-label': t('stats.trendSub'),
+    'aria-label': _cfdSubText(n),
   });
 
   // Stacked areas, bottom band first. Each band is a ribbon between the running
@@ -11769,10 +11804,14 @@ function _buildCfdSvg(weeks) {
   svg.appendChild(hair({ x1: PAD_L, x2: W - PAD_R, y1: y(0), y2: y(0) }, 0.3));
   axisLabel(0, y(0), false);
 
-  // Week labels along the bottom (always shown — keeps the axis calendar-accurate).
+  // Week labels along the bottom. At 4 weeks every column is labelled; wider spans
+  // would collide at this font size, so labels thin out (every 2nd at 8W, every 3rd
+  // at 12W) counting back from the current week, which is always labelled.
   // The current (last) week gets a blue dot beneath its label, mirroring the Agenda's
   // current-day marker.
+  const labelStep = n <= 4 ? 1 : n <= 8 ? 2 : 3;
   weeks.forEach((w, i) => {
+    if ((n - 1 - i) % labelStep !== 0) return;
     const wlab = _svgEl('text', {
       x: x(i), y: H - 6, 'text-anchor': 'middle',
       fill: 'var(--text-faint)', 'font-size': 11, 'font-weight': 600,
@@ -11793,11 +11832,13 @@ async function _renderStatsTrendSection() {
   const sec = document.getElementById('stats-section-trend');
   if (!sec) return;
 
-  // Raw week data, fetched once: current week from live weekData (reflects unsaved
-  // edits), the prior three from IDB. The branch lens then recomputes from these
-  // synchronously, so switching views needs no further IDB reads.
-  const keys = [-3, -2, -1, 0].map(d => offsetWeek(currentWeekKey, d));
-  const rawWeeks = await Promise.all(keys.map(async (wk, i) => {
+  // Raw week data, fetched once at the widest span: current week from live weekData
+  // (reflects unsaved edits), the earlier ones from IDB. Both lenses — branch and
+  // range — then recompute from this array synchronously, so switching either needs
+  // no further IDB reads.
+  const keys = Array.from({ length: _CFD_MAX_RANGE },
+    (_, i) => offsetWeek(currentWeekKey, i - (_CFD_MAX_RANGE - 1)));
+  const allWeeks = await Promise.all(keys.map(async (wk, i) => {
     const last = i === keys.length - 1;
     return { week: parseWeekKey(wk).week, data: last ? weekData : await loadWeekIDB(wk) };
   }));
@@ -11806,15 +11847,26 @@ async function _renderStatsTrendSection() {
   if (!_statsPanelOpen) return;
   sec.textContent = '';
 
+  // Caption row: title on the left, the range switcher (4W / 8W / 12W) on the right.
+  // Both caption and subtitle name the active span, so they retitle on every switch.
+  const head = document.createElement('div');
+  head.className = 'stats-trend-head';
   const title = document.createElement('div');
   title.className = 'help-section-title';
-  title.textContent = t('stats.trendTitle');
-  sec.appendChild(title);
+  head.appendChild(title);
+  const ranges = document.createElement('div');
+  ranges.className = 'stats-trend-range';
+  head.appendChild(ranges);
+  sec.appendChild(head);
 
   const sub = document.createElement('div');
   sub.className = 'stats-trend-sub';
-  sub.textContent = t('stats.trendSub');
   sec.appendChild(sub);
+
+  const paintCaption = () => {
+    title.textContent = t('stats.trendTitle', { n: _cfdRange });
+    sub.textContent = _cfdSubText(_cfdRange);
+  };
 
   // Lens switcher: Total + one chip per current-week branch (reuses the quick-add
   // branch-pill styling). If the remembered branch no longer exists, fall back to Total.
@@ -11829,7 +11881,8 @@ async function _renderStatsTrendSection() {
   // Morph state: the per-week numeric buckets last painted, so a lens switch tweens
   // FROM the currently shown shape (not from zero). Null buckets become flat columns.
   const ZERO = { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
-  let prevShape = null;   // [{...buckets}] per week, length === rawWeeks.length
+  let prevShape = null;   // [{...buckets}] per shown week, length === _cfdRange
+  let shownWeeks = [];    // the week slice prevShape was painted from
   let animId = 0;
   const lerpShape = (a, b, e) => b.map((bw, i) => {
     const aw = a[i];
@@ -11840,16 +11893,21 @@ async function _renderStatsTrendSection() {
     return s;
   });
   const paintSvg = (shape) => {
-    const weeks = rawWeeks.map((w, i) => ({ week: w.week, stats: shape[i] }));
-    const svg = _buildCfdSvg(weeks);
+    const svg = _buildCfdSvg(shownWeeks.map((w, i) => ({ week: w.week, stats: shape[i] })));
     const old = chart.querySelector('svg');
     if (old) chart.replaceChild(svg, old); else chart.insertBefore(svg, chart.firstChild);
   };
 
   const draw = (animate) => {
     cancelAnimationFrame(animId);
+    paintCaption();
     chart.textContent = '';
-    const weeks = rawWeeks.map(w => ({ week: w.week, stats: _weekCompletion(w.data, _cfdBranch) }));
+    const weeks = allWeeks.slice(-_cfdRange)
+      .map(w => ({ week: w.week, stats: _weekCompletion(w.data, _cfdBranch) }));
+    // A range switch changes the column count, so the previous shape can't be tweened
+    // into the new one — only same-width morphs (branch switches) animate.
+    if (prevShape && prevShape.length !== weeks.length) prevShape = null;
+    shownWeeks = weeks;
     if (weeks.filter(w => w.stats).length < 2) {
       const note = document.createElement('div');
       note.className = 'stats-trend-note';
@@ -11903,6 +11961,24 @@ async function _renderStatsTrendSection() {
     });
     return chip;
   };
+
+  // Range chips — same pill styling as the branch lens, one per supported span.
+  _CFD_RANGES.forEach(n => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'agenda-action-btn qab-pill' + (_cfdRange === n ? ' selected' : '');
+    btn.dataset.range = String(n);
+    btn.textContent = t('stats.trendRange', { n });
+    btn.setAttribute('aria-label', t('stats.trendRangeAria', { n }));
+    btn.addEventListener('click', () => {
+      if (_cfdRange === n) return;
+      _cfdRange = n;
+      ranges.querySelectorAll('.qab-pill').forEach(p =>
+        p.classList.toggle('selected', p.dataset.range === String(n)));
+      draw(true);
+    });
+    ranges.appendChild(btn);
+  });
 
   switcher.appendChild(makeChip(null, t('stats.trendTotal'), null));
   branches.forEach(b => {
