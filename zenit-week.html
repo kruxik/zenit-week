@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-0CBUOMwoMVoXcU5chzRV2ic3Hzdh/mrvtvhGz5+2+UM='
+               'sha256-KEN/2mUSYQpRWcVp8n7HpOLqpFhDA581efZXXlJSQ8s='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -11726,12 +11726,23 @@ const _cfdSubText = (n) => t(n >= 5 ? 'stats.trendSubMany' : 'stats.trendSub', {
 function _buildCfdSvg(weeks) {
   // The SVG scales to its container width keeping the viewBox aspect ratio. On a
   // narrow (mobile) panel the desktop H=100 renders too short, so use a taller
-  // viewBox below the 768px panel breakpoint — width-driven text size is
-  // unchanged, only the plot grows taller.
-  const W = 320, H = window.innerWidth < 768 ? 150 : 100, n = weeks.length;
+  // viewBox below the 768px panel breakpoint — only the plot grows taller.
+  const vw = window.innerWidth, mobile = vw < 768;
+  const W = 320, H = mobile ? 150 : 100, n = weeks.length;
+
+  // Label sizes are viewBox units, so their ON-SCREEN size depends on how far the
+  // fixed 320-unit box is stretched — ~2.3x in the 780px desktop panel but only
+  // ~1.1x on a phone. A constant font-size would therefore render twice as large on
+  // desktop as on mobile. Derive it from the panel geometry instead so both axes
+  // land at ~12.5px everywhere, matching the section subtitle.
+  const chartPx = Math.max(240, (mobile ? vw : Math.min(780, vw - 40)) - (mobile ? 18 : 24) * 2);
+  const FONT = 12.5 / (chartPx / W);
+  const CAP = FONT * 0.72; // approximate cap height, for gap/centring math
+
   // PAD_B fits exactly what sits under the baseline: a 5-unit gap (matching the Y
   // labels' gap to the axis), the week label, and the current-week dot beneath it.
-  const PAD_T = 14, PAD_B = 15, PAD_L = 28, PAD_R = 12;
+  // PAD_L keeps that same 5-unit gap clear once the widest load figure is drawn.
+  const PAD_T = 14, PAD_B = 11 + CAP, PAD_L = Math.max(28, 5 + FONT * 2.4), PAD_R = 12;
   const plotH = H - PAD_T - PAD_B;
   const innerW = W - PAD_L - PAD_R;
   const maxY = Math.max(...weeks.map(w => w.stats ? w.stats.total : 0)) || 1;
@@ -11777,8 +11788,8 @@ function _buildCfdSvg(weeks) {
   });
   const axisLabel = (val, yv, bold) => {
     const lab = _svgEl('text', {
-      x: PAD_L - 5, y: yv + 2, 'text-anchor': 'end',
-      fill: 'var(--text-faint)', 'font-size': 5.5, 'font-weight': 600,
+      x: PAD_L - 5, y: yv + CAP / 2, 'text-anchor': 'end',
+      fill: 'var(--text-faint)', 'font-size': FONT, 'font-weight': 600,
       'fill-opacity': bold ? 0.85 : 0.55,
     });
     lab.textContent = String(val);
@@ -11816,7 +11827,7 @@ function _buildCfdSvg(weeks) {
     if ((n - 1 - i) % labelStep !== 0) return;
     const wlab = _svgEl('text', {
       x: x(i), y: H - 6, 'text-anchor': 'middle',
-      fill: 'var(--text-faint)', 'font-size': 5.5, 'font-weight': 600,
+      fill: 'var(--text-faint)', 'font-size': FONT, 'font-weight': 600,
     });
     wlab.textContent = t('stats.weekPrefix') + w.week;
     svg.appendChild(wlab);
