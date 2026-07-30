@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.07.30] - 2026-07-30
+
+### Added
+
+- **stats:** Add 8- and 12-week ranges to the cumulative flow chart
+- **layout:** Pack inbox items into a grid tray instead of a tall column
+- **quick-add:** Preselect first branch when none saved
+- **quick-add:** Keep panel open after submit with in-panel receipt and close button
+- Support day-range interval syntax "(mo-we)" for scheduling
+- Experimental Drive Changes API poll behind a flag (off by default)
+
+### Fixed
+
+- **stats:** Size cumulative flow axis labels to ~12.5px at any width
+- **i18n:** Translate placeholders in applyTranslations
+- **quick-add:** Order receipt strip FIFO, oldest first
+- Keep Drive session on aborted or transient token refresh
+- Keep stored branch colors; validate the synced colors file
+- Cascade branch to descendants when rebinding a subtree across branches
+- Repair remote reset, log silent GC, unconditional pre-push pull, poll discovery
+- Undo reverses a transfer's own nodes instead of rewriting the next week
+- Keep queued uploads, honour the import flag, and stop undo deleting peer work
+- Serialize week-record writes and reconcile local-only weeks from IDB
+- Propagate done/unplanned status up to branch nodes
+- Sync branch left/right side across devices (refresh BRANCH_CONFIG on merge)
+- Stop Drive poll re-downloading colors file with legacy-scheme contentHash
+
+### Security
+
+- Serve strict hashed CSP headers for landing pages
+- Drop gapi client for plain fetch, close CSP to self + hashes
+- Sunset the revoke_legacy relay on 2026-11-01
+- Match localhost exactly in token proxy Secure-cookie check
+- Add frame-ancestors, nosniff, referrer, HSTS headers in vercel.json
+- Replace CSP unsafe-inline with per-script sha256 hashes, drop vercel.live
+- Drop localStorage refresh-token fallbacks, purge and revoke lingering copies on load
+
 ## [v2026.06.24.1] - 2026-06-24
 
 ### Fixed
