@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-DZsHSx8S8sdfO3ipnl6gAcbYFtvwYdAm5GPvG3wMjLU='
+               'sha256-0CBUOMwoMVoXcU5chzRV2ic3Hzdh/mrvtvhGz5+2+UM='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   img-src      'self' data: https://*.googleusercontent.com;
@@ -11729,7 +11729,9 @@ function _buildCfdSvg(weeks) {
   // viewBox below the 768px panel breakpoint — width-driven text size is
   // unchanged, only the plot grows taller.
   const W = 320, H = window.innerWidth < 768 ? 150 : 100, n = weeks.length;
-  const PAD_T = 14, PAD_B = 22, PAD_L = 28, PAD_R = 12;
+  // PAD_B fits exactly what sits under the baseline: a 5-unit gap (matching the Y
+  // labels' gap to the axis), the week label, and the current-week dot beneath it.
+  const PAD_T = 14, PAD_B = 15, PAD_L = 28, PAD_R = 12;
   const plotH = H - PAD_T - PAD_B;
   const innerW = W - PAD_L - PAD_R;
   const maxY = Math.max(...weeks.map(w => w.stats ? w.stats.total : 0)) || 1;
@@ -11775,9 +11777,9 @@ function _buildCfdSvg(weeks) {
   });
   const axisLabel = (val, yv, bold) => {
     const lab = _svgEl('text', {
-      x: PAD_L - 5, y: yv + 3, 'text-anchor': 'end',
-      fill: 'var(--text-faint)', 'font-size': 8.5,
-      'fill-opacity': bold ? 0.85 : 0.55, 'font-weight': bold ? 600 : 400,
+      x: PAD_L - 5, y: yv + 2, 'text-anchor': 'end',
+      fill: 'var(--text-faint)', 'font-size': 5.5, 'font-weight': 600,
+      'fill-opacity': bold ? 0.85 : 0.55,
     });
     lab.textContent = String(val);
     svg.appendChild(lab);
@@ -11814,7 +11816,7 @@ function _buildCfdSvg(weeks) {
     if ((n - 1 - i) % labelStep !== 0) return;
     const wlab = _svgEl('text', {
       x: x(i), y: H - 6, 'text-anchor': 'middle',
-      fill: 'var(--text-faint)', 'font-size': 11, 'font-weight': 600,
+      fill: 'var(--text-faint)', 'font-size': 5.5, 'font-weight': 600,
     });
     wlab.textContent = t('stats.weekPrefix') + w.week;
     svg.appendChild(wlab);
