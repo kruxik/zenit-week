@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-+h4Dx7LL7v3lj4yPcZWx0UWFiqo1KSGTWcsg65ujksU='
+               'sha256-wW80ry72eowBVDx0beqIN3LsjHuClUkFJwfYc4Gdqcw='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3917,6 +3917,15 @@ const _displayVersion = APP_VERSION.startsWith('__') ? 'dev' : APP_VERSION;
 const NET_TIMEOUT_MS       = 20000;  // Drive REST + token proxy
 const NET_PROBE_TIMEOUT_MS = 8000;   // version probe — cheap, nothing waits on it
 
+// navigator.onLine is only trustworthy in the negative. `false` means the OS
+// has no link at all, so a request is certain to fail and is not worth making;
+// `true` merely means an interface exists — a captive portal or a dead uplink
+// still reports true. Use this to skip doomed work, never to conclude that a
+// request will succeed. That is what the deadlines above are for.
+function isDefinitelyOffline() {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
 function netFetch(input, options = {}) {
   const { timeoutMs = NET_TIMEOUT_MS, ...init } = options;
   // AbortSignal.timeout is Baseline-wide; guard anyway so a stripped-down
@@ -3951,6 +3960,10 @@ function parseAssetVersionHeaders(headers) {
 }
 
 async function checkForAssetUpdate() {
+  if (isDefinitelyOffline()) {
+    console.debug('[quiet-refresh] probe-skipped-offline');
+    return;
+  }
   let resp;
   try {
     resp = await netFetch(_assetProbeUrl(), {
@@ -6769,14 +6782,38 @@ function scheduleDriveSync(wKey) {
   if (existing) clearTimeout(existing);
   syncDebounceTimers.set(wKey, setTimeout(() => {
     syncDebounceTimers.delete(wKey);
+    // Offline: park the week instead of firing. A failed upload only sets the
+    // error badge and forgets the attempt, so the week would then sit un-pushed
+    // until its content happened to change again.
+    if (isDefinitelyOffline()) {
+      _offlineUploadQueue.add(wKey);
+      setSyncStatus('error', 'sync.msg.failedSavedLocal');
+      return;
+    }
     syncWeekToDrive(wKey);
   }, 10000));
 }
+
+// Weeks whose upload was skipped because the device had no link. Flushed by the
+// 'online' listener below rather than by a retry timer — there is nothing to
+// poll for, the browser tells us when the link is back.
+const _offlineUploadQueue = new Set();
+
+window.addEventListener('online', () => {
+  if (!_offlineUploadQueue.size) return;
+  const keys = [..._offlineUploadQueue];
+  _offlineUploadQueue.clear();
+  console.debug('[sync] back online — re-queuing parked uploads', keys);
+  // Back through the debounce so a batch of parked weeks does not stampede
+  // Drive the instant the link returns.
+  keys.forEach(wk => scheduleDriveSync(wk));
+});
 
 // Clear every pending per-week debounce timer (used on sign-out / tab-hide).
 function clearAllSyncDebounceTimers() {
   syncDebounceTimers.forEach(t => clearTimeout(t));
   syncDebounceTimers.clear();
+  _offlineUploadQueue.clear();
 }
 
 async function syncColorsToDrive() {
@@ -7092,6 +7129,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
 function startDrivePoll(wKey) {
   stopDrivePoll();
   _pollTimer = setInterval(() => {
+    if (isDefinitelyOffline()) return; // nothing to poll for, and no request to waste
     if (_useChangeFeed()) pollDriveChanges(wKey);
     else pollDriveMeta(wKey);
   }, POLL_INTERVAL_MS);

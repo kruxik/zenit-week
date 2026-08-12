@@ -113,6 +113,8 @@ async function shellResponse(event) {
 }
 
 async function revalidateShell(cache, cached, path) {
+  // Only trusted in the negative — see isDefinitelyOffline() in the app.
+  if (self.navigator && self.navigator.onLine === false) return;
   let fresh;
   try {
     // `no-cache` sends a conditional request, so an unchanged shell costs a 304
