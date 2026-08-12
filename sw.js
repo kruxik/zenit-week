@@ -1,0 +1,121 @@
+/* Zenit Week — offline-first app shell.
+ *
+ * The whole application is one ~640 KB HTML document served with
+ * `Cache-Control: max-age=0, must-revalidate`, which means every launch used to
+ * block on a live network round-trip. This worker keeps a copy of that document
+ * in the Cache Storage API and serves it immediately, revalidating in the
+ * background. Startup therefore works offline and stays instant on a slow link.
+ *
+ * Scope is the whole origin (the file sits at the root), but only navigations to
+ * the app document are intercepted. The marketing pages, `/api/*` and every
+ * cross-origin request (Google Drive) fall straight through to the network.
+ *
+ * This is the one piece of the app that cannot live in zenit-week.html: browsers
+ * only accept a service worker from a same-origin script URL.
+ */
+'use strict';
+
+const CACHE_NAME = 'zw-shell-v1';
+
+// Synthetic cache key. The app answers on several URLs (`/app`, `/app/…`,
+// `/zenit-week.html`) that all resolve to the same document via Vercel
+// rewrites, and OAuth returns to `/app?code=…`. Storing one entry under a key
+// that is never fetched keeps those variants from multiplying in the cache.
+const SHELL_KEY = '/__zw-shell__';
+
+const APP_PATH = /^\/(?:app(?:\/.*)?|zenit-week\.html)$/;
+
+function isAppDocument(url) {
+  return url.origin === self.location.origin && APP_PATH.test(url.pathname);
+}
+
+// Version identity of a shell response, matching the page-side probe: an ETag
+// when the host sends one, Last-Modified otherwise.
+function versionToken(response) {
+  return response.headers.get('etag') || response.headers.get('last-modified') || null;
+}
+
+self.addEventListener('install', () => {
+  // Nothing to precache — the first navigation populates the shell. Activate
+  // straight away so a new worker never waits for every tab to close.
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)));
+    await self.clients.claim();
+    await warmShell();
+  })());
+});
+
+// The navigation that installs the worker is not itself intercepted, so without
+// this the very first visit would leave the cache empty — install the app, go
+// offline, and it would be dead. Fetch the shell once on activation instead.
+async function warmShell() {
+  const cache = await caches.open(CACHE_NAME);
+  if (await cache.match(SHELL_KEY)) return;
+  const windows = await self.clients.matchAll({ type: 'window' });
+  const client = windows.find(c => {
+    try { return isAppDocument(new URL(c.url)); } catch (_) { return false; }
+  });
+  if (!client) return;
+  // Path only: never store a response keyed to an OAuth `?code=` callback.
+  const path = new URL(client.url).pathname;
+  try {
+    const resp = await fetch(path, { cache: 'no-cache' });
+    if (resp && resp.ok) await cache.put(SHELL_KEY, resp);
+  } catch (err) {
+    console.debug('[sw] warm-failed', err && err.message);
+  }
+}
+
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.method !== 'GET' || req.mode !== 'navigate') return;
+  let url;
+  try { url = new URL(req.url); } catch (_) { return; }
+  if (!isAppDocument(url)) return;
+  event.respondWith(shellResponse(event));
+});
+
+async function shellResponse(event) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(SHELL_KEY);
+  if (cached) {
+    // Stale-while-revalidate: paint from cache, check for a new deploy after.
+    event.waitUntil(revalidateShell(cache, cached, new URL(event.request.url).pathname));
+    return cached;
+  }
+  try {
+    const fresh = await fetch(event.request);
+    if (fresh && fresh.ok) await cache.put(SHELL_KEY, fresh.clone());
+    return fresh;
+  } catch (err) {
+    return new Response(
+      'Zenit Week is offline and has no cached copy yet. Reconnect once to install it.',
+      { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+    );
+  }
+}
+
+async function revalidateShell(cache, cached, path) {
+  let fresh;
+  try {
+    // `no-cache` sends a conditional request, so an unchanged shell costs a 304
+    // and not another full download of the document.
+    fresh = await fetch(path, { cache: 'no-cache' });
+  } catch (err) {
+    return; // Offline or the link died — the cached shell stays authoritative.
+  }
+  if (!fresh || !fresh.ok) return;
+  const newToken = versionToken(fresh);
+  const oldToken = versionToken(cached);
+  await cache.put(SHELL_KEY, fresh.clone());
+  if (!newToken || !oldToken || newToken === oldToken) return;
+  const windows = await self.clients.matchAll({ type: 'window' });
+  for (const client of windows) {
+    client.postMessage({ type: 'zw-shell-updated', token: newToken });
+  }
+}

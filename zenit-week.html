@@ -11,9 +11,10 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-KEN/2mUSYQpRWcVp8n7HpOLqpFhDA581efZXXlJSQ8s='
+               'sha256-l8lOXUXE7gzmSLfY5RwIi9VGjGtsXtRVU9Ox8MX7Tfw='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
+  worker-src   'self';
   img-src      'self' data: https://*.googleusercontent.com;
   style-src    'unsafe-inline';
   manifest-src 'self' data:;
@@ -3945,6 +3946,15 @@ async function checkForAssetUpdate() {
     console.debug('[quiet-refresh] probe-no-token');
     return;
   }
+  _noteAssetVersion(token);
+}
+
+// Records the version token seen for the deployed shell. Shared by the HTTP
+// probe above and the service worker's postMessage, which report the same fact
+// through different channels. The token is persisted *before* `_pendingReload`
+// is flagged, so a broken deploy can only ever reload once.
+function _noteAssetVersion(token) {
+  if (!token) return;
   const prev = localStorage.getItem(ASSET_ETAG_KEY);
   if (prev === null) {
     localStorage.setItem(ASSET_ETAG_KEY, token);
@@ -3964,6 +3974,29 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('focus', () => checkForAssetUpdate());
 checkForAssetUpdate();
+
+// ─── Service worker: offline-first app shell ─────────────────────────────────
+// The document *is* the app (~640 KB, ~130 KB compressed) and it is served
+// `max-age=0, must-revalidate`, so without a cached copy every single launch
+// blocks on a live round-trip. On a weak link (EDGE) that is tens of seconds;
+// with no link at all the app does not start at all. The worker serves the
+// shell from the Cache Storage API and revalidates in the background, so
+// startup never touches the network on the critical path.
+//
+// It also supersedes the HTTP probe above wherever it is active: a controlled
+// page learns about new deploys via postMessage instead of its own HEAD.
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.addEventListener('message', event => {
+    const data = event.data;
+    if (!data || data.type !== 'zw-shell-updated') return;
+    console.debug('[sw] shell-updated', data.token);
+    _noteAssetVersion(data.token);
+  });
+  // Registration is deliberately unawaited — nothing in boot depends on it.
+  navigator.serviceWorker.register('/sw.js').catch(err => {
+    console.debug('[sw] register-failed', err && err.message);
+  });
+}
 
 // ─── Quiet refresh: restore payload helpers (Slice 3) ────────────────────────
 // Volatile view-state survives location.reload() via this serializable payload.
