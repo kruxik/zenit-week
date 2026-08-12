@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-l8lOXUXE7gzmSLfY5RwIi9VGjGtsXtRVU9Ox8MX7Tfw='
+               'sha256-+h4Dx7LL7v3lj4yPcZWx0UWFiqo1KSGTWcsg65ujksU='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3906,6 +3906,27 @@ const _displayVersion = APP_VERSION.startsWith('__') ? 'dev' : APP_VERSION;
   if (_verEl) _verEl.textContent = _displayVersion;
 }
 
+// ─── Network: every request carries a deadline ───────────────────────────────
+// Nothing this app does over the wire is worth waiting on forever. A request
+// that never answers — captive portal, dead proxy, a link that dropped
+// mid-flight — leaves a promise that simply never settles: the sync badge spins
+// for the rest of the session, the retry backoff never gets its verdict, and
+// the sign-in button stays hidden behind an unresolved silent restore. A
+// timeout turns all of those into the ordinary failure the callers already
+// handle, since an offline fetch has always rejected the same way.
+const NET_TIMEOUT_MS       = 20000;  // Drive REST + token proxy
+const NET_PROBE_TIMEOUT_MS = 8000;   // version probe — cheap, nothing waits on it
+
+function netFetch(input, options = {}) {
+  const { timeoutMs = NET_TIMEOUT_MS, ...init } = options;
+  // AbortSignal.timeout is Baseline-wide; guard anyway so a stripped-down
+  // runtime (or the test VM) degrades to an untimed fetch instead of throwing.
+  if (typeof AbortSignal === 'undefined' || !AbortSignal.timeout) {
+    return fetch(input, init);
+  }
+  return fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+}
+
 // ─── Quiet refresh: asset version probe (Slice 2 — observability only) ───────
 // Probes the deployed asset's ETag on foreground/focus. Loop guard: the new
 // ETag is persisted to localStorage *before* `_pendingReload` is flagged, so a
@@ -3932,7 +3953,11 @@ function parseAssetVersionHeaders(headers) {
 async function checkForAssetUpdate() {
   let resp;
   try {
-    resp = await fetch(_assetProbeUrl(), { method: 'HEAD', cache: 'no-store' });
+    resp = await netFetch(_assetProbeUrl(), {
+      method:    'HEAD',
+      cache:     'no-store',
+      timeoutMs: NET_PROBE_TIMEOUT_MS,
+    });
   } catch (err) {
     console.debug('[quiet-refresh] probe-failed', err && err.message);
     return;
@@ -5595,7 +5620,7 @@ async function generatePKCE() {
 }
 
 async function exchangeToken(params) {
-  const resp = await fetch('/api/token', {
+  const resp = await netFetch('/api/token', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(params),
@@ -5724,13 +5749,13 @@ async function authFetch(url, options = {}) {
     ...opts,
     headers: { ...(opts.headers || {}), 'Authorization': `Bearer ${googleAccessToken}` },
   });
-  const resp = await fetch(url, withAuth(options));
+  const resp = await netFetch(url, withAuth(options));
   if (resp.status !== 401) return resp;
 
   const stored = getStoredAuth();
   if (!stored?.hasSession) { _handleAuthExpiry(); return resp; }
   if (!_handleRefreshResult(await silentRefresh())) return resp;
-  return fetch(url, withAuth(options));
+  return netFetch(url, withAuth(options));
 }
 
 // ─── Called after every successful token acquisition (code exchange or refresh) ─
@@ -5866,7 +5891,7 @@ async function signOut() {
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
   showSignedOutButton('sync.btnLabel');
   setSyncStatus('disconnected');
-  const revokeToken = t => t && fetch(
+  const revokeToken = t => t && netFetch(
     `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(t)}`,
     { method: 'POST' }
   ).catch(() => {});

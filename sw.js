@@ -25,6 +25,18 @@ const SHELL_KEY = '/__zw-shell__';
 
 const APP_PATH = /^\/(?:app(?:\/.*)?|zenit-week\.html)$/;
 
+// Background shell fetches get a deadline so a dead link cannot pin the worker
+// open waiting on a response that never comes. The cache-miss path in
+// shellResponse() deliberately has none: there it is the only route to a
+// working app, and a slow answer still beats no answer.
+const SHELL_FETCH_TIMEOUT_MS = 20000;
+
+function timeoutSignal(ms) {
+  return (typeof AbortSignal !== 'undefined' && AbortSignal.timeout)
+    ? AbortSignal.timeout(ms)
+    : undefined;
+}
+
 function isAppDocument(url) {
   return url.origin === self.location.origin && APP_PATH.test(url.pathname);
 }
@@ -64,7 +76,7 @@ async function warmShell() {
   // Path only: never store a response keyed to an OAuth `?code=` callback.
   const path = new URL(client.url).pathname;
   try {
-    const resp = await fetch(path, { cache: 'no-cache' });
+    const resp = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
     if (resp && resp.ok) await cache.put(SHELL_KEY, resp);
   } catch (err) {
     console.debug('[sw] warm-failed', err && err.message);
@@ -105,7 +117,7 @@ async function revalidateShell(cache, cached, path) {
   try {
     // `no-cache` sends a conditional request, so an unchanged shell costs a 304
     // and not another full download of the document.
-    fresh = await fetch(path, { cache: 'no-cache' });
+    fresh = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
   } catch (err) {
     return; // Offline or the link died — the cached shell stays authoritative.
   }

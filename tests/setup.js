@@ -72,6 +72,10 @@ const sandbox = {
   crypto: globalThis.crypto,
   URL: globalThis.URL,
   URLSearchParams: globalThis.URLSearchParams,
+  // netFetch() attaches AbortSignal.timeout() to every request; exposing the
+  // real thing keeps the timed path under test rather than the fallback.
+  AbortController: globalThis.AbortController,
+  AbortSignal: globalThis.AbortSignal,
   fetch: (url, options) => {
     const finalUrl = (typeof url === 'string' && url.startsWith('/'))
       ? `http://localhost${url}`
