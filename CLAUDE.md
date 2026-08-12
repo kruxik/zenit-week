@@ -12,6 +12,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 
 ## Key Files
 - `zenit-week.html`: The entire application (HTML, CSS, and JS)
+- `sw.js`: Service worker — caches the app shell so launch never blocks on the network
 
 ## Architecture
 
@@ -62,7 +63,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - `syncStatusUp(nodeId, prop)` — propagates done/unplanned status up the tree after a child changes
 
 ## Coding Standards & Conventions
-- **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files
+- **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files. The one exception is `sw.js`: browsers only accept a service worker from a same-origin script URL, so it cannot be inlined or loaded from a `blob:`. Nothing else may leave the single file; do not treat `sw.js` as licence to split further, and keep application logic out of it — it holds shell-caching concerns only.
 - **JavaScript**:
   - Always use `'use strict';`
   - Prefer `const` and `let` over `var`
