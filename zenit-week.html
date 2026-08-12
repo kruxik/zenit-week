@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-iYLgKJ8Z/V4nwzn5DXg5tbn0J8fgJuSsnNach3dag5I='
+               'sha256-VDhrkmgjl2NDeXa458cs2z/1sByzfDCnLiFMvB9BPOU='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4007,11 +4007,37 @@ function _noteAssetVersion(token) {
   tryQuietReload();
 }
 
+// `visibilitychange` and `focus` both fire when a desktop tab is switched back
+// to, so the old pair of listeners spent two probes on every single return, and
+// nothing capped how often flipping between tabs could hit the network. Funnel
+// both through one throttled entry point instead — a deploy that lands while a
+// tab sits open is not urgent enough to warrant a round-trip per glance.
+const PROBE_MIN_INTERVAL_MS = 5 * 60 * 1000;
+let _lastProbeAt = 0;
+
+function requestAssetUpdateCheck() {
+  const now = Date.now();
+  if (now - _lastProbeAt < PROBE_MIN_INTERVAL_MS) return;
+  _lastProbeAt = now;
+  checkForAssetUpdate();
+}
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') checkForAssetUpdate();
+  if (document.visibilityState === 'visible') requestAssetUpdateCheck();
 });
-window.addEventListener('focus', () => checkForAssetUpdate());
-checkForAssetUpdate();
+window.addEventListener('focus', requestAssetUpdateCheck);
+
+// Boot probe. A page the service worker controls has just had its shell
+// revalidated by the worker as part of this very navigation, and a new version
+// arrives over postMessage — probing here would be a second round-trip for a
+// fact already in hand. The worker does *not* revalidate on focus, so the
+// listeners above still earn their keep either way.
+if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+  _lastProbeAt = Date.now();  // also holds off the first focus probe
+  console.debug('[quiet-refresh] boot-probe-skipped-sw');
+} else {
+  requestAssetUpdateCheck();
+}
 
 // ─── Service worker: offline-first app shell ─────────────────────────────────
 // The document *is* the app (~640 KB, ~130 KB compressed) and it is served
