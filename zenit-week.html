@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-wW80ry72eowBVDx0beqIN3LsjHuClUkFJwfYc4Gdqcw='
+               'sha256-iYLgKJ8Z/V4nwzn5DXg5tbn0J8fgJuSsnNach3dag5I='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4114,12 +4114,24 @@ const QUIESCENCE_PANEL_IDS = [
   'baseline-panel',
 ];
 
+// A reload refetches the whole document whenever the service worker is not the
+// one answering it — an uncontrolled tab, a browser without workers, an evicted
+// cache. On a link that can barely carry the app that turns a working tab into
+// a blank one, which is a far worse outcome than running a version behind. The
+// update is never urgent: hold it, and the next quiet moment on a usable link
+// takes it.
+const SLOW_EFFECTIVE_TYPES = new Set(['slow-2g', '2g']);
+
 function isAppQuiescent(state) {
   if (state.hasEditingNode)      return { quiescent: false, reason: 'editing' };
   if (state.isPanning)           return { quiescent: false, reason: 'panning' };
   if (state.atomicOpsDepth > 0)  return { quiescent: false, reason: 'atomic-op' };
   if (state.pendingUploadCount)  return { quiescent: false, reason: 'pending-upload' };
   if (state.openPanel)           return { quiescent: false, reason: `panel:${state.openPanel}` };
+  if (state.offline)             return { quiescent: false, reason: 'offline' };
+  if (SLOW_EFFECTIVE_TYPES.has(state.effectiveType)) {
+    return { quiescent: false, reason: `slow-link:${state.effectiveType}` };
+  }
   return { quiescent: true, reason: null };
 }
 
@@ -4129,12 +4141,17 @@ function _collectQuiescenceState() {
     const el = document.getElementById(id);
     if (el && el.classList.contains('visible')) { openPanel = id; break; }
   }
+  // navigator.connection is Chromium-only; elsewhere effectiveType stays null
+  // and only the offline check applies.
+  const conn = (typeof navigator !== 'undefined' && navigator.connection) || null;
   return {
     hasEditingNode:   weekData && weekData.nodes ? weekData.nodes.some(n => n._editing) : false,
     isPanning:        isPanning,
     atomicOpsDepth:   _atomicOpsDepth,
     pendingUploadCount: _pendingUploadKeys.size,
     openPanel,
+    offline:          isDefinitelyOffline(),
+    effectiveType:    conn ? conn.effectiveType : null,
   };
 }
 
