@@ -107,7 +107,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - **Daily log panel**: Floating panel showing completed/ticked activities for the day, with timestamps and branch color dots
 - **Summary panel**: Expandable drawer showing per-branch done/total stats and a global completion percentage
 - **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week
-- **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive — Zenit Week has no servers and never stores user data itself
+- **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive — Zenit Week runs no servers that hold user data (the sole backend is `/api/token`, an OAuth token-exchange function) and never stores user data itself
 - **Internationalization**: English and Czech UI supported; `t(key)` helper reads from `TRANSLATIONS[currentLang]`; language persisted as `zenit-week-lang` in `localStorage` and synced via Drive
 - **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern
 

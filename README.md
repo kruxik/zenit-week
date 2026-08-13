@@ -1,7 +1,7 @@
 # Zenit Week
 
 > Plan your week around what matters most — not what's just urgent.
-> A visual mind-map planner that runs in your browser. No signup. No servers. Free.
+> A visual mind-map planner that runs in your browser. No signup. No servers holding your data. Free.
 
 ![Zenit Week — visual mind-map week planner](./screenshot.svg)
 
@@ -67,7 +67,7 @@ Drag the background to pan. Scroll or pinch to zoom. Double-click the canvas to 
 
 ## Privacy
 
-Zenit Week has no servers. Your data lives in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see it. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel.
+Zenit Week runs no servers that hold your data. Your data lives in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see it. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel. Signing in with Google goes through one small serverless function of ours that exchanges OAuth tokens; it never sees your plans.
 
 Full details in the [privacy policy](https://zenitweek.com/privacy).
 
