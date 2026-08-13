@@ -112,5 +112,6 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern
 
 ## Workflow Rules
+- **No code in conversation**: Never show source code, diffs, or snippets in replies to the user — not in explanations, not in summaries, not in plans. Describe changes in prose (and tables where useful). Code belongs in files only. Exceptions: git commit messages, and shell commands the user is asked to run.
 - **After every implementation**: summarize the change as a one-liner git commit message, then ask the user "Should I add and commit?"
 - **Chrome testing token budget**: When verifying in the browser (chrome-devtools MCP — navigating, seeding data, screenshots, `evaluate_script`), if a single testing effort burns more than ~5K tokens (especially when wrangling the environment, e.g. importing/seeding data into IndexedDB), stop and ask the user to set up the app state instead of grinding on it. Tell them what state you need (week populated, language, panel open), then just screenshot/measure to confirm.
