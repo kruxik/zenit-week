@@ -12,7 +12,7 @@
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
                'sha256-FD/kA+RZKATl6Tb+/zZVlIamgm3jBRNv8Yjs+bme5t0='
-               'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
+               'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://*.googleusercontent.com;
@@ -16422,6 +16422,12 @@ window.addEventListener('resize', () => {
     var h = location.hostname;
     var allowed = h === 'zenitweek.com' || h === 'www.zenitweek.com' || h.endsWith('.vercel.app');
     if (!allowed) return;
+    // Analytics follows the same rules as every other request in this app: it
+    // is never worth a round-trip the user cannot benefit from. Offline it can
+    // only fail, and under Data Saver it spends bytes the user asked us not to.
+    if (navigator.onLine === false) return;
+    var conn = navigator.connection;
+    if (conn && conn.saveData === true) return;
     var s = document.createElement('script');
     s.defer = true;
     s.src = '/_vercel/insights/script.js';

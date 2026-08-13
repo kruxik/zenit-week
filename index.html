@@ -1020,7 +1020,19 @@
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
 </script>
-<script defer src="/_vercel/insights/script.js"></script>
+<script>
+  // Analytics is never worth a request the user cannot benefit from: skip it
+  // when the device has no link, and when Data Saver is on.
+  (function () {
+    if (navigator.onLine === false) return;
+    var conn = navigator.connection;
+    if (conn && conn.saveData === true) return;
+    var s = document.createElement('script');
+    s.defer = true;
+    s.src = '/_vercel/insights/script.js';
+    document.head.appendChild(s);
+  })();
+</script>
 
 </body>
 <!-- bstack-verify: a3f7e1b9c2d40856e7f3a1b9c2d40e56 -->
