@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-a3krWqWZh/Zarg3prIarNk7knPnrDS1fpnw5LtM3Vtw='
+               'sha256-FD/kA+RZKATl6Tb+/zZVlIamgm3jBRNv8Yjs+bme5t0='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5587,6 +5587,36 @@ function refreshSyncUiText() {
   updateDropdownSyncTime();
 }
 
+// Set when a photo exists but was skipped because the device had no link, so
+// the 'online' listener knows there is something to go back for.
+let _avatarPhotoDeferred = false;
+
+function paintAvatarInitials() {
+  const img      = document.getElementById('sync-avatar-img');
+  const initials = document.getElementById('sync-avatar-initials');
+  if (!img || !initials) return;
+  img.style.display = 'none';
+  initials.textContent = googleUserInitials;
+  initials.style.background = googleUserInitialsColor;
+  initials.style.display = 'flex';
+}
+
+function paintAvatarPhoto() {
+  const img      = document.getElementById('sync-avatar-img');
+  const initials = document.getElementById('sync-avatar-initials');
+  if (!img || !initials || !googleUserPhoto) return;
+  img.onerror = paintAvatarInitials;  // 404, expired link, blocked — same badge
+  img.src = googleUserPhoto;
+  img.style.display = 'block';
+  initials.style.display = 'none';
+}
+
+window.addEventListener('online', () => {
+  if (!_avatarPhotoDeferred) return;
+  _avatarPhotoDeferred = false;
+  paintAvatarPhoto();
+});
+
 function showSignedInAvatar(user) {
   googleUserEmail = user?.emailAddress || '';
   googleUserPhoto = user?.photoLink   || '';
@@ -5601,21 +5631,21 @@ function showSignedInAvatar(user) {
 
   if (btn) btn.style.display = 'none';
 
-  if (googleUserPhoto) {
-    img.onerror = () => {
-      img.style.display = 'none';
-      initials.textContent = googleUserInitials;
-      initials.style.background = googleUserInitialsColor;
-      initials.style.display = 'flex';
-    };
-    img.src = googleUserPhoto;
-    img.style.display = 'block';
-    initials.style.display = 'none';
+  // The profile photo is the one image the app loads from the network, and it
+  // is decoration — the initials badge says exactly as much. Offline, skip the
+  // request entirely rather than spending it on a load that can only fail into
+  // the same badge a moment later.
+  //
+  // Caching the photo as a data: URL was the obvious alternative and is the
+  // wrong trade: reading the bytes needs fetch(), which would mean adding
+  // googleusercontent.com to connect-src. Widening what the app may talk to, to
+  // save one HTTP-cached image, moves in the wrong direction.
+  if (googleUserPhoto && !isDefinitelyOffline()) {
+    _avatarPhotoDeferred = false;
+    paintAvatarPhoto();
   } else {
-    img.style.display = 'none';
-    initials.textContent = googleUserInitials;
-    initials.style.background = googleUserInitialsColor;
-    initials.style.display = 'flex';
+    _avatarPhotoDeferred = !!googleUserPhoto;
+    paintAvatarInitials();
   }
 
   if (emailEl) emailEl.textContent = googleUserEmail;
