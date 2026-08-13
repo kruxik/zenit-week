@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-VDhrkmgjl2NDeXa458cs2z/1sByzfDCnLiFMvB9BPOU='
+               'sha256-QzozAbF11HLpDPj3NKOnj80ZT8Ag3gjeCwcosoEr1Hw='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4061,6 +4061,33 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     console.debug('[sw] register-failed', err && err.message);
   });
 }
+
+// ─── Storage durability ──────────────────────────────────────────────────────
+// Everything that lets this app work without a network sits in evictable
+// storage: the worker's shell cache, and — far more importantly — the week
+// records in IndexedDB. A browser under storage pressure may discard both. The
+// shell costs a blocking download to rebuild; the week records cannot be
+// rebuilt at all, because Drive sync is optional and plenty of people never
+// sign in. Ask the browser to treat this origin as worth keeping.
+//
+// persist() is a request, not a guarantee: Chrome grants it silently for
+// installed PWAs and high-engagement origins, Firefox prompts, Safari mostly
+// applies its own rules regardless. It complements Drive sync rather than
+// replacing it — but asking is strictly better than not asking.
+async function requestPersistentStorage() {
+  if (!navigator.storage || !navigator.storage.persist) return;
+  try {
+    // Never re-ask once granted — in browsers that prompt, that is a second
+    // permission dialog for a permission already held.
+    if (await navigator.storage.persisted()) return;
+    const granted = await navigator.storage.persist();
+    console.debug('[storage] persist-' + (granted ? 'granted' : 'denied'));
+  } catch (err) {
+    console.debug('[storage] persist-failed', err && err.message);
+  }
+}
+
+requestPersistentStorage();
 
 // ─── Quiet refresh: restore payload helpers (Slice 3) ────────────────────────
 // Volatile view-state survives location.reload() via this serializable payload.
