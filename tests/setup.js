@@ -346,6 +346,15 @@ scheduleDriveSync = () => {};
 todayWeekKey = () => _todayWeekKeyOverride || currentWeekKey;
 let _todayWeekKeyOverride = null;
 
+// Network guards — the constants are top-level \`const\`s, which live in the
+// context's lexical scope rather than on the global object, so they need an
+// accessor like the module-level \`let\`s below.
+_state.getNetTimeouts = function() {
+  return { NET_TIMEOUT_MS, NET_PROBE_TIMEOUT_MS, PROBE_MIN_INTERVAL_MS };
+};
+_state.getLastProbeAt = function() { return _lastProbeAt; };
+_state.setLastProbeAt = function(v) { _lastProbeAt = v; };
+
 _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
 _state.setWeekKey = function(k) { currentWeekKey = k; };
@@ -641,6 +650,12 @@ export const {
   recomputeZoomBounds,
   // Import
   normalizeImportKey,
+  // Network guards
+  netFetch,
+  isDefinitelyOffline,
+  requestAssetUpdateCheck,
+  checkForAssetUpdate,
+  requestPersistentStorage,
   // Quiet Refresh
   parseAssetVersionHeaders,
   buildRestorePayload,
