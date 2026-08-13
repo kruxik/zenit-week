@@ -91,6 +91,21 @@ describe('isAppQuiescent', () => {
     expect(isAppQuiescent(allClearState({ effectiveType: undefined })).quiescent).toBe(true);
   });
 
+  it('defers when the user has asked the browser to save data', () => {
+    expect(isAppQuiescent(allClearState({ saveData: true })))
+      .toEqual({ quiescent: false, reason: 'save-data' });
+  });
+
+  it('allows the reload when Data Saver is off or unreported', () => {
+    expect(isAppQuiescent(allClearState({ saveData: false })).quiescent).toBe(true);
+    expect(isAppQuiescent(allClearState({ saveData: undefined })).quiescent).toBe(true);
+  });
+
+  it('reports the slower link before Data Saver when both apply', () => {
+    const r = isAppQuiescent(allClearState({ effectiveType: '2g', saveData: true }));
+    expect(r.reason).toBe('slow-link:2g');
+  });
+
   it('reports user activity before network state', () => {
     const r = isAppQuiescent(allClearState({ hasEditingNode: true, offline: true }));
     expect(r.reason).toBe('editing');

@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-QzozAbF11HLpDPj3NKOnj80ZT8Ag3gjeCwcosoEr1Hw='
+               'sha256-a3krWqWZh/Zarg3prIarNk7knPnrDS1fpnw5LtM3Vtw='
                'sha256-i6FnLBaDw0EQhCXybK77PI6841YMk6CCtpzKxcpvCPo=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4185,6 +4185,10 @@ function isAppQuiescent(state) {
   if (SLOW_EFFECTIVE_TYPES.has(state.effectiveType)) {
     return { quiescent: false, reason: `slow-link:${state.effectiveType}` };
   }
+  // Data Saver is an explicit "spend my bytes only on what I asked for". A
+  // background refetch of the whole document is the opposite of that, however
+  // fast the link happens to be.
+  if (state.saveData)            return { quiescent: false, reason: 'save-data' };
   return { quiescent: true, reason: null };
 }
 
@@ -4205,6 +4209,7 @@ function _collectQuiescenceState() {
     openPanel,
     offline:          isDefinitelyOffline(),
     effectiveType:    conn ? conn.effectiveType : null,
+    saveData:         conn ? conn.saveData === true : false,
   };
 }
 
