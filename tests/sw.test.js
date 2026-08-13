@@ -106,10 +106,45 @@ describe('sw.js — request routing', () => {
     }
   });
 
-  it('leaves the marketing pages, the API and the worker itself alone', () => {
+  it('does not mistake the marketing pages, the API or itself for the app', () => {
     for (const path of ['/', '/index.html', '/cs/', '/privacy', '/terms', '/api/token', '/sw.js']) {
       expect(w.ctx.isAppDocument(new URL(path, ORIGIN))).toBe(false);
     }
+  });
+
+  it('normalises each marketing page onto a single cache key', () => {
+    const pairs = [
+      ['/', '/'], ['/index.html', '/'],
+      ['/cs', '/cs/'], ['/cs/', '/cs/'], ['/cs/index.html', '/cs/'],
+      ['/privacy', '/privacy'], ['/privacy.html', '/privacy'],
+      ['/terms', '/terms'], ['/terms.html', '/terms'],
+    ];
+    for (const [path, key] of pairs) {
+      expect(w.ctx.marketingKey(new URL(path, ORIGIN))).toBe(key);
+    }
+  });
+
+  it('ignores a query string when keying a marketing page', () => {
+    expect(w.ctx.marketingKey(new URL('/?utm_source=x', ORIGIN))).toBe('/');
+  });
+
+  it('claims no other path, and no other origin', () => {
+    for (const path of ['/api/token', '/sw.js', '/assets/hero.svg', '/robots.txt', '/nope']) {
+      expect(w.ctx.marketingKey(new URL(path, ORIGIN))).toBeNull();
+    }
+    expect(w.ctx.marketingKey(new URL('https://evil.example/'))).toBeNull();
+  });
+
+  it('takes over a navigation to a marketing page', () => {
+    const ev = navEvent(`${ORIGIN}/privacy`);
+    w.listeners.fetch(ev);
+    expect(ev.responses).toHaveLength(1);
+  });
+
+  it('leaves non-document requests to the marketing pages alone', () => {
+    const ev = navEvent(`${ORIGIN}/assets/hero.svg`);
+    w.listeners.fetch(ev);
+    expect(ev.responses).toHaveLength(0);
   });
 
   it('never claims another origin — Drive traffic must pass straight through', () => {
@@ -289,6 +324,44 @@ describe('sw.js — revalidation', () => {
     await w.ctx.revalidateShell(w.cache, cached, '/app');
     expect((await w.cache.match('/__zw-shell__')).tag).toBe('cached');
     expect(w.posted).toHaveLength(0);
+  });
+});
+
+describe('sw.js — marketing pages', () => {
+  it('serves a cached landing page so an offline reader still reaches the app link', async () => {
+    const w = loadWorker({ fetchImpl: () => Promise.reject(new Error('offline')) });
+    await w.cache.put('/', makeResponse({ etag: '"landing"', tag: 'landing' }));
+    const ev = navEvent(`${ORIGIN}/index.html`);  // same document, other URL
+    w.listeners.fetch(ev);
+    const resp = await ev.responses[0];
+    expect(resp.tag).toBe('landing');
+  });
+
+  it('keeps each marketing page in its own cache entry', async () => {
+    const w = loadWorker();
+    await w.ctx.cachedDocument(navEvent(`${ORIGIN}/`), '/', false);
+    await w.ctx.cachedDocument(navEvent(`${ORIGIN}/privacy`), '/privacy', false);
+    expect([...w.cache.store.keys()].sort()).toEqual(['/', '/privacy']);
+  });
+
+  it('never announces a marketing update to the app — there is nothing to reload', async () => {
+    const w = loadWorker({
+      clients: [`${ORIGIN}/app`],
+      fetchImpl: () => Promise.resolve(makeResponse({ etag: '"v2"' })),
+    });
+    const cached = makeResponse({ etag: '"v1"' });
+    await w.cache.put('/', cached);
+    await w.ctx.revalidateDocument(w.cache, '/', cached, '/', false);
+    expect(w.posted).toHaveLength(0);
+    // ...but the newer copy is still cached for next time.
+    expect(w.ctx.versionToken(await w.cache.match('/'))).toBe('"v2"');
+  });
+
+  it('does not evict the app shell when a marketing page is cached', async () => {
+    const w = loadWorker();
+    await w.cache.put('/__zw-shell__', makeResponse({ tag: 'shell' }));
+    await w.ctx.cachedDocument(navEvent(`${ORIGIN}/`), '/', false);
+    expect((await w.cache.match('/__zw-shell__')).tag).toBe('shell');
   });
 });
 
