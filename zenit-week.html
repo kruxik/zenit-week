@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-btwA9p65uM8KlFV3GdknvyKOe5HYkRSJbT6u5o4al3k='
+               'sha256-ZdVOE09BqFjbY8U3sR1rRDz/SXSWRkr4MStqTxNpwiA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3129,6 +3129,13 @@
     .node-group.selected .node-rect {
       stroke-dasharray: 4 3;
     }
+  }
+
+  .comment-badge {
+    cursor: pointer;
+  }
+  .comment-badge:hover {
+    opacity: 0.7;
   }
 
   .gear-btn {
@@ -9864,6 +9871,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   }
 
   // Text
+  // Captured before the loop: `t` is shadowed by the <text> element inside it.
+  const commentIconTitle = t('menu.comment');
   lines.forEach((line, i) => {
     const textY = -totalTextH / 2 + lineH * i + lineH * 0.75;
     const t = svgEl('text', {
@@ -9928,15 +9937,28 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       }
 
       if (hasCommentIcon) {
-        // Display-only presence indicator — not interactive (pointer-events:none)
-        g.appendChild(svgEl('use', {
+        // Clickable presence indicator — opens the comment dialog (same as agenda).
+        const iconY = textY - badgeSize / 2 - fontSize * 0.35;
+        const pad = 5;
+        const cmtG = svgEl('g', { class: 'comment-badge', 'data-id': id });
+        const cmtTitle = svgEl('title');
+        cmtTitle.textContent = commentIconTitle;
+        cmtG.appendChild(cmtTitle);
+        // Transparent hit area — the icon itself is stroke-only and hard to hit.
+        cmtG.appendChild(svgEl('rect', {
+          x: rightCursor - pad, y: iconY - pad,
+          width: badgeSize + pad * 2, height: badgeSize + pad * 2,
+          rx: 4, fill: 'transparent',
+        }));
+        cmtG.appendChild(svgEl('use', {
           href: '#icon-message',
           width: badgeSize, height: badgeSize,
           x: rightCursor,
-          y: textY - badgeSize / 2 - fontSize * 0.35,
+          y: iconY,
           style: `color:${textColor};fill:none;stroke:currentColor`,
           'pointer-events': 'none',
         }));
+        g.appendChild(cmtG);
       }
     }
     t.textContent = line;
@@ -12857,6 +12879,15 @@ function attachNodeListeners() {
       });
     });
 
+    // Comment badge — opens the comment dialog (same as the agenda badge)
+    g.querySelectorAll('.comment-badge').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        openCommentDialog(btn.getAttribute('data-id'));
+      });
+    });
+
     // Gear button
     g.querySelectorAll('.gear-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -12897,6 +12928,7 @@ function attachNodeListeners() {
       if (e.target.closest('.add-branch-btn')) return;
       if (e.target.closest('.counter-btn')) return;
       if (e.target.closest('.week-nav-btn')) return;
+      if (e.target.closest('.comment-badge')) return;
 
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       e.stopPropagation();
@@ -12932,6 +12964,7 @@ function attachNodeListeners() {
     g.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       e.preventDefault();
+      if (e.target.closest('.comment-badge')) return;
       const node = findNode(id);
       if (node && (node.type === 'activity' || node.type === 'branch')) startRenameNode(id);
     });
