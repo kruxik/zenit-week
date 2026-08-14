@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-GYTKd1VqShR3PjzSeIl7IuoV7lLbqqtwVZzdIZbyGoM='
+               'sha256-KgsYcsxQvA6s9esnFuIv96ofQJofhOUj5PdsndtSrx0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -13715,15 +13715,61 @@ let currentView = localStorage.getItem('zenit-week-view') === 'agenda' ? 'agenda
 // 'overdue' | 0–6 (dayIndex). null = uninitialised, defaults to today on first open.
 let agendaActiveTab = null;
 let _lastKnownDay = new Date().getDay();
+let _lastKnownWeekKey = todayWeekKey();
+let _midnightTimer = null;
 
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') return;
-  const now = new Date().getDay();
-  if (now === _lastKnownDay) return;
-  _lastKnownDay = now;
-  agendaActiveTab = null;
+// Day and ISO week both roll over at midnight, and both used to be missed:
+// the day only when the tab was hidden and came back, the week never at all.
+// A tab left open across Sunday night kept showing last week — with a "today"
+// that no longer existed in it — until the user navigated or reloaded.
+//
+// Returns true when the caller should re-arm; false while an inline editor is
+// open, since pulling the week out from under a half-typed label is worse than
+// being a few minutes late.
+function checkDateRollover() {
+  const day = new Date().getDay();
+  const week = todayWeekKey();
+  if (day === _lastKnownDay && week === _lastKnownWeekKey) return true;
+  if (hasEditingNode()) return false;
+
+  // Only follow the rollover if the user was looking at the week that just
+  // stopped being the current one. Someone deliberately browsing another week
+  // should stay where they put themselves.
+  const followWeek = week !== _lastKnownWeekKey && currentWeekKey === _lastKnownWeekKey;
+  _lastKnownDay = day;
+  _lastKnownWeekKey = week;
+  agendaActiveTab = null;   // re-default the agenda to the new today
+
+  if (followWeek) {
+    loadAndRender(week);
+    return true;
+  }
   if (currentView === 'agenda') renderAgenda();
   else render();
+  return true;
+}
+
+// Fires shortly after the next local midnight. Recomputed each time rather than
+// set to a fixed 24h so DST transitions cannot drift it into the wrong day.
+function scheduleMidnightCheck() {
+  if (_midnightTimer) clearTimeout(_midnightTimer);
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  _midnightTimer = setTimeout(() => {
+    // A refused check (editor open) re-arms in a minute instead of waiting a day.
+    const settled = checkDateRollover();
+    if (settled) scheduleMidnightCheck();
+    else _midnightTimer = setTimeout(() => { checkDateRollover(); scheduleMidnightCheck(); }, 60000);
+  }, Math.max(1000, next.getTime() - now.getTime()));
+}
+scheduleMidnightCheck();
+
+// A background tab's timers are throttled or frozen outright, so returning to
+// the tab is still the check that matters most.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  checkDateRollover();
+  scheduleMidnightCheck();
 });
 let hoveredAgendaNode = null;
 

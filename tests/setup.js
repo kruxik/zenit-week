@@ -403,6 +403,8 @@ _state.getActiveDayFilter = function() { return activeDayFilter; };
 _state.setAgendaActiveTab = function(v) { agendaActiveTab = v; };
 _state.getAgendaActiveTab = function() { return agendaActiveTab; };
 _state.setTodayWeekKey   = function(k) { _todayWeekKeyOverride = k; };
+_state.setLastKnownDate = function(day, wk) { _lastKnownDay = day; _lastKnownWeekKey = wk; };
+_state.getLastKnownDate = function() { return { day: _lastKnownDay, weekKey: _lastKnownWeekKey }; };
 _state.clearTodayWeekKeyOverride = function() { _todayWeekKeyOverride = null; };
 _state.resetView         = async function() { return resetView(); };
 _state.getIDBStore = function() { return _idbStore; };
@@ -535,6 +537,7 @@ export const deleteValueIDB = (...args) => sandbox.deleteValueIDB(...args);
 export const loadWeek = (...args) => sandbox.loadWeek(...args);
 export const saveWeek = (...args) => sandbox.saveWeek(...args);
 export const runMigrationIfNeeded = (...args) => sandbox.runMigrationIfNeeded(...args);
+export const checkDateRollover = (...args) => sandbox.checkDateRollover(...args);
 
 export const {
   getISOWeek,
