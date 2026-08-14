@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-brwljPnvwRSKFfLG3uPTf0xYpNadpEV0UZdyPAffSJ0='
+               'sha256-btwA9p65uM8KlFV3GdknvyKOe5HYkRSJbT6u5o4al3k='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5681,7 +5681,13 @@ function showSignedInAvatar(user) {
   // wrong trade: reading the bytes needs fetch(), which would mean adding
   // googleusercontent.com to connect-src. Widening what the app may talk to, to
   // save one HTTP-cached image, moves in the wrong direction.
-  if (googleUserPhoto && !isDefinitelyOffline()) {
+  //
+  // The service worker does keep a copy, which needs no such widening — its own
+  // fetches are not governed by this document's CSP. So where a worker is in
+  // control the request is worth making even offline: it may well be answered
+  // from Cache Storage, and if it is not, it fails into the same badge as before.
+  const swControlled = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+  if (googleUserPhoto && (!isDefinitelyOffline() || swControlled)) {
     _avatarPhotoDeferred = false;
     paintAvatarPhoto();
   } else {
@@ -6036,8 +6042,12 @@ async function signOut() {
   }
 
   // Nothing parked may outlive the session it belongs to — the worker would
-  // otherwise wake up and push a signed-out user's week.
+  // otherwise wake up and push a signed-out user's week. The cached profile
+  // photo goes for the same reason: it identifies who was signed in.
   await _clearOfflineUploadQueue();
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'zw-clear-avatar' });
+  }
 
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;

@@ -29,6 +29,8 @@ function makeCache() {
     store,
     async match(key) { return store.get(key); },
     async put(key, value) { store.set(key, value); },
+    async keys() { return [...store.keys()]; },
+    async delete(key) { return store.delete(key); },
   };
 }
 
@@ -208,7 +210,7 @@ describe('sw.js — request routing', () => {
 
   it('registers every lifecycle listener it relies on', () => {
     expect(Object.keys(w.listeners).sort())
-      .toEqual(['activate', 'fetch', 'install', 'periodicsync', 'sync']);
+      .toEqual(['activate', 'fetch', 'install', 'message', 'periodicsync', 'sync']);
   });
 
   it('skips waiting on install so a new worker never waits for every tab to close', () => {
@@ -988,5 +990,106 @@ describe('sw.js — periodic refresh', () => {
     await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'cached' }));
     await expect(w.ctx.periodicRefresh()).resolves.toBeUndefined();
     expect(w.cache.store.get('/__zw-shell__').tag).toBe('cached');
+  });
+});
+
+// ─── Avatar photo ─────────────────────────────────────────────────────────────
+//
+// The only cross-origin subresource the app loads. The page cannot cache it
+// itself: reading the bytes would need fetch() and therefore
+// googleusercontent.com in connect-src, which costs more than the photo is worth.
+
+const PHOTO = 'https://lh3.googleusercontent.com/a/abc123=s96-c';
+
+function imgEvent(url) {
+  const waits = [];
+  return {
+    request: { url, method: 'GET', mode: 'no-cors' },
+    waitUntil: p => { waits.push(p); return p; },
+    respondWith: p => p,
+    waits,
+  };
+}
+
+describe('sw.js — avatar photo', () => {
+  let w;
+  beforeEach(() => { w = loadWorker(); });
+
+  it('claims the Google photo hosts', () => {
+    for (const href of ['https://lh3.googleusercontent.com/a/x', 'https://googleusercontent.com/a/x']) {
+      expect(w.ctx.isAvatarPhoto(new URL(href))).toBe(true);
+    }
+  });
+
+  it('matches the host suffix, not a substring an attacker can choose', () => {
+    for (const href of ['https://googleusercontent.com.evil.example/a/x',
+                        'https://evil-googleusercontent.com/a/x',
+                        'http://lh3.googleusercontent.com/a/x']) {
+      expect(w.ctx.isAvatarPhoto(new URL(href))).toBe(false);
+    }
+  });
+
+  it('leaves the Drive API alone — sync traffic must never be cached', () => {
+    expect(w.ctx.isAvatarPhoto(new URL('https://www.googleapis.com/drive/v3/files'))).toBe(false);
+  });
+
+  it('takes over the image request', () => {
+    const ev = imgEvent(PHOTO);
+    let responded = false;
+    ev.respondWith = () => { responded = true; };
+    w.listeners.fetch(ev);
+    expect(responded).toBe(true);
+  });
+
+  it('stores the photo on first sight', async () => {
+    const ev = imgEvent(PHOTO);
+    await w.ctx.cachedAvatar(ev, PHOTO);
+    await Promise.all(ev.waits);
+    expect(w.cache.store.has(PHOTO)).toBe(true);
+  });
+
+  it('serves it back with no network on the next load', async () => {
+    await w.cache.put(PHOTO, makeResponse({ tag: 'cached-photo' }));
+    const got = await w.ctx.cachedAvatar(imgEvent(PHOTO), PHOTO);
+    expect(got.tag).toBe('cached-photo');
+    expect(w.fetches).toHaveLength(0);
+  });
+
+  it('keeps exactly one — an opaque entry costs far more quota than its bytes', async () => {
+    const older = 'https://lh3.googleusercontent.com/a/older=s96-c';
+    await w.cache.put(older, makeResponse({ tag: 'old-photo' }));
+    const ev = imgEvent(PHOTO);
+    await w.ctx.cachedAvatar(ev, PHOTO);
+    await Promise.all(ev.waits);
+    expect(w.cache.store.has(older)).toBe(false);
+    expect(w.cache.store.has(PHOTO)).toBe(true);
+  });
+
+  it('never evicts the shell or the icons while pruning photos', async () => {
+    await w.cache.put('/__zw-shell__', makeResponse({ tag: 'shell' }));
+    await w.cache.put('/assets/icon-192.png', makeResponse({ tag: 'icon' }));
+    const ev = imgEvent(PHOTO);
+    await w.ctx.cachedAvatar(ev, PHOTO);
+    await Promise.all(ev.waits);
+    expect(w.cache.store.has('/__zw-shell__')).toBe(true);
+    expect(w.cache.store.has('/assets/icon-192.png')).toBe(true);
+  });
+
+  it('drops the photo on sign-out — it identifies who was signed in', async () => {
+    await w.cache.put(PHOTO, makeResponse({ tag: 'photo' }));
+    await w.cache.put('/__zw-shell__', makeResponse({ tag: 'shell' }));
+    await w.ctx.clearAvatars();
+    expect(w.cache.store.has(PHOTO)).toBe(false);
+    expect(w.cache.store.has('/__zw-shell__')).toBe(true);
+  });
+
+  it('clears on the signal from the page and ignores anything else', async () => {
+    await w.cache.put(PHOTO, makeResponse({ tag: 'photo' }));
+    const waits = [];
+    w.listeners.message({ data: { type: 'zw-something-else' }, waitUntil: p => waits.push(p) });
+    expect(waits).toHaveLength(0);
+    w.listeners.message({ data: { type: 'zw-clear-avatar' }, waitUntil: p => waits.push(p) });
+    await Promise.all(waits);
+    expect(w.cache.store.has(PHOTO)).toBe(false);
   });
 });

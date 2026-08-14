@@ -66,6 +66,14 @@ function isManifestIcon(url) {
   return url.origin === self.location.origin && ICON_PATHS.includes(url.pathname);
 }
 
+// The Google profile photo — the only cross-origin subresource the app loads.
+// Matched on the exact host suffix, never a substring: `googleusercontent.com`
+// appearing anywhere in an attacker-chosen hostname must not qualify.
+function isAvatarPhoto(url) {
+  return url.protocol === 'https:'
+    && (url.hostname === 'googleusercontent.com' || url.hostname.endsWith('.googleusercontent.com'));
+}
+
 // The marketing pages are ordinary, distinct documents, so unlike the shell they
 // are cached under their own keys — normalised, because each answers on both a
 // bare and an .html path and a query string never changes what is served.
@@ -363,6 +371,10 @@ self.addEventListener('fetch', event => {
     event.respondWith(cachedIcon(event, url.pathname));
     return;
   }
+  if (isAvatarPhoto(url)) {
+    event.respondWith(cachedAvatar(event, url.href));
+    return;
+  }
   if (req.mode !== 'navigate') return;
   if (isAppDocument(url)) {
     event.respondWith(shellResponse(event));
@@ -397,6 +409,59 @@ async function cachedIcon(event, path) {
     return new Response('', { status: 504, headers: { 'Content-Type': 'text/plain' } });
   }
 }
+
+// ─── Avatar photo ─────────────────────────────────────────────────────────────
+//
+// Cache-first and never revalidated: a Google photo URL carries its own content
+// id, so a changed photo arrives as a different URL rather than new bytes at the
+// same one. The page cannot do this itself — reading the bytes would need
+// fetch() and therefore googleusercontent.com in connect-src, and widening what
+// the document may talk to costs more than the photo is worth. A worker's own
+// fetches are not governed by that CSP.
+//
+// The response is opaque, so it cannot be inspected and it bills against quota
+// with a fixed padding far larger than the image. Exactly one is kept.
+async function cachedAvatar(event, href) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(href);
+  if (cached) return cached;
+  const fresh = await fetch(event.request);
+  // An opaque response reports status 0 and ok false, so "did it work" is not a
+  // question that can be answered here — store it and let the img tag decide.
+  event.waitUntil(storeAvatar(cache, href, fresh.clone()));
+  return fresh;
+}
+
+async function storeAvatar(cache, href, response) {
+  await cache.put(href, response);
+  await dropOtherAvatars(cache, href);
+}
+
+// Photo URLs rotate, so without this every past avatar would accumulate — each
+// one an opaque entry costing far more quota than its bytes.
+async function dropOtherAvatars(cache, keepHref) {
+  const keys = await cache.keys();
+  await Promise.all(keys.map(async request => {
+    const raw = typeof request === 'string' ? request : request.url;
+    if (raw === keepHref) return;
+    let url;
+    try { url = new URL(raw); } catch (_) { return; }
+    if (isAvatarPhoto(url)) await cache.delete(request);
+  }));
+}
+
+// Sign-out has to take the photo with it: it identifies the person who was
+// signed in, and leaving it cached outlives their session on a shared device.
+async function clearAvatars() {
+  const cache = await caches.open(CACHE_NAME);
+  await dropOtherAvatars(cache, null);
+}
+
+self.addEventListener('message', event => {
+  const data = event.data;
+  if (!data || data.type !== 'zw-clear-avatar') return;
+  event.waitUntil(clearAvatars());
+});
 
 // ─── Offline fallback ─────────────────────────────────────────────────────────
 //
