@@ -275,10 +275,25 @@ async function precacheIcons() {
   }));
 }
 
+// Lets the browser start the navigation request in parallel with booting this
+// worker, instead of the worker booting first and only then reaching for the
+// network. It costs no extra traffic: a cache hit already spends one request on
+// revalidation, and that is the request the preload becomes — see
+// revalidateDocument, which consumes it rather than issuing its own.
+async function enableNavigationPreload() {
+  if (!self.registration || !self.registration.navigationPreload) return;
+  try {
+    await self.registration.navigationPreload.enable();
+  } catch (err) {
+    console.debug('[sw] navigation-preload-failed', err && err.message);
+  }
+}
+
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const names = await caches.keys();
     await Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)));
+    await enableNavigationPreload();
     await self.clients.claim();
     await warmShell();
   })());
@@ -442,13 +457,17 @@ async function cachedDocument(event, cacheKey, notify) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(cacheKey);
   const path = new URL(event.request.url).pathname;
+  // The browser fires this the moment the navigation starts, whether or not we
+  // end up using it, so both branches below hand it on rather than starting a
+  // second request. A rejection is just "no preload" — never a failed response.
+  const preload = preloadResponse(event);
   if (cached) {
     // Stale-while-revalidate: paint from cache, check for a new deploy after.
-    event.waitUntil(revalidateDocument(cache, cacheKey, cached, path, notify));
+    event.waitUntil(revalidateDocument(cache, cacheKey, cached, path, notify, preload));
     return cached;
   }
   try {
-    const fresh = await fetch(event.request);
+    const fresh = (preload && await preload) || await fetch(event.request);
     if (fresh && fresh.ok) await cache.put(cacheKey, fresh.clone());
     return fresh;
   } catch (err) {
@@ -456,20 +475,30 @@ async function cachedDocument(event, cacheKey, notify) {
   }
 }
 
+// Null when the browser has no navigation preload, or the feature is off.
+function preloadResponse(event) {
+  if (!event.preloadResponse || typeof event.preloadResponse.then !== 'function') return null;
+  return event.preloadResponse.catch(() => null);
+}
+
 function revalidateShell(cache, cached, path) {
   return revalidateDocument(cache, SHELL_KEY, cached, path, true);
 }
 
-async function revalidateDocument(cache, cacheKey, cached, path, notify) {
+async function revalidateDocument(cache, cacheKey, cached, path, notify, preload = null) {
   // Only trusted in the negative — see isDefinitelyOffline() in the app.
   if (self.navigator && self.navigator.onLine === false) return;
-  let fresh;
-  try {
-    // `no-cache` sends a conditional request, so an unchanged document costs a
-    // 304 and not another full download.
-    fresh = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
-  } catch (err) {
-    return; // Offline or the link died — the cached copy stays authoritative.
+  let fresh = preload ? await preload : null;
+  if (!fresh) {
+    try {
+      // `no-cache` sends a conditional request, so an unchanged document costs a
+      // 304 and not another full download. The preload above is the browser's own
+      // navigation request, which the app document's must-revalidate makes
+      // conditional too — so either route costs the same on an unchanged deploy.
+      fresh = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
+    } catch (err) {
+      return; // Offline or the link died — the cached copy stays authoritative.
+    }
   }
   if (!fresh || !fresh.ok) return;
   const newToken = versionToken(fresh);

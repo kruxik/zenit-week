@@ -116,16 +116,18 @@ function loadWorker({ onLine, fetchImpl, clients = [], misc = null } = {}) {
   return { ctx, listeners, cache, posted, fetches, idb };
 }
 
-function navEvent(url) {
+function navEvent(url, preloadResponse) {
   const waits = [];
   const responses = [];
-  return {
+  const ev = {
     request: { url, method: 'GET', mode: 'navigate' },
     waitUntil: p => { waits.push(p); return p; },
     respondWith: p => { responses.push(p); return p; },
     waits,
     responses,
   };
+  if (preloadResponse !== undefined) ev.preloadResponse = preloadResponse;
+  return ev;
 }
 
 describe('sw.js — request routing', () => {
@@ -823,5 +825,95 @@ describe('sw.js — offline fallback', () => {
     await w.cache.put('/__zw-shell__', makeResponse({ tag: 'cached-shell' }));
     const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
     expect(resp.tag).toBe('cached-shell');
+  });
+});
+
+// ─── Navigation preload ───────────────────────────────────────────────────────
+//
+// The browser starts the navigation request in parallel with booting the
+// worker. It costs no extra traffic here: a cache hit already spends one
+// request on revalidation, and that is the request the preload becomes.
+
+describe('sw.js — navigation preload', () => {
+  it('turns it on during activation', async () => {
+    const w = loadWorker();
+    const calls = [];
+    w.ctx.self.registration = { navigationPreload: { enable: async () => calls.push('enabled') } };
+    await w.ctx.enableNavigationPreload();
+    expect(calls).toEqual(['enabled']);
+  });
+
+  it('activates cleanly on a browser that has no preload at all', async () => {
+    const w = loadWorker({ clients: [] });
+    let work;
+    w.listeners.activate({ waitUntil: p => { work = p; } });
+    await expect(work).resolves.toBeUndefined();
+  });
+
+  it('survives a browser that refuses to enable it', async () => {
+    const w = loadWorker();
+    w.ctx.self.registration = { navigationPreload: { enable: async () => { throw new Error('nope'); } } };
+    await expect(w.ctx.enableNavigationPreload()).resolves.toBeUndefined();
+  });
+
+  it('serves a cold cache from the preload instead of fetching again', async () => {
+    const preloaded = makeResponse({ etag: '"preloaded"', tag: 'preloaded' });
+    const w = loadWorker();
+    const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`, Promise.resolve(preloaded)));
+    expect(resp.tag).toBe('preloaded');
+    expect(w.fetches).toHaveLength(0);
+    expect(w.cache.store.size).toBe(1);
+  });
+
+  it('falls back to its own fetch when the preload yields nothing', async () => {
+    const w = loadWorker();
+    const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`, Promise.resolve(null)));
+    expect(resp.ok).toBe(true);
+    expect(w.fetches).toHaveLength(1);
+  });
+
+  it('treats a rejected preload as no preload, not as a failure', async () => {
+    const w = loadWorker();
+    const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`, Promise.reject(new Error('preload died'))));
+    expect(resp.ok).toBe(true);
+    expect(w.fetches).toHaveLength(1);
+  });
+
+  it('revalidates a cache hit from the preload rather than a second request', async () => {
+    const w = loadWorker();
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'cached' }));
+    const ev = navEvent(`${ORIGIN}/app`, Promise.resolve(makeResponse({ etag: '"v2"', tag: 'preloaded' })));
+    const resp = await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(resp.tag).toBe('cached');            // still painted from cache
+    expect(w.fetches).toHaveLength(0);          // and no request of our own
+    expect(w.cache.store.get('/__zw-shell__').tag).toBe('preloaded');
+  });
+
+  it('still tells the page about a new deploy it learned from the preload', async () => {
+    const w = loadWorker({ clients: [`${ORIGIN}/app`] });
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"' }));
+    const ev = navEvent(`${ORIGIN}/app`, Promise.resolve(makeResponse({ etag: '"v2"' })));
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(w.posted[0].msg).toEqual({ type: 'zw-shell-updated', token: '"v2"' });
+  });
+
+  it('ignores a preload that came back broken', async () => {
+    const w = loadWorker();
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'cached' }));
+    const ev = navEvent(`${ORIGIN}/app`, Promise.resolve(makeResponse({ ok: false, status: 500 })));
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(w.cache.store.get('/__zw-shell__').tag).toBe('cached');
+  });
+
+  it('does not reach for the network at all when the browser says it is offline', async () => {
+    const w = loadWorker({ onLine: false });
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"' }));
+    const ev = navEvent(`${ORIGIN}/app`, Promise.resolve(makeResponse({ etag: '"v2"' })));
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(w.cache.store.get('/__zw-shell__').headers.get('etag')).toBe('"v1"');
   });
 });
