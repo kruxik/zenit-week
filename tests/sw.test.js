@@ -206,8 +206,9 @@ describe('sw.js — request routing', () => {
     expect(ev.responses).toHaveLength(1);
   });
 
-  it('registers install, activate, fetch and sync', () => {
-    expect(Object.keys(w.listeners).sort()).toEqual(['activate', 'fetch', 'install', 'sync']);
+  it('registers every lifecycle listener it relies on', () => {
+    expect(Object.keys(w.listeners).sort())
+      .toEqual(['activate', 'fetch', 'install', 'periodicsync', 'sync']);
   });
 
   it('skips waiting on install so a new worker never waits for every tab to close', () => {
@@ -915,5 +916,77 @@ describe('sw.js — navigation preload', () => {
     await w.ctx.shellResponse(ev);
     await Promise.all(ev.waits);
     expect(w.cache.store.get('/__zw-shell__').headers.get('etag')).toBe('"v1"');
+  });
+});
+
+// ─── Periodic refresh ─────────────────────────────────────────────────────────
+//
+// Keeps the cached shell current between visits so opening the app lands on the
+// build it should be on. An enhancement only: Chromium-only, gated on an
+// installed PWA and site engagement, with the browser setting the real cadence.
+
+describe('sw.js — periodic refresh', () => {
+  it('only answers its own tag', () => {
+    const w = loadWorker();
+    const waits = [];
+    w.listeners.periodicsync({ tag: 'zw-drive-upload', waitUntil: p => waits.push(p) });
+    expect(waits).toHaveLength(0);
+  });
+
+  it('revalidates the cached shell', async () => {
+    const w = loadWorker();
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'stale' }));
+    await w.ctx.periodicRefresh();
+    expect(w.cache.store.get('/__zw-shell__').headers.get('etag')).toBe('"fresh"');
+  });
+
+  it('tells any open tab about a build it found', async () => {
+    const w = loadWorker({ clients: [`${ORIGIN}/app`] });
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"' }));
+    await w.ctx.periodicRefresh();
+    expect(w.posted[0].msg).toEqual({ type: 'zw-shell-updated', token: '"fresh"' });
+  });
+
+  it('waits for a real visit when nothing is cached yet', async () => {
+    // No client is open during a periodic sync, so there is nothing to learn the
+    // shell URL from — refreshing a shell we never had is not this event's job.
+    const w = loadWorker();
+    await w.ctx.periodicRefresh();
+    expect(w.cache.store.has('/__zw-shell__')).toBe(false);
+  });
+
+  it('tops up any icon it is missing', async () => {
+    const w = loadWorker();
+    await w.ctx.periodicRefresh();
+    expect(w.cache.store.size).toBe(ICON_PATHS.length);
+  });
+
+  it('pushes anything still parked from being offline', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry()] };
+    const drive = makeDriveFetch();
+    const w = loadWorker({ misc, fetchImpl: drive.impl });
+    await w.ctx.periodicRefresh();
+    expect(drive.calls.upload).toBe(1);
+    expect(misc[QUEUE_KEY]).toEqual([]);
+  });
+
+  it('does not escalate an upload failure — the sync event owns retrying', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry()] };
+    const w = loadWorker({
+      misc,
+      fetchImpl: (input) => (String(input).includes('googleapis') || String(input).includes('/api/token')
+        ? Promise.reject(new Error('drive down'))
+        : Promise.resolve(makeResponse({ etag: '"fresh"' }))),
+    });
+    await expect(w.ctx.periodicRefresh()).resolves.toBeUndefined();
+    expect(misc[QUEUE_KEY]).toHaveLength(1);
+  });
+
+  it('stays off the network entirely when the browser says it is offline', async () => {
+    const w = loadWorker({ onLine: false, misc: { [QUEUE_KEY]: [mkEntry()] },
+                           fetchImpl: () => Promise.reject(new Error('offline')) });
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'cached' }));
+    await expect(w.ctx.periodicRefresh()).resolves.toBeUndefined();
+    expect(w.cache.store.get('/__zw-shell__').tag).toBe('cached');
   });
 });

@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-KgsYcsxQvA6s9esnFuIv96ofQJofhOUj5PdsndtSrx0='
+               'sha256-brwljPnvwRSKFfLG3uPTf0xYpNadpEV0UZdyPAffSJ0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4049,6 +4049,32 @@ if (navigator.serviceWorker && navigator.serviceWorker.controller) {
 //
 // It also supersedes the HTTP probe above wherever it is active: a controlled
 // page learns about new deploys via postMessage instead of its own HEAD.
+// Asks the browser to revalidate the cached shell between visits, so opening the
+// app lands on the build it should be on instead of last week's plus a quiet
+// refresh. Every part of this is optional: the API is Chromium-only, needs the
+// PWA installed, needs the permission already granted (there is no prompt to
+// raise here), and the browser sets the real cadence from site engagement. The
+// HTTP probe above stays the guarantee — this only makes it a no-op more often.
+const PERIODIC_REFRESH_TAG = 'zw-refresh';
+const PERIODIC_REFRESH_MIN_INTERVAL_MS = 12 * 60 * 60 * 1000;
+
+async function _registerPeriodicRefresh() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (!reg.periodicSync) return;
+    // Querying an unknown permission name throws, which the catch below covers.
+    const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+    if (status.state !== 'granted') return;
+    const tags = await reg.periodicSync.getTags();
+    if (tags.includes(PERIODIC_REFRESH_TAG)) return;
+    await reg.periodicSync.register(PERIODIC_REFRESH_TAG, {
+      minInterval: PERIODIC_REFRESH_MIN_INTERVAL_MS,
+    });
+  } catch (err) {
+    console.debug('[sw] periodic-register-skipped', err && err.message);
+  }
+}
+
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.addEventListener('message', event => {
     const data = event.data;
@@ -4074,6 +4100,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('/sw.js').catch(err => {
     console.debug('[sw] register-failed', err && err.message);
   });
+  _registerPeriodicRefresh();
 }
 
 // ─── Storage durability ──────────────────────────────────────────────────────

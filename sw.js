@@ -251,6 +251,39 @@ self.addEventListener('sync', event => {
   event.waitUntil(drainUploadQueue());
 });
 
+// ─── Periodic refresh ─────────────────────────────────────────────────────────
+//
+// Keeps the cached shell current between visits, so opening the app lands on the
+// build it should be on rather than the one from last week plus a quiet-refresh
+// dance. Chromium-only, gated on an installed PWA and site engagement, and the
+// browser decides the real cadence — so this is an enhancement, never the
+// mechanism. The quiet-refresh probe in the page remains the guarantee.
+//
+// It deliberately does NOT pre-pull the user's Drive data. Reconciling a remote
+// week means the CRDT merge, and that stays in the page.
+const REFRESH_SYNC_TAG = 'zw-refresh';
+
+async function periodicRefresh() {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(SHELL_KEY);
+  // Nothing cached means the app was never opened on this device, and there is
+  // no client around to learn the shell URL from. Wait for a real visit.
+  if (cached) await revalidateDocument(cache, SHELL_KEY, cached, '/app', true);
+  await precacheIcons();
+  // Opportunistic: the dedicated sync event owns retrying, so a failure here is
+  // not this handler's to escalate.
+  try {
+    await drainUploadQueue();
+  } catch (err) {
+    console.debug('[sw] periodic-drain-skipped', err && err.message);
+  }
+}
+
+self.addEventListener('periodicsync', event => {
+  if (event.tag !== REFRESH_SYNC_TAG) return;
+  event.waitUntil(periodicRefresh());
+});
+
 self.addEventListener('install', event => {
   // The shell itself is not precached — the first navigation populates it. The
   // icons are, because nothing in the page ever requests them: the browser
