@@ -88,7 +88,7 @@ function loadWorker({ onLine, fetchImpl, clients = [], misc = null } = {}) {
       }
     },
     caches: {
-      _names: ['zw-shell-v0', 'zw-shell-v1'],
+      _names: ['zw-shell-v0', 'zw-shell-v1', 'zw-shell-v2'],
       async open() { return cache; },
       async keys() { return this._names; },
       async delete(name) { this._names = this._names.filter(n => n !== name); return true; },
@@ -209,7 +209,7 @@ describe('sw.js — request routing', () => {
   });
 
   it('skips waiting on install so a new worker never waits for every tab to close', () => {
-    w.listeners.install();
+    w.listeners.install({ waitUntil: p => p });
     expect(w.ctx.self._skipWaitingCalls).toBe(1);
   });
 });
@@ -424,7 +424,7 @@ describe('sw.js — activation', () => {
     let work;
     w.listeners.activate({ waitUntil: p => { work = p; } });
     await work;
-    expect(w.ctx.caches._names).toEqual(['zw-shell-v1']);
+    expect(w.ctx.caches._names).toEqual(['zw-shell-v2']);
   });
 });
 
@@ -617,5 +617,122 @@ describe('sw.js — offline upload queue: draining', () => {
     const w = loadWorker({ misc, fetchImpl: drive.impl });
     await w.ctx.drainUploadQueue();
     expect(drive.calls.upload).toBe(1);
+  });
+});
+
+// ─── Manifest icons ───────────────────────────────────────────────────────────
+//
+// Nothing in the page ever requests these: the browser fetches them when the
+// user installs the app, which is exactly when they may be offline. They are
+// also the only static files vercel.json sets no Cache-Control for.
+
+// Mirrors ICON_PATHS in sw.js — a top-level const lives in the script's lexical
+// scope, not on the context object, so it cannot be read back out of the worker.
+const ICON_PATHS = [
+  '/assets/icon-192.png',
+  '/assets/icon-512.png',
+  '/assets/icon-1024.png',
+  '/assets/icon-1024-maskable.png',
+];
+
+function iconEvent(url, mode = 'no-cors') {
+  const responses = [];
+  return {
+    request: { url, method: 'GET', mode },
+    waitUntil: p => p,
+    respondWith: p => { responses.push(p); return p; },
+    responses,
+  };
+}
+
+describe('sw.js — manifest icons', () => {
+  let w;
+  beforeEach(() => { w = loadWorker(); });
+
+  it('claims exactly the icons the manifest declares', () => {
+    for (const path of ICON_PATHS) {
+      expect(w.ctx.isManifestIcon(new URL(path, ORIGIN))).toBe(true);
+    }
+  });
+
+  it('leaves alone the maskable size the manifest deliberately omits', () => {
+    expect(w.ctx.isManifestIcon(new URL('/assets/icon-512-maskable.png', ORIGIN))).toBe(false);
+  });
+
+  it('leaves the rest of /assets alone — hero.svg is 632 KB of marketing', () => {
+    for (const path of ['/assets/hero.svg', '/og-image.png', '/assets/playground-seed.json']) {
+      expect(w.ctx.isManifestIcon(new URL(path, ORIGIN))).toBe(false);
+    }
+  });
+
+  it('never claims another origin', () => {
+    expect(w.ctx.isManifestIcon(new URL('https://evil.example/assets/icon-192.png'))).toBe(false);
+  });
+
+  it('precaches every icon on install', async () => {
+    await w.ctx.precacheIcons();
+    expect(w.cache.store.size).toBe(ICON_PATHS.length);
+    expect(w.fetches.map(f => f.input).sort()).toEqual([...ICON_PATHS].sort());
+  });
+
+  it('does not refetch icons it already holds', async () => {
+    await w.ctx.precacheIcons();
+    const before = w.fetches.length;
+    await w.ctx.precacheIcons();
+    expect(w.fetches).toHaveLength(before);
+  });
+
+  it('survives an install with no link — one bad icon must not fail the install', async () => {
+    const bad = loadWorker({ fetchImpl: () => Promise.reject(new Error('offline')) });
+    await expect(bad.ctx.precacheIcons()).resolves.toBeUndefined();
+    expect(bad.cache.store.size).toBe(0);
+  });
+
+  it('does not cache a failed response', async () => {
+    const bad = loadWorker({ fetchImpl: () => Promise.resolve(makeResponse({ ok: false, status: 500 })) });
+    await bad.ctx.precacheIcons();
+    expect(bad.cache.store.size).toBe(0);
+  });
+
+  it('serves an icon request even though it is not a navigation', () => {
+    const ev = iconEvent(`${ORIGIN}/assets/icon-192.png`);
+    w.listeners.fetch(ev);
+    expect(ev.responses).toHaveLength(1);
+  });
+
+  it('answers from cache without touching the network', async () => {
+    await w.cache.put('/assets/icon-192.png', makeResponse({ tag: 'cached-icon' }));
+    const got = await w.ctx.cachedIcon(iconEvent(`${ORIGIN}/assets/icon-192.png`), '/assets/icon-192.png');
+    expect(got.tag).toBe('cached-icon');
+    expect(w.fetches).toHaveLength(0);
+  });
+
+  it('fetches and stores an icon it does not hold yet', async () => {
+    const ev = iconEvent(`${ORIGIN}/assets/icon-512.png`);
+    await w.ctx.cachedIcon(ev, '/assets/icon-512.png');
+    expect(w.cache.store.has('/assets/icon-512.png')).toBe(true);
+  });
+
+  it('fails the request rather than caching a broken icon when offline', async () => {
+    const bad = loadWorker({ fetchImpl: () => Promise.reject(new Error('offline')) });
+    const got = await bad.ctx.cachedIcon(iconEvent(`${ORIGIN}/assets/icon-192.png`), '/assets/icon-192.png');
+    expect(got.status).toBe(504);
+    expect(bad.cache.store.size).toBe(0);
+  });
+
+  it('still ignores non-GET traffic to an icon path', () => {
+    const ev = iconEvent(`${ORIGIN}/assets/icon-192.png`);
+    ev.request.method = 'POST';
+    w.listeners.fetch(ev);
+    expect(ev.responses).toHaveLength(0);
+  });
+
+  it('drops the previous shell cache so stale icons cannot linger', async () => {
+    const stale = loadWorker({ clients: [] });
+    stale.ctx.caches._names = ['zw-shell-v1', 'zw-shell-v2'];
+    let work;
+    stale.listeners.activate({ waitUntil: p => { work = p; } });
+    await work;
+    expect(stale.ctx.caches._names).toEqual(['zw-shell-v2']);
   });
 });

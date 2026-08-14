@@ -22,7 +22,21 @@
  */
 'use strict';
 
-const CACHE_NAME = 'zw-shell-v1';
+const CACHE_NAME = 'zw-shell-v2';
+
+// The four icons the web app manifest points at. Every other asset the app
+// needs is inline in the document — favicons are canvas-rendered data: URLs and
+// the UI icons are an inline SVG sprite — so these are the only static files
+// that have to survive going offline. They are also the only ones `vercel.json`
+// sets no Cache-Control for, which left them revalidating on the install path.
+// The 512 maskable variant is on disk but deliberately absent from the manifest
+// (see the note beside the icon list in zenit-week.html), so it is not cached.
+const ICON_PATHS = [
+  '/assets/icon-192.png',
+  '/assets/icon-512.png',
+  '/assets/icon-1024.png',
+  '/assets/icon-1024-maskable.png',
+];
 
 // Synthetic cache key. The app answers on several URLs (`/app`, `/app/…`,
 // `/zenit-week.html`) that all resolve to the same document via Vercel
@@ -46,6 +60,10 @@ function timeoutSignal(ms) {
 
 function isAppDocument(url) {
   return url.origin === self.location.origin && APP_PATH.test(url.pathname);
+}
+
+function isManifestIcon(url) {
+  return url.origin === self.location.origin && ICON_PATHS.includes(url.pathname);
 }
 
 // The marketing pages are ordinary, distinct documents, so unlike the shell they
@@ -233,11 +251,29 @@ self.addEventListener('sync', event => {
   event.waitUntil(drainUploadQueue());
 });
 
-self.addEventListener('install', () => {
-  // Nothing to precache — the first navigation populates the shell. Activate
-  // straight away so a new worker never waits for every tab to close.
+self.addEventListener('install', event => {
+  // The shell itself is not precached — the first navigation populates it. The
+  // icons are, because nothing in the page ever requests them: the browser
+  // fetches them when the user installs the app, which is exactly the moment
+  // they may be offline. One failure must not fail the install, so each is
+  // allowed to settle on its own.
+  event.waitUntil(precacheIcons());
+  // Activate straight away so a new worker never waits for every tab to close.
   self.skipWaiting();
 });
+
+async function precacheIcons() {
+  const cache = await caches.open(CACHE_NAME);
+  await Promise.all(ICON_PATHS.map(async path => {
+    try {
+      if (await cache.match(path)) return;
+      const resp = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
+      if (resp && resp.ok) await cache.put(path, resp);
+    } catch (err) {
+      console.debug('[sw] icon-precache-failed', path, err && err.message);
+    }
+  }));
+}
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
@@ -271,9 +307,15 @@ async function warmShell() {
 
 self.addEventListener('fetch', event => {
   const req = event.request;
-  if (req.method !== 'GET' || req.mode !== 'navigate') return;
+  if (req.method !== 'GET') return;
   let url;
   try { url = new URL(req.url); } catch (_) { return; }
+  // Icons are not navigations, so this branch sits above the navigate check.
+  if (isManifestIcon(url)) {
+    event.respondWith(cachedIcon(event, url.pathname));
+    return;
+  }
+  if (req.mode !== 'navigate') return;
   if (isAppDocument(url)) {
     event.respondWith(shellResponse(event));
     return;
@@ -288,6 +330,24 @@ self.addEventListener('fetch', event => {
 
 function shellResponse(event) {
   return cachedDocument(event, SHELL_KEY, true);
+}
+
+// Cache-first with no revalidation, unlike the documents. An icon is content-
+// stable for the life of a build, and a build that changes one ships a new
+// CACHE_NAME — so a background check would only ever confirm what we hold.
+async function cachedIcon(event, path) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(path);
+  if (cached) return cached;
+  try {
+    const fresh = await fetch(event.request);
+    if (fresh && fresh.ok) await cache.put(path, fresh.clone());
+    return fresh;
+  } catch (err) {
+    // No cached copy and no link: let the browser render its own broken-image
+    // state rather than a 200 with nothing in it.
+    return new Response('', { status: 504, headers: { 'Content-Type': 'text/plain' } });
+  }
 }
 
 // Cache-first with background revalidation. `notify` is for the app shell only:
