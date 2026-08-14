@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-FD/kA+RZKATl6Tb+/zZVlIamgm3jBRNv8Yjs+bme5t0='
+               'sha256-GYTKd1VqShR3PjzSeIl7IuoV7lLbqqtwVZzdIZbyGoM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4052,9 +4052,23 @@ if (navigator.serviceWorker && navigator.serviceWorker.controller) {
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.addEventListener('message', event => {
     const data = event.data;
-    if (!data || data.type !== 'zw-shell-updated') return;
-    console.debug('[sw] shell-updated', data.token);
-    _noteAssetVersion(data.token);
+    if (!data) return;
+    if (data.type === 'zw-shell-updated') {
+      console.debug('[sw] shell-updated', data.token);
+      _noteAssetVersion(data.token);
+      return;
+    }
+    // A week the worker pushed while the tab was backgrounded or closed.
+    // Recording the hash it wrote keeps this tab from re-uploading identical
+    // content, and clears the offline badge without a round-trip.
+    if (data.type === 'zw-drive-uploaded' && data.weekKey) {
+      console.debug('[sw] drive-uploaded', data.weekKey);
+      _offlineUploadQueue.delete(data.weekKey);
+      if (data.contentHash) lastSyncedHash.set(data.weekKey, data.contentHash);
+      lastSyncedAt = Date.now();
+      updateDropdownSyncTime();
+      if (syncStatus === 'error') setSyncStatus('connected', 'sync.msg.synced');
+    }
   });
   // Registration is deliberately unawaited — nothing in boot depends on it.
   navigator.serviceWorker.register('/sw.js').catch(err => {
@@ -5994,6 +6008,10 @@ async function signOut() {
     }
   }
 
+  // Nothing parked may outlive the session it belongs to — the worker would
+  // otherwise wake up and push a signed-out user's week.
+  await _clearOfflineUploadQueue();
+
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
   const token  = googleAccessToken;
@@ -6892,6 +6910,7 @@ function scheduleDriveSync(wKey) {
     // until its content happened to change again.
     if (isDefinitelyOffline()) {
       _offlineUploadQueue.add(wKey);
+      _persistOfflineUpload(wKey);
       setSyncStatus('error', 'sync.msg.failedSavedLocal');
       return;
     }
@@ -6902,12 +6921,85 @@ function scheduleDriveSync(wKey) {
 // Weeks whose upload was skipped because the device had no link. Flushed by the
 // 'online' listener below rather than by a retry timer — there is nothing to
 // poll for, the browser tells us when the link is back.
+//
+// That listener only helps a tab that is still open. Closing the tab before the
+// link returns used to lose the parked week entirely — it would sit local-only
+// until its content happened to change again. So the queue is also written to
+// IndexedDB, where the service worker can drain it from a Background Sync event
+// long after this document is gone.
+//
+// The worker carries no merge and no hashing logic: the payload and its content
+// hash are both serialized here, and the worker pushes only when Drive still
+// holds a revision this device has already reconciled (see baseHashes). Anything
+// else is a real conflict and is left for the page's CRDT merge on next open.
 const _offlineUploadQueue = new Set();
+const OFFLINE_UPLOAD_QUEUE_KEY = 'zenit-week-offline-uploads';
+const DRIVE_UPLOAD_SYNC_TAG = 'zw-drive-upload';
+
+// Revisions of this week we know we have already seen: what we last uploaded,
+// and what the poll last reconciled. If Drive still holds one of them then no
+// other device has written since, so a blind push cannot lose their work.
+function _offlineUploadBaseHashes(wKey) {
+  const out = [];
+  for (const h of [lastSyncedHash.get(wKey), lastSeenRemoteHash.get(wKey)]) {
+    if (h === undefined || h === null) continue;
+    const s = String(h);
+    if (!out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
+// Null means "not pushable without the page": a week with no known file id has
+// never reached Drive, and creating the file needs the full sign-in path.
+async function _buildOfflineUploadEntry(wKey) {
+  const fileId = driveFileIdCache.get(wKey);
+  if (!fileId) return null;
+  const data = await loadWeekIDB(wKey);
+  if (!data) return null;
+  return {
+    weekKey:     wKey,
+    fileId,
+    json:        JSON.stringify(data),
+    contentHash: String(weekContentHash(data)),
+    savedAt:     String(data.savedAt ?? 0),
+    baseHashes:  _offlineUploadBaseHashes(wKey),
+  };
+}
+
+async function _persistOfflineUpload(wKey) {
+  try {
+    const entry = await _buildOfflineUploadEntry(wKey);
+    if (!entry) return;
+    const stored = await loadValueIDB(OFFLINE_UPLOAD_QUEUE_KEY);
+    const rest = (Array.isArray(stored) ? stored : []).filter(e => e && e.weekKey !== wKey);
+    rest.push(entry);
+    await saveValueIDB(OFFLINE_UPLOAD_QUEUE_KEY, rest);
+    _registerUploadSync();
+  } catch (err) {
+    console.debug('[sync] park-failed', err && err.message);
+  }
+}
+
+async function _clearOfflineUploadQueue() {
+  try { await saveValueIDB(OFFLINE_UPLOAD_QUEUE_KEY, []); } catch { /* best-effort */ }
+}
+
+// Ask the browser to wake the worker once the link is back. Background Sync is
+// Chromium-only, so this is strictly additive — the 'online' listener below
+// stays wired everywhere and remains the only drain in Safari and Firefox.
+function _registerUploadSync() {
+  if (!('serviceWorker' in navigator) || typeof SyncManager === 'undefined') return;
+  navigator.serviceWorker.ready
+    .then(reg => reg.sync && reg.sync.register(DRIVE_UPLOAD_SYNC_TAG))
+    .catch(err => console.debug('[sync] background-sync-register-failed', err && err.message));
+}
 
 window.addEventListener('online', () => {
   if (!_offlineUploadQueue.size) return;
   const keys = [..._offlineUploadQueue];
   _offlineUploadQueue.clear();
+  // This tab is taking the weeks back off the worker's hands.
+  _clearOfflineUploadQueue();
   console.debug('[sync] back online — re-queuing parked uploads', keys);
   // Back through the debounce so a batch of parked weeks does not stampede
   // Drive the instant the link returns.
@@ -6919,6 +7011,9 @@ function clearAllSyncDebounceTimers() {
   syncDebounceTimers.forEach(t => clearTimeout(t));
   syncDebounceTimers.clear();
   _offlineUploadQueue.clear();
+  // The persisted queue is deliberately NOT cleared here: this also runs on
+  // tab-hide via flushAllPendingSyncToDrive, which is exactly when the worker's
+  // copy has to survive. Sign-out clears it explicitly instead.
 }
 
 async function syncColorsToDrive() {
@@ -15837,6 +15932,12 @@ function flushAllPendingSyncToDrive() {
   const pendingWeeks = new Set([...syncDebounceTimers.keys(), currentWeekKey]);
   clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
+  // Offline this is the last moment the page gets: an upload attempt would only
+  // fail and be forgotten, so hand the weeks to the worker instead.
+  if (isDefinitelyOffline()) {
+    pendingWeeks.forEach(wk => { _offlineUploadQueue.add(wk); _persistOfflineUpload(wk); });
+    return;
+  }
   pendingWeeks.forEach(wk => syncWeekToDrive(wk));
   syncColorsToDrive();
 }

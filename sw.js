@@ -12,6 +12,13 @@
  *
  * This is the one piece of the app that cannot live in zenit-week.html: browsers
  * only accept a service worker from a same-origin script URL.
+ *
+ * It also drains the offline upload queue on a Background Sync event, which is
+ * the only way a week edited offline can reach Drive after the tab is closed.
+ * That path deliberately holds no application logic: the page serializes both
+ * the payload and its content hash, and this worker pushes a week only when
+ * Drive still holds a revision the page has already reconciled. Every real
+ * conflict is dropped for the page's CRDT merge to settle on next open.
  */
 'use strict';
 
@@ -62,6 +69,169 @@ function marketingKey(url) {
 function versionToken(response) {
   return response.headers.get('etag') || response.headers.get('last-modified') || null;
 }
+
+// ─── Offline upload queue ─────────────────────────────────────────────────────
+
+const DB_NAME = 'zenit-week-db';
+const DB_VERSION = 1;
+const UPLOAD_QUEUE_KEY = 'zenit-week-offline-uploads';
+const UPLOAD_SYNC_TAG = 'zw-drive-upload';
+const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
+
+// Open without ever triggering an upgrade. The page owns the schema; a worker
+// that created the stores itself would race the page's own open and could hand
+// back a database the page then has to upgrade underneath us.
+function openQueueDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => { try { request.transaction.abort(); } catch (_) {} };
+    request.onsuccess = e => resolve(e.target.result);
+    request.onerror = e => reject(e.target.error);
+    request.onblocked = () => reject(new Error('idb-blocked'));
+  });
+}
+
+function idbRequest(db, storeName, mode, run) {
+  return new Promise((resolve, reject) => {
+    if (!db.objectStoreNames.contains(storeName)) { resolve(undefined); return; }
+    let req;
+    try {
+      req = run(db.transaction(storeName, mode).objectStore(storeName));
+    } catch (err) { reject(err); return; }
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function readUploadQueue(db) {
+  const stored = await idbRequest(db, 'misc', 'readonly', store => store.get(UPLOAD_QUEUE_KEY));
+  return Array.isArray(stored) ? stored.filter(e => e && e.weekKey && e.fileId && e.json) : [];
+}
+
+function writeUploadQueue(db, entries) {
+  return idbRequest(db, 'misc', 'readwrite', store => store.put(entries, UPLOAD_QUEUE_KEY));
+}
+
+// The safety rule, in one place. `props` is the file's Drive appProperties, or
+// null when the file is gone. A push is safe only when Drive still holds a
+// revision this device has already reconciled — anything else means another
+// device wrote while we were offline, and blindly pushing would lose their work.
+function canPushEntry(entry, props) {
+  if (!props) return false;
+  const remote = props.contentHash === undefined || props.contentHash === null
+    ? null : String(props.contentHash);
+  const bases = Array.isArray(entry.baseHashes) ? entry.baseHashes.map(String) : [];
+  if (remote === null) return bases.length === 0;
+  return bases.includes(remote);
+}
+
+// The refresh token is an HttpOnly cookie, so the worker can mint an access
+// token without the page ever having run. Returns null when the session is gone
+// (signed out, cookie expired) — that is a reason to drop the queue, not retry.
+async function mintAccessToken() {
+  const resp = await fetch('/api/token', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'refresh_token' }),
+    signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS),
+  });
+  if (resp.status === 400 || resp.status === 401) return null;
+  if (!resp.ok) throw new Error(`token HTTP ${resp.status}`);
+  const data = await resp.json().catch(() => ({}));
+  return data.access_token || null;
+}
+
+async function fetchDriveProps(entry, token) {
+  const resp = await fetch(`${DRIVE_FILES_URL}/${entry.fileId}?fields=appProperties`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS),
+  });
+  if (resp.status === 404) return { gone: true, props: null };
+  if (!resp.ok) throw new Error(`props HTTP ${resp.status}`);
+  const data = await resp.json().catch(() => ({}));
+  return { gone: false, props: data.appProperties || {} };
+}
+
+async function pushEntry(entry, token) {
+  const boundary = `ZenitWeekSW_${entry.weekKey}_${entry.contentHash}`;
+  const meta = JSON.stringify({
+    appProperties: { savedAt: String(entry.savedAt), contentHash: String(entry.contentHash) },
+  });
+  const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`
+    + `--${boundary}\r\nContent-Type: application/json\r\n\r\n${entry.json}\r\n--${boundary}--`;
+  const resp = await fetch(`${DRIVE_UPLOAD_URL}/${entry.fileId}?uploadType=multipart`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body,
+    signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS),
+  });
+  if (!resp.ok) throw new Error(`upload HTTP ${resp.status}`);
+}
+
+async function notifyUploaded(entry) {
+  const windows = await self.clients.matchAll({ type: 'window' });
+  for (const client of windows) {
+    client.postMessage({
+      type: 'zw-drive-uploaded',
+      weekKey: entry.weekKey,
+      contentHash: String(entry.contentHash),
+    });
+  }
+}
+
+// Throws when anything is worth retrying, so the browser re-fires the sync
+// event on its own backoff. Entries are only kept for a retry when the failure
+// was transient — a conflict or a missing file is resolved by the page instead,
+// and staying in the queue would mean retrying forever.
+async function drainUploadQueue() {
+  if (self.navigator && self.navigator.onLine === false) throw new Error('offline');
+  const db = await openQueueDb();
+  try {
+    const entries = await readUploadQueue(db);
+    if (!entries.length) return;
+
+    const token = await mintAccessToken();
+    if (!token) {
+      console.debug('[sw] upload-queue: no session, dropping', entries.length);
+      await writeUploadQueue(db, []);
+      return;
+    }
+
+    const keep = [];
+    let retry = false;
+    for (const entry of entries) {
+      try {
+        const { gone, props } = await fetchDriveProps(entry, token);
+        if (gone) { console.debug('[sw] upload-queue: file gone', entry.weekKey); continue; }
+        if (!canPushEntry(entry, props)) {
+          console.debug('[sw] upload-queue: conflict, leaving to the page', entry.weekKey);
+          continue;
+        }
+        await pushEntry(entry, token);
+        await notifyUploaded(entry);
+        console.debug('[sw] upload-queue: pushed', entry.weekKey);
+      } catch (err) {
+        console.debug('[sw] upload-queue: retry', entry.weekKey, err && err.message);
+        keep.push(entry);
+        retry = true;
+      }
+    }
+    await writeUploadQueue(db, keep);
+    if (retry) throw new Error('upload-queue incomplete');
+  } finally {
+    try { db.close(); } catch (_) {}
+  }
+}
+
+self.addEventListener('sync', event => {
+  if (event.tag !== UPLOAD_SYNC_TAG) return;
+  event.waitUntil(drainUploadQueue());
+});
 
 self.addEventListener('install', () => {
   // Nothing to precache — the first navigation populates the shell. Activate

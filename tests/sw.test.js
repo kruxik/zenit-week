@@ -32,9 +32,39 @@ function makeCache() {
   };
 }
 
+// Minimal IndexedDB stand-in covering exactly what the worker's queue drain
+// touches: one `misc` store, get and put, requests that settle asynchronously
+// the way the real API does.
+function makeIndexedDb(misc, { stores = ['weeks', 'misc'] } = {}) {
+  const settle = req => { Promise.resolve().then(() => req.onsuccess && req.onsuccess({ target: req })); };
+  const db = {
+    closed: false,
+    objectStoreNames: { contains: name => stores.includes(name) },
+    close() { db.closed = true; },
+    transaction(name) {
+      return {
+        objectStore() {
+          return {
+            get(key) { const req = { result: misc[key] }; settle(req); return req; },
+            put(value, key) { misc[key] = value; const req = { result: key }; settle(req); return req; },
+          };
+        },
+      };
+    },
+  };
+  return {
+    db,
+    open() {
+      const req = {};
+      Promise.resolve().then(() => req.onsuccess && req.onsuccess({ target: { result: db } }));
+      return req;
+    },
+  };
+}
+
 // Boots sw.js in an isolated context with the worker globals it expects, and
 // hands back both the context and the recorded event listeners.
-function loadWorker({ onLine, fetchImpl, clients = [] } = {}) {
+function loadWorker({ onLine, fetchImpl, clients = [], misc = null } = {}) {
   const listeners = {};
   const cache = makeCache();
   const posted = [];
@@ -79,9 +109,11 @@ function loadWorker({ onLine, fetchImpl, clients = [] } = {}) {
     },
     addEventListener: (type, fn) => { listeners[type] = fn; },
   };
+  const idb = makeIndexedDb(misc || {});
+  ctx.indexedDB = idb;
   vm.createContext(ctx);
   vm.runInContext(swCode, ctx);
-  return { ctx, listeners, cache, posted, fetches };
+  return { ctx, listeners, cache, posted, fetches, idb };
 }
 
 function navEvent(url) {
@@ -172,8 +204,8 @@ describe('sw.js — request routing', () => {
     expect(ev.responses).toHaveLength(1);
   });
 
-  it('registers install, activate and fetch', () => {
-    expect(Object.keys(w.listeners).sort()).toEqual(['activate', 'fetch', 'install']);
+  it('registers install, activate, fetch and sync', () => {
+    expect(Object.keys(w.listeners).sort()).toEqual(['activate', 'fetch', 'install', 'sync']);
   });
 
   it('skips waiting on install so a new worker never waits for every tab to close', () => {
@@ -393,5 +425,197 @@ describe('sw.js — activation', () => {
     w.listeners.activate({ waitUntil: p => { work = p; } });
     await work;
     expect(w.ctx.caches._names).toEqual(['zw-shell-v1']);
+  });
+});
+
+// ─── Offline upload queue ─────────────────────────────────────────────────────
+//
+// The hole this closes: a week edited offline was parked in an in-memory Set and
+// drained only by the page's 'online' listener, so closing the tab before the
+// link returned stranded that week on the device until its content happened to
+// change again.
+
+const QUEUE_KEY = 'zenit-week-offline-uploads';
+
+function mkEntry(over = {}) {
+  return {
+    weekKey: '2026-30',
+    fileId: 'file-1',
+    json: '{"nodes":[]}',
+    contentHash: '111',
+    savedAt: '1700000000000',
+    baseHashes: ['999'],
+    ...over,
+  };
+}
+
+// Routes the three hosts the drain talks to. `props` is the appProperties Drive
+// reports for the file; `overrides` forces a status on a given leg.
+function makeDriveFetch({ props = { contentHash: '999' }, token = 'tok', overrides = {} } = {}) {
+  const calls = { token: 0, props: 0, upload: 0, uploadBodies: [] };
+  const json = (status, body) => Promise.resolve({
+    ok: status < 400, status, json: () => Promise.resolve(body),
+  });
+  const impl = (input, init) => {
+    const url = String(input);
+    if (url.includes('/api/token')) {
+      calls.token++;
+      if (overrides.token) return json(overrides.token, {});
+      return json(200, { access_token: token });
+    }
+    if (url.includes('/upload/drive/v3/files/')) {
+      calls.upload++;
+      calls.uploadBodies.push(init && init.body);
+      return json(overrides.upload || 200, {});
+    }
+    if (url.includes('/drive/v3/files/')) {
+      calls.props++;
+      if (overrides.props) return json(overrides.props, {});
+      return json(200, props === null ? {} : { appProperties: props });
+    }
+    return json(200, {});
+  };
+  return { impl, calls };
+}
+
+describe('sw.js — offline upload queue: the safety rule', () => {
+  let w;
+  beforeEach(() => { w = loadWorker(); });
+
+  it('pushes when Drive still holds a revision this device reconciled', () => {
+    expect(w.ctx.canPushEntry(mkEntry({ baseHashes: ['999'] }), { contentHash: '999' })).toBe(true);
+  });
+
+  it('accepts any known revision, not just the most recent one', () => {
+    // lastSyncedHash and lastSeenRemoteHash can legitimately differ; either
+    // proves we have already merged whatever Drive holds.
+    expect(w.ctx.canPushEntry(mkEntry({ baseHashes: ['999', '888'] }), { contentHash: '888' })).toBe(true);
+  });
+
+  it('refuses when another device wrote while we were offline', () => {
+    expect(w.ctx.canPushEntry(mkEntry({ baseHashes: ['999'] }), { contentHash: 'other' })).toBe(false);
+  });
+
+  it('refuses a week whose file has gone', () => {
+    expect(w.ctx.canPushEntry(mkEntry(), null)).toBe(false);
+  });
+
+  it('refuses when Drive holds content we have never seen a hash for', () => {
+    expect(w.ctx.canPushEntry(mkEntry({ baseHashes: [] }), { contentHash: 'other' })).toBe(false);
+  });
+
+  it('allows the first push to a file that carries no hash yet', () => {
+    expect(w.ctx.canPushEntry(mkEntry({ baseHashes: [] }), {})).toBe(true);
+  });
+
+  it('compares by value, so a numeric hash still matches its stored string', () => {
+    expect(w.ctx.canPushEntry(mkEntry({ baseHashes: [999] }), { contentHash: 999 })).toBe(true);
+  });
+});
+
+describe('sw.js — offline upload queue: draining', () => {
+  it('pushes a parked week and clears it from the queue', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry()] };
+    const drive = makeDriveFetch();
+    const w = loadWorker({ misc, fetchImpl: drive.impl, clients: [`${ORIGIN}/app`] });
+    await w.ctx.drainUploadQueue();
+    expect(drive.calls.upload).toBe(1);
+    expect(misc[QUEUE_KEY]).toEqual([]);
+  });
+
+  it('sends the payload the page serialized, not one it rebuilt', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry({ json: '{"nodes":[{"id":"a"}]}' })] };
+    const drive = makeDriveFetch();
+    const w = loadWorker({ misc, fetchImpl: drive.impl });
+    await w.ctx.drainUploadQueue();
+    expect(drive.calls.uploadBodies[0]).toContain('{"nodes":[{"id":"a"}]}');
+    expect(drive.calls.uploadBodies[0]).toContain('"contentHash":"111"');
+  });
+
+  it('tells an open tab what it pushed so the badge and hash agree', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry()] };
+    const drive = makeDriveFetch();
+    const w = loadWorker({ misc, fetchImpl: drive.impl, clients: [`${ORIGIN}/app`] });
+    await w.ctx.drainUploadQueue();
+    expect(w.posted).toHaveLength(1);
+    expect(w.posted[0].msg).toEqual({
+      type: 'zw-drive-uploaded', weekKey: '2026-30', contentHash: '111',
+    });
+  });
+
+  it('drops a conflicted week instead of retrying it forever', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry()] };
+    const drive = makeDriveFetch({ props: { contentHash: 'someone-else' } });
+    const w = loadWorker({ misc, fetchImpl: drive.impl });
+    await expect(w.ctx.drainUploadQueue()).resolves.toBeUndefined();
+    expect(drive.calls.upload).toBe(0);
+    expect(misc[QUEUE_KEY]).toEqual([]);
+  });
+
+  it('drops a week whose Drive file no longer exists', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry()] };
+    const drive = makeDriveFetch({ overrides: { props: 404 } });
+    const w = loadWorker({ misc, fetchImpl: drive.impl });
+    await w.ctx.drainUploadQueue();
+    expect(drive.calls.upload).toBe(0);
+    expect(misc[QUEUE_KEY]).toEqual([]);
+  });
+
+  it('drops the whole queue when the session is gone rather than retrying', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry(), mkEntry({ weekKey: '2026-31' })] };
+    const drive = makeDriveFetch({ overrides: { token: 400 } });
+    const w = loadWorker({ misc, fetchImpl: drive.impl });
+    await expect(w.ctx.drainUploadQueue()).resolves.toBeUndefined();
+    expect(drive.calls.props).toBe(0);
+    expect(misc[QUEUE_KEY]).toEqual([]);
+  });
+
+  it('keeps a week and throws when the upload fails transiently', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry()] };
+    const drive = makeDriveFetch({ overrides: { upload: 503 } });
+    const w = loadWorker({ misc, fetchImpl: drive.impl });
+    await expect(w.ctx.drainUploadQueue()).rejects.toThrow();
+    expect(misc[QUEUE_KEY]).toHaveLength(1);
+  });
+
+  it('does not lose a healthy week because another one failed', async () => {
+    const misc = { [QUEUE_KEY]: [mkEntry({ weekKey: '2026-30', fileId: 'good' }),
+                                 mkEntry({ weekKey: '2026-31', fileId: 'bad' })] };
+    const drive = makeDriveFetch();
+    const w = loadWorker({
+      misc,
+      fetchImpl: (input, init) => (String(input).includes('bad')
+        ? Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) })
+        : drive.impl(input, init)),
+    });
+    await expect(w.ctx.drainUploadQueue()).rejects.toThrow();
+    expect(drive.calls.upload).toBe(1);
+    expect(misc[QUEUE_KEY].map(e => e.weekKey)).toEqual(['2026-31']);
+  });
+
+  it('does nothing at all when nothing is parked', async () => {
+    const w = loadWorker({ misc: {}, fetchImpl: makeDriveFetch().impl });
+    await w.ctx.drainUploadQueue();
+    expect(w.fetches).toHaveLength(0);
+  });
+
+  it('refuses to start while the browser reports no link', async () => {
+    const w = loadWorker({ misc: { [QUEUE_KEY]: [mkEntry()] }, onLine: false });
+    await expect(w.ctx.drainUploadQueue()).rejects.toThrow('offline');
+  });
+
+  it('only answers its own sync tag', () => {
+    const w = loadWorker();
+    const waits = [];
+    w.listeners.sync({ tag: 'something-else', waitUntil: p => waits.push(p) });
+    expect(waits).toHaveLength(0);
+  });
+
+  it('ignores queue rows too damaged to push', async () => {
+    const misc = { [QUEUE_KEY]: [{ weekKey: '2026-30' }, null, mkEntry()] };
+    const drive = makeDriveFetch();
+    const w = loadWorker({ misc, fetchImpl: drive.impl });
+    await w.ctx.drainUploadQueue();
+    expect(drive.calls.upload).toBe(1);
   });
 });

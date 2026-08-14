@@ -63,7 +63,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - `syncStatusUp(nodeId, prop)` — propagates done/unplanned status up the tree after a child changes
 
 ## Coding Standards & Conventions
-- **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files. The one exception is `sw.js`: browsers only accept a service worker from a same-origin script URL, so it cannot be inlined or loaded from a `blob:`. Nothing else may leave the single file; do not treat `sw.js` as licence to split further, and keep application logic out of it — it holds shell-caching concerns only.
+- **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files. The one exception is `sw.js`: browsers only accept a service worker from a same-origin script URL, so it cannot be inlined or loaded from a `blob:`. Nothing else may leave the single file; do not treat `sw.js` as licence to split further. It holds exactly two concerns — shell caching, and draining the offline upload queue on a Background Sync event. Keep application logic out of both: the page serializes the upload payload and its content hash, and the worker only decides whether pushing is safe (`canPushEntry`). CRDT merging, hashing and layout never move into the worker.
 - **JavaScript**:
   - Always use `'use strict';`
   - Prefer `const` and `let` over `var`
