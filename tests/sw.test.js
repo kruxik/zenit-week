@@ -736,3 +736,92 @@ describe('sw.js — manifest icons', () => {
     expect(stale.ctx.caches._names).toEqual(['zw-shell-v2']);
   });
 });
+
+// ─── Offline fallback ─────────────────────────────────────────────────────────
+//
+// Only reachable when the very first visit to a document is offline. It used to
+// be one English sentence of text/plain, which reads as a broken server rather
+// than as "you are offline".
+
+function langEvent(url, acceptLanguage) {
+  const ev = navEvent(url);
+  ev.request.headers = { get: name => (name.toLowerCase() === 'accept-language' ? acceptLanguage : null) };
+  return ev;
+}
+
+const offlineWorker = () => loadWorker({ fetchImpl: () => Promise.reject(new Error('offline')) });
+
+describe('sw.js — offline fallback', () => {
+  it('answers 503 as a document, not as plain text', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
+    expect(resp.status).toBe(503);
+    expect(resp.headers['Content-Type']).toMatch(/text\/html/);
+  });
+
+  it('is never stored — a cached "you are offline" would outlive being offline', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
+    expect(resp.headers['Cache-Control']).toBe('no-store');
+    expect(w.cache.store.size).toBe(0);
+  });
+
+  it('speaks Czech to a Czech browser', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.shellResponse(langEvent(`${ORIGIN}/app`, 'cs-CZ,cs;q=0.9,en;q=0.8'));
+    expect(String(resp.body)).toContain('Jsi offline');
+    expect(String(resp.body)).toContain('lang="cs"');
+  });
+
+  it('finds Czech behind another preferred language', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.shellResponse(langEvent(`${ORIGIN}/app`, 'sk-SK,sk;q=0.9,cs;q=0.8'));
+    expect(String(resp.body)).toContain('Jsi offline');
+  });
+
+  it('falls back to English for anything else', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.shellResponse(langEvent(`${ORIGIN}/app`, 'de-DE,de;q=0.9'));
+    expect(String(resp.body)).toContain('You are offline');
+    expect(String(resp.body)).toContain('lang="en"');
+  });
+
+  it('does not mistake a language that merely starts with cs', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.shellResponse(langEvent(`${ORIGIN}/app`, 'csb-PL,csb;q=0.9'));
+    expect(String(resp.body)).toContain('You are offline');
+  });
+
+  it('falls back to English when the header is missing entirely', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
+    expect(String(resp.body)).toContain('You are offline');
+  });
+
+  it('offers a retry that lands back on the app', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
+    expect(String(resp.body)).toContain('href="/app"');
+  });
+
+  it('offers a retry that lands back on the page the reader asked for', async () => {
+    const w = offlineWorker();
+    const resp = await w.ctx.cachedDocument(navEvent(`${ORIGIN}/privacy.html`), '/privacy', false);
+    expect(String(resp.body)).toContain('href="/privacy"');
+  });
+
+  it('never puts the request path in the markup — /app/… takes any trailing segment', async () => {
+    const w = offlineWorker();
+    const hostile = `${ORIGIN}/app/"><script>alert(1)</script>`;
+    const resp = await w.ctx.shellResponse(navEvent(hostile));
+    expect(String(resp.body)).toContain('href="/app"');
+    expect(String(resp.body)).not.toContain('alert(1)');
+  });
+
+  it('keeps the cached copy authoritative — the fallback is a last resort', async () => {
+    const w = offlineWorker();
+    await w.cache.put('/__zw-shell__', makeResponse({ tag: 'cached-shell' }));
+    const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
+    expect(resp.tag).toBe('cached-shell');
+  });
+});

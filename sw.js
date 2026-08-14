@@ -350,6 +350,92 @@ async function cachedIcon(event, path) {
   }
 }
 
+// ─── Offline fallback ─────────────────────────────────────────────────────────
+//
+// Only ever reached by someone whose very first visit is offline: any later
+// visit is answered from the cache. It used to be one English sentence of
+// text/plain, which reads as a broken server rather than as "you are offline".
+//
+// The app ships English and Czech but the worker cannot read the stored
+// language — localStorage is unavailable here, and the choice is stored in a
+// document that by definition has never loaded on this device. Accept-Language
+// is all there is, and it is the same signal the browser itself would use.
+const OFFLINE_COPY = {
+  en: {
+    lang:  'en',
+    title: 'Zenit Week — offline',
+    head:  'You are offline',
+    body:  'This device has not installed Zenit Week yet. Connect once and it will keep working offline from then on.',
+    retry: 'Try again',
+  },
+  cs: {
+    lang:  'cs',
+    title: 'Zenit Week — offline',
+    head:  'Jsi offline',
+    body:  'Na tomto zařízení ještě není Zenit Week nainstalovaný. Připoj se jednou a od té chvíle bude fungovat i offline.',
+    retry: 'Zkusit znovu',
+  },
+};
+
+function offlineCopy(request) {
+  let header = '';
+  try { header = (request && request.headers && request.headers.get('accept-language')) || ''; } catch (_) {}
+  return /(^|,)\s*cs\b/i.test(header) ? OFFLINE_COPY.cs : OFFLINE_COPY.en;
+}
+
+// The retry target is the cache key, never the request URL: `/app/…` accepts
+// arbitrary trailing segments and interpolating one into markup would be an
+// injection. Every cache key is a constant defined in this file.
+function offlineRetryHref(cacheKey) {
+  return cacheKey === SHELL_KEY ? '/app' : cacheKey;
+}
+
+function offlineResponse(request, cacheKey) {
+  const c = offlineCopy(request);
+  const href = offlineRetryHref(cacheKey);
+  const html = `<!doctype html>
+<html lang="${c.lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>${c.title}</title>
+<style>
+:root { color-scheme: light dark; --bg: #f7f7fb; --fg: #1a1a24; --muted: #5a5a70; --line: #dededf; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #181825; --fg: #f2f2f7; --muted: #a0a0b8; --line: #33334a; }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: var(--bg); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.55; text-align: center;
+}
+main { max-width: 26rem; }
+h1 { margin: 0 0 12px; font-size: 1.5rem; font-weight: 600; }
+p { margin: 0 0 24px; color: var(--muted); }
+a {
+  display: inline-block; padding: 10px 20px; border: 1px solid var(--line); border-radius: 10px;
+  color: inherit; text-decoration: none; font-weight: 500;
+}
+a:hover { border-color: currentColor; }
+</style>
+</head>
+<body>
+<main>
+<h1>${c.head}</h1>
+<p>${c.body}</p>
+<a href="${href}">${c.retry}</a>
+</main>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 503,
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+}
+
 // Cache-first with background revalidation. `notify` is for the app shell only:
 // the marketing pages have no quiet-refresh machinery to tell about a new build.
 async function cachedDocument(event, cacheKey, notify) {
@@ -366,10 +452,7 @@ async function cachedDocument(event, cacheKey, notify) {
     if (fresh && fresh.ok) await cache.put(cacheKey, fresh.clone());
     return fresh;
   } catch (err) {
-    return new Response(
-      'Zenit Week is offline and has no cached copy yet. Reconnect once to install it.',
-      { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
-    );
+    return offlineResponse(event.request, cacheKey);
   }
 }
 
