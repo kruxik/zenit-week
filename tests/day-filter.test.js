@@ -424,3 +424,63 @@ describe('day-filter layout pruning', () => {
     expect(pos['play']).toBeUndefined(); // pruned by the day filter
   });
 });
+
+// A multi-day activity lays its day leaves out as a staggered zigzag block once
+// there are 3+ of them. Filtering to one day leaves a single survivor, which must
+// land exactly where a lone day leaf lands — the zigzag metrics have to be built
+// from the filtered child set, not the raw one, or the survivor is staggered
+// against siblings that aren't on screen and stranded inside a block sized for
+// all seven days.
+describe('day-filter zigzag positioning', () => {
+  afterEach(() => _state.setActiveDayFilter(null));
+
+  // One wide pruned sibling, so a stale maxW1/staggerX would show up loudly in x.
+  function build(dayIndexes) {
+    const center = { id: 'center', type: 'center', label: 'Week', children: ['b'] };
+    const b = { ...mkBranch('b'), parent: 'center', side: 'right', children: ['act'] };
+    const act = mkActivity('act', 'b', 'b', { label: 'Task', children: dayIndexes.map(d => `d${d}`) });
+    const leaves = dayIndexes.map(d => {
+      const leaf = mkDayChild(`d${d}`, 'act', 'b', d);
+      if (d === 1) leaf.label = 'MondayWideWideWideWide';
+      return leaf;
+    });
+    return [center, b, act, ...leaves];
+  }
+
+  function offsetOfWednesdayLeaf(dayIndexes, day) {
+    _state.set({ nodes: build(dayIndexes) });
+    _state.setWeekKey('2026-01');
+    _state.setLang('en');
+    _state.setViewLevel('full');
+    _state.setActiveDayFilter(day);
+    rebuildNodeMap();
+    const pos = computeLayout();
+    expect(pos['d3']).toBeDefined();
+    return { dx: pos['d3'].x - pos['act'].x, dy: pos['d3'].y - pos['act'].y };
+  }
+
+  test('the lone survivor of a 5-day block sits where a lone day leaf sits', () => {
+    const filtered = offsetOfWednesdayLeaf([1, 2, 3, 4, 5], 3);
+    const control  = offsetOfWednesdayLeaf([3], null);
+    expect(filtered.dx).toBeCloseTo(control.dx, 5);
+    expect(filtered.dy).toBeCloseTo(control.dy, 5);
+  });
+
+  test('a single survivor is vertically centred on its parent', () => {
+    expect(offsetOfWednesdayLeaf([1, 2, 3, 4, 5, 6, 0], 3).dy).toBeCloseTo(0, 5);
+  });
+
+  test('unfiltered, 5 day leaves still zigzag', () => {
+    // Guards the other direction: filtering the metrics input must not disable the
+    // stagger when every leaf is on screen.
+    _state.set({ nodes: build([1, 2, 3, 4, 5]) });
+    _state.setWeekKey('2026-01');
+    _state.setLang('en');
+    _state.setViewLevel('full');
+    _state.setActiveDayFilter(null);
+    rebuildNodeMap();
+    const pos = computeLayout();
+    expect(pos['d2'].x).not.toBeCloseTo(pos['d1'].x, 1); // odd slots are staggered out
+    expect(pos['d3'].x).toBeCloseTo(pos['d1'].x, 5);     // even slots share a column
+  });
+});

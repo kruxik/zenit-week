@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-6izDIK8sZi63ON/d/Y25eg3UZ0jbXbjO8TUdPZRtsj4='
+               'sha256-/9ukGw8uYWVH6Bl+D+t0G8r0R2MZvc3wOC8qE5RXFKo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9510,11 +9510,11 @@ function computeLayout() {
     const node = findNode(nodeId);
     if (!node || node.type !== 'activity') return nodeZigZagMetrics[nodeId] = null;
     
-    const activeChildren = (node.children || []).filter(cid => {
-      const child = findNode(cid);
-      const isActiveEdit = editState && editState.nodeId === cid;
-      return child && (!child._editing || isActiveEdit);
-    });
+    // Must be the same child set the placement pass walks (activeChildIds), or
+    // the two disagree: a day filter that leaves one of seven day leaves would
+    // still reserve a seven-slot block and stagger against the widest of all
+    // seven, stranding the survivor far from its parent.
+    const activeChildren = activeChildIds(nodeId);
 
     // Zigzag layout applies to leaf groups managed by magic labels — either
     // day-children (Mon..Sun) or tick-children (1..N from "Nx"). The two are
