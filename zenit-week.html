@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-jD5uQa6r4CO5fzDiqGM9zd/6q9mLWoHxC15ncBbF7r0='
+               'sha256-E0H0DdwwwKc+DDIXm7BClSIQPmKI2rTn3luWGla8lZ0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -645,18 +645,20 @@
     margin: 0 auto;
   }
 
-  /* ─── Day filter rail + chip ─────────────────────────────────────────────── */
-  #day-filter-rail {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  /* ─── Day filter button + chip ───────────────────────────────────────────── */
+  /* The button reuses .view-level-btn wholesale — box, hover and active colors —
+     so it reads as a peer of Sand/Pebbles/Rocks. Only the icon slot differs: a
+     day abbreviation instead of a stack of dots, boxed to the same 16px the dot
+     stack occupies so both cells end up exactly the same height. */
+  #day-filter-btn .view-level-icon {
+    height: 16px;
+    justify-content: center;
   }
 
-  /* Day cells inherit .view-level-btn's box, hover and active colors; only the
-     content differs — a day label instead of a stack of dots. */
-  .day-filter-btn {
-    padding: 3px 4px;
-    font-size: 10px;
+  #day-filter-glyph {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
     letter-spacing: 0;
     text-transform: none;
   }
@@ -2580,8 +2582,9 @@
   .agenda-priority-icon.high     { color: var(--accent-warning-text); }
   .agenda-priority-icon.critical { color: var(--accent-danger); }
 
-  /* Reschedule submenu */
-  #ctx-reschedule-submenu {
+  /* Reschedule submenu, and the day-filter menu that borrows its chrome */
+  #ctx-reschedule-submenu,
+  #day-filter-menu {
     position: fixed;
     z-index: 9001;
     background: var(--bg-surface);
@@ -2592,7 +2595,17 @@
     box-shadow: 0 8px 32px var(--shadow-md);
     display: none;
   }
-  #ctx-reschedule-submenu.visible { display: block; }
+  #ctx-reschedule-submenu.visible,
+  #day-filter-menu.visible { display: block; }
+
+  /* Day abbreviation column, so the day names line up past it. */
+  .day-filter-menu-glyph {
+    display: inline-block;
+    width: 18px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .ctx-item-selected .day-filter-menu-glyph { color: inherit; }
 
   .ctx-submenu-arrow {
     font-size: 9px;
@@ -3527,6 +3540,13 @@
 
   <div id="canvas-container">
     <div id="view-level-bar">
+      <!-- Day filter: one cell shaped like a view level, opening a menu of days.
+           Shows ∅ while off, the active day's abbreviation while on. -->
+      <div class="view-level-btn" id="day-filter-btn">
+        <div class="view-level-icon"><span id="day-filter-glyph">∅</span></div>
+        <span data-i18n="filter.dayShort">Day</span>
+      </div>
+      <div class="view-level-separator"></div>
       <div class="view-level-btn active" data-level="full" data-i18n-title="view.sandTitle" title="Sand — all nodes visible">
         <div class="view-level-icon">
           <div class="dot-row">
@@ -3580,9 +3600,6 @@
         </div>
         <span data-i18n="view.rocks">Rocks</span>
       </div>
-      <div class="view-level-separator"></div>
-      <!-- Day filter cells (overdue, Mon–Sun, unscheduled) — built by buildDayRail() -->
-      <div id="day-filter-rail"></div>
     </div>
     <div id="day-filter-chip">
       <span id="day-filter-chip-label" data-i18n="filter.showing">Showing</span>
@@ -3642,6 +3659,7 @@
 </div>
 
 <div id="ctx-reschedule-submenu"></div>
+<div id="day-filter-menu"></div>
 
 <textarea id="inline-input" autocomplete="off" spellcheck="false"></textarea>
 <span id="inline-sizer"></span>
@@ -4278,6 +4296,7 @@ const QUIESCENCE_PANEL_IDS = [
   'app-confirm-overlay',
   'context-menu',
   'ctx-reschedule-submenu',
+  'day-filter-menu',
   'help-panel',
   'help-overlay',
   'comment-panel',
@@ -7752,6 +7771,9 @@ const TRANSLATIONS = {
     'filter.off':                 'Filter off',
     'filter.showing':             'Showing',
     'filter.emptyDay':            '— nothing planned',
+    'filter.dayShort':            'Day',
+    'filter.dayTitle':            'Filter by day — show one day, hide the rest',
+    'filter.none':                'None',
     'menu.clearDayFilter':        'Clear Day Filter',
     'error.quotaExceeded':        'Storage quota exceeded — changes might not be saved',
     'sync.btnLabel':              'Sign in',
@@ -7996,6 +8018,9 @@ const TRANSLATIONS = {
     'filter.off':                 'Filtr vypnut',
     'filter.showing':             'Zobrazeno',
     'filter.emptyDay':            '— nic naplánováno',
+    'filter.dayShort':            'Den',
+    'filter.dayTitle':            'Filtr dne — zobrazí jeden den, zbytek skryje',
+    'filter.none':                'Žádný',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena — změny nemusí být uloženy',
     'sync.btnLabel':              'Přihlásit se',
@@ -12751,6 +12776,10 @@ function _windowKeydownHandler(e) {
     const settings = document.getElementById('settings-dropdown');
     const help = document.getElementById('help-overlay');
 
+    if (isDayFilterMenuOpen()) {
+      closeDayFilterMenu();
+      return;
+    }
     if (ctxMenu && ctxMenu.classList.contains('visible')) {
       hideContextMenu();
       return;
@@ -13176,6 +13205,7 @@ function attachNodeListeners() {
 const ctxMenu = document.getElementById('context-menu');
 
 function showContextMenu(x, y, nodeId) {
+  closeDayFilterMenu(); // two popovers open at once would be one too many
   contextTarget = nodeId;
   const node = (nodeId === 'center') ? { type: 'center' } : findNode(nodeId);
   const isBranch   = node && node.type === 'branch';
@@ -15975,10 +16005,10 @@ function switchViewLevel(level) {
   });
 }
 
-// Single entry point for the day filter — hotkeys 0–8, the day rail and the
-// context menu all land here. Repacks exactly like a view-level switch, and
-// render()'s applyFilters() refreshes the rail and chip, so the filter can never
-// be on without the UI naming the day it is showing. Pass null to clear.
+// Single entry point for the day filter — hotkeys 0–8, the day-filter menu and
+// the context menu all land here. Repacks exactly like a view-level switch, and
+// render()'s applyFilters() refreshes the button and chip, so the filter can
+// never be on without the UI naming the day it is showing. Pass null to clear.
 function setDayFilter(day) {
   if (activeDayFilter === day) return;
   repackWithSlide(() => { activeDayFilter = day; });
@@ -15987,22 +16017,13 @@ function setDayFilter(day) {
 
 // ─── Day filter indicators ────────────────────────────────────────────────────
 // Pruning makes a filtered week look like a small week, so the filter always has
-// to announce itself: the rail cell for the active day lights up, and a chip over
-// the canvas names the day on screen with one click to clear it.
+// to announce itself: the bar's day button carries the active day's abbreviation
+// and lights up, and a chip over the canvas names it with one click to clear.
 //
-// Rail order is Mon→Sun with the two non-day filters bracketing it; hotkey is the
+// Menu order — overdue first, then Mon→Sun, then unscheduled; the hotkey is the
 // 0–8 key that toggles the same filter.
-const DAY_RAIL = [
-  { day: 'overdue',     hotkey: '0' },
-  { day: 1,             hotkey: '1' },
-  { day: 2,             hotkey: '2' },
-  { day: 3,             hotkey: '3' },
-  { day: 4,             hotkey: '4' },
-  { day: 5,             hotkey: '5' },
-  { day: 6,             hotkey: '6' },
-  { day: 0,             hotkey: '7' },
-  { day: 'unscheduled', hotkey: '8' },
-];
+const DAY_FILTER_ORDER = ['overdue', ...AGENDA_DAY_ORDER, 'unscheduled'];
+const DAY_FILTER_HOTKEYS = { overdue: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 0: '7', unscheduled: '8' };
 
 function dayFilterName(day) {
   if (day === 'unscheduled') return t('filter.unscheduled');
@@ -16010,43 +16031,79 @@ function dayFilterName(day) {
   return (DAY_FULL_NAMES[currentLang] || DAY_FULL_NAMES.en)[day];
 }
 
-// Rail glyph: the language's two-letter day label, or a symbol for the two
-// filters that aren't a weekday.
+// Short form for the button face and the menu's abbreviation column: the
+// language's two-letter day label, or a symbol for the two non-weekday filters.
 function dayFilterGlyph(day) {
   if (day === 'overdue') return '!';
   if (day === 'unscheduled') return '∅';
   return (DAY_LABELS[currentLang] || DAY_LABELS.en)[day];
 }
 
-// data-day survives as a string; 'overdue'/'unscheduled' stay strings, weekdays
-// go back to the numbers activeDayFilter holds.
-function dayFilterFromRailValue(raw) {
-  return (raw === 'overdue' || raw === 'unscheduled') ? raw : Number(raw);
+// Rebuilt on open so day names and the selected row follow the current language
+// and filter. Borrows the context menu's rows (.ctx-item / .ctx-separator), so
+// there is no second menu component to keep in style.
+function openDayFilterMenu() {
+  const menu = document.getElementById('day-filter-menu');
+  const btn = document.getElementById('day-filter-btn');
+  if (!menu || !btn) return;
+  menu.replaceChildren();
+
+  const addRow = (label, glyph, day) => {
+    const row = document.createElement('div');
+    row.className = 'ctx-item' + (activeDayFilter === day ? ' ctx-item-selected' : '');
+    if (glyph !== null) {
+      const g = document.createElement('span');
+      g.className = 'day-filter-menu-glyph';
+      g.textContent = glyph;
+      row.appendChild(g);
+    }
+    row.appendChild(document.createTextNode(label));
+    row.addEventListener('click', e => {
+      e.stopPropagation();
+      closeDayFilterMenu();
+      setDayFilter(day);
+    });
+    menu.appendChild(row);
+  };
+
+  DAY_FILTER_ORDER.forEach(day => addRow(dayFilterName(day), dayFilterGlyph(day), day));
+  const sep = document.createElement('div');
+  sep.className = 'ctx-separator';
+  menu.appendChild(sep);
+  addRow(t('filter.none'), null, null);
+
+  // Opens to the left: the bar hugs the right edge, so there is no room beside it.
+  menu.classList.add('visible');
+  const r = btn.getBoundingClientRect();
+  const left = Math.max(6, r.left - menu.offsetWidth - 6);
+  const top = Math.min(r.top, Math.max(6, window.innerHeight - menu.offsetHeight - 6));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
 }
 
-// Built once. Cells reuse .view-level-btn so the rail matches the
-// Rocks/Pebbles/Sand group above it down to its active-state colors.
-function buildDayRail() {
-  const rail = document.getElementById('day-filter-rail');
-  if (!rail || rail.childElementCount) return;
-  DAY_RAIL.forEach(({ day }) => {
-    const cell = document.createElement('div');
-    cell.className = 'view-level-btn day-filter-btn';
-    cell.dataset.day = String(day);
-    rail.appendChild(cell);
-  });
+function closeDayFilterMenu() {
+  document.getElementById('day-filter-menu')?.classList.remove('visible');
+}
+
+function isDayFilterMenuOpen() {
+  return !!document.getElementById('day-filter-menu')?.classList.contains('visible');
 }
 
 // Called from applyFilters(), so every render leaves the indicators in sync, and
 // from applyTranslations() so day names follow a language switch.
 function refreshDayFilterUI() {
-  document.querySelectorAll('.day-filter-btn').forEach(cell => {
-    const day = dayFilterFromRailValue(cell.dataset.day);
-    cell.textContent = dayFilterGlyph(day);
-    const hotkey = DAY_RAIL.find(r => String(r.day) === cell.dataset.day)?.hotkey;
-    cell.title = `${dayFilterName(day)} (${hotkey})`;
-    cell.classList.toggle('active', activeDayFilter === day);
-  });
+  const btn = document.getElementById('day-filter-btn');
+  if (btn) {
+    const on = activeDayFilter !== null;
+    // ∅ is the resting face; an active Unscheduled filter shows the same glyph
+    // but on the lit button, and the chip spells the difference out.
+    document.getElementById('day-filter-glyph').textContent =
+      on ? dayFilterGlyph(activeDayFilter) : '∅';
+    btn.classList.toggle('active', on);
+    btn.title = on
+      ? `${t('filter.prefix')}: ${dayFilterName(activeDayFilter)} (${DAY_FILTER_HOTKEYS[activeDayFilter]})`
+      : t('filter.dayTitle');
+  }
 
   const chip = document.getElementById('day-filter-chip');
   if (!chip) return;
@@ -16166,13 +16223,16 @@ document.querySelectorAll('.view-level-btn[data-level]').forEach(btn => {
   btn.addEventListener('click', () => switchViewLevel(btn.dataset.level));
 });
 
-// Day rail — delegated, so the cells stay pure markup built by buildDayRail().
-buildDayRail();
-document.getElementById('day-filter-rail').addEventListener('click', (e) => {
-  const cell = e.target.closest('.day-filter-btn');
-  if (!cell) return;
-  const day = dayFilterFromRailValue(cell.dataset.day);
-  setDayFilter(activeDayFilter === day ? null : day);
+document.getElementById('day-filter-btn').addEventListener('click', () => {
+  if (isDayFilterMenuOpen()) closeDayFilterMenu();
+  else openDayFilterMenu();
+});
+
+// #view-level-bar swallows pointerdown, so this only ever sees clicks landing
+// outside the button — which is exactly when the menu should close.
+document.addEventListener('pointerdown', (e) => {
+  const menu = document.getElementById('day-filter-menu');
+  if (menu.classList.contains('visible') && !menu.contains(e.target)) closeDayFilterMenu();
 });
 
 // The chip floats over the canvas, so swallow pointerdown or clicking it starts a pan.
