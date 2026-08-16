@@ -567,7 +567,8 @@ export const {
   getPriorityWeight,
   getDescendantIds,
   // Day-child functions
-  getDayFilterOpacity,
+  dayFilterMatches,
+  dayFilterMatchSet,
   parseTodoDays,
   stripDayGroups,
   resolveMagicDayTokens,

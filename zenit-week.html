@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-XtOKvSdc9ME8WGpxQnRs9E8dc//qMmE9HmyKQ84koXY='
+               'sha256-jD5uQa6r4CO5fzDiqGM9zd/6q9mLWoHxC15ncBbF7r0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -643,6 +643,67 @@
     height: 1px;
     background: var(--view-separator);
     margin: 0 auto;
+  }
+
+  /* ─── Day filter rail + chip ─────────────────────────────────────────────── */
+  #day-filter-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Day cells inherit .view-level-btn's box, hover and active colors; only the
+     content differs — a day label instead of a stack of dots. */
+  .day-filter-btn {
+    padding: 3px 4px;
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  #day-filter-chip {
+    position: absolute;
+    /* Clears the 56px toolbar, which overlays the canvas from the top. */
+    top: 68px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 5px 6px 5px 14px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    box-shadow: 0 2px 8px var(--shadow-md);
+    z-index: 20;
+    user-select: none;
+  }
+  #day-filter-chip.visible { display: flex; }
+
+  #day-filter-chip strong { color: var(--text-primary); }
+  #day-filter-chip-empty { color: var(--text-subtle); }
+
+  #day-filter-chip-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-subtle);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0;
+  }
+  #day-filter-chip-clear:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
   }
 
   /* Opacity transitions for view level fading */
@@ -3519,6 +3580,16 @@
         </div>
         <span data-i18n="view.rocks">Rocks</span>
       </div>
+      <div class="view-level-separator"></div>
+      <!-- Day filter cells (overdue, Mon–Sun, unscheduled) — built by buildDayRail() -->
+      <div id="day-filter-rail"></div>
+    </div>
+    <div id="day-filter-chip">
+      <span id="day-filter-chip-label" data-i18n="filter.showing">Showing</span>
+      <strong id="day-filter-chip-day"></strong>
+      <span id="day-filter-chip-empty" data-i18n="filter.emptyDay">— nothing planned</span>
+      <button type="button" id="day-filter-chip-clear" data-i18n-title="menu.clearDayFilter"
+              data-i18n-aria="menu.clearDayFilter" title="Clear Day Filter" aria-label="Clear Day Filter">✕</button>
     </div>
     <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -3784,6 +3855,7 @@
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureMindmapLead">Visual mindmap</strong><span data-i18n="help.featureMindmapBody"> — view your week with customizable branches</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureAgendaLead">Agenda</strong><span data-i18n="help.featureAgendaBody"> view — same week, two lenses</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureZoomLead">View levels</strong><span data-i18n="help.featureZoomBody"> — Rocks · Pebbles · Sand</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureDayFilterLead">Day filter</strong><span data-i18n="help.featureDayFilterBody"> — one day at a time, the rest of the week hidden</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featurePrioritiesLead">Priorities</strong><span data-i18n="help.featurePrioritiesBody"> — Normal · High · Critical (cascade to children)</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureCountersLead">Magic counters</strong><span data-i18n="help.featureCountersBody"> — type Nx for a progress counter</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureDaysLead">Magic day selectors</strong><span data-i18n="help.featureDaysBody"> — type (mo), (mo, we) or (daily) to schedule</span></div>
@@ -7599,6 +7671,8 @@ const TRANSLATIONS = {
     'help.featureAgendaBody':     ' view — same week, two lenses',
     'help.featureZoomLead':       'View levels',
     'help.featureZoomBody':       ' — Rocks · Pebbles · Sand',
+    'help.featureDayFilterLead':  'Day filter',
+    'help.featureDayFilterBody':  ' — one day at a time, the rest of the week hidden',
     'help.featurePrioritiesLead': 'Priorities',
     'help.featurePrioritiesBody': ' — Normal · High · Critical (cascade to children)',
     'help.featureCountersLead':   'Magic counters',
@@ -7676,6 +7750,8 @@ const TRANSLATIONS = {
     'multitab.updated':           'Updated from another tab',
     'filter.prefix':              'Filter',
     'filter.off':                 'Filter off',
+    'filter.showing':             'Showing',
+    'filter.emptyDay':            '— nothing planned',
     'menu.clearDayFilter':        'Clear Day Filter',
     'error.quotaExceeded':        'Storage quota exceeded — changes might not be saved',
     'sync.btnLabel':              'Sign in',
@@ -7839,6 +7915,8 @@ const TRANSLATIONS = {
     'help.featureAgendaBody':     ' — stejný týden, dva pohledy',
     'help.featureZoomLead':       'Úrovně zobrazení',
     'help.featureZoomBody':       ' — Kameny · Oblázky · Písek',
+    'help.featureDayFilterLead':  'Filtr dne',
+    'help.featureDayFilterBody':  ' — jeden den, zbytek týdne skrytý',
     'help.featurePrioritiesLead': 'Priority',
     'help.featurePrioritiesBody': ' — Normální · Vysoká · Kritická (přenášejí se na podúkoly)',
     'help.featureCountersLead':   'Magická počítadla',
@@ -7916,6 +7994,8 @@ const TRANSLATIONS = {
     'multitab.updated':           'Aktualizováno z jiného panelu',
     'filter.prefix':              'Filtr',
     'filter.off':                 'Filtr vypnut',
+    'filter.showing':             'Zobrazeno',
+    'filter.emptyDay':            '— nic naplánováno',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena — změny nemusí být uloženy',
     'sync.btnLabel':              'Přihlásit se',
@@ -7973,6 +8053,7 @@ function applyTranslations() {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
   refreshSyncUiText();
+  refreshDayFilterUI(); // day names in the rail and chip are language-dependent
   const sel = document.getElementById('lang-select');
   if (sel) sel.value = currentLang;
   // Show only the day-indicator rows matching the current language
@@ -9399,6 +9480,7 @@ function viewLevelHideDepth(level = currentViewLevel) {
 
 function computeLayout() {
   const hideDepth = viewLevelHideDepth();
+  const dayMatch = dayFilterMatchSet(); // null when no day filter is active
   // Fresh sizing pass — clear per-render memoization so structural changes
   // (label, priority, badges, parent type) and edit-start/-end are reflected.
   _clearNodeMetricsCaches();
@@ -9460,14 +9542,22 @@ function computeLayout() {
     });
   }
 
+  // A node takes part in this layout pass only while both filters keep it: the
+  // view level bounds its depth, the day filter its day. Everything else is
+  // pruned outright — no position, so render() skips it and the survivors pack
+  // tight against each other.
+  function isVisibleNode(nodeId) {
+    return getNodeDepth(nodeId) < hideDepth && dayFilterMatches(nodeId, dayMatch);
+  }
+
   // Children that take part in this layout pass: skip nodes being edited
-  // elsewhere and anything the current view level hides.
+  // elsewhere and anything the active filters hide.
   function activeChildIds(nodeId) {
     const node = findNode(nodeId);
     return (node?.children || []).filter(cid => {
       const child = findNode(cid);
       const isChildActiveEdit = editState && editState.nodeId === cid;
-      return child && (!child._editing || isChildActiveEdit) && getNodeDepth(cid) < hideDepth;
+      return child && (!child._editing || isChildActiveEdit) && isVisibleNode(cid);
     });
   }
 
@@ -9570,16 +9660,22 @@ function computeLayout() {
     return heights[nodeId];
   }
 
-  const branchIds = (weekData.nodes || []).filter(n => n.type === 'branch').map(n => n.id);
+  const allBranchIds = (weekData.nodes || []).filter(n => n.type === 'branch').map(n => n.id);
+
+  // Ensure every branch has a BRANCH_CONFIG entry before layout — pruned ones
+  // included, since the side assignment must survive a filter being toggled.
+  allBranchIds.forEach((id, i) => {
+    if (!BRANCH_CONFIG[id]) BRANCH_CONFIG[id] = { side: i === 0 ? 'left' : 'right' };
+  });
+
+  // A branch with nothing left for the filtered day is pruned like any other
+  // non-member, so a day view shows only the branches that actually carry it.
+  const branchIds = allBranchIds.filter(isVisibleNode);
   branchIds.forEach(calcHeight);
 
   // Position center
   positions['center'] = { x: 0, y: 0, w: CENTER_W, h: CENTER_H };
 
-  // Ensure every branch has a BRANCH_CONFIG entry before layout
-  branchIds.forEach((id, i) => {
-    if (!BRANCH_CONFIG[id]) BRANCH_CONFIG[id] = { side: i === 0 ? 'left' : 'right' };
-  });
   const leftBranches = branchIds.filter(id => BRANCH_CONFIG[id].side === 'left');
   const rightBranches = branchIds.filter(id => BRANCH_CONFIG[id].side === 'right');
 
@@ -11348,23 +11444,22 @@ function _computeNodeDepth(nodeId) {
   return depth + 1; // +1 for the branch level itself
 }
 
-function getDayFilterOpacity(nodeId) {
-  if (activeDayFilter === null) return 1;
-
-  const node = nodeId === 'center' ? { type: 'center' } : findNode(nodeId);
-  if (!node) return 1;
-
-  const type = node.type;
-  if (type === 'center' || type === 'branch') return 1;
+// ─── Day filter visibility ────────────────────────────────────────────────────
+// An active day filter (hotkeys 0–8, the day rail) hides everything that isn't
+// that day's work the same way Rocks/Pebbles/Sand hides deep nodes: computeLayout
+// prunes the non-members outright, so the survivors repack tight instead of
+// sitting behind a ghosted overlay.
+//
+// Returns the set of node ids the filter keeps, or null when no filter is active
+// (meaning "everything visible"). A node is a member when it matches the filter
+// itself or any of its descendants does — that's what keeps an ancestor chain,
+// and the branch above it, alive while it still carries something for the day.
+function dayFilterMatchSet() {
+  if (activeDayFilter === null) return null;
 
   const d = activeDayFilter;
   const todayPos = isoWeekPos(new Date().getDay());
-
-  // Counter nodes inherit from parent
-  if (type === 'counter') {
-    const parent = findNode(node.parent);
-    return parent ? getDayFilterOpacity(parent.id) : 1;
-  }
+  const memo = new Map();
 
   function isOverdueMatch(n) {
     if (n.type !== 'activity' || n.done) return false;
@@ -11378,42 +11473,68 @@ function getDayFilterOpacity(nodeId) {
     return false;
   }
 
-  // Recursive check for activity/dayChild match in subtree
-  function hasMatch(id) {
+  // Memoized so the whole tree costs one pass rather than one walk per node.
+  function matches(id) {
+    if (memo.has(id)) return memo.get(id);
+    memo.set(id, false); // guard against a malformed parent/child cycle
     const n = findNode(id);
     if (!n) return false;
 
     // 1. Direct match?
+    let hit = false;
     if (d === 'overdue') {
-      if (isOverdueMatch(n)) return true;
+      hit = isOverdueMatch(n);
     } else if (n.dayChild) {
-      if (d === 'unscheduled') return false;
-      return n.dayIndex === d;
+      // A day leaf answers only for itself and never stands in for a subtree.
+      const own = d !== 'unscheduled' && n.dayIndex === d;
+      memo.set(id, own);
+      return own;
     } else if (n.type === 'activity') {
       if (d === 'unscheduled') {
         const children = (n.children || []).map(cid => findNode(cid));
         const hasDayChild = children.some(c => c?.dayChild);
         const hasCounter = children.some(c => c?.type === 'counter');
         const hasLabelDays = parseTodoDays(n.label || '').size > 0;
-        if (!hasDayChild && !hasCounter && !hasLabelDays) return true;
+        hit = !hasDayChild && !hasCounter && !hasLabelDays;
       } else {
         const dayChildren = (n.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild);
         if (dayChildren.length > 0) {
-          // Multi-day selector: only match if one of its day-children matches (or matches d)
-          return dayChildren.some(c => d === 'overdue' ? isOverdueMatch(c) : c.dayIndex === d);
+          // Multi-day selector: matches only when one of its own day leaves does.
+          const own = dayChildren.some(c => c.dayIndex === d);
+          memo.set(id, own);
+          return own;
         }
-        if (parseTodoDays(n.label || '').has(d)) return true;
+        hit = parseTodoDays(n.label || '').has(d);
       }
     }
 
     // 2. Subtree match (skip counters in recursion)
-    return (n.children || []).some(cid => {
-      const child = findNode(cid);
-      return child && child.type !== 'counter' && hasMatch(cid);
-    });
+    if (!hit) {
+      hit = (n.children || []).some(cid => {
+        const child = findNode(cid);
+        return child && child.type !== 'counter' && matches(cid);
+      });
+    }
+    memo.set(id, hit);
+    return hit;
   }
 
-  return hasMatch(nodeId) ? 1 : 0.12;
+  const visible = new Set(['center']); // the week root always anchors the map
+  for (const n of weekData.nodes) {
+    if (n.type === 'counter') continue;
+    if (matches(n.id)) visible.add(n.id);
+  }
+  // Counters carry no day of their own — they ride along with their activity.
+  for (const n of weekData.nodes) {
+    if (n.type === 'counter' && visible.has(n.parent)) visible.add(n.id);
+  }
+  return visible;
+}
+
+// True when nodeId survives the active day filter. Pass a set built once by
+// dayFilterMatchSet() when asking about many nodes, so the tree is walked once.
+function dayFilterMatches(nodeId, set = dayFilterMatchSet()) {
+  return !set || set.has(nodeId);
 }
 
 // Returns true when all day-filter-matching descendants of nodeId are done,
@@ -11465,24 +11586,18 @@ function applyVirtualDoneUI(id, isVirtual) {
 }
 
 function applyFilters() {
+  refreshDayFilterUI();
+
   const nodesLayer = document.getElementById('nodes-layer');
-  const linesLayer = document.getElementById('lines-layer');
-  if (!nodesLayer || !linesLayer) return;
+  if (!nodesLayer) return;
 
-  // View-level (Rocks/Pebbles/Sand) hiding is handled in computeLayout: pruned
-  // nodes get no position and are never rendered, so only the day filter and
-  // virtual-done state remain to apply here.
+  // Both filters hide by pruning in computeLayout — pruned nodes get no position
+  // and are never rendered — so anything that reached the DOM is a node the
+  // filters kept. All that remains is virtual-done: a parent whose matching
+  // leaves are all done reads as done for the filtered day, without the data
+  // saying so.
   nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
-    const id = g.dataset.id;
-    const dayOpacity = getDayFilterOpacity(id);
-    g.style.opacity = dayOpacity === 1 ? '' : String(dayOpacity);
-    applyVirtualDoneUI(id, dayOpacity === 1 && isVirtuallyDone(id));
-  });
-
-  linesLayer.querySelectorAll('path[data-to]').forEach(path => {
-    const toId = path.getAttribute('data-to');
-    const dayOpacity = getDayFilterOpacity(toId);
-    path.style.opacity = dayOpacity === 1 ? '' : String(dayOpacity);
+    applyVirtualDoneUI(g.dataset.id, isVirtuallyDone(g.dataset.id));
   });
 }
 
@@ -12756,19 +12871,7 @@ function _windowKeydownHandler(e) {
       e.preventDefault();
       const KEY_TO_DAY = { '0':'overdue', '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0, '8':'unscheduled' };
       const newFilter = KEY_TO_DAY[e.key];
-      if (activeDayFilter === newFilter) {
-        activeDayFilter = null;
-        showToast(t('filter.off'));
-      } else {
-        activeDayFilter = newFilter;
-        let filterName;
-        if (newFilter === 'unscheduled') filterName = t('filter.unscheduled');
-        else if (newFilter === 'overdue') filterName = t('agenda.overdue');
-        else filterName = (DAY_FULL_NAMES[currentLang] || DAY_FULL_NAMES.en)[newFilter];
-
-        showToast(`${t('filter.prefix')}: ${filterName}`);
-      }
-      applyFilters();
+      setDayFilter(activeDayFilter === newFilter ? null : newFilter);
       return;
     }
   }
@@ -13384,8 +13487,7 @@ document.addEventListener('pointerdown', (e) => {
 });
 
 document.getElementById('ctx-clear-day-filter').addEventListener('click', () => {
-  activeDayFilter = null;
-  applyFilters();
+  setDayFilter(null);
   hideContextMenu();
 });
 
@@ -15180,9 +15282,12 @@ async function resetView() {
   // current week at the default zoom (falls through to the mindmap reset below).
   if (currentView === 'stats') switchView('mindmap');
 
+  const hadDayFilter = activeDayFilter !== null;
   activeDayFilter = null;
   if (currentWeekKey !== todayWeekKey()) {
     await loadAndRender(todayWeekKey());
+  } else if (hadDayFilter) {
+    renderIfVisible(); // un-prune what the day filter was hiding
   }
 
   fitMindmapView();
@@ -15845,22 +15950,118 @@ document.getElementById('logo').addEventListener('click', resetView);
 // ─── View Level Bar ────────────────────────────────────────────────────────────
 document.getElementById('view-level-bar').addEventListener('pointerdown', e => e.stopPropagation());
 
-// Switch Rocks/Pebbles/Sand. Deeper nodes are pruned from the layout entirely
-// (computeLayout), so a full render() is needed to repack the survivors — unlike
-// the old opacity-only fade. The visible nodes then slide from their previous
-// positions into the tighter packing so the level change reads as a motion.
+// Repack the map around a filter change. Both the view levels and the day filter
+// hide by pruning nodes from the layout entirely (computeLayout), so both need a
+// full render() to repack the survivors — an opacity fade can't close the gaps.
+// The visible nodes then slide from their previous positions into the tighter
+// packing, so the change reads as one motion instead of a jump cut.
 const VIEW_SLIDE_MS = 300;
-function switchViewLevel(level) {
-  if (level === currentViewLevel) return;
-  // Snapshot positions at the *current* level — the slide origin.
-  const fromPos = computeLayout();
-  currentViewLevel = level;
-  document.querySelectorAll('.view-level-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.level === level));
-  render(); // rebuilds the SVG with the repacked (new-level) layout
+function repackWithSlide(mutate) {
+  const fromPos = computeLayout(); // snapshot the layout we're leaving
+  mutate();
+  render(); // rebuilds the SVG with the repacked layout
   // reduce-effects already folds in prefers-reduced-motion (set at load).
   if (document.documentElement.classList.contains('reduce-effects')) return;
   animateViewSlide(fromPos);
+}
+
+// Switch Rocks/Pebbles/Sand.
+function switchViewLevel(level) {
+  if (level === currentViewLevel) return;
+  repackWithSlide(() => {
+    currentViewLevel = level;
+    document.querySelectorAll('.view-level-btn[data-level]').forEach(b =>
+      b.classList.toggle('active', b.dataset.level === level));
+  });
+}
+
+// Single entry point for the day filter — hotkeys 0–8, the day rail and the
+// context menu all land here. Repacks exactly like a view-level switch, and
+// render()'s applyFilters() refreshes the rail and chip, so the filter can never
+// be on without the UI naming the day it is showing. Pass null to clear.
+function setDayFilter(day) {
+  if (activeDayFilter === day) return;
+  repackWithSlide(() => { activeDayFilter = day; });
+  showToast(day === null ? t('filter.off') : `${t('filter.prefix')}: ${dayFilterName(day)}`);
+}
+
+// ─── Day filter indicators ────────────────────────────────────────────────────
+// Pruning makes a filtered week look like a small week, so the filter always has
+// to announce itself: the rail cell for the active day lights up, and a chip over
+// the canvas names the day on screen with one click to clear it.
+//
+// Rail order is Mon→Sun with the two non-day filters bracketing it; hotkey is the
+// 0–8 key that toggles the same filter.
+const DAY_RAIL = [
+  { day: 'overdue',     hotkey: '0' },
+  { day: 1,             hotkey: '1' },
+  { day: 2,             hotkey: '2' },
+  { day: 3,             hotkey: '3' },
+  { day: 4,             hotkey: '4' },
+  { day: 5,             hotkey: '5' },
+  { day: 6,             hotkey: '6' },
+  { day: 0,             hotkey: '7' },
+  { day: 'unscheduled', hotkey: '8' },
+];
+
+function dayFilterName(day) {
+  if (day === 'unscheduled') return t('filter.unscheduled');
+  if (day === 'overdue') return t('agenda.overdue');
+  return (DAY_FULL_NAMES[currentLang] || DAY_FULL_NAMES.en)[day];
+}
+
+// Rail glyph: the language's two-letter day label, or a symbol for the two
+// filters that aren't a weekday.
+function dayFilterGlyph(day) {
+  if (day === 'overdue') return '!';
+  if (day === 'unscheduled') return '∅';
+  return (DAY_LABELS[currentLang] || DAY_LABELS.en)[day];
+}
+
+// data-day survives as a string; 'overdue'/'unscheduled' stay strings, weekdays
+// go back to the numbers activeDayFilter holds.
+function dayFilterFromRailValue(raw) {
+  return (raw === 'overdue' || raw === 'unscheduled') ? raw : Number(raw);
+}
+
+// Built once. Cells reuse .view-level-btn so the rail matches the
+// Rocks/Pebbles/Sand group above it down to its active-state colors.
+function buildDayRail() {
+  const rail = document.getElementById('day-filter-rail');
+  if (!rail || rail.childElementCount) return;
+  DAY_RAIL.forEach(({ day }) => {
+    const cell = document.createElement('div');
+    cell.className = 'view-level-btn day-filter-btn';
+    cell.dataset.day = String(day);
+    rail.appendChild(cell);
+  });
+}
+
+// Called from applyFilters(), so every render leaves the indicators in sync, and
+// from applyTranslations() so day names follow a language switch.
+function refreshDayFilterUI() {
+  document.querySelectorAll('.day-filter-btn').forEach(cell => {
+    const day = dayFilterFromRailValue(cell.dataset.day);
+    cell.textContent = dayFilterGlyph(day);
+    const hotkey = DAY_RAIL.find(r => String(r.day) === cell.dataset.day)?.hotkey;
+    cell.title = `${dayFilterName(day)} (${hotkey})`;
+    cell.classList.toggle('active', activeDayFilter === day);
+  });
+
+  const chip = document.getElementById('day-filter-chip');
+  if (!chip) return;
+  if (activeDayFilter === null) {
+    chip.classList.remove('visible');
+    return;
+  }
+  document.getElementById('day-filter-chip-day').textContent = dayFilterName(activeDayFilter);
+  // A day with nothing on it prunes down to the bare week root — say so, or an
+  // all-but-empty canvas reads as a bug instead of as an empty day.
+  const matchSet = dayFilterMatchSet();
+  const hasWork = weekData.nodes.some(n =>
+    n.type !== 'branch' && n.type !== 'center' && matchSet.has(n.id));
+  document.getElementById('day-filter-chip-empty').style.display = hasWork ? 'none' : '';
+  chip.classList.add('visible');
 }
 
 // Slide each surviving node from its previous position to the freshly rendered
@@ -15956,14 +16157,27 @@ function animateViewSlide(fromPos) {
       setEdge(ed, ed.fx1, ed.fy1, ed.fx2, ed.fy2);
       if (ed.appearing) ed.p.style.opacity = '';
     });
-    applyFilters(); // re-settle day-filter opacity we may have overwritten
+    applyFilters(); // re-settle virtual-done styling the tween may have skipped
   };
   requestAnimationFrame(frame);
 }
 
-document.querySelectorAll('.view-level-btn').forEach(btn => {
+document.querySelectorAll('.view-level-btn[data-level]').forEach(btn => {
   btn.addEventListener('click', () => switchViewLevel(btn.dataset.level));
 });
+
+// Day rail — delegated, so the cells stay pure markup built by buildDayRail().
+buildDayRail();
+document.getElementById('day-filter-rail').addEventListener('click', (e) => {
+  const cell = e.target.closest('.day-filter-btn');
+  if (!cell) return;
+  const day = dayFilterFromRailValue(cell.dataset.day);
+  setDayFilter(activeDayFilter === day ? null : day);
+});
+
+// The chip floats over the canvas, so swallow pointerdown or clicking it starts a pan.
+document.getElementById('day-filter-chip').addEventListener('pointerdown', e => e.stopPropagation());
+document.getElementById('day-filter-chip-clear').addEventListener('click', () => setDayFilter(null));
 
 // ─── Branch swipe → cycle view level (mobile) ─────────────────────────────────
 const VIEW_LEVELS = ['full', 'pebbles', 'rocks'];
