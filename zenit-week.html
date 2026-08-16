@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-Yr75unXSnf5C0wGLaMj+XCBcMLFl+Xo8RNoos90GwBg='
+               'sha256-6izDIK8sZi63ON/d/Y25eg3UZ0jbXbjO8TUdPZRtsj4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -13541,6 +13541,22 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
   hideContextMenu();
 });
 
+// Labels a menu row with its day text plus a small blue dot when that day is
+// today — the same indicator the agenda day-strip uses. Shared by the reschedule
+// submenu (abbreviations) and the day-filter menu (full names). A dayIdx outside
+// 0–6, e.g. the Overdue or Unscheduled rows, simply never gets a dot.
+function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
+  const labelSpan = document.createElement('span');
+  labelSpan.style.cssText = 'display:inline-flex;align-items:center;gap:6px;';
+  labelSpan.textContent = text;
+  if (dayIdx === todayIdx) {
+    const dot = document.createElement('span');
+    dot.className = 'ctx-today-dot';
+    labelSpan.appendChild(dot);
+  }
+  row.appendChild(labelSpan);
+}
+
 (function () {
   const rescheduleItem   = document.getElementById('ctx-reschedule');
   const rescheduleSubmenu = document.getElementById('ctx-reschedule-submenu');
@@ -13576,19 +13592,7 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
     };
 
     const todayIdx = new Date().getDay();
-    // Build label content: day abbrev + a small blue dot for today (mirrors
-    // the agenda day-strip today indicator).
-    const setDayLabel = (btn, dayIdx) => {
-      const labelSpan = document.createElement('span');
-      labelSpan.style.cssText = 'display:inline-flex;align-items:center;gap:6px;';
-      labelSpan.textContent = langLabels[dayIdx];
-      if (dayIdx === todayIdx) {
-        const dot = document.createElement('span');
-        dot.className = 'ctx-today-dot';
-        labelSpan.appendChild(dot);
-      }
-      btn.appendChild(labelSpan);
-    };
+    const setDayLabel = (btn, dayIdx) => appendDayLabel(btn, langLabels[dayIdx], dayIdx, todayIdx);
 
     let assignedDays, targetId, mode;
     if (node.tickChild) {
@@ -16042,7 +16046,8 @@ function openDayFilterMenu() {
   const addRow = (label, day) => {
     const row = document.createElement('div');
     row.className = 'ctx-item' + (activeDayFilter === day ? ' ctx-item-selected' : '');
-    row.textContent = label;
+    // typeof guard: 'overdue'/'unscheduled'/null are not weekdays, so no dot.
+    appendDayLabel(row, label, typeof day === 'number' ? day : null);
     row.addEventListener('click', e => {
       e.stopPropagation();
       closeDayFilterMenu();
