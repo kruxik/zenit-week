@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-ZdVOE09BqFjbY8U3sR1rRDz/SXSWRkr4MStqTxNpwiA='
+               'sha256-4mdNA+PryHkbmjkKsetH6WkOIsxUczULwUjVFNhQ8FY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -11073,7 +11073,9 @@ function commitEdit(followUp = 'auto') {
     }
 
     saveWeek(currentWeekKey, weekData);
-    renderIfVisible();
+    // Deferred: this commit is usually triggered by a blur from a pointerdown
+    // on another control — rebuilding now would eat that control's click.
+    scheduleRender();
 
     // Hold atomic op across the chained startAddNode so a remote-merge flush
     // can't fire between this commit and the next _openInlineInput. Without
@@ -11088,7 +11090,7 @@ function commitEdit(followUp = 'auto') {
     endAtomicOp();
   } else {
     endAtomicOp();
-    renderIfVisible();
+    scheduleRender();
   }
 }
 
@@ -11125,7 +11127,9 @@ function _cleanupCancel(nodeId, isNew, originalLabel) {
     if (node) { node.label = originalLabel; delete node._editing; }
   }
   endAtomicOp();
-  renderIfVisible();
+  // Deferred for the same reason as commitEdit: discarding an empty new node
+  // must not tear down the DOM under an in-flight click.
+  scheduleRender();
 }
 
 inlineInput.addEventListener('keydown', (e) => {
@@ -12417,6 +12421,11 @@ function updateSummary() {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
+  // A full rebuild supersedes anything scheduleRender() has queued.
+  if (_pendingRenderFrame !== null) {
+    cancelAnimationFrame(_pendingRenderFrame);
+    _pendingRenderFrame = null;
+  }
   const root = document.getElementById('map-root');
   while (root.firstChild) root.removeChild(root.firstChild);
 
@@ -12544,6 +12553,45 @@ function render() {
 function renderIfVisible() {
   if (currentView === 'agenda' && window.innerWidth < 768) return;
   render();
+}
+
+// Pointers currently pressed anywhere in the document. Capture phase, so the
+// set is accurate before any target listener (or scheduleRender) looks at it.
+const _pointersDown = new Set();
+window.addEventListener('pointerdown',   e => _pointersDown.add(e.pointerId),    true);
+window.addEventListener('pointerup',     e => _pointersDown.delete(e.pointerId), true);
+window.addEventListener('pointercancel', e => _pointersDown.delete(e.pointerId), true);
+
+// Defers a full mindmap rebuild until no pointer gesture is in flight.
+//
+// render() empties #map-root and recreates every node group, so calling it
+// synchronously from a teardown that runs *during* a gesture destroys the
+// element the pointer went down on. The browser is then left with no common
+// ancestor for pointerdown/pointerup and never dispatches `click` to the
+// intended target — so clicking "+" (or a node, or a menu row) while an inline
+// edit is open only dismissed the edit and swallowed the click.
+//
+// One rAF is NOT enough: blur fires on pointerdown, the frame lands ~16ms
+// later, and a real press lasts far longer than that, so the rebuild would
+// still beat pointerup. Instead we re-arm each frame while a button is held and
+// only rebuild once the gesture is over. `click` is dispatched in the same task
+// as pointerup, i.e. before the following frame, so the handler always runs
+// against live elements. Cost is one stale frame after release.
+//
+// Coalesced: repeat calls before the render lands are a no-op, and any
+// synchronous render() in between cancels the pending frame.
+let _pendingRenderFrame = null;
+function scheduleRender() {
+  if (_pendingRenderFrame !== null) return;
+  const tick = () => {
+    if (_pointersDown.size) {          // gesture still open — its click is owed a live target
+      _pendingRenderFrame = requestAnimationFrame(tick);
+      return;
+    }
+    _pendingRenderFrame = null;
+    renderIfVisible();
+  };
+  _pendingRenderFrame = requestAnimationFrame(tick);
 }
 
 // Global keyboard shortcuts for hovered node
