@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-E0H0DdwwwKc+DDIXm7BClSIQPmKI2rTn3luWGla8lZ0='
+               'sha256-Yr75unXSnf5C0wGLaMj+XCBcMLFl+Xo8RNoos90GwBg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2597,15 +2597,6 @@
   }
   #ctx-reschedule-submenu.visible,
   #day-filter-menu.visible { display: block; }
-
-  /* Day abbreviation column, so the day names line up past it. */
-  .day-filter-menu-glyph {
-    display: inline-block;
-    width: 18px;
-    font-weight: 700;
-    color: var(--text-muted);
-  }
-  .ctx-item-selected .day-filter-menu-glyph { color: inherit; }
 
   .ctx-submenu-arrow {
     font-size: 9px;
@@ -16031,8 +16022,8 @@ function dayFilterName(day) {
   return (DAY_FULL_NAMES[currentLang] || DAY_FULL_NAMES.en)[day];
 }
 
-// Short form for the button face and the menu's abbreviation column: the
-// language's two-letter day label, or a symbol for the two non-weekday filters.
+// Short form for the button face: the language's two-letter day label, or a
+// symbol for the two non-weekday filters.
 function dayFilterGlyph(day) {
   if (day === 'overdue') return '!';
   if (day === 'unscheduled') return '∅';
@@ -16048,16 +16039,10 @@ function openDayFilterMenu() {
   if (!menu || !btn) return;
   menu.replaceChildren();
 
-  const addRow = (label, glyph, day) => {
+  const addRow = (label, day) => {
     const row = document.createElement('div');
     row.className = 'ctx-item' + (activeDayFilter === day ? ' ctx-item-selected' : '');
-    if (glyph !== null) {
-      const g = document.createElement('span');
-      g.className = 'day-filter-menu-glyph';
-      g.textContent = glyph;
-      row.appendChild(g);
-    }
-    row.appendChild(document.createTextNode(label));
+    row.textContent = label;
     row.addEventListener('click', e => {
       e.stopPropagation();
       closeDayFilterMenu();
@@ -16066,11 +16051,11 @@ function openDayFilterMenu() {
     menu.appendChild(row);
   };
 
-  DAY_FILTER_ORDER.forEach(day => addRow(dayFilterName(day), dayFilterGlyph(day), day));
+  DAY_FILTER_ORDER.forEach(day => addRow(dayFilterName(day), day));
   const sep = document.createElement('div');
   sep.className = 'ctx-separator';
   menu.appendChild(sep);
-  addRow(t('filter.none'), null, null);
+  addRow(t('filter.none'), null);
 
   // Opens to the left: the bar hugs the right edge, so there is no room beside it.
   menu.classList.add('visible');
