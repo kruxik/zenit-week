@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-4mdNA+PryHkbmjkKsetH6WkOIsxUczULwUjVFNhQ8FY='
+               'sha256-XtOKvSdc9ME8WGpxQnRs9E8dc//qMmE9HmyKQ84koXY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3810,6 +3810,7 @@
         <div class="help-row"><span data-i18n="help.mindmapView">Mindmap view</span> <kbd>M</kbd></div>
         <div class="help-row"><span data-i18n="help.agendaView">Agenda view</span> <kbd>A</kbd></div>
         <div class="help-row"><span data-i18n="help.statsView">Stats view</span> <kbd>S</kbd></div>
+        <div class="help-row"><span data-i18n="quick_add.title">Quick add</span> <kbd>Q</kbd></div>
         <div class="help-row"><span data-i18n="help.escClose">Close panel / menu</span> <kbd>Esc</kbd></div>
         <div class="help-row"><span data-i18n="help.filterDay">Filter day</span> <span><kbd>1</kbd>–<kbd>7</kbd></span></div>
         <div class="help-row"><span data-i18n="filter.unscheduled">Unscheduled</span> <kbd>8</kbd></div>
@@ -12621,6 +12622,16 @@ function _windowKeydownHandler(e) {
     }
   }
 
+  // Quick add — the keyboard twin of the "+" FAB. Shift is allowed so both q
+  // and Q work; the panel's own input is excluded so typing "q" still types.
+  if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'q') {
+    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && window.toggleQuickAdd) {
+      e.preventDefault();
+      window.toggleQuickAdd();
+      return;
+    }
+  }
+
   if (e.key === 'Escape') {
     const settings = document.getElementById('settings-dropdown');
     const help = document.getElementById('help-overlay');
@@ -16383,8 +16394,8 @@ document.addEventListener('click', (e) => {
   }
 
   // ── Event listeners ──
-  fabAdd.addEventListener('click', (e) => {
-    e.stopPropagation();
+  // Shared by the FAB and the global Q hotkey, so both routes behave the same.
+  function toggleQuickAdd() {
     // Close settings dropdown if open
     settingsDropdown.classList.remove('visible');
     settingsFab.classList.remove('active');
@@ -16393,6 +16404,12 @@ document.addEventListener('click', (e) => {
     } else {
       openQuickAdd();
     }
+  }
+  window.toggleQuickAdd = toggleQuickAdd;
+
+  fabAdd.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleQuickAdd();
   });
 
   closeBtn.addEventListener('click', (e) => { e.stopPropagation(); closeQuickAdd(); });

@@ -49,6 +49,7 @@ No account is required. No tracking. Your data never touches Zenit Week's infras
 | Action | Shortcut |
 | :--- | :--- |
 | Switch to Mindmap / Agenda | `M` / `A` |
+| Quick add (inbox item) | `Q` |
 | Rename hovered node | `Enter` |
 | Add child to hovered node | `Tab` |
 | Delete hovered node | `Backspace` / `Delete` |

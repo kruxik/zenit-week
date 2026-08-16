@@ -97,6 +97,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
   - `Backspace` / `Delete` — delete hovered node
   - `D` — toggle done on hovered node
   - `U` — toggle unplanned on hovered node
+  - `Q` — open the quick-add inbox panel
   - `Ctrl/⌘ + Z` — undo
   - `Ctrl/⌘ + Shift + Z` / `Ctrl/⌘ + Y` — redo
   - `Esc` — close open panel/menu
