@@ -730,7 +730,11 @@
 
   #week-bar-label {
     display: flex;
-    align-items: baseline;
+    /* Not baseline: a baseline-aligned flex group is placed at the cross-start
+       edge, which pins the text to the top of the 36px button instead of
+       centring it. Both spans share one font-size, so their baselines line up
+       under center anyway — keep it that way if either size ever changes. */
+    align-items: center;
     gap: 5px;
     height: 36px;
     padding: 0 10px;
@@ -749,10 +753,11 @@
   #week-bar-label:hover { background: var(--bg-hover); }
   #week-bar-range { font-weight: 500; color: var(--text-subtle); }
 
-  /* The caret glyphs carry generous padding inside their 24-unit viewBox, so at
-     the inherited 16px they read as a third the size of the label beside them.
-     .icon is 1em, so the button's own font-size is the dial. */
-  #week-bar-prev, #week-bar-next { font-size: 22px; }
+  /* The glyphs carry generous padding inside their 24-unit viewBox, so at the
+     inherited size they read as a fraction of the label beside them. .icon is
+     1em, so the button's own font-size is the dial — and it has to be set on all
+     three, or the odd one out falls back to the UA button default of 13.33px. */
+  #week-bar-prev, #week-bar-actions, #week-bar-next { font-size: 22px; }
 
   /* Away from the present, the label and the arrow that leads back to it share
      one accent, so "this is not the current week" reads as a single cue rather
