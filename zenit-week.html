@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-XNSdFlAUm5p+P8QWIqpoNLHWF/4V/qxYL6ag0b9FQfk='
+               'sha256-zSX5VQe3XeHtiU7gli9AAYCcoZmKofdJghk0XNlCAgI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5242,6 +5242,20 @@ const CENTER_RING_R  = 90;
 const CENTER_RING_SW = 8;
 const CENTER_AVATAR_R = 80;
 
+// Hit radius of the root's two "+ branch" discs, which are drawn at r 22.5. The
+// root opens Stats on click, so every pixel that is not the + belongs to a
+// different action — this collar is what keeps "aim at the +" from needing a
+// steady hand. Sized to stay clear of the avatar's vertical extremes: it sits on
+// the node edge at ±100, so at r 40 it reaches x 60, well outside the ring arc's
+// top and bottom where the percentage is read.
+const CENTER_ADD_HIT_R = 40;
+
+// How far a press on the root may travel and still count as a click rather than
+// a pan. Screen pixels, not world units, so it means the same at every zoom —
+// and the same 5 px the node drag threshold uses, so "moved enough to matter"
+// is one number across the map.
+const CENTER_CLICK_SLOP_PX = 5;
+
 // Precise text measurement using canvas
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
@@ -10107,7 +10121,16 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     ['left', 'right'].forEach(side => {
       const bx = side === 'left' ? -boxW / 2 : boxW / 2;
       const btnG = svgEl('g', { class: 'add-btn add-branch-btn', 'data-side': side, transform: `translate(${bx}, 0)` });
-      btnG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: centerBtnR, fill: centerBtnColor }));
+      // Invisible hit collar, wider than the drawn disc. The rest of the root is
+      // one big "open Stats" target, so without this a click that lands a few
+      // pixels off the + silently opens a panel instead of adding a branch.
+      // `pointer-events: all` rather than a transparent fill: it hit-tests
+      // regardless of paint, and the parent's opacity-0 idle state cannot
+      // suppress it. First child, so the drawn + still paints over it.
+      btnG.appendChild(svgEl('circle', {
+        cx: 0, cy: 0, r: CENTER_ADD_HIT_R, fill: 'none', 'pointer-events': 'all',
+      }));
+      btnG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: centerBtnR, fill: centerBtnColor, 'pointer-events': 'none' }));
       btnG.appendChild(svgEl('line', { x1: -centerArm, y1: 0, x2: centerArm, y2: 0, stroke: btnSymbolColor, 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
       btnG.appendChild(svgEl('line', { x1: 0, y1: -centerArm, x2: 0, y2: centerArm, stroke: btnSymbolColor, 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
       g.appendChild(btnG);
@@ -15931,7 +15954,12 @@ window.addEventListener('pointerup', (e) => {
     container.classList.remove('panning');
     if (panningFromCenter) {
       panningFromCenter = false;
-      if (panX !== panStartPanX || panY !== panStartPanY) {
+      // A press that never left the slop circle is a click, however jittery the
+      // hand or trackpad: an exact-equality test on panX/panY made one stray
+      // pixel commit a "pan", which does not just skip Stats — it flattens every
+      // node's manual offset. Below the threshold, undo the stray pixels first.
+      const movedPx = Math.hypot(e.clientX - panStartX, e.clientY - panStartY);
+      if (movedPx > CENTER_CLICK_SLOP_PX) {
         takeSnapshot();
         weekData.nodes.forEach(n => {
           if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchNode(n.id); }
@@ -15939,8 +15967,12 @@ window.addEventListener('pointerup', (e) => {
         saveWeek(currentWeekKey, weekData);
         render();
       } else {
-        // A press on the root that never moved is a click, and the root wears the
-        // week's completion ring — so it opens the panel that explains the number.
+        // The root wears the week's completion ring, so a click on it — anywhere
+        // on the disc, ring or avatar alike — opens the panel that explains the
+        // number. Roll back the sub-threshold drift so the map does not creep.
+        panX = panStartPanX;
+        panY = panStartPanY;
+        applyTransform();
         switchView('stats');
       }
     }
