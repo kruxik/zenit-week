@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-/9ukGw8uYWVH6Bl+D+t0G8r0R2MZvc3wOC8qE5RXFKo='
+               'sha256-sAEZPqfd/im95bBHp+As7I1JyhX3LFPLDjmysRh5Nrk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3574,7 +3574,7 @@
         <span data-i18n="view.pebbles">Pebbles</span>
       </div>
       <div class="view-level-separator"></div>
-      <div class="view-level-btn" data-level="rocks" data-i18n-title="view.rocksTitle" title="Rocks — show only main branches">
+      <div class="view-level-btn" data-level="rocks" data-i18n-title="view.rocksTitle" title="Rocks — show only branches and their tasks">
         <div class="view-level-icon">
           <div class="dot-row" style="opacity:0.2">
             <span class="vli-dot" style="width:3px;height:3px"></span>
@@ -7598,7 +7598,7 @@ const TRANSLATIONS = {
     'view.rocks':                 'Rocks',
     'view.sandTitle':             'Sand — all nodes visible',
     'view.pebblesTitle':          'Pebbles — hide deep sub-tasks',
-    'view.rocksTitle':            'Rocks — show only main branches',
+    'view.rocksTitle':            'Rocks — show only branches and their tasks',
     'menu.currentWeek':           'Current Week',
     'menu.transferUnfinished':    'Transfer Unfinished',
     'menu.transferReusable':      'Transfer Reusable',
@@ -7845,7 +7845,7 @@ const TRANSLATIONS = {
     'view.rocks':                 'Kameny',
     'view.sandTitle':             'Písek — vše viditelné',
     'view.pebblesTitle':          'Oblázky — skryje hluboké podúkoly',
-    'view.rocksTitle':            'Kameny — zobrazí jen hlavní větve',
+    'view.rocksTitle':            'Kameny — zobrazí jen větve a jejich úkoly',
     'menu.currentWeek':           'Aktuální týden',
     'menu.transferUnfinished':    'Přenést nedokončené',
     'menu.transferReusable':      'Přenést opakované',
@@ -9489,8 +9489,8 @@ function setStatus(id, status) {
 // parents pack tightly together. Shared with applyFilters so both agree.
 // Depths: center=0, branch=1, activity=2, sub-task/counter=3, …
 function viewLevelHideDepth(level = currentViewLevel) {
-  if (level === 'pebbles') return 3; // hide deep sub-tasks
-  if (level === 'rocks')   return 2; // show only branches
+  if (level === 'pebbles') return 4; // hide sub-tasks below the first level
+  if (level === 'rocks')   return 3; // show branches and their activities
   return Infinity;                   // 'full' (Sand) — show everything
 }
 

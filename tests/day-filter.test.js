@@ -420,7 +420,8 @@ describe('day-filter layout pruning', () => {
   test('composes with the view level — Rocks still wins on depth', () => {
     const pos = layoutWith(1, 'rocks');
     expect(pos['work']).toBeDefined();   // matches Monday, depth 1
-    expect(pos['aMon']).toBeUndefined(); // matches Monday, but Rocks hides depth 2
+    expect(pos['aMon']).toBeDefined();   // matches Monday, depth 2
+    expect(pos['dMon']).toBeUndefined(); // matches Monday, but Rocks hides depth 3
     expect(pos['play']).toBeUndefined(); // pruned by the day filter
   });
 });
