@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-4Fwzd1dskSJgEF1CV1lbKfqAnR5L1G1FgsyfmF7xo08='
+               'sha256-tKrDbaVz3N4aplQZom7i8sn7JgItDHAVCCv5xWVu/64='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8868,6 +8868,9 @@ async function transferUnfinished() {
         children: [],
         _ts: Date.now(),
       };
+      // Transferring an unplanned task re-plans it: it was chosen for this week,
+      // so the badge and its arrival stamp don't carry over.
+      delete newNode.unplannedAt;
       if (newNode.type === 'counter') newNode.val = 0;
       if (newNode.tickChild) {
         delete newNode.doneAt;
@@ -9170,8 +9173,12 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
         id: newId,
         parent: oldToNew.get(n.parent) || n.parent,
         children: n.children.map(cid => oldToNew.get(cid)).filter(Boolean),
+        // Moving an unplanned task re-plans it: it was chosen for the new week,
+        // so the badge and its arrival stamp don't carry over.
+        unplanned: false,
         _ts: Date.now(),
       };
+      delete newNode.unplannedAt;
       nextData.nodes.push(newNode);
       nextById.set(newId, newNode);
       addedIds.push(newId);
