@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-YIrjsb9d/szOkN1p9kRe83neNPRvU96wAqrmWurxilo='
+               'sha256-pFh++u7cpvawt7u76PF3Ok5uaZvuafKjiEJ7impYnbc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5380,6 +5380,16 @@ const DAY_FULL_NAMES = {
   cs: { 0:'Neděle', 1:'Pondělí', 2:'Úterý', 3:'Středa', 4:'Čtvrtek', 5:'Pátek', 6:'Sobota' },
 };
 
+// The daily indicator word per language — the canonical form "(daily)" takes
+// when localizeDayGroups rewrites a label for display.
+const DAY_DAILY_LABELS = { en: 'daily', cs: 'denně' };
+
+// Weekday abbr (0=Sun … 6=Sat) in the active language. Single source for every
+// display site, so a language switch only needs a re-render.
+function dayAbbr(dayIndex) {
+  return (DAY_LABELS[currentLang] ?? DAY_LABELS.en)[dayIndex];
+}
+
 // Expands an ISO-week day-range token ("mo-we") into an array of weekday
 // indices in Mon→Sun order, inclusive. Returns null if the token is not a
 // well-formed "<day>-<day>" pair of known day abbrs. Wraps around the week
@@ -5603,6 +5613,45 @@ function stripDayGroups(label) {
   }).trim();
 }
 
+// Rewrites every valid day-pattern (…) group to the active language's abbrs,
+// leaving separators, spacing and non-day groups like "(v3)" untouched. Day
+// tokens are accepted in either language (see SCHED_DAY_TOKENS), so a Czech
+// user typing "(mo, we)" reads it back as "(Po, St)" — and switching language
+// flips it again, because this runs at display time and never touches storage.
+// Ranges keep their dash ("mo-we" → "Po-St") and the daily indicator follows
+// DAY_DAILY_LABELS. Output re-parses as the same day set, so the function is
+// idempotent and safe to feed back through parseTodoDays.
+function localizeDayGroups(label) {
+  if (!label) return label || '';
+  return label.replace(/\(([^)]+)\)/g, (match, inner) => {
+    if (!parseDayGroup(inner)) return match;
+    // split keeps the separators (whitespace + commas) so spacing survives
+    const rebuilt = inner.split(/([\s,]+)/).map(part => {
+      const tok = part.toLowerCase();
+      if (tok in SCHED_TOKEN_MAP) return dayAbbr(SCHED_TOKEN_MAP[tok]);
+      if (SCHED_DAILY_TOKENS.has(tok)) return DAY_DAILY_LABELS[currentLang] ?? DAY_DAILY_LABELS.en;
+      if (tok.includes('-')) {
+        const ends = tok.split('-');
+        if (ends.length === 2 && ends.every(e => e in SCHED_TOKEN_MAP)) {
+          return ends.map(e => dayAbbr(SCHED_TOKEN_MAP[e])).join('-');
+        }
+      }
+      return part;
+    }).join('');
+    return `(${rebuilt})`;
+  });
+}
+
+// The label to *show* for a node, as opposed to the label stored on it.
+// Day-children render from their dayIndex (the stored label is only a cached
+// abbr from whatever language was active when the child was created), and every
+// other node gets its day annotation localized.
+function nodeDisplayLabel(node) {
+  if (!node) return '';
+  if (node.dayChild && node.dayIndex != null) return dayAbbr(node.dayIndex) || node.label || '';
+  return localizeDayGroups(node.label || '');
+}
+
 // Per-render caches for the two metrics functions called dozens of times
 // per node during layout, makeNodeGroup and applyFilters. Cleared at the
 // top of computeLayout (the entry point for every fresh sizing pass).
@@ -5647,12 +5696,14 @@ function _computeNodeSize(nodeId) {
     style.rx *= scale;
   }
 
-  let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : (node.label || '');
+  // Editing shows the raw stored text (the user edits the tokens they typed);
+  // otherwise the display label, with day annotations in the active language.
+  let label = (editState && editState.nodeId === nodeId) ? inlineInput.value : nodeDisplayLabel(node);
   if (type === 'counter') {
     label = `${node.val || 0}`;
   } else if (node.tickChild && node.dayIndex != null && !(editState && editState.nodeId === nodeId)) {
     // Day-scheduled tick leaf shows its weekday alongside the step number.
-    const abbr = (DAY_LABELS[currentLang] ?? DAY_LABELS.en)[node.dayIndex];
+    const abbr = dayAbbr(node.dayIndex);
     if (abbr) label = `${label} (${abbr})`;
   }
 
@@ -10489,7 +10540,7 @@ function smoothPanToRevealNode(nodeId) {
 
 function createDayChild(parentId, dayIndex) {
   const parent = findNode(parentId);
-  const label = (DAY_LABELS[currentLang] ?? DAY_LABELS.en)[dayIndex];
+  const label = dayAbbr(dayIndex);
   const id = genId();
   const node = {
     id, type: 'activity', dayChild: true, dayIndex,
@@ -10980,7 +11031,7 @@ function getAgendaAncestorChain(node) {
   const chain = [];
   let cur = leaf ? findNode(leaf.parent) : null;
   while (cur && cur.type !== 'center') {
-    chain.unshift(stripDayGroups(cur.label) || cur.label);
+    chain.unshift(stripDayGroups(cur.label) || nodeDisplayLabel(cur));
     cur = findNode(cur.parent);
   }
   return chain;
@@ -10988,7 +11039,6 @@ function getAgendaAncestorChain(node) {
 
 function getAgendaNodeLabel(node, includeDayHint = false) {
   const p = findNode(node.parent);
-  const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
 
   let prefix = '';
   let main;
@@ -10996,25 +11046,25 @@ function getAgendaNodeLabel(node, includeDayHint = false) {
 
   // Case 1: Virtual day-leaf (Mo, Tu...). Show parent's stripped label.
   if (node.dayChild) {
-    main = p ? (stripDayGroups(p.label) || p.label) : node.label;
+    main = p ? (stripDayGroups(p.label) || nodeDisplayLabel(p)) : nodeDisplayLabel(node);
     if (p) {
       const gp = findNode(p.parent);
-      if (gp) prefix = stripDayGroups(gp.label) || gp.label;
+      if (gp) prefix = stripDayGroups(gp.label) || nodeDisplayLabel(gp);
     }
     if (includeDayHint && node.dayIndex != null) {
-      dayHint = langLabels[node.dayIndex];
+      dayHint = dayAbbr(node.dayIndex);
     }
   } else {
     // Case 2: Regular leaf activity. Display = own stripped label, with
     // immediate-parent prefix. Day hint comes from the closest annotated
     // ancestor (or self) — see getEffectiveDays.
-    main = stripDayGroups(node.label) || node.label;
-    if (p) prefix = stripDayGroups(p.label) || p.label;
+    main = stripDayGroups(node.label) || nodeDisplayLabel(node);
+    if (p) prefix = stripDayGroups(p.label) || nodeDisplayLabel(p);
     if (includeDayHint) {
       const days = getEffectiveDays(node);
       if (days.size > 0) {
         const [dayIdx] = [...days];
-        dayHint = langLabels[dayIdx];
+        dayHint = dayAbbr(dayIdx);
       }
     }
   }
@@ -11242,7 +11292,7 @@ function commitEdit(followUp = 'auto') {
       const tok = label.toLowerCase();
       if (tok in SCHED_TOKEN_MAP) {
         node.dayIndex = SCHED_TOKEN_MAP[tok];
-        node.label = (DAY_LABELS[currentLang] ?? DAY_LABELS.en)[node.dayIndex];
+        node.label = dayAbbr(node.dayIndex);
       } else {
         node.label = originalLabel; // invalid token — silently revert
       }
@@ -13974,7 +14024,7 @@ function openCommentDialog(nodeId) {
   const node = findNode(nodeId);
   if (!node) return;
   commentTargetId = nodeId;
-  document.getElementById('comment-title').textContent = node.label || '';
+  document.getElementById('comment-title').textContent = nodeDisplayLabel(node);
   const ta = document.getElementById('comment-textarea');
   ta.value = node.comments || '';
   updateCommentCounter();
@@ -14382,7 +14432,7 @@ function buildAgendaItem(node, label, opts = {}) {
   // Label — prefix shrinks with ellipsis, main always fully visible
   const lbl = (label && typeof label === 'object')
     ? label
-    : { prefix: '', main: label || node.label || t('todo.noLabel') };
+    : { prefix: '', main: label || nodeDisplayLabel(node) || t('todo.noLabel') };
   if (node.done || inDoneSection) item.classList.add('agenda-item-done');
   const labelEl = document.createElement('div');
   labelEl.className = 'daily-log-label';
@@ -16160,7 +16210,7 @@ function dayFilterName(day) {
 function dayFilterGlyph(day) {
   if (day === 'overdue') return '!';
   if (day === 'unscheduled') return '∅';
-  return (DAY_LABELS[currentLang] || DAY_LABELS.en)[day];
+  return dayAbbr(day);
 }
 
 // Rebuilt on open so day names and the selected row follow the current language
