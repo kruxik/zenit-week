@@ -1598,6 +1598,12 @@
     right: 0;
     z-index: 2;
   }
+  @media (min-width: 768px) {
+    /* The desktop panel has a 1px border, so its padding box (the containing
+       block for this header) already starts 1px down — 55px lands the header
+       flush against the toolbar's bottom edge instead of 1px below it. */
+    #stats-header { top: 55px; }
+  }
   #stats-content {
     padding: 24px;
     padding-top: 136px; /* 56px toolbar + 60px header + 20px gap */
@@ -2450,6 +2456,10 @@
   @media (min-width: 768px) {
     #agenda-day-strip {
       justify-content: center;
+      /* The desktop panel has a 1px border, so its padding box (the containing
+         block for this strip) already starts 1px down — 55px lands the strip
+         flush against the toolbar's bottom edge instead of 1px below it. */
+      top: 55px;
     }
   }
 
