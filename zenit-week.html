@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-KObMVzi5VvL+JHyTESt2niIIKqwZVzP5df9OSAnEqXE='
+               'sha256-Eg6U1136hy/yjWCLHlBwETfdMArKSKI3BShTTAyPEUY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3221,6 +3221,16 @@
     opacity: 0.7;
   }
 
+  /* Completion ring on the root node. The root's fill is dark in both themes, so
+     the track is a white wash rather than a --border token: those are tuned for
+     page backgrounds and vanish against #333. The arc reuses the Stats palette so
+     the ring and the Stats donut are visibly the same number. */
+  .center-ring-track { stroke: rgba(255, 255, 255, 0.35); }
+  .center-ring-arc {
+    stroke: var(--stats-plan);
+    transition: stroke-dasharray 0.35s ease;
+  }
+
 
   #inline-input {
     position: fixed;
@@ -3599,8 +3609,6 @@
 <div id="view-level-toast"></div>
 
 <div id="context-menu">
-  <div class="ctx-item" id="ctx-current-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.currentWeek">Current Week</span></div>
-  <div class="ctx-separator" id="ctx-sep-current-week"></div>
   <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.transferUnfinished">Transfer Unfinished</span></div>
   <div class="ctx-item" id="ctx-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> <span data-i18n="menu.transferReusable">Transfer Reusable</span></div>
   <div class="ctx-item" id="ctx-set-baseline"><svg class="icon" aria-hidden="true"><use href="#icon-battery-2"/></svg> <span data-i18n="menu.setBaseline">Set Effort Baseline</span></div>
@@ -5203,7 +5211,11 @@ const V_SPACING_SCALE = isMobile ? 1.25 : 1;
 const MAX_TICK_COUNT = 100;
 
 const NODE_STYLE = {
-  center:   { fontSize: 26, padX: 38, padY: 24, minW: 240, minH: 80, rx: 20,  avgCharW: 0.55 },
+  // The root is a circle (minW === minH, rx === half): it holds the user's avatar
+  // wrapped in a completion ring, and a ring only reads as one on a circle. 200
+  // rather than 160: a circle carries less visual mass than the pill it replaced,
+  // and at 160 the root read as smaller than the 160×64 branches it anchors.
+  center:   { fontSize: 34, padX: 38, padY: 24, minW: 200, minH: 200, rx: 100, avgCharW: 0.55 },
   branch:   { fontSize: 22, padX: 25, padY: 19, minW: 160, minH: 64, rx: 16,  avgCharW: 0.55 },
   activity: { fontSize: 13, padX: 14, padY: 10, minW: 80,  minH: 32, rx: 8,   avgCharW: 0.55 },
   counter:  { fontSize: 14, padX: 30, padY: 8,  minW: 80,  minH: 34, rx: 17,  avgCharW: 0.55 }
@@ -5214,6 +5226,14 @@ const DEPTH1_ACTIVITY_STYLE = { fontSize: 17, padX: 18, padY: 13, minW: 105, min
 
 const CENTER_W = NODE_STYLE.center.minW;
 const CENTER_H = NODE_STYLE.center.minH;
+
+// Root interior, all radii from the 80px circle outward-in: the completion ring
+// sits inside the node's edge rather than around it, because a ring drawn outside
+// would have its leftmost and rightmost points exactly where the branch edges
+// meet the root — every edge would cross it. The avatar then clears the ring.
+const CENTER_RING_R  = 90;
+const CENTER_RING_SW = 8;
+const CENTER_AVATAR_R = 80;
 
 // Precise text measurement using canvas
 const canvas = document.createElement('canvas');
@@ -5638,8 +5658,13 @@ function _computeNodeSize(nodeId) {
   const lineH = style.fontSize * 1.3;
   const totalTextH = lines.length * lineH;
 
-  const w = Math.max(style.minW, Math.ceil(textW) + style.padX * 2);
-  const h = Math.max(style.minH, totalTextH + style.padY * 2);
+  let w = Math.max(style.minW, Math.ceil(textW) + style.padX * 2);
+  let h = Math.max(style.minH, totalTextH + style.padY * 2);
+
+  // The root is a circle, so its size must not follow its text. Every label it
+  // can carry today is short enough that the minimums already win, but pinning
+  // makes the circle a guarantee rather than a coincidence.
+  if (type === 'center') { w = CENTER_W; h = CENTER_H; }
 
   // Day-child / tick-child leaves: circle when no status badges present,
   // pill/oval otherwise. rx = h/2 always so ends stay fully rounded.
@@ -5746,8 +5771,29 @@ function firstNameFrom(displayName, email) {
     : name;
 }
 
+// The root's accessible name and hover title. Not painted — the circle shows an
+// avatar — so without this an image-only node would be a blank to a screen reader.
 function centerDisplayName() {
-  return firstNameFrom(googleUserName, googleUserEmail) || t('center.you');
+  return firstNameFrom(googleUserName, googleUserEmail) || t('center.me');
+}
+
+// Whether the profile photo is worth requesting right now. Offline the request
+// usually only fails and, under Data Saver, spends bytes the user asked us not
+// to — unless a service worker is in control, in which case Cache Storage may
+// answer it without any CSP widening. Shared so the toolbar avatar and the root
+// node can never disagree about which face they are showing.
+function canShowAvatarPhoto() {
+  if (!googleUserPhoto) return false;
+  const swControlled = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+  return !isDefinitelyOffline() || swControlled;
+}
+
+// What the root circle paints, in descending order of what the account offers.
+// The photo is not a text tier: it is layered over the initials, so a failed or
+// skipped image reveals them with no error handling (see plan AD8).
+function centerNodeText() {
+  if (!googleUserEmail && !googleUserName) return t('center.me');  // signed out
+  return googleUserInitials || getInitials(googleUserEmail || '?');
 }
 
 function formatSyncTime(ts) {
@@ -5810,6 +5856,7 @@ window.addEventListener('online', () => {
   if (!_avatarPhotoDeferred) return;
   _avatarPhotoDeferred = false;
   paintAvatarPhoto();
+  scheduleRender();   // the root node wears the same photo
 });
 
 function showSignedInAvatar(user) {
@@ -5844,8 +5891,7 @@ function showSignedInAvatar(user) {
   // fetches are not governed by this document's CSP. So where a worker is in
   // control the request is worth making even offline: it may well be answered
   // from Cache Storage, and if it is not, it fails into the same badge as before.
-  const swControlled = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
-  if (googleUserPhoto && (!isDefinitelyOffline() || swControlled)) {
+  if (canShowAvatarPhoto()) {
     _avatarPhotoDeferred = false;
     paintAvatarPhoto();
   } else {
@@ -7635,7 +7681,7 @@ const TRANSLATIONS = {
     'quick_add.title':            'Quick add',
     'week.word':                  'Week',
     'week.short':                 'W',
-    'center.you':                 'You',
+    'center.me':                  'Me',
     'weekbar.today':              'Jump to current week',
     'weekbar.actions':            'Week actions',
     'settings.appearance':        'Theme',
@@ -7675,7 +7721,6 @@ const TRANSLATIONS = {
     'view.sandTitle':             'Sand — all nodes visible',
     'view.pebblesTitle':          'Pebbles — hide deep sub-tasks',
     'view.rocksTitle':            'Rocks — show only branches and their tasks',
-    'menu.currentWeek':           'Current Week',
     'menu.transferUnfinished':    'Transfer Unfinished',
     'menu.transferReusable':      'Transfer Reusable',
     'menu.clearWeek':             'Clear the Week',
@@ -7885,7 +7930,7 @@ const TRANSLATIONS = {
     'quick_add.title':            'Rychlé přidání',
     'week.word':                  'Týden',
     'week.short':                 'T',
-    'center.you':                 'Ty',
+    'center.me':                  'Já',
     'weekbar.today':              'Přejít na aktuální týden',
     'weekbar.actions':            'Akce týdne',
     'settings.appearance':        'Téma',
@@ -7925,7 +7970,6 @@ const TRANSLATIONS = {
     'view.sandTitle':             'Písek — vše viditelné',
     'view.pebblesTitle':          'Oblázky — skryje hluboké podúkoly',
     'view.rocksTitle':            'Kameny — zobrazí jen větve a jejich úkoly',
-    'menu.currentWeek':           'Aktuální týden',
     'menu.transferUnfinished':    'Přenést nedokončené',
     'menu.transferReusable':      'Přenést opakované',
     'menu.clearWeek':             'Vymazat týden',
@@ -9973,6 +10017,58 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   });
   g.appendChild(rect);
 
+  if (isCenter) {
+    // Named, so a screen reader and a hover both get something better than an
+    // unlabelled image.
+    const titleEl = svgEl('title', {});
+    titleEl.textContent = centerDisplayName();
+    g.appendChild(titleEl);
+
+    // Completion ring. The track is always whole, so an empty week keeps the
+    // exact same silhouette as a finished one — only the arc over it changes.
+    const { d: ringD, perimeter } = roundedRectPathD(CENTER_RING_R * 2, CENTER_RING_R * 2, CENTER_RING_R);
+    g.appendChild(svgEl('path', {
+      class: 'center-ring-track',
+      d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
+    }));
+    const arc = svgEl('path', {
+      class: 'center-ring-arc',
+      d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
+      'data-perimeter': perimeter,
+    });
+    setCenterRingArc(arc, computeWeekStats().global.percent, perimeter);
+    g.appendChild(arc);
+
+    // Initials disc first, photo clipped over it. If the photo 404s, is blocked,
+    // or was never requested, the initials are simply what remains visible — no
+    // error handling inside a subtree that gets rebuilt on every render.
+    if (googleUserInitials) {
+      g.appendChild(svgEl('circle', {
+        cx: 0, cy: 0, r: CENTER_AVATAR_R,
+        fill: googleUserInitialsColor || '#888888',
+      }));
+    }
+    const faceText = svgEl('text', {
+      x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+      'font-family': 'inherit', 'font-size': googleUserInitials ? 52 : fontSize,
+      'font-weight': '700', fill: textColor, 'pointer-events': 'none',
+    });
+    faceText.textContent = centerNodeText();
+    g.appendChild(faceText);
+
+    if (canShowAvatarPhoto()) {
+      g.appendChild(svgEl('image', {
+        class: 'center-avatar-img',
+        href: googleUserPhoto,
+        x: -CENTER_AVATAR_R, y: -CENTER_AVATAR_R,
+        width: CENTER_AVATAR_R * 2, height: CENTER_AVATAR_R * 2,
+        preserveAspectRatio: 'xMidYMid slice',
+        'clip-path': 'url(#center-avatar-clip)',
+        'pointer-events': 'none',
+      }));
+    }
+  }
+
   // "+ Branch" buttons on the center node's left and right edges. Week label,
   // navigation and the week-actions gear all moved to #week-bar — they were
   // global chrome sitting in a pannable coordinate space.
@@ -9994,7 +10090,10 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   // Text
   // Captured before the loop: `t` is shadowed by the <text> element inside it.
   const commentIconTitle = t('menu.comment');
-  lines.forEach((line, i) => {
+  // The root paints its own interior above (avatar over initials, or the
+  // signed-out wording), layered so a failed photo reveals what is under it.
+  // Running the generic label pass too would put text on top of the photo.
+  (isCenter ? [] : lines).forEach((line, i) => {
     const textY = -totalTextH / 2 + lineH * i + lineH * 0.75;
     const t = svgEl('text', {
       x: 0, y: textY,
@@ -12578,9 +12677,32 @@ function updateSummary() {
     });
   }
 
+  updateCenterRing();
+
   // Keep the Stats panel current (only reached when stats changed, since this
   // function early-returns on an unchanged signature).
   if (_statsPanelOpen) renderStatsPanel();
+}
+
+// The root's ring after a surgical change. updateNodeUI cannot carry this: it
+// starts with findNode(nodeId), which is null for the virtual center, and
+// returns. updateSummary is the right hook — its signature already covers every
+// input the percentage depends on. makeNodeGroup still draws the ring correctly
+// itself, because updateSummary early-returns on an unchanged signature.
+function updateCenterRing() {
+  const arc = document.querySelector('.node-group[data-id="center"] .center-ring-arc');
+  if (!arc) return;
+  const perimeter = parseFloat(arc.dataset.perimeter);
+  if (!perimeter) return;
+  setCenterRingArc(arc, computeWeekStats().global.percent, perimeter);
+}
+
+// Shared by the build and the patch so the two can never disagree. The rounded
+// cap is conditional: it paints a dot even on a zero-length dash, which would
+// leave an untouched week showing a stray pip at 12 o'clock.
+function setCenterRingArc(arc, pct, perimeter) {
+  arc.setAttribute('stroke-dasharray', `${(pct / 100) * perimeter} ${perimeter}`);
+  arc.setAttribute('stroke-linecap', pct > 0 ? 'round' : 'butt');
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -12616,6 +12738,12 @@ function render() {
   centerGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? '#666666' : '#454545' }));
   centerGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#444444' : '#252525' }));
   defsEl.appendChild(centerGrad);
+
+  // Rounds off the root's profile photo. A clipPath rather than a CSS
+  // basic-shape so the geometry is plain SVG in every engine.
+  const avatarClip = svgEl('clipPath', { id: 'center-avatar-clip' });
+  avatarClip.appendChild(svgEl('circle', { cx: 0, cy: 0, r: CENTER_AVATAR_R }));
+  defsEl.appendChild(avatarClip);
 
   const linesG = svgEl('g', { id: 'lines-layer' });
   root.appendChild(linesG);
@@ -13220,11 +13348,6 @@ function showContextMenu(x, y, nodeId) {
   const isActivity = node && node.type === 'activity';
   const isCounter  = node && node.type === 'counter';
 
-  // Current week (Center only, hidden when already on current week)
-  const onCurrentWeek = currentWeekKey === todayWeekKey();
-  document.getElementById('ctx-current-week').style.display    = (isCenter && !onCurrentWeek) ? '' : 'none';
-  document.getElementById('ctx-sep-current-week').style.display = (isCenter && !onCurrentWeek) ? '' : 'none';
-
   // Transfer items (Center only)
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
   document.getElementById('ctx-transfer-reusable').style.display  = isCenter ? '' : 'none';
@@ -13532,11 +13655,6 @@ document.getElementById('ctx-set-baseline').addEventListener('click', () => {
   const rect = ctxMenu.getBoundingClientRect();
   hideContextMenu();
   openBaselinePanel(rect.right + 4, rect.top);
-});
-
-document.getElementById('ctx-current-week').addEventListener('click', async () => {
-  await loadAndRender(todayWeekKey());
-  hideContextMenu();
 });
 
 document.getElementById('ctx-transfer-unfinished').addEventListener('click', async () => {
@@ -15793,6 +15911,10 @@ window.addEventListener('pointerup', (e) => {
         });
         saveWeek(currentWeekKey, weekData);
         render();
+      } else {
+        // A press on the root that never moved is a click, and the root wears the
+        // week's completion ring — so it opens the panel that explains the number.
+        switchView('stats');
       }
     }
   }

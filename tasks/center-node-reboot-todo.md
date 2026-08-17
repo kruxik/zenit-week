@@ -96,14 +96,57 @@ after S1. Check off only when AC + verification pass.
 
 ## ⏸ C2 checkpoint — awaiting human review before S3 (the ring)
 
-## S3 — Completion ring
-- [ ] T3.1 — Track path (`--border-soft`) + accent arc via `stroke-dasharray` from
-      `computeWeekStats().global.percent`.
-- [ ] T3.2 — `updateCenterRing()`, called from `updateSummary()`.
-- [ ] T3.3 — Empty week → track only, no accent arc.
-- [ ] T3.4 — Click-without-drag on the center opens Stats (reuse the `#vtb-stats` path).
-- [ ] T3.5 — Test: arc length for a known week fixture; manual `D`-toggle vs Stats donut.
-- [ ] T3.6 — `npm test` green.
+## S3 — Circular root: avatar + completion ring ✅
+Scope grew on 2026-08-17: the root goes circular and shows the user's avatar. See
+plan AD3 (superseded) and AD8.
+- [x] T3.1 — `NODE_STYLE.center` → **200×200, `rx: 100`**; `_computeNodeSize` pins the
+      center to a square so "circle" is a guarantee, not a coincidence of label length.
+- [x] T3.2 — i18n: `center.you` → `center.me` (`Me` / `Já`); S1's tests updated.
+- [x] T3.3 — `canShowAvatarPhoto()` extracted from `showSignedInAvatar`, shared by the
+      toolbar and the root; the `online` listener also schedules a render.
+- [x] T3.4 — Root interior: initials disc (`googleUserInitialsColor` +
+      `googleUserInitials`) with the photo `<image>` layered over it in a
+      `#center-avatar-clip` circular clip; `Me`/`Já` when signed out; `<title>` carries
+      `centerDisplayName()`. The generic label pass is skipped for the root, or it
+      would paint text over the photo.
+- [x] T3.5 — Ring inset at r=90, stroke 8, inside the r=100 node; avatar r=80.
+- [x] T3.6 — `updateCenterRing()` called from `updateSummary()`.
+- [x] T3.7 — Empty week → whole track, no arc, identical silhouette.
+- [x] T3.8 — Click-without-drag on the root opens Stats.
+- [x] T3.9 — `ctx-current-week` + `ctx-sep-current-week` deleted: markup, show/hide
+      logic, click handler and both `menu.currentWeek` translations.
+- [x] T3.10 — Tests: `centerNodeText` tiers, `center.me`, ring circumference and dash
+      mapping — 845 passing.
+- [x] T3.11 — `npm test` + `npm run validate` green; `layout` / `reset-view` / `zoom`
+      **unmodified** despite the size change, which is AD3's revision made good.
+
+### S3 verified in a real browser
+| Check | Result |
+|---|---|
+| Geometry | `200x200 rx100` — a circle |
+| Signed out | face `Me`, title `Me`, no initials disc, no photo |
+| Signed in, no photo | face `PB`, title `Petr`, initials disc present |
+| Signed in with photo | photo layered over the `PB` disc, clipped round |
+| Ring vs Stats donut | ring 40%, donut `40%` — same number |
+| `D` on an activity | dash 180.96 → 194.53 with no full render (AD4 holds) |
+| Empty week | dash `0 565.49`, track whole, box still 200×200 |
+| Click the root | `data-view` becomes `stats` |
+| Branch edges | meet the circle at `(±100, 0)`, clear of the r=90 ring |
+
+### S3 additions beyond the plan
+- **200px, not 160.** At 160 the circle read as *smaller* than the 160×64 branches it
+  anchors — a circle carries less visual mass than the pill it replaced. Caught by
+  looking at a screenshot, not by any assertion.
+- **`stroke-linecap` is conditional.** A round cap paints a dot even on a zero-length
+  dash, so an untouched week showed a stray green pip at 12 o'clock. Build and patch
+  now share `setCenterRingArc()` so they cannot disagree about it.
+- **Face font sizes differ by tier** — 52 for initials, the node's own 34 for `Me`/`Já`.
+
+### Carried into S5
+`scripts/og-image.mjs` still swaps the root's text for a marketing line
+(`centerLabel: 'My week'`). The root no longer carries a week label at all, so that
+substitution needs rethinking rather than retargeting — an avatar-bearing root in a
+marketing image is a stranger's face.
 
 ## S4 — Day-filter chip to the bottom stack ✅ *(pulled forward, see note)*
 - [x] T4.1 — Added `--stack-l1: 62px` / `--stack-l2: 118px` / **`--stack-l3: 174px`**.

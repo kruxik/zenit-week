@@ -3,6 +3,7 @@ import {
   _state,
   firstNameFrom,
   centerDisplayName,
+  centerNodeText,
   formatWeekParts,
   formatWeekLabel,
   roundedRectPathD,
@@ -59,9 +60,9 @@ describe('centerDisplayName', () => {
   it('uses the signed-out wording in both languages', () => {
     _state.setGoogleUser('', '');
     _state.setLang('en');
-    expect(centerDisplayName()).toBe('You');
+    expect(centerDisplayName()).toBe('Me');
     _state.setLang('cs');
-    expect(centerDisplayName()).toBe('Ty');
+    expect(centerDisplayName()).toBe('Já');
   });
 
   it('uses the signed-in first name regardless of language', () => {
@@ -75,6 +76,38 @@ describe('centerDisplayName', () => {
   it('falls back to the local-part for an account with no display name', () => {
     _state.setGoogleUser('', 'kruxik@gmail.com');
     expect(centerDisplayName()).toBe('kruxik');
+  });
+});
+
+// What the root circle paints. The photo is not a tier here — it is layered over
+// the initials in the DOM, so a failed or skipped image reveals them.
+describe('centerNodeText', () => {
+  afterEach(() => {
+    _state.setGoogleUser('', '');
+    _state.setLang('en');
+  });
+
+  it('shows the signed-out wording when there is no account', () => {
+    _state.setGoogleUser('', '');
+    expect(centerNodeText()).toBe('Me');
+    _state.setLang('cs');
+    expect(centerNodeText()).toBe('Já');
+  });
+
+  it('shows initials for a signed-in account', () => {
+    _state.setGoogleUser('Petr Burian', 'kruxik@gmail.com');
+    expect(centerNodeText()).toBe('PB');
+  });
+
+  it('derives initials from the email when there is no display name', () => {
+    _state.setGoogleUser('', 'kruxik@gmail.com');
+    expect(centerNodeText()).toBe('KR');
+  });
+
+  it('stays initials in Czech — a name is not translated', () => {
+    _state.setGoogleUser('Petr Burian', 'kruxik@gmail.com');
+    _state.setLang('cs');
+    expect(centerNodeText()).toBe('PB');
   });
 });
 
@@ -145,5 +178,29 @@ describe('roundedRectPathD', () => {
 
   it('never emits a negative radius', () => {
     expect(roundedRectPathD(240, 80, -10).perimeter).toBeCloseTo(640, 6);
+  });
+});
+
+// The root's completion ring: a circle of r=90 inset inside the 200px node.
+describe('root completion ring', () => {
+  const RING_R = 90;
+  const ring = () => roundedRectPathD(RING_R * 2, RING_R * 2, RING_R);
+
+  it('is a true circle, not a racetrack', () => {
+    expect(ring().perimeter).toBeCloseTo(2 * Math.PI * RING_R, 6);
+    expect(ring().perimeter).toBeCloseTo(565.4867, 3);
+  });
+
+  it('starts at the top of the circle so the arc fills clockwise', () => {
+    expect(ring().d.startsWith(`M 0 ${-RING_R}`)).toBe(true);
+  });
+
+  it('maps a percentage onto a dasharray that never exceeds the circle', () => {
+    const { perimeter } = ring();
+    const dash = (pct) => (pct / 100) * perimeter;
+    expect(dash(0)).toBe(0);                              // empty week — bare track
+    expect(dash(100)).toBeCloseTo(perimeter, 6);           // finished — closed ring
+    expect(dash(50)).toBeCloseTo(perimeter / 2, 6);
+    expect(dash(37)).toBeLessThan(perimeter);
   });
 });

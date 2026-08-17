@@ -412,9 +412,12 @@ _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[
 _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
 // Signed-in identity for the root node's derived name. Both '' = signed out.
-_state.setGoogleUser = function(displayName, email) {
+_state.setGoogleUser = function(displayName, email, photoLink) {
   googleUserName  = displayName || '';
   googleUserEmail = email || '';
+  googleUserPhoto = photoLink || '';
+  // Mirrors showSignedInAvatar, so the initials tiers behave as they do live.
+  googleUserInitials = (displayName || email) ? getInitials(displayName || email) : '';
 };
 _state.resetSyncState = function() {
   googleAccessToken = null;
@@ -646,6 +649,8 @@ export const {
   // Center node + week bar
   firstNameFrom,
   centerDisplayName,
+  centerNodeText,
+  canShowAvatarPhoto,
   formatWeekParts,
   formatWeekLabel,
   roundedRectPathD,

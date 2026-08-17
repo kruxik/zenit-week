@@ -37,12 +37,28 @@ Draw a rounded-rect outline `<path>` matching the center rect's geometry and set
   node whose width feeds layout, and duplicates the Stats panel visual.
 - *Rejected:* making the root circular — a true ring, but changes `CENTER_W` (see AD3).
 
-**AD3 — `CENTER_W` / `CENTER_H` stay at 240×80.**
-`computeLayout` reads `positions['center'] = {w: CENTER_W, h: CENTER_H}` and derives
-branch `baseDistance` from it. Leaving both alone means zero layout risk and no
-churn in `layout.test.js` / `reset-view.test.js` / `zoom.test.js`. The center still
-*shrinks visually* by 80px — that comes free from deleting the two nav bricks and
-`.center-outer-pill`, not from touching constants.
+**AD3 — ~~`CENTER_W` / `CENTER_H` stay at 240×80.~~ Superseded 2026-08-17: the root
+becomes a 160×160 circle.**
+The original caution was that `computeLayout` reads
+`positions['center'] = {w: CENTER_W, h: CENTER_H}` and derives branch `baseDistance`
+from it, so changing either risked re-baselining three test files. On inspection the
+risk was overstated: `layout.test.js` asserts only *relative* positions
+(`d1.x === d2.x`, zig-zag vStep), and neither `reset-view.test.js` nor
+`zoom.test.js` references the center's size at all. Going circular costs no test
+churn. Branch edges also land better: a circle's left and right extremities are
+exactly `(±r, 0)`, which is precisely where `drawEdges` already starts them —
+truer than it ever was for a pill.
+
+**AD8 — The root shows the user, in three tiers, and the ring goes *inside* it.**
+Photo → initials → `Me`/`Já`, mirroring what the toolbar avatar already resolves.
+Rather than duplicating that decision, the photo-vs-initials test is extracted from
+`showSignedInAvatar` into one predicate both callers share. The initials layer is
+drawn *underneath* the photo instead of behind an `onerror` handler: if the image
+fails or is never requested, the initials simply show through. No error plumbing in
+a subtree that gets rebuilt on every render.
+The ring is inset inside the circle's edge, not wrapped around the outside. Outside,
+its leftmost and rightmost points sit exactly where the branch edges run, and every
+edge would visibly cross it.
 
 **AD4 — Ring is drawn at build time and patched in `updateSummary()`.**
 `updateNodeUI()` cannot carry it: it calls `findNode(nodeId)`, which returns `null`
