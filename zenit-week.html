@@ -704,7 +704,8 @@
   /* Absolute inside #canvas-container rather than fixed to the body, so the
      agenda panel covers it exactly the way it covers the mindmap it belongs to.
      Styled as a peer of the other button bars (#undo-redo-bar, #view-toggle-bar)
-     because that is what it is; its buttons reuse .undo-redo-btn unchanged. */
+     because that is what it is; its buttons and the 1px rules between them
+     reuse .undo-redo-btn / .undo-redo-separator unchanged. */
   #week-bar {
     position: absolute;
     /* Clears the 56px toolbar, which overlays the canvas from the top. */
@@ -3573,17 +3574,20 @@
               data-i18n-aria="nav.prev" aria-label="Previous">
         <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-up"/></svg>
       </button>
+      <div class="undo-redo-separator"></div>
       <!-- aria-label is a placeholder for the empty-until-rendered spans;
            updateWeekBar replaces it with the full week wording. -->
       <button type="button" id="week-bar-label" aria-label="Week">
         <span id="week-bar-week"></span>
         <span id="week-bar-range"></span>
       </button>
+      <div class="undo-redo-separator"></div>
       <button type="button" class="undo-redo-btn" id="week-bar-actions"
               data-i18n-title="weekbar.actions" title="Week actions"
               data-i18n-aria="weekbar.actions" aria-label="Week actions" aria-haspopup="true">
         <svg class="icon" aria-hidden="true"><use href="#icon-menu-2"/></svg>
       </button>
+      <div class="undo-redo-separator"></div>
       <button type="button" class="undo-redo-btn" id="week-bar-next"
               data-i18n-aria="nav.next" aria-label="Next">
         <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-down"/></svg>
