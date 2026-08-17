@@ -1647,98 +1647,6 @@
   }
   #stats-overlay.visible { display: flex; opacity: 1; }
 
-  /* LEGACY (Stats window chrome) — superseded by .app-panel / .app-panel-header /
-     .app-panel-content. `@media not all` never matches any device, so everything
-     below is inert; kept for reference until the unified shell is polished. */
-  @media not all {
-  #stats-panel {
-    position: fixed;
-    top: 0; /* Scope B: rises behind the toolbar so content scrolls under it */
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    max-width: none;
-    height: auto;
-    background: var(--bg-surface);
-    border-radius: 0;
-    box-shadow: none;
-    overflow: hidden;
-    display: none;
-    flex-direction: column;
-    /* Mobile: a full-area opaque view layer that sits BELOW the bottom chrome
-       (FAB z1000, undo/redo + view pill z2500), mirroring the Agenda panel, so
-       Settings / + / navigation stay tappable. Desktop lifts to 2000 to float
-       over the blurred map. */
-    z-index: 800;
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(20px);
-  }
-  @media (min-width: 768px) {
-    #stats-panel {
-      top: 0; /* Scope B: rises behind the toolbar; header re-anchored at 56px */
-      left: 50%;
-      right: auto;
-      bottom: 5px;
-      width: var(--panel-width);
-      max-width: calc(100vw - 40px);
-      height: calc(100vh - 5px);
-      border-radius: 8px;
-      border: 1px solid var(--border-default);
-      box-shadow: 0 20px 60px var(--shadow-xl);
-      background: var(--bg-surface);
-      transform: translateX(-50%) translateY(20px);
-      z-index: 2000;
-    }
-  }
-  #stats-panel.visible {
-    display: flex;
-    opacity: 1;
-    pointer-events: all;
-    transform: translateY(0);
-  }
-  @media (min-width: 768px) {
-    #stats-panel.visible { transform: translateX(-50%) translateY(0); }
-  }
-
-  /* Scope B: glass header floats at the toolbar's bottom edge (56px); content
-     scrolls under BOTH the header and the toolbar above it. */
-  #stats-header {
-    background: var(--bg-surface);
-    height: 60px;
-    padding: 0 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border-soft);
-    position: absolute;
-    top: 56px;
-    left: 0;
-    right: 0;
-    z-index: 2;
-  }
-  @media (min-width: 768px) {
-    /* The desktop panel has a 1px border, so its padding box (the containing
-       block for this header) already starts 1px down — 55px lands the header
-       flush against the toolbar's bottom edge instead of 1px below it. */
-    #stats-header { top: 55px; }
-  }
-  #stats-content {
-    padding: 24px;
-    padding-top: 136px; /* 56px toolbar + 60px header + 20px gap */
-    padding-bottom: 80px;
-    flex: 1;
-    overflow-y: auto;
-    /* Scroll region runs full-height behind the glass header/toolbar so content
-       scrolls under them; a native scrollbar would span that whole height, so
-       hide it (matches the day-strip). */
-    scrollbar-width: none;
-  }
-  #stats-content::-webkit-scrollbar { display: none; }
-  } /* end LEGACY (Stats window chrome) */
-
   /* Hero: two top-aligned columns — Plan vs Reality (left) and The Week (right). */
   #stats-section-donut {
     display: flex;
@@ -2532,58 +2440,6 @@
     }
   }
 
-  /* LEGACY (Agenda window chrome) — superseded by .app-panel. `@media not all`
-     never matches, so everything below is inert; kept for reference until the
-     unified shell is polished. */
-  @media not all {
-  #agenda-view {
-    position: absolute;
-    top: 0; /* Scope B: rises behind the toolbar; day-strip re-anchored at 56px */
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    max-width: 100%;
-    display: none;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--bg-page);
-    z-index: 800;
-    transition: transform 0.3s ease, opacity 0.3s ease;
-  }
-
-  @media (min-width: 768px) {
-    #agenda-view {
-      position: fixed;
-      top: 0; /* Scope B: rises behind the toolbar; day-strip re-anchored at 56px */
-      left: 50%;
-      right: auto;
-      bottom: 5px;
-      width: var(--panel-width);
-      max-width: calc(100vw - 40px);
-      border-radius: 8px;
-      border: 1px solid var(--border-default);
-      box-shadow: 0 20px 60px var(--shadow-xl);
-      background: var(--bg-surface);
-      transform: translateX(-50%) translateY(20px);
-      opacity: 0;
-      pointer-events: none;
-      z-index: 2000; /* Match Help panel priority */
-      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
-    }
-    #agenda-view.active {
-      display: flex;
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
-      pointer-events: all;
-    }
-  }
-
-  #agenda-view.active {
-    display: flex;
-  }
-  } /* end LEGACY (Agenda window chrome) */
-
   /* The day-strip IS this panel's header slot (.app-panel-header supplies the
      position, height, background and border); only the horizontal tab-scroller
      behaviour is Agenda-specific. */
@@ -2870,62 +2726,6 @@
     opacity: 1;
   }
 
-  /* LEGACY (Help window chrome) — superseded by .app-panel; the panel now rises
-     behind the toolbar like Stats/Agenda instead of starting below it.
-     `@media not all` never matches, so everything below is inert. */
-  @media not all {
-  #help-panel {
-    position: fixed;
-    top: 56px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    max-width: none;
-    height: auto;
-    background: var(--bg-surface);
-    border-radius: 0;
-    box-shadow: none;
-    overflow: hidden;
-    display: none;
-    flex-direction: column;
-    z-index: 2000;
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease, border-radius 0.3s ease, top 0.3s ease, bottom 0.3s ease, width 0.3s ease, left 0.3s ease;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(20px);
-  }
-
-  @media (min-width: 768px) {
-    #help-panel {
-      top: 61px;
-      left: 50%;
-      right: auto;
-      bottom: 5px;
-      width: var(--panel-width);
-      max-width: calc(100vw - 40px);
-      height: calc(100vh - 66px);
-      border-radius: 8px;
-      border: 1px solid var(--border-default);
-      box-shadow: 0 20px 60px var(--shadow-xl);
-      transform: translateX(-50%) translateY(20px);
-    }
-  }
-
-  #help-panel.visible {
-    display: flex;
-    opacity: 1;
-    pointer-events: all;
-    transform: translateY(0);
-  }
-
-  @media (min-width: 768px) {
-    #help-panel.visible {
-      transform: translateX(-50%) translateY(0);
-    }
-  }
-  } /* end LEGACY (Help window chrome) */
-
   /* Mobile: floating "Close" pill replaces the top-right X while help is open */
   #help-close-bar,
   #comment-close-bar {
@@ -3006,88 +2806,6 @@
     display: flex;
     opacity: 1;
   }
-
-  /* LEGACY (Comment window chrome) — superseded by .app-panel; the panel now
-     rises behind the toolbar like Stats/Agenda. `@media not all` never matches,
-     so everything below is inert. */
-  @media not all {
-  #comment-panel {
-    position: fixed;
-    top: 56px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    max-width: none;
-    height: auto;
-    background: var(--bg-surface);
-    border-radius: 0;
-    box-shadow: none;
-    overflow: hidden;
-    display: none;
-    flex-direction: column;
-    z-index: 2000;
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(20px);
-  }
-
-  @media (min-width: 768px) {
-    #comment-panel {
-      top: 61px;
-      left: 50%;
-      right: auto;
-      bottom: 5px;
-      width: var(--panel-width);
-      max-width: calc(100vw - 40px);
-      height: calc(100vh - 66px);
-      border-radius: 8px;
-      border: 1px solid var(--border-default);
-      box-shadow: 0 20px 60px var(--shadow-xl);
-      transform: translateX(-50%) translateY(20px);
-    }
-  }
-
-  #comment-panel.visible {
-    display: flex;
-    opacity: 1;
-    pointer-events: all;
-    transform: translateY(0);
-  }
-
-  @media (min-width: 768px) {
-    #comment-panel.visible {
-      transform: translateX(-50%) translateY(0);
-    }
-  }
-
-  #comment-header {
-    background: var(--bg-surface-subtle);
-    padding: 20px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    border-bottom: 1px solid var(--border-soft);
-  }
-  #comment-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  #comment-close {
-    cursor: pointer;
-    font-size: 18px;
-    color: var(--text-placeholder);
-    transition: color 0.2s;
-    flex-shrink: 0;
-  }
-  #comment-close:hover { color: var(--text-primary); }
-  } /* end LEGACY (Comment window chrome) */
 
   #comment-close { flex-shrink: 0; }
 
@@ -3263,33 +2981,6 @@
     justify-content: flex-end;
     margin-top: 4px;
   }
-
-  /* LEGACY (Help header/content chrome) — superseded by .app-panel-header /
-     .app-panel-title / .app-panel-close / .app-panel-content. Inert. */
-  @media not all {
-  #help-header {
-    background: var(--bg-surface-subtle);
-    padding: 20px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border-soft);
-  }
-  #help-close {
-    cursor: pointer;
-    font-size: 18px;
-    color: var(--text-placeholder);
-    transition: color 0.2s;
-  }
-  #help-close:hover { color: var(--text-primary); }
-
-  #help-content {
-    padding: 24px;
-    padding-bottom: 80px;
-    flex: 1;
-    overflow-y: auto;
-  }
-  } /* end LEGACY (Help header/content chrome) */
 
   .help-section {
     margin-bottom: 24px;
