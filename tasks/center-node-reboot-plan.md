@@ -73,9 +73,9 @@ It currently returns a `\n`-joined two-line string for SVG text. Both callers ch
 in this work (`_computeNodeSize`'s center branch and the center render), so the `\n`
 has no remaining consumer. The bar wants one line.
 
-**AD6 — The trigger is `⋯`, not a gear.**
+**AD6 — The trigger is `☰`, not a gear.**
 `#fab-settings` already means *app settings*. A second gear meaning *week actions*
-is an ambiguity, not a shortcut. The `⋯` reuses `showContextMenu('center')` verbatim,
+is an ambiguity, not a shortcut. The `☰` reuses `showContextMenu('center')` verbatim,
 anchored to the button's bounding rect — no new dropdown code.
 
 **AD7 — The bottom stack gets two shared CSS vars.**
@@ -89,7 +89,7 @@ and toast reference them. Toast steps up over a visible chip via
 ```
 S1  Pure helpers (centerDisplayName, roundedRectPathD, formatWeekLabel single-line)
      │   no call sites yet → app behaviour unchanged
-     ├──> S2a  #week-bar: DOM + CSS + i18n + arrows + today-label + ⋯
+     ├──> S2a  #week-bar: DOM + CSS + i18n + arrows + today-label + ☰
      │      │   (week nav now exists in two places — both work)
      │      └──> S2b  Strip nav bricks / gear / outer pill from the center node;
      │                 center label → centerDisplayName()
@@ -140,10 +140,10 @@ rounded-rect path plus its analytic perimeter `2(w-2rx) + 2(h-2rx) + 2πrx`.
 #### Task 2.1: `#week-bar` — arrows, today-label, week-actions
 **Description:** New bar inside `#canvas-container` at `top:68px`, centered, styled as
 a peer of `#day-filter-chip` (glass background, `--border-subtle`, pill radius). Holds
-`‹`, the single-line week label, `⋯`, `›`. Arrows call
+`‹`, the single-line week label, `☰`, `›`. Arrows call
 `loadAndRender(offsetWeek(currentWeekKey, ±1))` and carry the today-direction accent
 when that direction leads toward `todayWeekKey()`. The label is a button: click →
-`loadAndRender(todayWeekKey())`, accent-tinted while off-current. `⋯` opens
+`loadAndRender(todayWeekKey())`, accent-tinted while off-current. `☰` opens
 `showContextMenu()` for `center` anchored to its own rect. A single `updateWeekBar()`
 refreshes label + accents, called from `loadAndRender`, the `hashchange` handler and
 `applyTranslations()`.
@@ -151,7 +151,7 @@ refreshes label + accents, called from `loadAndRender`, the `hashchange` handler
 **Acceptance criteria:**
 - [ ] Arrows navigate weeks and the label tracks; the direction toward today is accented
 - [ ] Clicking the label from any week lands on the current week and drops the tint
-- [ ] `⋯` opens the same menu the center gear opens today
+- [ ] `☰` opens the same menu the center gear opens today
 - [ ] The whole bar fits a 320px viewport in EN and CS — the date range hides below
       360px, mirroring the `#day-filter-chip-label` pattern
 - [ ] Bar is absent in agenda view (mobile) and behind the panel (desktop), with no

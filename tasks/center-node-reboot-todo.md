@@ -29,7 +29,7 @@ after S1. Check off only when AC + verification pass.
   and whether sign-out re-renders at all.
 
 ## S2a — `#week-bar` ✅
-- [x] T2.1 — Markup inside `#canvas-container`: `‹` · label · `⋯` · `›`. New `icon-dots`
+- [x] T2.1 — Markup inside `#canvas-container`: `‹` · label · `☰` · `›`. New `icon-menu-2`
       symbol; buttons reuse `.undo-redo-btn` unchanged.
 - [x] T2.2 — CSS at `top:68px`, styled as a peer of the other button bars; date range
       hidden at ≤360px.
@@ -37,7 +37,7 @@ after S1. Check off only when AC + verification pass.
 - [x] T2.4 — Arrows → `loadAndRender(offsetWeek(±1))`; `today-direction` accent on the
       arrow leading back to the present.
 - [x] T2.5 — Label → `loadAndRender(todayWeekKey())`; `off-current` accent tint.
-- [x] T2.6 — `⋯` → `showContextMenu('center')` anchored to its own rect.
+- [x] T2.6 — `☰` → `showContextMenu('center')` anchored to its own rect.
 - [x] T2.7 — `updateWeekBar()` from `loadAndRender`, `hashchange`, `applyTranslations()`.
 - [x] T2.8 — `npm test` 838 passed, `npm run validate` clean.
 
@@ -48,7 +48,7 @@ after S1. Check off only when AC + verification pass.
 | Range hidden ≤360, full wording kept in aria | `aria="Week 34 (Aug 17 - Aug 23)"` at 320px |
 | Arrow titles name the target week | `Previous · W33` / `Předchozí · T33` |
 | Accents | on current week: none; +1 week: prev lit; −1: next lit |
-| `⋯` menu | opens below the bar, `ctx-current-week` shown when off-current |
+| `☰` menu | opens below the bar, `ctx-current-week` shown when off-current |
 | Label → today | returns to W34 and clears the URL hash |
 | Drag on the bar | map does not pan |
 | Agenda view | mobile: canvas hidden with the bar; desktop: behind the panel, `elementFromPoint` hits the panel |
@@ -60,7 +60,7 @@ after S1. Check off only when AC + verification pass.
   the precedent's small cost.
 - Arrow buttons get `font-size: 22px` — `.icon` is `1em`, and the caret glyphs carry
   so much padding inside their viewBox that the inherited 16px read as decoration.
-- `icon-dots` symbol added (three circles, Tabler style) for the `⋯` trigger.
+- `icon-menu-2` symbol added (Tabler `menu-2`) for the week-actions trigger.
 
 ## S2b — Strip center chrome ✅
 - [x] T2.9 — Both `week-nav-btn` brick groups deleted from `makeNodeGroup`'s `isCenter` branch.

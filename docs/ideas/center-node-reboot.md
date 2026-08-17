@@ -36,9 +36,9 @@ The first name is no longer painted, but it is still derived: it becomes the
 root's accessible name and hover title, so an image-only node is not a blank to
 a screen reader.
 
-The week bar reads `‹  Week 34 (Aug 17 – Aug 23)  ⋯  ›`. Arrows keep the
+The week bar reads `‹  Week 34 (Aug 17 – Aug 23)  ☰  ›`. Arrows keep the
 today-direction accent. The label itself is a button: click to jump to the
-current week, tinted when you are away from it. The `⋯` opens today's center
+current week, tinted when you are away from it. The `☰` opens today's center
 context menu (Current Week / Transfer Unfinished / Transfer Reusable / Set
 Baseline / Clear Week) — deliberately **not** a gear, since a gear already means
 *app settings* in the bottom-right FAB pill.
@@ -48,7 +48,7 @@ and beside the day-filter cell that spawns it. When the view-level row
 discloses, the chip and `#view-level-toast` shift up by the row's height.
 
 ## Key Assumptions to Validate
-- [ ] "Week 34 (Aug 17 – Aug 23)" + 2 arrows + `⋯` fits a 320px viewport in both
+- [ ] "Week 34 (Aug 17 – Aug 23)" + 2 arrows + `☰` fits a 320px viewport in both
       EN and CS — measure; if not, the date range gets a short form the way
       `#day-filter-chip-empty-short` already does
 - [ ] The ring stays correct after a surgical update — toggle a task done via `D`
@@ -62,7 +62,7 @@ discloses, the chip and `#view-level-toast` shift up by the row's height.
 
 ## MVP Scope
 **In:**
-- `#week-bar` — arrows, label-as-today-button, `⋯` week-actions trigger
+- `#week-bar` — arrows, label-as-today-button, `☰` week-actions trigger
 - Center node = first name + completion ring; nav bricks, gear and outer pill
   removed from the `isCenter` branch of `makeNodeGroup`
 - Chip relocation with view-level-row stacking
@@ -88,7 +88,7 @@ discloses, the chip and `#view-level-toast` shift up by the row's height.
 - **Moving app settings out of the FAB pill** — unrelated to this problem.
 
 ## Resolved Questions
-- **`⋯` menu** — reuses `showContextMenu('center')` verbatim, anchored to the
+- **`☰` menu** — reuses `showContextMenu('center')` verbatim, anchored to the
   button's rect. No new dropdown. *(Shipped in S2a.)*
 - **`ctx-current-week`** — deleted. The week label button in the bar does the same
   job where people can actually see it.
