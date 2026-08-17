@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.08.17] - 2026-08-17
+
+### Added
+
+- **hotkeys:** Add keyboard focus ring and document every shortcut
+- **center:** Circular root with the user's avatar and a completion ring
+- **week-bar:** Navigate weeks from a fixed bar, move the day-filter chip down
+- **center:** Derive root name and ring geometry helpers
+- **layout:** Widen vertical node spacing 25% on mobile
+- **i18n:** Render day abbreviations in the active language
+- **view:** Expose view levels on mobile via the Mindmap tab
+- **view:** Shift Rocks/Pebbles one level deeper
+- **mindmap:** Day filter prunes instead of dimming
+- **quick-add:** Open the quick-add panel with the Q hotkey
+- **mindmap:** Open comment dialog on comment icon click
+- **offline:** Cache the Google profile photo in the service worker
+- **offline:** Refresh the cached shell on a periodic background sync
+- **offline:** Replace the plain-text 503 with a localized offline page
+- **offline:** Precache the manifest icons in the service worker
+- **sync:** Drain offline uploads from the service worker
+- **offline:** Cache the landing and legal pages alongside the app shell
+- **storage:** Request persistent storage for the shell cache and week data
+- **offline:** Serve the app shell from a service worker cache
+
+### Changed
+
+- **week-nav:** Refit the mindmap view when the week changes
+- **week-bar:** Split its buttons with the toolbar's 1px vertical rules
+- **sync:** Replace toolbar avatar with a state-bearing cloud glyph
+- **center:** Paint the root ring as the Stats donut's four-band split
+- **center:** Thin the root's dark bands to a third, from 7.5 to 2.5
+- **center:** Scale the root 1.25x so the avatar and completion ring read larger
+- **week-bar:** Use Tabler menu-2 for the week-actions trigger
+- **center:** Root node is the user, not the week
+- **view-toggle:** Order tabs Mindmap, Agenda, Stats
+- **view-levels:** Collapse the view-level row on desktop too
+- **panels:** Delete legacy per-panel window chrome
+- **panels:** Unify panel window chrome behind .app-panel
+- **filter:** Drop the day-filter toast in favour of the chip
+- **mindmap:** Share the today-dot label between both day menus
+- **mindmap:** Drop the abbreviation column from the day-filter menu
+- **mindmap:** Collapse the day rail into one button with a day menu
+- **offline:** Consume the navigation preload in the service worker
+- **quiet-refresh:** Collapse the duplicate version probes into one throttled check
+
+### Fixed
+
+- **transfer:** Clear unplanned flag on nodes moved to next week
+- **center:** Give the root's + buttons a hit collar and a click slop for Stats
+- **avatar:** Request profile photos at s320 so the monogram stops looking blurred
+- **view-bar:** Let hover paint on inactive view-toggle tabs
+- **week-bar:** Centre the label and match the actions icon to the arrows
+- **help:** Dismiss help panel when switching views
+- **views:** Persist stats section across refresh
+- **panels:** Close 1px gap under toolbar in agenda and stats
+- **filter:** Keep the day-filter chip inside narrow viewports
+- **mindmap:** Build zigzag metrics from the filtered child set
+- **mindmap:** Hold edit-teardown render until the pointer gesture ends
+- **week:** Roll over the displayed week at midnight
+- **analytics:** Skip Insights when offline or under Data Saver
+- **sync:** Skip the avatar photo request when there is no link
+- **quiet-refresh:** Honour Data Saver before refetching the document
+- **quiet-refresh:** Defer the reload when the link can't carry the document
+- **net:** Skip probe, poll and upload while the device has no link
+- **net:** Give every network request an abort deadline
+
 ## [v2026.07.30] - 2026-07-30
 
 ### Added
