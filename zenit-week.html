@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-pX2e1T7fyDVo21mepHknklSAZUT3uv0Yc9Lqme3ke2w='
+               'sha256-dUZU4+JiV+sBGfXZDPyfdGBsMfEfziPR7TzDsn3efH0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -12745,8 +12745,9 @@ function _windowKeydownHandler(e) {
     if (key === 's') {
       if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
-        // Toggle Stats; leaving lands on the default (mindmap).
-        switchView(currentView === 'stats' ? 'mindmap' : 'stats');
+        // Toggle Stats; leaving lands on the default (mindmap). With Help open
+        // the press spends itself on dismissing Help, so Stats stays put.
+        switchView(currentView === 'stats' && !isHelpOpen() ? 'mindmap' : 'stats');
         return;
       }
     }
@@ -12778,6 +12779,17 @@ function _windowKeydownHandler(e) {
       hideContextMenu();
       return;
     }
+    // Help sits on top of any view (Stats included), so it dismisses first —
+    // otherwise leaving Stats would close both panels on a single press.
+    const helpPanel = document.getElementById('help-panel');
+    if (helpPanel && helpPanel.classList.contains('visible')) {
+      if (window.doCloseHelp) window.doCloseHelp();
+      else {
+        helpPanel.classList.remove('visible');
+        if (help) help.classList.remove('visible');
+      }
+      return;
+    }
     if (_statsPanelOpen) {
       switchView('mindmap'); // leave Stats → default view
       return;
@@ -12791,15 +12803,6 @@ function _windowKeydownHandler(e) {
       settings.classList.remove('visible');
       const sFab = document.getElementById('fab-settings');
       if (sFab) sFab.classList.remove('active');
-      return;
-    }
-    const helpPanel = document.getElementById('help-panel');
-    if (helpPanel && helpPanel.classList.contains('visible')) {
-      if (window.doCloseHelp) window.doCloseHelp();
-      else {
-        helpPanel.classList.remove('visible');
-        if (help) help.classList.remove('visible');
-      }
       return;
     }
     if (currentView === 'agenda' && window.innerWidth >= 768) {
@@ -15131,12 +15134,22 @@ function _renderAgendaFlush() {
   }
 }
 
+// Help is a modal over the views; the two live independently, so callers that
+// care about "what does this click dismiss first" ask here.
+function isHelpOpen() {
+  const p = document.getElementById('help-panel');
+  return !!p && p.classList.contains('visible');
+}
+
 // Mindmap, Agenda and Stats are peer views. Each switch fully owns the three
 // content layers (canvas, agenda panel, stats panel) so no hidden view stays
 // "live" behind another — the source of the earlier stale-control bugs.
 // All three are persisted, so a refresh lands back on the view the user left.
 function switchView(view) {
   currentView = view;
+  // Help is a modal floating over whichever view is beneath it; navigating to
+  // any view dismisses it first so the destination is actually visible.
+  if (window.doCloseHelp) window.doCloseHelp();
   // The mobile level row belongs to the mindmap; leaving it takes the row along.
   if (view !== 'mindmap') closeViewLevels();
   localStorage.setItem('zenit-week-view', view);
@@ -16924,8 +16937,9 @@ window.addEventListener('load', async () => {
   }
   document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
   document.getElementById('vtb-stats').addEventListener('click', () => {
-    // Toggle Stats; leaving lands on the default (mindmap).
-    switchView(currentView === 'stats' ? 'mindmap' : 'stats');
+    // Toggle Stats; leaving lands on the default (mindmap). With Help open the
+    // click spends itself on dismissing Help, so Stats stays put.
+    switchView(currentView === 'stats' && !isHelpOpen() ? 'mindmap' : 'stats');
   });
   switchView(currentView); // apply persisted view (mindmap / agenda / stats)
 
