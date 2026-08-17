@@ -10,8 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-h/fw2yeKBJwea9oAdFPwTsGty+p+PtkXPpGNNIp6VOM='
+               'sha256-4Fwzd1dskSJgEF1CV1lbKfqAnR5L1G1FgsyfmF7xo08='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -912,75 +911,56 @@
     z-index: -1;
   }
 
-  #sync-badge {
-    position: absolute;
-    bottom: 1px;
-    right: 1px;
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: #aaaaaa;
-    border: 2px solid var(--bg-app);
-    pointer-events: none;
-    transition: background 0.3s;
-    z-index: 1;
-  }
-
-  #sync-badge[data-status="connected"] { background: #34a853; }
-  #sync-badge[data-status="syncing"]   { background: #fbbc04; animation: sync-pulse 1s ease-in-out infinite; }
-  #sync-badge[data-status="error"]     { background: #ea4335; }
-
   @keyframes sync-pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.35; }
   }
 
-  #sync-avatar-btn {
+  #sync-state-btn {
     width: 36px;
     height: 36px;
     border-radius: 8px;
     border: 1px solid var(--border-subtle);
     padding: 0;
     cursor: pointer;
-    overflow: hidden;
     background: var(--glass-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     flex-shrink: 0;
     box-shadow: 0 2px 8px var(--shadow-md);
-    transition: transform 0.15s, box-shadow 0.15s;
+    transition: transform 0.15s, box-shadow 0.15s, color 0.3s;
     display: none;
     align-items: center;
     justify-content: center;
+    color: var(--text-muted);
   }
 
   html:not(.zw-has-session) #sync-btn { display: inline-flex; }
-  html.zw-has-session #sync-avatar-btn { display: flex; }
+  html.zw-has-session #sync-state-btn { display: flex; }
 
-  #sync-avatar-btn:hover {
+  #sync-state-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
 
-  #sync-avatar-img {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    object-fit: cover;
-    display: none;
+  /* The status dot the avatar used to carry now lives in the glyph itself, so
+     exactly one variant is visible at a time. */
+  .sync-glyph { display: none; }
+  #sync-state-btn[data-status="connected"]    .sync-glyph-connected    { display: block; }
+  #sync-state-btn[data-status="syncing"]      .sync-glyph-syncing      { display: block; }
+  #sync-state-btn[data-status="error"]        .sync-glyph-error        { display: block; }
+  #sync-state-btn[data-status="disconnected"] .sync-glyph-disconnected { display: block; }
+
+  #sync-state-btn[data-status="connected"] { color: var(--accent-success-text); }
+  #sync-state-btn[data-status="syncing"]   { color: var(--accent-warning-text); }
+  #sync-state-btn[data-status="error"]     { color: var(--accent-danger); }
+
+  #sync-state-btn[data-status="syncing"] .sync-glyph-syncing {
+    animation: sync-pulse 1s ease-in-out infinite;
   }
 
-  #sync-avatar-initials {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary);
-    background: var(--bg-surface);
-    letter-spacing: 0.5px;
+  @media (prefers-reduced-motion: reduce) {
+    #sync-state-btn[data-status="syncing"] .sync-glyph-syncing { animation: none; }
   }
 
   #sync-dropdown {
@@ -3468,24 +3448,47 @@
           </svg>
           <span id="sync-btn-label">Sign in</span>
         </button>
-        <button type="button" id="sync-avatar-btn" data-i18n-aria="sync.avatarAria" aria-label="Sync options" aria-haspopup="true">
-          <!-- [html-validate-disable-next element-required-attributes -- src set at runtime by JS once a profile photo is available] -->
-          <img id="sync-avatar-img" alt="" referrerpolicy="no-referrer">
-          <span id="sync-avatar-initials"></span>
+        <!--
+          Signed in, this replaces the sign-in button. It deliberately does NOT
+          wear the profile photo: the root node already carries the user's face,
+          and the menu behind this button is about Drive sync (account, last
+          sync, sign out), not about identity. So the glyph states what sync is
+          doing. All four variants ship in the DOM and CSS picks one off
+          [data-status] — no runtime markup building, no innerHTML.
+          Glyphs: Tabler Icons (MIT) cloud-check / cloud-up / cloud-exclamation
+          / cloud-off.
+        -->
+        <button type="button" id="sync-state-btn" data-status="disconnected"
+                data-i18n-aria="sync.stateAria" aria-label="Sync options"
+                data-i18n-title="sync.badge.disconnected" title="Not connected to Google Drive"
+                aria-haspopup="true">
+          <svg class="sync-glyph sync-glyph-connected" viewBox="0 0 24 24" width="20" height="20"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M11 18.004h-4.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.388 0 2.585 .82 3.138 2.007"/>
+            <path d="M15 19l2 2l4 -4"/>
+          </svg>
+          <svg class="sync-glyph sync-glyph-syncing" viewBox="0 0 24 24" width="20" height="20"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M12 18.004h-5.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.38 0 2.57 .811 3.128 1.986"/>
+            <path d="M19 22v-6"/>
+            <path d="M22 19l-3 -3l-3 3"/>
+          </svg>
+          <svg class="sync-glyph sync-glyph-error" viewBox="0 0 24 24" width="20" height="20"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M15 18.004h-8.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.374 0 2.562 .805 3.121 1.972"/>
+            <path d="M19 16v3"/>
+            <path d="M19 22v.01"/>
+          </svg>
+          <svg class="sync-glyph sync-glyph-disconnected" viewBox="0 0 24 24" width="20" height="20"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M9.58 5.548c.24 -.11 .492 -.207 .752 -.286c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 .957 -.383 1.824 -1.003 2.454m-2.997 1.033h-11.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.13 -.582 .37 -1.128 .7 -1.62"/>
+            <path d="M3 3l18 18"/>
+          </svg>
         </button>
-        <script>
-          (function() {
-            try {
-              var a = JSON.parse(localStorage.getItem('zenit-week-google-auth') || 'null');
-              if (a && a.photoLink) {
-                var img = document.getElementById('sync-avatar-img');
-                img.src = a.photoLink;
-                img.style.display = 'block';
-              }
-            } catch(e) {}
-          })();
-        </script>
-        <div id="sync-badge" data-status="disconnected" data-i18n-title="sync.badge.disconnected" title="Not connected to Google Drive"></div>
         <div id="sync-dropdown" role="menu">
           <div id="sync-dropdown-email"></div>
           <div class="settings-separator"></div>
@@ -5834,8 +5837,8 @@ function sizedAvatarUrl(url) {
 // Whether the profile photo is worth requesting right now. Offline the request
 // usually only fails and, under Data Saver, spends bytes the user asked us not
 // to — unless a service worker is in control, in which case Cache Storage may
-// answer it without any CSP widening. Shared so the toolbar avatar and the root
-// node can never disagree about which face they are showing.
+// answer it without any CSP widening. The root node is the only place the photo
+// is shown — the toolbar reports sync state, not identity.
 function canShowAvatarPhoto() {
   if (!googleUserPhoto) return false;
   const swControlled = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
@@ -5863,57 +5866,40 @@ function updateDropdownSyncTime() {
   if (el) el.textContent = `${t('sync.lastSyncLabel')}: ${formatSyncTime(lastSyncedAt)}`;
 }
 
+// Fallback tooltip per sync state, used whenever a call site has no more
+// specific message of its own.
+const SYNC_STATE_TITLE_KEYS = {
+  disconnected: 'sync.badge.disconnected',
+  connected:    'sync.badge.connected',
+  syncing:      'sync.badge.syncing',
+  error:        'sync.badge.error',
+};
+
 // Re-render any sync UI text that's set imperatively, so language switches
 // (and first paint) display localized strings.
 function refreshSyncUiText() {
   const labelEl = document.getElementById('sync-btn-label');
   if (labelEl) labelEl.textContent = t(lastSignedOutLabelKey);
-  const dot = document.getElementById('sync-badge');
-  if (dot) {
-    const defaults = {
-      disconnected: 'sync.badge.disconnected',
-      connected:    'sync.badge.connected',
-      syncing:      'sync.badge.syncing',
-      error:        'sync.badge.error',
-    };
-    const key = lastSyncMessageKey || defaults[syncStatus];
-    if (key) dot.title = t(key);
+  const stateBtn = document.getElementById('sync-state-btn');
+  if (stateBtn) {
+    const key = lastSyncMessageKey || SYNC_STATE_TITLE_KEYS[syncStatus];
+    if (key) stateBtn.title = t(key);
   }
   updateDropdownSyncTime();
 }
 
 // Set when a photo exists but was skipped because the device had no link, so
-// the 'online' listener knows there is something to go back for.
+// the 'online' listener knows there is something to go back for. The root node
+// is the only place the photo is painted, so getting it back is a re-render.
 let _avatarPhotoDeferred = false;
-
-function paintAvatarInitials() {
-  const img      = document.getElementById('sync-avatar-img');
-  const initials = document.getElementById('sync-avatar-initials');
-  if (!img || !initials) return;
-  img.style.display = 'none';
-  initials.textContent = googleUserInitials;
-  initials.style.background = googleUserInitialsColor;
-  initials.style.display = 'flex';
-}
-
-function paintAvatarPhoto() {
-  const img      = document.getElementById('sync-avatar-img');
-  const initials = document.getElementById('sync-avatar-initials');
-  if (!img || !initials || !googleUserPhoto) return;
-  img.onerror = paintAvatarInitials;  // 404, expired link, blocked — same badge
-  img.src = googleUserPhoto;
-  img.style.display = 'block';
-  initials.style.display = 'none';
-}
 
 window.addEventListener('online', () => {
   if (!_avatarPhotoDeferred) return;
   _avatarPhotoDeferred = false;
-  paintAvatarPhoto();
-  scheduleRender();   // the root node wears the same photo
+  scheduleRender();   // the root node wears the photo
 });
 
-function showSignedInAvatar(user) {
+function showSignedInState(user) {
   googleUserEmail = user?.emailAddress || '';
   googleUserName  = user?.displayName  || '';
   googleUserPhoto = sizedAvatarUrl(user?.photoLink || '');
@@ -5923,18 +5909,16 @@ function showSignedInAvatar(user) {
   // name, and the node's width follows its label — so redraw, don't patch text.
   scheduleRender();
 
-  const btn       = document.getElementById('sync-btn');
-  const avatarBtn = document.getElementById('sync-avatar-btn');
-  const img       = document.getElementById('sync-avatar-img');
-  const initials  = document.getElementById('sync-avatar-initials');
-  const emailEl   = document.getElementById('sync-dropdown-email');
+  const btn      = document.getElementById('sync-btn');
+  const stateBtn = document.getElementById('sync-state-btn');
+  const emailEl  = document.getElementById('sync-dropdown-email');
 
   if (btn) btn.style.display = 'none';
 
   // The profile photo is the one image the app loads from the network, and it
-  // is decoration — the initials badge says exactly as much. Offline, skip the
-  // request entirely rather than spending it on a load that can only fail into
-  // the same badge a moment later.
+  // is decoration — the root node's initials disc says exactly as much. Offline,
+  // skip the request entirely rather than spending it on a load that can only
+  // fail into those initials a moment later.
   //
   // Caching the photo as a data: URL was the obvious alternative and is the
   // wrong trade: reading the bytes needs fetch(), which would mean adding
@@ -5944,27 +5928,21 @@ function showSignedInAvatar(user) {
   // The service worker does keep a copy, which needs no such widening — its own
   // fetches are not governed by this document's CSP. So where a worker is in
   // control the request is worth making even offline: it may well be answered
-  // from Cache Storage, and if it is not, it fails into the same badge as before.
-  if (canShowAvatarPhoto()) {
-    _avatarPhotoDeferred = false;
-    paintAvatarPhoto();
-  } else {
-    _avatarPhotoDeferred = !!googleUserPhoto;
-    paintAvatarInitials();
-  }
+  // from Cache Storage, and if it is not, it fails into the same initials disc.
+  _avatarPhotoDeferred = canShowAvatarPhoto() ? false : !!googleUserPhoto;
 
   if (emailEl) emailEl.textContent = googleUserEmail;
-  if (avatarBtn) avatarBtn.style.display = 'flex';
+  if (stateBtn) stateBtn.style.display = 'flex';
   updateDropdownSyncTime();
 }
 
 function showSignedOutButton(labelKey = 'sync.btnLabel') {
   const btn       = document.getElementById('sync-btn');
-  const avatarBtn = document.getElementById('sync-avatar-btn');
+  const stateBtn  = document.getElementById('sync-state-btn');
   const dropdown  = document.getElementById('sync-dropdown');
 
   if (dropdown) dropdown.classList.remove('visible');
-  if (avatarBtn) avatarBtn.style.display = 'none';
+  if (stateBtn) stateBtn.style.display = 'none';
   document.documentElement.classList.remove('zw-has-session');
   if (btn) { btn.style.display = ''; }
   lastSignedOutLabelKey = labelKey;
@@ -6069,7 +6047,7 @@ async function attemptSilentRestore() {
   if (!stored?.hasSession) return;
   // Show avatar immediately with cached user info — no visible flash on reload
   if (stored.email) {
-    showSignedInAvatar({
+    showSignedInState({
       emailAddress: stored.email,
       displayName:  stored.displayName  || '',
       photoLink:    stored.photoLink    || '',
@@ -6379,17 +6357,11 @@ function setSyncStatus(status, messageKey) {
   if (status === 'error' && syncStatus === 'disconnected') return;
   syncStatus = status;
   lastSyncMessageKey = messageKey || null;
-  const dot = document.getElementById('sync-badge');
-  if (!dot) return;
-  dot.dataset.status = status;
-  const defaults = {
-    disconnected: 'sync.badge.disconnected',
-    connected:    'sync.badge.connected',
-    syncing:      'sync.badge.syncing',
-    error:        'sync.badge.error',
-  };
-  const key = messageKey || defaults[status];
-  dot.title = key ? t(key) : '';
+  const stateBtn = document.getElementById('sync-state-btn');
+  if (!stateBtn) return;
+  stateBtn.dataset.status = status;   // CSS swaps the cloud glyph off this
+  const key = messageKey || SYNC_STATE_TITLE_KEYS[status];
+  stateBtn.title = key ? t(key) : '';
 }
 
 // ─── TASK-08: First-sync session bootstrap ────────────────────────────────────
@@ -6404,7 +6376,7 @@ async function startDriveSession() {
       params: { fields: 'user(displayName,emailAddress,photoLink)' },
     });
     const user = aboutResp.result?.user;
-    showSignedInAvatar(user);
+    showSignedInState(user);
     // Cache user info so avatar renders instantly on next page load
     const storedAuth = getStoredAuth();
     if (storedAuth) {
@@ -7946,7 +7918,7 @@ const TRANSLATIONS = {
     'error.quotaExceeded':        'Storage quota exceeded — changes might not be saved',
     'sync.btnLabel':              'Sign in',
     'sync.btnTitle':              'Sign in with Google to sync across devices. Your data is stored only in your own Google Drive — Zenit Week never sees or stores it.',
-    'sync.avatarAria':            'Sync options',
+    'sync.stateAria':             'Sync options',
     'sync.lastSyncLabel':         'Last sync',
     'sync.signOut':               'Sign out of Google Drive',
     'sync.signOutConfirm.title':      'Sign out of Google Drive?',
@@ -8195,7 +8167,7 @@ const TRANSLATIONS = {
     'error.quotaExceeded':        'Úložná kvóta byla překročena — změny nemusí být uloženy',
     'sync.btnLabel':              'Přihlásit se',
     'sync.btnTitle':              'Přihlaste se přes Google a synchronizujte data mezi zařízeními. Data se ukládají pouze na vašem Disku Google — Zenit Week k nim nemá přístup.',
-    'sync.avatarAria':            'Možnosti synchronizace',
+    'sync.stateAria':             'Možnosti synchronizace',
     'sync.lastSyncLabel':         'Aktualizace',
     'sync.signOut':               'Odhlásit se z Disku Google',
     'sync.signOutConfirm.title':      'Odhlásit se z Disku Google?',
@@ -16694,13 +16666,13 @@ window.addEventListener('hashchange', async () => {
 // ─── Google Drive Sync Button (signed-out state only) ────────────────────────
 document.getElementById('sync-btn').addEventListener('click', () => { startSignIn(); });
 
-// ─── Avatar button + sync dropdown ───────────────────────────────────────────
+// ─── Sync state button + sync dropdown ───────────────────────────────────────
 (function () {
-  const avatarBtn  = document.getElementById('sync-avatar-btn');
+  const stateBtn   = document.getElementById('sync-state-btn');
   const dropdown   = document.getElementById('sync-dropdown');
   const signoutBtn = document.getElementById('sync-dropdown-signout');
 
-  avatarBtn.addEventListener('click', (e) => {
+  stateBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     dropdown.classList.toggle('visible');
     if (dropdown.classList.contains('visible')) updateDropdownSyncTime();
