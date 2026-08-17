@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-AsdZ/9freir5UvMEmlYncJa1xIjGLJ18tE24fBcWVms='
+               'sha256-I1eX1qUiFepj3nMUP8DVJqCLxLujxLseOaOrsnTcyy4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -233,6 +233,14 @@
        the blur. --panel-gap is the desktop breathing room below the card. */
     --toolbar-h: 56px;
     --panel-gap: 5px;
+    /* Rungs of the bottom stack, above the 12px-offset 42px-tall bottom bar.
+       Each level clears the one below it plus an 8px gap: L1 is directly above
+       the bar, L2 also clears the disclosed view-level row, L3 also clears the
+       day-filter chip. Named once because three elements share the ladder and
+       four independent magic numbers is where the overlaps come from. */
+    --stack-l1: 62px;
+    --stack-l2: 118px;
+    --stack-l3: 174px;
   }
 
   [data-theme="dark"] {
@@ -565,7 +573,7 @@
   #view-level-bar {
     position: fixed;
     left: 50%;
-    bottom: 62px; /* 12px bar offset + 42px bar height + 8px gap */
+    bottom: var(--stack-l1);
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -589,8 +597,13 @@
     transform: translateX(-50%) translateY(0);
     pointer-events: auto;
   }
-  /* Clear the open row instead of landing behind it. */
-  html.view-levels-open #view-level-toast { bottom: 118px; }
+  /* Clear the open row instead of landing behind it. A visible day-filter chip
+     takes the rung the toast would otherwise land on, so the toast climbs one
+     further — and one further again when the row is open as well. Equal
+     specificity between the first two rules; source order settles it. */
+  html.view-levels-open #view-level-toast { bottom: var(--stack-l2); }
+  body:has(#day-filter-chip.visible) #view-level-toast { bottom: var(--stack-l2); }
+  html.view-levels-open body:has(#day-filter-chip.visible) #view-level-toast { bottom: var(--stack-l3); }
 
   /* Touch: thumb-sized cells. */
   @media (pointer: coarse) {
@@ -688,10 +701,80 @@
     text-transform: none;
   }
 
-  #day-filter-chip {
+  /* ─── Week bar ───────────────────────────────────────────────────────────── */
+  /* Absolute inside #canvas-container rather than fixed to the body, so the
+     agenda panel covers it exactly the way it covers the mindmap it belongs to.
+     Styled as a peer of the other button bars (#undo-redo-bar, #view-toggle-bar)
+     because that is what it is; its buttons reuse .undo-redo-btn unchanged. */
+  #week-bar {
     position: absolute;
     /* Clears the 56px toolbar, which overlays the canvas from the top. */
     top: 68px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    max-width: calc(100vw - 24px);
+    box-sizing: border-box;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px var(--shadow-md);
+    padding: 3px;
+    z-index: 20;
+    user-select: none;
+  }
+
+  #week-bar-label {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    height: 36px;
+    padding: 0 10px;
+    border: none;
+    background: none;
+    border-radius: 5px;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+  }
+  #week-bar-label:hover { background: var(--bg-hover); }
+  #week-bar-range { font-weight: 500; color: var(--text-subtle); }
+
+  /* The caret glyphs carry generous padding inside their 24-unit viewBox, so at
+     the inherited 16px they read as a third the size of the label beside them.
+     .icon is 1em, so the button's own font-size is the dial. */
+  #week-bar-prev, #week-bar-next { font-size: 22px; }
+
+  /* Away from the present, the label and the arrow that leads back to it share
+     one accent, so "this is not the current week" reads as a single cue rather
+     than two unrelated highlights. */
+  #week-bar.off-current #week-bar-label { color: var(--accent-warning-text); }
+  .undo-redo-btn.today-direction {
+    color: var(--accent-warning-text);
+    background: var(--accent-warning-bg);
+  }
+
+  /* Phones: the date range gives way first. The week number carries navigation,
+     and the full wording stays in the label's title and aria-label. */
+  @media (max-width: 360px) {
+    #week-bar-range { display: none; }
+  }
+
+  /* Docked at the bottom, beside the day-filter cell that spawns it, rather than
+     at the top where the week bar now lives. Rises to clear the view-level row
+     when that row is disclosed. */
+  #day-filter-chip {
+    position: absolute;
+    bottom: var(--stack-l1);
     left: 50%;
     transform: translateX(-50%);
     display: none;
@@ -713,8 +796,12 @@
     box-shadow: 0 2px 8px var(--shadow-md);
     z-index: 20;
     user-select: none;
+    /* Matches the view-level row's own fade, so the chip rides up and down with
+       the row instead of snapping a rung ahead of it. */
+    transition: bottom 0.15s ease;
   }
   #day-filter-chip.visible { display: flex; }
+  html.view-levels-open #day-filter-chip { bottom: var(--stack-l2); }
 
   /* If anything has to give, it is the day name — clipped with an ellipsis
      rather than pushing the clear button off screen. */
@@ -3365,6 +3452,7 @@
   <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
   <symbol id="icon-chart-donut" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></symbol>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
+  <symbol id="icon-dots" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
   <symbol id="icon-calendar-week" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M7 14h.013"/><path d="M10.01 14h.005"/><path d="M13.01 14h.005"/><path d="M16.015 14h.005"/><path d="M13.015 17h.005"/><path d="M7.01 17h.005"/><path d="M10.01 17h.005"/></symbol>
   <symbol id="icon-transfer" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 10h-16l5.5 -6"/><path d="M4 14h16l-5.5 6"/></symbol>
   <symbol id="icon-upload" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 9l5 -5l5 5"/><path d="M12 4l0 12"/></symbol>
@@ -3524,6 +3612,31 @@
         </div>
         <span data-i18n="view.rocks">Rocks</span>
       </div>
+    </div>
+    <!-- Week navigation. Global chrome, so it lives in the DOM instead of inside
+         the pannable SVG root node, where reaching it meant zooming to the
+         center of the map. Titles are set in updateWeekBar (they name the
+         target week), so only the aria labels are declared here. -->
+    <div id="week-bar">
+      <button type="button" class="undo-redo-btn" id="week-bar-prev"
+              data-i18n-aria="nav.prev" aria-label="Previous">
+        <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-up"/></svg>
+      </button>
+      <!-- aria-label is a placeholder for the empty-until-rendered spans;
+           updateWeekBar replaces it with the full week wording. -->
+      <button type="button" id="week-bar-label" aria-label="Week">
+        <span id="week-bar-week"></span>
+        <span id="week-bar-range"></span>
+      </button>
+      <button type="button" class="undo-redo-btn" id="week-bar-actions"
+              data-i18n-title="weekbar.actions" title="Week actions"
+              data-i18n-aria="weekbar.actions" aria-label="Week actions" aria-haspopup="true">
+        <svg class="icon" aria-hidden="true"><use href="#icon-dots"/></svg>
+      </button>
+      <button type="button" class="undo-redo-btn" id="week-bar-next"
+              data-i18n-aria="nav.next" aria-label="Next">
+        <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-down"/></svg>
+      </button>
     </div>
     <div id="day-filter-chip">
       <span id="day-filter-chip-label" data-i18n="filter.showing">Showing</span>
@@ -7585,6 +7698,8 @@ const TRANSLATIONS = {
     'week.word':                  'Week',
     'week.short':                 'W',
     'center.you':                 'You',
+    'weekbar.today':              'Jump to current week',
+    'weekbar.actions':            'Week actions',
     'settings.appearance':        'Theme',
     'settings.light':             'Light',
     'settings.dark':              'Dark',
@@ -7833,6 +7948,8 @@ const TRANSLATIONS = {
     'week.word':                  'Týden',
     'week.short':                 'T',
     'center.you':                 'Ty',
+    'weekbar.today':              'Přejít na aktuální týden',
+    'weekbar.actions':            'Akce týdne',
     'settings.appearance':        'Téma',
     'settings.light':             'Světlý',
     'settings.dark':              'Tmavý',
@@ -8094,6 +8211,7 @@ function applyTranslations() {
   });
   refreshSyncUiText();
   refreshDayFilterUI(); // day names in the rail and chip are language-dependent
+  updateWeekBar();      // as is every string in the week bar
   const sel = document.getElementById('lang-select');
   if (sel) sel.value = currentLang;
   // Show only the day-indicator rows matching the current language
@@ -16238,6 +16356,60 @@ function refreshDayFilterUI() {
   chip.classList.add('visible');
 }
 
+// ─── Week bar ─────────────────────────────────────────────────────────────────
+// Single refresh for the whole bar. Called from the two places currentWeekKey
+// changes (loadAndRender and the hashchange handler) and from applyTranslations,
+// since every string here is language-dependent.
+function updateWeekBar() {
+  const bar = document.getElementById('week-bar');
+  if (!bar || !currentWeekKey) return;   // pre-init: no week to describe yet
+
+  const { year, week } = parseWeekKey(currentWeekKey);
+  const { weekPart, rangePart } = formatWeekParts(year, week);
+  document.getElementById('week-bar-week').textContent  = weekPart;
+  document.getElementById('week-bar-range').textContent = `(${rangePart})`;
+
+  const twk = todayWeekKey();
+  const onCurrentWeek = currentWeekKey === twk;
+  bar.classList.toggle('off-current', !onCurrentWeek);
+
+  // Accent whichever arrow leads back to the present — neither, when this is it.
+  document.getElementById('week-bar-prev').classList.toggle('today-direction', currentWeekKey > twk);
+  document.getElementById('week-bar-next').classList.toggle('today-direction', currentWeekKey < twk);
+
+  // Each arrow names the week it lands on, the way the old root-node bricks did.
+  [['week-bar-prev', 'nav.prev', -1], ['week-bar-next', 'nav.next', +1]].forEach(([id, key, delta]) => {
+    const { week: targetWeek } = parseWeekKey(offsetWeek(currentWeekKey, delta));
+    document.getElementById(id).title = `${t(key)} · ${t('week.short')}${targetWeek}`;
+  });
+
+  // The visible label drops its date range on narrow viewports, so the full
+  // wording lives on the button itself — for tooltips and for screen readers.
+  const label = document.getElementById('week-bar-label');
+  const full = `${weekPart} (${rangePart})`;
+  const text = onCurrentWeek ? full : `${full} — ${t('weekbar.today')}`;
+  label.title = text;
+  label.setAttribute('aria-label', text);
+}
+
+(function wireWeekBar() {
+  const step = (delta) => loadAndRender(offsetWeek(currentWeekKey, delta));
+  document.getElementById('week-bar-prev').addEventListener('click', () => step(-1));
+  document.getElementById('week-bar-next').addEventListener('click', () => step(+1));
+
+  document.getElementById('week-bar-label').addEventListener('click', () => {
+    const twk = todayWeekKey();
+    if (twk !== currentWeekKey) loadAndRender(twk);
+  });
+
+  const actions = document.getElementById('week-bar-actions');
+  actions.addEventListener('click', (e) => {
+    e.stopPropagation();   // the document-level dismissal would close it again
+    const r = actions.getBoundingClientRect();
+    showContextMenu(r.left, r.bottom + 4, 'center');
+  });
+})();
+
 // Slide each surviving node from its previous position to the freshly rendered
 // one and move its connecting edges in lockstep. Edges are static bezier paths,
 // so a transform tween can't bend them — instead we re-derive each path's two
@@ -16353,6 +16525,9 @@ document.addEventListener('pointerdown', (e) => {
 });
 
 // The chip floats over the canvas, so swallow pointerdown or clicking it starts a pan.
+// Both float over the canvas as container descendants, so their pointerdowns
+// would otherwise bubble to the pan handler and drag the map behind them.
+document.getElementById('week-bar').addEventListener('pointerdown', e => e.stopPropagation());
 document.getElementById('day-filter-chip').addEventListener('pointerdown', e => e.stopPropagation());
 document.getElementById('day-filter-chip-clear').addEventListener('click', () => setDayFilter(null));
 
@@ -16420,6 +16595,7 @@ async function loadAndRender(wk) {
   } else {
     location.hash = wk;
   }
+  updateWeekBar();
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
   if (googleAccessToken) {
@@ -16448,6 +16624,7 @@ window.addEventListener('hashchange', async () => {
     // cache keeps the previous week's "next week" data, and any later undo/redo
     // snapshot would write that stale blob into the wrong next-week record.
     await refreshNextWeekCache();
+    updateWeekBar();
     renderIfVisible();
     if (currentView === 'agenda') renderAgenda();
     if (googleAccessToken) startDrivePoll(currentWeekKey);

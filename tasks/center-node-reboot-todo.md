@@ -28,17 +28,39 @@ after S1. Check off only when AC + verification pass.
   `syncColorsFromDrive` → `applyBranchColor` → `render()` path already covers sign-in,
   and whether sign-out re-renders at all.
 
-## S2a — `#week-bar`
-- [ ] T2.1 — Markup inside `#canvas-container`: `‹` · label button · `⋯` · `›`,
-      with `data-i18n-title` / `data-i18n-aria` on every control.
-- [ ] T2.2 — CSS at `top:68px`, styled as a peer of `#day-filter-chip`; date range
-      hidden below 360px.
-- [ ] T2.3 — i18n EN+CS: `weekbar.today`, `weekbar.actions` (reuse `nav.prev`/`nav.next`).
-- [ ] T2.4 — Arrows → `loadAndRender(offsetWeek(currentWeekKey, ±1))`, today-direction accent.
-- [ ] T2.5 — Label button → `loadAndRender(todayWeekKey())`; accent tint while off-current.
-- [ ] T2.6 — `⋯` → `showContextMenu()` for `center`, anchored to its own rect.
-- [ ] T2.7 — `updateWeekBar()` called from `loadAndRender`, `hashchange` and `applyTranslations()`.
-- [ ] T2.8 — `npm test` + `npm run validate` green.
+## S2a — `#week-bar` ✅
+- [x] T2.1 — Markup inside `#canvas-container`: `‹` · label · `⋯` · `›`. New `icon-dots`
+      symbol; buttons reuse `.undo-redo-btn` unchanged.
+- [x] T2.2 — CSS at `top:68px`, styled as a peer of the other button bars; date range
+      hidden at ≤360px.
+- [x] T2.3 — i18n EN+CS: `weekbar.today`, `weekbar.actions`; `nav.prev`/`nav.next` reused.
+- [x] T2.4 — Arrows → `loadAndRender(offsetWeek(±1))`; `today-direction` accent on the
+      arrow leading back to the present.
+- [x] T2.5 — Label → `loadAndRender(todayWeekKey())`; `off-current` accent tint.
+- [x] T2.6 — `⋯` → `showContextMenu('center')` anchored to its own rect.
+- [x] T2.7 — `updateWeekBar()` from `loadAndRender`, `hashchange`, `applyTranslations()`.
+- [x] T2.8 — `npm test` 838 passed, `npm run validate` clean.
+
+### S2a verified in a real browser (headless Playwright, measured not eyeballed)
+| Check | Result |
+|---|---|
+| Fit at 1280 / 390 / 360 / 320, EN + CS | fits at every width; 305→191px as the range drops |
+| Range hidden ≤360, full wording kept in aria | `aria="Week 34 (Aug 17 - Aug 23)"` at 320px |
+| Arrow titles name the target week | `Previous · W33` / `Předchozí · T33` |
+| Accents | on current week: none; +1 week: prev lit; −1: next lit |
+| `⋯` menu | opens below the bar, `ctx-current-week` shown when off-current |
+| Label → today | returns to W34 and clears the URL hash |
+| Drag on the bar | map does not pan |
+| Agenda view | mobile: canvas hidden with the bar; desktop: behind the panel, `elementFromPoint` hits the panel |
+
+### S2a additions beyond the plan
+- `#week-bar` swallows its own `pointerdown`, matching `#day-filter-chip` and
+  `#view-level-bar`. A guard inside the pan handler would also have kept
+  document-level dismissals alive, but two mechanisms for one problem is worse than
+  the precedent's small cost.
+- Arrow buttons get `font-size: 22px` — `.icon` is `1em`, and the caret glyphs carry
+  so much padding inside their viewBox that the inherited 16px read as decoration.
+- `icon-dots` symbol added (three circles, Tabler style) for the `⋯` trigger.
 
 ## S2b — Strip center chrome
 - [ ] T2.9 — Delete the two `week-nav-btn` brick groups from `makeNodeGroup`'s `isCenter` branch.
@@ -58,14 +80,24 @@ after S1. Check off only when AC + verification pass.
 - [ ] T3.5 — Test: arc length for a known week fixture; manual `D`-toggle vs Stats donut.
 - [ ] T3.6 — `npm test` green.
 
-## S4 — Day-filter chip to the bottom stack *(independent after S1)*
-- [ ] T4.1 — Add `--stack-l1: 62px` / `--stack-l2: 118px`.
-- [ ] T4.2 — Chip → `l1`, and `l2` under `html.view-levels-open`.
-- [ ] T4.3 — Retarget `#view-level-toast`'s two offsets at the same vars.
-- [ ] T4.4 — Toast steps up over a visible chip via `body:has(#day-filter-chip.visible)`.
-- [ ] T4.5 — Verify all four state combinations at 320px and desktop.
-- [ ] T4.6 — `npm test` + `npm run validate` green.
-- [ ] **C3 checkpoint** — full manual pass: both languages, both themes, phone + desktop.
+## S4 — Day-filter chip to the bottom stack ✅ *(pulled forward, see note)*
+- [x] T4.1 — Added `--stack-l1: 62px` / `--stack-l2: 118px` / **`--stack-l3: 174px`**.
+- [x] T4.2 — Chip → `l1`, and `l2` under `html.view-levels-open`, with a
+      `transition: bottom` matching the row's own fade.
+- [x] T4.3 — `#view-level-bar` and `#view-level-toast` retargeted at the same vars.
+- [x] T4.4 — Toast steps to `l2` over a visible chip, `l3` when the row is open too.
+- [x] T4.5 — Measured at 390: bottom bar 744 → row 692..738 → chip 650..682 →
+      toast 592..626. Zero overlaps across all four state combinations, EN + CS.
+- [x] T4.6 — `npm test` 838 passed, `npm run validate` clean.
+
+### Why S4 moved up, and the extra rung
+- **Pulled forward into S2a's commit.** The plan called S4 independent, but both
+  elements want `top:68px`: leaving the chip there for a slice would have shipped a
+  commit where an active day filter overlaps the new bar. They land together.
+- **`--stack-l3` was missing from the plan.** The toast is not view-level-only —
+  `showToast` also serves multi-tab updates, quota errors and "moved to next week", so
+  it can appear with the row closed. Chip visible + row open needs a third rung, or the
+  toast lands on the chip. Two rungs were not enough.
 
 ## S5 — Assets
 - [ ] T5.1 — `scripts/og-image.mjs`: drop the dead `.gear-btn, .week-nav-btn` selectors,
