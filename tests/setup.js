@@ -411,6 +411,11 @@ _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
 _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
+// Signed-in identity for the root node's derived name. Both '' = signed out.
+_state.setGoogleUser = function(displayName, email) {
+  googleUserName  = displayName || '';
+  googleUserEmail = email || '';
+};
 _state.resetSyncState = function() {
   googleAccessToken = null;
   _driveSessionStarted = false;
@@ -638,6 +643,12 @@ export const {
   getThemeColors,
   deriveBranchPalette,
   t,
+  // Center node + week bar
+  firstNameFrom,
+  centerDisplayName,
+  formatWeekParts,
+  formatWeekLabel,
+  roundedRectPathD,
   // Storage
   fnv1a32,
   weekContentHash,

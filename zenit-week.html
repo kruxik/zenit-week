@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-Itfkf4m27kV2HjZtHac2YL5QBmBq8LFSb5BYX7WlasI='
+               'sha256-AsdZ/9freir5UvMEmlYncJa1xIjGLJ18tE24fBcWVms='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5534,7 +5534,7 @@ function getNodeSize(nodeId) {
 }
 
 function _computeNodeSize(nodeId) {
-  const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey))) } : findNode(nodeId);
+  const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey)), true) } : findNode(nodeId);
   if (!node) return { w: 0, h: 0 };
 
   const type = node.type || 'activity';
@@ -5662,6 +5662,7 @@ let _changesPageToken = null;   // Drive Changes API cursor (null = needs re-bas
 function _useChangeFeed() { return localStorage.getItem('zenit-week-sync-changes-feed') === '1'; }
 let pendingRemoteMerge = null;  // { wKey, mergedData, mergedJson, mergedHash, scheduleUpload }
 let googleUserEmail = '';
+let googleUserName = '';
 let googleUserPhoto = '';
 let googleUserInitials = '';
 let googleUserInitialsColor = '';
@@ -5679,6 +5680,30 @@ function getInitials(name) {
   return parts.length >= 2
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     : name.slice(0, 2).toUpperCase();
+}
+
+// Longest name the root node shows. A first name past this is pathological
+// (a pasted display name, not a name), so it is cut with an ellipsis rather
+// than silently — a hard cut would read as a real, odd-looking name.
+const MAX_CENTER_NAME_LEN = 16;
+
+// First name for the root node, derived — never stored. Google's displayName
+// first, its email local-part as the fallback for accounts that have no
+// display name, and '' when neither is available (the caller supplies the
+// signed-out wording). Deliberately does not capitalize the local-part: a
+// handle is shown as the handle it is rather than dressed up as a name.
+function firstNameFrom(displayName, email) {
+  const token = String(displayName || '').trim().split(/\s+/)[0] || '';
+  const local = String(email || '').split('@')[0] || '';
+  const name = token || local;
+  if (!name) return '';
+  return name.length > MAX_CENTER_NAME_LEN
+    ? name.slice(0, MAX_CENTER_NAME_LEN - 1) + '…'
+    : name;
+}
+
+function centerDisplayName() {
+  return firstNameFrom(googleUserName, googleUserEmail) || t('center.you');
 }
 
 function formatSyncTime(ts) {
@@ -5745,6 +5770,7 @@ window.addEventListener('online', () => {
 
 function showSignedInAvatar(user) {
   googleUserEmail = user?.emailAddress || '';
+  googleUserName  = user?.displayName  || '';
   googleUserPhoto = user?.photoLink   || '';
   googleUserInitials = getInitials(user?.displayName || googleUserEmail || '?');
   googleUserInitialsColor = hashColor(googleUserEmail || googleUserInitials);
@@ -5799,6 +5825,7 @@ function showSignedOutButton(labelKey = 'sync.btnLabel') {
   if (labelEl) labelEl.textContent = t(labelKey);
 
   googleUserEmail = '';
+  googleUserName = '';
   googleUserPhoto = '';
   googleUserInitials = '';
   googleUserInitialsColor = '';
@@ -7557,6 +7584,7 @@ const TRANSLATIONS = {
     'quick_add.title':            'Quick add',
     'week.word':                  'Week',
     'week.short':                 'W',
+    'center.you':                 'You',
     'settings.appearance':        'Theme',
     'settings.light':             'Light',
     'settings.dark':              'Dark',
@@ -7804,6 +7832,7 @@ const TRANSLATIONS = {
     'quick_add.title':            'Rychlé přidání',
     'week.word':                  'Týden',
     'week.short':                 'T',
+    'center.you':                 'Ty',
     'settings.appearance':        'Téma',
     'settings.light':             'Světlý',
     'settings.dark':              'Tmavý',
@@ -8084,21 +8113,33 @@ function setLanguage(lang) {
   saveBranchColors(); // propagate lang change to Drive via colors file
 }
 
-function formatWeekLabel(year, week) {
+// The week's name and its date range, kept apart so the week bar can render
+// them as two elements and drop the range on narrow viewports without
+// re-deriving the wording. Callers that want one string use formatWeekLabel.
+function formatWeekParts(year, week) {
   const { monday, sunday } = getWeekBounds(year, week);
+  const weekPart = `${t('week.word')} ${week}`;
   if (currentLang === 'cs') {
     const months = MONTH_NAMES.cs;
     const d1 = monday.getUTCDate(), m1 = months[monday.getUTCMonth()];
     const d2 = sunday.getUTCDate(), m2 = months[sunday.getUTCMonth()];
-    const range = (m1 === m2)
+    const rangePart = (m1 === m2)
       ? `${d1}. - ${d2}. ${m1}`
       : `${d1}. ${m1} - ${d2}. ${m2}`;
-    return `${t('week.word')} ${week}\n(${range})`;
+    return { weekPart, rangePart };
   }
   const months = MONTH_NAMES.en;
   const mStart = `${months[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
   const mEnd   = `${months[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
-  return `${t('week.word')} ${week}\n(${mStart} - ${mEnd})`;
+  return { weekPart, rangePart: `${mStart} - ${mEnd}` };
+}
+
+// One line by default. `multiline` is the transitional form for the SVG root
+// node, which still carries the week label until the week bar takes it over;
+// drop the flag together with those call sites.
+function formatWeekLabel(year, week, multiline = false) {
+  const { weekPart, rangePart } = formatWeekParts(year, week);
+  return `${weekPart}${multiline ? '\n' : ' '}(${rangePart})`;
 }
 
 function parseWeekKey(key) {
@@ -10151,6 +10192,31 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   g.setAttribute('transform', `translate(${x},${y})`);
   return g;
+}
+
+// Outline of a rounded rect centered on the origin, as a path that starts at
+// top-center and runs clockwise — so a stroke-dasharray built from `perimeter`
+// fills the way a progress ring is read. A <path> rather than pathLength on a
+// <rect>: the analytic perimeter is exact and needs no layout-dependent
+// getTotalLength() call, and it does not depend on SVG2 pathLength support.
+function roundedRectPathD(w, h, rx) {
+  const r = Math.max(0, Math.min(rx, w / 2, h / 2));
+  const halfW = w / 2, halfH = h / 2;
+  const d = [
+    `M 0 ${-halfH}`,
+    `H ${halfW - r}`,
+    `A ${r} ${r} 0 0 1 ${halfW} ${-halfH + r}`,
+    `V ${halfH - r}`,
+    `A ${r} ${r} 0 0 1 ${halfW - r} ${halfH}`,
+    `H ${-halfW + r}`,
+    `A ${r} ${r} 0 0 1 ${-halfW} ${halfH - r}`,
+    `V ${-halfH + r}`,
+    `A ${r} ${r} 0 0 1 ${-halfW + r} ${-halfH}`,
+    'Z',
+  ].join(' ');
+  // Four straight runs plus four quarter-circles, which sum to one full circle.
+  const perimeter = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
+  return { d, perimeter };
 }
 
 function taperedPathD(x1, y1, x2, y2, swStart, swEnd) {
@@ -12655,7 +12721,7 @@ function render() {
 
   // Draw center node
   const { year: y, week: w } = parseWeekKey(currentWeekKey);
-  const centerLabel = formatWeekLabel(y, w);
+  const centerLabel = formatWeekLabel(y, w, true);
   const centerG = makeNodeGroup('center', 0, 0, centerLabel, 'center', null, null, null);
   nodesG.appendChild(centerG);
 

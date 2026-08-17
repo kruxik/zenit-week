@@ -4,16 +4,29 @@ Plan: `tasks/center-node-reboot-plan.md` · Idea: `docs/ideas/center-node-reboot
 Order: **S1 → S2a → S2b → S3 → S5**. S4 (chip) is independent and may land any time
 after S1. Check off only when AC + verification pass.
 
-## S1 — Pure helpers
-- [ ] T1.1 — `centerDisplayName()`: first token of stored Drive `displayName` → email
-      local-part → `t('center.you')`; clamp 16 chars.
-- [ ] T1.2 — i18n EN+CS: `center.you` (`You` / `Ty`).
-- [ ] T1.3 — `roundedRectPathD(w, h, rx)` → `{ d, perimeter }`, origin top-center, clockwise.
-- [ ] T1.4 — `formatWeekLabel()` → single line (drop `\n`); confirm by grep that only
-      `_computeNodeSize` and the center render consume it.
-- [ ] T1.5 — Export all three from `tests/setup.js`; new `tests/center-node.test.js`.
-- [ ] T1.6 — `npm test` + `npm run validate` green.
-- [ ] **C1 checkpoint** — app unchanged except a one-line center label.
+## S1 — Pure helpers ✅
+- [x] T1.1 — `firstNameFrom(displayName, email)` + `centerDisplayName()`: first token of
+      Drive `displayName` → email local-part → `t('center.you')`; clamp 16 chars with `…`.
+      New `googleUserName` module var, set in `showSignedInAvatar`, cleared on sign-out.
+- [x] T1.2 — i18n EN+CS: `center.you` (`You` / `Ty`).
+- [x] T1.3 — `roundedRectPathD(w, h, rx)` → `{ d, perimeter }`, origin top-center, clockwise.
+- [x] T1.4 — `formatWeekParts()` is now the source of truth (S2a needs two spans);
+      `formatWeekLabel()` joins it to one line.
+- [x] T1.5 — Exported from `tests/setup.js` + `_state.setGoogleUser()`;
+      `tests/center-node.test.js` — 21 cases.
+- [x] T1.6 — `npm test` 838 passed, `npm run validate` clean.
+- [x] **C1 checkpoint** — app visually unchanged; `npm run csp` re-run (app-script hash).
+
+### S1 deviations from the plan
+- **AD5 softened.** `formatWeekLabel(year, week, multiline = false)` keeps a transitional
+  `multiline` flag instead of dropping `\n` outright. Dropping it in S1 would have widened
+  the root node to ~426px for one commit and shoved the branches sideways — a real, if
+  temporary, regression. The two center call sites pass `true`; **delete the flag with
+  them in T2.13**.
+- **New fact for S2b:** the root label now depends on sign-in state, so sign-in and
+  sign-out must trigger a re-render for the name to change. Verify whether the existing
+  `syncColorsFromDrive` → `applyBranchColor` → `render()` path already covers sign-in,
+  and whether sign-out re-renders at all.
 
 ## S2a — `#week-bar`
 - [ ] T2.1 — Markup inside `#canvas-container`: `‹` · label button · `⋯` · `›`,
