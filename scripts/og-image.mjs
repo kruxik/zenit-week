@@ -1,6 +1,6 @@
 // Open Graph image generator. For each locale (en, cs) it:
-//   1. Seeds the real Zenit Week app with a minimal week — virtual center
-//      plus four branches (Work/Family/Me/Growth) — and captures the rendered
+//   1. Seeds the real Zenit Week app with a minimal week — the root circle plus
+//      four branches (Work/Family/Me/Growth) — and captures the rendered
 //      mindmap as a transparent-bg PNG.
 //   2. Stitches the mindmap into the og-image.svg layout (brand text on the
 //      left, mindmap on the right).
@@ -143,22 +143,18 @@ async function captureMindmap(variant) {
     { timeout: 10_000 },
   );
 
-  // Replace the virtual center's "Week N / (range)" label with the marketing
-  // line. The renderer creates one <text> per visual line, so drop extras and
-  // recentre the survivor vertically inside the rect.
+  // Relabel the root with the marketing line. Signed out — which a headless
+  // capture always is — the root reads "Me"/"Já", and the seed already has a
+  // branch by that name, so leaving it alone would put the same word twice in
+  // one picture. Its completion ring is left as it renders: the seed has no
+  // activities, so the ring is empty rather than showing invented progress.
   await page.evaluate((centerLabel) => {
     const g = document.querySelector('.node-group[data-id="center"]');
     if (!g) return;
-    // Strip in-app chrome (settings gear, week-nav arrows, +branch buttons)
-    // from the center node — pure noise in a static marketing image.
-    g.querySelectorAll('.gear-btn, .week-nav-btn, .add-btn').forEach(n => n.remove());
-    const texts = g.querySelectorAll('text');
-    if (!texts.length) return;
-    for (let i = 1; i < texts.length; i++) texts[i].remove();
-    const t = texts[0];
-    t.textContent = centerLabel;
-    t.setAttribute('y', '0');
-    t.setAttribute('dominant-baseline', 'middle');
+    // +Branch buttons are in-app chrome — pure noise in a static image.
+    g.querySelectorAll('.add-btn').forEach(n => n.remove());
+    const t = g.querySelector('text');
+    if (t) t.textContent = centerLabel;
   }, variant.centerLabel);
 
   // Fit content to viewport (same UX as clicking the zoom label).
@@ -176,7 +172,7 @@ async function captureMindmap(variant) {
     if (cc) { cc.style.background = 'transparent'; cc.style.backgroundImage = 'none'; }
     const overlays = [
       '#toolbar', '#fab-pill', '#view-level-bar', '#view-level-toast',
-      '#zoom-label', '#help-fab', '#help-panel', '#sync-container',
+      '#week-bar', '#zoom-label', '#help-fab', '#help-panel', '#sync-container',
       '#placeholder-panel', '#agenda-view', '#context-menu',
       '#app-confirm-overlay',
     ];
