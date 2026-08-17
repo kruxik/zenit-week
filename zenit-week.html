@@ -1525,10 +1525,12 @@
      real to blur.
 
      Per-panel knobs (set on the panel element, consumed by the parts):
-       --panel-header-h   height of the floating header slot (default 60px)
+       --panel-header-h   height of the floating header slot (default 48px,
+                          set by the Agenda day-strip — the tallest thing any
+                          header carries; Stats and Help caption bars match it)
      Both .visible and .active open the panel — Agenda uses .active in JS. */
   .app-panel {
-    --panel-header-h: 60px;
+    --panel-header-h: 48px;
     /* The header is absolutely positioned inside the panel's padding box. On
        desktop the panel has a 1px border, so that box already starts 1px down —
        one subtraction here keeps every header flush with the toolbar's edge. */
@@ -2432,11 +2434,9 @@
 
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
   /* Window chrome comes from .app-panel; only the Agenda-specific bits live here:
-     a 48px header slot (the day-strip), the page-coloured mobile view layer, and
-     the mobile `position: absolute` that keeps it inside #app. */
-  #agenda-view {
-    --panel-header-h: 48px;
-  }
+     the page-coloured mobile view layer and the mobile `position: absolute` that
+     keeps it inside #app. The day-strip's 48px is the shared --panel-header-h
+     default, so no override is needed. */
   @media (max-width: 767px) {
     #agenda-view {
       position: absolute;
