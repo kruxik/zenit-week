@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-2g6Bvin+3grGj47/fwdosHdpqSW6vnJWrb869XyrMnc='
+               'sha256-MNroW25mf9S7hw1h3gj3BKJUUrLLz4QUM9bqhh23yO8='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -699,6 +699,11 @@
     display: none;
     align-items: center;
     gap: 6px;
+    /* Never wider than the viewport it is centred in — the last resort behind
+       the compact phone wording below, for oversized system font scales. */
+    max-width: calc(100vw - 24px);
+    box-sizing: border-box;
+    white-space: nowrap;
     background: var(--glass-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -713,8 +718,24 @@
   }
   #day-filter-chip.visible { display: flex; }
 
-  #day-filter-chip strong { color: var(--text-primary); }
+  /* If anything has to give, it is the day name — clipped with an ellipsis
+     rather than pushing the clear button off screen. */
+  #day-filter-chip strong {
+    color: var(--text-primary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   #day-filter-chip-empty { color: var(--text-subtle); }
+  #day-filter-chip-empty-short { display: none; }
+
+  /* Phones: "Showing" is redundant next to a lit filter button, and the empty
+     note drops to its short form, so both EN and CS fit a 320px viewport. */
+  @media (max-width: 767px) {
+    #day-filter-chip-label,
+    #day-filter-chip-empty-full { display: none; }
+    #day-filter-chip-empty-short { display: inline; }
+  }
 
   #day-filter-chip-clear {
     display: flex;
@@ -3655,7 +3676,9 @@
     <div id="day-filter-chip">
       <span id="day-filter-chip-label" data-i18n="filter.showing">Showing</span>
       <strong id="day-filter-chip-day"></strong>
-      <span id="day-filter-chip-empty" data-i18n="filter.emptyDay">— nothing planned</span>
+      <span id="day-filter-chip-empty"><span id="day-filter-chip-empty-full"
+              data-i18n="filter.emptyDay">— nothing planned</span><span id="day-filter-chip-empty-short"
+              data-i18n="filter.emptyDayShort">— empty</span></span>
       <button type="button" id="day-filter-chip-clear" data-i18n-title="menu.clearDayFilter"
               data-i18n-aria="menu.clearDayFilter" title="Clear Day Filter" aria-label="Clear Day Filter">✕</button>
     </div>
@@ -7823,6 +7846,7 @@ const TRANSLATIONS = {
     'filter.off':                 'Filter off',
     'filter.showing':             'Showing',
     'filter.emptyDay':            '— nothing planned',
+    'filter.emptyDayShort':       '— empty',
     'filter.dayShort':            'Day',
     'filter.dayTitle':            'Filter by day — show one day, hide the rest',
     'filter.none':                'None',
@@ -8070,6 +8094,7 @@ const TRANSLATIONS = {
     'filter.off':                 'Filtr vypnut',
     'filter.showing':             'Zobrazeno',
     'filter.emptyDay':            '— nic naplánováno',
+    'filter.emptyDayShort':       '— prázdné',
     'filter.dayShort':            'Den',
     'filter.dayTitle':            'Filtr dne — zobrazí jeden den, zbytek skryje',
     'filter.none':                'Žádný',
