@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-MNroW25mf9S7hw1h3gj3BKJUUrLLz4QUM9bqhh23yO8='
+               'sha256-YIrjsb9d/szOkN1p9kRe83neNPRvU96wAqrmWurxilo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7843,7 +7843,6 @@ const TRANSLATIONS = {
     'blocked.body':               'Zenit Week’s storage is being upgraded in another tab. This tab will be ready in a moment — try refreshing.',
     'multitab.updated':           'Updated from another tab',
     'filter.prefix':              'Filter',
-    'filter.off':                 'Filter off',
     'filter.showing':             'Showing',
     'filter.emptyDay':            '— nothing planned',
     'filter.emptyDayShort':       '— empty',
@@ -8091,7 +8090,6 @@ const TRANSLATIONS = {
     'blocked.body':               'Úložiště Zenit Week se aktualizuje v jiném panelu. Tento panel bude za chvíli připraven — zkuste obnovit stránku.',
     'multitab.updated':           'Aktualizováno z jiného panelu',
     'filter.prefix':              'Filtr',
-    'filter.off':                 'Filtr vypnut',
     'filter.showing':             'Zobrazeno',
     'filter.emptyDay':            '— nic naplánováno',
     'filter.emptyDayShort':       '— prázdné',
@@ -16139,7 +16137,6 @@ function switchViewLevel(level) {
 function setDayFilter(day) {
   if (activeDayFilter === day) return;
   repackWithSlide(() => { activeDayFilter = day; });
-  showToast(day === null ? t('filter.off') : `${t('filter.prefix')}: ${dayFilterName(day)}`);
 }
 
 // ─── Day filter indicators ────────────────────────────────────────────────────
