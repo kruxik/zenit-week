@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-nLOO0nBUCvj8MyW+gfLLHd+x2pUbWmdpFbPOQFRZtjw='
+               'sha256-jwoCzgYAWxtV2Fmb7gUzGlTLC9tGAgGvoXNgSI2AIdE='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5236,13 +5236,19 @@ const DEPTH1_ACTIVITY_STYLE = { fontSize: 17, padX: 18, padY: 13, minW: 105, min
 const CENTER_W = NODE_STYLE.center.minW;
 const CENTER_H = NODE_STYLE.center.minH;
 
-// Root interior, all radii from the 100px circle outward-in: the completion ring
+// Root interior, all radii from the 110px circle outward-in: the completion ring
 // sits inside the node's edge rather than around it, because a ring drawn outside
 // would have its leftmost and rightmost points exactly where the branch edges
 // meet the root — every edge would cross it. The avatar then clears the ring.
-const CENTER_RING_R  = 112.5;
+//
+// The two dark bands the ring floats in — node edge to ring, and ring to avatar —
+// are gaps, not strokes: nothing draws them, they are what is left of the node's
+// fill. So they are set by these three radii, and both come to 2.5. Any wider and
+// they read as borders framing the picture rather than as the ring's own breathing
+// room. Ring outer edge 122.5, inner edge 112.5, against a node edge at 125.
+const CENTER_RING_R  = 117.5;
 const CENTER_RING_SW = 10;
-const CENTER_AVATAR_R = 100;
+const CENTER_AVATAR_R = 110;
 
 // Initials fill the avatar disc, so they are sized off it rather than off the
 // node's label font — that one only ever paints the signed-out wording, which
@@ -5807,10 +5813,10 @@ function centerDisplayName() {
 
 // Drive's `about.user.photoLink` comes back at a fixed, tiny size (`=s64`), and
 // for an account with no uploaded picture that URL is a server-drawn monogram
-// bitmap — not an absence of a photo. The root circle paints it 200 units wide,
+// bitmap — not an absence of a photo. The root circle paints it 220 units wide,
 // so the letter arrives upscaled ~3x and looks blurred next to the rest of the
 // SVG. Google honours any `=sN` on these URLs, so ask for one that survives the
-// biggest place we show it: 2× the painted size, which holds up on a hidpi
+// biggest place we show it: ~2× the painted size, which holds up on a hidpi
 // screen and through the upper half of the zoom range. Idempotent, so re-sizing
 // an already-sized link (an auth blob cached before this existed, say) is
 // harmless.
