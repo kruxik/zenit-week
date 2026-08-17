@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-6PZeiJl7uDSfSZXwaBjrMEZya6jCvduOQ3jAmGym8YU='
+               'sha256-Itfkf4m27kV2HjZtHac2YL5QBmBq8LFSb5BYX7WlasI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5143,9 +5143,17 @@ function getThemeColors() {
 }
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
+const isMobile = navigator.maxTouchPoints > 0;
+
 const MIN_HORIZONTAL_GAP = 200; // Level 2 gap (branch → direct children); Level 3+ = 134
 const DY = 44;  // Vertical spacing between siblings
 const BRANCH_GAP = 300; // Vertical gap between main branches
+// Mobile viewports are far taller than they are wide, so vertical room is the
+// cheap axis — spread siblings out to make tap targets easier to hit. Scales
+// the whole vertical slot a node occupies (its height plus the sibling gap):
+// scaling the 12px gap alone moves a leaf by 3px, which reads as no change at
+// all. Horizontal spacing is untouched on both platforms.
+const V_SPACING_SCALE = isMobile ? 1.25 : 1;
 
 // Hard cap on N in "Nx" magic counters — anything above clamps silently.
 const MAX_TICK_COUNT = 100;
@@ -9489,7 +9497,8 @@ function computeLayout() {
   _clearNodeMetricsCaches();
   const positions = {};
   const heights = {};
-  const VERTICAL_GAP = 12; // Vertical gap between siblings
+  const VERTICAL_GAP = 12; // Base gap between siblings (also used for horizontal offsets)
+  const V_GAP = VERTICAL_GAP * V_SPACING_SCALE; // Vertical-only gap — wider on mobile
   const nodeZigZagMetrics = {};
 
   function getZigZagMetrics(nodeId) {
@@ -9524,7 +9533,9 @@ function computeLayout() {
     });
 
     const maxChildScale = zigKids.reduce((m, cid) => Math.max(m, getPriorityScale(cid)), 1);
-    const standardH = maxH + VERTICAL_GAP * maxChildScale; // Tallest zig-child + gap (scaled by highest-priority zig-child)
+    // Tallest zig-child + gap (scaled by highest-priority zig-child), then the
+    // whole slot widened on mobile.
+    const standardH = (maxH + VERTICAL_GAP * maxChildScale) * V_SPACING_SCALE;
     const vStep = standardH / 2;
     const metrics = {
       maxW1,
@@ -9596,7 +9607,7 @@ function computeLayout() {
     // One shared column width aligns every inner edge — sizing each node by its
     // own width is what turns the current column into a staircase.
     const colW = maxW + VERTICAL_GAP * 2;
-    const rowH = maxH + VERTICAL_GAP * 2;
+    const rowH = (maxH + VERTICAL_GAP * 2) * V_SPACING_SCALE;
     return nodeInboxGridMetrics[nodeId] = {
       ids: gridKids,
       set: new Set(gridKids),
@@ -9616,7 +9627,9 @@ function computeLayout() {
       return 0;
     }
     const { h: nodeH } = getNodeSize(nodeId);
-    const selfH = nodeH + VERTICAL_GAP * getPriorityScale(nodeId);
+    // The slot a node reserves in its parent's column — box plus gap, the whole
+    // thing stretched on mobile so leaves land further apart.
+    const selfH = (nodeH + VERTICAL_GAP * getPriorityScale(nodeId)) * V_SPACING_SCALE;
 
     const activeChildren = sortedChildren(activeChildIds(nodeId));
 
@@ -9637,7 +9650,7 @@ function computeLayout() {
         let sum = acc + heights[cid];
         if (isBranch && i < kids.length - 1) {
           const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(kids[i + 1]));
-          sum += VERTICAL_GAP * 2 * neighborScale;
+          sum += V_GAP * 2 * neighborScale;
         }
         return sum;
       }, 0);
@@ -9740,7 +9753,7 @@ function computeLayout() {
         y += childH;
         if (depth === 0 && i < kids.length - 1) {
           const neighborScale = Math.max(getPriorityScale(cid), getPriorityScale(kids[i + 1]));
-          y += VERTICAL_GAP * 2 * neighborScale;
+          y += V_GAP * 2 * neighborScale;
         }
         const finalX = x + (child.offX || 0);
         const finalY = cy + (child.offY || 0);
@@ -13953,8 +13966,6 @@ document.addEventListener('contextmenu', (e) => {
 // ─── Zoom / Pan ───────────────────────────────────────────────────────────────
 const container = document.getElementById('canvas-container');
 const mapRoot   = document.getElementById('map-root');
-
-const isMobile = navigator.maxTouchPoints > 0;
 
 // ─── View state ───────────────────────────────────────────────────────────────
 // All three peer views are persisted and restored on load; anything else in
