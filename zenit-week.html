@@ -224,6 +224,10 @@
     /* Node state colors (kept in sync with getThemeColors() in JS) */
     --node-done-bg: #EBEBEB;
     --node-done-border: #cccccc;
+
+    /* Desktop panel width — one value for every floating panel (Stats, Agenda,
+       Help, Comment) so they never disagree. Stats is the reference. */
+    --panel-width: 780px;
   }
 
   [data-theme="dark"] {
@@ -1557,7 +1561,7 @@
       left: 50%;
       right: auto;
       bottom: 5px;
-      width: 780px;
+      width: var(--panel-width);
       max-width: calc(100vw - 40px);
       height: calc(100vh - 5px);
       border-radius: 8px;
@@ -2397,7 +2401,7 @@
       left: 50%;
       right: auto;
       bottom: 5px;
-      width: 592px;
+      width: var(--panel-width);
       max-width: calc(100vw - 40px);
       border-radius: 8px;
       border: 1px solid var(--border-default);
@@ -2748,7 +2752,7 @@
       left: 50%;
       right: auto;
       bottom: 5px;
-      width: 592px;
+      width: var(--panel-width);
       max-width: calc(100vw - 40px);
       height: calc(100vh - 66px);
       border-radius: 8px;
@@ -2880,7 +2884,7 @@
       left: 50%;
       right: auto;
       bottom: 5px;
-      width: 592px;
+      width: var(--panel-width);
       max-width: calc(100vw - 40px);
       height: calc(100vh - 66px);
       border-radius: 8px;
