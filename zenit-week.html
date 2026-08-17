@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-Eg6U1136hy/yjWCLHlBwETfdMArKSKI3BShTTAyPEUY='
+               'sha256-XNSdFlAUm5p+P8QWIqpoNLHWF/4V/qxYL6ag0b9FQfk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5784,6 +5784,24 @@ function centerDisplayName() {
   return firstNameFrom(googleUserName, googleUserEmail) || t('center.me');
 }
 
+// Drive's `about.user.photoLink` comes back at a fixed, tiny size (`=s64`), and
+// for an account with no uploaded picture that URL is a server-drawn monogram
+// bitmap — not an absence of a photo. The root circle paints it 160 units wide,
+// so the letter arrives upscaled ~3x and looks blurred next to the rest of the
+// SVG. Google honours any `=sN` on these URLs, so ask for one that survives the
+// biggest place we show it. Idempotent, so re-sizing an already-sized link (an
+// auth blob cached before this existed, say) is harmless.
+const AVATAR_PHOTO_PX = 320;
+function sizedAvatarUrl(url) {
+  if (!url) return '';
+  // `=s64`, `=s64-c`, `=s64-c-k-no`: keep any modifiers, swap only the number.
+  if (/=s\d+(-|$)/.test(url)) return url.replace(/=s\d+/, `=s${AVATAR_PHOTO_PX}`);
+  let host = '';
+  try { host = new URL(url, location.href).hostname; } catch { return url; }
+  if (!/(^|\.)googleusercontent\.com$/.test(host)) return url;
+  return `${url}=s${AVATAR_PHOTO_PX}`;
+}
+
 // Whether the profile photo is worth requesting right now. Offline the request
 // usually only fails and, under Data Saver, spends bytes the user asked us not
 // to — unless a service worker is in control, in which case Cache Storage may
@@ -5869,7 +5887,7 @@ window.addEventListener('online', () => {
 function showSignedInAvatar(user) {
   googleUserEmail = user?.emailAddress || '';
   googleUserName  = user?.displayName  || '';
-  googleUserPhoto = user?.photoLink   || '';
+  googleUserPhoto = sizedAvatarUrl(user?.photoLink || '');
   googleUserInitials = getInitials(user?.displayName || googleUserEmail || '?');
   googleUserInitialsColor = hashColor(googleUserEmail || googleUserInitials);
   // Signing in renames the root node from the signed-out wording to a first
@@ -6363,7 +6381,9 @@ async function startDriveSession() {
     if (storedAuth) {
       storedAuth.email       = user?.emailAddress || '';
       storedAuth.displayName = user?.displayName  || '';
-      storedAuth.photoLink   = user?.photoLink    || '';
+      // Sized before caching so the inline first-paint script requests the same
+      // URL the app does later — one Cache Storage entry, not two.
+      storedAuth.photoLink   = sizedAvatarUrl(user?.photoLink || '');
       localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(storedAuth));
     }
     setSyncStatus('connected', 'sync.msg.synced');
@@ -16360,6 +16380,12 @@ function updateWeekBar() {
   const actions = document.getElementById('week-bar-actions');
   actions.addEventListener('click', (e) => {
     e.stopPropagation();   // the document-level dismissal would close it again
+    // …which also means the second click can't reach that dismissal, so the
+    // button has to close its own menu.
+    if (ctxMenu.classList.contains('visible') && contextTarget === 'center') {
+      hideContextMenu();
+      return;
+    }
     const r = actions.getBoundingClientRect();
     showContextMenu(r.left, r.bottom + 4, 'center');
   });
