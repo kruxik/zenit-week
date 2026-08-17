@@ -11,7 +11,7 @@
                'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-sAEZPqfd/im95bBHp+As7I1JyhX3LFPLDjmysRh5Nrk='
+               'sha256-2g6Bvin+3grGj47/fwdosHdpqSW6vnJWrb869XyrMnc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -568,8 +568,35 @@
     user-select: none;
   }
 
+  /* Touch: the rail has nowhere to live on a phone — the right edge is thumb-
+     hostile and 40px of permanent chrome is 5% of the canvas. So it turns on its
+     side and docks above the view-toggle bar, collapsed until the already-active
+     Mindmap tab is tapped again (see toggleViewLevels). Costs zero pixels shut,
+     sits in the best thumb zone open, and stays open while levels are flipped. */
   @media (pointer: coarse) {
-    #view-level-bar { display: none; }
+    #view-level-bar {
+      position: fixed;
+      top: auto;
+      right: auto;
+      left: 50%;
+      bottom: 62px; /* 12px bar offset + 42px bar height + 8px gap */
+      flex-direction: row;
+      z-index: 2500; /* peer of #view-toggle-bar */
+      opacity: 0;
+      transform: translateX(-50%) translateY(6px);
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    html.view-levels-open[data-view="mindmap"] #view-level-bar {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    /* Thumb-sized cells, and a separator that turns with the bar. */
+    .view-level-btn { width: 46px; padding: 8px 4px; font-size: 7px; }
+    .view-level-separator { width: 1px; height: 26px; margin: auto 0; }
+    /* Clear the open row instead of landing behind it. */
+    html.view-levels-open #view-level-toast { bottom: 118px; }
   }
 
   #view-level-toast {
@@ -2249,6 +2276,39 @@
     .view-toggle-btn span { display: none; }
   }
 
+  /* Caret under the Mindmap tab: the only hint that the active tab is also a
+     disclosure for the view-level row. Absolutely placed so it never shifts the
+     icon, and doubling as the collapsed state light — it goes accent whenever a
+     level or day filter is pruning the map, which is the one thing the user must
+     not be able to forget while the row is shut. */
+  .vtb-caret {
+    display: none;
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    margin-left: -3.5px;
+    border-left: 3.5px solid transparent;
+    border-right: 3.5px solid transparent;
+    border-bottom: 4px solid currentColor;
+    opacity: 0.5;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+
+  @media (pointer: coarse) {
+    .view-toggle-btn { position: relative; }
+    html[data-view="mindmap"] #vtb-mindmap .vtb-caret { display: block; }
+    html.view-levels-open #vtb-mindmap .vtb-caret {
+      transform: rotate(180deg);
+      opacity: 0.8;
+    }
+    html.view-filtered #vtb-mindmap .vtb-caret {
+      border-bottom-color: var(--accent-primary);
+      opacity: 1;
+    }
+  }
+
   .view-toggle-separator {
     width: 1px;
     height: 22px;
@@ -3721,6 +3781,7 @@
   <button type="button" class="view-toggle-btn active" id="vtb-mindmap">
     <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-sitemap"/></svg>
     <span data-i18n="view.mindmap">Mindmap</span>
+    <span class="vtb-caret" aria-hidden="true"></span>
   </button>
   <div class="view-toggle-separator"></div>
   <button type="button" class="view-toggle-btn" id="vtb-stats" aria-haspopup="dialog">
@@ -12771,6 +12832,10 @@ function _windowKeydownHandler(e) {
       closeDayFilterMenu();
       return;
     }
+    if (areViewLevelsOpen()) {
+      closeViewLevels();
+      return;
+    }
     if (ctxMenu && ctxMenu.classList.contains('visible')) {
       hideContextMenu();
       return;
@@ -15132,6 +15197,8 @@ function _renderAgendaFlush() {
 // real content view (the pre-paint script only knows agenda/mindmap).
 function switchView(view) {
   currentView = view;
+  // The mobile level row belongs to the mindmap; leaving it takes the row along.
+  if (view !== 'mindmap') closeViewLevels();
   if (view !== 'stats') localStorage.setItem('zenit-week-view', view);
   document.documentElement.dataset.view = view;
   const canvasEl   = document.getElementById('canvas-container');
@@ -15975,6 +16042,46 @@ document.getElementById('logo').addEventListener('click', resetView);
 // ─── View Level Bar ────────────────────────────────────────────────────────────
 document.getElementById('view-level-bar').addEventListener('pointerdown', e => e.stopPropagation());
 
+// ─── Mobile disclosure for the view-level row ─────────────────────────────────
+// On a touch device the rail is docked above the view-toggle bar and hidden; the
+// active Mindmap tab doubles as its disclosure. Desktop never opens it — the
+// rail is already on screen — so every entry point checks the pointer type.
+function isCoarsePointer() {
+  return window.matchMedia('(pointer: coarse)').matches;
+}
+
+function areViewLevelsOpen() {
+  return document.documentElement.classList.contains('view-levels-open');
+}
+
+function openViewLevels() {
+  document.documentElement.classList.add('view-levels-open');
+  document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'true');
+}
+
+// Safe to call unconditionally — used as a catch-all dismiss from view switches,
+// Esc, quick-add and canvas taps, so it must be a no-op when already shut.
+function closeViewLevels() {
+  if (!areViewLevelsOpen()) return;
+  document.documentElement.classList.remove('view-levels-open');
+  document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'false');
+  closeDayFilterMenu(); // the day menu hangs off the row; it can't outlive it
+}
+
+function toggleViewLevels() {
+  if (areViewLevelsOpen()) closeViewLevels();
+  else openViewLevels();
+}
+
+// Tapping the canvas dismisses the row. #view-level-bar swallows its own
+// pointerdown, and the toggle bar is excluded so the Mindmap tab's own tap isn't
+// closed here before its click handler can toggle it.
+document.addEventListener('pointerdown', (e) => {
+  if (!areViewLevelsOpen()) return;
+  if (e.target.closest('#view-toggle-bar, #day-filter-menu')) return;
+  closeViewLevels();
+});
+
 // Repack the map around a filter change. Both the view levels and the day filter
 // hide by pruning nodes from the layout entirely (computeLayout), so both need a
 // full render() to repack the survivors — an opacity fade can't close the gaps.
@@ -16062,11 +16169,22 @@ function openDayFilterMenu() {
   menu.appendChild(sep);
   addRow(t('filter.none'), null);
 
-  // Opens to the left: the bar hugs the right edge, so there is no room beside it.
+  // Placement follows the bar's orientation, measured rather than media-queried:
+  // the desktop rail hugs the right edge so the menu opens beside it, while the
+  // mobile row sits bottom-centre with no room to either side, so it opens
+  // upward and centres on the button.
   menu.classList.add('visible');
   const r = btn.getBoundingClientRect();
-  const left = Math.max(6, r.left - menu.offsetWidth - 6);
-  const top = Math.min(r.top, Math.max(6, window.innerHeight - menu.offsetHeight - 6));
+  let left = r.left - menu.offsetWidth - 6;
+  let top;
+  if (left >= 6) {
+    top = Math.min(r.top, Math.max(6, window.innerHeight - menu.offsetHeight - 6));
+  } else {
+    left = Math.min(
+      Math.max(6, r.left + r.width / 2 - menu.offsetWidth / 2),
+      Math.max(6, window.innerWidth - menu.offsetWidth - 6));
+    top = Math.max(6, r.top - menu.offsetHeight - 6);
+  }
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
 }
@@ -16082,6 +16200,12 @@ function isDayFilterMenuOpen() {
 // Called from applyFilters(), so every render leaves the indicators in sync, and
 // from applyTranslations() so day names follow a language switch.
 function refreshDayFilterUI() {
+  // Collapsed, the mobile row shows nothing — so the tab caret carries the fact
+  // that the map is pruned. Both prunings light it; the day filter also has its
+  // own chip, the view level has nothing else.
+  document.documentElement.classList.toggle('view-filtered',
+    currentViewLevel !== 'full' || activeDayFilter !== null);
+
   const btn = document.getElementById('day-filter-btn');
   if (btn) {
     const on = activeDayFilter !== null;
@@ -16585,6 +16709,7 @@ document.addEventListener('click', (e) => {
       selectBranch(fallback.id);
     }
 
+    closeViewLevels(); // quick-add takes the bottom of the screen; the row yields
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     input.value = '';
@@ -16848,7 +16973,16 @@ window.addEventListener('load', async () => {
   updateColorDots();
 
   // View toggle bar
-  document.getElementById('vtb-mindmap').addEventListener('click', () => switchView('mindmap'));
+  // Tapping the tab you are already on is the disclosure gesture for the mobile
+  // view-level row; from any other view it just navigates, as before.
+  document.getElementById('vtb-mindmap').addEventListener('click', () => {
+    if (currentView === 'mindmap' && isCoarsePointer()) toggleViewLevels();
+    else switchView('mindmap');
+  });
+  // Only a disclosure where the row exists, so the state is announced only there.
+  if (isCoarsePointer()) {
+    document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'false');
+  }
   document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
   document.getElementById('vtb-stats').addEventListener('click', () => {
     // Toggle Stats; leaving lands on the default (mindmap).
