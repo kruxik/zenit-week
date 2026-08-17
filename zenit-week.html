@@ -228,6 +228,11 @@
     /* Desktop panel width — one value for every floating panel (Stats, Agenda,
        Help, Comment) so they never disagree. Stats is the reference. */
     --panel-width: 780px;
+    /* Unified panel window geometry (see .app-panel). The toolbar overlays every
+       panel from the top; panels rise behind it so their content scrolls under
+       the blur. --panel-gap is the desktop breathing room below the card. */
+    --toolbar-h: 56px;
+    --panel-gap: 5px;
   }
 
   [data-theme="dark"] {
@@ -1511,6 +1516,118 @@
     flex-shrink: 0;
   }
 
+  /* ─── Unified panel window (.app-panel) ─────────────────────────────────────
+     One window shell for every full-size panel (Stats, Agenda, Help, Comment).
+     Modelled on the Stats/Agenda "Scope B" behaviour: the panel's top edge rises
+     to 0 so it sits BEHIND the translucent toolbar, its header floats at the
+     toolbar's bottom edge, and the content is a full-height scroll region that
+     runs under both — which is what gives the toolbar's backdrop blur something
+     real to blur.
+
+     Per-panel knobs (set on the panel element, consumed by the parts):
+       --panel-header-h   height of the floating header slot (default 60px)
+     Both .visible and .active open the panel — Agenda uses .active in JS. */
+  .app-panel {
+    --panel-header-h: 60px;
+    /* The header is absolutely positioned inside the panel's padding box. On
+       desktop the panel has a 1px border, so that box already starts 1px down —
+       one subtraction here keeps every header flush with the toolbar's edge. */
+    --panel-header-top: var(--toolbar-h);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    background: var(--bg-surface);
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+  }
+  .app-panel.visible,
+  .app-panel.active {
+    display: flex;
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+  }
+
+  @media (min-width: 768px) {
+    .app-panel {
+      --panel-header-top: calc(var(--toolbar-h) - 1px);
+      left: 50%;
+      right: auto;
+      bottom: var(--panel-gap);
+      width: var(--panel-width);
+      max-width: calc(100vw - 40px);
+      border: 1px solid var(--border-default);
+      border-radius: 8px;
+      box-shadow: 0 20px 60px var(--shadow-xl);
+      transform: translateX(-50%) translateY(20px);
+    }
+    .app-panel.visible,
+    .app-panel.active { transform: translateX(-50%) translateY(0); }
+  }
+
+  .app-panel-header {
+    position: absolute;
+    top: var(--panel-header-top);
+    left: 0;
+    right: 0;
+    height: var(--panel-header-h);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 24px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .app-panel-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .app-panel-close {
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text-placeholder);
+    transition: color 0.2s;
+  }
+  .app-panel-close:hover { color: var(--text-primary); }
+
+  /* Scroll region spans the panel's full height so content passes under the
+     header and the toolbar; the padding keeps the first item clear of both. A
+     native scrollbar would span that whole height, so it stays hidden. */
+  .app-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    padding-top: calc(var(--toolbar-h) + var(--panel-header-h) + 20px);
+    padding-bottom: 80px;
+    scrollbar-width: none;
+  }
+  .app-panel-content::-webkit-scrollbar { display: none; }
+
+  /* Agenda and Stats are view layers on mobile: they must sit BELOW the bottom
+     chrome (FAB z1000, undo/redo + view pill z2500) so those stay tappable. */
+  @media (max-width: 767px) {
+    #agenda-view,
+    #stats-panel { z-index: 800; }
+  }
+
   /* ─── Quick-Add Panel ───────────────────────────────────────────────────── */
   /* Stats panel — mirrors the Help dialog layout (desktop centered panel, mobile
      full-area with a bottom "Close" pill). Opened by clicking the summary box. */
@@ -1530,6 +1647,10 @@
   }
   #stats-overlay.visible { display: flex; opacity: 1; }
 
+  /* LEGACY (Stats window chrome) — superseded by .app-panel / .app-panel-header /
+     .app-panel-content. `@media not all` never matches any device, so everything
+     below is inert; kept for reference until the unified shell is polished. */
+  @media not all {
   #stats-panel {
     position: fixed;
     top: 0; /* Scope B: rises behind the toolbar so content scrolls under it */
@@ -1616,6 +1737,7 @@
     scrollbar-width: none;
   }
   #stats-content::-webkit-scrollbar { display: none; }
+  } /* end LEGACY (Stats window chrome) */
 
   /* Hero: two top-aligned columns — Plan vs Reality (left) and The Week (right). */
   #stats-section-donut {
@@ -1884,7 +2006,13 @@
      one item per line) on the left, completion headlines on the right; ② bars and ③ balance
      stay. Tightened spacing so the story fits one thumb-scroll. */
   @media (max-width: 767px) {
-    #stats-content { padding: 18px; padding-top: 136px; padding-bottom: 80px; } /* 56px toolbar + 60px header + 20px gap (matches desktop offset) */
+    /* Tighter side padding on phones; the top offset stays derived from the
+       shared tokens so it always matches the floating header. */
+    #stats-content {
+      padding: 18px;
+      padding-top: calc(var(--toolbar-h) + var(--panel-header-h) + 20px);
+      padding-bottom: 80px;
+    }
     #stats-section-donut { gap: 14px; }
     .stats-legend { grid-template-columns: 1fr; }
     /* Shrink the donut so two columns fit on ~360px phones (e.g. Galaxy S22). */
@@ -2350,7 +2478,14 @@
   /* ─── Pre-paint view state ───────────────────────────────────────────────── */
   /* Set by inline <head> script from localStorage so the correct view is
      visible on first paint, avoiding a mindmap→agenda flash on refresh. */
-  html[data-view="agenda"] #agenda-view { display: flex; }
+  /* .app-panel starts hidden (opacity 0, translateY, no pointer events), so the
+     pre-paint rule has to open it fully, not just flip `display`. */
+  html[data-view="agenda"] #agenda-view {
+    display: flex;
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+  }
   @media (max-width: 767px) {
     html[data-view="agenda"] #canvas-container { display: none; }
   }
@@ -2384,6 +2519,23 @@
   }
 
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
+  /* Window chrome comes from .app-panel; only the Agenda-specific bits live here:
+     a 48px header slot (the day-strip), the page-coloured mobile view layer, and
+     the mobile `position: absolute` that keeps it inside #app. */
+  #agenda-view {
+    --panel-header-h: 48px;
+  }
+  @media (max-width: 767px) {
+    #agenda-view {
+      position: absolute;
+      background: var(--bg-page);
+    }
+  }
+
+  /* LEGACY (Agenda window chrome) — superseded by .app-panel. `@media not all`
+     never matches, so everything below is inert; kept for reference until the
+     unified shell is polished. */
+  @media not all {
   #agenda-view {
     position: absolute;
     top: 0; /* Scope B: rises behind the toolbar; day-strip re-anchored at 56px */
@@ -2430,37 +2582,25 @@
   #agenda-view.active {
     display: flex;
   }
+  } /* end LEGACY (Agenda window chrome) */
 
-  /* Scope B: glass day-strip floats at the toolbar's bottom edge (56px); items
-     scroll under BOTH the day-strip and the toolbar above it. */
+  /* The day-strip IS this panel's header slot (.app-panel-header supplies the
+     position, height, background and border); only the horizontal tab-scroller
+     behaviour is Agenda-specific. */
   #agenda-day-strip {
-    display: flex;
-    align-items: center;
     overflow-x: auto;
-    width: 100%;
     min-width: 0;
-    height: 48px;
     padding: 0 8px;
     gap: 2px;
-    border-bottom: 1px solid var(--border-default);
-    background: var(--bg-surface);
-    position: absolute;
-    top: 56px;
-    left: 0;
-    right: 0;
-    z-index: 2;
+    /* Tabs scroll as one run, so they pack from the start rather than spreading
+       like a caption/close header. */
+    justify-content: flex-start;
     scrollbar-width: none;
   }
   #agenda-day-strip::-webkit-scrollbar { display: none; }
 
   @media (min-width: 768px) {
-    #agenda-day-strip {
-      justify-content: center;
-      /* The desktop panel has a 1px border, so its padding box (the containing
-         block for this strip) already starts 1px down — 55px lands the strip
-         flush against the toolbar's bottom edge instead of 1px below it. */
-      top: 55px;
-    }
+    #agenda-day-strip { justify-content: center; }
   }
 
   .agenda-tab {
@@ -2557,21 +2697,17 @@
     line-height: 1;
   }
 
+  /* .app-panel-content supplies the full-height scroll region; the list is
+     full-bleed (no side padding) and its rows sit directly under the day-strip,
+     with no extra gap. */
   #agenda-tab-content {
-    flex: 1;
-    overflow-y: auto;
     overflow-x: hidden;
     width: 100%;
     min-width: 0;
     padding: 0;
-    padding-top: 104px; /* 56px toolbar + 48px day-strip; items scroll under both */
+    padding-top: calc(var(--toolbar-h) + var(--panel-header-h));
     padding-bottom: 66px;
-    /* Full-height scroll region behind the glass day-strip/toolbar; hide the
-       native scrollbar that would otherwise span behind them (matches the
-       day-strip). */
-    scrollbar-width: none;
   }
-  #agenda-tab-content::-webkit-scrollbar { display: none; }
 
   @media (min-width: 768px) {
     #agenda-tab-content {
@@ -2734,6 +2870,10 @@
     opacity: 1;
   }
 
+  /* LEGACY (Help window chrome) — superseded by .app-panel; the panel now rises
+     behind the toolbar like Stats/Agenda instead of starting below it.
+     `@media not all` never matches, so everything below is inert. */
+  @media not all {
   #help-panel {
     position: fixed;
     top: 56px;
@@ -2784,6 +2924,7 @@
       transform: translateX(-50%) translateY(0);
     }
   }
+  } /* end LEGACY (Help window chrome) */
 
   /* Mobile: floating "Close" pill replaces the top-right X while help is open */
   #help-close-bar,
@@ -2866,6 +3007,10 @@
     opacity: 1;
   }
 
+  /* LEGACY (Comment window chrome) — superseded by .app-panel; the panel now
+     rises behind the toolbar like Stats/Agenda. `@media not all` never matches,
+     so everything below is inert. */
+  @media not all {
   #comment-panel {
     position: fixed;
     top: 56px;
@@ -2942,12 +3087,17 @@
     flex-shrink: 0;
   }
   #comment-close:hover { color: var(--text-primary); }
+  } /* end LEGACY (Comment window chrome) */
 
+  #comment-close { flex-shrink: 0; }
+
+  /* Not a scroll region — the textarea fills the panel, so the top offset clears
+     the floating header and the toolbar above it instead of scrolling under. */
   #comment-body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 16px 24px 24px;
+    padding: calc(var(--toolbar-h) + var(--panel-header-h) + 16px) 24px 24px;
     min-height: 0;
   }
   #comment-textarea {
@@ -3114,6 +3264,9 @@
     margin-top: 4px;
   }
 
+  /* LEGACY (Help header/content chrome) — superseded by .app-panel-header /
+     .app-panel-title / .app-panel-close / .app-panel-content. Inert. */
+  @media not all {
   #help-header {
     background: var(--bg-surface-subtle);
     padding: 20px 24px;
@@ -3136,6 +3289,7 @@
     flex: 1;
     overflow-y: auto;
   }
+  } /* end LEGACY (Help header/content chrome) */
 
   .help-section {
     margin-bottom: 24px;
@@ -3708,9 +3862,9 @@
       <g id="map-root"></g>
     </svg>
   </div>
-  <div id="agenda-view">
-    <div id="agenda-day-strip"></div>
-    <div id="agenda-tab-content"></div>
+  <div id="agenda-view" class="app-panel">
+    <div id="agenda-day-strip" class="app-panel-header"></div>
+    <div id="agenda-tab-content" class="app-panel-content"></div>
   </div>
 </div>
 
@@ -3925,11 +4079,11 @@
 <div id="agenda-overlay"></div>
 
 <div id="stats-overlay"></div>
-<div id="stats-panel">
-  <div id="stats-header">
-    <div id="stats-title" style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="stats.title">Week Stats</div>
+<div id="stats-panel" class="app-panel">
+  <div id="stats-header" class="app-panel-header">
+    <div id="stats-title" class="app-panel-title" data-i18n="stats.title">Week Stats</div>
   </div>
-  <div id="stats-content">
+  <div id="stats-content" class="app-panel-content">
     <div id="stats-section-donut" class="help-section"></div>
     <div id="stats-section-branches" class="help-section"></div>
     <div id="stats-section-balance" class="help-section"></div>
@@ -3937,13 +4091,13 @@
   </div>
 </div>
 
-<div id="help-panel">
-  <div id="help-header">
-    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" data-i18n="help.title">Help &amp; Hotkeys</div>
-    <div id="help-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
+<div id="help-panel" class="app-panel">
+  <div id="help-header" class="app-panel-header">
+    <div class="app-panel-title" data-i18n="help.title">Help &amp; Hotkeys</div>
+    <div id="help-close" class="app-panel-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
   </div>
 
-  <div id="help-content">
+  <div id="help-content" class="app-panel-content">
       <div class="help-section">
         <div class="help-section-title" data-i18n="help.aboutTitle">What it solves</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
@@ -4062,10 +4216,10 @@
 </div>
 
 <div id="comment-overlay"></div>
-<div id="comment-panel">
-  <div id="comment-header">
-    <div id="comment-title"></div>
-    <div id="comment-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
+<div id="comment-panel" class="app-panel">
+  <div id="comment-header" class="app-panel-header">
+    <div id="comment-title" class="app-panel-title"></div>
+    <div id="comment-close" class="app-panel-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
   </div>
   <div id="comment-body">
     <textarea id="comment-textarea" spellcheck="true"></textarea>
