@@ -156,6 +156,13 @@ const sandbox = {
     get length()  { return Object.keys(sandbox._lsStore).length; },
   },
   location: { hash: '' },
+  // The app strips the hash on today's week via history.replaceState (and never
+  // pushes). Both stubs mirror the browser's observable effect for our call
+  // sites — every one passes pathname + search, i.e. a hash-less URL.
+  history: {
+    replaceState: () => { sandbox.location.hash = ''; },
+    pushState:    () => { sandbox.location.hash = ''; },
+  },
   navigator: { userAgentData: null, userAgent: '' },
   performance: { now: () => 0 },
   requestAnimationFrame: () => {},
