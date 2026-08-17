@@ -8,10 +8,10 @@
                'sha256-S898NuOveUJcNiHnB0IzK+tNkwBpCZyFVgp/8bYT15w='
                'sha256-Y+82jK1htj+LRGINk8nVHvUIpfKyEkBhaHi3JjWCgi8='
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
-               'sha256-lNWcGTFhaXEfeeJUT+Mwseod5iMtdbMdZ7rCOKdkPEI='
+               'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-pFh++u7cpvawt7u76PF3Ok5uaZvuafKjiEJ7impYnbc='
+               'sha256-pX2e1T7fyDVo21mepHknklSAZUT3uv0Yc9Lqme3ke2w='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2388,22 +2388,26 @@
      visible on first paint, avoiding a mindmap→agenda flash on refresh. */
   /* .app-panel starts hidden (opacity 0, translateY, no pointer events), so the
      pre-paint rule has to open it fully, not just flip `display`. */
-  html[data-view="agenda"] #agenda-view {
+  html[data-view="agenda"] #agenda-view,
+  html[data-view="stats"] #stats-panel {
     display: flex;
     opacity: 1;
     pointer-events: all;
     transform: translateY(0);
   }
   @media (max-width: 767px) {
-    html[data-view="agenda"] #canvas-container { display: none; }
+    html[data-view="agenda"] #canvas-container,
+    html[data-view="stats"] #canvas-container { display: none; }
   }
   @media (min-width: 768px) {
-    html[data-view="agenda"] #agenda-view {
+    html[data-view="agenda"] #agenda-view,
+    html[data-view="stats"] #stats-panel {
       transform: translateX(-50%) translateY(0);
       opacity: 1;
       pointer-events: all;
     }
-    html[data-view="agenda"] #agenda-overlay {
+    html[data-view="agenda"] #agenda-overlay,
+    html[data-view="stats"] #stats-overlay {
       display: flex;
       opacity: 1;
     }
@@ -3328,11 +3332,13 @@
   })();
 </script>
 <script>
-  // Apply persisted view before first paint so refresh in agenda doesn't
-  // flash the mindmap. CSS rules keyed on html[data-view] handle visibility.
+  // Apply persisted view before first paint so refresh in agenda or stats
+  // doesn't flash the mindmap. CSS rules keyed on html[data-view] handle
+  // visibility.
   try {
     var v = localStorage.getItem('zenit-week-view');
-    document.documentElement.dataset.view = (v === 'agenda') ? 'agenda' : 'mindmap';
+    document.documentElement.dataset.view =
+      (v === 'agenda' || v === 'stats') ? v : 'mindmap';
   } catch (e) {
     document.documentElement.dataset.view = 'mindmap';
   }
@@ -13961,9 +13967,12 @@ const mapRoot   = document.getElementById('map-root');
 const isMobile = navigator.maxTouchPoints > 0;
 
 // ─── View state ───────────────────────────────────────────────────────────────
-// Only mindmap/agenda are persisted; Stats is never restored on load (the
-// pre-paint script only knows those two), so coerce anything else to mindmap.
-let currentView = localStorage.getItem('zenit-week-view') === 'agenda' ? 'agenda' : 'mindmap';
+// All three peer views are persisted and restored on load; anything else in
+// storage coerces to the default (mindmap).
+let currentView = (() => {
+  const v = localStorage.getItem('zenit-week-view');
+  return (v === 'agenda' || v === 'stats') ? v : 'mindmap';
+})();
 
 // 'overdue' | 0–6 (dayIndex). null = uninitialised, defaults to today on first open.
 let agendaActiveTab = null;
@@ -15125,13 +15134,12 @@ function _renderAgendaFlush() {
 // Mindmap, Agenda and Stats are peer views. Each switch fully owns the three
 // content layers (canvas, agenda panel, stats panel) so no hidden view stays
 // "live" behind another — the source of the earlier stale-control bugs.
-// Stats is intentionally NOT persisted: returning to the app lands on the last
-// real content view (the pre-paint script only knows agenda/mindmap).
+// All three are persisted, so a refresh lands back on the view the user left.
 function switchView(view) {
   currentView = view;
   // The mobile level row belongs to the mindmap; leaving it takes the row along.
   if (view !== 'mindmap') closeViewLevels();
-  if (view !== 'stats') localStorage.setItem('zenit-week-view', view);
+  localStorage.setItem('zenit-week-view', view);
   document.documentElement.dataset.view = view;
   const canvasEl   = document.getElementById('canvas-container');
   const agendaEl   = document.getElementById('agenda-view');
@@ -16919,7 +16927,7 @@ window.addEventListener('load', async () => {
     // Toggle Stats; leaving lands on the default (mindmap).
     switchView(currentView === 'stats' ? 'mindmap' : 'stats');
   });
-  switchView(currentView); // apply persisted view (renders canvas or agenda)
+  switchView(currentView); // apply persisted view (mindmap / agenda / stats)
 
   // Position the default-zoom marker on the track
   const defaultMarker = document.getElementById('zoom-default-marker');
