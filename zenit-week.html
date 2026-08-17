@@ -2501,12 +2501,14 @@
     background: var(--view-btn-active-bg);
     color: var(--view-btn-active-text);
   }
-  html[data-view="agenda"]  #vtb-mindmap,
-  html[data-view="agenda"]  #vtb-stats,
-  html[data-view="mindmap"] #vtb-agenda,
-  html[data-view="mindmap"] #vtb-stats,
-  html[data-view="stats"]   #vtb-agenda,
-  html[data-view="stats"]   #vtb-mindmap {
+  /* `:not(:hover)` keeps this ID-specificity reset from outranking
+     `.view-toggle-btn:hover`, which would otherwise never paint. */
+  html[data-view="agenda"]  #vtb-mindmap:not(:hover),
+  html[data-view="agenda"]  #vtb-stats:not(:hover),
+  html[data-view="mindmap"] #vtb-agenda:not(:hover),
+  html[data-view="mindmap"] #vtb-stats:not(:hover),
+  html[data-view="stats"]   #vtb-agenda:not(:hover),
+  html[data-view="stats"]   #vtb-mindmap:not(:hover) {
     background: none;
     color: var(--text-subtle);
   }
