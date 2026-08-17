@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-jwoCzgYAWxtV2Fmb7gUzGlTLC9tGAgGvoXNgSI2AIdE='
+               'sha256-h/fw2yeKBJwea9oAdFPwTsGty+p+PtkXPpGNNIp6VOM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3230,12 +3230,12 @@
 
   /* Completion ring on the root node. The root's fill is dark in both themes, so
      the track is a white wash rather than a --border token: those are tuned for
-     page backgrounds and vanish against #333. The arc reuses the Stats palette so
-     the ring and the Stats donut are visibly the same number. */
+     page backgrounds and vanish against #333. The arcs carry their own stroke per
+     band (see centerRingBandStroke) — declaring a stroke here would beat those
+     presentation attributes and flatten all four to one colour. */
   .center-ring-track { stroke: rgba(255, 255, 255, 0.35); }
   .center-ring-arc {
-    stroke: var(--stats-plan);
-    transition: stroke-dasharray 0.35s ease;
+    transition: stroke-dasharray 0.35s ease, stroke-dashoffset 0.35s ease;
   }
 
 
@@ -10080,20 +10080,25 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     titleEl.textContent = centerDisplayName();
     g.appendChild(titleEl);
 
-    // Completion ring. The track is always whole, so an empty week keeps the
-    // exact same silhouette as a finished one — only the arc over it changes.
+    // Completion ring: the Stats donut's four-arc split, drawn at node scale. The
+    // track is always whole, so an empty week keeps the exact same silhouette as a
+    // finished one — only the arcs over it change. One path per band, all four
+    // always present, so a patch never has to add or remove nodes.
     const { d: ringD, perimeter } = roundedRectPathD(CENTER_RING_R * 2, CENTER_RING_R * 2, CENTER_RING_R);
     g.appendChild(svgEl('path', {
       class: 'center-ring-track',
       d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
     }));
-    const arc = svgEl('path', {
-      class: 'center-ring-arc',
-      d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
-      'data-perimeter': perimeter,
+    const arcs = svgEl('g', { class: 'center-ring-arcs', 'data-perimeter': perimeter });
+    STATS_SPLIT_BANDS.forEach((band, i) => {
+      arcs.appendChild(svgEl('path', {
+        class: 'center-ring-arc', 'data-band': i,
+        d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
+        stroke: centerRingBandStroke(band),
+      }));
     });
-    setCenterRingArc(arc, computeWeekStats().global.percent, perimeter);
-    g.appendChild(arc);
+    setCenterRingArcs(arcs, computeWeekStats().global, perimeter);
+    g.appendChild(arcs);
 
     // Initials disc first, photo clipped over it. If the photo 404s, is blocked,
     // or was never requested, the initials are simply what remains visible — no
@@ -11907,6 +11912,20 @@ function _effortTooltipKey(level) {
        : 'summary.tooltipNormal';
 }
 
+// The planned/unplanned × done/open split, as it is painted everywhere it is
+// painted: the Stats donut, the CFD's stacked bands and the root node's
+// completion ring. Green = planned, amber = unplanned, solid = done, faded =
+// open. One list rather than three, because the ring only earns its place by
+// being the same number as the donut — and it stops being that the moment a
+// colour or the ordering drifts in one copy. Done first, so the finished share
+// is one contiguous run from the top.
+const STATS_SPLIT_BANDS = [
+  { key: 'plannedDone',   color: 'var(--stats-plan)',   opacity: 1    },
+  { key: 'unplannedDone', color: 'var(--stats-unplan)', opacity: 1    },
+  { key: 'plannedOpen',   color: 'var(--stats-plan)',   opacity: 0.32 },
+  { key: 'unplannedOpen', color: 'var(--stats-unplan)', opacity: 0.32 },
+];
+
 // ─── Stats Panel (Plan vs Reality) ────────────────────────────────────────────
 // Read-only reflection surface. Reads weekData via computeWeekStats() and never
 // mutates it, so opening/closing/refreshing produces no undo entry. Sections ②③④
@@ -11924,17 +11943,9 @@ function _pct(part, whole) { return whole > 0 ? Math.round((part / whole) * 100)
 // Four-arc donut of the global planned/unplanned × done/open split. Center shows
 // overall completion %. Global by design, so branch count never changes its shape.
 function _statsDonut(c) {
-  const PLAN = 'var(--stats-plan)';        // planned → green
-  const UNPL = 'var(--stats-unplan)';      // unplanned → amber
-  const OPEN_OPACITY = 0.32;                     // done = solid, open = faded
   // Order: all done first (planned, unplanned), then all open — so the completed
   // portion is one contiguous arc clockwise from the top.
-  const segs = [
-    { v: c.plannedDone,   color: PLAN, opacity: 1 },
-    { v: c.unplannedDone, color: UNPL, opacity: 1 },
-    { v: c.plannedOpen,   color: PLAN, opacity: OPEN_OPACITY },
-    { v: c.unplannedOpen, color: UNPL, opacity: OPEN_OPACITY },
-  ];
+  const segs = STATS_SPLIT_BANDS.map(b => ({ v: c[b.key], color: b.color, opacity: b.opacity }));
   const R = 15.91549; // circumference ≈ 100 → dasharray reads as percent
   const svg = _svgEl('svg', {
     viewBox: '0 0 36 36', class: 'stats-donut', role: 'img',
@@ -12386,13 +12397,8 @@ function _weekCompletion(data, branchId) {
 // donut (green = planned, amber = unplanned; solid = done, faded = open).
 // Async: prior weeks come from IDB; the current week uses live weekData so unsaved
 // edits show immediately. Blank weeks pinch to the baseline (an empty column).
-// Rendered fire-and-forget by renderStatsPanel().
-const _CFD_BANDS = [
-  { key: 'plannedDone',   color: 'var(--stats-plan)',   opacity: 1    },
-  { key: 'unplannedDone', color: 'var(--stats-unplan)', opacity: 1    },
-  { key: 'plannedOpen',   color: 'var(--stats-plan)',   opacity: 0.32 },
-  { key: 'unplannedOpen', color: 'var(--stats-unplan)', opacity: 0.32 },
-];
+// Rendered fire-and-forget by renderStatsPanel(). Bands come from
+// STATS_SPLIT_BANDS, the one list the donut and the root ring paint from too.
 
 // Selected CFD lens: null = Total (all branches), otherwise a branch id. Persists
 // across panel opens within the session; reset to Total if the branch disappears.
@@ -12449,7 +12455,7 @@ function _buildCfdSvg(weeks) {
   const areas = _svgEl('g', { opacity: 0.7 });
   svg.appendChild(areas);
   let lower = weeks.map(() => 0);
-  for (const band of _CFD_BANDS) {
+  for (const band of STATS_SPLIT_BANDS) {
     const upper = weeks.map((w, i) => lower[i] + valOf(w, band.key));
     const top = upper.map((v, i) => `${x(i)},${y(v)}`);
     const bot = lower.map((v, i) => `${x(i)},${y(v)}`).reverse();
@@ -12755,19 +12761,44 @@ function updateSummary() {
 // input the percentage depends on. makeNodeGroup still draws the ring correctly
 // itself, because updateSummary early-returns on an unchanged signature.
 function updateCenterRing() {
-  const arc = document.querySelector('.node-group[data-id="center"] .center-ring-arc');
-  if (!arc) return;
-  const perimeter = parseFloat(arc.dataset.perimeter);
+  const arcs = document.querySelector('.node-group[data-id="center"] .center-ring-arcs');
+  if (!arcs) return;
+  const perimeter = parseFloat(arcs.dataset.perimeter);
   if (!perimeter) return;
-  setCenterRingArc(arc, computeWeekStats().global.percent, perimeter);
+  setCenterRingArcs(arcs, computeWeekStats().global, perimeter);
 }
 
-// Shared by the build and the patch so the two can never disagree. The rounded
-// cap is conditional: it paints a dot even on a zero-length dash, which would
-// leave an untouched week showing a stray pip at 12 o'clock.
-function setCenterRingArc(arc, pct, perimeter) {
-  arc.setAttribute('stroke-dasharray', `${(pct / 100) * perimeter} ${perimeter}`);
-  arc.setAttribute('stroke-linecap', pct > 0 ? 'round' : 'butt');
+// The open bands are the same colour at the same 32% as the donut's, but alpha
+// is a function of what is behind it — and behind the ring is the root's near-
+// black fill, not the donut's light panel. Painted with opacity the planned-open
+// band composites to rgb(90,148,135) here against rgb(168,226,213) there: the
+// same paint reading as a different colour, which is exactly what the ring must
+// not do. So mix the band against --border-soft — the surface the donut's arcs
+// actually land on — and stroke the result opaque. The ring's own track then
+// stays the white wash it needs to be readable on a dark disc, instead of having
+// to double as the backdrop that makes the tints come out right.
+function centerRingBandStroke(band) {
+  return band.opacity === 1
+    ? band.color
+    : `color-mix(in srgb, ${band.color} ${band.opacity * 100}%, var(--border-soft))`;
+}
+
+// Shared by the build and the patch so the two can never disagree. Each band is
+// one dash of its own share, offset past everything before it, laid down in
+// STATS_SPLIT_BANDS order — the donut's arithmetic on a circle of a different
+// radius. Caps stay butt, like the donut's: a round cap paints a dot even on a
+// zero-length dash, which on an untouched week would leave a stray pip at 12
+// o'clock, and between two live bands it would overlap its neighbour.
+function setCenterRingArcs(arcs, stats, perimeter) {
+  let acc = 0;
+  STATS_SPLIT_BANDS.forEach((band, i) => {
+    const el = arcs.querySelector(`.center-ring-arc[data-band="${i}"]`);
+    if (!el) return;
+    const len = stats.total > 0 ? (stats[band.key] / stats.total) * perimeter : 0;
+    el.setAttribute('stroke-dasharray', `${len} ${perimeter}`);
+    el.setAttribute('stroke-dashoffset', -acc);
+    acc += len;
+  });
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
