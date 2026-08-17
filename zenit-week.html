@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-CVhdQJNYGtHhUbVMKrZ1C/zS0kSHITL3RjCK9Gj95PA='
+               'sha256-QkryhK5lEIx7dOwesMUZ7F0xREVw6FIcbCYE50SaFEo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3130,6 +3130,17 @@
   .node-group.subnode-hover .node-rect {
     filter: brightness(0.88);
   }
+  /* Keyboard focus ring. Arrow keys move it and it stands in for the mouse
+     hover every node hotkey reads, so it has to look like hover — plus a dashed
+     outline, because nothing else on the map is dashed. */
+  .node-group.kb-focus .node-rect {
+    filter: brightness(0.88);
+    stroke-dasharray: 4 3;
+  }
+  .node-group.kb-focus .add-btn {
+    opacity: 1;
+  }
+
   /* While the user is actively wheel/pinch-zooming, freeze hover state. The
      cursor's hit target can otherwise flip between adjacent nodes on
      subpixel jitter, retoggling the per-subtree brightness filter every
@@ -3865,6 +3876,7 @@
         <div class="help-section-title" data-i18n="help.featuresTitle">Key features</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureMindmapLead">Visual mindmap</strong><span data-i18n="help.featureMindmapBody"> — view your week with customizable branches</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureAgendaLead">Agenda</strong><span data-i18n="help.featureAgendaBody"> view — same week, two lenses</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureStatsLead">Stats</strong><span data-i18n="help.featureStatsBody"> — balance, trend and completion for the week</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureZoomLead">View levels</strong><span data-i18n="help.featureZoomBody"> — Rocks · Pebbles · Sand</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureDayFilterLead">Day filter</strong><span data-i18n="help.featureDayFilterBody"> — one day at a time, the rest of the week hidden</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featurePrioritiesLead">Priorities</strong><span data-i18n="help.featurePrioritiesBody"> — Normal · High · Critical (cascade to children)</span></div>
@@ -3872,12 +3884,18 @@
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureDaysLead">Magic day selectors</strong><span data-i18n="help.featureDaysBody"> — type (mo), (mo, we) or (daily) to schedule</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureBaselineLead">Effort baseline</strong><span data-i18n="help.featureBaselineBody"> — track your weekly effort and overall progress</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSyncLead">Google Drive sync</strong><span data-i18n="help.featureSyncBody"> — your own Drive only (optional)</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureCommentsLead">Comments</strong><span data-i18n="help.featureCommentsBody"> — attach a note to any activity</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureTransfersLead">Reusable &amp; transfers</strong><span data-i18n="help.featureTransfersBody"> — carry unfinished or repeating work into the next week</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureQuickAddLead">Quick add</strong><span data-i18n="help.featureQuickAddBody"> — drop a task on a branch without touching the map</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureUndoLead">Undo / Redo</strong><span data-i18n="help.featureUndoBody"> — made a typo? Revert anytime</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureBackupLead">Export / Import</strong><span data-i18n="help.featureBackupBody"> — full backup of every week as one JSON file</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureOfflineLead">Works offline</strong><span data-i18n="help.featureOfflineBody"> — installable, and edits made offline sync when you are back</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureLangLead">EN / CS, Light / Dark</strong><span data-i18n="help.featureLangBody"> — customize to fit your needs</span></div>
       </div>
 
       <div class="help-section">
-        <div class="help-section-title" data-i18n="help.hotkeysTitle">Activity hotkeys (On Hover)</div>
+        <div class="help-section-title" data-i18n="help.hotkeysTitle">Activity hotkeys (hovered or focused)</div>
+        <div class="help-row"><span data-i18n="help.moveFocus">Move focus</span> <span><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd></span></div>
         <div class="help-row"><span data-i18n="help.rename">Rename</span> <kbd>Enter</kbd></div>
         <div class="help-row"><span data-i18n="help.add">Add</span> <kbd>Tab</kbd></div>
         <div class="help-row"><span data-i18n="help.delete">Delete</span> <span><kbd>Backspace</kbd> <kbd>Delete</kbd></span></div>
@@ -3885,7 +3903,23 @@
         <div class="help-row"><span data-i18n="help.toggleUnplanned">Toggle Unplanned</span> <kbd>U</kbd></div>
         <div class="help-row"><span data-i18n="help.scheduleDay">Schedule day</span> <span><kbd>1</kbd>–<kbd>7</kbd></span></div>
         <div class="help-row"><span data-i18n="help.clearDays">Clear days</span> <kbd>8</kbd></div>
+        <div class="help-row"><span data-i18n="help.cyclePriority">Cycle priority</span> <kbd>P</kbd></div>
+        <div class="help-row"><span data-i18n="menu.comment">Comment</span> <kbd>C</kbd></div>
+        <div class="help-row"><span data-i18n="help.toggleReusable">Toggle Reusable</span> <kbd>R</kbd></div>
+        <div class="help-row"><span data-i18n="help.moveNextWeek">Move to next week</span> <kbd>N</kbd></div>
         <div class="help-row"><span data-i18n="help.quickOptions">Quick Options</span> <kbd>Right Click</kbd></div>
+        <div class="help-row"><span data-i18n="help.clearWeek">Clear week (root node)</span> <span><kbd>Backspace</kbd> <kbd>Delete</kbd></span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title" data-i18n="help.agendaTitle">Agenda hotkeys</div>
+        <div class="help-row"><span data-i18n="help.agendaNavItems">Move between items</span> <span><kbd>↑</kbd> <kbd>↓</kbd></span></div>
+        <div class="help-row"><span data-i18n="help.agendaNavTabs">Previous / next day</span> <span><kbd>←</kbd> <kbd>→</kbd></span></div>
+        <div class="help-row"><span data-i18n="help.agendaJumpTab">Jump to day</span> <span><kbd>1</kbd>–<kbd>7</kbd></span></div>
+        <div class="help-row"><span data-i18n="agenda.overdue">Overdue</span> <kbd>0</kbd></div>
+        <div class="help-row"><span data-i18n="help.toggleDone">Toggle Done</span> <kbd>D</kbd></div>
+        <div class="help-row"><span data-i18n="help.rename">Rename</span> <kbd>Enter</kbd></div>
+        <div class="help-row"><span data-i18n="help.delete">Delete</span> <span><kbd>Backspace</kbd> <kbd>Delete</kbd></span></div>
       </div>
 
       <div class="help-section">
@@ -3894,10 +3928,16 @@
         <div class="help-row"><span data-i18n="help.agendaView">Agenda view</span> <kbd>A</kbd></div>
         <div class="help-row"><span data-i18n="help.statsView">Stats view</span> <kbd>S</kbd></div>
         <div class="help-row"><span data-i18n="quick_add.title">Quick add</span> <kbd>Q</kbd></div>
+        <div class="help-row"><span data-i18n="help.title">Help &amp; Hotkeys</span> <span><kbd>?</kbd> <kbd>H</kbd></span></div>
         <div class="help-row"><span data-i18n="help.escClose">Close panel / menu</span> <kbd>Esc</kbd></div>
         <div class="help-row"><span data-i18n="help.filterDay">Filter day</span> <span><kbd>1</kbd>–<kbd>7</kbd></span></div>
         <div class="help-row"><span data-i18n="filter.unscheduled">Unscheduled</span> <kbd>8</kbd></div>
         <div class="help-row"><span data-i18n="agenda.overdue">Overdue</span> <kbd>0</kbd></div>
+        <div class="help-row"><span data-i18n="help.fitView">Fit to view</span> <kbd>F</kbd></div>
+        <div class="help-row"><span data-i18n="help.cycleViewLevel">Cycle view level</span> <kbd>V</kbd></div>
+        <div class="help-row"><span data-i18n="help.prevWeek">Previous week</span> <span><kbd>[</kbd> <kbd>⇧ ←</kbd></span></div>
+        <div class="help-row"><span data-i18n="help.nextWeek">Next week</span> <span><kbd>]</kbd> <kbd>⇧ →</kbd></span></div>
+        <div class="help-row"><span data-i18n="help.currentWeek">Current week</span> <kbd>T</kbd></div>
         <div class="help-row"><span data-i18n="help.undo">Undo</span> <kbd id="undo-kbd">Ctrl + Z</kbd></div>
         <div class="help-row"><span data-i18n="help.redo">Redo</span> <kbd id="redo-kbd">Ctrl + Shift + Z</kbd></div>
       </div>
@@ -3936,6 +3976,7 @@
         <div class="help-section-title" data-i18n="help.navTitle">Canvas Navigation</div>
         <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.navDesc">Drag background to pan. Scroll / pinch to zoom.</div>
         <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.navFitDesc">Click the logo to fit everything to the view.</div>
+        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.navKeyboardDesc">Arrow keys move a focus ring from node to node — every activity hotkey then works on the focused node.</div>
       </div>
 
       <div class="help-section">
@@ -3951,6 +3992,8 @@
         <div id="help-legend">
           <div class="legend-item"><div class="legend-dot" style="background:var(--accent-warning-bg); border: 1px solid var(--accent-warning-border)"></div><span data-i18n="help.unplanned">Unplanned</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--node-done-bg); border: 1px solid var(--node-done-border)"></div><span data-i18n="help.done">Done</span></div>
+          <div class="legend-item"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg><span data-i18n="menu.reusable">Reusable</span></div>
+          <div class="legend-item"><svg class="icon" aria-hidden="true"><use href="#icon-message"/></svg><span data-i18n="menu.comment">Comment</span></div>
         </div>
       </div>
 
@@ -7832,6 +7875,8 @@ const TRANSLATIONS = {
     'help.featureMindmapBody':    ' — view your week with customizable branches',
     'help.featureAgendaLead':     'Agenda',
     'help.featureAgendaBody':     ' view — same week, two lenses',
+    'help.featureStatsLead':      'Stats',
+    'help.featureStatsBody':      ' — balance, trend and completion for the week',
     'help.featureZoomLead':       'View levels',
     'help.featureZoomBody':       ' — Rocks · Pebbles · Sand',
     'help.featureDayFilterLead':  'Day filter',
@@ -7846,11 +7891,36 @@ const TRANSLATIONS = {
     'help.featureBaselineBody':   ' — track your weekly effort and overall progress',
     'help.featureSyncLead':       'Google Drive sync',
     'help.featureSyncBody':       ' — your own Drive only (optional)',
+    'help.featureCommentsLead':   'Comments',
+    'help.featureCommentsBody':   ' — attach a note to any activity',
+    'help.featureTransfersLead':  'Reusable & transfers',
+    'help.featureTransfersBody':  ' — carry unfinished or repeating work into the next week',
+    'help.featureQuickAddLead':   'Quick add',
+    'help.featureQuickAddBody':   ' — drop a task on a branch without touching the map',
     'help.featureUndoLead':       'Undo / Redo',
     'help.featureUndoBody':       ' — made a typo? Revert anytime',
+    'help.featureBackupLead':     'Export / Import',
+    'help.featureBackupBody':     ' — full backup of every week as one JSON file',
+    'help.featureOfflineLead':    'Works offline',
+    'help.featureOfflineBody':    ' — installable, and edits made offline sync when you are back',
     'help.featureLangLead':       'EN / CS, Light / Dark',
     'help.featureLangBody':       ' — customize to fit your needs',
-    'help.hotkeysTitle':          'Activity hotkeys (On Hover)',
+    'help.hotkeysTitle':          'Activity hotkeys (hovered or focused)',
+    'help.moveFocus':             'Move focus',
+    'help.cyclePriority':         'Cycle priority',
+    'help.toggleReusable':        'Toggle Reusable',
+    'help.moveNextWeek':          'Move to next week',
+    'help.clearWeek':             'Clear week (root node)',
+    'help.agendaTitle':           'Agenda hotkeys',
+    'help.agendaNavItems':        'Move between items',
+    'help.agendaNavTabs':         'Previous / next day',
+    'help.agendaJumpTab':         'Jump to day',
+    'help.fitView':               'Fit to view',
+    'help.cycleViewLevel':        'Cycle view level',
+    'help.prevWeek':              'Previous week',
+    'help.nextWeek':              'Next week',
+    'help.currentWeek':           'Current week',
+    'help.navKeyboardDesc':       'Arrow keys move a focus ring from node to node — every activity hotkey then works on the focused node.',
     'help.rename':                'Rename',
     'help.add':                   'Add',
     'help.delete':                'Delete',
@@ -8081,6 +8151,8 @@ const TRANSLATIONS = {
     'help.featureMindmapBody':    ' — zobrazte svůj týden s vlastními větvemi',
     'help.featureAgendaLead':     'Agenda',
     'help.featureAgendaBody':     ' — stejný týden, dva pohledy',
+    'help.featureStatsLead':      'Statistika',
+    'help.featureStatsBody':      ' — rovnováha, trend a dokončenost týdne',
     'help.featureZoomLead':       'Úrovně zobrazení',
     'help.featureZoomBody':       ' — Kameny · Oblázky · Písek',
     'help.featureDayFilterLead':  'Filtr dne',
@@ -8095,11 +8167,36 @@ const TRANSLATIONS = {
     'help.featureBaselineBody':   ' — sledujte týdenní zátěž a celkový pokrok',
     'help.featureSyncLead':       'Synchronizace Disku Google',
     'help.featureSyncBody':       ' — pouze vlastní Drive (volitelné)',
+    'help.featureCommentsLead':   'Komentáře',
+    'help.featureCommentsBody':   ' — připojte poznámku k libovolné aktivitě',
+    'help.featureTransfersLead':  'Opakované úkoly a přenosy',
+    'help.featureTransfersBody':  ' — nedokončenou i opakující se práci přenesete do dalšího týdne',
+    'help.featureQuickAddLead':   'Rychlé přidání',
+    'help.featureQuickAddBody':   ' — přidejte úkol do větve bez zásahu do mapy',
     'help.featureUndoLead':       'Zpět / Znovu',
     'help.featureUndoBody':       ' — překlep? Vrátit lze kdykoliv',
+    'help.featureBackupLead':     'Export / Import',
+    'help.featureBackupBody':     ' — záloha všech týdnů v jednom JSON souboru',
+    'help.featureOfflineLead':    'Funguje offline',
+    'help.featureOfflineBody':    ' — lze nainstalovat a offline úpravy se po připojení samy synchronizují',
     'help.featureLangLead':       'EN / CS, Světlý / Tmavý',
     'help.featureLangBody':       ' — upravte si vše podle sebe',
-    'help.hotkeysTitle':          'Klávesové zkratky aktivit (při najetí)',
+    'help.hotkeysTitle':          'Klávesové zkratky aktivit (najetí nebo zaměření)',
+    'help.moveFocus':             'Přesun zaměření',
+    'help.cyclePriority':         'Přepínat prioritu',
+    'help.toggleReusable':        'Přepnout opakované',
+    'help.moveNextWeek':          'Přesunout na příští týden',
+    'help.clearWeek':             'Vyprázdnit týden (kořenový uzel)',
+    'help.agendaTitle':           'Klávesové zkratky Agendy',
+    'help.agendaNavItems':        'Pohyb mezi položkami',
+    'help.agendaNavTabs':         'Předchozí / další den',
+    'help.agendaJumpTab':         'Skok na den',
+    'help.fitView':               'Vyplnit pohled',
+    'help.cycleViewLevel':        'Přepínat úroveň zobrazení',
+    'help.prevWeek':              'Předchozí týden',
+    'help.nextWeek':              'Příští týden',
+    'help.currentWeek':           'Aktuální týden',
+    'help.navKeyboardDesc':       'Šipky posouvají zaměření mezi uzly — všechny zkratky aktivit pak platí pro zaměřený uzel.',
     'help.rename':                'Přejmenovat',
     'help.add':                   'Přidat',
     'help.delete':                'Smazat',
@@ -12964,6 +13061,128 @@ function scheduleRender() {
   _pendingRenderFrame = requestAnimationFrame(tick);
 }
 
+// ─── Mindmap keyboard focus ───────────────────────────────────────────────────
+// Every node hotkey reads hoveredNodeId, and only a pointer could ever set it —
+// so without a mouse there was no way to reach a node at all. The arrow keys
+// move a focus ring and point hoveredNodeId at it, which hands the whole
+// existing hotkey set to the keyboard without duplicating any of it.
+let kbFocusId = null;
+
+function isTypingTarget(el) {
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+}
+
+// Repaints the ring from kbFocusId. Also called after every render, since
+// render() rebuilds the node groups and drops the class with them.
+function paintKbFocus() {
+  document.querySelectorAll('.node-group').forEach(g =>
+    g.classList.toggle('kb-focus', kbFocusId !== null && g.getAttribute('data-id') === kbFocusId));
+}
+
+function clearKbFocus() {
+  if (kbFocusId === null) return;
+  if (hoveredNodeId === kbFocusId) hoveredNodeId = null;
+  kbFocusId = null;
+  paintKbFocus();
+}
+
+// Slide the map just far enough that the focused node clears the viewport edge —
+// arrowing off-screen otherwise loses the ring behind the toolbars.
+function panNodeIntoView(pos) {
+  const svg = document.getElementById('main-svg');
+  if (!svg || !pos) return;
+  const w = svg.clientWidth, h = svg.clientHeight;
+  if (!w || !h) return;
+  const pad = 80;
+  const halfW = (pos.w || 80) / 2 * zoom;
+  const halfH = (pos.h || 36) / 2 * zoom;
+  const sx = pos.x * zoom + panX;
+  const sy = pos.y * zoom + panY;
+  const before = { panX, panY };
+  if (sx - halfW < pad)          panX += pad - (sx - halfW);
+  else if (sx + halfW > w - pad) panX -= (sx + halfW) - (w - pad);
+  if (sy - halfH < pad)          panY += pad - (sy - halfH);
+  else if (sy + halfH > h - pad) panY -= (sy + halfH) - (h - pad);
+  if (panX !== before.panX || panY !== before.panY) applyTransform();
+}
+
+function setKbFocus(id, pos) {
+  kbFocusId = id;
+  hoveredNodeId = id;
+  paintKbFocus();
+  panNodeIntoView(pos);
+}
+
+// Nearest node in the pressed direction: inside a ~63° cone, scored so a node
+// that is both close and well-aligned wins. Geometry rather than tree order,
+// because a radial map has no "next sibling" the eye agrees with.
+function nearestNodeInDirection(positions, fromId, dx, dy) {
+  const from = positions[fromId];
+  if (!from) return null;
+  let best = null, bestScore = Infinity;
+  Object.keys(positions).forEach(id => {
+    if (id === fromId) return;
+    const p = positions[id];
+    const vx = p.x - from.x, vy = p.y - from.y;
+    const along = vx * dx + vy * dy;
+    if (along <= 0) return;                       // behind the direction pressed
+    const across = Math.abs(vx * dy - vy * dx);
+    if (across > along * 2) return;               // off to the side, not "that way"
+    const score = along + across * 2;
+    if (score < bestScore) { bestScore = score; best = id; }
+  });
+  return best;
+}
+
+function moveKbFocus(dx, dy) {
+  if (currentView !== 'mindmap') return;
+  const positions = computeLayout();
+  const start = kbFocusId || hoveredNodeId;
+  // First press lands on the root; from there the arrows walk outward.
+  if (!start || !positions[start]) {
+    setKbFocus('center', positions['center']);
+    return;
+  }
+  const next = nearestNodeInDirection(positions, start, dx, dy);
+  if (next) setKbFocus(next, positions[next]);
+}
+
+const ARROW_DIRS = {
+  ArrowLeft:  [-1, 0],
+  ArrowRight: [ 1, 0],
+  ArrowUp:    [ 0, -1],
+  ArrowDown:  [ 0, 1],
+};
+
+// ─── Node actions shared by the context menu and the hotkeys ──────────────────
+// Reusable cascades to the subtree: a repeating task repeats with its steps.
+function toggleReusableNode(nodeId) {
+  const n = findNode(nodeId);
+  if (!n) return;
+  takeSnapshot();
+  const newVal = !n.reusable;
+  (function setReusable(id) {
+    const node = findNode(id);
+    if (!node || node.type === 'counter') return;
+    node.reusable = newVal;
+    touchNode(id);
+    (node.children || []).forEach(setReusable);
+  })(nodeId);
+  saveWeek(currentWeekKey, weekData);
+  renderIfVisible();
+  if (currentView === 'agenda') renderAgenda();
+}
+
+// One key has to reach three priorities, so it cycles them.
+const PRIORITY_CYCLE = ['normal', 'high', 'critical'];
+function cyclePriority(nodeId) {
+  const n = findNode(nodeId);
+  if (!n) return;
+  const cur = n.priority || 'normal';
+  const next = PRIORITY_CYCLE[(PRIORITY_CYCLE.indexOf(cur) + 1) % PRIORITY_CYCLE.length];
+  setStatus(nodeId, `prio-${next}`);
+}
+
 // Global keyboard shortcuts for hovered node
 function _windowKeydownHandler(e) {
   if (editState) return; // Don't interfere with inline editing
@@ -13002,9 +13221,52 @@ function _windowKeydownHandler(e) {
     }
   }
 
+  // Global hotkeys for what used to be pointer-only: Help, fit, view level and
+  // week navigation. Modifier-free and never while an input has focus, like the
+  // view toggles above. Help answers even from on top of itself; the rest stand
+  // down while a modal is up, so Esc stays the only way out of one.
+  if (!e.metaKey && !e.ctrlKey && !e.altKey && !isTypingTarget(e.target)) {
+    const k = e.key.toLowerCase();
+    if (k === 'h' || e.key === '?') {
+      e.preventDefault();
+      toggleHelp();
+      return;
+    }
+    if (!isHelpOpen() && !isCommentDialogOpen()) {
+      // Bracket keys are the desktop pair; Shift+arrows cover the layouts where
+      // brackets need a modifier of their own (Czech included).
+      if (e.key === '[' || (e.shiftKey && e.key === 'ArrowLeft')) {
+        e.preventDefault();
+        stepWeek(-1);
+        return;
+      }
+      if (e.key === ']' || (e.shiftKey && e.key === 'ArrowRight')) {
+        e.preventDefault();
+        stepWeek(1);
+        return;
+      }
+      if (k === 't') {
+        e.preventDefault();
+        goToTodayWeek();
+        return;
+      }
+      if (currentView === 'mindmap' && !e.shiftKey) {
+        if (k === 'f') {
+          e.preventDefault();
+          fitMindmapView();
+          return;
+        }
+        if (k === 'v') {
+          e.preventDefault();
+          cycleViewLevel();
+          return;
+        }
+      }
+    }
+  }
+
   if (e.key === 'Escape') {
     const settings = document.getElementById('settings-dropdown');
-    const help = document.getElementById('help-overlay');
 
     if (isDayFilterMenuOpen()) {
       closeDayFilterMenu();
@@ -13020,13 +13282,8 @@ function _windowKeydownHandler(e) {
     }
     // Help sits on top of any view (Stats included), so it dismisses first —
     // otherwise leaving Stats would close both panels on a single press.
-    const helpPanel = document.getElementById('help-panel');
-    if (helpPanel && helpPanel.classList.contains('visible')) {
-      if (window.doCloseHelp) window.doCloseHelp();
-      else {
-        helpPanel.classList.remove('visible');
-        if (help) help.classList.remove('visible');
-      }
+    if (isHelpOpen()) {
+      closeHelp();
       return;
     }
     if (_statsPanelOpen) {
@@ -13042,6 +13299,10 @@ function _windowKeydownHandler(e) {
       settings.classList.remove('visible');
       const sFab = document.getElementById('fab-settings');
       if (sFab) sFab.classList.remove('active');
+      return;
+    }
+    if (kbFocusId) {
+      clearKbFocus();
       return;
     }
     if (currentView === 'agenda' && window.innerWidth >= 768) {
@@ -13141,6 +13402,15 @@ function _windowKeydownHandler(e) {
     }
   }
 
+  // Arrow keys walk the focus ring across the map. Shift+←/→ is week navigation
+  // and was already claimed above.
+  if (currentView === 'mindmap' && ARROW_DIRS[e.key]
+      && !e.metaKey && !e.ctrlKey && !e.shiftKey && !isTypingTarget(e.target)) {
+    e.preventDefault();
+    moveKbFocus(ARROW_DIRS[e.key][0], ARROW_DIRS[e.key][1]);
+    return;
+  }
+
   if (!hoveredNodeId) return;
 
   const id = hoveredNodeId;
@@ -13191,6 +13461,27 @@ function _windowKeydownHandler(e) {
     if (id !== 'center' && node.type !== 'branch') {
       e.preventDefault();
       setStatus(id, node.unplanned ? 'planned' : 'unplanned');
+    }
+  } else if (e.key.toLowerCase() === 'c') {
+    // Same targets the context menu offers a comment for.
+    if (node.type === 'activity' && !node.tickChild && !node.dayChild) {
+      e.preventDefault();
+      openCommentDialog(id);
+    }
+  } else if (e.key.toLowerCase() === 'r') {
+    if (node.type === 'activity') {
+      e.preventDefault();
+      toggleReusableNode(id);
+    }
+  } else if (e.key.toLowerCase() === 'n') {
+    if (node.type === 'activity') {
+      e.preventDefault();
+      moveNodeToNextWeek(id);
+    }
+  } else if (e.key.toLowerCase() === 'p') {
+    if (id !== 'center' && node.type !== 'branch' && node.type !== 'counter') {
+      e.preventDefault();
+      cyclePriority(id);
     }
   } else if (!e.metaKey && !e.ctrlKey && e.key >= '1' && e.key <= '8') {
     const KEY_TO_DAY = { '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0 };
@@ -13316,6 +13607,7 @@ function attachNodeListeners() {
     });
 
     g.addEventListener('mouseenter', () => {
+      clearKbFocus();   // the pointer takes the ring back over
       hoveredNodeId = id;
       if (id === 'center') return;
       const els = g._descendantEls;
@@ -13413,6 +13705,11 @@ function attachNodeListeners() {
       showContextMenu(e.clientX, e.clientY, id);
     });
   });
+
+  // render() rebuilt these groups, so the ring has to be repainted onto the new
+  // ones — and dropped if its node did not survive the change.
+  if (kbFocusId !== null && kbFocusId !== 'center' && !findNode(kbFocusId)) clearKbFocus();
+  else paintKbFocus();
 }
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
@@ -14029,25 +14326,7 @@ document.getElementById('ctx-unplanned').addEventListener('click', () => {
 });
 
 document.getElementById('ctx-reusable').addEventListener('click', () => {
-  if (contextTarget) {
-    const target = _agendaTickRedirect(contextTarget);
-    const n = findNode(target);
-    if (n) {
-      takeSnapshot();
-      const newVal = !n.reusable;
-      function setReusable(id) {
-        const node = findNode(id);
-        if (!node || node.type === 'counter') return;
-        node.reusable = newVal;
-        touchNode(id);
-        (node.children || []).forEach(setReusable);
-      }
-      setReusable(target);
-      saveWeek(currentWeekKey, weekData);
-      renderIfVisible();
-      if (currentView === 'agenda') renderAgenda();
-    }
-  }
+  if (contextTarget) toggleReusableNode(_agendaTickRedirect(contextTarget));
   hideContextMenu();
 });
 
@@ -15346,6 +15625,31 @@ function isHelpOpen() {
   return !!p && p.classList.contains('visible');
 }
 
+function openHelp() {
+  document.getElementById('help-overlay').classList.add('visible');
+  document.getElementById('help-panel').classList.add('visible');
+}
+
+function closeHelp() {
+  document.getElementById('help-overlay').classList.remove('visible');
+  document.getElementById('help-panel').classList.remove('visible');
+}
+// Kept as a window property: the Esc chain and switchView have called it through
+// window since Help was wired inside init.
+window.doCloseHelp = closeHelp;
+
+function toggleHelp() {
+  if (isHelpOpen()) closeHelp();
+  else openHelp();
+}
+
+// The comment dialog is modal over any view, so the global hotkeys check it the
+// same way they check Help.
+function isCommentDialogOpen() {
+  const p = document.getElementById('comment-panel');
+  return !!p && p.classList.contains('visible');
+}
+
 // Mindmap, Agenda and Stats are peer views. Each switch fully owns the three
 // content layers (canvas, agenda panel, stats panel) so no hidden view stays
 // "live" behind another — the source of the earlier stale-control bugs.
@@ -15356,7 +15660,12 @@ function switchView(view) {
   // any view dismisses it first so the destination is actually visible.
   if (window.doCloseHelp) window.doCloseHelp();
   // The mobile level row belongs to the mindmap; leaving it takes the row along.
-  if (view !== 'mindmap') closeViewLevels();
+  // So does the keyboard focus ring — hoveredNodeId must not follow the user
+  // into a view where nothing can clear it.
+  if (view !== 'mindmap') {
+    closeViewLevels();
+    clearKbFocus();
+  }
   localStorage.setItem('zenit-week-view', view);
   document.documentElement.dataset.view = view;
   const canvasEl   = document.getElementById('canvas-container');
@@ -16428,15 +16737,21 @@ function updateWeekBar() {
   label.setAttribute('aria-label', text);
 }
 
-(function wireWeekBar() {
-  const step = (delta) => loadAndRender(offsetWeek(currentWeekKey, delta));
-  document.getElementById('week-bar-prev').addEventListener('click', () => step(-1));
-  document.getElementById('week-bar-next').addEventListener('click', () => step(+1));
+// Week navigation, shared by the bar's arrows and the [ / ] hotkeys.
+function stepWeek(delta) {
+  return loadAndRender(offsetWeek(currentWeekKey, delta));
+}
 
-  document.getElementById('week-bar-label').addEventListener('click', () => {
-    const twk = todayWeekKey();
-    if (twk !== currentWeekKey) loadAndRender(twk);
-  });
+function goToTodayWeek() {
+  const twk = todayWeekKey();
+  if (twk !== currentWeekKey) return loadAndRender(twk);
+}
+
+(function wireWeekBar() {
+  document.getElementById('week-bar-prev').addEventListener('click', () => stepWeek(-1));
+  document.getElementById('week-bar-next').addEventListener('click', () => stepWeek(+1));
+
+  document.getElementById('week-bar-label').addEventListener('click', () => goToTodayWeek());
 
   const actions = document.getElementById('week-bar-actions');
   actions.addEventListener('click', (e) => {
@@ -16586,6 +16901,13 @@ function _setViewLevel(level) {
   _toast.classList.add('visible');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => _toast.classList.remove('visible'), 1200);
+}
+
+// Sand → Pebbles → Rocks → Sand. The swipe walks the same list one step at a
+// time; the V hotkey wraps, so one key still reaches all three.
+function cycleViewLevel() {
+  const idx = VIEW_LEVELS.indexOf(currentViewLevel);
+  _setViewLevel(VIEW_LEVELS[(idx + 1) % VIEW_LEVELS.length]);
 }
 
 function showToast(msg, duration = 2000) {
@@ -17235,27 +17557,12 @@ window.addEventListener('load', async () => {
 
 
   // Help panel listeners
-  const helpOverlay = document.getElementById('help-overlay');
-  const helpPanel = document.getElementById('help-panel');
-  const helpClose = document.getElementById('help-close');
-
-  const doOpenHelp = () => {
-    helpOverlay.classList.add('visible');
-    helpPanel.classList.add('visible');
-  };
-
-  const doCloseHelp = () => {
-    helpOverlay.classList.remove('visible');
-    helpPanel.classList.remove('visible');
-  };
-  window.doCloseHelp = doCloseHelp;
-
   const settingsHelpBtn = document.getElementById('settings-help-btn');
   if (settingsHelpBtn) {
     settingsHelpBtn.addEventListener('click', () => {
       settingsDropdown.classList.remove('visible');
       settingsFab.classList.remove('active');
-      doOpenHelp();
+      openHelp();
     });
   }
 
@@ -17272,10 +17579,10 @@ window.addEventListener('load', async () => {
   document.getElementById('redo-btn').addEventListener('click', () => redo());
   updateUndoRedoButtons();
 
-  helpClose.addEventListener('click', doCloseHelp);
-  helpOverlay.addEventListener('click', doCloseHelp);
+  document.getElementById('help-close').addEventListener('click', closeHelp);
+  document.getElementById('help-overlay').addEventListener('click', closeHelp);
   const helpCloseMobile = document.getElementById('help-close-mobile');
-  if (helpCloseMobile) helpCloseMobile.addEventListener('click', doCloseHelp);
+  if (helpCloseMobile) helpCloseMobile.addEventListener('click', closeHelp);
 
   // Comment dialog close wiring
   document.getElementById('comment-close').addEventListener('click', () => closeCommentDialog());

@@ -390,6 +390,11 @@ _state.getCurrentView = function() { return currentView; };
 _state.setCurrentView = function(v) { currentView = v; };
 _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
+// hoveredNodeId / kbFocusId are module-level \`let\`s — the hotkeys read the first
+// and the arrow keys write the second, so both need an accessor to test.
+_state.setHoveredNode = function(id) { hoveredNodeId = id; };
+_state.getHoveredNode = function() { return hoveredNodeId; };
+_state.getKbFocus = function() { return kbFocusId; };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 _state.setViewLevel = function(v) { currentViewLevel = v; };
