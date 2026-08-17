@@ -104,14 +104,15 @@ describe('week label', () => {
     expect(formatWeekParts(...W36).rangePart).toBe('31. srpen - 6. září');
   });
 
-  it('joins to a single line by default', () => {
+  it('joins the parts to a single line', () => {
     const label = formatWeekLabel(...W34);
     expect(label).toBe('Week 34 (Aug 17 - Aug 23)');
     expect(label).not.toContain('\n');
   });
 
-  it('breaks the line only when asked (transitional SVG root form)', () => {
-    expect(formatWeekLabel(...W34, true)).toBe('Week 34\n(Aug 17 - Aug 23)');
+  it('joins in Czech too', () => {
+    _state.setLang('cs');
+    expect(formatWeekLabel(...W34)).toBe('Týden 34 (17. - 23. srpen)');
   });
 });
 

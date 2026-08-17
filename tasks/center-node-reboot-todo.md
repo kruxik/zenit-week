@@ -62,14 +62,39 @@ after S1. Check off only when AC + verification pass.
   so much padding inside their viewBox that the inherited 16px read as decoration.
 - `icon-dots` symbol added (three circles, Tabler style) for the `⋯` trigger.
 
-## S2b — Strip center chrome
-- [ ] T2.9 — Delete the two `week-nav-btn` brick groups from `makeNodeGroup`'s `isCenter` branch.
-- [ ] T2.10 — Delete `.gear-btn` and the `.center-outer-pill` rect.
-- [ ] T2.11 — Delete the `.week-nav-*` and `.center-outer-pill` CSS blocks.
-- [ ] T2.12 — Remove both `e.target.closest('.week-nav-btn')` guards (`pointerdown`, `click`).
-- [ ] T2.13 — Center label → `centerDisplayName()` in `_computeNodeSize` **and** the render path.
-- [ ] T2.14 — `npm test` green with `layout` / `reset-view` / `zoom` tests **unmodified**.
-- [ ] **C2 checkpoint** — week nav works at any zoom/pan; human review before the ring.
+## S2b — Strip center chrome ✅
+- [x] T2.9 — Both `week-nav-btn` brick groups deleted from `makeNodeGroup`'s `isCenter` branch.
+- [x] T2.10 — `.gear-btn` group and `.center-outer-pill` rect deleted.
+- [x] T2.11 — 69 lines of `.gear-btn` / `.gear-bg` / `.center-outer-pill` / `.week-nav-*` CSS deleted.
+- [x] T2.12 — Both `.week-nav-btn` guards and the `.gear-btn` guard removed; the
+      gear and week-nav click listeners deleted with them.
+- [x] T2.13 — Center label → `centerDisplayName()` in `_computeNodeSize` and the render
+      path; the transitional `multiline` flag retired as promised in S1.
+- [x] T2.14 — `npm test` 838 passed with `layout` / `reset-view` / `zoom` **unmodified**
+      (`git diff --stat` on all three is empty), `npm run validate` clean.
+
+### S2b verified in a real browser
+| Check | Result |
+|---|---|
+| Signed out / signed in root label | `You` → `Petr` (via the stored-auth restore path) |
+| Root node box | 240×82 single pill — was 240×~242 with the bricks |
+| `+ Branch` buttons | both still present |
+| Stray `.week-nav-btn` / `.gear-btn` / `.center-outer-pill` in the DOM | zero |
+| Right-click the root | week menu opens with Transfer Unfinished and Clear the Week |
+| Drag the root | still pans the canvas |
+
+### S2b additions beyond the plan
+- **Sign-in and sign-out now `scheduleRender()`.** The S1 note turned out to be real:
+  nothing redrew the map on an identity change, so the root would have kept the stale
+  wording. A text patch would not do — the node's width follows its label, and a 16-char
+  name exceeds the 240px minimum.
+- **`formatWeekLabel` was left with no callers** once the root stopped using it, while
+  `updateWeekBar` re-joined the same two parts by hand. Pointed the latter at the former
+  rather than leaving dead code beside a duplicate.
+
+---
+
+## ⏸ C2 checkpoint — awaiting human review before S3 (the ring)
 
 ## S3 — Completion ring
 - [ ] T3.1 — Track path (`--border-soft`) + accent arc via `stroke-dasharray` from

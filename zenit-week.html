@@ -11,7 +11,7 @@
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
                'sha256-bD23RX3RrXNbQIqS7jP3nAdmiSfKi0rzUcA06O3mIAs='
-               'sha256-I1eX1qUiFepj3nMUP8DVJqCLxLujxLseOaOrsnTcyy4='
+               'sha256-KObMVzi5VvL+JHyTESt2niIIKqwZVzP5df9OSAnEqXE='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3221,75 +3221,6 @@
     opacity: 0.7;
   }
 
-  .gear-btn {
-    cursor: pointer;
-    opacity: 0.6;
-    transition: opacity 0.2s;
-  }
-  .gear-btn:hover {
-    opacity: 1;
-  }
-  .gear-bg {
-    transition: fill 0.2s;
-  }
-  .gear-btn:hover .gear-bg {
-    fill: rgba(255,255,255,0.25);
-  }
-
-  .center-outer-pill {
-    fill: #ECECEC;
-    stroke: #D0D0D0;
-    stroke-width: 1;
-  }
-  html[data-theme="dark"] .center-outer-pill {
-    fill: #262626;
-    stroke: #3a3a3a;
-  }
-
-  .week-nav-btn {
-    cursor: pointer;
-  }
-  .week-nav-btn .week-nav-bg {
-    fill: transparent;
-    transition: fill 0.15s;
-  }
-  .week-nav-btn:hover .week-nav-bg {
-    fill: rgba(0,0,0,0.06);
-  }
-  html[data-theme="dark"] .week-nav-btn:hover .week-nav-bg {
-    fill: rgba(255,255,255,0.08);
-  }
-  .week-nav-btn.today-direction .week-nav-bg {
-    fill: #E8A020;
-  }
-  .week-nav-btn.today-direction:hover .week-nav-bg {
-    fill: #f0b440;
-  }
-  .week-nav-btn .week-nav-text,
-  .week-nav-btn .week-nav-icon {
-    fill: #444444;
-    stroke: #444444;
-  }
-  .week-nav-btn .week-nav-text {
-    stroke: none;
-  }
-  .week-nav-btn .week-nav-icon {
-    fill: none;
-  }
-  html[data-theme="dark"] .week-nav-btn .week-nav-text,
-  html[data-theme="dark"] .week-nav-btn .week-nav-icon {
-    fill: #cccccc;
-    stroke: #cccccc;
-  }
-  html[data-theme="dark"] .week-nav-btn .week-nav-text { stroke: none; }
-  html[data-theme="dark"] .week-nav-btn .week-nav-icon { fill: none; }
-  .week-nav-btn.today-direction .week-nav-text,
-  .week-nav-btn.today-direction .week-nav-icon {
-    fill: #1a1a1a;
-    stroke: #1a1a1a;
-  }
-  .week-nav-btn.today-direction .week-nav-text { stroke: none; }
-  .week-nav-btn.today-direction .week-nav-icon { fill: none; }
 
   #inline-input {
     position: fixed;
@@ -5647,7 +5578,7 @@ function getNodeSize(nodeId) {
 }
 
 function _computeNodeSize(nodeId) {
-  const node = (nodeId === 'center') ? { type: 'center', label: formatWeekLabel(...Object.values(parseWeekKey(currentWeekKey)), true) } : findNode(nodeId);
+  const node = (nodeId === 'center') ? { type: 'center', label: centerDisplayName() } : findNode(nodeId);
   if (!node) return { w: 0, h: 0 };
 
   const type = node.type || 'activity';
@@ -5887,6 +5818,9 @@ function showSignedInAvatar(user) {
   googleUserPhoto = user?.photoLink   || '';
   googleUserInitials = getInitials(user?.displayName || googleUserEmail || '?');
   googleUserInitialsColor = hashColor(googleUserEmail || googleUserInitials);
+  // Signing in renames the root node from the signed-out wording to a first
+  // name, and the node's width follows its label — so redraw, don't patch text.
+  scheduleRender();
 
   const btn       = document.getElementById('sync-btn');
   const avatarBtn = document.getElementById('sync-avatar-btn');
@@ -5943,6 +5877,10 @@ function showSignedOutButton(labelKey = 'sync.btnLabel') {
   googleUserInitials = '';
   googleUserInitialsColor = '';
   lastSyncedAt = null;
+  // The root node is labelled with the signed-in first name, so losing the
+  // identity changes the map. Its width follows the label, so this is a
+  // re-render rather than a text patch.
+  scheduleRender();
 }
 
 // Legacy cleanup: before the HttpOnly-cookie change the refresh token was kept
@@ -8252,12 +8190,9 @@ function formatWeekParts(year, week) {
   return { weekPart, rangePart: `${mStart} - ${mEnd}` };
 }
 
-// One line by default. `multiline` is the transitional form for the SVG root
-// node, which still carries the week label until the week bar takes it over;
-// drop the flag together with those call sites.
-function formatWeekLabel(year, week, multiline = false) {
+function formatWeekLabel(year, week) {
   const { weekPart, rangePart } = formatWeekParts(year, week);
-  return `${weekPart}${multiline ? '\n' : ' '}(${rangePart})`;
+  return `${weekPart} (${rangePart})`;
 }
 
 function parseWeekKey(key) {
@@ -10026,20 +9961,6 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const isDarkTheme = document.documentElement.dataset.theme === 'dark';
   const btnSymbolColor = isDarkTheme ? '#1a1a1a' : '#ffffff';
 
-  if (isCenter) {
-    // Outer pill wraps middle (week) brick + top/bottom nav bricks — looks
-    // like the bottom Agenda/Mindmap pill: container with an "active" inner.
-    const navBrickH = Math.round(boxH * 0.5);
-    const outerH = boxH + 2 * navBrickH;
-    g.appendChild(svgEl('rect', {
-      class: 'center-outer-pill',
-      x: -boxW / 2, y: -outerH / 2,
-      width: boxW, height: outerH,
-      rx: rx,
-      filter: 'url(#shadow)',
-    }));
-  }
-
   const rect = svgEl('rect', {
     class: 'node-rect',
     x: -boxW / 2, y: -boxH / 2,
@@ -10052,82 +9973,10 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   });
   g.appendChild(rect);
 
-  // Gear Icon for center node
+  // "+ Branch" buttons on the center node's left and right edges. Week label,
+  // navigation and the week-actions gear all moved to #week-bar — they were
+  // global chrome sitting in a pannable coordinate space.
   if (isCenter) {
-    const gearG = svgEl('g', {
-      class: 'gear-btn',
-      'transform': `translate(${boxW/2 - 42}, ${-boxH/2 + 32})`
-    });
-    const gearCircle = svgEl('circle', { cx: 0, cy: 0, r: 21, fill: 'rgba(255,255,255,0.1)', class: 'gear-bg' });
-    const gearIcon = svgEl('use', {
-      href: '#icon-settings',
-      x: -15, y: -15, width: 30, height: 30,
-      stroke: textColor, 'stroke-width': 1.5, fill: 'none',
-      'pointer-events': 'none',
-    });
-    gearG.appendChild(gearCircle);
-    gearG.appendChild(gearIcon);
-    g.appendChild(gearG);
-
-    // Week-nav bricks attached above/below center node (inside outer pill)
-    const twk = todayWeekKey();
-    const isPast = currentWeekKey < twk;
-    const isFuture = currentWeekKey > twk;
-    const brickH = Math.round(boxH * 0.5);
-    const brickInnerRx = Math.max(0, rx - 4);
-    const navIconH = 18;
-    const navFontSize = 14;
-    const navFontWeight = '600';
-    const navGap = 8;
-    [
-      { dir: 'prev', icon: 'caret-up',   yTop: -boxH / 2 - brickH, todayDir: isFuture, delta: -1 },
-      { dir: 'next', icon: 'caret-down', yTop:  boxH / 2,          todayDir: isPast,   delta: +1 },
-    ].forEach(({ dir, icon, yTop, todayDir, delta }) => {
-      const targetKey = offsetWeek(currentWeekKey, delta);
-      const { week: targetWeek } = parseWeekKey(targetKey);
-      const label = `${t(dir === 'prev' ? 'nav.prev' : 'nav.next')} · ${t('week.short')}${targetWeek}`;
-      const labelW = measureText(label, navFontSize, navFontWeight);
-      const groupW = navIconH + navGap + labelW;
-      const iconCx = -groupW / 2 + navIconH / 2;
-      const textX  = iconCx + navIconH / 2 + navGap;
-      const cy = yTop + brickH / 2;
-
-      const brickG = svgEl('g', {
-        class: `week-nav-btn week-nav-${dir}${todayDir ? ' today-direction' : ''}`,
-        title: dir === 'prev' ? 'Previous week' : 'Next week',
-      });
-      // Inset hit/highlight rect — sits inside the outer pill with small
-      // padding so hover and today-direction states read as inner buttons.
-      brickG.appendChild(svgEl('rect', {
-        class: 'week-nav-bg',
-        x: -boxW / 2 + 3, y: yTop + 3,
-        width: boxW - 6, height: brickH - 6,
-        rx: brickInnerRx,
-      }));
-      brickG.appendChild(svgEl('use', {
-        class: 'week-nav-icon',
-        href: `#icon-${icon}`,
-        x: iconCx - navIconH / 2, y: cy - navIconH / 2,
-        width: navIconH, height: navIconH,
-        'stroke-width': 1.5, fill: 'none',
-        'pointer-events': 'none',
-      }));
-      const txt = svgEl('text', {
-        class: 'week-nav-text',
-        x: textX, y: cy,
-        'text-anchor': 'start',
-        'dominant-baseline': 'middle',
-        'font-family': 'inherit',
-        'font-size': navFontSize,
-        'font-weight': navFontWeight,
-        'pointer-events': 'none',
-      });
-      txt.textContent = label;
-      brickG.appendChild(txt);
-      g.appendChild(brickG);
-    });
-
-    // "+ Branch" buttons on left and right edges of center node
     const centerBtnColor = document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666';
     const centerBtnR = 10 * 1.5 * 1.5;
     const centerArm = 4.5 * 1.5 * 1.5;
@@ -12837,10 +12686,9 @@ function render() {
     drawEdges(bid, 0);
   });
 
-  // Draw center node
-  const { year: y, week: w } = parseWeekKey(currentWeekKey);
-  const centerLabel = formatWeekLabel(y, w, true);
-  const centerG = makeNodeGroup('center', 0, 0, centerLabel, 'center', null, null, null);
+  // Draw center node. Its label is the user, not the week — the week and its
+  // navigation live in #week-bar.
+  const centerG = makeNodeGroup('center', 0, 0, centerDisplayName(), 'center', null, null, null);
   nodesG.appendChild(centerG);
 
   // Draw all other nodes
@@ -13260,25 +13108,6 @@ function attachNodeListeners() {
       });
     });
 
-    // Gear button
-    g.querySelectorAll('.gear-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        showContextMenu(e.clientX, e.clientY, id);
-      });
-    });
-
-    // Week-nav buttons (prev/next week)
-    g.querySelectorAll('.week-nav-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const delta = btn.classList.contains('week-nav-prev') ? -1 : +1;
-        loadAndRender(offsetWeek(currentWeekKey, delta));
-      });
-    });
-
     g.addEventListener('mouseenter', () => {
       hoveredNodeId = id;
       if (id === 'center') return;
@@ -13299,7 +13128,6 @@ function attachNodeListeners() {
       if (e.target.closest('.add-btn')) return;
       if (e.target.closest('.add-branch-btn')) return;
       if (e.target.closest('.counter-btn')) return;
-      if (e.target.closest('.week-nav-btn')) return;
       if (e.target.closest('.comment-badge')) return;
 
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -13346,8 +13174,6 @@ function attachNodeListeners() {
       if (e.target.closest('.add-btn')) return;
       if (e.target.closest('.add-branch-btn')) return;
       if (e.target.closest('.counter-btn')) return;
-      if (e.target.closest('.week-nav-btn')) return;
-      if (e.target.closest('.gear-btn')) return;
       if (e.target.closest('.drag-handle')) return;
       if (id === 'center') return;
       document.querySelectorAll('.node-group.selected').forEach(el => {
@@ -16386,7 +16212,7 @@ function updateWeekBar() {
   // The visible label drops its date range on narrow viewports, so the full
   // wording lives on the button itself — for tooltips and for screen readers.
   const label = document.getElementById('week-bar-label');
-  const full = `${weekPart} (${rangePart})`;
+  const full = formatWeekLabel(year, week);
   const text = onCurrentWeek ? full : `${full} — ${t('weekbar.today')}`;
   label.title = text;
   label.setAttribute('aria-label', text);
