@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-4b/IECxCNNwFsgvFUdoLiBeOKWyrbxHo1rDxq/XVCf4='
+               'sha256-PWGACc6P5J6X4d14lT4/XHHV8wDrmxgZDPZx5JDSWG4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -844,6 +844,15 @@
   #day-filter-chip-clear:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
+  }
+
+  /* View levels and the day filter hide by pruning nodes out of the layout, but
+     the elements stay in the SVG carrying this class. Rebuilding them on every
+     switch cost 40 ms of frozen main thread before the animation could even
+     start; display:none keeps them out of layout, paint and hit-testing until a
+     switch brings them back, so repackLayout() only has to toggle the class. */
+  .view-hidden {
+    display: none;
   }
 
   /* Opacity transitions for view level fading */
@@ -10471,6 +10480,35 @@ function taperedPathD(x1, y1, x2, y2, swStart, swEnd) {
          `L ${b_x2} ${b_y2} C ${b_c2x} ${b_c2y} ${b_c1x} ${b_c1y} ${b_x1} ${b_y1} Z`;
 }
 
+// Nearest ancestor the given layout actually placed, the node itself included.
+// Pruned nodes park here so they have somewhere to sit while hidden, and
+// appearing nodes grow out of here — both read the same fallback chain.
+function nearestPlacedPos(positions, nodeId) {
+  let cur = findNode(nodeId);
+  while (cur) {
+    if (positions[cur.id]) return positions[cur.id];
+    cur = findNode(cur.parent);
+  }
+  return positions['center'] || { x: 0, y: 0, side: 'right' };
+}
+
+// The two ends of a parent→child bezier, each anchored on the facing edge of its
+// node's box, on the side the parent sits on. `at` resolves an id to a position,
+// so render() can pass a resolver that parks pruned nodes while repackLayout()
+// passes the bare layout and hides whatever it cannot place.
+function edgeEndpoints(fromId, toId, at) {
+  const isCenter = fromId === 'center';
+  const cPos = at(toId);
+  const pPos = isCenter ? { x: 0, y: 0 } : at(fromId);
+  if (!pPos || !cPos) return null;
+  const side = isCenter ? cPos.side : pPos.side;
+  const pW = isCenter ? CENTER_W : getNodeSize(fromId).w;
+  const cW = getNodeSize(toId).w;
+  return side === 'left'
+    ? { x1: pPos.x - pW / 2, y1: pPos.y, x2: cPos.x + cW / 2, y2: cPos.y }
+    : { x1: pPos.x + pW / 2, y1: pPos.y, x2: cPos.x - cW / 2, y2: cPos.y };
+}
+
 // Edge color: done child uses muted DONE_BORDER, else branch color.
 // Mirrors the cascade: when a parent is marked done, all descendants get
 // node.done=true, so each of their incoming edges turns muted in turn.
@@ -11895,12 +11933,12 @@ function applyFilters() {
   const nodesLayer = document.getElementById('nodes-layer');
   if (!nodesLayer) return;
 
-  // Both filters hide by pruning in computeLayout — pruned nodes get no position
-  // and are never rendered — so anything that reached the DOM is a node the
-  // filters kept. All that remains is virtual-done: a parent whose matching
-  // leaves are all done reads as done for the filtered day, without the data
-  // saying so.
-  nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
+  // Both filters hide by pruning in computeLayout, but pruned nodes stay in the
+  // DOM under .view-hidden so a switch can reveal them without rebuilding — so
+  // presence no longer proves the filters kept a node, and the hidden ones are
+  // skipped. All that remains is virtual-done: a parent whose matching leaves
+  // are all done reads as done for the filtered day, without the data saying so.
+  nodesLayer.querySelectorAll('.node-group[data-id]:not(.view-hidden)').forEach(g => {
     applyVirtualDoneUI(g.dataset.id, isVirtuallyDone(g.dataset.id));
   });
 }
@@ -12941,41 +12979,29 @@ function render() {
     return BRANCH_COLORS[branch]?.main || '#888';
   }
 
-  // Draw all edges
+  // Pruned nodes are built too — hidden, and parked on their nearest surviving
+  // ancestor — so a view or filter switch can repack without building anything.
+  const placed = (id) => positions[id] || nearestPlacedPos(positions, id);
+
+  // Draw all edges, pruned ones included but hidden.
   function drawEdges(nodeId, depth) {
     const node = findNode(nodeId);
     if (!node) return;
-    const pos = positions[nodeId];
-    if (!pos) return;
-    const side = pos.side;
     const branch = node.branch || node.id;
-    const { w: nodeW } = getNodeSize(nodeId);
 
     (node.children || []).forEach(childId => {
-      const childPos = positions[childId];
-      if (!childPos) return;
       const childNode = findNode(childId);
       if (!childNode) return; // Prevent orphan lines
       // Inbox nodes have no bezier to their branch, but recurse to draw their day-leaf connections
       if (!childNode.inbox) {
-        const { w: childW } = getNodeSize(childId);
-        const color = edgeColorFor(childId, branch);
-
         // Level2 (depth=0): branch→activity; Level3+ (depth≥1): deeper nesting
-        let swStart, swEnd;
-        if (depth === 0) { swStart = 8;   swEnd = 5.3; }
-        else             { swStart = 5.3; swEnd = 3.5; }
-
-        let x1, x2;
-        if (side === 'left') {
-          x1 = pos.x - nodeW / 2;
-          x2 = childPos.x + childW / 2;
-        } else {
-          x1 = pos.x + nodeW / 2;
-          x2 = childPos.x - childW / 2;
-        }
-
-        linesG.appendChild(makeTaperedCurve(x1, pos.y, x2, childPos.y, color, swStart, swEnd, nodeId, childId, defsEl));
+        const swStart = depth === 0 ? 8   : 5.3;
+        const swEnd   = depth === 0 ? 5.3 : 3.5;
+        const e = edgeEndpoints(nodeId, childId, placed);
+        const edge = makeTaperedCurve(e.x1, e.y1, e.x2, e.y2,
+          edgeColorFor(childId, branch), swStart, swEnd, nodeId, childId, defsEl);
+        if (!positions[nodeId] || !positions[childId]) edge.classList.add('view-hidden');
+        linesG.appendChild(edge);
       }
       drawEdges(childId, depth + 1);
     });
@@ -12984,16 +13010,11 @@ function render() {
   // Draw center → branch edges
   const branchIds = weekData.nodes.filter(n => n.type === 'branch').map(n => n.id);
   branchIds.forEach(bid => {
-    const bPos = positions[bid];
-    if (!bPos) return;
-    const color = edgeColorFor(bid, bid);
-    const side = bPos.side;
-    const { w: bW } = getNodeSize(bid);
-
-    let x1 = (side === 'left' ? -CENTER_W / 2 : CENTER_W / 2);
-    let x2 = (side === 'left' ? bPos.x + bW / 2 : bPos.x - bW / 2);
-
-    linesG.appendChild(makeTaperedCurve(x1, 0, x2, bPos.y, color, 12, 8, 'center', bid, defsEl));
+    const e = edgeEndpoints('center', bid, placed);
+    const edge = makeTaperedCurve(e.x1, e.y1, e.x2, e.y2,
+      edgeColorFor(bid, bid), 12, 8, 'center', bid, defsEl);
+    if (!positions[bid]) edge.classList.add('view-hidden');
+    linesG.appendChild(edge);
     drawEdges(bid, 0);
   });
 
@@ -13002,16 +13023,16 @@ function render() {
   const centerG = makeNodeGroup('center', 0, 0, centerDisplayName(), 'center', null, null, null);
   nodesG.appendChild(centerG);
 
-  // Draw all other nodes
+  // Draw all other nodes, pruned ones included but hidden.
   weekData.nodes.forEach(node => {
     if (node._editing) return;
-    const pos = positions[node.id];
-    if (!pos) return;
+    const pos = placed(node.id);
     const g = makeNodeGroup(
       node.id, pos.x, pos.y, node.label,
       node.type, node.branch || node.id, node, pos.side
     );
     if (node.inbox || (node.dayChild && findNode(node.parent)?.inbox)) g.setAttribute('opacity', '0.55');
+    if (!positions[node.id]) g.classList.add('view-hidden');
     nodesG.appendChild(g);
   });
 
@@ -13020,6 +13041,7 @@ function render() {
   updateSummary();
 
   document.body.classList.remove('app-loading');
+  return positions;
 }
 
 // Skip mindmap render when canvas is display:none (mobile + agenda view).
@@ -16570,10 +16592,57 @@ document.addEventListener('pointerdown', (e) => {
 // The visible nodes then slide from their previous positions into the tighter
 // packing, so the change reads as one motion instead of a jump cut.
 const VIEW_SLIDE_MS = 300;
+// Move the SVG that is already on screen into a freshly computed layout. Every
+// node is in the DOM whatever the view level — render() builds the pruned ones
+// hidden — so a switch is a matter of toggling .view-hidden and repositioning
+// the survivors, with nothing built and nothing thrown away. Rebuilding instead
+// froze the main thread for 40 ms before the animation could start.
+//
+// Returns the new layout, matching render(), and falls back to a full render
+// when there is no map on screen yet to repack.
+function repackLayout() {
+  const nodesLayer = document.getElementById('nodes-layer');
+  const linesLayer = document.getElementById('lines-layer');
+  if (!nodesLayer || !linesLayer) return render();
+
+  const positions = computeLayout();
+  const at = (id) => positions[id];
+
+  nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
+    const pos = positions[g.dataset.id];
+    g.classList.toggle('view-hidden', !pos);
+    if (pos) g.setAttribute('transform', `translate(${pos.x},${pos.y})`);
+  });
+
+  const defsEl = document.querySelector('#map-root defs');
+  linesLayer.querySelectorAll('path[data-to]').forEach(p => {
+    const fromId = p.getAttribute('data-from');
+    const toId = p.getAttribute('data-to');
+    const e = edgeEndpoints(fromId, toId, at);
+    p.classList.toggle('view-hidden', !e);
+    if (!e) return;
+    // Stroke widths come from the node's depth, which a repack never changes,
+    // so they are read back off the path rather than re-derived.
+    p.setAttribute('d', taperedPathD(e.x1, e.y1, e.x2, e.y2,
+      +p.getAttribute('data-sw-start'), +p.getAttribute('data-sw-end')));
+    p.setAttribute('data-x1', e.x1); p.setAttribute('data-y1', e.y1);
+    p.setAttribute('data-x2', e.x2); p.setAttribute('data-y2', e.y2);
+    const grad = defsEl && defsEl.querySelector(`#grad-${fromId || 'c'}-${toId || 'c'}`);
+    if (grad) {
+      grad.setAttribute('x1', e.x1); grad.setAttribute('y1', e.y1);
+      grad.setAttribute('x2', e.x2); grad.setAttribute('y2', e.y2);
+    }
+  });
+
+  applyFilters();
+  updateSummary();
+  return positions;
+}
+
 function repackWithSlide(mutate) {
   const fromPos = computeLayout(); // snapshot the layout we're leaving
   mutate();
-  render(); // rebuilds the SVG with the repacked layout
+  repackLayout(); // moves the existing SVG into the repacked layout
   // reduce-effects already folds in prefers-reduced-motion (set at load).
   if (document.documentElement.classList.contains('reduce-effects')) return;
   animateViewSlide(fromPos);
@@ -16787,14 +16856,7 @@ function animateViewSlide(fromPos) {
   if (!nodesLayer || typeof nodesLayer.querySelectorAll !== 'function') return;
   if (typeof requestAnimationFrame !== 'function') return;
   const toPos = computeLayout(); // matches what render() just drew (new level)
-  const originFor = (id) => {
-    let cur = findNode(id);
-    while (cur) {
-      if (fromPos[cur.id]) return fromPos[cur.id];
-      cur = findNode(cur.parent);
-    }
-    return fromPos['center'] || { x: 0, y: 0 };
-  };
+  const originFor = (id) => nearestPlacedPos(fromPos, id);
 
   // Elements that fade in. Writing style.opacity on each of them every frame was
   // the single most expensive thing in this animation — with .node-group and
@@ -16817,7 +16879,7 @@ function animateViewSlide(fromPos) {
 
   // Node tweens: from old (or ancestor origin) center → new center.
   const nodeTweens = [];
-  nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
+  nodesLayer.querySelectorAll('.node-group[data-id]:not(.view-hidden)').forEach(g => {
     const to = toPos[g.dataset.id];
     if (!to) return;
     const appearing = !fromPos[g.dataset.id];
@@ -16832,7 +16894,7 @@ function animateViewSlide(fromPos) {
   // ±width/2 offset baked into the final endpoint is constant, so this holds.
   const centerC = { x: 0, y: 0 };
   const edgeTweens = [];
-  if (linesLayer) linesLayer.querySelectorAll('path[data-to]').forEach(p => {
+  if (linesLayer) linesLayer.querySelectorAll('path[data-to]:not(.view-hidden)').forEach(p => {
     const fromId = p.getAttribute('data-from');
     const toId = p.getAttribute('data-to');
     const fx1 = +p.getAttribute('data-x1'), fy1 = +p.getAttribute('data-y1');
