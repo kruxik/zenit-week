@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Ss2aEUgSMob2dcew2V/4Zo+ATKsK5aJ6RaX44E3Mmmk='
+               'sha256-j63rPXJ+X88rzncbBvFMZIlqToqojxzwBGCGBR2r1F8='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -10157,16 +10157,19 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const isDarkTheme = document.documentElement.dataset.theme === 'dark';
   const btnSymbolColor = isDarkTheme ? '#1a1a1a' : '#ffffff';
 
-  const rect = svgEl('rect', {
+  const paint = {
     class: 'node-rect',
-    x: -boxW / 2, y: -boxH / 2,
-    width: boxW, height: boxH,
-    rx: rx,
     fill: fillAttr,
     stroke: borderColor,
     'stroke-width': sw,
     filter: isCenter ? 'none' : filterRef,
-  });
+  };
+  // A square whose corner radius is half its side is a disc — that is how the
+  // root is drawn. Nothing reads geometry off .node-rect, only fill, stroke and
+  // stroke-width, so the element type is free to change.
+  const rect = (boxW === boxH && rx >= boxW / 2)
+    ? svgDisc(boxW / 2, paint)
+    : svgEl('rect', Object.assign({ x: -boxW / 2, y: -boxH / 2, width: boxW, height: boxH, rx: rx }, paint));
   g.appendChild(rect);
 
   if (isCenter) {
@@ -10200,8 +10203,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     // or was never requested, the initials are simply what remains visible — no
     // error handling inside a subtree that gets rebuilt on every render.
     if (googleUserInitials) {
-      g.appendChild(svgEl('circle', {
-        cx: 0, cy: 0, r: CENTER_AVATAR_R,
+      g.appendChild(svgDisc(CENTER_AVATAR_R, {
         fill: googleUserInitialsColor || '#888888',
       }));
     }
@@ -10246,7 +10248,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       btnG.appendChild(svgEl('circle', {
         cx: 0, cy: 0, r: CENTER_ADD_HIT_R, fill: 'none', 'pointer-events': 'all',
       }));
-      btnG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: centerBtnR, fill: centerBtnColor, 'pointer-events': 'none' }));
+      btnG.appendChild(svgDisc(centerBtnR, { fill: centerBtnColor, 'pointer-events': 'none' }));
       btnG.appendChild(svgEl('line', { x1: -centerArm, y1: 0, x2: centerArm, y2: 0, stroke: btnSymbolColor, 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
       btnG.appendChild(svgEl('line', { x1: 0, y1: -centerArm, x2: 0, y2: centerArm, stroke: btnSymbolColor, 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
       g.appendChild(btnG);
@@ -10361,13 +10363,13 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     
     // Minus
     const minusG = svgEl('g', { class: 'counter-btn minus', 'data-id': id, transform: `translate(${-boxW/2 + 15}, 0)` });
-    minusG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: btnR, fill: btnColor, stroke: borderColor, 'stroke-width': 1 }));
+    minusG.appendChild(svgDisc(btnR, { fill: btnColor, stroke: borderColor, 'stroke-width': 1 }));
     minusG.appendChild(svgEl('line', { x1: -4, y1: 0, x2: 4, y2: 0, stroke: textColor, 'stroke-width': 2, 'stroke-linecap': 'round' }));
     g.appendChild(minusG);
 
     // Plus
     const plusG = svgEl('g', { class: 'counter-btn plus', 'data-id': id, transform: `translate(${boxW/2 - 15}, 0)` });
-    plusG.appendChild(svgEl('circle', { cx: 0, cy: 0, r: btnR, fill: btnColor, stroke: borderColor, 'stroke-width': 1 }));
+    plusG.appendChild(svgDisc(btnR, { fill: btnColor, stroke: borderColor, 'stroke-width': 1 }));
     plusG.appendChild(svgEl('line', { x1: -4, y1: 0, x2: 4, y2: 0, stroke: textColor, 'stroke-width': 2, 'stroke-linecap': 'round' }));
     plusG.appendChild(svgEl('line', { x1: 0, y1: -4, x2: 0, y2: 4, stroke: textColor, 'stroke-width': 2, 'stroke-linecap': 'round' }));
     g.appendChild(plusG);
@@ -10388,7 +10390,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       'data-parent': id,
       'transform': `translate(${btnX}, 0)`
     });
-    const circle = svgEl('circle', { cx: 0, cy: 0, r: btnR, fill: btnColor });
+    const circle = svgDisc(btnR, { fill: btnColor });
 
     const arm = 4.5 * btnScale;
     const plusSW = (2.5 * btnScale).toFixed(1);
@@ -10431,6 +10433,36 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 // fills the way a progress ring is read. A <path> rather than pathLength on a
 // <rect>: the analytic perimeter is exact and needs no layout-dependent
 // getTotalLength() call, and it does not depend on SVG2 pathLength support.
+// Chrome on Android mis-rasterises FILLED bezier shapes once a page carries
+// roughly twenty of them: an unrelated disc comes out with a straight chord
+// bitten from its edge. Confirmed on a Galaxy S22 against a standalone page —
+// five filled curved paths are fine, twenty are not, and the damage lands on a
+// shape that is not itself the cause. Stroked curves and straight-edged paths
+// are never affected; filled curves always are. Element type, shape size, paint
+// order, gradient use, separate <svg> elements and every rendering hint
+// (geometricPrecision, will-change, contain, translateZ) make no difference, and
+// Firefox on the same phone renders it correctly. The likely culprit is Skia's
+// shared tessellation atlas for small paths.
+//
+// The mindmap always carries far more than twenty filled tapered edges, so every
+// filled disc in it is drawn as a many-sided polygon instead. At these radii the
+// chord error is well under a tenth of a pixel — indistinguishable from a circle
+// — and it never enters curve rasterisation at all.
+function discPathD(r) {
+  const segs = Math.max(24, Math.min(128, Math.round(r * 1.2)));
+  let d = '';
+  for (let i = 0; i < segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    d += (i ? ' L ' : 'M ') + (Math.cos(a) * r).toFixed(2) + ' ' + (Math.sin(a) * r).toFixed(2);
+  }
+  return d + ' Z';
+}
+
+// Centred on 0,0, like every filled circle this replaces.
+function svgDisc(r, attrs) {
+  return svgEl('path', Object.assign({ d: discPathD(r) }, attrs));
+}
+
 function roundedRectPathD(w, h, rx) {
   const r = Math.max(0, Math.min(rx, w / 2, h / 2));
   const halfW = w / 2, halfH = h / 2;
