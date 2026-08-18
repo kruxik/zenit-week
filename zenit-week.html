@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-JKJ0S82F52UJ1orTH5BsiADSJB0Ij6CCaxRxeumx/tI='
+               'sha256-4b/IECxCNNwFsgvFUdoLiBeOKWyrbxHo1rDxq/XVCf4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -16830,7 +16830,6 @@ function animateViewSlide(fromPos) {
   // Edge tweens: each endpoint shifts by exactly how far its node moved, so the
   // start endpoint = final endpoint + (oldNodeCenter − newNodeCenter). The
   // ±width/2 offset baked into the final endpoint is constant, so this holds.
-  const defsEl = document.querySelector('#map-root defs');
   const centerC = { x: 0, y: 0 };
   const edgeTweens = [];
   if (linesLayer) linesLayer.querySelectorAll('path[data-to]').forEach(p => {
@@ -16849,19 +16848,23 @@ function animateViewSlide(fromPos) {
     const appearing = !fromPos[toId];
     if (appearing) markFadeIn(p);
     if (!appearing && sx1 === fx1 && sy1 === fy1 && sx2 === fx2 && sy2 === fy2) return;
-    const grad = defsEl && defsEl.querySelector(`#grad-${fromId || 'c'}-${toId || 'c'}`);
-    edgeTweens.push({ p, grad, sx1, sy1, sx2, sy2, fx1, fy1, fx2, fy2, sws, swe });
+    edgeTweens.push({ p, sx1, sy1, sx2, sy2, fx1, fy1, fx2, fy2, sws, swe });
   });
 
   if (!nodeTweens.length && !edgeTweens.length && !fadeIns.length) return;
 
   const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  // Only the path is re-derived per frame. Each edge's gradient is
+  // userSpaceOnUse, so re-anchoring it to the moving endpoints meant four more
+  // attribute writes per edge per frame, and each one invalidates the paint
+  // server and forces a full re-raster of that path. Measured at 20x CPU
+  // throttle on a 197-edge week, driving nodes and edges together: 65.8 ms per
+  // frame with the gradient following, 50.9 ms with it left where render() put
+  // it. Both stops carry the same colour and differ only in opacity (0.9 → 0.4),
+  // so a stale anchor costs at most a slightly flatter fade along an edge that
+  // is itself mid-flight and mid-fade.
   const setEdge = (ed, x1, y1, x2, y2) => {
     ed.p.setAttribute('d', taperedPathD(x1, y1, x2, y2, ed.sws, ed.swe));
-    if (ed.grad) {
-      ed.grad.setAttribute('x1', x1); ed.grad.setAttribute('y1', y1);
-      ed.grad.setAttribute('x2', x2); ed.grad.setAttribute('y2', y2);
-    }
   };
   let t0 = null;
   const frame = (now) => {
