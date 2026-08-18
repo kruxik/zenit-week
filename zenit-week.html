@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-5QNLiWcFYO2oIKo54rvAWp3qvNJEUb4y5OaGkIYH6RY='
+               'sha256-Ss2aEUgSMob2dcew2V/4Zo+ATKsK5aJ6RaX44E3Mmmk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -14052,8 +14052,9 @@ document.addEventListener('pointerdown', (e) => {
 });
 
 document.getElementById('ctx-clear-day-filter').addEventListener('click', () => {
-  setDayFilter(null);
+  // Menu closes now, the repack starts on the next task — see deferFromInput.
   hideContextMenu();
+  deferFromInput(() => setDayFilter(null));
 });
 
 document.getElementById('ctx-set-baseline').addEventListener('click', () => {
@@ -16992,7 +16993,7 @@ document.addEventListener('pointerdown', (e) => {
 // would otherwise bubble to the pan handler and drag the map behind them.
 document.getElementById('week-bar').addEventListener('pointerdown', e => e.stopPropagation());
 document.getElementById('day-filter-chip').addEventListener('pointerdown', e => e.stopPropagation());
-document.getElementById('day-filter-chip-clear').addEventListener('click', () => setDayFilter(null));
+document.getElementById('day-filter-chip-clear').addEventListener('click', () => deferFromInput(() => setDayFilter(null)));
 
 // ─── Branch swipe → cycle view level (mobile) ─────────────────────────────────
 const VIEW_LEVELS = ['full', 'pebbles', 'rocks'];
