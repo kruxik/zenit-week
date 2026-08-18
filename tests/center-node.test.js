@@ -181,14 +181,14 @@ describe('roundedRectPathD', () => {
   });
 });
 
-// The root's completion ring: a circle of r=117.5 inset inside the 250px node.
+// The root's completion ring: a circle of r=110.5 inset inside the 250px node.
 describe('root completion ring', () => {
-  const RING_R = 117.5;
+  const RING_R = 110.5;
   const ring = () => roundedRectPathD(RING_R * 2, RING_R * 2, RING_R);
 
   it('is a true circle, not a racetrack', () => {
     expect(ring().perimeter).toBeCloseTo(2 * Math.PI * RING_R, 6);
-    expect(ring().perimeter).toBeCloseTo(738.2743, 3);
+    expect(ring().perimeter).toBeCloseTo(694.2920, 3);
   });
 
   it('starts at the top of the circle so the arc fills clockwise', () => {

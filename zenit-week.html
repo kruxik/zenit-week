@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-QkryhK5lEIx7dOwesMUZ7F0xREVw6FIcbCYE50SaFEo='
+               'sha256-dTSJJSAAaSt6W2yCvjzHOQcXWeREP2N5j7GUsfn+NYA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5286,24 +5286,31 @@ const DEPTH1_ACTIVITY_STYLE = { fontSize: 17, padX: 18, padY: 13, minW: 105, min
 const CENTER_W = NODE_STYLE.center.minW;
 const CENTER_H = NODE_STYLE.center.minH;
 
-// Root interior, all radii from the 110px circle outward-in: the completion ring
-// sits inside the node's edge rather than around it, because a ring drawn outside
-// would have its leftmost and rightmost points exactly where the branch edges
-// meet the root — every edge would cross it. The avatar then clears the ring.
+// Root interior, all radii from the 96px avatar disc outward-in: the completion
+// ring sits inside the node's edge rather than around it, because a ring drawn
+// outside would have its leftmost and rightmost points exactly where the branch
+// edges meet the root — every edge would cross it. The avatar then clears the ring.
+//
+// The ring is the one thing on the root that carries information, and at the zoom
+// levels a whole week is read at, a 10px band vanished. So the avatar gives back
+// radius (110 → 96) and the ring takes it: 24px of stroke instead of 10, over the
+// same outer edge. The face is still the largest thing inside the root, just no
+// longer the only one that reads from far out.
 //
 // The two dark bands the ring floats in — node edge to ring, and ring to avatar —
 // are gaps, not strokes: nothing draws them, they are what is left of the node's
 // fill. So they are set by these three radii, and both come to 2.5. Any wider and
 // they read as borders framing the picture rather than as the ring's own breathing
-// room. Ring outer edge 122.5, inner edge 112.5, against a node edge at 125.
-const CENTER_RING_R  = 117.5;
-const CENTER_RING_SW = 10;
-const CENTER_AVATAR_R = 110;
+// room. Ring outer edge 122.5, inner edge 98.5, against a node edge at 125.
+const CENTER_RING_R  = 110.5;
+const CENTER_RING_SW = 24;
+const CENTER_AVATAR_R = 96;
 
 // Initials fill the avatar disc, so they are sized off it rather than off the
 // node's label font — that one only ever paints the signed-out wording, which
-// is a word and not a monogram.
-const CENTER_INITIALS_FONT = 65;
+// is a word and not a monogram. Scaled with the disc, so the monogram keeps the
+// same clearance inside it that it had at r 110.
+const CENTER_INITIALS_FONT = 57;
 
 // Hit radius of the root's two "+ branch" discs, which are drawn at r 22.5. The
 // root opens Stats on click, so every pixel that is not the + belongs to a
