@@ -74,6 +74,14 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     expect(shouldShowHint('unplanned')).toBe(true);
     expect(shouldShowHint('done')).toBe(true);
     expect(shouldShowHint('priority')).toBe(true);
+    expect(shouldShowHint('undo')).toBe(true);
+  });
+
+  // views and undo anchor to a control, not a node, so they must never join the
+  // competition for a hovered task — a matcher-less hint would throw there.
+  it('control-anchored hints stay out of the node competition', () => {
+    expect(hintIdsByPriority()).not.toContain('views');
+    expect(hintIdsByPriority()).not.toContain('undo');
   });
 
   describe('hoverHintId (which hint a node teaches on hover)', () => {
