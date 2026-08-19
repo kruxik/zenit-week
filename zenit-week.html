@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-kRsRry4gFsw/iV/MmW8pjGhfBT9oOhlWPFxM47WH9wg='
+               'sha256-rg5FiheUFzgObg9X0ePAq1dfFn18xea+THCelo1pGYo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3676,7 +3676,7 @@
         <span data-i18n="filter.dayShort">Day</span>
       </div>
       <div class="view-level-separator"></div>
-      <div class="view-level-btn active" data-level="full" data-i18n-title="view.sandTitle" title="Sand — all nodes visible">
+      <div class="view-level-btn active" data-level="full">
         <div class="view-level-icon">
           <div class="dot-row">
             <span class="vli-dot" style="width:3px;height:3px"></span>
@@ -3694,7 +3694,7 @@
         <span data-i18n="view.sand">Sand</span>
       </div>
       <div class="view-level-separator"></div>
-      <div class="view-level-btn" data-level="pebbles" data-i18n-title="view.pebblesTitle" title="Pebbles — hide deep sub-tasks">
+      <div class="view-level-btn" data-level="pebbles">
         <div class="view-level-icon">
           <div class="dot-row">
             <span class="vli-dot" style="width:3px;height:3px;opacity:0.2"></span>
@@ -3712,7 +3712,7 @@
         <span data-i18n="view.pebbles">Pebbles</span>
       </div>
       <div class="view-level-separator"></div>
-      <div class="view-level-btn" data-level="rocks" data-i18n-title="view.rocksTitle" title="Rocks — show only branches and their activities">
+      <div class="view-level-btn" data-level="rocks">
         <div class="view-level-icon">
           <div class="dot-row" style="opacity:0.2">
             <span class="vli-dot" style="width:3px;height:3px"></span>
@@ -3748,7 +3748,6 @@
       </button>
       <div class="undo-redo-separator"></div>
       <button type="button" class="undo-redo-btn" id="week-bar-actions"
-              data-i18n-title="weekbar.actions" title="Week actions"
               data-i18n-aria="weekbar.actions" aria-label="Week actions" aria-haspopup="true">
         <svg class="icon" aria-hidden="true"><use href="#icon-menu-2"/></svg>
       </button>
@@ -8034,7 +8033,6 @@ const TRANSLATIONS = {
     'quick_add.placeholder':      'Add a task…',
     'quick_add.title':            'Quick add',
     'week.word':                  'Week',
-    'week.short':                 'W',
     'center.me':                  'Me',
     'weekbar.today':              'Jump to current week',
     'weekbar.actions':            'Week actions',
@@ -8110,9 +8108,6 @@ const TRANSLATIONS = {
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
     'view.rocks':                 'Rocks',
-    'view.sandTitle':             'Sand — all nodes visible',
-    'view.pebblesTitle':          'Pebbles — hide deep sub-tasks',
-    'view.rocksTitle':            'Rocks — show only branches and their tasks',
     'menu.transferUnfinished':    'Transfer Unfinished',
     'menu.transferReusable':      'Transfer Reusable',
     'menu.clearWeek':             'Clear the Week',
@@ -8306,12 +8301,10 @@ const TRANSLATIONS = {
     'blocked.title':              'Storage busy',
     'blocked.body':               'Zenit Week’s storage is being upgraded in another tab. This tab will be ready in a moment — try refreshing.',
     'multitab.updated':           'Updated from another tab',
-    'filter.prefix':              'Filter',
     'filter.showing':             'Showing',
     'filter.emptyDay':            '— nothing planned',
     'filter.emptyDayShort':       '— empty',
     'filter.dayShort':            'Day',
-    'filter.dayTitle':            'Filter by day — show one day, hide the rest',
     'filter.none':                'None',
     'menu.clearDayFilter':        'Clear Day Filter',
     'error.quotaExceeded':        'Storage quota exceeded — changes might not be saved',
@@ -8356,7 +8349,6 @@ const TRANSLATIONS = {
     'quick_add.placeholder':      'Přidat úkol…',
     'quick_add.title':            'Rychlé přidání',
     'week.word':                  'Týden',
-    'week.short':                 'T',
     'center.me':                  'Já',
     'weekbar.today':              'Přejít na aktuální týden',
     'weekbar.actions':            'Akce týdne',
@@ -8432,9 +8424,6 @@ const TRANSLATIONS = {
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
     'view.rocks':                 'Kameny',
-    'view.sandTitle':             'Písek — vše viditelné',
-    'view.pebblesTitle':          'Oblázky — skryje hluboké podúkoly',
-    'view.rocksTitle':            'Kameny — zobrazí jen větve a jejich úkoly',
     'menu.transferUnfinished':    'Přenést nedokončené',
     'menu.transferReusable':      'Přenést opakované',
     'menu.clearWeek':             'Vymazat týden',
@@ -8628,12 +8617,10 @@ const TRANSLATIONS = {
     'blocked.title':              'Úložiště je zaneprázdněné',
     'blocked.body':               'Úložiště Zenit Week se aktualizuje v jiném panelu. Tento panel bude za chvíli připraven — zkuste obnovit stránku.',
     'multitab.updated':           'Aktualizováno z jiného panelu',
-    'filter.prefix':              'Filtr',
     'filter.showing':             'Zobrazeno',
     'filter.emptyDay':            '— nic naplánováno',
     'filter.emptyDayShort':       '— prázdné',
     'filter.dayShort':            'Den',
-    'filter.dayTitle':            'Filtr dne — zobrazí jeden den, zbytek skryje',
     'filter.none':                'Žádný',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena — změny nemusí být uloženy',
@@ -17092,10 +17079,8 @@ function setDayFilter(day) {
 // to announce itself: the bar's day button carries the active day's abbreviation
 // and lights up, and a chip over the canvas names it with one click to clear.
 //
-// Menu order — overdue first, then Mon→Sun, then unscheduled; the hotkey is the
-// 0–8 key that toggles the same filter.
+// Menu order — overdue first, then Mon→Sun, then unscheduled.
 const DAY_FILTER_ORDER = ['overdue', ...AGENDA_DAY_ORDER, 'unscheduled'];
-const DAY_FILTER_HOTKEYS = { overdue: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 0: '7', unscheduled: '8' };
 
 function dayFilterName(day) {
   if (day === 'unscheduled') return t('filter.unscheduled');
@@ -17176,9 +17161,6 @@ function refreshDayFilterUI() {
     document.getElementById('day-filter-glyph').textContent =
       on ? dayFilterGlyph(activeDayFilter) : '∅';
     btn.classList.toggle('active', on);
-    btn.title = on
-      ? `${t('filter.prefix')}: ${dayFilterName(activeDayFilter)} (${DAY_FILTER_HOTKEYS[activeDayFilter]})`
-      : t('filter.dayTitle');
   }
 
   const chip = document.getElementById('day-filter-chip');
@@ -17218,18 +17200,12 @@ function updateWeekBar() {
   document.getElementById('week-bar-prev').classList.toggle('today-direction', currentWeekKey > twk);
   document.getElementById('week-bar-next').classList.toggle('today-direction', currentWeekKey < twk);
 
-  // Each arrow names the week it lands on, the way the old root-node bricks did.
-  [['week-bar-prev', 'nav.prev', -1], ['week-bar-next', 'nav.next', +1]].forEach(([id, key, delta]) => {
-    const { week: targetWeek } = parseWeekKey(offsetWeek(currentWeekKey, delta));
-    document.getElementById(id).title = `${t(key)} · ${t('week.short')}${targetWeek}`;
-  });
-
   // The visible label drops its date range on narrow viewports, so the full
-  // wording lives on the button itself — for tooltips and for screen readers.
+  // wording lives on the button's accessible name. No title — the week bar is
+  // the weeknav coachmark's anchor, and a native tooltip fights it on hover.
   const label = document.getElementById('week-bar-label');
   const full = formatWeekLabel(year, week);
   const text = onCurrentWeek ? full : `${full} — ${t('weekbar.today')}`;
-  label.title = text;
   label.setAttribute('aria-label', text);
 }
 
