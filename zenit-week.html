@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-13Vj1CANzSl4/0jPu//mZ4Nc7VzqmrzueSq/nDkAkXs='
+               'sha256-QZj8K24zMtMmgzugr05bS7Itnu9TcfiKLfYyvFh4SXA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -724,7 +724,9 @@
     .coachmark-pulse { display: none; }
   }
   #coachmark-text { margin-bottom: 10px; white-space: pre-line; }
+  #coachmark-text .coachmark-caption { font-weight: 600; margin-bottom: 4px; }
   #coachmark-text .coachmark-intro { margin-bottom: 8px; }
+  #coachmark-text .coachmark-intro:last-child { margin-bottom: 0; }
   #coachmark-text .help-row { margin-bottom: 6px; }
   #coachmark-text .help-row:last-child { margin-bottom: 0; }
   #coachmark-footer {
@@ -8060,6 +8062,13 @@ const TRANSLATIONS = {
     'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
     'settings.tipsReplay':        'Replay tips',
     'settings.tipsReplayDone':    'Tips reset — they’ll show again.',
+    'tips.doneCaption':           'Done',
+    'tips.unplannedCaption':      'Unplanned',
+    'tips.counterCaption':        'Counters',
+    'tips.daysCaption':           'Days',
+    'tips.priorityCaption':       'Priority',
+    'tips.hoverCaption':          'Quick keys',
+    'tips.viewsCaption':          'Views',
     'tips.hoverIntro':            'Hover a task, then press:',
     'tips.counter':               'Nice — that became a counter. End a task with a number + “x” (e.g. “3x”) to split it into check-off steps.',
     'tips.days':                  'Scheduled! Add days in parentheses — “(mo, we)” or “(daily)” — to place a task across the week.',
@@ -8357,6 +8366,13 @@ const TRANSLATIONS = {
     'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
     'settings.tipsReplay':        'Přehrát tipy znovu',
     'settings.tipsReplayDone':    'Tipy resetovány — zobrazí se znovu.',
+    'tips.doneCaption':           'Hotovo',
+    'tips.unplannedCaption':      'Neplánované',
+    'tips.counterCaption':        'Počítadla',
+    'tips.daysCaption':           'Dny',
+    'tips.priorityCaption':       'Priorita',
+    'tips.hoverCaption':          'Rychlé klávesy',
+    'tips.viewsCaption':          'Pohledy',
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
     'tips.counter':               'Super — vznikl počítací úkol. Zakončete název číslem s „x“ (např. „3x“) a rozdělí se na odškrtávací kroky.',
     'tips.days':                  'Naplánováno! Přidejte dny v závorce — „(po, st)“ nebo „(denně)“ — a úkol se rozmístí po týdnu.',
@@ -18122,6 +18138,7 @@ let _coachmarkRaf = null;       // rAF handle for live repositioning
 // and never competes here.
 const HINTS = {
   'done': {
+    captionKey: 'tips.doneCaption',
     priority: 1,
     introKey: 'tips.doneIntro',
     keys: [
@@ -18130,6 +18147,7 @@ const HINTS = {
     matches: (node) => !!node.done,
   },
   'unplanned': {
+    captionKey: 'tips.unplannedCaption',
     priority: 2,
     introKey: 'tips.unplannedIntro',
     keys: [
@@ -18138,17 +18156,20 @@ const HINTS = {
     matches: (node) => !!node.unplanned,
   },
   'counter': {
+    captionKey: 'tips.counterCaption',
     priority: 3,
     textKey: 'tips.counter',
     matches: (node, kids) => node.tickChild || kids.some(n => n.tickChild),
   },
   'days': {
+    captionKey: 'tips.daysCaption',
     priority: 4,
     textKey: 'tips.days',
     matches: (node, kids) => node.dayChild || kids.some(n => n.dayChild)
       || parseTodoDays(node.label || '').size >= 1, // single-day inline token
   },
   'priority': {
+    captionKey: 'tips.priorityCaption',
     priority: 5,
     introKey: 'tips.priorityIntro',
     keys: [
@@ -18157,6 +18178,7 @@ const HINTS = {
     matches: (node) => node.priority === 'high' || node.priority === 'critical',
   },
   'hover-keys': {
+    captionKey: 'tips.hoverCaption',
     priority: 6,
     introKey: 'tips.hoverIntro',
     keys: [
@@ -18169,6 +18191,7 @@ const HINTS = {
     matches: () => true, // the fallback card: every task qualifies
   },
   'views': {
+    captionKey: 'tips.viewsCaption',
     priority: 7,
     textKey: 'tips.views',
   },
@@ -18253,17 +18276,29 @@ function positionCoachmark(cm, anchorEl) {
 // Build the coachmark body from a hint definition. Plain hints set text; key
 // hints render an intro line + Help-style `<span>label</span> <kbd>key</kbd>`
 // rows. DOM-built (no innerHTML) per the XSS rule.
+// Every tip reads the same way: a bold caption naming the idea, the description
+// under it, then any key rows.
 function renderCoachmarkContent(hint) {
   const textEl = document.getElementById('coachmark-text');
   if (!textEl) return;
   while (textEl.firstChild) textEl.removeChild(textEl.firstChild);
+
+  if (hint.captionKey) {
+    const caption = document.createElement('div');
+    caption.className = 'coachmark-caption';
+    caption.textContent = t(hint.captionKey);
+    textEl.appendChild(caption);
+  }
+
+  const bodyKey = hint.introKey || hint.textKey;
+  if (bodyKey) {
+    const body = document.createElement('div');
+    body.className = 'coachmark-intro';
+    body.textContent = t(bodyKey);
+    textEl.appendChild(body);
+  }
+
   if (hint.keys) {
-    if (hint.introKey) {
-      const intro = document.createElement('div');
-      intro.className = 'coachmark-intro';
-      intro.textContent = t(hint.introKey);
-      textEl.appendChild(intro);
-    }
     hint.keys.forEach(({ k, labelKey }) => {
       const row = document.createElement('div');
       row.className = 'help-row';
@@ -18275,8 +18310,6 @@ function renderCoachmarkContent(hint) {
       row.appendChild(kbd);
       textEl.appendChild(row);
     });
-  } else {
-    textEl.textContent = t(hint.textKey);
   }
 }
 
