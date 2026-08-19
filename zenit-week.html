@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-p9Y1O8env1g/2NSfDGU6fvc/yV7BYm4BDlMGVDswpL4='
+               'sha256-ziRm8MNxvM8dKURBLahzdLJCKvA//IeHuxS1f3TDgO0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8067,6 +8067,7 @@ const TRANSLATIONS = {
     'tips.counterCaption':        'Counters',
     'tips.daysCaption':           'Days',
     'tips.priorityCaption':       'Priority',
+    'tips.signInCaption':         'Sync across devices',
     'tips.weekNavCaption':        'Your week',
     'tips.weekNavKeysLabel':      'Previous / next week',
     'tips.weekNavTodayLabel':     'Back to this week',
@@ -8077,6 +8078,7 @@ const TRANSLATIONS = {
     'tips.viewsCaption':          'Views',
     'tips.levelsCaption':         'Detail levels',
     'tips.dayFilterCaption':      'Day filter',
+    'tips.signIn':                'Optional. Everything already works offline in this browser — signing in keeps a copy in your own Google Drive so your phone and laptop stay in step. Zenit Week runs no server that holds your data.',
     'tips.weekNav':               'Each week is a map of its own. Step to the next one to plan ahead — unfinished tasks can follow you there, and the menu here transfers them.',
     'tips.quickAdd':              'Write a task down without deciding where it belongs. Pick a branch, type it, and it waits on that branch until you drag it into place. Also on:',
     'tips.inbox':                 'Caught in a hurry and parked on the branch, with no place in the plan yet. Drag it onto a task and it files itself underneath, taking that task’s colour.',
@@ -8385,6 +8387,7 @@ const TRANSLATIONS = {
     'tips.counterCaption':        'Počítadla',
     'tips.daysCaption':           'Dny',
     'tips.priorityCaption':       'Priorita',
+    'tips.signInCaption':         'Synchronizace mezi zařízeními',
     'tips.weekNavCaption':        'Váš týden',
     'tips.weekNavKeysLabel':      'Předchozí / další týden',
     'tips.weekNavTodayLabel':     'Zpět na tento týden',
@@ -8395,6 +8398,7 @@ const TRANSLATIONS = {
     'tips.viewsCaption':          'Pohledy',
     'tips.levelsCaption':         'Úrovně detailu',
     'tips.dayFilterCaption':      'Filtr dnů',
+    'tips.signIn':                'Nepovinné. Vše funguje offline v tomto prohlížeči — přihlášení uloží kopii do vašeho Google Disku, aby telefon i notebook držely krok. Zenit Week neprovozuje server, který by vaše data držel.',
     'tips.weekNav':               'Každý týden je vlastní mapa. Přejděte na další a plánujte dopředu — nedokončené úkoly vás mohou následovat, menu zde je přenese.',
     'tips.quickAdd':              'Zapište úkol, aniž byste řešili, kam patří. Vyberte větev, napište ho a počká na ní, dokud ho nepřetáhnete na místo. Také na:',
     'tips.inbox':                 'Rychlý zápis odložený na větvi, zatím bez místa v plánu. Přetáhněte ho na úkol a zařadí se pod něj — i s jeho barvou.',
@@ -18262,6 +18266,11 @@ const HINTS = {
     priority: 10,
     textKey: 'tips.levels',
   },
+  'signin': {
+    captionKey: 'tips.signInCaption',
+    priority: 14,
+    textKey: 'tips.signIn',
+  },
   'weeknav': {
     captionKey: 'tips.weekNavCaption',
     priority: 13,
@@ -18601,6 +18610,8 @@ window.addEventListener('load', async () => {
   // Coachmark: teach the view controls on first hover of either bar.
   const _viewToggleBar = document.getElementById('view-toggle-bar');
   if (_viewToggleBar) _viewToggleBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewToggleBar));
+  const _syncBtn = document.getElementById('sync-btn');
+  if (_syncBtn) _syncBtn.addEventListener('mouseenter', () => maybeShowHint('signin', _syncBtn));
   const _weekBar = document.getElementById('week-bar');
   if (_weekBar) _weekBar.addEventListener('mouseenter', () => maybeShowHint('weeknav', _weekBar));
   const _fabAdd = document.getElementById('fab-add');
