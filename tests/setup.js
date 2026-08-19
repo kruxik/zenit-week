@@ -565,6 +565,7 @@ export const maybeSeedPlayground = (...args) => sandbox.maybeSeedPlayground(...a
 export const checkDateRollover = (...args) => sandbox.checkDateRollover(...args);
 
 export const {
+  isDevResetAllowed,
   getISOWeek,
   weeksInYear,
   offsetWeek,

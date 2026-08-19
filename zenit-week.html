@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-1bAEf5sZQ90JBNOoz4Py3NPuyZ3ZRUzCGsKujZ1k1BY='
+               'sha256-nt0+5pedUTnUMyReC7ZDVZAxQoUAa/LIXlNIE0ct0LY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3986,6 +3986,12 @@
     </div>
     <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file — could not import.</div>
   </div>
+  <!-- Dev-only; unhidden by init on a development host. Never translated. -->
+  <div class="settings-separator" id="settings-dev-separator" hidden></div>
+  <div class="settings-section" id="settings-dev-section" hidden>
+    <div class="settings-label">Development</div>
+    <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor" style="width:100%;">Reset to first visit</button>
+  </div>
 </div>
 
 <div id="help-overlay"></div>
@@ -4796,6 +4802,83 @@ async function deleteValueIDB(key) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+// ─── Dev-only reset ───────────────────────────────────────────────────────────
+// Wipes every trace of this user so the next load is a genuine first visit. It
+// exists for onboarding work, where "what does a new user see" has to be
+// answerable more than once. What keeps it away from real data is the host:
+// only a development origin (loopback, .local, a tunnel, or file:) exposes it,
+// and the production hosts are denied outright, so on zenitweek.com the entry
+// never renders and the function refuses even when called from the console.
+const DEV_RESET_DENY_HOSTS = ['zenitweek.com', 'www.zenitweek.com'];
+const DEV_RESET_DENY_SUFFIXES = ['.vercel.app'];
+const DEV_RESET_ALLOW_HOSTS = ['localhost', '127.0.0.1', '[::1]', '::1'];
+const DEV_RESET_ALLOW_SUFFIXES = ['.localhost', '.local', '.ngrok-free.dev', '.ngrok-free.app', '.ngrok.app', '.ngrok.io'];
+
+// Pure so the guard itself is testable: every input is passed in.
+function isDevResetAllowed(hostname, protocol) {
+  const host = String(hostname || '').toLowerCase();
+  // Deny wins over allow — a production host is never a dev host, whatever else matches.
+  if (DEV_RESET_DENY_HOSTS.includes(host)) return false;
+  if (DEV_RESET_DENY_SUFFIXES.some(sfx => host.endsWith(sfx))) return false;
+
+  return protocol === 'file:'
+    || DEV_RESET_ALLOW_HOSTS.includes(host)
+    || DEV_RESET_ALLOW_SUFFIXES.some(sfx => host.endsWith(sfx));
+}
+
+function devResetEnabled() {
+  return isDevResetAllowed(location.hostname, location.protocol);
+}
+
+// Deletes the IndexedDB database outright. A still-open connection would block
+// the delete, so the cached handle is closed first; if something else still
+// holds one we give up after a moment rather than hanging on a dialog the dev
+// cannot dismiss.
+function devDeleteDatabase() {
+  if (_db) { try { _db.close(); } catch { /* already closing */ } }
+  _db = null;
+  _dbPromise = null;
+  return new Promise(resolve => {
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(); } };
+    setTimeout(done, 3000);
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = done;
+    req.onerror = done;
+    req.onblocked = done;
+  });
+}
+
+async function devResetApp() {
+  // Re-checked at call time, not just at render time: the settings entry is one
+  // way in, but this must also refuse a console call on a production page.
+  if (!devResetEnabled()) return;
+
+  await devDeleteDatabase();
+
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('zenit-week')) localStorage.removeItem(k);
+  }
+  try { sessionStorage.clear(); } catch { /* private mode */ }
+
+  // The shell cache and the worker itself go too — a first visit has neither.
+  if (window.caches) {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    } catch { /* cache API unavailable */ }
+  }
+  if (navigator.serviceWorker) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    } catch { /* no worker registered */ }
+  }
+
+  location.reload();
 }
 
 // TODO: remove after 2026-07-28 — localStorage→IDB migration code
@@ -18318,6 +18401,25 @@ window.addEventListener('load', async () => {
         },
       });
     });
+  }
+
+  if (devResetEnabled()) {
+    const devSection = document.getElementById('settings-dev-section');
+    const devSeparator = document.getElementById('settings-dev-separator');
+    if (devSection) devSection.hidden = false;
+    if (devSeparator) devSeparator.hidden = false;
+    const devResetBtn = document.getElementById('dev-reset-btn');
+    if (devResetBtn) {
+      devResetBtn.addEventListener('click', () => {
+        showAppConfirm({
+          title: 'Reset to first visit?',
+          body: 'Deletes every week, setting and sync link stored in this browser, then reloads as a brand-new visitor. Data already synced to Google Drive is not touched.',
+          okLabel: 'Reset',
+          danger: true,
+          onConfirm: () => { devResetApp(); },
+        });
+      });
+    }
   }
 
   const settingsHelpBtn = document.getElementById('settings-help-btn');
