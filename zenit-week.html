@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-nt0+5pedUTnUMyReC7ZDVZAxQoUAa/LIXlNIE0ct0LY='
+               'sha256-4qkvLnvogHF2w1emiLKlkCx2JXutPk9+NFudSM5CuKs='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -694,8 +694,35 @@
     font-size: 13px;
     line-height: 1.45;
     color: var(--text-primary);
+    /* Grows out of its own arrow, so the bubble reads as belonging to the thing
+       it points at rather than appearing from nowhere. --cm-origin-x is the
+       arrow's offset, written by positionCoachmark. */
+    opacity: 0;
+    transform: scale(0.92);
+    transform-origin: var(--cm-origin-x, 50%) bottom;
+    transition: opacity 160ms ease, transform 220ms cubic-bezier(0.34, 1.42, 0.64, 1);
   }
+  #coachmark.below { transform-origin: var(--cm-origin-x, 50%) top; }
+  #coachmark.visible { opacity: 1; transform: scale(1); }
   #coachmark[hidden] { display: none; }
+  /* Two beats of a ring expanding out of the anchor. It runs before the bubble
+     settles, so the eye is sent to the element first and reads the label second. */
+  .coachmark-pulse {
+    position: fixed;
+    z-index: 3190;
+    pointer-events: none;
+    border: 2px solid var(--accent-primary);
+    animation: coachmark-pulse 700ms ease-out 2;
+  }
+  @keyframes coachmark-pulse {
+    from { opacity: 0.5; transform: scale(1); }
+    to   { opacity: 0;   transform: scale(1.3); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #coachmark { transition: opacity 100ms linear; transform: none; }
+    #coachmark.visible { transform: none; }
+    .coachmark-pulse { display: none; }
+  }
   #coachmark-text { margin-bottom: 10px; white-space: pre-line; }
   #coachmark-text .coachmark-intro { margin-bottom: 8px; }
   #coachmark-text .help-row { margin-bottom: 6px; }
@@ -18077,6 +18104,7 @@ function maybePlaygroundNudge() {
 // cross-device Drive sync attaches here later. See
 // docs/specs/onboarding-part-b-coachmarks.md.
 let _tipsEnabled = true;        // global "Show tips" setting (default on)
+let _coachmarkHideTimer = null; // pending display:none after the exit fade
 let _tipsSeen = {};             // { [hintId]: true } — persisted
 let _coachmarkVisible = false;  // single coachmark on screen at a time
 let _coachmarkAnchorEl = null;  // element the bubble points at
@@ -18152,22 +18180,26 @@ function shouldShowHint(id) {
 
 function positionCoachmark(cm, anchorEl) {
   const r = anchorEl.getBoundingClientRect();
-  const cmRect = cm.getBoundingClientRect();
+  // offsetWidth/Height, not getBoundingClientRect: the entrance animation scales
+  // the bubble, and a scaled rect would place it against the wrong dimensions.
+  const cmW = cm.offsetWidth, cmH = cm.offsetHeight;
   const vw = window.innerWidth, vh = window.innerHeight;
   const margin = 8;
   // Prefer above the anchor; flip below if not enough room.
-  const below = r.top - cmRect.height - 12 < margin;
-  const top = below ? r.bottom + 12 : r.top - cmRect.height - 12;
-  let left = r.left + r.width / 2 - cmRect.width / 2;
-  left = Math.max(margin, Math.min(left, vw - cmRect.width - margin));
-  cm.style.top = `${Math.max(margin, Math.min(top, vh - cmRect.height - margin))}px`;
+  const below = r.top - cmH - 12 < margin;
+  const top = below ? r.bottom + 12 : r.top - cmH - 12;
+  let left = r.left + r.width / 2 - cmW / 2;
+  left = Math.max(margin, Math.min(left, vw - cmW - margin));
+  cm.style.top = `${Math.max(margin, Math.min(top, vh - cmH - margin))}px`;
   cm.style.left = `${left}px`;
   cm.classList.toggle('below', below);
   // Arrow points at the anchor's horizontal center, clamped to the bubble.
   const arrow = document.getElementById('coachmark-arrow');
   if (arrow) {
-    const ax = r.left + r.width / 2 - left;
-    arrow.style.left = `${Math.max(14, Math.min(ax, cmRect.width - 14))}px`;
+    const ax = Math.max(14, Math.min(r.left + r.width / 2 - left, cmW - 14));
+    arrow.style.left = `${ax}px`;
+    // The bubble grows from the arrow, wherever the clamp put it.
+    cm.style.setProperty('--cm-origin-x', `${ax}px`);
   }
 }
 
@@ -18240,19 +18272,61 @@ function showCoachmark(id, anchorEl) {
   if (!cm || !hint) return;
   renderCoachmarkContent(hint);
   cm._hintId = id;
+  if (_coachmarkHideTimer) { clearTimeout(_coachmarkHideTimer); _coachmarkHideTimer = null; }
   cm.hidden = false;
+  cm.classList.remove('visible');
   _coachmarkVisible = true;
   _coachmarkAnchorEl = anchorEl;
   _coachmarkAnchorId = (anchorEl && anchorEl.dataset && anchorEl.dataset.id) || null;
   // Position now, then track so it follows the node as the canvas moves.
   positionCoachmark(cm, anchorEl);
+  // The ring goes first; the bubble arrives on the next frame, once the browser
+  // has a start value to animate away from.
+  pulseCoachmarkAnchor(anchorEl);
+  requestAnimationFrame(() => { if (cm._hintId === id) cm.classList.add('visible'); });
   startCoachmarkTracking();
+}
+
+// A ring the size of the anchor, expanding and fading twice. Purely decorative:
+// it never takes pointer events and removes itself when the animation ends.
+function pulseCoachmarkAnchor(anchorEl) {
+  if (!anchorEl || typeof anchorEl.getBoundingClientRect !== 'function') return;
+  const r = anchorEl.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const pad = 4;
+  const ring = document.createElement('div');
+  ring.className = 'coachmark-pulse';
+  ring.style.left = `${r.left - pad}px`;
+  ring.style.top = `${r.top - pad}px`;
+  ring.style.width = `${r.width + pad * 2}px`;
+  ring.style.height = `${r.height + pad * 2}px`;
+  // Follow the anchor's own corner radius where it has one; nodes drawn in SVG
+  // report none, so fall back to something that suits a small rounded box.
+  let radius = '';
+  try { radius = getComputedStyle(anchorEl).borderRadius; } catch { /* SVG in some engines */ }
+  ring.style.borderRadius = (radius && parseFloat(radius) > 0)
+    ? radius
+    : `${Math.min(12, r.height / 2 + pad)}px`;
+  const remove = () => ring.remove();
+  ring.addEventListener('animationend', remove);
+  setTimeout(remove, 2000); // belt and braces if the animation never fires
+  document.body.appendChild(ring);
 }
 
 function hideCoachmark() {
   cancelCoachmarkTracking();
   const cm = document.getElementById('coachmark');
-  if (cm) { cm.hidden = true; cm._hintId = null; }
+  if (cm) {
+    // Leaving needs no attention, so it just fades — the element stays in the
+    // layout until the fade ends, then goes back to display:none.
+    cm.classList.remove('visible');
+    cm._hintId = null;
+    if (_coachmarkHideTimer) clearTimeout(_coachmarkHideTimer);
+    _coachmarkHideTimer = setTimeout(() => {
+      _coachmarkHideTimer = null;
+      if (!_coachmarkVisible) cm.hidden = true;
+    }, 160);
+  }
   _coachmarkVisible = false;
   _coachmarkAnchorEl = null;
   _coachmarkAnchorId = null;
