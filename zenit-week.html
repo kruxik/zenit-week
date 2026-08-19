@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-8NUtGXyIHMzwuTzb2hQxGkKWHNdjTafdfERZS62GQ4k='
+               'sha256-13Vj1CANzSl4/0jPu//mZ4Nc7VzqmrzueSq/nDkAkXs='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8065,6 +8065,7 @@ const TRANSLATIONS = {
     'tips.days':                  'Scheduled! Add days in parentheses — “(mo, we)” or “(daily)” — to place a task across the week.',
     'tips.unplannedIntro':        'Amber means unplanned — it wasn’t in the plan, it just turned up. Stats counts it apart from what you planned. Hover and press:',
     'tips.doneIntro':             'Struck through means done. Finishing a task ticks its parent up the tree once every child is in. Hover and press:',
+    'tips.priorityIntro':         'A flame marks critical, an exclamation marks high — and the bigger a task is drawn, the more it matters. Priority cascades to everything beneath it. Hover and press:',
     'tips.views':                 'Three views of your week: Mindmap to plan, Agenda for the day by day, Stats for how it went. In Mindmap, Rocks · Pebbles · Sand zoom from the big picture to full detail.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
@@ -8361,6 +8362,7 @@ const TRANSLATIONS = {
     'tips.days':                  'Naplánováno! Přidejte dny v závorce — „(po, st)“ nebo „(denně)“ — a úkol se rozmístí po týdnu.',
     'tips.unplannedIntro':        'Oranžová znamená neplánované — nebylo v plánu, prostě přišlo. Statistika je počítá zvlášť od plánu. Najeďte a stiskněte:',
     'tips.doneIntro':             'Přeškrtnuté znamená hotové. Dokončený úkol se propíše nahoru — rodič se odškrtne, jakmile jsou hotové všechny děti. Najeďte a stiskněte:',
+    'tips.priorityIntro':         'Plamínek značí kritickou, vykřičník vysokou prioritu — a čím větší úkol, tím víc váží. Priorita se propíše na vše pod ním. Najeďte a stiskněte:',
     'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek. V mapě Kameny · Oblázky · Písek přiblíží od celku k detailu.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
@@ -18146,8 +18148,16 @@ const HINTS = {
     matches: (node, kids) => node.dayChild || kids.some(n => n.dayChild)
       || parseTodoDays(node.label || '').size >= 1, // single-day inline token
   },
-  'hover-keys': {
+  'priority': {
     priority: 5,
+    introKey: 'tips.priorityIntro',
+    keys: [
+      { k: 'P', labelKey: 'help.cyclePriority' },
+    ],
+    matches: (node) => node.priority === 'high' || node.priority === 'critical',
+  },
+  'hover-keys': {
+    priority: 6,
     introKey: 'tips.hoverIntro',
     keys: [
       { k: 'Enter', labelKey: 'help.rename' },
@@ -18159,7 +18169,7 @@ const HINTS = {
     matches: () => true, // the fallback card: every task qualifies
   },
   'views': {
-    priority: 6,
+    priority: 7,
     textKey: 'tips.views',
   },
 };

@@ -73,6 +73,7 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     expect(shouldShowHint('views')).toBe(true);
     expect(shouldShowHint('unplanned')).toBe(true);
     expect(shouldShowHint('done')).toBe(true);
+    expect(shouldShowHint('priority')).toBe(true);
   });
 
   describe('hoverHintId (which hint a node teaches on hover)', () => {
@@ -101,7 +102,7 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     });
 
     it('orders the competing hints by priority, lowest first', () => {
-      expect(hintIdsByPriority()).toEqual(['done', 'unplanned', 'counter', 'days', 'hover-keys']);
+      expect(hintIdsByPriority()).toEqual(['done', 'unplanned', 'counter', 'days', 'priority', 'hover-keys']);
     });
 
     it('state outranks syntax: an unplanned counter or day task teaches unplanned', () => {
@@ -130,6 +131,26 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
         { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] },
       ] });
       expect(hoverHintId(_state.get().nodes[0])).toBe('done');
+    });
+
+    it('returns "priority" for a high or critical task', () => {
+      _state.set({ nodes: [mk({ children: [], label: 'Q1 OKR draft', priority: 'critical' })] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('priority');
+      _state.set({ nodes: [mk({ children: [], label: 'Claude Design', priority: 'high' })] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('priority');
+    });
+
+    it('does not treat a normal-priority task as a priority hint', () => {
+      _state.set({ nodes: [mk({ children: [], label: 'Plain', priority: null })] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('hover-keys');
+    });
+
+    it('syntax outranks priority: a critical counter teaches Nx', () => {
+      _state.set({ nodes: [
+        mk({ priority: 'critical' }),
+        { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] },
+      ] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('counter');
     });
 
     it('falls back to the generic hotkey card for a plain task', () => {
