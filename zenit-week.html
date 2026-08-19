@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-1CDAaA1UvRyzsFmCFfjpoE3ZBfGO3vt7KTHbbjnCXAs='
+               'sha256-8NUtGXyIHMzwuTzb2hQxGkKWHNdjTafdfERZS62GQ4k='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -18114,8 +18114,40 @@ let _coachmarkRaf = null;       // rAF handle for live repositioning
 // Hint registry. Each entry is either { textKey } for a plain-text hint, or
 // { introKey, keys: [{ k, labelKey }] } to render kbd rows like the Help panel.
 // Triggers live at the call sites.
+// priority orders the hints against each other when one node qualifies for
+// several — lower wins. matches() decides whether a hovered node qualifies at
+// all; a hint without one (views) is anchored to a control instead of a node
+// and never competes here.
 const HINTS = {
+  'done': {
+    priority: 1,
+    introKey: 'tips.doneIntro',
+    keys: [
+      { k: 'D', labelKey: 'help.toggleDone' },
+    ],
+    matches: (node) => !!node.done,
+  },
+  'unplanned': {
+    priority: 2,
+    introKey: 'tips.unplannedIntro',
+    keys: [
+      { k: 'U', labelKey: 'help.toggleUnplanned' },
+    ],
+    matches: (node) => !!node.unplanned,
+  },
+  'counter': {
+    priority: 3,
+    textKey: 'tips.counter',
+    matches: (node, kids) => node.tickChild || kids.some(n => n.tickChild),
+  },
+  'days': {
+    priority: 4,
+    textKey: 'tips.days',
+    matches: (node, kids) => node.dayChild || kids.some(n => n.dayChild)
+      || parseTodoDays(node.label || '').size >= 1, // single-day inline token
+  },
   'hover-keys': {
+    priority: 5,
     introKey: 'tips.hoverIntro',
     keys: [
       { k: 'Enter', labelKey: 'help.rename' },
@@ -18124,44 +18156,36 @@ const HINTS = {
       { k: 'U',     labelKey: 'help.toggleUnplanned' },
       { k: 'Del',   labelKey: 'help.delete' },
     ],
+    matches: () => true, // the fallback card: every task qualifies
   },
-  'counter': { textKey: 'tips.counter' },
-  'days':    { textKey: 'tips.days' },
-  'views':   { textKey: 'tips.views' },
-  'unplanned': {
-    introKey: 'tips.unplannedIntro',
-    keys: [
-      { k: 'U', labelKey: 'help.toggleUnplanned' },
-    ],
-  },
-  'done': {
-    introKey: 'tips.doneIntro',
-    keys: [
-      { k: 'D', labelKey: 'help.toggleDone' },
-    ],
+  'views': {
+    priority: 6,
+    textKey: 'tips.views',
   },
 };
+
+// Hint ids that compete for a hovered node, most important first.
+function hintIdsByPriority() {
+  return Object.keys(HINTS)
+    .filter(id => typeof HINTS[id].matches === 'function')
+    .sort((a, b) => HINTS[a].priority - HINTS[b].priority);
+}
 
 // Which hint a node teaches when the pointer lands on it. Hovering is the one
 // gesture every user performs before they know anything, so each kind of node
 // explains itself on contact rather than waiting for the user to have already
 // typed the syntax it describes. Pure — used by the mouseenter trigger.
 //
-// Counter and day nodes win over the state checks: they teach a syntax the user
-// may not know, while unplanned and done are states they can already see. A
-// task that is both unplanned and done teaches unplanned, the rarer idea of the
-// two. A plain task falls through to the generic hotkey card.
+// A node often qualifies for several hints at once — a done counter, an
+// unplanned task with days. The winner is whichever matching hint carries the
+// lowest priority number, so reordering the teaching sequence means editing one
+// field in HINTS rather than an if-chain.
 function hoverHintId(node) {
   if (!node) return null;
   if (node.type !== 'activity' && node.type !== 'counter') return null;
 
   const kids = (node.children || []).map(findNode).filter(Boolean);
-  if (node.tickChild || kids.some(n => n.tickChild)) return 'counter';
-  if (node.dayChild || kids.some(n => n.dayChild)) return 'days';
-  if (parseTodoDays(node.label || '').size >= 1) return 'days'; // single-day inline token
-  if (node.unplanned) return 'unplanned';
-  if (node.done) return 'done';
-  return 'hover-keys';
+  return hintIdsByPriority().find(id => HINTS[id].matches(node, kids)) || null;
 }
 
 function tipsEnabled() { return _tipsEnabled; }

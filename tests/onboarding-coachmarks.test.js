@@ -7,6 +7,7 @@ import {
   markHintSeen,
   shouldShowHint,
   hoverHintId,
+  hintIdsByPriority,
   replayTips,
 } from './setup.js';
 
@@ -99,14 +100,18 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
       expect(hoverHintId(_state.get().nodes[0])).toBe('unplanned');
     });
 
-    it('teaches the syntax first: counter and days outrank the unplanned state', () => {
+    it('orders the competing hints by priority, lowest first', () => {
+      expect(hintIdsByPriority()).toEqual(['done', 'unplanned', 'counter', 'days', 'hover-keys']);
+    });
+
+    it('state outranks syntax: an unplanned counter or day task teaches unplanned', () => {
       _state.set({ nodes: [
         mk({ unplanned: true }),
         { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] },
       ] });
-      expect(hoverHintId(_state.get().nodes[0])).toBe('counter');
+      expect(hoverHintId(_state.get().nodes[0])).toBe('unplanned');
       _state.set({ nodes: [mk({ children: [], label: 'Workout (tu)', unplanned: true })] });
-      expect(hoverHintId(_state.get().nodes[0])).toBe('days');
+      expect(hoverHintId(_state.get().nodes[0])).toBe('unplanned');
     });
 
     it('returns "done" for a finished task', () => {
@@ -114,17 +119,17 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
       expect(hoverHintId(_state.get().nodes[0])).toBe('done');
     });
 
-    it('teaches unplanned over done when a task is both', () => {
+    it('teaches done over unplanned when a task is both', () => {
       _state.set({ nodes: [mk({ children: [], label: 'Fix the boiler', unplanned: true, done: true })] });
-      expect(hoverHintId(_state.get().nodes[0])).toBe('unplanned');
+      expect(hoverHintId(_state.get().nodes[0])).toBe('done');
     });
 
-    it('teaches the syntax first: a done counter still teaches Nx', () => {
+    it('state outranks syntax: a done counter teaches done', () => {
       _state.set({ nodes: [
         mk({ done: true }),
         { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] },
       ] });
-      expect(hoverHintId(_state.get().nodes[0])).toBe('counter');
+      expect(hoverHintId(_state.get().nodes[0])).toBe('done');
     });
 
     it('falls back to the generic hotkey card for a plain task', () => {

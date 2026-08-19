@@ -567,6 +567,7 @@ export const checkDateRollover = (...args) => sandbox.checkDateRollover(...args)
 export const {
   isDevResetAllowed,
   hoverHintId,
+  hintIdsByPriority,
   getISOWeek,
   weeksInYear,
   offsetWeek,
