@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-L6Dg5fN4QV5GK8pBO1dcTdo3c7Clsko55yHVX2zW6+4='
+               'sha256-Hv50Flr7mnA37w8jLjf7/Zr8W6KdzRBTOAtuNMoSidY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8070,6 +8070,7 @@ const TRANSLATIONS = {
     'tips.hoverCaption':          'Quick keys',
     'tips.undoCaption':           'Undo',
     'tips.viewsCaption':          'Views',
+    'tips.levelsCaption':         'Detail levels',
     'tips.hoverIntro':            'Hover a task, then press:',
     'tips.counter':               'Each circle is one repetition to tick off. Any task ending in a number + “x” — “Pushups 50x” — splits itself into steps like these, and finishes when the last one is ticked.',
     'tips.days':                  'Each circle is one day this task is planned for. Put days in parentheses — “(mo, we)” or “(daily)” — and the task spreads itself across the week.',
@@ -8077,7 +8078,8 @@ const TRANSLATIONS = {
     'tips.doneIntro':             'Struck through means done. Finishing a task ticks its parent up the tree once every child is in. Hover and press:',
     'tips.priorityIntro':         'A flame marks critical, an exclamation marks high — and the bigger a task is drawn, the more it matters. Priority cascades to everything beneath it. Hover and press:',
     'tips.undoIntro':             'Every change can be taken back — a delete, a move, a priority, a whole branch. Experiment freely, nothing here is one-way.',
-    'tips.views':                 'Three views of your week: Mindmap to plan, Agenda for the day by day, Stats for how it went. In Mindmap, Rocks · Pebbles · Sand zoom from the big picture to full detail.',
+    'tips.levels':                'How deep the map draws. Rocks keeps branches and their tasks, Pebbles adds one level of sub-tasks, Sand shows everything. Hidden work is still there — it just steps out of the picture.',
+    'tips.views':                 'Three views of your week: Mindmap to plan, Agenda for the day by day, Stats for how it went.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
@@ -8376,6 +8378,7 @@ const TRANSLATIONS = {
     'tips.hoverCaption':          'Rychlé klávesy',
     'tips.undoCaption':           'Zpět',
     'tips.viewsCaption':          'Pohledy',
+    'tips.levelsCaption':         'Úrovně detailu',
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
     'tips.counter':               'Každé kolečko je jedno opakování k odškrtnutí. Úkol zakončený číslem s „x“ — „Kliky 50 2x“ — se sám rozdělí na takové kroky a dokončí se posledním odškrtnutím.',
     'tips.days':                  'Každé kolečko je jeden den, na který je úkol naplánovaný. Napište dny do závorky — „(po, st)“ nebo „(denně)“ — a úkol se sám rozmístí po týdnu.',
@@ -8383,7 +8386,8 @@ const TRANSLATIONS = {
     'tips.doneIntro':             'Přeškrtnuté znamená hotové. Dokončený úkol se propíše nahoru — rodič se odškrtne, jakmile jsou hotové všechny děti. Najeďte a stiskněte:',
     'tips.priorityIntro':         'Plamínek značí kritickou, vykřičník vysokou prioritu — a čím větší úkol, tím víc váží. Priorita se propíše na vše pod ním. Najeďte a stiskněte:',
     'tips.undoIntro':             'Každou změnu lze vzít zpět — smazání, přesun, prioritu i celou větev. Klidně zkoušejte, nic tu není nevratné.',
-    'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek. V mapě Kameny · Oblázky · Písek přiblíží od celku k detailu.',
+    'tips.levels':                'Jak hluboko se mapa kreslí. Kameny nechají větve a jejich úkoly, Oblázky přidají jednu úroveň podúkolů, Písek ukáže vše. Skryté úkoly nikam nezmizely — jen ustoupí z obrazu.',
+    'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
     'view.mindmap':               'Mapa',
@@ -18215,6 +18219,11 @@ const HINTS = {
     priority: 8,
     textKey: 'tips.views',
   },
+  'levels': {
+    captionKey: 'tips.levelsCaption',
+    priority: 9,
+    textKey: 'tips.levels',
+  },
 };
 
 // Hint ids that compete for a hovered node, most important first.
@@ -18530,7 +18539,7 @@ window.addEventListener('load', async () => {
   const _undoRedoBar = document.getElementById('undo-redo-bar');
   if (_undoRedoBar) _undoRedoBar.addEventListener('mouseenter', () => maybeShowHint('undo', _undoRedoBar));
   const _viewLevelBar = document.getElementById('view-level-bar');
-  if (_viewLevelBar) _viewLevelBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewLevelBar));
+  if (_viewLevelBar) _viewLevelBar.addEventListener('mouseenter', () => maybeShowHint('levels', _viewLevelBar));
   switchView(currentView); // apply persisted view (mindmap / agenda / stats)
 
   // Position the default-zoom marker on the track
