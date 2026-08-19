@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-rNz7Uw4ZMDpoJXoQkyzZX8B2UT4XXg0KM5tpHsLIsdA='
+               'sha256-44pz2xou06ogbCesrLqC4sJWbUAOlx75D3kVCczDEvQ='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8064,6 +8064,7 @@ const TRANSLATIONS = {
     'tips.counter':               'Nice — that became a counter. End a task with a number + “x” (e.g. “3x”) to split it into check-off steps.',
     'tips.days':                  'Scheduled! Add days in parentheses — “(mo, we)” or “(daily)” — to place a task across the week.',
     'tips.unplannedIntro':        'Amber means unplanned — it wasn’t in the plan, it just turned up. Stats counts it apart from what you planned. Hover and press:',
+    'tips.doneIntro':             'Struck through means done. Finishing a task ticks its parent up the tree once every child is in. Hover and press:',
     'tips.views':                 'Three views of your week: Mindmap to plan, Agenda for the day by day, Stats for how it went. In Mindmap, Rocks · Pebbles · Sand zoom from the big picture to full detail.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
@@ -8359,6 +8360,7 @@ const TRANSLATIONS = {
     'tips.counter':               'Super — vznikl počítací úkol. Zakončete název číslem s „x“ (např. „3x“) a rozdělí se na odškrtávací kroky.',
     'tips.days':                  'Naplánováno! Přidejte dny v závorce — „(po, st)“ nebo „(denně)“ — a úkol se rozmístí po týdnu.',
     'tips.unplannedIntro':        'Oranžová znamená neplánované — nebylo v plánu, prostě přišlo. Statistika je počítá zvlášť od plánu. Najeďte a stiskněte:',
+    'tips.doneIntro':             'Přeškrtnuté znamená hotové. Dokončený úkol se propíše nahoru — rodič se odškrtne, jakmile jsou hotové všechny děti. Najeďte a stiskněte:',
     'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek. V mapě Kameny · Oblázky · Písek přiblíží od celku k detailu.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
@@ -18132,6 +18134,12 @@ const HINTS = {
       { k: 'U', labelKey: 'help.toggleUnplanned' },
     ],
   },
+  'done': {
+    introKey: 'tips.doneIntro',
+    keys: [
+      { k: 'D', labelKey: 'help.toggleDone' },
+    ],
+  },
 };
 
 // Which hint a node teaches when the pointer lands on it. Hovering is the one
@@ -18139,9 +18147,10 @@ const HINTS = {
 // explains itself on contact rather than waiting for the user to have already
 // typed the syntax it describes. Pure — used by the mouseenter trigger.
 //
-// Counter and day nodes win over the unplanned check: they teach a syntax the
-// user may not know, while unplanned is a state they can already see. A plain
-// task falls through to the generic hotkey card.
+// Counter and day nodes win over the state checks: they teach a syntax the user
+// may not know, while unplanned and done are states they can already see. A
+// task that is both unplanned and done teaches unplanned, the rarer idea of the
+// two. A plain task falls through to the generic hotkey card.
 function hoverHintId(node) {
   if (!node) return null;
   if (node.type !== 'activity' && node.type !== 'counter') return null;
@@ -18151,6 +18160,7 @@ function hoverHintId(node) {
   if (node.dayChild || kids.some(n => n.dayChild)) return 'days';
   if (parseTodoDays(node.label || '').size >= 1) return 'days'; // single-day inline token
   if (node.unplanned) return 'unplanned';
+  if (node.done) return 'done';
   return 'hover-keys';
 }
 

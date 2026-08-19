@@ -66,11 +66,12 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     expect(shouldShowHint('hover-keys')).toBe(true);
   });
 
-  it('counter, days, views and unplanned hints are registered', () => {
+  it('counter, days, views, unplanned and done hints are registered', () => {
     expect(shouldShowHint('counter')).toBe(true);
     expect(shouldShowHint('days')).toBe(true);
     expect(shouldShowHint('views')).toBe(true);
     expect(shouldShowHint('unplanned')).toBe(true);
+    expect(shouldShowHint('done')).toBe(true);
   });
 
   describe('hoverHintId (which hint a node teaches on hover)', () => {
@@ -106,6 +107,24 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
       expect(hoverHintId(_state.get().nodes[0])).toBe('counter');
       _state.set({ nodes: [mk({ children: [], label: 'Workout (tu)', unplanned: true })] });
       expect(hoverHintId(_state.get().nodes[0])).toBe('days');
+    });
+
+    it('returns "done" for a finished task', () => {
+      _state.set({ nodes: [mk({ children: [], label: 'Call grandma', done: true })] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('done');
+    });
+
+    it('teaches unplanned over done when a task is both', () => {
+      _state.set({ nodes: [mk({ children: [], label: 'Fix the boiler', unplanned: true, done: true })] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('unplanned');
+    });
+
+    it('teaches the syntax first: a done counter still teaches Nx', () => {
+      _state.set({ nodes: [
+        mk({ done: true }),
+        { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] },
+      ] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('counter');
     });
 
     it('falls back to the generic hotkey card for a plain task', () => {
