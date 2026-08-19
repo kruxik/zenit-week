@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-xmoehJRJAPaVQ45pOklcd5nWUK/iIle4mRCSesm41yA='
+               'sha256-rNz7Uw4ZMDpoJXoQkyzZX8B2UT4XXg0KM5tpHsLIsdA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8063,6 +8063,7 @@ const TRANSLATIONS = {
     'tips.hoverIntro':            'Hover a task, then press:',
     'tips.counter':               'Nice — that became a counter. End a task with a number + “x” (e.g. “3x”) to split it into check-off steps.',
     'tips.days':                  'Scheduled! Add days in parentheses — “(mo, we)” or “(daily)” — to place a task across the week.',
+    'tips.unplannedIntro':        'Amber means unplanned — it wasn’t in the plan, it just turned up. Stats counts it apart from what you planned. Hover and press:',
     'tips.views':                 'Three views of your week: Mindmap to plan, Agenda for the day by day, Stats for how it went. In Mindmap, Rocks · Pebbles · Sand zoom from the big picture to full detail.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
@@ -8357,6 +8358,7 @@ const TRANSLATIONS = {
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
     'tips.counter':               'Super — vznikl počítací úkol. Zakončete název číslem s „x“ (např. „3x“) a rozdělí se na odškrtávací kroky.',
     'tips.days':                  'Naplánováno! Přidejte dny v závorce — „(po, st)“ nebo „(denně)“ — a úkol se rozmístí po týdnu.',
+    'tips.unplannedIntro':        'Oranžová znamená neplánované — nebylo v plánu, prostě přišlo. Statistika je počítá zvlášť od plánu. Najeďte a stiskněte:',
     'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek. V mapě Kameny · Oblázky · Písek přiblíží od celku k detailu.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
@@ -11856,10 +11858,6 @@ function commitEdit(followUp = 'auto') {
     // on another control — rebuilding now would eat that control's click.
     scheduleRender();
 
-    // Teachable moment: first time a node gains tick (counter) or day children,
-    // surface the matching tip anchored to that node.
-    maybeShowMagicHint(nodeId);
-
     // Hold atomic op across the chained startAddNode so a remote-merge flush
     // can't fire between this commit and the next _openInlineInput. Without
     // this, the just-pushed follow-up node lives only in weekData (not yet in
@@ -13983,8 +13981,8 @@ function attachNodeListeners() {
       clearKbFocus();   // the pointer takes the ring back over
       hoveredNodeId = id;
       if (id === 'center') return;
-      const hn = findNode(id);
-      if (hn && (hn.type === 'activity' || hn.type === 'counter')) maybeShowHint('hover-keys', g);
+      const hintId = hoverHintId(findNode(id));
+      if (hintId) maybeShowHint(hintId, g);
       const els = g._descendantEls;
       if (!els) return;
       for (let i = 0; i < els.length; i++) els[i].classList.add('subnode-hover');
@@ -18128,27 +18126,32 @@ const HINTS = {
   'counter': { textKey: 'tips.counter' },
   'days':    { textKey: 'tips.days' },
   'views':   { textKey: 'tips.views' },
+  'unplanned': {
+    introKey: 'tips.unplannedIntro',
+    keys: [
+      { k: 'U', labelKey: 'help.toggleUnplanned' },
+    ],
+  },
 };
 
-// Which magic-feature hint (if any) a node now qualifies for, based on the
-// children applyMagicLabel just created. Pure — used by the commitEdit trigger.
-function magicHintId(node) {
+// Which hint a node teaches when the pointer lands on it. Hovering is the one
+// gesture every user performs before they know anything, so each kind of node
+// explains itself on contact rather than waiting for the user to have already
+// typed the syntax it describes. Pure — used by the mouseenter trigger.
+//
+// Counter and day nodes win over the unplanned check: they teach a syntax the
+// user may not know, while unplanned is a state they can already see. A plain
+// task falls through to the generic hotkey card.
+function hoverHintId(node) {
   if (!node) return null;
-  const kids = (node.children || []).map(findNode).filter(Boolean);
-  if (kids.some(n => n.tickChild)) return 'counter';
-  if (kids.some(n => n.dayChild)) return 'days';          // multi-day → day-children
-  if (parseTodoDays(node.label || '').size >= 1) return 'days'; // single-day inline token
-  return null;
-}
+  if (node.type !== 'activity' && node.type !== 'counter') return null;
 
-// Fire the counter/days hint for a just-committed node, anchored to its element.
-function maybeShowMagicHint(nodeId) {
-  const id = magicHintId(findNode(nodeId));
-  if (!id) return;
-  // Node ids are genId() UUIDs (selector-safe) — mirror the existing
-  // .node-group[data-id=…] lookups, which don't use CSS.escape.
-  const el = document.querySelector(`.node-group[data-id="${nodeId}"]`);
-  if (el) maybeShowHint(id, el);
+  const kids = (node.children || []).map(findNode).filter(Boolean);
+  if (node.tickChild || kids.some(n => n.tickChild)) return 'counter';
+  if (node.dayChild || kids.some(n => n.dayChild)) return 'days';
+  if (parseTodoDays(node.label || '').size >= 1) return 'days'; // single-day inline token
+  if (node.unplanned) return 'unplanned';
+  return 'hover-keys';
 }
 
 function tipsEnabled() { return _tipsEnabled; }

@@ -566,6 +566,7 @@ export const checkDateRollover = (...args) => sandbox.checkDateRollover(...args)
 
 export const {
   isDevResetAllowed,
+  hoverHintId,
   getISOWeek,
   weeksInYear,
   offsetWeek,
@@ -666,7 +667,6 @@ export const {
   isHintSeen,
   markHintSeen,
   shouldShowHint,
-  magicHintId,
   replayTips,
   // History
   takeSnapshot,

@@ -6,7 +6,7 @@ import {
   isHintSeen,
   markHintSeen,
   shouldShowHint,
-  magicHintId,
+  hoverHintId,
   replayTips,
 } from './setup.js';
 
@@ -66,33 +66,58 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     expect(shouldShowHint('hover-keys')).toBe(true);
   });
 
-  it('counter, days and views hints are registered', () => {
+  it('counter, days, views and unplanned hints are registered', () => {
     expect(shouldShowHint('counter')).toBe(true);
     expect(shouldShowHint('days')).toBe(true);
     expect(shouldShowHint('views')).toBe(true);
+    expect(shouldShowHint('unplanned')).toBe(true);
   });
 
-  describe('magicHintId (counter/days trigger logic)', () => {
+  describe('hoverHintId (which hint a node teaches on hover)', () => {
     const mk = (overrides) => ({ id: 'x', type: 'activity', children: ['c'], ...overrides });
 
-    it('returns "counter" when a child is a tickChild', () => {
+    it('returns "counter" for a node with tick children, and for a tick child itself', () => {
       _state.set({ nodes: [mk(), { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] }] });
-      expect(magicHintId(_state.get().nodes[0])).toBe('counter');
+      expect(hoverHintId(_state.get().nodes[0])).toBe('counter');
+      expect(hoverHintId(_state.get().nodes[1])).toBe('counter');
     });
 
-    it('returns "days" when a child is a dayChild', () => {
+    it('returns "days" for a node with day children, and for a day child itself', () => {
       _state.set({ nodes: [mk(), { id: 'c', type: 'activity', parent: 'x', dayChild: true, dayIndex: 0, children: [] }] });
-      expect(magicHintId(_state.get().nodes[0])).toBe('days');
+      expect(hoverHintId(_state.get().nodes[0])).toBe('days');
+      expect(hoverHintId(_state.get().nodes[1])).toBe('days');
     });
 
     it('returns "days" for a single-day inline token (no day-children)', () => {
       _state.set({ nodes: [mk({ children: [], label: 'Workout (tu)' })] });
-      expect(magicHintId(_state.get().nodes[0])).toBe('days');
+      expect(hoverHintId(_state.get().nodes[0])).toBe('days');
     });
 
-    it('returns null for a plain task', () => {
+    it('returns "unplanned" for an unplanned task', () => {
+      _state.set({ nodes: [mk({ children: [], label: 'Fix the boiler', unplanned: true })] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('unplanned');
+    });
+
+    it('teaches the syntax first: counter and days outrank the unplanned state', () => {
+      _state.set({ nodes: [
+        mk({ unplanned: true }),
+        { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] },
+      ] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('counter');
+      _state.set({ nodes: [mk({ children: [], label: 'Workout (tu)', unplanned: true })] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('days');
+    });
+
+    it('falls back to the generic hotkey card for a plain task', () => {
       _state.set({ nodes: [mk({ children: [], label: 'Workout' })] });
-      expect(magicHintId(_state.get().nodes[0])).toBe(null);
+      expect(hoverHintId(_state.get().nodes[0])).toBe('hover-keys');
+    });
+
+    it('teaches nothing for branches, the centre, or a missing node', () => {
+      _state.set({ nodes: [{ id: 'work', type: 'branch', children: [] }] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe(null);
+      expect(hoverHintId(null)).toBe(null);
     });
   });
 });
+
