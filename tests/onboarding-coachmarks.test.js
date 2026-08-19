@@ -110,7 +110,7 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
     });
 
     it('orders the competing hints by priority, lowest first', () => {
-      expect(hintIdsByPriority()).toEqual(['done', 'unplanned', 'counter', 'days', 'priority', 'hover-keys']);
+      expect(hintIdsByPriority()).toEqual(['done', 'unplanned', 'counter', 'days', 'priority', 'inbox', 'hover-keys']);
     });
 
     it('state outranks syntax: an unplanned counter or day task teaches unplanned', () => {
@@ -159,6 +159,11 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
         { id: 'c', type: 'counter', parent: 'x', tickChild: true, children: [] },
       ] });
       expect(hoverHintId(_state.get().nodes[0])).toBe('counter');
+    });
+
+    it('returns "inbox" for a parked quick-capture', () => {
+      _state.set({ nodes: [mk({ children: [], label: 'Buy a flower', inbox: true })] });
+      expect(hoverHintId(_state.get().nodes[0])).toBe('inbox');
     });
 
     it('falls back to the generic hotkey card for a plain task', () => {

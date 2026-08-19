@@ -46,7 +46,7 @@ describe('Onboarding playground seed (S1)', () => {
     expect(keys).toEqual([TODAY]);
 
     const week = await loadWeekIDB(TODAY);
-    expect(week.nodes.length).toBe(46);
+    expect(week.nodes.length).toBe(_state.getPlaygroundSeed().week.nodes.length);
     expect(week.nodes.every(n => n._demo === true)).toBe(true);
     expect(week.nodes.every(n => typeof n._ts === 'number')).toBe(true);
     expect(week.tombstones).toEqual([]);
@@ -84,7 +84,7 @@ describe('Onboarding playground seed (S1)', () => {
     const seeded = await maybeSeedPlayground();
     expect(seeded).toBe(true);
     const week = await loadWeekIDB(TODAY);
-    expect(week.nodes.length).toBe(46);
+    expect(week.nodes.length).toBe(_state.getPlaygroundSeed().week.nodes.length);
   });
 
   it('does not clobber existing current-week data, even with #playground', async () => {

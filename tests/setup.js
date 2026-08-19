@@ -392,6 +392,7 @@ _state.clearLocalStorage = function() {
 _state.getLocalStorage = function(key) {
   return _lsStore[key];
 };
+_state.getPlaygroundSeed = function() { return PLAYGROUND_SEED; };
 _state.getDocument = function() { return document; };
 _state.getCurrentView = function() { return currentView; };
 _state.setCurrentView = function(v) { currentView = v; };
