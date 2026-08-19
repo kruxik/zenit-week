@@ -125,5 +125,6 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 
 ## Workflow Rules
 - **No code in conversation**: Never show source code, diffs, or snippets in replies to the user — not in explanations, not in summaries, not in plans. Describe changes in prose (and tables where useful). Code belongs in files only. Exceptions: git commit messages, and shell commands the user is asked to run.
-- **After every implementation**: summarize the change as a one-liner git commit message, then ask the user "Should I add and commit?"
+- **After every implementation**: summarize the change as a one-liner git commit message, then ask the user "Should I add and commit?" Never commit (or push) without asking first — the user decides when history changes.
+- **End every reply with the next actions**: whenever anything is left for the user to do — verify in the browser, run a command, approve a commit, push, make a decision — close the reply with a short numbered "What to do next" list, one line per step, concrete and in order. No action pending: no list.
 - **Chrome testing token budget**: When verifying in the browser (chrome-devtools MCP — navigating, seeding data, screenshots, `evaluate_script`), if a single testing effort burns more than ~5K tokens (especially when wrangling the environment, e.g. importing/seeding data into IndexedDB), stop and ask the user to set up the app state instead of grinding on it. Tell them what state you need (week populated, language, panel open), then just screenshot/measure to confirm.
