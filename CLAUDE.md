@@ -12,6 +12,7 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 
 ## Key Files
 - `zenit-week.html`: The entire application (HTML, CSS, and JS)
+- `sw.js`: Service worker — caches the app shell so launch never blocks on the network
 
 ## Architecture
 
@@ -62,7 +63,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - `syncStatusUp(nodeId, prop)` — propagates done/unplanned status up the tree after a child changes
 
 ## Coding Standards & Conventions
-- **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files
+- **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files. The one exception is `sw.js`: browsers only accept a service worker from a same-origin script URL, so it cannot be inlined or loaded from a `blob:`. Nothing else may leave the single file; do not treat `sw.js` as licence to split further. It holds exactly two concerns — shell caching, and draining the offline upload queue on a Background Sync event. Keep application logic out of both: the page serializes the upload payload and its content hash, and the worker only decides whether pushing is safe (`canPushEntry`). CRDT merging, hashing and layout never move into the worker.
 - **JavaScript**:
   - Always use `'use strict';`
   - Prefer `const` and `let` over `var`
@@ -91,11 +92,23 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 ## UI/UX Guidelines
 - **Visual Style**: Modern, clean interface with rounded corners, soft shadows, professional color palette
 - **Interactions**: Support both mouse (click/drag) and keyboard shortcuts:
+  - Arrow keys — move the mindmap focus ring (`kbFocusId`); it sets `hoveredNodeId`, so every hovered-node hotkey below works without a mouse
   - `Enter` — rename hovered node
   - `Tab` — add child to hovered node
-  - `Backspace` / `Delete` — delete hovered node
+  - `Backspace` / `Delete` — delete hovered node (clear the week on the root)
   - `D` — toggle done on hovered node
   - `U` — toggle unplanned on hovered node
+  - `P` — cycle priority on hovered node
+  - `C` — comment on hovered node
+  - `R` — toggle reusable on hovered node
+  - `N` — move hovered node to next week
+  - `1`–`7` / `8` — set / clear days on hovered node; on empty canvas they set the day filter (`0` = overdue)
+  - `M` / `A` / `S` — Mindmap / Agenda / Stats view
+  - `Q` — open the quick-add inbox panel
+  - `?` / `H` — toggle Help & Hotkeys
+  - `F` — fit the mindmap to the view; `V` — cycle view level (Sand · Pebbles · Rocks)
+  - `[` / `]` or `Shift + ←` / `Shift + →` — previous / next week; `T` — jump to the current week
+  - Agenda: `↑` / `↓` between items, `←` / `→` between day tabs, `1`–`7` / `0` to jump
   - `Ctrl/⌘ + Z` — undo
   - `Ctrl/⌘ + Shift + Z` / `Ctrl/⌘ + Y` — redo
   - `Esc` — close open panel/menu
@@ -106,10 +119,11 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - **Daily log panel**: Floating panel showing completed/ticked activities for the day, with timestamps and branch color dots
 - **Summary panel**: Expandable drawer showing per-branch done/total stats and a global completion percentage
 - **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week
-- **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive — Zenit Week has no servers and never stores user data itself
+- **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive — Zenit Week runs no servers that hold user data (the sole backend is `/api/token`, an OAuth token-exchange function) and never stores user data itself
 - **Internationalization**: English and Czech UI supported; `t(key)` helper reads from `TRANSLATIONS[currentLang]`; language persisted as `zenit-week-lang` in `localStorage` and synced via Drive
 - **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern
 
 ## Workflow Rules
+- **No code in conversation**: Never show source code, diffs, or snippets in replies to the user — not in explanations, not in summaries, not in plans. Describe changes in prose (and tables where useful). Code belongs in files only. Exceptions: git commit messages, and shell commands the user is asked to run.
 - **After every implementation**: summarize the change as a one-liner git commit message, then ask the user "Should I add and commit?"
 - **Chrome testing token budget**: When verifying in the browser (chrome-devtools MCP — navigating, seeding data, screenshots, `evaluate_script`), if a single testing effort burns more than ~5K tokens (especially when wrangling the environment, e.g. importing/seeding data into IndexedDB), stop and ask the user to set up the app state instead of grinding on it. Tell them what state you need (week populated, language, panel open), then just screenshot/measure to confirm.

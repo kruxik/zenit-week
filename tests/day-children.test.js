@@ -62,6 +62,38 @@ describe('parseTodoDays', () => {
   test('mixed: day group + non-day group', () => {
     expect(days('Sprint (v3) (mo)')).toEqual([1]);
   });
+
+  test('range (mo-we) → {1,2,3}', () => {
+    expect(days('Standup (mo-we)')).toEqual([1, 2, 3]);
+  });
+
+  test('range with spaces around dash (mo - we) → {1,2,3}', () => {
+    expect(days('Standup (mo - we)')).toEqual([1, 2, 3]);
+  });
+
+  test('range wraps the week end (fr-mo) → {0,1,5,6}', () => {
+    expect(days('Shift (fr-mo)')).toEqual([0, 1, 5, 6]);
+  });
+
+  test('range to Sunday (fr-su) → {0,5,6}', () => {
+    expect(days('Weekend (fr-su)')).toEqual([0, 5, 6]);
+  });
+
+  test('single-day range (we-we) → {3}', () => {
+    expect(days('One (we-we)')).toEqual([3]);
+  });
+
+  test('range mixed with single tokens (mo-we, fr) → {1,2,3,5}', () => {
+    expect(days('Mix (mo-we, fr)')).toEqual([1, 2, 3, 5]);
+  });
+
+  test('invalid range token disqualifies group (mo-xx)', () => {
+    expect(days('Bad (mo-xx)')).toEqual([]);
+  });
+
+  test('three-part range is not a day group (mo-we-fr)', () => {
+    expect(days('Bad (mo-we-fr)')).toEqual([]);
+  });
 });
 
 // ─── stripDayGroups ───────────────────────────────────────────────────────────
@@ -81,6 +113,10 @@ describe('stripDayGroups', () => {
 
   test('strips daily', () => {
     expect(stripDayGroups('Duolingo (daily)')).toBe('Duolingo');
+  });
+
+  test('strips range group', () => {
+    expect(stripDayGroups('Standup (mo-we)')).toBe('Standup');
   });
 
   test('preserves empty parens (not a day group)', () => {

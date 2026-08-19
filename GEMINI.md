@@ -91,11 +91,23 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 ## UI/UX Guidelines
 - **Visual Style**: Modern, clean interface with rounded corners, soft shadows, professional color palette
 - **Interactions**: Support both mouse (click/drag) and keyboard shortcuts:
+  - Arrow keys — move the mindmap focus ring (`kbFocusId`); it sets `hoveredNodeId`, so every hovered-node hotkey below works without a mouse
   - `Enter` — rename hovered node
   - `Tab` — add child to hovered node
-  - `Backspace` / `Delete` — delete hovered node
+  - `Backspace` / `Delete` — delete hovered node (clear the week on the root)
   - `D` — toggle done on hovered node
   - `U` — toggle unplanned on hovered node
+  - `P` — cycle priority on hovered node
+  - `C` — comment on hovered node
+  - `R` — toggle reusable on hovered node
+  - `N` — move hovered node to next week
+  - `1`–`7` / `8` — set / clear days on hovered node; on empty canvas they set the day filter (`0` = overdue)
+  - `M` / `A` / `S` — Mindmap / Agenda / Stats view
+  - `Q` — open the quick-add inbox panel
+  - `?` / `H` — toggle Help & Hotkeys
+  - `F` — fit the mindmap to the view; `V` — cycle view level (Sand · Pebbles · Rocks)
+  - `[` / `]` or `Shift + ←` / `Shift + →` — previous / next week; `T` — jump to the current week
+  - Agenda: `↑` / `↓` between items, `←` / `→` between day tabs, `1`–`7` / `0` to jump
   - `Ctrl/⌘ + Z` — undo
   - `Ctrl/⌘ + Shift + Z` / `Ctrl/⌘ + Y` — redo
   - `Esc` — close open panel/menu

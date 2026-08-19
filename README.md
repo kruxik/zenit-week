@@ -1,7 +1,7 @@
 # Zenit Week
 
 > Plan your week around what matters most — not what's just urgent.
-> A visual mind-map planner that runs in your browser. No signup. No servers. Free.
+> A visual mind-map planner that runs in your browser. No signup. No servers holding your data. Free.
 
 ![Zenit Week — visual mind-map week planner](./screenshot.svg)
 
@@ -25,12 +25,14 @@ No account is required. No tracking. Your data never touches Zenit Week's infras
 ## Features
 
 - **Mind-map view** with a center node and radial branches. Defaults are Work, Family, Me — but every branch is yours to rename, recolor, add, or remove.
-- **Two views, one week:** *Mindmap* for the whole-week picture, *Agenda* for day-by-day execution with Mon–Sun tabs and an Overdue lane.
+- **Three views, one week:** *Mindmap* for the whole-week picture, *Agenda* for day-by-day execution with Mon–Sun tabs and an Overdue lane, *Stats* for balance, trend and completion.
+- **Week navigation** — a week bar with prev/next arrows, the week's date range, and a click on the label to jump back to the current week.
 - **View levels — Rocks, Pebbles, Sand:** zoom out to just the big rocks, fade out deep detail with pebbles, or reveal everything with sand.
 - **Priorities (Normal / High / Critical):** scale layout space and visual weight; cascade to children automatically.
 - **Counters** — type `Nx` in any task name to track progress (e.g. *Pushups 10x*); click to increment, every tick is timestamped.
-- **Day indicators** — append `(mo, we, fr)` to a task to schedule it for those days (Czech tokens `po, út, st, čt, pá, so, ne` also work). `daily` schedules all seven days and auto-adds a 7-counter.
-- **Reusable tasks** — flag tasks that repeat every week; *Transfer Reusable* copies them forward with counters reset.
+- **Day indicators** — append `(mo, we, fr)` to a task to schedule it for those days (Czech tokens `po, út, st, čt, pá, so, ne` also work). Ranges work too — `(mo-we)`. `daily` schedules all seven days and auto-adds a 7-counter, `(today)` / `(tomorrow)` freeze to the real weekday on save, and `(now)` also pins the task to the top of today's agenda.
+- **Comments** — attach a note to any activity; a badge on the node and in the agenda opens it.
+- **Reusable tasks** — flag tasks that repeat every week; *Transfer Reusable* copies them forward with counters reset. *Disposable* clears the flag again.
 - **Transfer Unfinished** — carry incomplete work into the next ISO week with one action. *Move to next week* relocates a single task and its subtree.
 - **Effort baseline** — set a realistic activity-per-week target; the summary turns yellow at stretch, red at overload.
 - **Quick-add** — floating input to drop a task straight onto any branch without touching the mind map.
@@ -39,35 +41,68 @@ No account is required. No tracking. Your data never touches Zenit Week's infras
 - **Daily log** — completed and ticked activities collected with timestamps and branch dots.
 - **Light & dark theme** — respects `prefers-color-scheme` on first load.
 - **Languages** — English and Čeština, with browser-language detection and a dismissable suggestion banner.
-- **Optional Google Drive sync** — your own Drive, scope `drive.appdata` only, one file per week, never our servers. Conflict resolution by last-write-wins with CRDT tombstones, auto-polled every 30s.
+- **Optional Google Drive sync** — your own Drive, scope `drive.appdata` only, one file per week, never our servers. Conflict resolution by last-write-wins with CRDT tombstones, auto-polled every 10s.
 - **Undo / Redo** — 100 levels.
+- **Works offline** — installable as an app; the shell is cached by a service worker and edits made offline are uploaded once you are back online.
 - **Export & import** — full backup as JSON.
 - **Touch-friendly** — pinch to zoom, swipe an agenda item right to mark done, left for options.
 
 ## Keyboard shortcuts
 
+### Views and navigation
+
 | Action | Shortcut |
 | :--- | :--- |
-| Switch to Mindmap / Agenda | `M` / `A` |
-| Rename hovered node | `Enter` |
-| Add child to hovered node | `Tab` |
-| Delete hovered node | `Backspace` / `Delete` |
-| Toggle done | `D` |
-| Toggle unplanned | `U` |
-| Toggle day for hovered node | `1`–`7` (Mon–Sun) |
-| Clear all day indicators | `8` |
+| Switch to Mindmap / Agenda / Stats | `M` / `A` / `S` |
+| Help & hotkeys | `?` or `H` |
+| Quick add (inbox item) | `Q` |
+| Previous / next week | `[` / `]`, or `Shift + ←` / `Shift + →` |
+| Jump to the current week | `T` |
+| Fit everything to the view (mindmap) | `F` |
+| Cycle view level — Sand · Pebbles · Rocks | `V` |
 | Filter mindmap by day | `1`–`7` on empty canvas |
 | Filter to Unscheduled / Overdue | `8` / `0` on empty canvas |
-| Quick options menu | Right click |
 | Undo | `Ctrl/⌘ + Z` |
 | Redo | `Ctrl/⌘ + Shift + Z` or `Ctrl/⌘ + Y` |
-| Close panel / dialog | `Esc` |
+| Close panel / dialog (in the agenda on desktop: back to the mindmap) | `Esc` |
 
-Drag the background to pan. Scroll or pinch to zoom. Double-click the canvas to fit everything to the view.
+### Mindmap — on the hovered or focused node
+
+Arrow keys move a focus ring from node to node, so every shortcut below works without a mouse.
+
+| Action | Shortcut |
+| :--- | :--- |
+| Move the focus ring | `↑` `↓` `←` `→` |
+| Rename | `Enter` |
+| Add child | `Tab` |
+| Delete | `Backspace` / `Delete` |
+| Toggle done | `D` |
+| Toggle unplanned | `U` |
+| Cycle priority — Normal · High · Critical | `P` |
+| Comment | `C` |
+| Toggle reusable | `R` |
+| Move to next week | `N` |
+| Toggle day | `1`–`7` (Mon–Sun) |
+| Clear all day indicators | `8` |
+| Clear the whole week (on the root node) | `Backspace` / `Delete` |
+| Quick options menu | Right click |
+
+### Agenda
+
+| Action | Shortcut |
+| :--- | :--- |
+| Move between items | `↑` / `↓` |
+| Previous / next day tab | `←` / `→` |
+| Jump to a day / Overdue | `1`–`7` / `0` |
+| Toggle done | `D` |
+| Rename | `Enter` |
+| Delete | `Backspace` / `Delete` |
+
+Drag the background to pan. Scroll or pinch to zoom. Click the logo to fit everything to the view.
 
 ## Privacy
 
-Zenit Week has no servers. Your data lives in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see it. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel.
+Zenit Week runs no servers that hold your data. Your data lives in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see it. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel. Signing in with Google goes through one small serverless function of ours that exchanges OAuth tokens; it never sees your plans.
 
 Full details in the [privacy policy](https://zenitweek.com/privacy).
 

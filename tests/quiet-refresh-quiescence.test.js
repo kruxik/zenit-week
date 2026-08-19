@@ -66,4 +66,48 @@ describe('isAppQuiescent', () => {
   it('treats zero pendingUploadCount as clear', () => {
     expect(isAppQuiescent(allClearState({ pendingUploadCount: 0 })).quiescent).toBe(true);
   });
+
+  it('defers while the device has no link', () => {
+    expect(isAppQuiescent(allClearState({ offline: true })))
+      .toEqual({ quiescent: false, reason: 'offline' });
+  });
+
+  it('defers on a link too slow to refetch the document', () => {
+    expect(isAppQuiescent(allClearState({ effectiveType: 'slow-2g' })))
+      .toEqual({ quiescent: false, reason: 'slow-link:slow-2g' });
+    expect(isAppQuiescent(allClearState({ effectiveType: '2g' })))
+      .toEqual({ quiescent: false, reason: 'slow-link:2g' });
+  });
+
+  it('allows the reload on 3g and better', () => {
+    for (const t of ['3g', '4g']) {
+      expect(isAppQuiescent(allClearState({ effectiveType: t })).quiescent).toBe(true);
+    }
+  });
+
+  it('allows the reload where connection info is unavailable', () => {
+    // navigator.connection is Chromium-only — absence must not block updates.
+    expect(isAppQuiescent(allClearState({ effectiveType: null })).quiescent).toBe(true);
+    expect(isAppQuiescent(allClearState({ effectiveType: undefined })).quiescent).toBe(true);
+  });
+
+  it('defers when the user has asked the browser to save data', () => {
+    expect(isAppQuiescent(allClearState({ saveData: true })))
+      .toEqual({ quiescent: false, reason: 'save-data' });
+  });
+
+  it('allows the reload when Data Saver is off or unreported', () => {
+    expect(isAppQuiescent(allClearState({ saveData: false })).quiescent).toBe(true);
+    expect(isAppQuiescent(allClearState({ saveData: undefined })).quiescent).toBe(true);
+  });
+
+  it('reports the slower link before Data Saver when both apply', () => {
+    const r = isAppQuiescent(allClearState({ effectiveType: '2g', saveData: true }));
+    expect(r.reason).toBe('slow-link:2g');
+  });
+
+  it('reports user activity before network state', () => {
+    const r = isAppQuiescent(allClearState({ hasEditingNode: true, offline: true }));
+    expect(r.reason).toBe('editing');
+  });
 });

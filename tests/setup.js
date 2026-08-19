@@ -24,9 +24,12 @@ function elementStub() {
       add: (c) => classes.add(c),
       remove: (c) => classes.delete(c),
       contains: (c) => classes.has(c),
-      toggle: (c) => {
-        if (classes.has(c)) classes.delete(c);
-        else classes.add(c);
+      toggle: (c, force) => {
+        // Honor the optional force argument like the real DOMTokenList.
+        const add = force === undefined ? !classes.has(c) : !!force;
+        if (add) classes.add(c);
+        else classes.delete(c);
+        return add;
       }
     },
     style: {},
@@ -67,6 +70,12 @@ function elementStub() {
 // window.addEventListener is stubbed so the 'load' callback never fires.
 const sandbox = {
   crypto: globalThis.crypto,
+  URL: globalThis.URL,
+  URLSearchParams: globalThis.URLSearchParams,
+  // netFetch() attaches AbortSignal.timeout() to every request; exposing the
+  // real thing keeps the timed path under test rather than the fallback.
+  AbortController: globalThis.AbortController,
+  AbortSignal: globalThis.AbortSignal,
   fetch: (url, options) => {
     const finalUrl = (typeof url === 'string' && url.startsWith('/'))
       ? `http://localhost${url}`
@@ -82,7 +91,6 @@ const sandbox = {
     dispatchEvent: () => {},
     location: { origin: 'http://localhost', pathname: '/' },
     fetch: null, // populated below
-    gapi: null,  // populated below
     innerWidth: 1280,
     innerHeight: 768,
     matchMedia: () => ({
@@ -92,32 +100,6 @@ const sandbox = {
       addListener: () => {},
       removeListener: () => {},
     }),
-  },
-  gapi: {
-    load: (name, cb) => cb(),
-    client: {
-      init: () => Promise.resolve(),
-      setToken: () => {},
-      request: async (config) => {
-        const url = new URL(config.path);
-        if (config.params) {
-          Object.entries(config.params).forEach(([k, v]) => url.searchParams.append(k, v));
-        }
-        const resp = await globalThis.fetch(url.toString(), {
-          method: config.method,
-          headers: config.headers,
-          body: config.body,
-        });
-        const result = await resp.json();
-        if (!resp.ok) {
-          const error = new Error('GAPI Error');
-          error.status = resp.status;
-          error.result = { error: { code: resp.status, message: result.error?.message } };
-          throw error;
-        }
-        return { result };
-      }
-    }
   },
   BroadcastChannel: class {
     constructor() {}
@@ -174,6 +156,13 @@ const sandbox = {
     get length()  { return Object.keys(sandbox._lsStore).length; },
   },
   location: { hash: '' },
+  // The app strips the hash on today's week via history.replaceState (and never
+  // pushes). Both stubs mirror the browser's observable effect for our call
+  // sites — every one passes pathname + search, i.e. a hash-less URL.
+  history: {
+    replaceState: () => { sandbox.location.hash = ''; },
+    pushState:    () => { sandbox.location.hash = ''; },
+  },
   navigator: { userAgentData: null, userAgent: '' },
   performance: { now: () => 0 },
   requestAnimationFrame: () => {},
@@ -202,7 +191,6 @@ const sandbox = {
   _state: {},
 };
 sandbox.window.fetch = sandbox.fetch;
-sandbox.window.gapi = sandbox.gapi;
 
 vm.createContext(sandbox);
 
@@ -219,18 +207,18 @@ silentRefresh = async function(token) {
 };
 
 const _origSyncWeekFromDrive = syncWeekFromDrive;
-syncWeekFromDrive = async function(wk) {
-  return _origSyncWeekFromDrive(wk);
+syncWeekFromDrive = async function(...args) {
+  return _origSyncWeekFromDrive(...args);
 };
 
 const _origSyncWeekToDrive = syncWeekToDrive;
-syncWeekToDrive = async function(wk) {
-  return _origSyncWeekToDrive(wk);
+syncWeekToDrive = async function(...args) {
+  return _origSyncWeekToDrive(...args);
 };
 
 const _origPollDriveMeta = pollDriveMeta;
-pollDriveMeta = async function(wk) {
-  return _origPollDriveMeta(wk);
+pollDriveMeta = async function(...args) {
+  return _origPollDriveMeta(...args);
 };
 
 const _origMergeWeekData = mergeWeekData;
@@ -243,45 +231,15 @@ applyRemoteMerge = function(w, d, j, h, s, r) {
   return _origApplyRemoteMerge(w, d, j, h, s, r);
 };
 
-// Sync overrides for tests because existing tests are synchronous
-loadWeek = function(wk) {
-  const raw = localStorage.getItem('zenit-week-' + wk);
-  if (raw) {
-    try {
-      const data = JSON.parse(raw);
-      return migrateCrdt(validateAndRepair(migrateDayCounters(data)));
-    } catch(e) {}
-  }
-  const prevWk = offsetWeek(wk, -1);
-  const prevRaw = localStorage.getItem('zenit-week-' + prevWk);
-  if (prevRaw) {
-    try {
-      const prevData = JSON.parse(prevRaw);
-      const prevBranches = (prevData.nodes || []).filter(n => n.type === 'branch');
-      if (prevBranches.length > 0) {
-        prevBranches.forEach(b => {
-          if (!BRANCH_COLORS[b.id]) {
-            BRANCH_COLORS[b.id] = deriveBranchPalette((BRANCH_COLORS[b.id] || {}).main || pickBranchColor());
-          }
-        });
-        const newWeek = { nodes: prevBranches.map(b => ({ ...b, children: [] })) };
-        if (prevData.baseline) newWeek.baseline = prevData.baseline;
-        return newWeek;
-      }
-    } catch(e) {}
-  }
-  return defaultWeekData();
-};
-
-saveWeek = function(wk, data) {
-  data.savedAt = Date.now();
-  data.crdtVersion = (data.crdtVersion || 0) + 1;
-  if (!Array.isArray(data.tombstones)) data.tombstones = [];
-  localStorage.setItem('zenit-week-' + wk, JSON.stringify(data));
-};
-
 // Mock IDB functions by default to keep existing tests synchronous and stable.
-// persistence.test.js will opt-out of this by setting _state.useRealIDB(true).
+// Opt out with _state.useRealIDB(true) — required for anything testing the
+// async read-modify-write behaviour of week records, since the synchronous
+// localStorage stand-ins below make those look atomic.
+//
+// The _real* captures MUST come before any override: capturing them afterwards
+// meant useRealIDB(true) restored the IDB primitives but left loadWeek/saveWeek
+// pointing at the localStorage stand-ins, so "real IDB" tests still wrote to
+// localStorage. The overrides are applied by the updateIDBMethods() call below.
 let _useMockIDB = true;
 
 const _realOpenDB = openDB;
@@ -376,22 +334,33 @@ render = () => {};
 applyAutoLayout = () => {};
 updateColorDots = () => {};
 updateSvgFilters = () => {};
-syncBranchConfig = () => {};
+// syncBranchConfig is pure data (reads node.side → BRANCH_CONFIG, backfills side);
+// kept real so tests exercise branch-side propagation through merges.
 updateThemeColor = () => {};
 scheduleColorsSync = () => {};
 isAtomicOpActive = () => false;
 stopDrivePoll = () => {};
 startDrivePoll = () => {};
-loadGapiAndSync = () => {};
+startDriveSession = () => {};
 onTokensReceived = async (token) => {
   googleAccessToken = token;
   _tokenReceivedAt = Date.now();
+  _cancelRefreshRetry();   // mirrors the real one — a token ends the retry loop
 };
 forcePushAllToDrive = () => {};
 initDriveSync = () => Promise.resolve();
 scheduleDriveSync = () => {};
 todayWeekKey = () => _todayWeekKeyOverride || currentWeekKey;
 let _todayWeekKeyOverride = null;
+
+// Network guards — the constants are top-level \`const\`s, which live in the
+// context's lexical scope rather than on the global object, so they need an
+// accessor like the module-level \`let\`s below.
+_state.getNetTimeouts = function() {
+  return { NET_TIMEOUT_MS, NET_PROBE_TIMEOUT_MS, PROBE_MIN_INTERVAL_MS };
+};
+_state.getLastProbeAt = function() { return _lastProbeAt; };
+_state.setLastProbeAt = function(v) { _lastProbeAt = v; };
 
 _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
@@ -403,6 +372,7 @@ _state.getNextWeekRawCache = function() { return _nextWeekRawCache; };
 _state.setNextWeekRawCache = function(v) { _nextWeekRawCache = v; };
 _state.refreshNextWeekCache = function() { return refreshNextWeekCache(); };
 _state.moveNodeToNextWeek = function(id) { return moveNodeToNextWeek(id); };
+_state.withWeekLock = function(wk, fn) { return withWeekLock(wk, fn); };
 _state.loadAndRender = function(wk) { return loadAndRender(wk); };
 _state.setLang   = function(l) { 
   currentLang = l; 
@@ -427,6 +397,11 @@ _state.getCurrentView = function() { return currentView; };
 _state.setCurrentView = function(v) { currentView = v; };
 _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
+// hoveredNodeId / kbFocusId are module-level \`let\`s — the hotkeys read the first
+// and the arrow keys write the second, so both need an accessor to test.
+_state.setHoveredNode = function(id) { hoveredNodeId = id; };
+_state.getHoveredNode = function() { return hoveredNodeId; };
+_state.getKbFocus = function() { return kbFocusId; };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 _state.setViewLevel = function(v) { currentViewLevel = v; };
@@ -440,6 +415,8 @@ _state.getActiveDayFilter = function() { return activeDayFilter; };
 _state.setAgendaActiveTab = function(v) { agendaActiveTab = v; };
 _state.getAgendaActiveTab = function() { return agendaActiveTab; };
 _state.setTodayWeekKey   = function(k) { _todayWeekKeyOverride = k; };
+_state.setLastKnownDate = function(day, wk) { _lastKnownDay = day; _lastKnownWeekKey = wk; };
+_state.getLastKnownDate = function() { return { day: _lastKnownDay, weekKey: _lastKnownWeekKey }; };
 _state.clearTodayWeekKeyOverride = function() { _todayWeekKeyOverride = null; };
 _state.resetView         = async function() { return resetView(); };
 _state.getIDBStore = function() { return _idbStore; };
@@ -450,21 +427,67 @@ _state.resetPlaygroundNudge = function() { _playgroundNudgeDone = false; _playgr
 _state.setPlaygroundNudgeDone = function(v) { _playgroundNudgeDone = v; };
 _state.resetTips = function() { _tipsEnabled = true; _tipsSeen = {}; _coachmarkVisible = false; };
 _state.setCoachmarkVisible = function(v) { _coachmarkVisible = v; };
+// Signed-in identity for the root node's derived name. Both '' = signed out.
+_state.setGoogleUser = function(displayName, email, photoLink) {
+  googleUserName  = displayName || '';
+  googleUserEmail = email || '';
+  googleUserPhoto = photoLink || '';
+  // Mirrors showSignedInAvatar, so the initials tiers behave as they do live.
+  googleUserInitials = (displayName || email) ? getInitials(displayName || email) : '';
+};
 _state.resetSyncState = function() {
   googleAccessToken = null;
-  _gapiInitialized = false;
+  _driveSessionStarted = false;
   driveFileIdCache.clear();
   lastSyncedHash.clear();
+  lastSeenRemoteHash.clear();
   etagCache.clear();
   colorsSyncedHash = null;
+  lastSeenRemoteColorsHash = null;
+  _changesPageToken = null;
   _undoRedoForcePush = new Set();
+  _remoteOriginIds.clear();
+  clearAllSyncDebounceTimers();
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
+  _cancelRefreshRetry();
+  syncStatus = 'disconnected';
 };
+_state.getSyncStatus = function() { return syncStatus; };
+_state.hasRefreshRetryPending = function() { return _refreshRetryTimer !== null; };
 _state.getUndoRedoForcePush = function() { return _undoRedoForcePush; };
+_state.recordRemoteArrivals = function(wk, local, merged) { _recordRemoteArrivals(wk, local, merged); };
+_state.getRemoteOriginIds = function(wk) { return _remoteOriginIds.get(wk) || null; };
+_state.clearRemoteOriginIds = function() { _remoteOriginIds.clear(); };
+_state.isImportPending = function() { return isImportPending(); };
+_state.flushAllPendingSyncToDrive = function() { return flushAllPendingSyncToDrive(); };
+_state.getSyncDebounceTimerKeys = function() { return [...syncDebounceTimers.keys()]; };
+_state.setSyncDebounceTimer = function(wk) {
+  syncDebounceTimers.set(wk, setTimeout(() => {}, 60000));
+};
+// Run fn with a signed-in token and syncWeekToDrive/syncColorsToDrive replaced
+// by recorders, so teardown-flush tests can assert which weeks were pushed.
+_state.withStubbedUploads = async function(collector, fn) {
+  const prevToken = googleAccessToken;
+  const prevWeek = syncWeekToDrive;
+  const prevColors = syncColorsToDrive;
+  googleAccessToken = 'test-token';
+  syncWeekToDrive = async (wk) => { collector.push(wk); };
+  syncColorsToDrive = async () => {};
+  try { return await fn(); }
+  finally {
+    googleAccessToken = prevToken;
+    syncWeekToDrive = prevWeek;
+    syncColorsToDrive = prevColors;
+  }
+};
 _state.setUndoRedoForcePush = function(v) {
   _undoRedoForcePush = (v == null) ? new Set() : (v instanceof Set ? v : new Set([v]));
 };
 _state.getAccessToken = () => googleAccessToken;
+_state.setAccessToken = (t) => { googleAccessToken = t; };
+_state.takeSnapshot = function() { return takeSnapshot(); };
+_state.handleResetTokenMismatch = function(tok) { return _handleResetTokenMismatch(tok); };
+_state.getDriveFileMissKeys = function() { return [..._driveFileMissSince.keys()]; };
 _state.useRealIDB = function(v) {
   _useMockIDB = !v;
   _db = null;
@@ -495,6 +518,25 @@ _state.setDriveFileId = function(wk, id) {
 _state.setLastSyncedHash = function(wk, hash) {
   lastSyncedHash.set(wk, hash);
 };
+// Viewport vars are module-level \`let\`s; tests that convert client → world
+// coordinates need to pin them (zoom defaults to 0.6).
+_state.setViewport = function({ panX: px = 0, panY: py = 0, zoom: z = 1 } = {}) {
+  panX = px; panY = py; zoom = z;
+};
+// dragState is a module-level \`let\`, so it is invisible on the sandbox object.
+// Expose a setter so drag/drop tests can stage a drag without real pointer events.
+_state.setDragState = function(patch) {
+  dragState = {
+    activeNodeId: null,
+    startX: 0, startY: 0,
+    rectLeft: 0, rectTop: 0,
+    cursorStartWorldX: 0, cursorStartWorldY: 0,
+    initialPositions: {},
+    layoutPositions: {},
+    descendantSet: new Set(),
+    ...patch,
+  };
+};
 
 // Initialize app state
 currentLang = 'en';
@@ -520,6 +562,7 @@ export const loadWeek = (...args) => sandbox.loadWeek(...args);
 export const saveWeek = (...args) => sandbox.saveWeek(...args);
 export const runMigrationIfNeeded = (...args) => sandbox.runMigrationIfNeeded(...args);
 export const maybeSeedPlayground = (...args) => sandbox.maybeSeedPlayground(...args);
+export const checkDateRollover = (...args) => sandbox.checkDateRollover(...args);
 
 export const {
   getISOWeek,
@@ -549,13 +592,20 @@ export const {
   getPriorityWeight,
   getDescendantIds,
   // Day-child functions
-  getDayFilterOpacity,
+  dayFilterMatches,
+  dayFilterMatchSet,
   parseTodoDays,
   stripDayGroups,
+  localizeDayGroups,
+  nodeDisplayLabel,
+  dayAbbr,
   resolveMagicDayTokens,
   magicTokenResolvesToNextWeek,
   hasNowToken,
-  pinToTopOfTodayAgenda,
+  pinToTopOfAgenda,
+  restoreToAgendaOrder,
+  agendaRowsForNode,
+  setActivityDays,
   commitEdit,
   applyMagicLabel,
   migrateDayCounters,
@@ -568,6 +618,7 @@ export const {
   applyBranchColor,
   updateSummary,
   computeWeekStats,
+  _weekCompletion,
   openStatsPanel,
   closeStatsPanel,
   applyTranslations,
@@ -575,6 +626,7 @@ export const {
   isoWeekPos,
   sortDayChildren,
   getAgendaAncestorChain,
+  getAgendaNodeLabel,
   getAgendaItems,
   getOverdueItems,
   getAnyDayItems,
@@ -588,10 +640,13 @@ export const {
   // CRDT & Sync
   mergeWeekData,
   migrateCrdt,
+  withWeekLock,
   // Multi-tab (Option B) — local sync peer
   _weekContentSig,
   hasEditingNode,
   applyRemoteMerge,
+  // Drag & drop
+  handleNodeDrop,
   // Transfers
   transferUnfinished,
   moveNodeToNextWeek,
@@ -625,8 +680,22 @@ export const {
   getThemeColors,
   deriveBranchPalette,
   t,
+  // Center node + week bar
+  firstNameFrom,
+  centerDisplayName,
+  centerNodeText,
+  canShowAvatarPhoto,
+  formatWeekParts,
+  formatWeekLabel,
+  roundedRectPathD,
   // Storage
   fnv1a32,
+  weekContentHash,
+  colorsContentHash,
+  sanitizeColorsData,
+  loadBranchColors,
+  saveBranchColors,
+  bootstrapColorsSettings,
   // Color picker
   hexToHsv,
   hsvToHex,
@@ -639,6 +708,12 @@ export const {
   recomputeZoomBounds,
   // Import
   normalizeImportKey,
+  // Network guards
+  netFetch,
+  isDefinitelyOffline,
+  requestAssetUpdateCheck,
+  checkForAssetUpdate,
+  requestPersistentStorage,
   // Quiet Refresh
   parseAssetVersionHeaders,
   buildRestorePayload,
@@ -650,9 +725,12 @@ export const {
   driveApiRequest,
   syncWeekFromDrive,
   syncWeekToDrive,
+  syncColorsFromDrive,
   pollDriveMeta,
+  pollDriveChanges,
   silentRefresh,
   exchangeToken,
+  purgeLegacyRefreshToken,
   _state,
 } = sandbox;
 

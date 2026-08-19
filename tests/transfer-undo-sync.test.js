@@ -3,8 +3,8 @@
 //          (wrong-week) blob into the next-week record → duplication into week+2.
 //   Bug B: undo of a cross-week move must tombstone the copy it placed in the
 //          next week, and force-push that week, or a Drive pull-merge resurrects it.
-import { describe, test, expect, beforeEach } from 'vitest';
-import { takeSnapshot, undo, saveWeekIDB, _state } from './setup.js';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { takeSnapshot, undo, redo, openDB, saveWeekIDB, loadWeekIDB, _state } from './setup.js';
 
 const mkBranch = (id, children = []) =>
   ({ id, type: 'branch', branch: id, label: id, children, side: 'left', _ts: 0 });
@@ -51,48 +51,135 @@ describe('Bug A — refreshNextWeekCache tracks the current week', () => {
 });
 
 describe('Bug B — undo of a move un-resurrects the next-week copy', () => {
-  beforeEach(() => {
+  const WK = '2026-01';
+  const NEXT = '2026-02';
+
+  // Driven over real IndexedDB against the real transfer: undo reverses the ids
+  // the move recorded, so a hand-simulated move (which records nothing) would no
+  // longer exercise the path at all.
+  beforeEach(async () => {
+    _state.useRealIDB(true);
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['weeks', 'misc'], 'readwrite');
+      tx.objectStore('weeks').clear();
+      tx.objectStore('misc').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
     _state.clearLocalStorage();
-    _state.clearIDBStore();
     _state.reset();
     _state.resetSyncState();
   });
 
+  afterEach(() => _state.useRealIDB(false));
+
   test('tombstones the moved-in node and force-pushes the next week', async () => {
-    const WK = '2026-01';
-    const NEXT = '2026-02';
-
-    // Pre-move state: current week holds a1; next week is just a branch.
     _state.setWeekKey(WK);
-    _state.set({ nodes: [mkBranch('work', ['a1']),
-      { id: 'a1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 100 }],
-      tombstones: [] });
-    _state.setNextWeekRawCache(JSON.stringify({ nodes: [mkBranch('work')], tombstones: [] }));
-
-    // Snapshot captures the pre-move state of both weeks.
-    takeSnapshot();
-
-    // Simulate the move having completed: a1 gone from current, a fresh copy
-    // 'moved1' placed in the next-week record (as moveNodeToNextWeek would).
-    _state.set({ nodes: [mkBranch('work')], tombstones: ['a1'] });
-    await _state.saveWeekIDB(NEXT, {
-      nodes: [mkBranch('work', ['moved1']),
-        { id: 'moved1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 9000 }],
+    const week = {
+      nodes: [mkBranch('work', ['a1']),
+        { id: 'a1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 100 }],
       tombstones: [],
-    });
+    };
+    _state.set(structuredClone(week));
+    await saveWeekIDB(WK, structuredClone(week));
+    await saveWeekIDB(NEXT, { nodes: [mkBranch('work')], tombstones: [] });
+    await _state.refreshNextWeekCache();
+
+    await _state.moveNodeToNextWeek('a1');
+    const movedId = (await loadWeekIDB(NEXT)).nodes.find(n => n.label === 'a1').id;
 
     await undo();
 
-    const restoredNext = await _state.loadWeekIDB(NEXT);
+    const restoredNext = await loadWeekIDB(NEXT);
     // The moved-in copy is gone AND tombstoned so a Drive merge can't bring it back.
-    expect(restoredNext.nodes.some(n => n.id === 'moved1')).toBe(false);
-    expect(restoredNext.tombstones).toContain('moved1');
+    expect(restoredNext.nodes.some(n => n.id === movedId)).toBe(false);
+    expect(restoredNext.tombstones).toContain(movedId);
     // Structural branches must never be tombstoned (a branch tombstone lets a
     // Drive merge permanently delete it).
     expect(restoredNext.tombstones).not.toContain('work');
     // Both touched weeks are force-pushed (no pull-before-push that would resurrect).
     expect(_state.getUndoRedoForcePush().has(WK)).toBe(true);
     expect(_state.getUndoRedoForcePush().has(NEXT)).toBe(true);
+    // a1 is back where it started.
+    expect(_state.get().nodes.some(n => n.id === 'a1')).toBe(true);
+  });
+
+  test('a node someone else put in the next week survives that undo', async () => {
+    _state.setWeekKey(WK);
+    const week = {
+      nodes: [mkBranch('work', ['a1']),
+        { id: 'a1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 100 }],
+      tombstones: [],
+    };
+    _state.set(structuredClone(week));
+    await saveWeekIDB(WK, structuredClone(week));
+    // Next week already holds unrelated work — an earlier transfer, or another device.
+    await saveWeekIDB(NEXT, {
+      nodes: [mkBranch('work', ['keep1']),
+        { id: 'keep1', type: 'activity', parent: 'work', branch: 'work', label: 'keep me', children: [], done: false, _ts: 500 }],
+      tombstones: [],
+    });
+    await _state.refreshNextWeekCache();
+
+    await _state.moveNodeToNextWeek('a1');
+    await undo();
+
+    const next = await loadWeekIDB(NEXT);
+    expect(next.nodes.some(n => n.id === 'keep1')).toBe(true);
+    expect(next.tombstones).not.toContain('keep1');
+  });
+
+  test('redo puts the moved copy back', async () => {
+    _state.setWeekKey(WK);
+    const week = {
+      nodes: [mkBranch('work', ['a1']),
+        { id: 'a1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 100 }],
+      tombstones: [],
+    };
+    _state.set(structuredClone(week));
+    await saveWeekIDB(WK, structuredClone(week));
+    await saveWeekIDB(NEXT, { nodes: [mkBranch('work')], tombstones: [] });
+    await _state.refreshNextWeekCache();
+
+    await _state.moveNodeToNextWeek('a1');
+    await undo();
+    await redo();
+
+    const next = await loadWeekIDB(NEXT);
+    const copy = next.nodes.find(n => n.label === 'a1');
+    expect(copy).toBeTruthy();
+    // Its tombstone from the undo must be cleared, or the next merge kills it again.
+    expect(next.tombstones).not.toContain(copy.id);
+    expect(next.nodes.find(n => n.id === 'work').children).toContain(copy.id);
+  });
+
+  test('an undo that never touched the next week leaves it alone', async () => {
+    _state.setWeekKey(WK);
+    _state.set({ nodes: [mkBranch('work', [])], tombstones: [] });
+    await saveWeekIDB(NEXT, {
+      nodes: [mkBranch('work', ['keep1']),
+        { id: 'keep1', type: 'activity', parent: 'work', branch: 'work', label: 'keep me', children: [], done: false, _ts: 500 }],
+      tombstones: [],
+    });
+    // Snapshot taken before the next week existed locally — the case that used to
+    // make undo replace the whole week with an empty record.
+    _state.setNextWeekRawCache(null);
+    takeSnapshot();
+
+    const after = {
+      nodes: [mkBranch('work', ['n1']),
+        { id: 'n1', type: 'activity', parent: 'work', branch: 'work', label: 'n1', children: [], done: false, _ts: 700 }],
+      tombstones: [],
+    };
+    _state.set(structuredClone(after));
+    await saveWeekIDB(WK, structuredClone(after));
+
+    await undo();
+
+    const next = await loadWeekIDB(NEXT);
+    expect(next.nodes.some(n => n.id === 'keep1')).toBe(true);
+    expect(next.tombstones).toEqual([]);
   });
 });
 

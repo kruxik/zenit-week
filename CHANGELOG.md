@@ -5,6 +5,163 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.08.17] - 2026-08-17
+
+### Added
+
+- **hotkeys:** Add keyboard focus ring and document every shortcut
+- **center:** Circular root with the user's avatar and a completion ring
+- **week-bar:** Navigate weeks from a fixed bar, move the day-filter chip down
+- **center:** Derive root name and ring geometry helpers
+- **layout:** Widen vertical node spacing 25% on mobile
+- **i18n:** Render day abbreviations in the active language
+- **view:** Expose view levels on mobile via the Mindmap tab
+- **view:** Shift Rocks/Pebbles one level deeper
+- **mindmap:** Day filter prunes instead of dimming
+- **quick-add:** Open the quick-add panel with the Q hotkey
+- **mindmap:** Open comment dialog on comment icon click
+- **offline:** Cache the Google profile photo in the service worker
+- **offline:** Refresh the cached shell on a periodic background sync
+- **offline:** Replace the plain-text 503 with a localized offline page
+- **offline:** Precache the manifest icons in the service worker
+- **sync:** Drain offline uploads from the service worker
+- **offline:** Cache the landing and legal pages alongside the app shell
+- **storage:** Request persistent storage for the shell cache and week data
+- **offline:** Serve the app shell from a service worker cache
+
+### Changed
+
+- **week-nav:** Refit the mindmap view when the week changes
+- **week-bar:** Split its buttons with the toolbar's 1px vertical rules
+- **sync:** Replace toolbar avatar with a state-bearing cloud glyph
+- **center:** Paint the root ring as the Stats donut's four-band split
+- **center:** Thin the root's dark bands to a third, from 7.5 to 2.5
+- **center:** Scale the root 1.25x so the avatar and completion ring read larger
+- **week-bar:** Use Tabler menu-2 for the week-actions trigger
+- **center:** Root node is the user, not the week
+- **view-toggle:** Order tabs Mindmap, Agenda, Stats
+- **view-levels:** Collapse the view-level row on desktop too
+- **panels:** Delete legacy per-panel window chrome
+- **panels:** Unify panel window chrome behind .app-panel
+- **filter:** Drop the day-filter toast in favour of the chip
+- **mindmap:** Share the today-dot label between both day menus
+- **mindmap:** Drop the abbreviation column from the day-filter menu
+- **mindmap:** Collapse the day rail into one button with a day menu
+- **offline:** Consume the navigation preload in the service worker
+- **quiet-refresh:** Collapse the duplicate version probes into one throttled check
+
+### Fixed
+
+- **transfer:** Clear unplanned flag on nodes moved to next week
+- **center:** Give the root's + buttons a hit collar and a click slop for Stats
+- **avatar:** Request profile photos at s320 so the monogram stops looking blurred
+- **view-bar:** Let hover paint on inactive view-toggle tabs
+- **week-bar:** Centre the label and match the actions icon to the arrows
+- **help:** Dismiss help panel when switching views
+- **views:** Persist stats section across refresh
+- **panels:** Close 1px gap under toolbar in agenda and stats
+- **filter:** Keep the day-filter chip inside narrow viewports
+- **mindmap:** Build zigzag metrics from the filtered child set
+- **mindmap:** Hold edit-teardown render until the pointer gesture ends
+- **week:** Roll over the displayed week at midnight
+- **analytics:** Skip Insights when offline or under Data Saver
+- **sync:** Skip the avatar photo request when there is no link
+- **quiet-refresh:** Honour Data Saver before refetching the document
+- **quiet-refresh:** Defer the reload when the link can't carry the document
+- **net:** Skip probe, poll and upload while the device has no link
+- **net:** Give every network request an abort deadline
+
+## [v2026.07.30] - 2026-07-30
+
+### Added
+
+- **stats:** Add 8- and 12-week ranges to the cumulative flow chart
+- **layout:** Pack inbox items into a grid tray instead of a tall column
+- **quick-add:** Preselect first branch when none saved
+- **quick-add:** Keep panel open after submit with in-panel receipt and close button
+- Support day-range interval syntax "(mo-we)" for scheduling
+- Experimental Drive Changes API poll behind a flag (off by default)
+
+### Fixed
+
+- **stats:** Size cumulative flow axis labels to ~12.5px at any width
+- **i18n:** Translate placeholders in applyTranslations
+- **quick-add:** Order receipt strip FIFO, oldest first
+- Keep Drive session on aborted or transient token refresh
+- Keep stored branch colors; validate the synced colors file
+- Cascade branch to descendants when rebinding a subtree across branches
+- Repair remote reset, log silent GC, unconditional pre-push pull, poll discovery
+- Undo reverses a transfer's own nodes instead of rewriting the next week
+- Keep queued uploads, honour the import flag, and stop undo deleting peer work
+- Serialize week-record writes and reconcile local-only weeks from IDB
+- Propagate done/unplanned status up to branch nodes
+- Sync branch left/right side across devices (refresh BRANCH_CONFIG on merge)
+- Stop Drive poll re-downloading colors file with legacy-scheme contentHash
+
+### Security
+
+- Serve strict hashed CSP headers for landing pages
+- Drop gapi client for plain fetch, close CSP to self + hashes
+- Sunset the revoke_legacy relay on 2026-11-01
+- Match localhost exactly in token proxy Secure-cookie check
+- Add frame-ancestors, nosniff, referrer, HSTS headers in vercel.json
+- Replace CSP unsafe-inline with per-script sha256 hashes, drop vercel.live
+- Drop localStorage refresh-token fallbacks, purge and revoke lingering copies on load
+
+## [v2026.06.24.1] - 2026-06-24
+
+### Fixed
+
+- Stop Drive poll re-downloading files with legacy-scheme contentHash
+
+## [v2026.06.24] - 2026-06-24
+
+### Added
+
+- Live mirror-flip branch when dragged across root centerline
+
+### Fixed
+
+- Base colors sync identity on content hash, not raw JSON
+- Stop Drive sync ping-pong by hashing canonical content, not raw JSON
+
+## [v2026.06.22.1] - 2026-06-22
+
+### Fixed
+
+- Solid Stats/Agenda panel content so mindmap no longer bleeds through (light theme)
+
+## [v2026.06.22] - 2026-06-22
+
+### Added
+
+- Agenda remembers manual task order; priority only sorts unordered groups
+- Add Stats segment to view pill (S hotkey), drop stats close button
+- Mark current week with a blue dot under the CFD axis label
+- Morph CFD between lenses on click (from previous shape, no first-render anim)
+- Add Total/per-branch lens switcher to the 4-week CFD
+- Drop ambiguous CFD delta chip; rely on the visual trend
+- Add gradient week guides and 50-point horizontal gridlines to CFD
+- Replace 4-week sparkline with stacked-area cumulative flow diagram
+- Lay out top stats sections as three equal-width columns, center the middle
+- Hide unplanned stats and legends when week has no unplanned tasks
+- Collapse deep nodes in Rocks/Pebbles and slide nodes + edges together
+
+### Changed
+
+- Remove the top-of-mindmap mini-stats box and its dead code
+- Make Stats a real peer view so toolbar controls work correctly
+- Group stats legend by category, fix Czech CFD title + week axis prefix
+
+### Fixed
+
+- Block browser pinch-zoom app-wide; only mindmap zooms (touch-action floor on body)
+- Reflow immediately when opening node editor so new item doesn't overlap siblings
+- Keep full bottom navigation visible while Stats panel is open
+- Shrink mobile donut to 120px so two-column stats fit on 360px phones
+- Move follow-through legend below branch bars to match Plan vs Reality
+- Refresh next-week snapshot cache on Drive/peer merge to prevent undo tombstoning live nodes
+
 ## [v2026.06.14] - 2026-06-14
 
 ### Added

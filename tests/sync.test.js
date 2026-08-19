@@ -11,6 +11,7 @@ import {
   pollDriveMeta,
   fnv1a32,
   attemptSilentRestore,
+  purgeLegacyRefreshToken,
   defaultWeekData
 } from './setup.js';
 
@@ -22,8 +23,9 @@ const handlers = [
     const body = await request.json();
     // A refresh grant with no body token models the HttpOnly cookie supplying it
     // server-side (the production path); an explicit token is the migration path.
-    const cookieSession = body.grant_type === 'refresh_token' && !body.refresh_token;
-    if (body.refresh_token === 'valid_refresh_token' || body.code === 'valid_code' || cookieSession) {
+    // A refresh grant carries no token in the body — the HttpOnly cookie
+    // supplies it server-side, so any refresh grant models a valid session.
+    if (body.grant_type === 'refresh_token' || body.code === 'valid_code') {
       return HttpResponse.json({
         access_token: 'new_access_token',
         expires_in: 3600
@@ -117,16 +119,16 @@ describe('Google Drive Sync', () => {
     });
 
     test('silentRefresh updates internal token state', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
-      
-      const ok = await silentRefresh();
-      expect(ok).toBe(true);
-      
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+
+      const result = await silentRefresh();
+      expect(result).toBe('ok');
+
       expect(_state.getAccessToken()).toBe('new_access_token');
     });
 
     test('authFetch automatically refreshes token on 401', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
       await attemptSilentRestore();
       
       let callCount = 0;
@@ -147,26 +149,147 @@ describe('Google Drive Sync', () => {
       expect(callCount).toBe(2);
     });
 
-    test('silentRefresh returns false on invalid token', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'invalid_token' });
-      
-      const ok = await silentRefresh();
-      expect(ok).toBe(false);
+    // An expired or revoked refresh cookie — the proxy rejects the grant.
+    const rejectRefresh = () => server.use(
+      http.post('http://localhost/api/token', () =>
+        HttpResponse.json({ error: 'invalid_grant' }, { status: 400 }))
+    );
+
+    test('silentRefresh reports a hard failure on a rejected grant', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+      rejectRefresh();
+
+      expect(await silentRefresh()).toBe('hard');
+    });
+
+    test('silentRefresh reports a soft failure when the call never lands', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+      server.use(http.post('http://localhost/api/token', () => HttpResponse.error()));
+
+      expect(await silentRefresh()).toBe('soft');
     });
 
     test('attemptSilentRestore clears localStorage on failure', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'invalid_token', email: 'test@ex.com' });
-      
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true, email: 'test@ex.com' });
+      rejectRefresh();
+
       await attemptSilentRestore();
       
       expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBeUndefined();
       expect(_state.getAccessToken()).toBeNull();
+      expect(_state.hasRefreshRetryPending()).toBe(false);
+    });
+
+    // No verdict ever arrived. A fast reload aborts the in-flight token call,
+    // and the proxy answers 500 when it cannot reach Google — neither means the
+    // refresh cookie is dead, so the stored session must survive.
+    const softFailures = {
+      'an aborted request':  () => HttpResponse.error(),
+      'a proxy 5xx':         () => HttpResponse.json({ error: 'token_exchange_failed' }, { status: 500 }),
+      'a Google rate limit': () => HttpResponse.json({ error: 'rate_limit_exceeded' },  { status: 429 }),
+    };
+
+    for (const [label, respond] of Object.entries(softFailures)) {
+      test(`attemptSilentRestore keeps the session after ${label}`, async () => {
+        const auth = { hasSession: true, email: 'test@ex.com' };
+        _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, auth);
+        server.use(http.post('http://localhost/api/token', respond));
+
+        await attemptSilentRestore();
+
+        expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBe(JSON.stringify(auth));
+        expect(_state.getSyncStatus()).toBe('error');
+        expect(_state.hasRefreshRetryPending()).toBe(true);
+      });
+    }
+
+    test('a retried refresh reconnects and stops the retry loop', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true, email: 'test@ex.com' });
+      server.use(http.post('http://localhost/api/token', () => HttpResponse.error()));
+
+      await attemptSilentRestore();
+      expect(_state.hasRefreshRetryPending()).toBe(true);
+
+      server.resetHandlers();
+      const result = await silentRefresh();
+
+      expect(result).toBe('ok');
+      expect(_state.getAccessToken()).toBe('new_access_token');
+      expect(_state.hasRefreshRetryPending()).toBe(false);
+    });
+  });
+
+  describe('Legacy plaintext refresh-token purge', () => {
+    // Captures every /api/token body so we can assert on the revoke call.
+    let bodies;
+    beforeEach(() => {
+      bodies = [];
+      server.use(
+        http.post('http://localhost/api/token', async ({ request }) => {
+          bodies.push(await request.json());
+          return new HttpResponse(null, { status: 204 });
+        })
+      );
+    });
+
+    const flush = () => new Promise(r => setTimeout(r, 0));
+
+    test('purges an unmigrated token and revokes it via the proxy', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'legacy_rt', email: 'a@ex.com' });
+
+      purgeLegacyRefreshToken();
+      await flush();
+
+      expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBeUndefined();
+      expect(bodies).toEqual([{ grant_type: 'revoke_legacy', refresh_token: 'legacy_rt' }]);
+    });
+
+    test('purges even when the revoke request fails', async () => {
+      server.use(
+        http.post('http://localhost/api/token', () => HttpResponse.error())
+      );
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'legacy_rt' });
+
+      purgeLegacyRefreshToken();
+      await flush();
+
+      expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBeUndefined();
+    });
+
+    test('keeps a live cookie session, dropping only the plaintext copy', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true, refresh_token: 'legacy_rt', email: 'a@ex.com' });
+
+      purgeLegacyRefreshToken();
+      await flush();
+
+      const stored = JSON.parse(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY));
+      expect(stored).toEqual({ hasSession: true, email: 'a@ex.com' });
+      expect(bodies).toEqual([]);
+    });
+
+    test('leaves a cookie-only record untouched', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+
+      purgeLegacyRefreshToken();
+      await flush();
+
+      expect(JSON.parse(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY))).toEqual({ hasSession: true });
+      expect(bodies).toEqual([]);
+    });
+
+    test('a legacy token no longer restores a session', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'legacy_rt' });
+
+      await attemptSilentRestore();
+
+      expect(_state.getAccessToken()).toBeNull();
+      expect(bodies).toEqual([]);
     });
   });
 
   describe('Drive API Orchestration', () => {
     test('syncWeekFromDrive (Pull) merges remote data into local', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
       await attemptSilentRestore();
       _state.setDriveFileId('2026-01', 'file_id_2026_01');
       
@@ -187,7 +310,7 @@ describe('Google Drive Sync', () => {
     });
 
     test('syncWeekToDrive (Push) uploads local data to Drive', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
       await attemptSilentRestore();
       _state.setDriveFileId('2026-01', 'file_id_2026_01');
       
@@ -215,7 +338,7 @@ describe('Google Drive Sync', () => {
     });
 
     test('pollDriveMeta detects remote changes and triggers sync', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
       await attemptSilentRestore();
       _state.setDriveFileId('2026-01', 'file_id_2026_01');
       await _state.saveWeekIDB('2026-01', defaultWeekData());
@@ -228,7 +351,7 @@ describe('Google Drive Sync', () => {
     });
 
     test('pollDriveMeta skips download when hash matches local', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
       await attemptSilentRestore();
       _state.setDriveFileId('2026-01', 'file_id_2026_01');
       
@@ -252,7 +375,7 @@ describe('Google Drive Sync', () => {
     });
     
     test('pollDriveMeta handles resetToken mismatch (Full Resync)', async () => {
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'valid_refresh_token' });
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
       await attemptSilentRestore();
       _state.setDriveFileId('colors', 'file_id_colors');
       _state.setLocalStorage('zenit-week-reset-token', 'local_token');

@@ -43,7 +43,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Zenit Week",
-    "description": "A visually rich, single-file mind-map week planner. Privacy-first, no servers, free.",
+    "description": "A visually rich, single-file mind-map week planner. Privacy-first, your plans never reach our servers, free.",
     "url": "https://zenitweek.com/",
     "applicationCategory": "ProductivityApplication",
     "operatingSystem": "Web",
@@ -855,7 +855,7 @@
         <div class="benefit-icon" style="--ico:#1ABCFE;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></div>
         <div class="benefit-body">
           <h3>Fully private</h3>
-          <p>Your data lives in your browser or your own Google Drive. No servers, no tracking.</p>
+          <p>Your data lives in your browser or your own Google Drive. It never reaches our servers, and nothing tracks you.</p>
         </div>
       </div>
     </div>
@@ -930,7 +930,7 @@
         <div class="benefit-icon" style="--ico:#1ABCFE;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.486 -3.465 3.486h-11.878"/></svg></div>
         <div class="benefit-body">
           <h3>Device sync</h3>
-          <p>Optional cross-device sync. Data stays in your own Drive — no servers.</p>
+          <p>Optional cross-device sync. Data stays in your own Drive — never ours.</p>
         </div>
       </div>
 
@@ -1020,7 +1020,19 @@
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
 </script>
-<script defer src="/_vercel/insights/script.js"></script>
+<script>
+  // Analytics is never worth a request the user cannot benefit from: skip it
+  // when the device has no link, and when Data Saver is on.
+  (function () {
+    if (navigator.onLine === false) return;
+    var conn = navigator.connection;
+    if (conn && conn.saveData === true) return;
+    var s = document.createElement('script');
+    s.defer = true;
+    s.src = '/_vercel/insights/script.js';
+    document.head.appendChild(s);
+  })();
+</script>
 
 </body>
 <!-- bstack-verify: a3f7e1b9c2d40856e7f3a1b9c2d40e56 -->
