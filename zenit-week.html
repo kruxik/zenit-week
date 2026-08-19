@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ziRm8MNxvM8dKURBLahzdLJCKvA//IeHuxS1f3TDgO0='
+               'sha256-kRsRry4gFsw/iV/MmW8pjGhfBT9oOhlWPFxM47WH9wg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8067,6 +8067,7 @@ const TRANSLATIONS = {
     'tips.counterCaption':        'Counters',
     'tips.daysCaption':           'Days',
     'tips.priorityCaption':       'Priority',
+    'tips.rootCaption':           'Rearrange freely',
     'tips.signInCaption':         'Sync across devices',
     'tips.weekNavCaption':        'Your week',
     'tips.weekNavKeysLabel':      'Previous / next week',
@@ -8078,6 +8079,7 @@ const TRANSLATIONS = {
     'tips.viewsCaption':          'Views',
     'tips.levelsCaption':         'Detail levels',
     'tips.dayFilterCaption':      'Day filter',
+    'tips.root':                  'Drag a task to move it. Drop it on another and it belongs there instead — colour and all.',
     'tips.signIn':                'Optional. Everything already works offline in this browser — signing in keeps a copy in your own Google Drive so your phone and laptop stay in step. Zenit Week runs no server that holds your data.',
     'tips.weekNav':               'Each week is a map of its own. Step to the next one to plan ahead — unfinished tasks can follow you there, and the menu here transfers them.',
     'tips.quickAdd':              'Write a task down without deciding where it belongs. Pick a branch, type it, and it waits on that branch until you drag it into place. Also on:',
@@ -8387,6 +8389,7 @@ const TRANSLATIONS = {
     'tips.counterCaption':        'Počítadla',
     'tips.daysCaption':           'Dny',
     'tips.priorityCaption':       'Priorita',
+    'tips.rootCaption':           'Volné přeskládání',
     'tips.signInCaption':         'Synchronizace mezi zařízeními',
     'tips.weekNavCaption':        'Váš týden',
     'tips.weekNavKeysLabel':      'Předchozí / další týden',
@@ -8398,6 +8401,7 @@ const TRANSLATIONS = {
     'tips.viewsCaption':          'Pohledy',
     'tips.levelsCaption':         'Úrovně detailu',
     'tips.dayFilterCaption':      'Filtr dnů',
+    'tips.root':                  'Přetažením úkol přesunete. Puštěním na jiný ho přeřadíte pod něj — i s barvou.',
     'tips.signIn':                'Nepovinné. Vše funguje offline v tomto prohlížeči — přihlášení uloží kopii do vašeho Google Disku, aby telefon i notebook držely krok. Zenit Week neprovozuje server, který by vaše data držel.',
     'tips.weekNav':               'Každý týden je vlastní mapa. Přejděte na další a plánujte dopředu — nedokončené úkoly vás mohou následovat, menu zde je přenese.',
     'tips.quickAdd':              'Zapište úkol, aniž byste řešili, kam patří. Vyberte větev, napište ho a počká na ní, dokud ho nepřetáhnete na místo. Také na:',
@@ -14032,7 +14036,7 @@ function attachNodeListeners() {
     g.addEventListener('mouseenter', () => {
       clearKbFocus();   // the pointer takes the ring back over
       hoveredNodeId = id;
-      if (id === 'center') return;
+      if (id === 'center') { maybeShowHint('root', g); return; }
       const hintId = hoverHintId(findNode(id));
       if (hintId) maybeShowHint(hintId, g);
       const els = g._descendantEls;
@@ -18265,6 +18269,11 @@ const HINTS = {
     captionKey: 'tips.levelsCaption',
     priority: 10,
     textKey: 'tips.levels',
+  },
+  'root': {
+    captionKey: 'tips.rootCaption',
+    priority: 15,
+    textKey: 'tips.root',
   },
   'signin': {
     captionKey: 'tips.signInCaption',
