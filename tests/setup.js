@@ -392,6 +392,7 @@ _state.clearLocalStorage = function() {
 _state.getLocalStorage = function(key) {
   return _lsStore[key];
 };
+_state.getPlaygroundSeed = function() { return PLAYGROUND_SEED; };
 _state.getDocument = function() { return document; };
 _state.getCurrentView = function() { return currentView; };
 _state.setCurrentView = function(v) { currentView = v; };
@@ -423,6 +424,10 @@ _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
 _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
+_state.resetPlaygroundNudge = function() { _playgroundNudgeDone = false; _playgroundNudgeShown = false; };
+_state.setPlaygroundNudgeDone = function(v) { _playgroundNudgeDone = v; };
+_state.resetTips = function() { _tipsEnabled = true; _tipsSeen = {}; _coachmarkVisible = false; };
+_state.setCoachmarkVisible = function(v) { _coachmarkVisible = v; };
 // Signed-in identity for the root node's derived name. Both '' = signed out.
 _state.setGoogleUser = function(displayName, email, photoLink) {
   googleUserName  = displayName || '';
@@ -557,9 +562,13 @@ export const deleteValueIDB = (...args) => sandbox.deleteValueIDB(...args);
 export const loadWeek = (...args) => sandbox.loadWeek(...args);
 export const saveWeek = (...args) => sandbox.saveWeek(...args);
 export const runMigrationIfNeeded = (...args) => sandbox.runMigrationIfNeeded(...args);
+export const maybeSeedPlayground = (...args) => sandbox.maybeSeedPlayground(...args);
 export const checkDateRollover = (...args) => sandbox.checkDateRollover(...args);
 
 export const {
+  isDevResetAllowed,
+  hoverHintId,
+  hintIdsByPriority,
   getISOWeek,
   weeksInYear,
   offsetWeek,
@@ -645,6 +654,22 @@ export const {
   // Transfers
   transferUnfinished,
   moveNodeToNextWeek,
+  // Onboarding _demo drop-on-touch
+  touchNode,
+  // Onboarding cleanup
+  clearExampleTasks,
+  hasDemoActivityNodes,
+  // Onboarding nudge
+  shouldShowPlaygroundNudge,
+  playgroundUserNodeCount,
+  dismissPlaygroundNudge,
+  // Coachmark hints (Part B)
+  tipsEnabled,
+  setTipsEnabled,
+  isHintSeen,
+  markHintSeen,
+  shouldShowHint,
+  replayTips,
   // History
   takeSnapshot,
   undo,

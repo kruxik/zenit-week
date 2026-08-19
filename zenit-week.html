@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-j63rPXJ+X88rzncbBvFMZIlqToqojxzwBGCGBR2r1F8='
+               'sha256-kRsRry4gFsw/iV/MmW8pjGhfBT9oOhlWPFxM47WH9wg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -628,6 +628,144 @@
     transition: opacity 0.2s ease;
   }
   #view-level-toast.visible { opacity: 1; }
+
+  /* Onboarding nudge — gentle, actionable banner offering to clear leftover
+     example tasks once the user has started their own week. */
+  #playground-nudge {
+    position: fixed;
+    bottom: 68px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: min(92vw, 480px);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    padding: 10px 12px 10px 16px;
+    box-shadow: 0 4px 16px var(--shadow-md);
+    z-index: 3000;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  #playground-nudge.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+  #playground-nudge-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  #playground-nudge-actions .agenda-action-btn {
+    white-space: nowrap;
+    height: 32px;
+    padding: 0 12px;
+    font-weight: 400;
+  }
+  #playground-nudge-actions .agenda-action-btn.danger {
+    color: var(--accent-danger);
+    border-color: var(--accent-danger-border);
+  }
+  #playground-nudge-actions .agenda-action-btn.danger:hover {
+    color: var(--accent-danger);
+    border-color: var(--accent-danger);
+  }
+  #playground-nudge-actions .agenda-action-btn.danger:hover::before {
+    background: var(--accent-danger-bg);
+  }
+
+  /* Coachmark — anchored just-in-time tip bubble (Part B). */
+  #coachmark {
+    position: fixed;
+    z-index: 3200;
+    max-width: min(86vw, 320px);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    box-shadow: 0 6px 22px var(--shadow-md);
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-primary);
+    /* Grows out of its own arrow, so the bubble reads as belonging to the thing
+       it points at rather than appearing from nowhere. --cm-origin-x is the
+       arrow's offset, written by positionCoachmark. */
+    opacity: 0;
+    transform: scale(0.92);
+    transform-origin: var(--cm-origin-x, 50%) bottom;
+    transition: opacity 160ms ease, transform 220ms cubic-bezier(0.34, 1.42, 0.64, 1);
+  }
+  #coachmark.below { transform-origin: var(--cm-origin-x, 50%) top; }
+  #coachmark.visible { opacity: 1; transform: scale(1); }
+  #coachmark[hidden] { display: none; }
+  /* Two beats of a ring expanding out of the anchor. It runs before the bubble
+     settles, so the eye is sent to the element first and reads the label second. */
+  .coachmark-pulse {
+    position: fixed;
+    z-index: 3190;
+    pointer-events: none;
+    border: 2px solid var(--accent-primary);
+    animation: coachmark-pulse 700ms ease-out 2;
+  }
+  @keyframes coachmark-pulse {
+    from { opacity: 0.5; transform: scale(1); }
+    to   { opacity: 0;   transform: scale(1.3); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #coachmark { transition: opacity 100ms linear; transform: none; }
+    #coachmark.visible { transform: none; }
+    .coachmark-pulse { display: none; }
+  }
+  #coachmark-text { margin-bottom: 10px; white-space: pre-line; }
+  #coachmark-text .coachmark-caption { font-weight: 600; margin-bottom: 4px; }
+  #coachmark-text .coachmark-intro { margin-bottom: 8px; }
+  #coachmark-text .coachmark-intro:last-child { margin-bottom: 0; }
+  #coachmark-text .help-row { margin-bottom: 6px; }
+  #coachmark-text .help-row:last-child { margin-bottom: 0; }
+  #coachmark-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  #coachmark-tip-off {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  #coachmark-footer .agenda-action-btn {
+    white-space: nowrap;
+    height: 30px;
+    padding: 0 12px;
+    font-weight: 400;
+    flex-shrink: 0;
+  }
+  /* Arrow — points down at the anchor (default, bubble above the target). */
+  #coachmark-arrow {
+    position: absolute;
+    bottom: -7px;
+    width: 12px;
+    height: 12px;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-default);
+    border-bottom: 1px solid var(--border-default);
+    transform: translateX(-50%) rotate(45deg);
+  }
+  /* Bubble below the target — arrow points up. */
+  #coachmark.below #coachmark-arrow {
+    bottom: auto;
+    top: -7px;
+    border-right: none;
+    border-bottom: none;
+    border-left: 1px solid var(--border-default);
+    border-top: 1px solid var(--border-default);
+  }
 
   .view-level-btn {
     display: flex;
@@ -3023,6 +3161,13 @@
     padding: 0 16px;
     font-weight: 400;
   }
+  /* Respect the hidden attribute — .agenda-action-btn sets its own display,
+     which would otherwise override [hidden]{display:none} and show an empty
+     secondary button on confirms that don't use one. */
+  #app-confirm-actions .agenda-action-btn[hidden],
+  #import-confirm-actions .agenda-action-btn[hidden] {
+    display: none;
+  }
   #app-confirm-actions .agenda-action-btn.danger,
   #import-confirm-actions .agenda-action-btn.danger {
     color: var(--accent-danger);
@@ -3460,7 +3605,7 @@
     </div>
     <div id="toolbar-right">
       <div id="sync-container">
-        <button type="button" id="sync-btn" data-i18n-title="sync.btnTitle" title="Sign in with Google to sync across devices. Your data is stored only in your own Google Drive — Zenit Week never sees or stores it.">
+        <button type="button" id="sync-btn">
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
             <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
             <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
@@ -3567,7 +3712,7 @@
         <span data-i18n="view.pebbles">Pebbles</span>
       </div>
       <div class="view-level-separator"></div>
-      <div class="view-level-btn" data-level="rocks" data-i18n-title="view.rocksTitle" title="Rocks — show only branches and their tasks">
+      <div class="view-level-btn" data-level="rocks" data-i18n-title="view.rocksTitle" title="Rocks — show only branches and their activities">
         <div class="view-level-icon">
           <div class="dot-row" style="opacity:0.2">
             <span class="vli-dot" style="width:3px;height:3px"></span>
@@ -3641,6 +3786,23 @@
 </div>
 
 <div id="view-level-toast"></div>
+
+<div id="playground-nudge" role="status" aria-live="polite">
+  <span id="playground-nudge-text" data-i18n="onboarding.nudge">Done exploring? Clear the example tasks and keep your own — you can also do this anytime in Settings → Help.</span>
+  <span id="playground-nudge-actions">
+    <button type="button" class="agenda-action-btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Dismiss</button>
+    <button type="button" class="agenda-action-btn danger" id="playground-nudge-clear" data-i18n="onboarding.clearExample">Clear example tasks</button>
+  </span>
+</div>
+
+<div id="coachmark" role="dialog" aria-live="polite" hidden>
+  <div id="coachmark-text"></div>
+  <div id="coachmark-footer">
+    <span id="coachmark-tip-off" data-i18n="tips.disableHint">Turn tips off in Settings.</span>
+    <button type="button" class="agenda-action-btn" id="coachmark-got-it" data-i18n="tips.gotIt">Got it</button>
+  </div>
+  <div id="coachmark-arrow"></div>
+</div>
 
 <div id="context-menu">
   <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.transferUnfinished">Transfer Unfinished</span></div>
@@ -3753,21 +3915,21 @@
 
 
 <div id="undo-redo-bar">
-  <button type="button" class="undo-redo-btn" id="undo-btn" data-i18n-title="help.undo" title="Undo" aria-label="Undo" disabled>
+  <button type="button" class="undo-redo-btn" id="undo-btn" data-i18n-aria="help.undo" aria-label="Undo" disabled>
     <svg class="icon" aria-hidden="true"><use href="#icon-arrow-back-up"/></svg>
   </button>
   <div class="undo-redo-separator"></div>
-  <button type="button" class="undo-redo-btn" id="redo-btn" data-i18n-title="help.redo" title="Redo" aria-label="Redo" disabled>
+  <button type="button" class="undo-redo-btn" id="redo-btn" data-i18n-aria="help.redo" aria-label="Redo" disabled>
     <svg class="icon" aria-hidden="true"><use href="#icon-arrow-forward-up"/></svg>
   </button>
 </div>
 
 <div id="fab-pill">
-  <button type="button" id="fab-settings" data-i18n-title="toolbar.settings" title="Settings" aria-label="Settings" aria-haspopup="true">
+  <button type="button" id="fab-settings" data-i18n-aria="toolbar.settings" aria-label="Settings" aria-haspopup="true">
     <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
   </button>
   <div class="fab-divider" aria-hidden="true"></div>
-  <button type="button" id="fab-add" title="Quick add" aria-label="Quick add">
+  <button type="button" id="fab-add" aria-label="Quick add">
     <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
   </button>
 </div>
@@ -3831,6 +3993,16 @@
   </div>
   <div class="settings-separator"></div>
   <div class="settings-section">
+    <div class="theme-toggle-row">
+      <span class="settings-label" data-i18n="settings.tips">Show tips</span>
+      <button type="button" class="theme-toggle" id="tips-toggle" role="switch" aria-checked="true" data-i18n-title="settings.tipsTitle" title="Show just-in-time tips for first-time actions" data-i18n-aria="settings.tipsTitle" aria-label="Show just-in-time tips for first-time actions">
+        <span class="theme-toggle-thumb"></span>
+      </button>
+    </div>
+    <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay" style="width:100%;margin-top:8px;">Replay tips</button>
+  </div>
+  <div class="settings-separator"></div>
+  <div class="settings-section">
     <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab" style="width:100%;">Help &amp; Hotkeys</button>
   </div>
   <div class="settings-separator"></div>
@@ -3842,6 +4014,12 @@
       <input type="file" id="import-file-input" accept=".json" style="display:none;">
     </div>
     <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file — could not import.</div>
+  </div>
+  <!-- Dev-only; unhidden by init on a development host. Never translated. -->
+  <div class="settings-separator" id="settings-dev-separator" hidden></div>
+  <div class="settings-section" id="settings-dev-section" hidden>
+    <div class="settings-label">Development</div>
+    <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor" style="width:100%;">Reset to first visit</button>
   </div>
 </div>
 
@@ -3868,6 +4046,14 @@
   </div>
 
   <div id="help-content" class="app-panel-content">
+      <div class="help-section" id="help-onboarding-section" hidden>
+        <div class="help-section-title" data-i18n="onboarding.clearTitle">Example week</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary); margin-bottom: 10px;">
+          <span data-i18n="onboarding.clearHelpBody">This week was started from an example. Edit anything to make it yours — then clear what's left.</span>
+        </div>
+        <button type="button" class="agenda-action-btn danger" id="help-clear-example" data-i18n="onboarding.clearExample">Clear example tasks</button>
+      </div>
+
       <div class="help-section">
         <div class="help-section-title" data-i18n="help.aboutTitle">What it solves</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
@@ -4645,6 +4831,83 @@ async function deleteValueIDB(key) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+// ─── Dev-only reset ───────────────────────────────────────────────────────────
+// Wipes every trace of this user so the next load is a genuine first visit. It
+// exists for onboarding work, where "what does a new user see" has to be
+// answerable more than once. What keeps it away from real data is the host:
+// only a development origin (loopback, .local, a tunnel, or file:) exposes it,
+// and the production hosts are denied outright, so on zenitweek.com the entry
+// never renders and the function refuses even when called from the console.
+const DEV_RESET_DENY_HOSTS = ['zenitweek.com', 'www.zenitweek.com'];
+const DEV_RESET_DENY_SUFFIXES = ['.vercel.app'];
+const DEV_RESET_ALLOW_HOSTS = ['localhost', '127.0.0.1', '[::1]', '::1'];
+const DEV_RESET_ALLOW_SUFFIXES = ['.localhost', '.local', '.ngrok-free.dev', '.ngrok-free.app', '.ngrok.app', '.ngrok.io'];
+
+// Pure so the guard itself is testable: every input is passed in.
+function isDevResetAllowed(hostname, protocol) {
+  const host = String(hostname || '').toLowerCase();
+  // Deny wins over allow — a production host is never a dev host, whatever else matches.
+  if (DEV_RESET_DENY_HOSTS.includes(host)) return false;
+  if (DEV_RESET_DENY_SUFFIXES.some(sfx => host.endsWith(sfx))) return false;
+
+  return protocol === 'file:'
+    || DEV_RESET_ALLOW_HOSTS.includes(host)
+    || DEV_RESET_ALLOW_SUFFIXES.some(sfx => host.endsWith(sfx));
+}
+
+function devResetEnabled() {
+  return isDevResetAllowed(location.hostname, location.protocol);
+}
+
+// Deletes the IndexedDB database outright. A still-open connection would block
+// the delete, so the cached handle is closed first; if something else still
+// holds one we give up after a moment rather than hanging on a dialog the dev
+// cannot dismiss.
+function devDeleteDatabase() {
+  if (_db) { try { _db.close(); } catch { /* already closing */ } }
+  _db = null;
+  _dbPromise = null;
+  return new Promise(resolve => {
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(); } };
+    setTimeout(done, 3000);
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = done;
+    req.onerror = done;
+    req.onblocked = done;
+  });
+}
+
+async function devResetApp() {
+  // Re-checked at call time, not just at render time: the settings entry is one
+  // way in, but this must also refuse a console call on a production page.
+  if (!devResetEnabled()) return;
+
+  await devDeleteDatabase();
+
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('zenit-week')) localStorage.removeItem(k);
+  }
+  try { sessionStorage.clear(); } catch { /* private mode */ }
+
+  // The shell cache and the worker itself go too — a first visit has neither.
+  if (window.caches) {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    } catch { /* cache API unavailable */ }
+  }
+  if (navigator.serviceWorker) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    } catch { /* no worker registered */ }
+  }
+
+  location.reload();
 }
 
 // TODO: remove after 2026-07-28 — localStorage→IDB migration code
@@ -7795,6 +8058,44 @@ const TRANSLATIONS = {
     'import.complete':            'Import complete',
     'settings.autoLayout':        'Auto layout',
     'settings.autoLayoutTitle':   'Automatically reset layout after each change',
+    'settings.tips':              'Show tips',
+    'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
+    'settings.tipsReplay':        'Replay tips',
+    'settings.tipsReplayDone':    'Tips reset — they’ll show again.',
+    'tips.doneCaption':           'Done',
+    'tips.unplannedCaption':      'Unplanned',
+    'tips.counterCaption':        'Counters',
+    'tips.daysCaption':           'Days',
+    'tips.priorityCaption':       'Priority',
+    'tips.rootCaption':           'Rearrange freely',
+    'tips.signInCaption':         'Sync across devices',
+    'tips.weekNavCaption':        'Your week',
+    'tips.weekNavKeysLabel':      'Previous / next week',
+    'tips.weekNavTodayLabel':     'Back to this week',
+    'tips.quickAddCaption':       'Quick add',
+    'tips.inboxCaption':          'Inbox',
+    'tips.hoverCaption':          'Quick keys',
+    'tips.undoCaption':           'Undo',
+    'tips.viewsCaption':          'Views',
+    'tips.levelsCaption':         'Detail levels',
+    'tips.dayFilterCaption':      'Day filter',
+    'tips.root':                  'Drag a task to move it. Drop it on another and it belongs there instead — colour and all.',
+    'tips.signIn':                'Optional. Everything already works offline in this browser — signing in keeps a copy in your own Google Drive so your phone and laptop stay in step. Zenit Week runs no server that holds your data.',
+    'tips.weekNav':               'Each week is a map of its own. Step to the next one to plan ahead — unfinished tasks can follow you there, and the menu here transfers them.',
+    'tips.quickAdd':              'Write a task down without deciding where it belongs. Pick a branch, type it, and it waits on that branch until you drag it into place. Also on:',
+    'tips.inbox':                 'Caught in a hurry and parked on the branch, with no place in the plan yet. Drag it onto a task and it files itself underneath, taking that task’s colour.',
+    'tips.hoverIntro':            'Hover a task, then press:',
+    'tips.counter':               'Each circle is one repetition to tick off. Any task ending in a number + “x” — “Pushups 50x” — splits itself into steps like these, and finishes when the last one is ticked.',
+    'tips.days':                  'Each circle is one day this task is planned for. Put days in parentheses — “(mo, we)” or “(daily)” — and the task spreads itself across the week.',
+    'tips.unplannedIntro':        'Amber means unplanned — it wasn’t in the plan, it just turned up. Stats counts it apart from what you planned. Hover and press:',
+    'tips.doneIntro':             'Struck through means done. Finishing a task ticks its parent up the tree once every child is in. Hover and press:',
+    'tips.priorityIntro':         'A flame marks critical, an exclamation marks high — and the bigger a task is drawn, the more it matters. Priority cascades to everything beneath it. Hover and press:',
+    'tips.undoIntro':             'Every change can be taken back — a delete, a move, a priority, a whole branch. Experiment freely, nothing here is one-way.',
+    'tips.dayFilter':             'Narrows the map to one day. Pick a day here, or press 1–7 on the canvas — 0 for what is overdue, 8 to clear.',
+    'tips.levels':                'How deep the map draws. Rocks keeps branches and their tasks, Pebbles adds one level of sub-tasks, Sand shows everything. Hidden work is still there — it just steps out of the picture.',
+    'tips.views':                 'Three views of your week: Mindmap to plan, Agenda for the day by day, Stats for how it went.',
+    'tips.gotIt':                 'Got it',
+    'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
     'view.agenda':                'Agenda',
     'view.stats':                 'Stats',
@@ -7880,6 +8181,14 @@ const TRANSLATIONS = {
     'stats.trendTotal':           'Total',
     'help.title':                 'Help & Hotkeys',
     'help.fab':                   'Help & Hotkeys',
+    'onboarding.clearTitle':      'Example week',
+    'onboarding.clearHelpBody':   "This week was started from an example. Edit anything to make it yours — then clear what's left.",
+    'onboarding.clearExample':    'Clear example tasks',
+    'onboarding.clearConfirmTitle': 'Clear example tasks?',
+    'onboarding.clearConfirmBody':  'This removes the remaining example tasks you haven’t touched. Anything you edited or added stays. You can undo this.',
+    'onboarding.clearConfirmOk':  'Clear',
+    'onboarding.nudge':           'Done exploring? Clear the example tasks and keep your own — you can also do this anytime in Settings → Help.',
+    'onboarding.nudgeDismiss':    'Dismiss',
     'help.aboutTitle':            'What it solves',
     'help.aboutP1':               'Most planners are flat lists — checklists or todos.',
     'help.aboutP2Lead':           'Rocks first',
@@ -8071,6 +8380,44 @@ const TRANSLATIONS = {
     'import.complete':            'Import dokončen',
     'settings.autoLayout':        'Automatické rozvržení',
     'settings.autoLayoutTitle':   'Automaticky resetovat rozvržení po každé změně',
+    'settings.tips':              'Zobrazovat tipy',
+    'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
+    'settings.tipsReplay':        'Přehrát tipy znovu',
+    'settings.tipsReplayDone':    'Tipy resetovány — zobrazí se znovu.',
+    'tips.doneCaption':           'Hotovo',
+    'tips.unplannedCaption':      'Neplánované',
+    'tips.counterCaption':        'Počítadla',
+    'tips.daysCaption':           'Dny',
+    'tips.priorityCaption':       'Priorita',
+    'tips.rootCaption':           'Volné přeskládání',
+    'tips.signInCaption':         'Synchronizace mezi zařízeními',
+    'tips.weekNavCaption':        'Váš týden',
+    'tips.weekNavKeysLabel':      'Předchozí / další týden',
+    'tips.weekNavTodayLabel':     'Zpět na tento týden',
+    'tips.quickAddCaption':       'Rychlý zápis',
+    'tips.inboxCaption':          'Schránka',
+    'tips.hoverCaption':          'Rychlé klávesy',
+    'tips.undoCaption':           'Zpět',
+    'tips.viewsCaption':          'Pohledy',
+    'tips.levelsCaption':         'Úrovně detailu',
+    'tips.dayFilterCaption':      'Filtr dnů',
+    'tips.root':                  'Přetažením úkol přesunete. Puštěním na jiný ho přeřadíte pod něj — i s barvou.',
+    'tips.signIn':                'Nepovinné. Vše funguje offline v tomto prohlížeči — přihlášení uloží kopii do vašeho Google Disku, aby telefon i notebook držely krok. Zenit Week neprovozuje server, který by vaše data držel.',
+    'tips.weekNav':               'Každý týden je vlastní mapa. Přejděte na další a plánujte dopředu — nedokončené úkoly vás mohou následovat, menu zde je přenese.',
+    'tips.quickAdd':              'Zapište úkol, aniž byste řešili, kam patří. Vyberte větev, napište ho a počká na ní, dokud ho nepřetáhnete na místo. Také na:',
+    'tips.inbox':                 'Rychlý zápis odložený na větvi, zatím bez místa v plánu. Přetáhněte ho na úkol a zařadí se pod něj — i s jeho barvou.',
+    'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
+    'tips.counter':               'Každé kolečko je jedno opakování k odškrtnutí. Úkol zakončený číslem s „x“ — „Kliky 50 2x“ — se sám rozdělí na takové kroky a dokončí se posledním odškrtnutím.',
+    'tips.days':                  'Každé kolečko je jeden den, na který je úkol naplánovaný. Napište dny do závorky — „(po, st)“ nebo „(denně)“ — a úkol se sám rozmístí po týdnu.',
+    'tips.unplannedIntro':        'Oranžová znamená neplánované — nebylo v plánu, prostě přišlo. Statistika je počítá zvlášť od plánu. Najeďte a stiskněte:',
+    'tips.doneIntro':             'Přeškrtnuté znamená hotové. Dokončený úkol se propíše nahoru — rodič se odškrtne, jakmile jsou hotové všechny děti. Najeďte a stiskněte:',
+    'tips.priorityIntro':         'Plamínek značí kritickou, vykřičník vysokou prioritu — a čím větší úkol, tím víc váží. Priorita se propíše na vše pod ním. Najeďte a stiskněte:',
+    'tips.undoIntro':             'Každou změnu lze vzít zpět — smazání, přesun, prioritu i celou větev. Klidně zkoušejte, nic tu není nevratné.',
+    'tips.dayFilter':             'Zúží mapu na jeden den. Vyberte den zde, nebo na ploše stiskněte 1–7 — 0 pro prošlé, 8 pro zrušení.',
+    'tips.levels':                'Jak hluboko se mapa kreslí. Kameny nechají větve a jejich úkoly, Oblázky přidají jednu úroveň podúkolů, Písek ukáže vše. Skryté úkoly nikam nezmizely — jen ustoupí z obrazu.',
+    'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek.',
+    'tips.gotIt':                 'Rozumím',
+    'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
     'view.mindmap':               'Mapa',
     'view.agenda':                'Agenda',
     'view.stats':                 'Statistika',
@@ -8156,6 +8503,14 @@ const TRANSLATIONS = {
     'stats.trendTotal':           'Celkem',
     'help.title':                 'Nápověda & klávesové zkratky',
     'help.fab':                   'Nápověda & klávesové zkratky',
+    'onboarding.clearTitle':      'Ukázkový týden',
+    'onboarding.clearHelpBody':   'Tento týden začal jako ukázka. Cokoli upravte, ať je váš — a pak zbytek smažte.',
+    'onboarding.clearExample':    'Smazat ukázkové úkoly',
+    'onboarding.clearConfirmTitle': 'Smazat ukázkové úkoly?',
+    'onboarding.clearConfirmBody':  'Odebere zbývající ukázkové úkoly, kterých jste se nedotkli. Co jste upravili nebo přidali, zůstane. Akci lze vrátit zpět.',
+    'onboarding.clearConfirmOk':  'Smazat',
+    'onboarding.nudge':           'Hotovo s prozkoumáváním? Smažte ukázkové úkoly a nechte si jen své — kdykoli to lze i v Nastavení → Nápověda.',
+    'onboarding.nudgeDismiss':    'Zavřít',
     'help.aboutTitle':            'Co řeší',
     'help.aboutP1':               'Většina plánovačů je jen plochý seznam — checklist nebo todo.',
     'help.aboutP2Lead':           'Velké kameny první',
@@ -8711,6 +9066,10 @@ async function saveWeek(wk, data) {
   }
 
   scheduleDriveSync(wk);
+
+  // Onboarding: once the user has made the on-screen week their own, gently
+  // offer to clear leftover example tasks.
+  if (wk === currentWeekKey) maybePlaygroundNudge();
 }
 
 async function exportAllData() {
@@ -9427,9 +9786,16 @@ function findNode(id) {
   return nodeMap.get(id);
 }
 
-function touchNode(id) {
+// Marks a node as user-modified: bumps _ts for Drive LWW merge and, for
+// onboarding seed nodes, drops the _demo flag so the node is now the user's own
+// (and survives "Clear example tasks"). Pass { keepDemo: true } for bulk layout
+// operations (e.g. recenter-all) that touch every node without the user
+// actually claiming each one. See docs/specs/onboarding-part-a-playground.md.
+function touchNode(id, opts) {
   const node = findNode(id);
-  if (node) node._ts = Date.now();
+  if (!node) return;
+  node._ts = Date.now();
+  if (node._demo && !(opts && opts.keepDemo)) delete node._demo;
 }
 
 function tombstoneNodes(ids) {
@@ -13670,7 +14036,9 @@ function attachNodeListeners() {
     g.addEventListener('mouseenter', () => {
       clearKbFocus();   // the pointer takes the ring back over
       hoveredNodeId = id;
-      if (id === 'center') return;
+      if (id === 'center') { maybeShowHint('root', g); return; }
+      const hintId = hoverHintId(findNode(id));
+      if (hintId) maybeShowHint(hintId, g);
       const els = g._descendantEls;
       if (!els) return;
       for (let i = 0; i < els.length; i++) els[i].classList.add('subnode-hover');
@@ -15688,6 +16056,9 @@ function isHelpOpen() {
 }
 
 function openHelp() {
+  // Show the "Clear example tasks" entry only while untouched seed tasks remain.
+  const onboardingSection = document.getElementById('help-onboarding-section');
+  if (onboardingSection) onboardingSection.hidden = !hasDemoActivityNodes();
   document.getElementById('help-overlay').classList.add('visible');
   document.getElementById('help-panel').classList.add('visible');
 }
@@ -16362,7 +16733,7 @@ window.addEventListener('pointerup', (e) => {
       if (movedPx > CENTER_CLICK_SLOP_PX) {
         takeSnapshot();
         weekData.nodes.forEach(n => {
-          if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchNode(n.id); }
+          if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchNode(n.id, { keepDemo: true }); }
         });
         saveWeek(currentWeekKey, weekData);
         render();
@@ -17553,6 +17924,38 @@ document.getElementById('autolayout-toggle').addEventListener('click', () => {
 
 syncAutoLayoutToggleUI();
 
+// ─── Tips toggle + coachmark dismissal ────────────────────────────────────────
+function syncTipsToggleUI() {
+  const toggle = document.getElementById('tips-toggle');
+  if (toggle) toggle.setAttribute('aria-checked', _tipsEnabled ? 'true' : 'false');
+}
+const tipsToggle = document.getElementById('tips-toggle');
+if (tipsToggle) {
+  tipsToggle.addEventListener('click', () => {
+    setTipsEnabled(!_tipsEnabled);
+    syncTipsToggleUI();
+  });
+}
+const tipsReplayBtn = document.getElementById('tips-replay-btn');
+if (tipsReplayBtn) {
+  tipsReplayBtn.addEventListener('click', () => {
+    replayTips();
+    syncTipsToggleUI();
+    // Close settings so the next first-time action can surface a tip.
+    settingsDropdown.classList.remove('visible');
+    settingsFab.classList.remove('active');
+    if (typeof showToast === 'function') showToast(t('settings.tipsReplayDone'));
+  });
+}
+// Initial sync runs in Init after the persisted tips state loads (the let
+// declarations live later in the file, so don't read them at top level here).
+
+const coachmarkGotIt = document.getElementById('coachmark-got-it');
+if (coachmarkGotIt) coachmarkGotIt.addEventListener('click', dismissCoachmark);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && _coachmarkVisible) dismissCoachmark();
+});
+
 // ─── Lang select ──────────────────────────────────────────────────────────────
 document.getElementById('lang-select').addEventListener('change', e => {
   setLanguage(e.target.value);
@@ -17607,10 +18010,545 @@ document.getElementById('export-data-btn').addEventListener('click', () => {
   });
 })();
 
+// ─── Onboarding playground seed ─────────────────────────────────────────────
+// The seed week is mirrored from assets/playground-seed.json by
+// scripts/inject-playground-seed.mjs (build step). The block below is
+// machine-managed — edit the JSON, not this constant.
+/* PLAYGROUND_SEED_START */
+const PLAYGROUND_SEED = {"week":{"nodes":[{"id":"family","type":"branch","branch":"family","label":"Family","children":["n08eceff4b1b1","n86d7bb85b7a0","n3a3a88ed82ca","n1f95a172cf3c","n7d41c0a9b3e2"],"offX":0,"offY":0,"side":"right"},{"id":"work","type":"branch","branch":"work","label":"Work","children":["nc615d740acdd","nbc765cabdc86","nc0e506d5cc89","n399c0070935b"],"offX":0,"offY":0,"side":"left"},{"id":"me","type":"branch","branch":"me","label":"Me","children":["ne9adc6b8de35","n674c41539736","n94947d5ad65d"],"offX":0,"offY":0,"side":"right"},{"id":"growth","type":"branch","branch":"growth","label":"Growth","side":"left","children":["ne123a2b09d2e","nae518b467484"],"offX":0,"offY":0},{"id":"nc615d740acdd","type":"activity","branch":"work","parent":"work","label":"Q1 OKR draft","done":false,"unplanned":false,"children":[],"priority":"critical","offX":0,"offY":0},{"id":"nbc765cabdc86","type":"activity","branch":"work","parent":"work","label":"1:1 with Sara","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:57.408Z","donedOn":"2026-05-12"},{"id":"nc0e506d5cc89","type":"activity","branch":"work","parent":"work","label":"Sprint review","done":false,"unplanned":false,"children":["n8b8172d2dbe9","n8993e4720c6a","ncd8a291c78bd"],"offX":0,"offY":0},{"id":"n8b8172d2dbe9","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Prep","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:56.101Z","donedOn":"2026-05-12"},{"id":"n8993e4720c6a","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Review","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:20.270Z","donedOn":"2026-05-13"},{"id":"ncd8a291c78bd","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Debrief","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n399c0070935b","type":"activity","branch":"work","parent":"work","label":"Code review","done":false,"unplanned":false,"children":["nce194d8cd0df","n2113d3c4afe8","nfc2a45939626"],"offX":0,"offY":0},{"id":"nce194d8cd0df","type":"activity","tickChild":true,"tickIndex":1,"branch":"work","parent":"n399c0070935b","label":"1","done":true,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:47:32.316Z","donedOn":"2026-05-12"},{"id":"n2113d3c4afe8","type":"activity","tickChild":true,"tickIndex":2,"branch":"work","parent":"n399c0070935b","label":"2","done":true,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:05:57.265Z","donedOn":"2026-05-13"},{"id":"nfc2a45939626","type":"activity","tickChild":true,"tickIndex":3,"branch":"work","parent":"n399c0070935b","label":"3","done":false,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0},{"id":"ne123a2b09d2e","type":"activity","branch":"growth","parent":"growth","label":"AI","done":false,"unplanned":false,"children":["n3acbb94f9475","n601d146212c8","nf486f1cd2579"],"offX":0,"offY":0},{"id":"n3acbb94f9475","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Claude Code","done":false,"unplanned":false,"children":["n11a2a4a26dd6","n1474e7ac7516","n566977f573a3","n59733bcc6638","nfadba4369111","n6b02b4d97ed5","nee26e3ba5df6"],"offX":0,"offY":0},{"id":"n11a2a4a26dd6","type":"activity","dayChild":true,"dayIndex":1,"branch":"growth","parent":"n3acbb94f9475","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:58:19.644Z","donedOn":"2026-05-09","offX":0,"offY":0},{"id":"n1474e7ac7516","type":"activity","dayChild":true,"dayIndex":2,"branch":"growth","parent":"n3acbb94f9475","label":"Tu","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n566977f573a3","type":"activity","dayChild":true,"dayIndex":3,"branch":"growth","parent":"n3acbb94f9475","label":"We","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n59733bcc6638","type":"activity","dayChild":true,"dayIndex":4,"branch":"growth","parent":"n3acbb94f9475","label":"Th","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"nfadba4369111","type":"activity","dayChild":true,"dayIndex":5,"branch":"growth","parent":"n3acbb94f9475","label":"Fr","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n6b02b4d97ed5","type":"activity","dayChild":true,"dayIndex":6,"branch":"growth","parent":"n3acbb94f9475","label":"Sa","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"nee26e3ba5df6","type":"activity","dayChild":true,"dayIndex":0,"branch":"growth","parent":"n3acbb94f9475","label":"Su","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n601d146212c8","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Claude Design","priority":"high","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"nf486f1cd2579","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Build MVP app","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T19:01:36.028Z","donedOn":"2026-05-09","offX":0,"offY":0},{"id":"nae518b467484","type":"activity","branch":"growth","parent":"growth","label":"Watch Tristan Harris video","done":false,"unplanned":true,"children":[],"unplannedAt":"2026-05-09T19:01:41.320Z","offX":0,"offY":0},{"id":"n08eceff4b1b1","type":"activity","branch":"family","parent":"family","label":"Birthday cake for Mia","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:06:08.398Z","donedOn":"2026-05-13"},{"id":"n86d7bb85b7a0","type":"activity","branch":"family","parent":"family","label":"Plan summer trip","done":true,"unplanned":false,"children":["nd15eea9fae27","n7cf7ce957f3c"],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:06.734Z","donedOn":"2026-05-13"},{"id":"nd15eea9fae27","type":"activity","branch":"family","parent":"n86d7bb85b7a0","label":"Trips","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:06.734Z","donedOn":"2026-05-13"},{"id":"n7cf7ce957f3c","type":"activity","branch":"family","parent":"n86d7bb85b7a0","label":"Requirements","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:50.882Z","donedOn":"2026-05-12"},{"id":"n3a3a88ed82ca","type":"activity","branch":"family","parent":"family","label":"Park walk together","done":false,"unplanned":false,"children":["n6838f13b1d74","na1bc2ccc40d3"],"offX":0,"offY":0},{"id":"n6838f13b1d74","type":"activity","dayChild":true,"dayIndex":1,"branch":"family","parent":"n3a3a88ed82ca","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:55:31.146Z","donedOn":"2026-05-09","offX":0,"offY":0},{"id":"na1bc2ccc40d3","type":"activity","dayChild":true,"dayIndex":5,"branch":"family","parent":"n3a3a88ed82ca","label":"Fr","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n1f95a172cf3c","type":"activity","branch":"family","parent":"family","label":"Call grandma","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:44.285Z","donedOn":"2026-05-12"},{"id":"n7d41c0a9b3e2","type":"activity","branch":"family","parent":"family","label":"Buy a flower to Lucy","done":false,"unplanned":false,"inbox":true,"children":[],"offX":0,"offY":0},{"id":"ne9adc6b8de35","type":"activity","branch":"me","parent":"me","label":"Pushups 50","done":false,"unplanned":false,"children":["n12d18c4d4a95","n36f3112117cb"],"reusable":true,"offX":0,"offY":0},{"id":"n12d18c4d4a95","type":"activity","tickChild":true,"tickIndex":1,"branch":"me","parent":"ne9adc6b8de35","label":"1","done":true,"unplanned":false,"priority":null,"reusable":true,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:05:52.194Z","donedOn":"2026-05-13"},{"id":"n36f3112117cb","type":"activity","tickChild":true,"tickIndex":2,"branch":"me","parent":"ne9adc6b8de35","label":"2","done":false,"unplanned":false,"priority":null,"reusable":true,"children":[],"offX":0,"offY":0},{"id":"n674c41539736","type":"activity","branch":"me","parent":"me","label":"Read 15 min","done":false,"unplanned":false,"children":["na5b1d3e15099","n30eb38ef93b6","nb30d1d326106","n52c1c9b25021","ne5a34e42e5a1","n345c8128e1ad","nbdc070c7108b"],"reusable":true,"offX":0,"offY":0},{"id":"na5b1d3e15099","type":"activity","dayChild":true,"dayIndex":1,"branch":"me","parent":"n674c41539736","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:55:26.977Z","donedOn":"2026-05-09","reusable":true,"offX":0,"offY":0},{"id":"n30eb38ef93b6","type":"activity","dayChild":true,"dayIndex":2,"branch":"me","parent":"n674c41539736","label":"Tu","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"nb30d1d326106","type":"activity","dayChild":true,"dayIndex":3,"branch":"me","parent":"n674c41539736","label":"We","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n52c1c9b25021","type":"activity","dayChild":true,"dayIndex":4,"branch":"me","parent":"n674c41539736","label":"Th","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"ne5a34e42e5a1","type":"activity","dayChild":true,"dayIndex":5,"branch":"me","parent":"n674c41539736","label":"Fr","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n345c8128e1ad","type":"activity","dayChild":true,"dayIndex":6,"branch":"me","parent":"n674c41539736","label":"Sa","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"nbdc070c7108b","type":"activity","dayChild":true,"dayIndex":0,"branch":"me","parent":"n674c41539736","label":"Su","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n94947d5ad65d","type":"activity","branch":"me","parent":"me","label":"Drop off donations","done":false,"unplanned":true,"children":[],"unplannedAt":"2026-05-09T18:55:48.351Z","offX":0,"offY":0}]},"colors":{"work":{"main":"#F24E1E"},"family":{"main":"#A259FF"},"me":{"main":"#1ABCFE"},"growth":{"main":"#0ACF83"}}};
+/* PLAYGROUND_SEED_END */
+
+// First-run onboarding: seed a fully-populated example week so the canvas is
+// never blank. Returns true if a seed was written. Triggered by an empty
+// database (genuine first run) or the #playground anchor; never clobbers an
+// existing current-week record, and never re-seeds once the onboarded flag is
+// set. See docs/specs/onboarding-part-a-playground.md.
+async function maybeSeedPlayground() {
+  // Idempotency — never seed twice.
+  try {
+    if (await loadValueIDB('zenit-week-onboarded')) return false;
+  } catch (e) { /* treat as not-yet-onboarded */ }
+
+  const hash = (typeof location !== 'undefined' && location.hash) ? location.hash.slice(1) : '';
+  const wantPlayground = hash === 'playground';
+
+  let keys;
+  try {
+    keys = await listWeekKeysIDB();
+  } catch (e) {
+    return false; // can't determine DB state — stay safe, don't seed
+  }
+  const dbEmpty = !keys || keys.length === 0;
+  if (!dbEmpty && !wantPlayground) return false;
+
+  const wk = todayWeekKey();
+  // Safety gate: never overwrite real data for the current week.
+  let existing = null;
+  try { existing = await loadWeekIDB(wk); } catch (e) { /* treat as absent */ }
+  if (existing) return false;
+
+  // Build the seeded week: stamp every node as demo scaffolding with a fresh
+  // timestamp; match loadWeek()'s new-week shape (tombstones + crdtVersion).
+  const now = Date.now();
+  const nodes = (PLAYGROUND_SEED.week.nodes || []).map(n => ({ ...n, _demo: true, _ts: now }));
+  const week = { nodes, tombstones: [], crdtVersion: 0 };
+  await saveWeekIDB(wk, week);
+
+  // Apply + persist branch colors (incl. the custom Growth green) so they
+  // render deterministically and survive reload / Drive sync.
+  const seedColors = PLAYGROUND_SEED.colors || {};
+  Object.keys(seedColors).forEach(b => {
+    if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
+    const main = seedColors[b] && seedColors[b].main;
+    if (main) BRANCH_COLORS[b] = deriveBranchPalette(main);
+  });
+  if (Object.keys(seedColors).length) await saveBranchColors();
+
+  await saveValueIDB('zenit-week-onboarded', true);
+
+  // Strip #playground so a reload doesn't re-trigger and the URL stays clean.
+  if (wantPlayground && typeof history !== 'undefined' && history.replaceState) {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  return true;
+}
+
+// True when the current week still holds untouched example (seed) tasks —
+// i.e. non-branch nodes that retain the _demo flag. Drives the Help cleanup
+// entry's visibility and the auto-nudge (S4). Branches are never counted.
+function hasDemoActivityNodes() {
+  return (weekData.nodes || []).some(n => n._demo && n.type !== 'branch');
+}
+
+// True when n and its entire subtree are untouched demo nodes (no branch, no
+// node the user has touched). Such a subtree is safe to remove wholesale.
+function _subtreeAllDemo(id) {
+  const n = findNode(id);
+  if (!n || n.type === 'branch' || !n._demo) return false;
+  return (n.children || []).every(_subtreeAllDemo);
+}
+
+// "Clear example tasks" — removes only fully-untouched demo subtrees. Branches
+// always survive (even if emptied); any subtree containing a node the user
+// touched is kept so their work is never lost. Snapshot-undoable. Returns the
+// number of nodes removed. See docs/specs/onboarding-part-a-playground.md.
+function clearExampleTasks() {
+  const removed = new Set();
+  (weekData.nodes || []).forEach(n => {
+    if (n.type !== 'branch' && n._demo && _subtreeAllDemo(n.id)) removed.add(n.id);
+  });
+  if (removed.size === 0) return 0;
+
+  takeSnapshot();
+  tombstoneNodes([...removed]);
+  weekData.nodes = weekData.nodes.filter(n => !removed.has(n.id));
+  weekData.nodes.forEach(n => {
+    if (Array.isArray(n.children)) n.children = n.children.filter(id => !removed.has(id));
+  });
+  rebuildNodeMap();
+  saveWeek(currentWeekKey, weekData);
+  render();
+  if (typeof updateSummary === 'function') updateSummary();
+  return removed.size;
+}
+
+// ─── Onboarding nudge ────────────────────────────────────────────────────────
+let _playgroundNudgeDone = false;   // persisted: user dismissed or cleared
+let _playgroundNudgeShown = false;  // already surfaced this session
+
+// Count of the user's own committed tasks in the current week: non-branch,
+// non-demo, and not an in-progress placeholder (_editing). Excluding _editing
+// means an empty placeholder created on commit doesn't inflate the count.
+function playgroundUserNodeCount() {
+  return (weekData.nodes || []).filter(n => n.type !== 'branch' && !n._demo && !n._editing).length;
+}
+
+// Threshold of the user's own saved tasks before we offer cleanup.
+const PLAYGROUND_NUDGE_THRESHOLD = 5;
+
+// Show the nudge once the user has clearly started their own week (enough of
+// their own saved tasks) while untouched example tasks still remain — once only.
+function shouldShowPlaygroundNudge() {
+  return !_playgroundNudgeDone
+      && !_playgroundNudgeShown
+      && hasDemoActivityNodes()
+      && playgroundUserNodeCount() >= PLAYGROUND_NUDGE_THRESHOLD;
+}
+
+function dismissPlaygroundNudge(persist) {
+  _playgroundNudgeShown = true;
+  const banner = document.getElementById('playground-nudge');
+  if (banner) banner.classList.remove('visible');
+  if (persist) {
+    _playgroundNudgeDone = true;
+    saveValueIDB('zenit-week-playground-nudged', true);
+  }
+}
+
+function maybePlaygroundNudge() {
+  if (!shouldShowPlaygroundNudge()) return;
+  _playgroundNudgeShown = true;
+  const banner = document.getElementById('playground-nudge');
+  if (banner) banner.classList.add('visible');
+}
+
+// ─── Coachmark hints (Part B) ─────────────────────────────────────────────────
+// Just-in-time tips shown once per hint, anchored to the relevant element.
+// Storage is local-first behind this seam (tipsEnabled / isHintSeen / mark…);
+// cross-device Drive sync attaches here later. See
+// docs/specs/onboarding-part-b-coachmarks.md.
+let _tipsEnabled = true;        // global "Show tips" setting (default on)
+let _coachmarkHideTimer = null; // pending display:none after the exit fade
+let _tipsSeen = {};             // { [hintId]: true } — persisted
+let _coachmarkVisible = false;  // single coachmark on screen at a time
+let _coachmarkAnchorEl = null;  // element the bubble points at
+let _coachmarkAnchorId = null;  // its node-group data-id (re-queried after re-render)
+let _coachmarkRaf = null;       // rAF handle for live repositioning
+
+// Hint registry. Each entry is either { textKey } for a plain-text hint, or
+// { introKey, keys: [{ k, labelKey }] } to render kbd rows like the Help panel.
+// Triggers live at the call sites.
+// Smallest rect covering every element given — lets a ring wrap a group of
+// buttons that has no container of its own.
+function unionRect(els) {
+  const rects = [...els].map(el => el.getBoundingClientRect()).filter(r => r.width && r.height);
+  if (!rects.length) return null;
+  const left = Math.min(...rects.map(r => r.left));
+  const top = Math.min(...rects.map(r => r.top));
+  const right = Math.max(...rects.map(r => r.right));
+  const bottom = Math.max(...rects.map(r => r.bottom));
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+// Modifier names as the reader's keyboard prints them. Help and the undo tip
+// both label the same shortcuts, so the detection lives in one place.
+function platformKeys() {
+  const isMac = navigator.userAgentData?.platform
+    ? navigator.userAgentData.platform === 'macOS'
+    : /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
+  return { mod: isMac ? '⌘' : 'Ctrl', shift: isMac ? '⇧' : 'Shift' };
+}
+
+// priority orders the hints against each other when one node qualifies for
+// several — lower wins. matches() decides whether a hovered node qualifies at
+// all; a hint without one (views) is anchored to a control instead of a node
+// and never competes here.
+const HINTS = {
+  'done': {
+    captionKey: 'tips.doneCaption',
+    priority: 1,
+    introKey: 'tips.doneIntro',
+    keys: [
+      { k: 'D', labelKey: 'help.toggleDone' },
+    ],
+    matches: (node) => !!node.done,
+  },
+  'unplanned': {
+    captionKey: 'tips.unplannedCaption',
+    priority: 2,
+    introKey: 'tips.unplannedIntro',
+    keys: [
+      { k: 'U', labelKey: 'help.toggleUnplanned' },
+    ],
+    matches: (node) => !!node.unplanned,
+  },
+  'counter': {
+    captionKey: 'tips.counterCaption',
+    priority: 3,
+    textKey: 'tips.counter',
+    matches: (node, kids) => node.tickChild || kids.some(n => n.tickChild),
+  },
+  'days': {
+    captionKey: 'tips.daysCaption',
+    priority: 4,
+    textKey: 'tips.days',
+    matches: (node, kids) => node.dayChild || kids.some(n => n.dayChild)
+      || parseTodoDays(node.label || '').size >= 1, // single-day inline token
+  },
+  'priority': {
+    captionKey: 'tips.priorityCaption',
+    priority: 5,
+    introKey: 'tips.priorityIntro',
+    keys: [
+      { k: 'P', labelKey: 'help.cyclePriority' },
+    ],
+    matches: (node) => node.priority === 'high' || node.priority === 'critical',
+  },
+  'inbox': {
+    captionKey: 'tips.inboxCaption',
+    priority: 6,
+    textKey: 'tips.inbox',
+    matches: (node) => !!node.inbox,
+  },
+  'hover-keys': {
+    captionKey: 'tips.hoverCaption',
+    priority: 7,
+    introKey: 'tips.hoverIntro',
+    keys: [
+      { k: 'Enter', labelKey: 'help.rename' },
+      { k: 'Tab',   labelKey: 'help.add' },
+      { k: 'Del',   labelKey: 'help.delete' },
+    ],
+    matches: () => true, // the fallback card: every task qualifies
+  },
+  'undo': {
+    captionKey: 'tips.undoCaption',
+    priority: 8,
+    introKey: 'tips.undoIntro',
+    keys: [
+      { k: () => `${platformKeys().mod} + Z`, labelKey: 'help.undo' },
+      { k: () => `${platformKeys().mod} + ${platformKeys().shift} + Z`, labelKey: 'help.redo' },
+    ],
+  },
+  'views': {
+    captionKey: 'tips.viewsCaption',
+    priority: 9,
+    textKey: 'tips.views',
+  },
+  'levels': {
+    captionKey: 'tips.levelsCaption',
+    priority: 10,
+    textKey: 'tips.levels',
+  },
+  'root': {
+    captionKey: 'tips.rootCaption',
+    priority: 15,
+    textKey: 'tips.root',
+  },
+  'signin': {
+    captionKey: 'tips.signInCaption',
+    priority: 14,
+    textKey: 'tips.signIn',
+  },
+  'weeknav': {
+    captionKey: 'tips.weekNavCaption',
+    priority: 13,
+    introKey: 'tips.weekNav',
+    keys: [
+      { k: '[  ]', labelKey: 'tips.weekNavKeysLabel' },
+      { k: 'T',    labelKey: 'tips.weekNavTodayLabel' },
+    ],
+  },
+  'quickadd': {
+    captionKey: 'tips.quickAddCaption',
+    priority: 12,
+    introKey: 'tips.quickAdd',
+    keys: [
+      { k: 'Q', labelKey: 'help.featureQuickAddLead' },
+    ],
+  },
+  'dayfilter': {
+    captionKey: 'tips.dayFilterCaption',
+    priority: 11,
+    textKey: 'tips.dayFilter',
+  },
+};
+
+// Hint ids that compete for a hovered node, most important first.
+function hintIdsByPriority() {
+  return Object.keys(HINTS)
+    .filter(id => typeof HINTS[id].matches === 'function')
+    .sort((a, b) => HINTS[a].priority - HINTS[b].priority);
+}
+
+// Which hint a node teaches when the pointer lands on it. Hovering is the one
+// gesture every user performs before they know anything, so each kind of node
+// explains itself on contact rather than waiting for the user to have already
+// typed the syntax it describes. Pure — used by the mouseenter trigger.
+//
+// A node often qualifies for several hints at once — a done counter, an
+// unplanned task with days. The winner is whichever matching hint carries the
+// lowest priority number, so reordering the teaching sequence means editing one
+// field in HINTS rather than an if-chain.
+function hoverHintId(node) {
+  if (!node) return null;
+  if (node.type !== 'activity' && node.type !== 'counter') return null;
+
+  const kids = (node.children || []).map(findNode).filter(Boolean);
+  return hintIdsByPriority().find(id => HINTS[id].matches(node, kids)) || null;
+}
+
+function tipsEnabled() { return _tipsEnabled; }
+function isHintSeen(id) { return !!_tipsSeen[id]; }
+
+function markHintSeen(id) {
+  if (_tipsSeen[id]) return;
+  _tipsSeen[id] = true;
+  saveValueIDB('zenit-week-tips-seen', _tipsSeen);
+}
+
+function setTipsEnabled(on) {
+  _tipsEnabled = !!on;
+  saveValueIDB('zenit-week-tips-enabled', _tipsEnabled);
+  if (!_tipsEnabled) hideCoachmark();
+}
+
+// Clear all seen-flags so every hint can appear again; re-enable tips if off.
+function replayTips() {
+  _tipsSeen = {};
+  saveValueIDB('zenit-week-tips-seen', _tipsSeen);
+  if (!_tipsEnabled) setTipsEnabled(true);
+}
+
+// Pure gate — fire iff tips on, none showing, hint unseen, and registered.
+function shouldShowHint(id) {
+  return _tipsEnabled && !_coachmarkVisible && !isHintSeen(id) && !!HINTS[id];
+}
+
+function positionCoachmark(cm, anchorEl) {
+  const r = anchorEl.getBoundingClientRect();
+  // offsetWidth/Height, not getBoundingClientRect: the entrance animation scales
+  // the bubble, and a scaled rect would place it against the wrong dimensions.
+  const cmW = cm.offsetWidth, cmH = cm.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const margin = 8;
+  // Prefer above the anchor; flip below if not enough room.
+  const below = r.top - cmH - 12 < margin;
+  const top = below ? r.bottom + 12 : r.top - cmH - 12;
+  let left = r.left + r.width / 2 - cmW / 2;
+  left = Math.max(margin, Math.min(left, vw - cmW - margin));
+  cm.style.top = `${Math.max(margin, Math.min(top, vh - cmH - margin))}px`;
+  cm.style.left = `${left}px`;
+  cm.classList.toggle('below', below);
+  // Arrow points at the anchor's horizontal center, clamped to the bubble.
+  const arrow = document.getElementById('coachmark-arrow');
+  if (arrow) {
+    const ax = Math.max(14, Math.min(r.left + r.width / 2 - left, cmW - 14));
+    arrow.style.left = `${ax}px`;
+    // The bubble grows from the arrow, wherever the clamp put it.
+    cm.style.setProperty('--cm-origin-x', `${ax}px`);
+  }
+}
+
+// Build the coachmark body from a hint definition. Plain hints set text; key
+// hints render an intro line + Help-style `<span>label</span> <kbd>key</kbd>`
+// rows. DOM-built (no innerHTML) per the XSS rule.
+// Every tip reads the same way: a bold caption naming the idea, the description
+// under it, then any key rows.
+function renderCoachmarkContent(hint) {
+  const textEl = document.getElementById('coachmark-text');
+  if (!textEl) return;
+  while (textEl.firstChild) textEl.removeChild(textEl.firstChild);
+
+  if (hint.captionKey) {
+    const caption = document.createElement('div');
+    caption.className = 'coachmark-caption';
+    caption.textContent = t(hint.captionKey);
+    textEl.appendChild(caption);
+  }
+
+  const bodyKey = hint.introKey || hint.textKey;
+  if (bodyKey) {
+    const body = document.createElement('div');
+    body.className = 'coachmark-intro';
+    body.textContent = t(bodyKey);
+    textEl.appendChild(body);
+  }
+
+  if (hint.keys) {
+    hint.keys.forEach(({ k, labelKey }) => {
+      const row = document.createElement('div');
+      row.className = 'help-row';
+      const label = document.createElement('span');
+      label.textContent = t(labelKey);
+      const kbd = document.createElement('kbd');
+      kbd.textContent = (typeof k === 'function') ? k() : k;
+      row.appendChild(label);
+      row.appendChild(kbd);
+      textEl.appendChild(row);
+    });
+  }
+}
+
+// Re-resolve the anchor element each frame: a full render() rebuilds node
+// groups, so prefer a fresh lookup by data-id over the (possibly stale) ref.
+function _resolveCoachmarkAnchor() {
+  if (_coachmarkAnchorId) {
+    const byId = document.querySelector(`.node-group[data-id="${_coachmarkAnchorId}"]`);
+    if (byId) return byId;
+  }
+  return _coachmarkAnchorEl;
+}
+
+// Keep the bubble glued to its anchor while it moves (pan, zoom, auto-layout
+// animation). Stops when dismissed or the anchored node disappears.
+function startCoachmarkTracking() {
+  cancelCoachmarkTracking();
+  if (typeof requestAnimationFrame !== 'function') return;
+  const tick = () => {
+    if (!_coachmarkVisible) { _coachmarkRaf = null; return; }
+    const cm = document.getElementById('coachmark');
+    const el = _resolveCoachmarkAnchor();
+    if (!cm || !el || el.isConnected === false) { hideCoachmark(); return; }
+    positionCoachmark(cm, el);
+    _coachmarkRaf = requestAnimationFrame(tick);
+  };
+  _coachmarkRaf = requestAnimationFrame(tick);
+}
+
+function cancelCoachmarkTracking() {
+  if (_coachmarkRaf != null && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(_coachmarkRaf);
+  }
+  _coachmarkRaf = null;
+}
+
+function showCoachmark(id, anchorEl, pulseTarget) {
+  const cm = document.getElementById('coachmark');
+  const hint = HINTS[id];
+  if (!cm || !hint) return;
+  renderCoachmarkContent(hint);
+  cm._hintId = id;
+  if (_coachmarkHideTimer) { clearTimeout(_coachmarkHideTimer); _coachmarkHideTimer = null; }
+  cm.hidden = false;
+  cm.classList.remove('visible');
+  _coachmarkVisible = true;
+  _coachmarkAnchorEl = anchorEl;
+  _coachmarkAnchorId = (anchorEl && anchorEl.dataset && anchorEl.dataset.id) || null;
+  // Position now, then track so it follows the node as the canvas moves.
+  positionCoachmark(cm, anchorEl);
+  // The ring goes first; the bubble arrives on the next frame, once the browser
+  // has a start value to animate away from.
+  pulseCoachmarkAnchor(pulseTarget || anchorEl);
+  requestAnimationFrame(() => { if (cm._hintId === id) cm.classList.add('visible'); });
+  startCoachmarkTracking();
+}
+
+// A ring the size of the anchor, expanding and fading twice. Purely decorative:
+// it never takes pointer events and removes itself when the animation ends.
+// Accepts an element, or a plain rect for controls that share a container with
+// something else — the level bar also holds the day filter, which the ring must
+// not cover.
+function pulseCoachmarkAnchor(target) {
+  if (!target) return;
+  const anchorEl = (typeof target.getBoundingClientRect === 'function') ? target : null;
+  const r = anchorEl ? anchorEl.getBoundingClientRect() : target;
+  if (r.width == null || r.height == null) return;
+  if (!r.width || !r.height) return;
+  const pad = 4;
+  const ring = document.createElement('div');
+  ring.className = 'coachmark-pulse';
+  ring.style.left = `${r.left - pad}px`;
+  ring.style.top = `${r.top - pad}px`;
+  ring.style.width = `${r.width + pad * 2}px`;
+  ring.style.height = `${r.height + pad * 2}px`;
+  // Follow the anchor's own corner radius where it has one; nodes drawn in SVG
+  // report none, so fall back to something that suits a small rounded box.
+  let radius = '';
+  try { radius = getComputedStyle(anchorEl).borderRadius; } catch { /* SVG in some engines */ }
+  ring.style.borderRadius = (radius && parseFloat(radius) > 0)
+    ? radius
+    : `${Math.min(12, r.height / 2 + pad)}px`;
+  const remove = () => ring.remove();
+  ring.addEventListener('animationend', remove);
+  setTimeout(remove, 2000); // belt and braces if the animation never fires
+  document.body.appendChild(ring);
+}
+
+function hideCoachmark() {
+  cancelCoachmarkTracking();
+  const cm = document.getElementById('coachmark');
+  if (cm) {
+    // Leaving needs no attention, so it just fades — the element stays in the
+    // layout until the fade ends, then goes back to display:none.
+    cm.classList.remove('visible');
+    cm._hintId = null;
+    if (_coachmarkHideTimer) clearTimeout(_coachmarkHideTimer);
+    _coachmarkHideTimer = setTimeout(() => {
+      _coachmarkHideTimer = null;
+      if (!_coachmarkVisible) cm.hidden = true;
+    }, 160);
+  }
+  _coachmarkVisible = false;
+  _coachmarkAnchorEl = null;
+  _coachmarkAnchorId = null;
+}
+
+// Mark the visible hint seen and dismiss it (Got it / Esc).
+function dismissCoachmark() {
+  const cm = document.getElementById('coachmark');
+  if (cm && cm._hintId) markHintSeen(cm._hintId);
+  hideCoachmark();
+}
+
+// Entry point from trigger sites.
+function maybeShowHint(id, anchorEl, pulseTarget) {
+  if (!anchorEl || !shouldShowHint(id)) return;
+  showCoachmark(id, anchorEl, pulseTarget);
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', async () => {
   await openDB();
   await runMigrationIfNeeded();
+  await maybeSeedPlayground();
+  try { _playgroundNudgeDone = !!(await loadValueIDB('zenit-week-playground-nudged')); } catch (e) { /* not nudged yet */ }
+  try {
+    const en = await loadValueIDB('zenit-week-tips-enabled');
+    _tipsEnabled = (en === undefined || en === null) ? true : !!en;
+    _tipsSeen = (await loadValueIDB('zenit-week-tips-seen')) || {};
+  } catch (e) { /* defaults: tips on, none seen */ }
+  if (typeof syncTipsToggleUI === 'function') syncTipsToggleUI();
 
   currentLang = localStorage.getItem('zenit-week-lang') || detectBrowserLang();
   // Must be awaited: bootstrapColorsSettings() may write BRANCH_COLORS straight
@@ -17677,6 +18615,28 @@ window.addEventListener('load', async () => {
     // click spends itself on dismissing Help, so Stats stays put.
     switchView(currentView === 'stats' && !isHelpOpen() ? 'mindmap' : 'stats');
   });
+
+  // Coachmark: teach the view controls on first hover of either bar.
+  const _viewToggleBar = document.getElementById('view-toggle-bar');
+  if (_viewToggleBar) _viewToggleBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewToggleBar));
+  const _syncBtn = document.getElementById('sync-btn');
+  if (_syncBtn) _syncBtn.addEventListener('mouseenter', () => maybeShowHint('signin', _syncBtn));
+  const _weekBar = document.getElementById('week-bar');
+  if (_weekBar) _weekBar.addEventListener('mouseenter', () => maybeShowHint('weeknav', _weekBar));
+  const _fabAdd = document.getElementById('fab-add');
+  if (_fabAdd) _fabAdd.addEventListener('mouseenter', () => maybeShowHint('quickadd', _fabAdd));
+  const _undoRedoBar = document.getElementById('undo-redo-bar');
+  if (_undoRedoBar) _undoRedoBar.addEventListener('mouseenter', () => maybeShowHint('undo', _undoRedoBar));
+  const _viewLevelBar = document.getElementById('view-level-bar');
+  if (_viewLevelBar) {
+    const levelBtns = _viewLevelBar.querySelectorAll('.view-level-btn[data-level]');
+    levelBtns.forEach(btn => {
+      // Ring the three level buttons only — the day filter shares this bar.
+      btn.addEventListener('mouseenter', () => maybeShowHint('levels', _viewLevelBar, unionRect(levelBtns)));
+    });
+    const dayFilterBtn = document.getElementById('day-filter-btn');
+    if (dayFilterBtn) dayFilterBtn.addEventListener('mouseenter', () => maybeShowHint('dayfilter', dayFilterBtn));
+  }
   switchView(currentView); // apply persisted view (mindmap / agenda / stats)
 
   // Position the default-zoom marker on the track
@@ -17686,16 +18646,61 @@ window.addEventListener('load', async () => {
     defaultMarker.style.left = defaultPct + '%';
   }
 
-  // OS detection for help hotkeys
-  const isMac = navigator.userAgentData?.platform
-    ? navigator.userAgentData.platform === 'macOS'
-    : /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
-  const mod = isMac ? '⌘' : 'Ctrl';
+  // OS-specific hotkey labels for Help
+  const { mod, shift } = platformKeys();
   document.getElementById('undo-kbd').textContent = `${mod} + Z`;
-  document.getElementById('redo-kbd').textContent = isMac ? `${mod} + ⇧ + Z` : `${mod} + Shift + Z`;
+  document.getElementById('redo-kbd').textContent = `${mod} + ${shift} + Z`;
 
 
   // Help panel listeners
+  const nudgeDismissBtn = document.getElementById('playground-nudge-dismiss');
+  if (nudgeDismissBtn) {
+    nudgeDismissBtn.addEventListener('click', () => dismissPlaygroundNudge(true));
+  }
+  const nudgeClearBtn = document.getElementById('playground-nudge-clear');
+  if (nudgeClearBtn) {
+    nudgeClearBtn.addEventListener('click', () => {
+      clearExampleTasks();
+      dismissPlaygroundNudge(true);
+    });
+  }
+
+  const clearExampleBtn = document.getElementById('help-clear-example');
+  if (clearExampleBtn) {
+    clearExampleBtn.addEventListener('click', () => {
+      showAppConfirm({
+        title: t('onboarding.clearConfirmTitle'),
+        body: t('onboarding.clearConfirmBody'),
+        okLabel: t('onboarding.clearConfirmOk'),
+        danger: true,
+        onConfirm: () => {
+          clearExampleTasks();
+          const section = document.getElementById('help-onboarding-section');
+          if (section) section.hidden = !hasDemoActivityNodes();
+        },
+      });
+    });
+  }
+
+  if (devResetEnabled()) {
+    const devSection = document.getElementById('settings-dev-section');
+    const devSeparator = document.getElementById('settings-dev-separator');
+    if (devSection) devSection.hidden = false;
+    if (devSeparator) devSeparator.hidden = false;
+    const devResetBtn = document.getElementById('dev-reset-btn');
+    if (devResetBtn) {
+      devResetBtn.addEventListener('click', () => {
+        showAppConfirm({
+          title: 'Reset to first visit?',
+          body: 'Deletes every week, setting and sync link stored in this browser, then reloads as a brand-new visitor. Data already synced to Google Drive is not touched.',
+          okLabel: 'Reset',
+          danger: true,
+          onConfirm: () => { devResetApp(); },
+        });
+      });
+    }
+  }
+
   const settingsHelpBtn = document.getElementById('settings-help-btn');
   if (settingsHelpBtn) {
     settingsHelpBtn.addEventListener('click', () => {
