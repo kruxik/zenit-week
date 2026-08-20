@@ -407,6 +407,11 @@ _state.getLocalStorage = function(key) {
   return _lsStore[key];
 };
 _state.getPlaygroundSeed = function() { return PLAYGROUND_SEED; };
+// Seed the in-app tips state the way a session that has shown hints would.
+_state.setTipsSeen = function(seen) {
+  _tipsSeen = seen;
+  writeTipsSeen(seen);
+};
 _state.getDocument = function() { return document; };
 _state.getCurrentView = function() { return currentView; };
 _state.setCurrentView = function(v) { currentView = v; };
@@ -713,6 +718,12 @@ export const {
   weekContentHash,
   colorsContentHash,
   sanitizeColorsData,
+  onboardingSettings,
+  mergeRemoteOnboarding,
+  readBoolPref,
+  writeBoolPref,
+  readTipsSeen,
+  writeTipsSeen,
   loadBranchColors,
   saveBranchColors,
   bootstrapColorsSettings,

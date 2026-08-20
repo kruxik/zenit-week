@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-hQEA7Si9NzFmUuK3ZfukfH6C/VOr20zJ4imcaT/iKsU='
+               'sha256-DzwhyteZ3Lkt+w5xoo9AAmXrqCAvZTWS+YUVuBtiJNQ='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5673,6 +5673,78 @@ function reloadBranchPalettes() {
 
 // Branch ids are genId() UUIDs or the legacy 'work' / 'family' / 'me' names.
 const BRANCH_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+// ─── Onboarding state ────────────────────────────────────────────────────────
+// "This browser has already been taught the app" — the same class of thing as
+// theme and language, not user data. It lives in localStorage so "Clear & sign
+// out" doesn't replay the whole first run (see SIGNOUT_PRESERVE_KEYS), and it
+// rides along in the settings file so a second device stays quiet too.
+const ONBOARDED_KEY   = 'zenit-week-onboarded';
+const NUDGED_KEY      = 'zenit-week-playground-nudged';
+const TIPS_ON_KEY     = 'zenit-week-tips-enabled';
+const TIPS_SEEN_KEY   = 'zenit-week-tips-seen';
+const MAX_TIPS_SEEN   = 200;   // cap on a synced blob we didn't write ourselves
+
+function readBoolPref(key, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === '1';
+  } catch (e) { return fallback; }
+}
+function writeBoolPref(key, on) {
+  try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) { /* private mode */ }
+}
+function readTipsSeen() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TIPS_SEEN_KEY) || '{}');
+    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  } catch (e) { return {}; }
+}
+function writeTipsSeen(seen) {
+  try { localStorage.setItem(TIPS_SEEN_KEY, JSON.stringify(seen)); } catch (e) { /* private mode */ }
+}
+
+// Pre-localStorage installs kept these in IndexedDB. Adopt them once, so an
+// existing user is not treated as a first run the next time they clear.
+async function adoptOnboardingStateFromIDB() {
+  const adopt = async (key, apply) => {
+    try {
+      if (localStorage.getItem(key) !== null) return;
+      const v = await loadValueIDB(key);
+      if (v !== undefined && v !== null) apply(v);
+    } catch (e) { /* nothing to adopt */ }
+  };
+  await adopt(ONBOARDED_KEY, v => writeBoolPref(ONBOARDED_KEY, !!v));
+  await adopt(NUDGED_KEY,    v => writeBoolPref(NUDGED_KEY, !!v));
+  await adopt(TIPS_ON_KEY,   v => writeBoolPref(TIPS_ON_KEY, !!v));
+  await adopt(TIPS_SEEN_KEY, v => { if (typeof v === 'object') writeTipsSeen(v); });
+}
+
+// The onboarding half of the settings blob, as written to Drive.
+function onboardingSettings() {
+  return {
+    onboarded:   readBoolPref(ONBOARDED_KEY, false),
+    nudged:      readBoolPref(NUDGED_KEY, false),
+    tipsEnabled: readBoolPref(TIPS_ON_KEY, true),
+    seen:        readTipsSeen(),
+  };
+}
+
+function sanitizeOnboarding(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const seen = {};
+  const rawSeen = (raw.seen && typeof raw.seen === 'object' && !Array.isArray(raw.seen)) ? raw.seen : {};
+  Object.keys(rawSeen).slice(0, MAX_TIPS_SEEN).forEach(id => {
+    if (id === '__proto__' || id === 'constructor' || id === 'prototype') return;
+    if (BRANCH_ID_RE.test(id) && rawSeen[id]) seen[id] = true;
+  });
+  return {
+    onboarded:   !!raw.onboarded,
+    nudged:      !!raw.nudged,
+    tipsEnabled: raw.tipsEnabled === undefined ? true : !!raw.tipsEnabled,
+    seen,
+  };
+}
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 // Whitelists the colors/settings blob. Week data has validateAndRepair; this is
@@ -5690,8 +5762,10 @@ function sanitizeColorsData(raw) {
   if (typeof raw.lang === 'string' && Object.prototype.hasOwnProperty.call(TRANSLATIONS, raw.lang)) {
     out.lang = raw.lang;
   }
+  const onboarding = sanitizeOnboarding(raw.onboarding);
+  if (onboarding) out.onboarding = onboarding;
   Object.keys(raw).forEach(b => {
-    if (b === 'savedAt' || b === 'theme' || b === 'lang') return;
+    if (b === 'savedAt' || b === 'theme' || b === 'lang' || b === 'onboarding') return;
     if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
     if (!BRANCH_ID_RE.test(b)) return;
     const main = raw[b] && raw[b].main;
@@ -5704,7 +5778,7 @@ async function loadBranchColors() {
   try {
     const saved = sanitizeColorsData(await loadValueIDB(COLORS_STORAGE_KEY));
     Object.keys(saved).forEach(b => {
-      if (b === 'savedAt' || b === 'theme' || b === 'lang') return;
+      if (b === 'savedAt' || b === 'theme' || b === 'lang' || b === 'onboarding') return;
       BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
     });
   } catch(e) {
@@ -5719,6 +5793,7 @@ async function saveBranchColors() {
   });
   toSave.theme = localStorage.getItem('zenit-week-theme') || 'light';
   toSave.lang  = currentLang || 'en';
+  toSave.onboarding = onboardingSettings();
   await saveValueIDB(COLORS_STORAGE_KEY, toSave);
   scheduleColorsSync();
 }
@@ -6930,6 +7005,12 @@ const SIGNOUT_PRESERVE_KEYS = new Set([
   'zenit-week-view',
   'zenit-week-autolayout',
   'zenit-week-storage-migrated',
+  // Onboarding state: a wipe clears the data, not the fact that this browser
+  // has already seen the tour.
+  'zenit-week-onboarded',
+  'zenit-week-playground-nudged',
+  'zenit-week-tips-enabled',
+  'zenit-week-tips-seen',
 ]);
 async function signOutAndClear() {
   await signOut();
@@ -8001,6 +8082,35 @@ async function syncColorsToDrive() {
   }
 }
 
+// Onboarding state merges instead of losing to last-write-wins: a tip read on
+// any device counts as read everywhere, and once any device has been onboarded
+// no other one seeds the playground. Only the Show tips switch is a setting the
+// user toggles, so that one follows savedAt like theme and language. Returns
+// true when this device still knows something the remote file doesn't.
+function mergeRemoteOnboarding(remote, remoteIsNewer) {
+  if (!remote) return false;
+
+  if (remote.onboarded) writeBoolPref(ONBOARDED_KEY, true);
+  if (remote.nudged) {
+    writeBoolPref(NUDGED_KEY, true);
+    _playgroundNudgeDone = true;
+  }
+  let seenChanged = false;
+  Object.keys(remote.seen || {}).forEach(id => {
+    if (!_tipsSeen[id]) { _tipsSeen[id] = true; seenChanged = true; }
+  });
+  if (seenChanged) writeTipsSeen(_tipsSeen);
+
+  if (remoteIsNewer && !!remote.tipsEnabled !== _tipsEnabled) {
+    _tipsEnabled = !!remote.tipsEnabled;
+    writeBoolPref(TIPS_ON_KEY, _tipsEnabled);
+    if (!_tipsEnabled) hideCoachmark();
+    if (typeof syncTipsToggleUI === 'function') syncTipsToggleUI();
+  }
+
+  return JSON.stringify(onboardingSettings()) !== JSON.stringify(remote);
+}
+
 async function syncColorsFromDrive() {
   if (!googleAccessToken) return;
   try {
@@ -8022,6 +8132,11 @@ async function syncColorsFromDrive() {
     const remoteSavedAt = remoteData.savedAt ?? 0;
     const localData = await loadValueIDB(COLORS_STORAGE_KEY);
     const localSavedAt = localData?.savedAt ?? 0;
+
+    // Runs whichever side is newer — see mergeRemoteOnboarding.
+    if (mergeRemoteOnboarding(remoteData.onboarding, remoteSavedAt > localSavedAt)) {
+      saveBranchColors();   // this device knows a tip the file doesn't
+    }
 
     if (remoteSavedAt > localSavedAt) {
       await saveValueIDB(COLORS_STORAGE_KEY, remoteData);
@@ -18576,7 +18691,7 @@ const PLAYGROUND_SEED = {"week":{"nodes":[{"id":"family","type":"branch","branch
 async function maybeSeedPlayground() {
   // Idempotency — never seed twice.
   try {
-    if (await loadValueIDB('zenit-week-onboarded')) return false;
+    if (readBoolPref(ONBOARDED_KEY, false)) return false;
   } catch (e) { /* treat as not-yet-onboarded */ }
 
   const hash = (typeof location !== 'undefined' && location.hash) ? location.hash.slice(1) : '';
@@ -18620,7 +18735,8 @@ async function maybeSeedPlayground() {
   });
   if (Object.keys(seedColors).length) await saveBranchColors();
 
-  await saveValueIDB('zenit-week-onboarded', true);
+  writeBoolPref(ONBOARDED_KEY, true);
+  saveBranchColors();   // carries the onboarding state out to the other devices
 
   // Strip #playground so a reload doesn't re-trigger and the URL stays clean.
   if (wantPlayground && typeof history !== 'undefined' && history.replaceState) {
@@ -18710,7 +18826,8 @@ function dismissPlaygroundNudge(persist) {
   if (banner) banner.classList.remove('visible');
   if (persist) {
     _playgroundNudgeDone = true;
-    saveValueIDB('zenit-week-playground-nudged', true);
+    writeBoolPref(NUDGED_KEY, true);
+    saveBranchColors();
   }
 }
 
@@ -18925,19 +19042,22 @@ function isHintSeen(id) { return !!_tipsSeen[id]; }
 function markHintSeen(id) {
   if (_tipsSeen[id]) return;
   _tipsSeen[id] = true;
-  saveValueIDB('zenit-week-tips-seen', _tipsSeen);
+  writeTipsSeen(_tipsSeen);
+  saveBranchColors();   // a tip read here is read on every device
 }
 
 function setTipsEnabled(on) {
   _tipsEnabled = !!on;
-  saveValueIDB('zenit-week-tips-enabled', _tipsEnabled);
+  writeBoolPref(TIPS_ON_KEY, _tipsEnabled);
+  saveBranchColors();
   if (!_tipsEnabled) hideCoachmark();
 }
 
 // Clear all seen-flags so every hint can appear again; re-enable tips if off.
 function replayTips() {
   _tipsSeen = {};
-  saveValueIDB('zenit-week-tips-seen', _tipsSeen);
+  writeTipsSeen(_tipsSeen);
+  saveBranchColors();
   if (!_tipsEnabled) setTipsEnabled(true);
 }
 
@@ -19210,15 +19330,13 @@ function maybeShowHint(id, anchorEl, pulseTarget) {
 window.addEventListener('load', async () => {
   await openDB();
   await runMigrationIfNeeded();
+  await adoptOnboardingStateFromIDB();
   // Resolved before seeding: the playground picks its labels by language.
   currentLang = localStorage.getItem('zenit-week-lang') || detectBrowserLang();
   await maybeSeedPlayground();
-  try { _playgroundNudgeDone = !!(await loadValueIDB('zenit-week-playground-nudged')); } catch (e) { /* not nudged yet */ }
-  try {
-    const en = await loadValueIDB('zenit-week-tips-enabled');
-    _tipsEnabled = (en === undefined || en === null) ? true : !!en;
-    _tipsSeen = (await loadValueIDB('zenit-week-tips-seen')) || {};
-  } catch (e) { /* defaults: tips on, none seen */ }
+  _playgroundNudgeDone = readBoolPref(NUDGED_KEY, false);
+  _tipsEnabled = readBoolPref(TIPS_ON_KEY, true);
+  _tipsSeen = readTipsSeen();
   if (typeof syncTipsToggleUI === 'function') syncTipsToggleUI();
 
   // Must be awaited: bootstrapColorsSettings() may write BRANCH_COLORS straight

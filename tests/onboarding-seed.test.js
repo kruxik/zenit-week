@@ -63,7 +63,7 @@ describe('Onboarding playground seed (S1)', () => {
 
   it('sets the onboarded flag and does not re-seed on a second call', async () => {
     expect(await maybeSeedPlayground()).toBe(true);
-    expect(await loadValueIDB('zenit-week-onboarded')).toBe(true);
+    expect(_state.getLocalStorage('zenit-week-onboarded')).toBe('1');
 
     // Second call is a no-op even though the DB now has exactly the seeded week.
     expect(await maybeSeedPlayground()).toBe(false);
@@ -97,6 +97,6 @@ describe('Onboarding playground seed (S1)', () => {
     const week = await loadWeekIDB(TODAY);
     expect(week.nodes).toHaveLength(1);
     expect(week.nodes[0].label).toBe('My task');
-    expect(await loadValueIDB('zenit-week-onboarded')).toBeFalsy();
+    expect(_state.getLocalStorage('zenit-week-onboarded')).toBeUndefined();
   });
 });
