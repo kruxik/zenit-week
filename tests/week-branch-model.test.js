@@ -3,7 +3,7 @@
 // week across a gap (or before every week that exists) still lands on the
 // user's own branches instead of the defaults.
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { _state, saveWeekIDB, deleteWeekIDB, listWeekKeysIDB, loadWeek, defaultWeekData } from './setup.js';
+import { _state, saveWeekIDB, deleteWeekIDB, listWeekKeysIDB, loadWeek, defaultWeekData, weekKeysByProximity } from './setup.js';
 
 const mkBranch = (id, label, side = 'left') =>
   ({ id, type: 'branch', branch: id, label, children: [], side, _ts: 0 });
@@ -58,5 +58,24 @@ describe('New week inherits the branches of the last shaped week', () => {
   test('falls back to the playground defaults when nothing is stored', async () => {
     const fresh = await loadWeek('2026-30');
     expect(fresh.nodes.map(n => n.id)).toEqual(defaultWeekData().nodes.map(n => n.id));
+  });
+});
+
+describe('weekKeysByProximity', () => {
+  it('orders earlier weeks nearest-first, then later ones', () => {
+    const keys = ['2026-20', '2026-28', '2026-32', '2026-40'];
+    expect(weekKeysByProximity(keys, '2026-30')).toEqual(['2026-28', '2026-20', '2026-32', '2026-40']);
+  });
+
+  it('crosses a year boundary by rank, not by string', () => {
+    expect(weekKeysByProximity(['2025-52', '2026-05'], '2026-01')).toEqual(['2025-52', '2026-05']);
+  });
+
+  it('drops the target week itself', () => {
+    expect(weekKeysByProximity(['2026-30', '2026-31'], '2026-30')).toEqual(['2026-31']);
+  });
+
+  it('returns nothing for an unparseable target', () => {
+    expect(weekKeysByProximity(['2026-30'], 'not-a-week')).toEqual([]);
   });
 });

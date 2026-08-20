@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-72RuUyZhDidmvlGUF6EoffBwaf0NzXP23OhMYftbuec='
+               'sha256-hQEA7Si9NzFmUuK3ZfukfH6C/VOr20zJ4imcaT/iKsU='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7031,12 +7031,28 @@ function _weekContentSig(d) {
 
 // ─── TASK-13: Conflict resolution — last-write-wins per week ─────────────────
 // CRDT merge: LWW per node by _ts, union tombstones, rebuild tree integrity.
-// Drops every fully-untouched onboarding subtree from a week record. Branches
-// always stay, and a subtree holding a node the user touched (touchNode clears
-// _demo) stays whole — the same rule "Clear example tasks" applies. Pure: the
-// input is left alone.
-function stripUntouchedDemoNodes(data) {
+// True when a week holds something the user actually made: a task that is not
+// onboarding scaffolding. Branches don't count — every week has those.
+function hasRealTasks(data) {
+  return (data.nodes || []).some(n => n.type !== 'branch' && !n._demo);
+}
+
+// Drops onboarding scaffolding from `data` that `other` has never heard of.
+//
+// Scaffolding is a fully-untouched _demo subtree (touchNode clears the flag, so
+// anything the user touched stays whole — the rule "Clear example tasks" uses),
+// plus a _demo branch left with no children once those subtrees are gone.
+//
+// Two guards keep a genuine first run intact. `other` must hold real tasks of
+// its own — a week of examples meeting an empty one is just the user's own
+// playground. And a node `other` also carries is left to the normal LWW merge:
+// the same device pushed it there, so it is the user's copy of the seed, not
+// somebody else's week being polluted. Pure: the input is left alone.
+function stripDemoScaffolding(data, other) {
+  if (!hasRealTasks(other)) return data;
+
   const nodes = data.nodes || [];
+  const known = new Set((other.nodes || []).map(n => n.id));
   const byId = new Map(nodes.map(n => [n.id, n]));
   const subtreeAllDemo = (id) => {
     const n = byId.get(id);
@@ -7046,7 +7062,15 @@ function stripUntouchedDemoNodes(data) {
 
   const drop = new Set();
   nodes.forEach(n => {
-    if (n.type !== 'branch' && n._demo && subtreeAllDemo(n.id)) drop.add(n.id);
+    if (n.type !== 'branch' && n._demo && !known.has(n.id) && subtreeAllDemo(n.id)) drop.add(n.id);
+  });
+  // A seeded branch whose every example task just went is scaffolding too — that
+  // is the empty branch that used to survive an import and come back on sync.
+  nodes.forEach(n => {
+    if (n.type === 'branch' && n._demo && !known.has(n.id)
+        && (n.children || []).every(id => drop.has(id) || !byId.has(id))) {
+      drop.add(n.id);
+    }
   });
   if (!drop.size) return data;
 
@@ -7061,15 +7085,15 @@ function stripUntouchedDemoNodes(data) {
 }
 
 // A device that boots with an empty database seeds the playground before the
-// user gets a chance to sign in. If Drive then hands back a week that already
-// holds real tasks, this is not a first run — it's an existing account on a new
-// device — so the example tasks must not merge into their week and upload back
-// out to every other device.
+// user gets a chance to sign in, and that seed can end up on either side of a
+// merge: locally, when an existing account signs in on a fresh device; remotely,
+// once such a device has pushed it to Drive. Either way it must not graft itself
+// onto a week of real work — strip it from both sides before merging.
 function mergeWeekData(local, remote) {
   try {
-    if ((remote.nodes || []).some(n => n.type !== 'branch')) {
-      local = stripUntouchedDemoNodes(local);
-    }
+    const localBefore = local;
+    local = stripDemoScaffolding(local, remote);
+    remote = stripDemoScaffolding(remote, localBefore);
 
     // 1. Union tombstones
     const tombstones = new Set([...(local.tombstones||[]), ...(remote.tombstones||[])]);
@@ -9297,27 +9321,34 @@ function migrateDayCounters(data) {
 // every empty week they open next. Nearest earlier week first (the one they just
 // came from), then the nearest later one, so opening a week before or beyond a
 // gap still lands on their own layout rather than the defaults.
-async function findBranchModelWeek(wk) {
-  let keys = [];
-  try { keys = await listWeekKeysIDB(); } catch (e) { return null; }
+// Week keys ordered by how good a model they are for `wk`: the closest earlier
+// week first (the one the user just came from), then the closest later one.
+// Drops `wk` itself and anything unparseable.
+function weekKeysByProximity(keys, wk) {
   const rank = k => {
     const { year, week } = parseWeekKey(k);
     return Number.isFinite(year) && Number.isFinite(week) ? year * 100 + week : null;
   };
   const target = rank(wk);
-  if (target == null) return null;
+  if (target == null) return [];
 
   const earlier = [], later = [];
-  keys.forEach(k => {
+  (keys || []).forEach(k => {
     if (k === wk) return;
     const r = rank(k);
     if (r == null) return;
     (r < target ? earlier : later).push({ k, r });
   });
-  earlier.sort((a, b) => b.r - a.r);   // closest before wk first
-  later.sort((a, b) => a.r - b.r);     // then closest after
+  earlier.sort((a, b) => b.r - a.r);
+  later.sort((a, b) => a.r - b.r);
+  return earlier.concat(later).map(e => e.k);
+}
 
-  for (const { k } of earlier.concat(later)) {
+async function findBranchModelWeek(wk) {
+  let keys = [];
+  try { keys = await listWeekKeysIDB(); } catch (e) { return null; }
+
+  for (const k of weekKeysByProximity(keys, wk)) {
     let data = null;
     try { data = await loadWeekIDB(k); } catch (e) { continue; }
     if (data && (data.nodes || []).some(n => n.type === 'branch')) return data;
@@ -9553,6 +9584,21 @@ async function importAllData(file) {
       const parsedWk = safeParse(allWeeks.get(currentWk));
       if (parsedWk) await saveWeekIDB(currentWk, parsedWk);
       allWeeks.delete(currentWk);
+    } else {
+      // The export has no record for the current week, so opening it creates a
+      // new one — and a new week models its branches on the nearest stored week.
+      // Every other week is still queued for the background pass at this point,
+      // which left the database empty and produced a week of default branches
+      // next to the imported data. Write the nearest week up front so the model
+      // is there; the background pass then skips it.
+      const nearest = weekKeysByProximity([...allWeeks.keys()], currentWk)[0];
+      if (nearest) {
+        const parsedNearest = safeParse(allWeeks.get(nearest));
+        if (parsedNearest) {
+          await saveWeekIDB(nearest, parsedNearest);
+          allWeeks.delete(nearest);
+        }
+      }
     }
 
     // Reset token + import-pending flag

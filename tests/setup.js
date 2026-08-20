@@ -288,19 +288,13 @@ function updateIDBMethods() {
       }
       // Mirrors findBranchModelWeek: nearest earlier stored week first, then
       // the nearest later one, so a new week copies the user's own branches.
-      const rank = (k) => { const { year, week } = parseWeekKey(k); return year * 100 + week; };
-      const target = rank(wk);
-      const stored = Object.keys(localStorage)
-        .filter(k => /^zenit-week-\d{4}-\d{1,2}$/.test(k))
-        .map(k => k.slice('zenit-week-'.length))
-        .filter(k => k !== wk)
-        .map(k => ({ k, r: rank(k) }))
-        .sort((a, b) => {
-          const aEarlier = a.r < target, bEarlier = b.r < target;
-          if (aEarlier !== bEarlier) return aEarlier ? -1 : 1;
-          return aEarlier ? b.r - a.r : a.r - b.r;
-        });
-      for (const { k } of stored) {
+      const stored = weekKeysByProximity(
+        Object.keys(localStorage)
+          .filter(k => /^zenit-week-\d{4}-\d{1,2}$/.test(k))
+          .map(k => k.slice('zenit-week-'.length)),
+        wk,
+      );
+      for (const k of stored) {
         const prevRaw = localStorage.getItem('zenit-week-' + k);
         if (!prevRaw) continue;
         try {
@@ -595,6 +589,7 @@ export const {
   offsetWeek,
   weekKey,
   parseWeekKey,
+  weekKeysByProximity,
   genId,
   defaultWeekData,
   validateAndRepair,

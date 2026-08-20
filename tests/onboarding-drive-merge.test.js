@@ -80,4 +80,60 @@ describe('Playground never merges into an existing Drive account', () => {
     const merged = mergeWeekData(seeded(), remoteWeek());
     expect(merged.tombstones).toEqual([]);
   });
+
+  // The reported bug: a device pushed its playground to Drive, so the seeded
+  // branch lives on the remote side. Importing real data locally and syncing
+  // brought the empty branch straight back.
+  it('drops a seeded branch that arrives from the remote side', () => {
+    const remote = {
+      nodes: [
+        { ...branch('growth', ['demoA']), _demo: true },
+        { id: 'demoA', type: 'activity', parent: 'growth', label: 'Example', _demo: true, children: [], _ts: 10 },
+      ],
+      tombstones: [], savedAt: 900, crdtVersion: 2,
+    };
+    const local = {
+      nodes: [
+        branch('work', ['real']),
+        { id: 'real', type: 'activity', parent: 'work', label: 'Real task', children: [], _ts: 500 },
+      ],
+      tombstones: [], savedAt: 2000, crdtVersion: 4,
+    };
+    const ids = mergeWeekData(local, remote).nodes.map(n => n.id);
+    expect(ids).toEqual(['work', 'real']);
+  });
+
+  it('keeps a seeded branch the user put their own task under', () => {
+    const remote = {
+      nodes: [
+        { ...branch('growth', ['mine']), _demo: true },
+        { id: 'mine', type: 'activity', parent: 'growth', label: 'My task', children: [], _ts: 900 },
+      ],
+      tombstones: [], savedAt: 900, crdtVersion: 2,
+    };
+    const local = {
+      nodes: [
+        branch('work', ['real']),
+        { id: 'real', type: 'activity', parent: 'work', label: 'Real task', children: [], _ts: 500 },
+      ],
+      tombstones: [], savedAt: 2000, crdtVersion: 4,
+    };
+    const ids = mergeWeekData(local, remote).nodes.map(n => n.id);
+    expect(ids).toContain('growth');
+    expect(ids).toContain('mine');
+  });
+
+  it('leaves the playground alone when both sides are the same seed', () => {
+    // First run, two devices: the user has added one real task. The seed nodes
+    // exist on both sides, so LWW owns them — nothing is scaffolding to strip.
+    const withReal = () => {
+      const w = seeded();
+      w.nodes.push({ id: 'real', type: 'activity', parent: 'work', label: 'Real task', children: [], _ts: 900 });
+      w.nodes.find(n => n.id === 'work').children.push('real');
+      return w;
+    };
+    const ids = mergeWeekData(withReal(), withReal()).nodes.map(n => n.id);
+    expect(ids).toContain('demo1');
+    expect(ids).toContain('real');
+  });
 });
