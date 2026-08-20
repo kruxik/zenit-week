@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ginXzoNKaipFfbeKW3QgGYjGalTQc4ikhk7X03FYJIk='
+               'sha256-E/ay0Kzd6MLRasJdo2zy7uC2Nb099lRPvuQg/1Nr5Vc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8619,7 +8619,7 @@ const TRANSLATIONS = {
     'help.unplanned':             'Neplánované',
     'help.done':                  'Hotovo',
     'help.close':                 'Zavřít',
-    'filter.unscheduled':         'Neplánované',
+    'filter.unscheduled':         'Bez termínu',
     'blocked.title':              'Úložiště je zaneprázdněné',
     'blocked.body':               'Úložiště Zenit Week se aktualizuje v jiném panelu. Tento panel bude za chvíli připraven — zkuste obnovit stránku.',
     'multitab.updated':           'Aktualizováno z jiného panelu',
@@ -18566,6 +18566,8 @@ function armTouchHintGate(el, id, pulseTarget, anchorEl) {
     }, true);
   }
   _touchHintGates.push({ el, id, pulseTarget, anchorEl: anchorEl || el });
+}
+, true);
 }
 
 // Entry point from trigger sites.
