@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-VUUAujdel66BYnyIRvM/jsKb/acH9ehFW3Ja7RpmOSo='
+               'sha256-csaofywImxjMOj4nlpzsEroG4q31o8nNpbTBLO9teHc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -16884,18 +16884,30 @@ function openViewLevels() {
   document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'true');
 }
 
+// True while the map is pruned by either control in the row.
+function viewFiltersActive() {
+  return activeDayFilter !== null || currentViewLevel !== 'full';
+}
+
 // Safe to call unconditionally — used as a catch-all dismiss from view switches,
 // Esc, quick-add and canvas taps, so it must be a no-op when already shut.
-function closeViewLevels() {
+// While a filter is on, the row is the only thing naming it, so it stays put
+// until the Mindmap tab clears the filters and closes it deliberately.
+function closeViewLevels({ force = false } = {}) {
   if (!areViewLevelsOpen()) return;
+  if (!force && viewFiltersActive()) return;
   document.documentElement.classList.remove('view-levels-open');
   document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'false');
   closeDayFilterMenu(); // the day menu hangs off the row; it can't outlive it
 }
 
 function toggleViewLevels() {
-  if (areViewLevelsOpen()) closeViewLevels();
-  else openViewLevels();
+  if (!areViewLevelsOpen()) { openViewLevels(); return; }
+  // Closing from the tab is the deliberate gesture, so it also puts the map
+  // back the way it was found: every day, every level.
+  if (activeDayFilter !== null) setDayFilter(null);
+  if (currentViewLevel !== 'full') switchViewLevel('full');
+  closeViewLevels({ force: true });
 }
 
 // Tapping the canvas dismisses the row. #view-level-bar swallows its own
@@ -17081,6 +17093,10 @@ function refreshDayFilterUI() {
   // the map is pruned. Both prunings light it.
   document.documentElement.classList.toggle('view-filtered',
     currentViewLevel !== 'full' || activeDayFilter !== null);
+
+  // The row names whatever is pruning the map, so it follows the filter: back
+  // from Agenda or Stats, or in from a reload, it opens itself again.
+  if (currentView === 'mindmap' && viewFiltersActive()) openViewLevels();
 
   const btn = document.getElementById('day-filter-btn');
   if (btn) {
