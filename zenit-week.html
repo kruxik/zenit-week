@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-yO9jLDTXsa7GhmLyT2eG5prQ+fVkoEpzWVRaXNOmyB0='
+               'sha256-RGQqWtpGJaTi6oAz71d5bRdKMkCXbj1zBvnEgZdrmD8='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8082,7 +8082,7 @@ const TRANSLATIONS = {
     'tips.root':                  'Drag a task to move it. Drop it on another and it belongs there instead — colour and all.',
     'tips.signIn':                'Optional. Everything already works offline in this browser — signing in keeps a copy in your own Google Drive so your phone and laptop stay in step. Zenit Week runs no server that holds your data.',
     'tips.weekNav':               'Each week is a map of its own. Step to the next one to plan ahead — unfinished tasks can follow you there, and the menu here transfers them.',
-    'tips.quickAdd':              'Write a task down without deciding where it belongs. Pick a branch, type it, and it waits on that branch until you drag it into place. Also on:',
+    'tips.quickAdd':              'Write a task down before you know where it belongs. Type it now, drag it into place later.',
     'tips.inbox':                 'No place in the plan yet. Drag it onto a task and it files itself underneath, in that task’s colour.',
     'tips.hoverIntro':            'Hover a task, then press:',
     'tips.hoverCaptionTouch':     'Quick gestures',
@@ -8400,7 +8400,7 @@ const TRANSLATIONS = {
     'tips.root':                  'Přetažením úkol přesunete. Puštěním na jiný ho přeřadíte pod něj — i s barvou.',
     'tips.signIn':                'Nepovinné. Vše funguje offline v tomto prohlížeči — přihlášení uloží kopii do vašeho Google Disku, aby telefon i notebook držely krok. Zenit Week neprovozuje server, který by vaše data držel.',
     'tips.weekNav':               'Každý týden je vlastní mapa. Přejděte na další a plánujte dopředu — nedokončené úkoly vás mohou následovat, menu zde je přenese.',
-    'tips.quickAdd':              'Zapište úkol, aniž byste řešili, kam patří. Vyberte větev, napište ho a počká na ní, dokud ho nepřetáhnete na místo. Také na:',
+    'tips.quickAdd':              'Zapište úkol dřív, než víte, kam patří. Napište ho teď, na místo ho přetáhnete později.',
     'tips.inbox':                 'Zatím bez místa v plánu. Přetáhněte ho na úkol a zařadí se pod něj, v jeho barvě.',
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
     'tips.hoverCaptionTouch':     'Rychlá gesta',
@@ -18540,6 +18540,34 @@ function dismissCoachmark() {
   hideCoachmark();
 }
 
+// Touch has no hover, so the tap that should reveal a tip is the same tap that
+// fires the control — the panel opens over the bubble and the lesson is missed.
+// The first tap on a gated control spends itself on the tip instead: the tip is
+// marked seen there and then, so the very next tap does the thing. Registered
+// on document in the capture phase, because a listener on the control itself
+// would run after the control's own click handler.
+const _touchHintGates = [];
+
+// el is what the user taps; anchorEl is what the bubble points at, which for
+// the level buttons is the bar they sit in. pulseTarget may be a function, as
+// the ring around those buttons is measured when it is drawn.
+function armTouchHintGate(el, id, pulseTarget, anchorEl) {
+  if (!el) return;
+  if (!_touchHintGates.length) {
+    document.addEventListener('click', (e) => {
+      if (coachmarkKeysApply()) return; // a pointer device hovered it already
+      const gate = _touchHintGates.find(g => g.el.contains(e.target));
+      if (!gate || !_tipsEnabled || isHintSeen(gate.id)) return;
+      const pulse = (typeof gate.pulseTarget === 'function') ? gate.pulseTarget() : gate.pulseTarget;
+      maybeShowHint(gate.id, gate.anchorEl, pulse);
+      markHintSeen(gate.id);
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+  }
+  _touchHintGates.push({ el, id, pulseTarget, anchorEl: anchorEl || el });
+}
+
 // Entry point from trigger sites.
 function maybeShowHint(id, anchorEl, pulseTarget) {
   if (!anchorEl || !shouldShowHint(id)) return;
@@ -18627,24 +18655,43 @@ window.addEventListener('load', async () => {
 
   // Coachmark: teach the view controls on first hover of either bar.
   const _viewToggleBar = document.getElementById('view-toggle-bar');
-  if (_viewToggleBar) _viewToggleBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewToggleBar));
+  if (_viewToggleBar) {
+    _viewToggleBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewToggleBar));
+    armTouchHintGate(_viewToggleBar, 'views');
+  }
   const _syncBtn = document.getElementById('sync-btn');
-  if (_syncBtn) _syncBtn.addEventListener('mouseenter', () => maybeShowHint('signin', _syncBtn));
+  if (_syncBtn) {
+    _syncBtn.addEventListener('mouseenter', () => maybeShowHint('signin', _syncBtn));
+    armTouchHintGate(_syncBtn, 'signin');
+  }
   const _weekBar = document.getElementById('week-bar');
-  if (_weekBar) _weekBar.addEventListener('mouseenter', () => maybeShowHint('weeknav', _weekBar));
+  if (_weekBar) {
+    _weekBar.addEventListener('mouseenter', () => maybeShowHint('weeknav', _weekBar));
+    armTouchHintGate(_weekBar, 'weeknav');
+  }
   const _fabAdd = document.getElementById('fab-add');
-  if (_fabAdd) _fabAdd.addEventListener('mouseenter', () => maybeShowHint('quickadd', _fabAdd));
+  if (_fabAdd) {
+    _fabAdd.addEventListener('mouseenter', () => maybeShowHint('quickadd', _fabAdd));
+    armTouchHintGate(_fabAdd, 'quickadd');
+  }
   const _undoRedoBar = document.getElementById('undo-redo-bar');
-  if (_undoRedoBar) _undoRedoBar.addEventListener('mouseenter', () => maybeShowHint('undo', _undoRedoBar));
+  if (_undoRedoBar) {
+    _undoRedoBar.addEventListener('mouseenter', () => maybeShowHint('undo', _undoRedoBar));
+    armTouchHintGate(_undoRedoBar, 'undo');
+  }
   const _viewLevelBar = document.getElementById('view-level-bar');
   if (_viewLevelBar) {
     const levelBtns = _viewLevelBar.querySelectorAll('.view-level-btn[data-level]');
     levelBtns.forEach(btn => {
       // Ring the three level buttons only — the day filter shares this bar.
       btn.addEventListener('mouseenter', () => maybeShowHint('levels', _viewLevelBar, unionRect(levelBtns)));
+      armTouchHintGate(btn, 'levels', () => unionRect(levelBtns), _viewLevelBar);
     });
     const dayFilterBtn = document.getElementById('day-filter-btn');
-    if (dayFilterBtn) dayFilterBtn.addEventListener('mouseenter', () => maybeShowHint('dayfilter', dayFilterBtn));
+    if (dayFilterBtn) {
+      dayFilterBtn.addEventListener('mouseenter', () => maybeShowHint('dayfilter', dayFilterBtn));
+      armTouchHintGate(dayFilterBtn, 'dayfilter');
+    }
   }
   switchView(currentView); // apply persisted view (mindmap / agenda / stats)
 
