@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-6+n4E2ZoKqhbJhnIa+tcYp5MLs8tb4s0xgJ5see9aos='
+               'sha256-yO9jLDTXsa7GhmLyT2eG5prQ+fVkoEpzWVRaXNOmyB0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -684,7 +684,9 @@
   /* Coachmark — anchored just-in-time tip bubble (Part B). */
   #coachmark {
     position: fixed;
-    z-index: 3200;
+    /* Above the day-filter menu (9001), which opens upward into the bubble's
+       space; still under the confirm dialog overlay (10000). */
+    z-index: 9100;
     max-width: min(86vw, 320px);
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
@@ -8091,7 +8093,7 @@ const TRANSLATIONS = {
     'tips.doneIntro':             'Struck through means done. Finishing every child ticks the parent too.',
     'tips.priorityIntro':         'A flame marks critical, an exclamation high. Priority sizes the task on the map and passes down to everything beneath it.',
     'tips.undoIntro':             'Every change can be taken back. Experiment freely — nothing gets lost.',
-    'tips.dayFilter':             'Narrows the map to one day. Pick a day here, or press 1–7 on the canvas — 0 for what is overdue, 8 to clear.',
+    'tips.dayFilter':             'Narrows the map to one day. Pick a day here and the rest of the week steps aside.',
     'tips.levels':                'How much detail the map draws. Rocks shows what matters, Pebbles adds sub-tasks, Sand shows everything. Nothing is lost — it just steps into the background.',
     'tips.views':                 'Three views of your week: Mindmap to plan, Agenda day by day, Stats for how it went.',
     'tips.gotIt':                 'Got it',
@@ -8409,7 +8411,7 @@ const TRANSLATIONS = {
     'tips.doneIntro':             'Přeškrtnuté znamená hotové. Dokončení všech podúkolů odškrtne i ten nadřazený.',
     'tips.priorityIntro':         'Plamínek značí kritickou prioritu, vykřičník vysokou. Priorita zvětšuje úkol na mapě a propíše se na vše pod ním.',
     'tips.undoIntro':             'Každou změnu lze vzít zpět. Klidně zkoušejte — nic se neztratí.',
-    'tips.dayFilter':             'Zúží mapu na jeden den. Vyberte den zde, nebo na ploše stiskněte 1–7 — 0 pro prošlé, 8 pro zrušení.',
+    'tips.dayFilter':             'Zúží mapu na jeden den. Vyberte den a zbytek týdne ustoupí.',
     'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to klíčové, Oblázky přidají podúkoly, Písek ukáže vše. Nic se neztratí — jen ustoupí do pozadí.',
     'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek.',
     'tips.gotIt':                 'Rozumím',
@@ -18297,7 +18299,12 @@ const HINTS = {
   'dayfilter': {
     captionKey: 'tips.dayFilterCaption',
     priority: 11,
-    textKey: 'tips.dayFilter',
+    introKey: 'tips.dayFilter',
+    keys: [
+      { k: '1–7', labelKey: 'help.filterDay' },
+      { k: '8',   labelKey: 'filter.unscheduled' },
+      { k: '0',   labelKey: 'agenda.overdue' },
+    ],
   },
 };
 
