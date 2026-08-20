@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-VqQTPy+e9TcNxCihioPo7kAuSUK1ZWqBZ8bTKeS36ms='
+               'sha256-8R759c/AxUFbc4GAuylYcn+edvqUn80LT9+6HUvxfQg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -18542,8 +18542,21 @@ let _playgroundNudgeShown = false;  // already surfaced this session
 // Count of the user's own committed tasks in the current week: non-branch,
 // non-demo, and not an in-progress placeholder (_editing). Excluding _editing
 // means an empty placeholder created on commit doesn't inflate the count.
+// Day and tick children (and the counter node behind them) are bookkeeping the
+// app creates itself — one task with days assigned is still one task, so they
+// never count on their own. They do credit their parent though: ticking off a
+// day or a rep on an example task is the user working their week, so that task
+// counts as theirs even while its own label is untouched.
 function playgroundUserNodeCount() {
-  return (weekData.nodes || []).filter(n => n.type !== 'branch' && !n._demo && !n._editing).length;
+  const nodes = weekData.nodes || [];
+  const claimedByChild = new Set();
+  nodes.forEach(n => {
+    if ((n.dayChild || n.tickChild) && !n._demo && n.parent) claimedByChild.add(n.parent);
+  });
+  return nodes.filter(n =>
+    n.type !== 'branch' && n.type !== 'counter'
+    && !n.dayChild && !n.tickChild && !n._editing
+    && (!n._demo || claimedByChild.has(n.id))).length;
 }
 
 // Threshold of the user's own saved tasks before we offer cleanup.

@@ -35,6 +35,34 @@ describe('Onboarding auto-nudge (S4)', () => {
     expect(playgroundUserNodeCount()).toBe(3);
   });
 
+  it('does not count day children, tick children or the counter node', () => {
+    const w = week({ userCount: 3, demoCount: 5 });
+    // One of the user's tasks gets days assigned and a counter with ticks —
+    // all app-created bookkeeping under a task that already counts as one.
+    w.nodes.push(
+      { id: 'day1', type: 'activity', dayChild: true, dayIndex: 1, branch: 'work', parent: 'u0', label: 'Mo', children: [] },
+      { id: 'day2', type: 'activity', dayChild: true, dayIndex: 2, branch: 'work', parent: 'u0', label: 'Tu', children: [] },
+      { id: 'cnt',  type: 'counter',  branch: 'work', parent: 'u1', label: '0/3', children: [] },
+      { id: 'tick1', type: 'activity', tickChild: true, tickIndex: 1, branch: 'work', parent: 'u1', label: '1', children: [] },
+    );
+    _state.set(w);
+    expect(playgroundUserNodeCount()).toBe(3);
+    expect(shouldShowPlaygroundNudge()).toBe(false);   // still under the threshold
+  });
+
+  it('counts an example task once the user ticks one of its day children', () => {
+    const w = week({ userCount: 4, demoCount: 5 });
+    // d0 keeps its _demo flag; its Monday child was ticked off, so touchNode
+    // has already cleared _demo there.
+    w.nodes.push(
+      { id: 'd0-mo', type: 'activity', dayChild: true, dayIndex: 1, branch: 'work', parent: 'd0', label: 'Mo', done: true, children: [] },
+      { id: 'd1-tu', type: 'activity', dayChild: true, dayIndex: 2, branch: 'work', parent: 'd1', label: 'Tu', _demo: true, children: [] },
+    );
+    _state.set(w);
+    expect(playgroundUserNodeCount()).toBe(5);         // 4 own + d0, claimed by its tick
+    expect(shouldShowPlaygroundNudge()).toBe(true);
+  });
+
   it('does not count in-progress placeholder (_editing) nodes', () => {
     const w = week({ userCount: 5, demoCount: 1 });
     // Simulate the placeholder created on commit / before ESC.
