@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-aHGBwOV+JMyWWMiVPuUlNzekAZ+m54zyYLs++rvgmmg='
+               'sha256-72RuUyZhDidmvlGUF6EoffBwaf0NzXP23OhMYftbuec='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7031,8 +7031,46 @@ function _weekContentSig(d) {
 
 // ─── TASK-13: Conflict resolution — last-write-wins per week ─────────────────
 // CRDT merge: LWW per node by _ts, union tombstones, rebuild tree integrity.
+// Drops every fully-untouched onboarding subtree from a week record. Branches
+// always stay, and a subtree holding a node the user touched (touchNode clears
+// _demo) stays whole — the same rule "Clear example tasks" applies. Pure: the
+// input is left alone.
+function stripUntouchedDemoNodes(data) {
+  const nodes = data.nodes || [];
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const subtreeAllDemo = (id) => {
+    const n = byId.get(id);
+    if (!n || n.type === 'branch' || !n._demo) return false;
+    return (n.children || []).every(subtreeAllDemo);
+  };
+
+  const drop = new Set();
+  nodes.forEach(n => {
+    if (n.type !== 'branch' && n._demo && subtreeAllDemo(n.id)) drop.add(n.id);
+  });
+  if (!drop.size) return data;
+
+  return {
+    ...data,
+    nodes: nodes
+      .filter(n => !drop.has(n.id))
+      .map(n => (Array.isArray(n.children) && n.children.some(id => drop.has(id)))
+        ? { ...n, children: n.children.filter(id => !drop.has(id)) }
+        : n),
+  };
+}
+
+// A device that boots with an empty database seeds the playground before the
+// user gets a chance to sign in. If Drive then hands back a week that already
+// holds real tasks, this is not a first run — it's an existing account on a new
+// device — so the example tasks must not merge into their week and upload back
+// out to every other device.
 function mergeWeekData(local, remote) {
   try {
+    if ((remote.nodes || []).some(n => n.type !== 'branch')) {
+      local = stripUntouchedDemoNodes(local);
+    }
+
     // 1. Union tombstones
     const tombstones = new Set([...(local.tombstones||[]), ...(remote.tombstones||[])]);
 
