@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-hbymezxurqE3R8eQY0J34oWW1fLN9N5jUPr3Z2XXqa8='
+               'sha256-6HRILw3GEoF0jRFNGhbYLzB2vXzr0MK6kFJgn9rcAQw='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -10989,6 +10989,10 @@ function resizeInlineInput(immediate = false) {
 }
 
 let _panAnimToken = 0;
+// A tip anchored to a node must wait for the canvas to stop moving: the bubble
+// tracks its anchor, but the pulse ring is painted once and would be left
+// behind. flushPendingHint() (coachmarks section) runs when this clears.
+let _panAnimating = false;
 
 // Reveal the newly-created node after the inline editor opens. Desktop animates
 // to center. Mobile is fully handled by _panEditNodeToVisibleArea (350ms
@@ -11006,6 +11010,10 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
   const startX = panX, startY = panY;
   const startTime = performance.now();
   const myToken = ++_panAnimToken;     // claim this animation slot (cancels any in-flight)
+  _panAnimating = true;
+  // Frames stop in a hidden tab, so the settle is also promised on a timer —
+  // a tip must never be stranded in the queue by a pan that never finished.
+  setTimeout(() => { if (myToken === _panAnimToken) endPanAnimation(); }, duration + 80);
   const rect = container.getBoundingClientRect();
   const positions = computeLayout();
   const pos = nodeId ? positions[nodeId] : null;
@@ -11028,8 +11036,16 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
     }
 
     if (t < 1) requestAnimationFrame(step);
+    else endPanAnimation();
   }
   requestAnimationFrame(step);
+}
+
+// Called by whichever finishes first — the last frame or the safety timer.
+function endPanAnimation() {
+  if (!_panAnimating) return;
+  _panAnimating = false;
+  if (typeof flushPendingHint === 'function') flushPendingHint();
 }
 
 function smoothPanToRevealNode(nodeId) {
@@ -18572,9 +18588,36 @@ function armNodeTouchHintGate() {
   }, true);
 }
 
+// A tip asked for while the canvas is animating waits here: adding a node pans
+// the map to reveal it, and a bubble that appears mid-pan slides across the
+// screen away from its own pulse ring. Order is add, then move, then teach.
+let _pendingHint = null;
+
+function flushPendingHint() {
+  const pending = _pendingHint;
+  _pendingHint = null;
+  if (!pending) return;
+  const el = pending.anchorId
+    ? (document.querySelector(`.node-group[data-id="${CSS.escape(pending.anchorId)}"]`) || pending.anchorEl)
+    : pending.anchorEl;
+  if (!el || el.isConnected === false) return; // anchor gone — nothing to point at
+  maybeShowHint(pending.id, el, pending.pulseTarget);
+}
+
 // Entry point from trigger sites.
 function maybeShowHint(id, anchorEl, pulseTarget) {
   if (!anchorEl || !shouldShowHint(id)) return;
+  if (_panAnimating) {
+    // Newest request wins: whatever the pointer landed on last is what the
+    // settled view will be showing.
+    _pendingHint = {
+      id,
+      anchorEl,
+      anchorId: (anchorEl.dataset && anchorEl.dataset.id) || null,
+      pulseTarget,
+    };
+    return;
+  }
   showCoachmark(id, anchorEl, pulseTarget);
 }
 
