@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ZGnZSKk3qPxcJSkToYQ68OSIuaht2wsi7oe2j685K8E='
+               'sha256-6+n4E2ZoKqhbJhnIa+tcYp5MLs8tb4s0xgJ5see9aos='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8092,7 +8092,7 @@ const TRANSLATIONS = {
     'tips.priorityIntro':         'A flame marks critical, an exclamation high. Priority sizes the task on the map and passes down to everything beneath it.',
     'tips.undoIntro':             'Every change can be taken back. Experiment freely — nothing gets lost.',
     'tips.dayFilter':             'Narrows the map to one day. Pick a day here, or press 1–7 on the canvas — 0 for what is overdue, 8 to clear.',
-    'tips.levels':                'How deep the map draws. Rocks keeps branches and their tasks, Pebbles adds one level of sub-tasks, Sand shows everything. Hidden work is still there — it just steps out of the picture.',
+    'tips.levels':                'How much detail the map draws. Rocks shows what matters, Pebbles adds sub-tasks, Sand shows everything. Nothing is lost — it just steps into the background.',
     'tips.views':                 'Three views of your week: Mindmap to plan, Agenda day by day, Stats for how it went.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
@@ -8410,7 +8410,7 @@ const TRANSLATIONS = {
     'tips.priorityIntro':         'Plamínek značí kritickou prioritu, vykřičník vysokou. Priorita zvětšuje úkol na mapě a propíše se na vše pod ním.',
     'tips.undoIntro':             'Každou změnu lze vzít zpět. Klidně zkoušejte — nic se neztratí.',
     'tips.dayFilter':             'Zúží mapu na jeden den. Vyberte den zde, nebo na ploše stiskněte 1–7 — 0 pro prošlé, 8 pro zrušení.',
-    'tips.levels':                'Jak hluboko se mapa kreslí. Kameny nechají větve a jejich úkoly, Oblázky přidají jednu úroveň podúkolů, Písek ukáže vše. Skryté úkoly nikam nezmizely — jen ustoupí z obrazu.',
+    'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to klíčové, Oblázky přidají podúkoly, Písek ukáže vše. Nic se neztratí — jen ustoupí do pozadí.',
     'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
@@ -18262,7 +18262,10 @@ const HINTS = {
   'levels': {
     captionKey: 'tips.levelsCaption',
     priority: 10,
-    textKey: 'tips.levels',
+    introKey: 'tips.levels',
+    keys: [
+      { k: 'V', labelKey: 'help.cycleViewLevel' },
+    ],
   },
   'root': {
     captionKey: 'tips.rootCaption',
