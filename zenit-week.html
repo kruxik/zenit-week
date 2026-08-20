@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-vX2VcIUEh7px3CEop3npwlthOQ0XazDTyDtp5YxzeSc='
+               'sha256-m4rDawI1QdxjvDEkos+YahBfseMXVMHe3roRl+jEsCo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8083,6 +8083,8 @@ const TRANSLATIONS = {
     'tips.quickAdd':              'Write a task down without deciding where it belongs. Pick a branch, type it, and it waits on that branch until you drag it into place. Also on:',
     'tips.inbox':                 'No place in the plan yet. Drag it onto a task and it files itself underneath, in that task’s colour.',
     'tips.hoverIntro':            'Hover a task, then press:',
+    'tips.hoverCaptionTouch':     'Quick gestures',
+    'tips.hoverTouch':            'Double-tap a task to rename it. Long-press opens the menu with everything else.',
     'tips.counter':               'Each circle is one repetition. Add “3x” to a task and it splits into three steps — done when the last one is ticked.',
     'tips.days':                  'Each circle is one day this task is planned for. Add “(mo, we)” to a task, or “(daily)” for all seven.',
     'tips.unplannedIntro':        'Amber means unplanned. It wasn’t in the plan, and Stats counts it apart from what was.',
@@ -8399,6 +8401,8 @@ const TRANSLATIONS = {
     'tips.quickAdd':              'Zapište úkol, aniž byste řešili, kam patří. Vyberte větev, napište ho a počká na ní, dokud ho nepřetáhnete na místo. Také na:',
     'tips.inbox':                 'Zatím bez místa v plánu. Přetáhněte ho na úkol a zařadí se pod něj, v jeho barvě.',
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
+    'tips.hoverCaptionTouch':     'Rychlá gesta',
+    'tips.hoverTouch':            'Dvojitým klepnutím úkol přejmenujete. Podržením otevřete nabídku se vším ostatním.',
     'tips.counter':               'Každé kolečko je jedno opakování. Přidejte do úkolu „3x“ a rozdělí se na tři kroky — hotový je posledním odškrtnutím.',
     'tips.days':                  'Každé kolečko je jeden den, na který je úkol naplánovaný. Do úkolu přidejte „(po, st)“ — nebo „(denně)“ pro celý týden.',
     'tips.unplannedIntro':        'Oranžová znamená neplánované. Nebylo to v plánu a Statistika to od plánovaného odděluje.',
@@ -18225,8 +18229,10 @@ const HINTS = {
   },
   'hover-keys': {
     captionKey: 'tips.hoverCaption',
+    touchCaptionKey: 'tips.hoverCaptionTouch',
     priority: 7,
     introKey: 'tips.hoverIntro',
+    touchTextKey: 'tips.hoverTouch',
     keys: [
       { k: 'Enter', labelKey: 'help.rename' },
       { k: 'Tab',   labelKey: 'help.add' },
@@ -18373,14 +18379,19 @@ function renderCoachmarkContent(hint) {
   if (!textEl) return;
   while (textEl.firstChild) textEl.removeChild(textEl.firstChild);
 
-  if (hint.captionKey) {
+  // Without key rows a hint that only led into them would say nothing, so a
+  // touch device can substitute its own caption and body teaching the gesture.
+  const keysApply = coachmarkKeysApply();
+
+  const captionKey = (!keysApply && hint.touchCaptionKey) || hint.captionKey;
+  if (captionKey) {
     const caption = document.createElement('div');
     caption.className = 'coachmark-caption';
-    caption.textContent = t(hint.captionKey);
+    caption.textContent = t(captionKey);
     textEl.appendChild(caption);
   }
 
-  const bodyKey = hint.introKey || hint.textKey;
+  const bodyKey = (!keysApply && hint.touchTextKey) || hint.introKey || hint.textKey;
   if (bodyKey) {
     const body = document.createElement('div');
     body.className = 'coachmark-intro';
@@ -18388,7 +18399,7 @@ function renderCoachmarkContent(hint) {
     textEl.appendChild(body);
   }
 
-  if (hint.keys && coachmarkKeysApply()) {
+  if (hint.keys && keysApply) {
     hint.keys.forEach(({ k, labelKey }) => {
       const row = document.createElement('div');
       row.className = 'help-row';
