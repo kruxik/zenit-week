@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-xgiwNCkmQRJu8niaqErhDllCG9tOmxHPzfzvo6UZ/0M='
+               'sha256-hbymezxurqE3R8eQY0J34oWW1fLN9N5jUPr3Z2XXqa8='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -11795,7 +11795,21 @@ function commitEdit(followUp = 'auto') {
 
   const node = findNode(nodeId);
   if (node) {
-    node.label = label;
+    // Added while the map shows one day: that day is the one the user meant, so
+    // the label carries it and the new task stays where it was created. Only a
+    // weekday filter stamps — "overdue" and "unscheduled" name no day — and only
+    // a task takes a day; a branch is a category, not something scheduled.
+    const stampDay = isNew
+      && node.type === 'activity'
+      && typeof activeDayFilter === 'number'
+      && !parseTodoDays(label).size
+      && !/\(([^)]*)\)/.test(label);
+    node.label = stampDay
+      ? `${label} (${(DAY_LABELS[currentLang] ?? DAY_LABELS.en)[activeDayFilter]})`
+      : label;
+    // Not every new node can carry the filtered day — a branch never does — so
+    // whatever the filter would now hide stays visible until the filter moves.
+    if (isNew && activeDayFilter !== null) _dayFilterFresh.add(nodeId);
     delete node._editing;
     touchNode(nodeId);
 
@@ -12116,6 +12130,20 @@ function _computeNodeDepth(nodeId) {
 // (meaning "everything visible"). A node is a member when it matches the filter
 // itself or any of its descendants does — that's what keeps an ancestor chain,
 // and the branch above it, alive while it still carries something for the day.
+// Nodes created while a filter is on. A brand-new branch has nothing scheduled
+// in it yet and a task may be named before it is dated, so the filter would
+// swallow them the moment they are committed. They ride along until the filter
+// changes — or until they say which day they belong to, which answers the
+// question the filter is asking and puts them back under its rules.
+let _dayFilterFresh = new Set();
+
+// Does this node name a day of its own — in its label, or through day leaves?
+function _hasOwnSchedule(node) {
+  if (!node) return false;
+  if (parseTodoDays(node.label || '').size > 0) return true;
+  return (node.children || []).some(id => findNode(id)?.dayChild);
+}
+
 function dayFilterMatchSet() {
   if (activeDayFilter === null) return null;
 
@@ -12141,6 +12169,12 @@ function dayFilterMatchSet() {
     memo.set(id, false); // guard against a malformed parent/child cycle
     const n = findNode(id);
     if (!n) return false;
+
+    // A node still being typed has no label to read a day out of yet, so the
+    // filter would hide it the instant it is created; one just committed may
+    // still carry no day at all.
+    if (n._editing) { memo.set(id, true); return true; }
+    if (_dayFilterFresh.has(id) && !_hasOwnSchedule(n)) { memo.set(id, true); return true; }
 
     // 1. Direct match?
     let hit = false;
@@ -13347,9 +13381,15 @@ function render() {
   weekData.nodes.forEach(node => {
     if (node._editing) return;
     const pos = placed(node.id);
+    // Parking a pruned node on a placed ancestor borrows that ancestor's side,
+    // which for a left branch parked on the centre points everything the wrong
+    // way — the "+" included, until the next full render. Its own branch knows
+    // better.
+    const branchNode = node.type === 'branch' ? node : findNode(node.branch);
+    const side = positions[node.id] ? pos.side : (branchNode?.side || pos.side);
     const g = makeNodeGroup(
       node.id, pos.x, pos.y, node.label,
-      node.type, node.branch || node.id, node, pos.side
+      node.type, node.branch || node.id, node, side
     );
     if (node.inbox || (node.dayChild && findNode(node.parent)?.inbox)) g.setAttribute('opacity', '0.55');
     if (!positions[node.id]) g.classList.add('view-hidden');
@@ -13357,6 +13397,7 @@ function render() {
   });
 
   attachNodeListeners();
+  dropHoverIfPruned(positions);
   applyFilters();
   updateSummary();
 
@@ -13426,6 +13467,15 @@ function isTypingTarget(el) {
 function paintKbFocus() {
   document.querySelectorAll('.node-group').forEach(g =>
     g.classList.toggle('kb-focus', kbFocusId !== null && g.getAttribute('data-id') === kbFocusId));
+}
+
+// A pruned node keeps no position, and the pointer that was over it gets no
+// mouseleave — the element is hidden underneath it, not moved away. Left alone,
+// hoveredNodeId still names it, and the next hovered-node hotkey edits something
+// nobody can see instead of doing what the empty canvas would do.
+function dropHoverIfPruned(positions) {
+  if (hoveredNodeId && !positions[hoveredNodeId]) hoveredNodeId = null;
+  if (kbFocusId && !positions[kbFocusId]) clearKbFocus();
 }
 
 function clearKbFocus() {
@@ -16980,6 +17030,7 @@ function repackLayout() {
     }
   });
 
+  dropHoverIfPruned(positions);
   applyFilters();
   updateSummary();
   return positions;
@@ -17026,6 +17077,7 @@ function switchViewLevel(level) {
 // never be on without the UI naming the day it is showing. Pass null to clear.
 function setDayFilter(day) {
   if (activeDayFilter === day) return;
+  _dayFilterFresh = new Set(); // a new day, a fresh answer to what belongs here
   repackWithSlide(() => { activeDayFilter = day; });
 }
 
