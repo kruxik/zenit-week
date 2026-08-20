@@ -16,6 +16,9 @@ const REPO = resolve(__dirname, '..');
 const APP_URL = pathToFileURL(resolve(REPO, 'zenit-week.html')).href;
 const ASSETS = resolve(REPO, 'assets');
 const SOURCE_JSON = resolve(REPO, 'assets', 'zenit-week-2026-05-12.json');
+// Branch palette source of truth — the onboarding playground. The export
+// predates the Growth branch and carries no colour for it, which left it grey.
+const PALETTE_JSON = resolve(REPO, 'assets', 'playground-seed.json');
 
 // The canonical seed week — must match what `todayWeekKey()` resolves to so
 // the app loads it on boot. Week 20 of 2026.
@@ -42,7 +45,23 @@ function loadSeed() {
   }
 
   const colorsRaw = raw.data?.['zenit-week-colors'];
-  const colors = colorsRaw ? JSON.parse(colorsRaw) : null;
+  const colors = colorsRaw ? JSON.parse(colorsRaw) : {};
+
+  // Every branch renders in its playground colour, so the shots, the OG images
+  // and a freshly seeded app all show the same palette. The export keys colours
+  // by branch id, and a branch added by hand carries a generated id (Growth is
+  // nc6405d8db686 here, not `growth`) — so fall back to matching on the label.
+  const seed = JSON.parse(readFileSync(PALETTE_JSON, 'utf8'));
+  const palette = seed.colors || {};
+  const mainByLabel = {};
+  for (const n of seed.week.nodes) {
+    if (n.type === 'branch' && palette[n.branch]) mainByLabel[n.label] = palette[n.branch].main;
+  }
+  for (const n of week.nodes) {
+    if (n.type !== 'branch') continue;
+    const main = palette[n.branch]?.main ?? mainByLabel[n.label];
+    if (main) colors[n.branch] = { main };
+  }
 
   return { week, colors };
 }
@@ -86,7 +105,7 @@ async function seedPage(page, { theme, view, week, colors }) {
       tx.onerror = (e) => rej(e.target.error);
     });
 
-    // Seed branch colors so the custom Growth branch keeps its green.
+    // Seed branch colors so every branch keeps its playground colour.
     if (colors) {
       await new Promise((res, rej) => {
         const tx = db.transaction('misc', 'readwrite');
@@ -129,6 +148,19 @@ async function capture() {
         await page.goto(APP_URL, { waitUntil: 'load' });
         await seedPage(page, { theme, view, week: seed.week, colors: seed.colors });
         await page.reload({ waitUntil: 'load' });
+
+        // Seeding the view through localStorage alone has come back on the
+        // wrong view (a dark mobile run captured the mindmap), so state the
+        // intent again once the app is live and wait for it to land.
+        await page.waitForFunction(() => typeof window.switchView === 'function', { timeout: 10_000 });
+        await page.evaluate((v) => {
+          if (document.documentElement.dataset.view !== v) window.switchView(v);
+        }, view);
+        await page.waitForFunction(
+          (v) => document.documentElement.dataset.view === v,
+          view,
+          { timeout: 10_000 },
+        );
 
         if (view === 'mindmap') {
           await page.waitForFunction(

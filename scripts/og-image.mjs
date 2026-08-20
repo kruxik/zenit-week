@@ -24,8 +24,8 @@ const APP_URL = pathToFileURL(resolve(REPO, 'zenit-week.html')).href;
 const VARIANTS = [
   {
     lang: 'en',
-    centerLabel: 'My week',
-    labels:   { work: 'Work',  family: 'Family', me: 'Me', growth: 'Growth' },
+    centerLabel: 'Me',
+    labels:   { work: 'Work',  family: 'Family', me: 'Personal', growth: 'Growth' },
     headline: { thin: 'Plan what',         bold: 'matters.', letterSpacing: -2,  fontSize: 80 },
     subtitle: ['A visual mind-map week planner.', 'No signup. No servers. Free.'],
     outSvg:   resolve(REPO, 'og-image.svg'),
@@ -33,8 +33,8 @@ const VARIANTS = [
   },
   {
     lang: 'cs',
-    centerLabel: 'Můj týden',
-    labels:   { work: 'Práce', family: 'Rodina', me: 'Já', growth: 'Růst' },
+    centerLabel: 'Já',
+    labels:   { work: 'Práce', family: 'Rodina', me: 'Osobní', growth: 'Rozvoj' },
     headline: { thin: 'Plánujte to,',      bold: 'na čem záleží.', letterSpacing: -1.5, fontSize: 64 },
     subtitle: ['Vizuální plánovač týdne.', 'Bez registrace. Bez serverů. Zdarma.'],
     outSvg:   resolve(REPO, 'og-image-cs.svg'),
@@ -66,9 +66,9 @@ function buildSeedWeek(labels) {
   return {
     nodes: [
       { id: 'work',   type: 'branch', branch: 'work',   label: labels.work,   children: [], side: 'left',  offY: -SPREAD, _ts: 0 },
-      { id: 'family', type: 'branch', branch: 'family', label: labels.family, children: [], side: 'left',  offY:  SPREAD, _ts: 0 },
-      { id: 'me',     type: 'branch', branch: 'me',     label: labels.me,     children: [], side: 'right', offY: -SPREAD, _ts: 0 },
-      { id: 'growth', type: 'branch', branch: 'growth', label: labels.growth, children: [], side: 'right', offY:  SPREAD, _ts: 0 },
+      { id: 'growth', type: 'branch', branch: 'growth', label: labels.growth, children: [], side: 'left',  offY:  SPREAD, _ts: 0 },
+      { id: 'family', type: 'branch', branch: 'family', label: labels.family, children: [], side: 'right', offY: -SPREAD, _ts: 0 },
+      { id: 'me',     type: 'branch', branch: 'me',     label: labels.me,     children: [], side: 'right', offY:  SPREAD, _ts: 0 },
     ],
     tombstones: [],
     crdtVersion: 0,
