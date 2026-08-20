@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-DzwhyteZ3Lkt+w5xoo9AAmXrqCAvZTWS+YUVuBtiJNQ='
+               'sha256-8gVuVnzRaRHmVIQPMHMOjXK8cYEdpIulSAbQEy8jGUw='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -18850,6 +18850,12 @@ let _coachmarkVisible = false;  // single coachmark on screen at a time
 let _coachmarkAnchorEl = null;  // element the bubble points at
 let _coachmarkAnchorId = null;  // its node-group data-id (re-queried after re-render)
 let _coachmarkRaf = null;       // rAF handle for live repositioning
+let _coachmarkSeenTimer = null; // marks the visible hint seen once it's been read
+
+// A hint counts as seen once it has been on screen this long. "Got it" and Esc
+// still mark it immediately; without this a user who reads a tip and moves the
+// mouse on would be shown it again on every hover, forever.
+const COACHMARK_SEEN_MS = 1500;
 
 // Hint registry. Each entry is either { textKey } for a plain-text hint, or
 // { introKey, keys: [{ k, labelKey }] } to render kbd rows like the Help panel.
@@ -19187,6 +19193,11 @@ function showCoachmark(id, anchorEl, pulseTarget) {
   // has a start value to animate away from.
   pulseCoachmarkAnchor(pulseTarget || anchorEl);
   requestAnimationFrame(() => { if (cm._hintId === id) cm.classList.add('visible'); });
+  if (_coachmarkSeenTimer) clearTimeout(_coachmarkSeenTimer);
+  _coachmarkSeenTimer = setTimeout(() => {
+    _coachmarkSeenTimer = null;
+    if (cm._hintId === id) markHintSeen(id);
+  }, COACHMARK_SEEN_MS);
   startCoachmarkTracking();
 }
 
@@ -19223,6 +19234,7 @@ function pulseCoachmarkAnchor(target) {
 
 function hideCoachmark() {
   cancelCoachmarkTracking();
+  if (_coachmarkSeenTimer) { clearTimeout(_coachmarkSeenTimer); _coachmarkSeenTimer = null; }
   const cm = document.getElementById('coachmark');
   if (cm) {
     // Leaving needs no attention, so it just fades — the element stays in the
