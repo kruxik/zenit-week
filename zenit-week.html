@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-6xpUbJCWgGa2G6gVKPilXk8MiZcaf/Gd293rzh+Gb9s='
+               'sha256-ZGnZSKk3qPxcJSkToYQ68OSIuaht2wsi7oe2j685K8E='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8093,7 +8093,7 @@ const TRANSLATIONS = {
     'tips.undoIntro':             'Every change can be taken back. Experiment freely — nothing gets lost.',
     'tips.dayFilter':             'Narrows the map to one day. Pick a day here, or press 1–7 on the canvas — 0 for what is overdue, 8 to clear.',
     'tips.levels':                'How deep the map draws. Rocks keeps branches and their tasks, Pebbles adds one level of sub-tasks, Sand shows everything. Hidden work is still there — it just steps out of the picture.',
-    'tips.views':                 'Three views of your week: Mindmap to plan, Agenda for the day by day, Stats for how it went.',
+    'tips.views':                 'Three views of your week: Mindmap to plan, Agenda day by day, Stats for how it went.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
@@ -8570,9 +8570,9 @@ const TRANSLATIONS = {
     'help.scheduleDay':           'Naplánovat den',
     'help.clearDays':             'Zrušit dny',
     'help.viewsTitle':            'Pohledy a obecné',
-    'help.mindmapView':           'Pohled Myšlenková mapa',
-    'help.agendaView':            'Pohled Agenda',
-    'help.statsView':             'Pohled Statistika',
+    'help.mindmapView':           'Myšlenková mapa',
+    'help.agendaView':            'Agenda',
+    'help.statsView':             'Statistika',
     'help.escClose':              'Zavřít panel / menu',
     'help.filterDay':             'Filtr dne',
     'help.undo':                  'Zpět',
@@ -18252,7 +18252,12 @@ const HINTS = {
   'views': {
     captionKey: 'tips.viewsCaption',
     priority: 9,
-    textKey: 'tips.views',
+    introKey: 'tips.views',
+    keys: [
+      { k: 'M', labelKey: 'help.mindmapView' },
+      { k: 'A', labelKey: 'help.agendaView' },
+      { k: 'S', labelKey: 'help.statsView' },
+    ],
   },
   'levels': {
     captionKey: 'tips.levelsCaption',
