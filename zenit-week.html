@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-8gVuVnzRaRHmVIQPMHMOjXK8cYEdpIulSAbQEy8jGUw='
+               'sha256-IKrIlzSQC/aGHqj6tqt0oqgYIan8ylqty0WBG/2ij1A='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4289,12 +4289,22 @@ function isDefinitelyOffline() {
 
 function netFetch(input, options = {}) {
   const { timeoutMs = NET_TIMEOUT_MS, ...init } = options;
+  // Single choke point for every request the app makes, so the flow trace gets
+  // its round-trip census here rather than at each call site.
+  const label = _netLabel(typeof input === 'string' ? input : (input && input.url) || '', init.method);
+  const t0 = performance.now();
   // AbortSignal.timeout is Baseline-wide; guard anyway so a stripped-down
   // runtime (or the test VM) degrades to an untimed fetch instead of throwing.
-  if (typeof AbortSignal === 'undefined' || !AbortSignal.timeout) {
-    return fetch(input, init);
-  }
-  return fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  const p = (typeof AbortSignal === 'undefined' || !AbortSignal.timeout)
+    ? fetch(input, init)
+    : fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  return p.then(
+    resp => {
+      _traceNet(label, t0, resp.status, resp.headers && resp.headers.get('content-length'));
+      return resp;
+    },
+    err => { _traceNet(label, t0, 'ERR ' + (err && err.name)); throw err; }
+  );
 }
 
 // ─── Quiet refresh: asset version probe (Slice 2 — observability only) ───────
@@ -5134,6 +5144,163 @@ function showProbeReport(text) {
   pre.textContent = text;   // never innerHTML — the report quotes live app state
   panel.hidden = false;
   console.log(text);
+}
+
+// ─── Flow trace: where the seconds go between an action and the pixels ───────
+// The perf probe above answers "which frame was late". This answers a different
+// question: a whole flow — sign in, or import a file — takes seconds, and the
+// only way to compare the two is a timeline of the phases each one runs plus
+// every network round trip inside it. Recording is a push onto a capped array,
+// so it stays armed all the time; only the *report* is gated, on a flag that
+// survives the OAuth redirect (a URL opt-in would not — the redirect_uri drops
+// both hash and query).
+const FLOW_TRACE_KEY   = 'zenit-week-flow-trace';
+const FLOW_ENABLED_KEY = 'zenit-week-perf-flow';
+const FLOW_MAX_MARKS   = 800;
+
+let _flowName  = 'boot';
+let _flowT0    = 0;              // nav start for boot/login, mark time for import
+let _flowMarks = [];
+let _flowNet   = [];
+
+function flowTraceOn() {
+  try { return localStorage.getItem(FLOW_ENABLED_KEY) === '1'; } catch { return false; }
+}
+
+function traceMark(name, detail) {
+  if (_flowMarks.length >= FLOW_MAX_MARKS) return;
+  _flowMarks.push({ t: performance.now(), name, detail: detail == null ? '' : String(detail) });
+}
+
+// A milestone is what the user actually perceives (avatar on screen, week
+// painted); the report lists them on their own so the headline numbers do not
+// have to be dug out of the timeline.
+function traceMilestone(name) { traceMark('★ ' + name); }
+
+// Returns the closer, so a phase is `const end = traceSpan('x'); … end()`.
+function traceSpan(name, detail) {
+  const t0 = performance.now();
+  traceMark(name + ':start', detail);
+  return (endDetail) => traceMark(name + ':end',
+    (endDetail == null ? '' : endDetail + ' ') + '[' + (performance.now() - t0).toFixed(0) + 'ms]');
+}
+
+// Renames the flow and rebases the clock. Boot and login share the page load,
+// so login keeps t0 = navigation start; import starts its own clock.
+function flowBegin(name, { rebase = false } = {}) {
+  _flowName = name;
+  if (rebase) { _flowT0 = performance.now(); _flowMarks = []; _flowNet = []; }
+  traceMark('flow:' + name);
+}
+
+function flowFinish(reason) {
+  traceMark('flow:finished', reason);
+  const report = buildFlowReport();
+  try { localStorage.setItem(FLOW_TRACE_KEY, report); } catch { /* quota — console still has it */ }
+  if (flowTraceOn()) showProbeReport(report);
+  else console.debug('[flow] ' + _flowName + ' trace recorded — window.__perfFlow.report()');
+}
+
+// One label per kind of request, so the network summary groups round trips that
+// are the same call for a different week.
+function _netLabel(url, method) {
+  const m = (method || 'GET').toUpperCase();
+  try {
+    const u = new URL(url, location.href);
+    const p = u.pathname;
+    if (p.endsWith('/api/token'))                 return 'api/token';
+    if (p.includes('/upload/drive/v3/files'))     return 'drive/upload';
+    if (p.endsWith('/drive/v3/about'))            return 'drive/about';
+    if (p.endsWith('/drive/v3/changes'))          return 'drive/changes';
+    if (p.endsWith('/drive/v3/changes/startPageToken')) return 'drive/startPageToken';
+    if (/\/drive\/v3\/files\/[^/]+$/.test(p)) {
+      return u.searchParams.get('alt') === 'media' ? 'drive/download' : 'drive/meta';
+    }
+    if (p.endsWith('/drive/v3/files')) {
+      if (m !== 'GET') return 'drive/create';
+      const q = u.searchParams.get('q') || '';
+      return /name = /.test(q) ? 'drive/find' : 'drive/list';
+    }
+    return m + ' ' + p;
+  } catch { return m + ' ?'; }
+}
+
+function _traceNet(label, t0, status, bytes) {
+  const dur = performance.now() - t0;
+  if (_flowNet.length < FLOW_MAX_MARKS) _flowNet.push({ label, start: t0, dur, status });
+  traceMark('net ' + label, status + ' ' + dur.toFixed(0) + 'ms' + (bytes ? ' ' + bytes + 'B' : ''));
+}
+
+function _flowNavSummary() {
+  const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+  if (!nav) return '(no navigation timing)';
+  const n = v => Math.round(v);
+  return 'type=' + nav.type +
+    '  request ' + n(nav.responseStart - nav.requestStart) + 'ms' +
+    '  response ' + n(nav.responseEnd - nav.responseStart) + 'ms' +
+    '  domInteractive ' + n(nav.domInteractive) + 'ms' +
+    '  domContentLoaded ' + n(nav.domContentLoadedEventEnd) + 'ms' +
+    '  load ' + n(nav.loadEventEnd || performance.now()) + 'ms' +
+    '  transferred ' + n((nav.transferSize || 0) / 1024) + 'kB';
+}
+
+function buildFlowReport() {
+  const L = [];
+  const rel = t => (t - _flowT0);
+  L.push('== zenit flow trace: ' + _flowName + ' ==');
+  L.push('ua: ' + navigator.userAgent);
+  L.push('week: ' + (typeof currentWeekKey !== 'undefined' ? currentWeekKey : '?') +
+         '  nodes: ' + ((typeof weekData !== 'undefined' && weekData && weekData.nodes) ? weekData.nodes.length : '?') +
+         '  online: ' + navigator.onLine);
+  L.push('page load: ' + _flowNavSummary());
+
+  L.push('');
+  L.push('-- milestones (ms from flow start) --');
+  const miles = _flowMarks.filter(m => m.name.startsWith('★ '));
+  if (!miles.length) L.push('(none)');
+  for (const m of miles) L.push(rel(m.t).toFixed(0).padStart(8) + '  ' + m.name.slice(2));
+
+  L.push('');
+  L.push('-- network (' + _flowNet.length + ' requests) --');
+  const byLabel = new Map();
+  for (const r of _flowNet) {
+    const e = byLabel.get(r.label) || { n: 0, total: 0, max: 0 };
+    e.n++; e.total += r.dur; e.max = Math.max(e.max, r.dur);
+    byLabel.set(r.label, e);
+  }
+  let netTotal = 0;
+  for (const r of _flowNet) netTotal += r.dur;
+  L.push('total request time (serial + parallel): ' + Math.round(netTotal) + 'ms');
+  for (const [label, e] of [...byLabel.entries()].sort((a, b) => b[1].total - a[1].total)) {
+    L.push('  ' + label.padEnd(22) + e.n + 'x  total ' + Math.round(e.total) +
+           'ms  worst ' + Math.round(e.max) + 'ms');
+  }
+
+  L.push('');
+  L.push('-- timeline (ms from flow start, +delta) --');
+  let prev = _flowT0;
+  for (const m of _flowMarks) {
+    L.push(rel(m.t).toFixed(0).padStart(8) + '  +' + (m.t - prev).toFixed(0).padStart(6) +
+           '  ' + m.name + (m.detail ? '  ' + m.detail : ''));
+    prev = m.t;
+  }
+  return L.join('\n');
+}
+
+// Opt-in lives in localStorage because the OAuth round trip returns to a bare
+// redirect_uri: a URL flag would be gone exactly when the login trace matters.
+function initFlowTrace() {
+  const url = (location.hash + location.search).toLowerCase();
+  try {
+    if (url.includes('perftrace')) localStorage.setItem(FLOW_ENABLED_KEY, '1');
+  } catch { /* private mode — console API still works */ }
+  window.__perfFlow = {
+    on:     () => { localStorage.setItem(FLOW_ENABLED_KEY, '1'); return 'flow trace reports ON'; },
+    off:    () => { localStorage.removeItem(FLOW_ENABLED_KEY); return 'flow trace reports OFF'; },
+    report: () => { const r = buildFlowReport(); showProbeReport(r); return r; },
+    last:   () => { const r = localStorage.getItem(FLOW_TRACE_KEY); if (r) showProbeReport(r); return r; },
+  };
+  traceMark('boot:script-ready');
 }
 
 // Deletes the IndexedDB database outright. A still-open connection would block
@@ -6670,6 +6837,7 @@ function initGoogleAuth() {
   localStorage.removeItem('zenit-week-had-google-session');
   purgeLegacyRefreshToken();
   if (_PENDING_OAUTH_CALLBACK) {
+    flowBegin('login');   // same page life as the boot the redirect started
     setSyncStatus('syncing', 'sync.msg.completingSignin');
     handleAuthCode(_PENDING_OAUTH_CALLBACK);
   } else {
@@ -6846,6 +7014,7 @@ async function authFetch(url, options = {}) {
 
 // ─── Called after every successful token acquisition (code exchange or refresh) ─
 async function onTokensReceived(accessToken) {
+  traceMilestone('access token in hand');
   googleAccessToken = accessToken;
   _tokenReceivedAt  = Date.now();
   _cancelRefreshRetry();   // a token is in hand — nothing left to retry
@@ -6921,6 +7090,7 @@ async function handleAuthCode(callback) {
     return;
   }
 
+  const endExchange = traceSpan('auth:code-exchange');
   try {
     const tokens = await exchangeToken({
       code:          callback.code,
@@ -6929,6 +7099,7 @@ async function handleAuthCode(callback) {
       grant_type:    'authorization_code',
       redirect_uri:  pending.redirectUri,
     });
+    endExchange();
     if (tokens.error) {
       console.warn('[Drive] Token exchange error:', tokens.error);
       setSyncStatus('error', 'sync.msg.signinFailedNetwork');
@@ -7057,12 +7228,15 @@ function setSyncStatus(status, messageKey) {
 async function startDriveSession() {
   try {
     // Fetch user info via Drive about (works with drive.appdata scope)
+    const endAbout = traceSpan('drive:about');
     const aboutResp = await driveApiRequest({
       path: 'https://www.googleapis.com/drive/v3/about',
       params: { fields: 'user(displayName,emailAddress,photoLink)' },
     });
+    endAbout();
     const user = aboutResp.result?.user;
     showSignedInState(user);
+    traceMilestone('avatar painted');
     // Cache user info so avatar renders instantly on next page load
     const storedAuth = getStoredAuth();
     if (storedAuth) {
@@ -7076,7 +7250,11 @@ async function startDriveSession() {
     setSyncStatus('connected', 'sync.msg.synced');
     await initDriveSync(); // TASK-09 — list all files + 3-phase seed
     startDrivePoll(currentWeekKey);
+    traceMilestone('sign-in sync settled');
+    flowFinish('drive session ready');
   } catch (err) {
+    traceMark('drive:session-error', err && err.message);
+    flowFinish('drive session failed');
     console.error('[Drive] First sync init error:', err);
     setSyncStatus('error', 'sync.msg.initFailedRetry');
   }
@@ -7281,6 +7459,7 @@ async function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, schedu
 }
 
 async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload) {
+  const endCommit = traceSpan('week:commit ' + wKey);
   try {
     await saveWeekIDB(wKey, mergedData);
   } catch (e) {
@@ -7317,8 +7496,12 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
     if (changed) {
       renderIfVisible();
       if (currentView === 'agenda') renderAgenda();
+      traceMilestone('current week repainted from Drive');
+    } else {
+      traceMark('week:commit-no-visual-change ' + wKey);
     }
   }
+  endCommit();
   // Only mark as synced when merged == remote (nothing to push).
   // When scheduleUpload is true, keep lastSyncedHash at its pre-merge value so
   // syncWeekToDrive sees hash(localStorage) != lastSyncedHash and uploads.
@@ -7423,7 +7606,9 @@ async function syncWeekFromDrive(wKey, { force = false } = {}) {
 
       const remoteJson = (await resp.text()).trim();
       if (!remoteJson) return; // empty file — nothing to merge
+      traceMark('week:downloaded ' + wKey, remoteJson.length + ' chars');
 
+      const endMerge = traceSpan('week:merge ' + wKey);
       const parsedRemote = migrateCrdt(JSON.parse(remoteJson));
       // Skip merge on a malformed remote rather than letting validateAndRepair
       // substitute defaultWeekData() (which would inject fresh default branches).
@@ -7442,6 +7627,7 @@ async function syncWeekFromDrive(wKey, { force = false } = {}) {
         const scheduleUpload = mergedHash !== weekContentHash(remoteData);
         await applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
       });
+      endMerge();
       return;
 
     } catch (err) {
@@ -7616,11 +7802,15 @@ async function initDriveSync() {
   }
   try {
     // Sync global colors (not week-specific)
+    const endColors = traceSpan('drive:colors');
     await syncColorsFromDrive();
     await syncColorsToDrive();
+    endColors();
 
     // Step 1 — Drive metadata only (no content downloads)
+    const endList = traceSpan('drive:list-weeks');
     const driveWeeks = await listAllDriveWeekFiles();
+    endList(driveWeeks.length + ' files');
     const driveMap = new Map(driveWeeks.map(({ wKey, savedAt, contentHash }) => [wKey, { savedAt, contentHash }]));
 
     // Step 2 — local content hashes (zero API calls). Week records live in
@@ -7629,11 +7819,13 @@ async function initDriveSync() {
     // the local-only → upload branch below and stranded whole weeks (typically a
     // future week populated by a transfer) on one device forever.
     const localMap = new Map();
+    const endHashes = traceSpan('local:hash-scan');
     for (const wKey of await listWeekKeysIDB()) {
       if (!/^\d{4}-\d{2}$/.test(wKey)) continue;
       const data = await loadWeekIDB(wKey);
       localMap.set(wKey, data ? weekContentHash(data) : null);
     }
+    endHashes(localMap.size + ' local weeks');
 
     // Step 3 — classify every week
     // CRDT merge handles all conflicts — no special first-connection behaviour needed.
@@ -7665,9 +7857,14 @@ async function initDriveSync() {
     const todayKey = todayWeekKey();
     const prioritySet = new Set([todayKey, offsetWeek(todayKey, -1), offsetWeek(todayKey, +1)]);
     const hadConflict = _isFirstConnection && [...toMerge, ...toUpload].some(k => prioritySet.has(k));
+    traceMark('drive:classified', toMerge.length + ' to merge, ' + toUpload.length + ' to upload');
     for (const k of prioritySet) {
+      const endWeek = traceSpan('drive:priority-week ' + k,
+        toMerge.includes(k) ? 'merge' : toUpload.includes(k) ? 'upload' : 'skip');
       if (toMerge.includes(k))  await syncWeekFromDrive(k);
       else if (toUpload.includes(k)) await syncWeekToDrive(k);
+      endWeek();
+      if (k === currentWeekKey) traceMilestone('current week reconciled');
     }
 
     if (hadConflict) {
@@ -7687,6 +7884,7 @@ async function initDriveSync() {
       ...byProximity(toUpload).map(k => ({ k, isDownload: false })),
     ];
     const CONCURRENCY = 5;
+    const endRest = traceSpan('drive:remaining-weeks', restAll.length + ' weeks');
     for (let i = 0; i < restAll.length; i += CONCURRENCY) {
       await Promise.all(
         restAll.slice(i, i + CONCURRENCY).map(({ k, isDownload }) =>
@@ -7694,6 +7892,7 @@ async function initDriveSync() {
         )
       );
     }
+    endRest();
     if (restAll.length > 0) setSyncStatus('connected', 'sync.msg.synced');
 
   } catch (err) {
@@ -9653,7 +9852,12 @@ async function importWeekOnDemand(weekKey) {
 async function importAllData(file) {
   const reader = new FileReader();
   reader.onload = async (e) => {
+    // Same trace as sign-in, on its own clock: this is the comparison case —
+    // the identical payload arriving over IndexedDB instead of over Drive.
+    flowBegin('import', { rebase: true });
+    traceMark('import:file-read', (e.target.result || '').length + ' chars');
     let parsed;
+    const endParse = traceSpan('import:parse');
     try {
       parsed = JSON.parse(e.target.result);
       if (!parsed.version || !parsed.data || typeof parsed.data !== 'object') throw new Error('Invalid format');
@@ -9664,10 +9868,14 @@ async function importAllData(file) {
       return;
     }
 
+    endParse(Object.keys(parsed.data).length + ' keys');
+
     // Wipe existing IDB data
+    const endWipe = traceSpan('import:wipe');
     const weekKeys = await listWeekKeysIDB();
     for (const wk of weekKeys) await deleteWeekIDB(wk);
     await deleteValueIDB(COLORS_STORAGE_KEY);
+    endWipe(weekKeys.length + ' weeks');
 
     // Partition weeks: current week vs rest
     const currentWk = todayWeekKey();
@@ -9695,6 +9903,7 @@ async function importAllData(file) {
     }
 
     // Write current week first
+    const endWrite = traceSpan('import:write-current');
     if (allWeeks.has(currentWk)) {
       const parsedWk = safeParse(allWeeks.get(currentWk));
       if (parsedWk) await saveWeekIDB(currentWk, parsedWk);
@@ -9716,12 +9925,16 @@ async function importAllData(file) {
       }
     }
 
+    endWrite();
+    traceMilestone('current week written to IndexedDB');
+
     // Reset token + import-pending flag
     localStorage.setItem('zenit-week-reset-token', genId());
     await saveValueIDB('zenit-week-import-pending', '1');
     stopDrivePoll();
 
     // Re-initialize and render current week immediately
+    const endReinit = traceSpan('import:reinit');
     try {
       undoStack = [];
       redoStack = [];
@@ -9736,9 +9949,17 @@ async function importAllData(file) {
       applyTranslations();
       saveBranchColors();
       agendaActiveTab = null;
+      traceMark('import:settings-applied');
+      const endPaint = traceSpan('import:load-and-render');
       await loadAndRender(todayWeekKey());
+      endPaint();
       fitMindmapView();
+      endReinit();
+      traceMilestone('imported week painted');
+      flowFinish('import foreground done');
     } catch (reinitErr) {
+      traceMark('import:reinit-error', reinitErr && reinitErr.message);
+      flowFinish('import failed');
       console.error('[zenit-week] Import re-init failed:', reinitErr);
       const errEl = document.getElementById('import-error');
       if (errEl) { errEl.style.display = ''; errEl.textContent = t('settings.importReloadHint'); }
@@ -13969,6 +14190,7 @@ function setCenterRingArcs(arcs, stats, perimeter) {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
+  const endRender = traceSpan('render');
   probeMark('render:start');
   // A full rebuild supersedes anything scheduleRender() has queued.
   if (_pendingRenderFrame !== null) {
@@ -14091,6 +14313,7 @@ function render() {
 
   document.body.classList.remove('app-loading');
   probeMark('render:end', document.querySelectorAll('.node-group').length + ' groups');
+  endRender(document.querySelectorAll('.node-group').length + ' groups');
   return positions;
 }
 
@@ -19340,7 +19563,11 @@ function maybeShowHint(id, anchorEl, pulseTarget) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', async () => {
+  initFlowTrace();
+  traceMark('boot:load-event');
+  const endBoot = traceSpan('boot:init');
   await openDB();
+  traceMark('boot:db-open');
   await runMigrationIfNeeded();
   await adoptOnboardingStateFromIDB();
   // Resolved before seeding: the playground picks its labels by language.
@@ -19357,6 +19584,7 @@ window.addEventListener('load', async () => {
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   await bootstrapColorsSettings();
   updateSvgFilters();
+  traceMark('boot:settings-ready');
   initGoogleAuth(); // legacy-token purge, OAuth callback handling, silent session restore
   const isStandalone =
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
@@ -19392,7 +19620,11 @@ window.addEventListener('load', async () => {
     console.debug('[quiet-refresh] restore-applied', _quietRestore);
   }
 
+  const endFirstPaint = traceSpan('boot:load-and-render');
   await loadAndRender(initialWeek);
+  endFirstPaint();
+  traceMilestone('local week painted');
+  endBoot();
 
   if (_quietRestore && _quietRestore.hoveredNodeId && findNode(_quietRestore.hoveredNodeId)) {
     hoveredNodeId = _quietRestore.hoveredNodeId;
