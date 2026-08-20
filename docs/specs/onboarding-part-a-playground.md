@@ -90,7 +90,7 @@ Buttons reuse `.agenda-action-btn`; confirm uses the existing danger variant tok
 3. Existing user with data for the current week opens `#playground` → data is **not** clobbered; no seed applied.
 4. Editing a seed node (rename / move / done / unplanned / priority / counter tick / add child) removes its `_demo` flag (verify in persisted IDB record).
 5. "Clear example tasks" removes exactly the untouched demo nodes; all user-touched/created nodes and all branches remain; action is undoable (Ctrl/⌘+Z restores).
-6. Auto-nudge fires once after ≥3 real user nodes exist with ≥1 demo node remaining; never reappears after dismiss/action.
+6. Auto-nudge fires once after ≥7 real user nodes exist with ≥1 demo node remaining; never reappears after dismiss/action.
 7. Growth branch renders green (`#0ACF83`); work/family/me keep default colors.
 8. EN + CS strings present; `npm test` and `npm run validate` pass.
 
@@ -106,4 +106,4 @@ Add `tests/onboarding-seed.test.js` (uses existing `fake-indexeddb`):
 - onboarded flag prevents re-seed.
 - `clearDemo` drops flag per mutator (unit-level).
 - cleanup removes only `_demo` nodes, keeps branches + user nodes, is snapshot-undoable.
-- nudge threshold logic (≥3 user nodes + ≥1 demo remaining, once).
+- nudge threshold logic (≥7 user nodes + ≥1 demo remaining, once).

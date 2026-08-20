@@ -51,7 +51,7 @@ describe('Onboarding auto-nudge (S4)', () => {
   });
 
   it('counts an example task once the user ticks one of its day children', () => {
-    const w = week({ userCount: 4, demoCount: 5 });
+    const w = week({ userCount: 6, demoCount: 5 });
     // d0 keeps its _demo flag; its Monday child was ticked off, so touchNode
     // has already cleared _demo there.
     w.nodes.push(
@@ -59,43 +59,43 @@ describe('Onboarding auto-nudge (S4)', () => {
       { id: 'd1-tu', type: 'activity', dayChild: true, dayIndex: 2, branch: 'work', parent: 'd1', label: 'Tu', _demo: true, children: [] },
     );
     _state.set(w);
-    expect(playgroundUserNodeCount()).toBe(5);         // 4 own + d0, claimed by its tick
+    expect(playgroundUserNodeCount()).toBe(7);         // 6 own + d0, claimed by its tick
     expect(shouldShowPlaygroundNudge()).toBe(true);
   });
 
   it('does not count in-progress placeholder (_editing) nodes', () => {
-    const w = week({ userCount: 5, demoCount: 1 });
+    const w = week({ userCount: 7, demoCount: 1 });
     // Simulate the placeholder created on commit / before ESC.
     w.nodes[0].children.push('placeholder');
     w.nodes.push({ id: 'placeholder', type: 'activity', branch: 'work', parent: 'work', label: '', _editing: true, children: [] });
     _state.set(w);
-    expect(playgroundUserNodeCount()).toBe(5);          // placeholder excluded
-    expect(shouldShowPlaygroundNudge()).toBe(true);     // 5 real, not 6
+    expect(playgroundUserNodeCount()).toBe(7);          // placeholder excluded
+    expect(shouldShowPlaygroundNudge()).toBe(true);     // 7 real, not 8
   });
 
-  it('does not nudge below the 5-user-node threshold', () => {
-    _state.set(week({ userCount: 4, demoCount: 5 }));
+  it('does not nudge below the 7-user-node threshold', () => {
+    _state.set(week({ userCount: 6, demoCount: 5 }));
     expect(shouldShowPlaygroundNudge()).toBe(false);
   });
 
-  it('nudges at >=5 user nodes while demo tasks remain', () => {
-    _state.set(week({ userCount: 5, demoCount: 1 }));
+  it('nudges at >=7 user nodes while demo tasks remain', () => {
+    _state.set(week({ userCount: 7, demoCount: 1 }));
     expect(shouldShowPlaygroundNudge()).toBe(true);
   });
 
   it('does not nudge when no demo tasks remain', () => {
-    _state.set(week({ userCount: 6, demoCount: 0 }));
+    _state.set(week({ userCount: 8, demoCount: 0 }));
     expect(shouldShowPlaygroundNudge()).toBe(false);
   });
 
   it('does not nudge once the persisted flag is set', () => {
-    _state.set(week({ userCount: 5, demoCount: 2 }));
+    _state.set(week({ userCount: 7, demoCount: 2 }));
     _state.setPlaygroundNudgeDone(true);
     expect(shouldShowPlaygroundNudge()).toBe(false);
   });
 
   it('does not nudge again after dismissal (within the session)', () => {
-    _state.set(week({ userCount: 5, demoCount: 2 }));
+    _state.set(week({ userCount: 7, demoCount: 2 }));
     expect(shouldShowPlaygroundNudge()).toBe(true);
     dismissPlaygroundNudge(true);
     expect(shouldShowPlaygroundNudge()).toBe(false);
