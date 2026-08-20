@@ -69,6 +69,20 @@ describe('pointer handlers never start the view slide inline', () => {
     expect(SRC).toMatch(/deferFromInput\(\(\) => setDayFilter\(day\)\)/);
   });
 
+  test('the mobile reveal pan is deferred too', () => {
+    // _openInlineInput runs from the add-button tap; its optimistic pan is a rAF
+    // tween and would otherwise animate downstream of that discrete input event.
+    expect(SRC).toMatch(
+      /deferFromInput\(\(\) => _panEditNodeToVisibleArea\(\{ optimistic: true \}\)\)/
+    );
+  });
+
+  test('the pan tween never measures the inline input per frame', () => {
+    const body = /function animatePanTo\([\s\S]*?\n\}/.exec(SRC);
+    expect(body).not.toBeNull();
+    expect(body[0]).not.toMatch(/offsetWidth|offsetHeight/);
+  });
+
   test('deferFromInput yields a macrotask, not a frame', () => {
     const body = /function deferFromInput\(fn\) \{([\s\S]*?)\n\}/.exec(SRC);
     expect(body).not.toBeNull();

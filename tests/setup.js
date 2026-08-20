@@ -362,6 +362,12 @@ _state.getNetTimeouts = function() {
 _state.getLastProbeAt = function() { return _lastProbeAt; };
 _state.setLastProbeAt = function(v) { _lastProbeAt = v; };
 
+// Reveal-pan guard: the tween's target and in-flight flag are module-level.
+_state.getPanState = function() {
+  return { animating: _panAnimating, tx: _panTargetX, ty: _panTargetY };
+};
+_state.endPan = function() { _panAnimating = false; _panTargetX = _panTargetY = null; };
+
 _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
 _state.setWeekKey = function(k) { currentWeekKey = k; };
@@ -578,6 +584,7 @@ export const {
   genId,
   defaultWeekData,
   validateAndRepair,
+  animatePanTo,
   // Status-propagation functions
   startAddNode,
   cancelEdit,
@@ -737,6 +744,10 @@ export const {
   purgeLegacyRefreshToken,
   _state,
 } = sandbox;
+
+export const panState = () => sandbox._state.getPanState();
+export const endPan = () => sandbox._state.endPan();
+export const sandboxGlobal = sandbox;
 
 export const BRANCH_CONFIG = sandbox._state.getBranchConfig();
 export const BRANCH_COLORS = sandbox._state.getBranchColors();

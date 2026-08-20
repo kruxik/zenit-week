@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-6HRILw3GEoF0jRFNGhbYLzB2vXzr0MK6kFJgn9rcAQw='
+               'sha256-s1GlYq5PeSpBjNnH7hIw7kWKsS49sSIHdq+cxV5e8W4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -10932,7 +10932,11 @@ function _scheduleEditRender(immediate = false) {
   }, EDIT_RENDER_DEBOUNCE_MS);
 }
 
-function resizeInlineInput(immediate = false) {
+// Last size written by resizeInlineInput(); the input is border-box, so these
+// equal offsetWidth/offsetHeight without touching layout.
+let _inlineInputW = 0, _inlineInputH = 0;
+
+function resizeInlineInput(immediate = false, withRender = true) {
   const nodeId = editState.nodeId;
   const { w, h, fontSize, padX, lineH, totalTextH } = getNodeSize(nodeId);
   const { sw, visualRx } = getNodeVisuals(nodeId);
@@ -10964,6 +10968,10 @@ function resizeInlineInput(immediate = false) {
   inlineInput.style.fontSize = (fontSize * zoom) + 'px';
   inlineInput.style.width = totalW + 'px';
   inlineInput.style.height = totalH + 'px';
+  // Cached for animatePanTo: reading offsetWidth/offsetHeight inside the tween
+  // forces a synchronous layout every frame, right after the transform write.
+  _inlineInputW = totalW;
+  _inlineInputH = totalH;
   inlineInput.style.borderRadius = (visualRx * zoom) + 'px';
 
   // Vertical padding — content height excludes border under border-box
@@ -10985,10 +10993,14 @@ function resizeInlineInput(immediate = false) {
       inlineInput.style.top  = (sp.y - totalH / 2) + 'px';
     }
   }
-  _scheduleEditRender(immediate);
+  if (withRender) _scheduleEditRender(immediate);
 }
 
 let _panAnimToken = 0;
+// Where the in-flight pan is heading, so a repeat request for the same place
+// can be dropped instead of restarting the tween.
+let _panTargetX = null, _panTargetY = null;
+const PAN_RETARGET_EPS = 4;   // px — below this the two targets are the same place
 // A tip anchored to a node must wait for the canvas to stop moving: the bubble
 // tracks its anchor, but the pulse ring is painted once and would be left
 // behind. flushPendingHint() (coachmarks section) runs when this clears.
@@ -11007,6 +11019,27 @@ function revealNewlyEditedNode(nodeId) {
 // animation; restarts smoothly from current values so repeated calls (e.g.
 // debounced vv.resize during a keyboard opening) compose without snapping.
 function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
+  // Three independent triggers ask for this pan (optimistic, keyboard-settled,
+  // 500 ms fallback) and they usually agree. Restarting the tween for a target
+  // it is already flying to reads as a stutter: the running ease decelerates,
+  // the new one accelerates from zero again, mid-motion.
+  if (_panAnimating && _panTargetX !== null &&
+      Math.abs(targetPanX - _panTargetX) < PAN_RETARGET_EPS &&
+      Math.abs(targetPanY - _panTargetY) < PAN_RETARGET_EPS) {
+    return;
+  }
+  // Already parked where we were asked to go. The 500 ms fallback normally lands
+  // here once the earlier passes have done the work, and it used to spend a full
+  // 300 ms tween — twenty frames of transform writes — travelling a pixel.
+  if (Math.abs(targetPanX - panX) < PAN_RETARGET_EPS &&
+      Math.abs(targetPanY - panY) < PAN_RETARGET_EPS) {
+    return;
+  }
+  // A genuine retarget mid-flight continues out of the motion already on screen
+  // (ease-out only) rather than braking and re-accelerating.
+  const continuing = _panAnimating;
+  _panTargetX = targetPanX;
+  _panTargetY = targetPanY;
   const startX = panX, startY = panY;
   const startTime = performance.now();
   const myToken = ++_panAnimToken;     // claim this animation slot (cancels any in-flight)
@@ -11018,7 +11051,10 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
   const positions = computeLayout();
   const pos = nodeId ? positions[nodeId] : null;
 
-  function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+  function ease(t) {
+    if (continuing) return t * (2 - t);                  // ease-out, no second ramp
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;   // ease-in-out from rest
+  }
 
   function step(now) {
     if (myToken !== _panAnimToken) return;   // superseded by a newer call
@@ -11029,8 +11065,8 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
     applyTransform();
 
     if (pos && editState && editState.nodeId === nodeId) {
-      const iW = inlineInput.offsetWidth;
-      const iH = inlineInput.offsetHeight;
+      const iW = _inlineInputW;
+      const iH = _inlineInputH;
       inlineInput.style.left = (rect.left + panX + pos.x * zoom - iW / 2) + 'px';
       inlineInput.style.top  = (rect.top  + panY + pos.y * zoom - iH / 2) + 'px';
     }
@@ -11045,6 +11081,7 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
 function endPanAnimation() {
   if (!_panAnimating) return;
   _panAnimating = false;
+  _panTargetX = _panTargetY = null;
   if (typeof flushPendingHint === 'function') flushPendingHint();
 }
 
@@ -11781,7 +11818,10 @@ function _openInlineInput(nodeId, isNew) {
   // start animating to the centered position immediately so the motion runs
   // in parallel with the keyboard opening. The vv.resize listener will
   // refine if reality differs.
-  if (isMobile) _panEditNodeToVisibleArea({ optimistic: true });
+  // deferFromInput, not a direct call: this runs from the add-button tap, and a
+  // rAF tween started inside a discrete input handler is serialised input-to-paint
+  // (same pathology as the view slide — see deferFromInput).
+  if (isMobile) deferFromInput(() => _panEditNodeToVisibleArea({ optimistic: true }));
 
   // Fallback for devices where visualViewport.resize fires unreliably:
   // re-pan after the keyboard has had time to settle.
@@ -11947,6 +11987,9 @@ inlineInput.addEventListener('dblclick',  (e) => e.stopPropagation());
 // dimensions so we don't apply a portrait value in landscape (or vice versa).
 // Updated each time we observe the keyboard fully open via vv.resize.
 const KEYBOARD_INSET_KEY = 'zenit-week-keyboard-inset';
+// Share of the layout viewport a soft keyboard typically takes. Measured 45% on
+// a Galaxy S22 (310 of 692); only ever used until the real value is measured.
+const KEYBOARD_INSET_GUESS = 0.45;
 function getCachedKeyboardInset() {
   try {
     const raw = localStorage.getItem(KEYBOARD_INSET_KEY);
@@ -11994,9 +12037,13 @@ function _panEditNodeToVisibleArea(opts) {
   if (kbOpen) {
     effectiveInset = window.innerHeight - vv.height;
   } else if (optimistic) {
+    // No measurement yet (first edit on this device, or after a reset): assume a
+    // typical soft keyboard rather than sitting still. Whatever the real inset
+    // turns out to be, the settled pass retargets, and that retarget is now
+    // continuous — so a wrong guess costs a few px of course correction, while
+    // waiting costs the whole keyboard animation.
     const cached = getCachedKeyboardInset();
-    if (cached <= 0) return; // no cache yet — wait for real vv.resize to fire
-    effectiveInset = cached;
+    effectiveInset = cached > 0 ? cached : Math.round(window.innerHeight * KEYBOARD_INSET_GUESS);
   } else {
     effectiveInset = 0;
   }
@@ -12018,9 +12065,10 @@ if (window.visualViewport) {
   let _vpResizeTimer = null;
   window.visualViewport.addEventListener('resize', () => {
     if (!editState) return;
-    // Long debounce: fire only after the soft keyboard finishes animating
-    // open (typical animation is ~250-300ms). Panning while the viewport is
-    // still resizing produces jerky multi-step motion.
+    // Short debounce: Android reports the final inset in its first resize, and
+    // a multi-step open no longer costs anything — a second request for the same
+    // target is dropped, and a different one retargets without a restart. The
+    // old 250 ms wait was pure dead time between the tap and any motion.
     clearTimeout(_vpResizeTimer);
     _vpResizeTimer = setTimeout(() => {
       const inset = window.innerHeight - window.visualViewport.height;
@@ -12031,7 +12079,7 @@ if (window.visualViewport) {
         if (Math.abs(inset - cached) > 10) saveKeyboardInset(inset);
       }
       _panEditNodeToVisibleArea();
-    }, 250);
+    }, 90);
   });
 }
 
@@ -18867,7 +18915,10 @@ window.addEventListener('load', async () => {
 let _resizeRefitTimer = null;
 window.addEventListener('resize', () => {
   if (typeof editState !== 'undefined' && editState) {
-    resizeInlineInput();
+    // Reposition the input only. Node geometry lives in SVG coordinates, so a
+    // viewport resize (the soft keyboard opening) cannot change it, and the
+    // rebuild this used to queue landed mid-pan for nothing.
+    resizeInlineInput(false, false);
     return;
   }
   if (_editJustCommitted) return;
