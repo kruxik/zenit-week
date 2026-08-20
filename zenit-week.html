@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-csaofywImxjMOj4nlpzsEroG4q31o8nNpbTBLO9teHc='
+               'sha256-xgiwNCkmQRJu8niaqErhDllCG9tOmxHPzfzvo6UZ/0M='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3239,6 +3239,8 @@
   .dragging-active .node-group:hover .node-rect {
     filter: none;
   }
+
+  .node-group.no-add .add-btn { display: none; }
 
   .add-btn {
     opacity: 0;
@@ -10055,6 +10057,13 @@ function viewLevelHideDepth(level = currentViewLevel) {
   return Infinity;                   // 'full' (Sand) — show everything
 }
 
+// A child of this node would sit one level deeper, and the view level may
+// already be pruning that level away. Offering an add there would create a node
+// the user cannot see, so every entry point to adding one asks here first.
+function canAddChildAt(id) {
+  return getNodeDepth(id) + 1 < viewLevelHideDepth();
+}
+
 function computeLayout() {
   const hideDepth = viewLevelHideDepth();
   const dayMatch = dayFilterMatchSet(); // null when no day filter is active
@@ -10653,6 +10662,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   // "+" add-child button (hidden for counter nodes, day-child leaves, and inbox nodes)
   if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.tickChild && !node?.inbox) {
+    // Built whatever the view level, hidden by .no-add while a child would land
+    // in a pruned level — a repack toggles the class without rebuilding.
+    g.classList.toggle('no-add', !canAddChildAt(id));
     const bc = BRANCH_COLORS[branch] || { main: document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666' };
     const btnColor = node?.done ? getThemeColors().DONE_BORDER : bc.main;
     const depth = getNodeDepth(id);
@@ -11886,7 +11898,7 @@ inlineInput.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Tab') {
     e.preventDefault();
-    commitEdit('child');
+    commitEdit(canAddChildAt(editState.nodeId) ? 'child' : undefined);
   }
   if (e.key === 'Escape') {
     e.preventDefault();
@@ -13768,7 +13780,7 @@ function _windowKeydownHandler(e) {
     }
   } else if (e.key === 'Tab') {
     e.preventDefault();
-    startAddNode(id);
+    if (canAddChildAt(id)) startAddNode(id);
   } else if (e.key === 'Backspace' || e.key === 'Delete') {
     if (id === 'center') {
       e.preventDefault();
@@ -14109,7 +14121,7 @@ function showContextMenu(x, y, nodeId) {
 
   const canDeleteBranch = isBranch && weekData.nodes.filter(n => n.type === 'branch').length > 1;
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
-  document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda') ? 'none' : '';
+  document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda' || !canAddChildAt(contextTarget)) ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
   const isCommentable = isActivity && !isTick && !node.dayChild;
   document.getElementById('ctx-comment').style.display   = isCommentable ? '' : 'none';
@@ -16944,6 +16956,7 @@ function repackLayout() {
   nodesLayer.querySelectorAll('.node-group[data-id]').forEach(g => {
     const pos = positions[g.dataset.id];
     g.classList.toggle('view-hidden', !pos);
+    g.classList.toggle('no-add', !canAddChildAt(g.dataset.id));
     if (pos) g.setAttribute('transform', `translate(${pos.x},${pos.y})`);
   });
 
