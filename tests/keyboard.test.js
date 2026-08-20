@@ -210,6 +210,9 @@ describe('Mindmap keyboard focus', () => {
     _state.setCurrentView('mindmap');
     _state.setEditState(null);
     _state.setHoveredNode(null);
+    // A level change opens the view-level row, and Esc closes that row before
+    // it touches the focus ring.
+    _state.closeViewLevels();
     _state.set({
       nodes: [
         { id: 'work', type: 'branch', branch: 'work', label: 'work', children: [], side: 'left', _ts: 0 },

@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-BG3+o+ku7tf0mMsN0EKyUX5chfjaBwjxZeoVkkbdFFo='
+               'sha256-VUUAujdel66BYnyIRvM/jsKb/acH9ehFW3Ja7RpmOSo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -601,8 +601,6 @@
      further — and one further again when the row is open as well. Equal
      specificity between the first two rules; source order settles it. */
   html.view-levels-open #view-level-toast { bottom: var(--stack-l2); }
-  body:has(#day-filter-chip.visible) #view-level-toast { bottom: var(--stack-l2); }
-  html.view-levels-open body:has(#day-filter-chip.visible) #view-level-toast { bottom: var(--stack-l3); }
 
   /* Touch: thumb-sized cells. */
   @media (pointer: coarse) {
@@ -912,78 +910,6 @@
      and the full wording stays in the label's title and aria-label. */
   @media (max-width: 360px) {
     #week-bar-range { display: none; }
-  }
-
-  /* Docked at the bottom, beside the day-filter cell that spawns it, rather than
-     at the top where the week bar now lives. Rises to clear the view-level row
-     when that row is disclosed. */
-  #day-filter-chip {
-    position: absolute;
-    bottom: var(--stack-l1);
-    left: 50%;
-    transform: translateX(-50%);
-    display: none;
-    align-items: center;
-    gap: 6px;
-    /* Never wider than the viewport it is centred in — the last resort behind
-       the compact phone wording below, for oversized system font scales. */
-    max-width: calc(100vw - 24px);
-    box-sizing: border-box;
-    white-space: nowrap;
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 999px;
-    padding: 5px 6px 5px 14px;
-    font-size: 12px;
-    color: var(--text-secondary);
-    box-shadow: 0 2px 8px var(--shadow-md);
-    z-index: 20;
-    user-select: none;
-    /* Matches the view-level row's own fade, so the chip rides up and down with
-       the row instead of snapping a rung ahead of it. */
-    transition: bottom 0.15s ease;
-  }
-  #day-filter-chip.visible { display: flex; }
-  html.view-levels-open #day-filter-chip { bottom: var(--stack-l2); }
-
-  /* If anything has to give, it is the day name — clipped with an ellipsis
-     rather than pushing the clear button off screen. */
-  #day-filter-chip strong {
-    color: var(--text-primary);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  #day-filter-chip-empty { color: var(--text-subtle); }
-  #day-filter-chip-empty-short { display: none; }
-
-  /* Phones: "Showing" is redundant next to a lit filter button, and the empty
-     note drops to its short form, so both EN and CS fit a 320px viewport. */
-  @media (max-width: 767px) {
-    #day-filter-chip-label,
-    #day-filter-chip-empty-full { display: none; }
-    #day-filter-chip-empty-short { display: inline; }
-  }
-
-  #day-filter-chip-clear {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border: none;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--text-subtle);
-    font-size: 11px;
-    cursor: pointer;
-    padding: 0;
-  }
-  #day-filter-chip-clear:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
   }
 
   /* View levels and the day filter hide by pruning nodes out of the layout, but
@@ -3758,15 +3684,6 @@
               data-i18n-aria="nav.next" aria-label="Next">
         <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-down"/></svg>
       </button>
-    </div>
-    <div id="day-filter-chip">
-      <span id="day-filter-chip-label" data-i18n="filter.showing">Showing</span>
-      <strong id="day-filter-chip-day"></strong>
-      <span id="day-filter-chip-empty"><span id="day-filter-chip-empty-full"
-              data-i18n="filter.emptyDay">— nothing planned</span><span id="day-filter-chip-empty-short"
-              data-i18n="filter.emptyDayShort">— empty</span></span>
-      <button type="button" id="day-filter-chip-clear" data-i18n-title="menu.clearDayFilter"
-              data-i18n-aria="menu.clearDayFilter" title="Clear Day Filter" aria-label="Clear Day Filter">✕</button>
     </div>
     <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -13824,6 +13741,7 @@ function _windowKeydownHandler(e) {
       const KEY_TO_DAY = { '0':'overdue', '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0, '8':'unscheduled' };
       const newFilter = KEY_TO_DAY[e.key];
       setDayFilter(activeDayFilter === newFilter ? null : newFilter);
+      openViewLevels(); // the row carries the day button — it shows what is set
       return;
     }
   }
@@ -17160,8 +17078,7 @@ function isDayFilterMenuOpen() {
 // from applyTranslations() so day names follow a language switch.
 function refreshDayFilterUI() {
   // Collapsed, the row shows nothing — so the tab caret carries the fact that
-  // the map is pruned. Both prunings light it; the day filter also has its
-  // own chip, the view level has nothing else.
+  // the map is pruned. Both prunings light it.
   document.documentElement.classList.toggle('view-filtered',
     currentViewLevel !== 'full' || activeDayFilter !== null);
 
@@ -17169,26 +17086,12 @@ function refreshDayFilterUI() {
   if (btn) {
     const on = activeDayFilter !== null;
     // ∅ is the resting face; an active Unscheduled filter shows the same glyph
-    // but on the lit button, and the chip spells the difference out.
+    // but on the lit button.
     document.getElementById('day-filter-glyph').textContent =
       on ? dayFilterGlyph(activeDayFilter) : '∅';
     btn.classList.toggle('active', on);
   }
 
-  const chip = document.getElementById('day-filter-chip');
-  if (!chip) return;
-  if (activeDayFilter === null) {
-    chip.classList.remove('visible');
-    return;
-  }
-  document.getElementById('day-filter-chip-day').textContent = dayFilterName(activeDayFilter);
-  // A day with nothing on it prunes down to the bare week root — say so, or an
-  // all-but-empty canvas reads as a bug instead of as an empty day.
-  const matchSet = dayFilterMatchSet();
-  const hasWork = weekData.nodes.some(n =>
-    n.type !== 'branch' && n.type !== 'center' && matchSet.has(n.id));
-  document.getElementById('day-filter-chip-empty').style.display = hasWork ? 'none' : '';
-  chip.classList.add('visible');
 }
 
 // ─── Week bar ─────────────────────────────────────────────────────────────────
@@ -17384,22 +17287,19 @@ document.addEventListener('pointerdown', (e) => {
 // Both float over the canvas as container descendants, so their pointerdowns
 // would otherwise bubble to the pan handler and drag the map behind them.
 document.getElementById('week-bar').addEventListener('pointerdown', e => e.stopPropagation());
-document.getElementById('day-filter-chip').addEventListener('pointerdown', e => e.stopPropagation());
-document.getElementById('day-filter-chip-clear').addEventListener('click', () => deferFromInput(() => setDayFilter(null)));
 
 // ─── Branch swipe → cycle view level (mobile) ─────────────────────────────────
 const VIEW_LEVELS = ['full', 'pebbles', 'rocks'];
-const VIEW_LEVEL_LABELS = { full: 'Sand', pebbles: 'Pebbles', rocks: 'Rocks' };
 let _swipeState = null;
 let _toastTimer = null;
 const _toast = document.getElementById('view-level-toast');
 
+// A level change used to announce itself with a toast naming the level. The row
+// holding the three buttons says the same thing and stays: it shows which level
+// is lit, and leaves the other two one tap away.
 function _setViewLevel(level) {
   switchViewLevel(level); // repack + animate + button state
-  _toast.textContent = VIEW_LEVEL_LABELS[level];
-  _toast.classList.add('visible');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => _toast.classList.remove('visible'), 1200);
+  openViewLevels();
 }
 
 // Sand → Pebbles → Rocks → Sand. The swipe walks the same list one step at a
