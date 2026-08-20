@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-IKrIlzSQC/aGHqj6tqt0oqgYIan8ylqty0WBG/2ij1A='
+               'sha256-wafg/EGheeyq1N42eg6lbQJE7nk8UF5QWbT9lPskSp8='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -6593,6 +6593,13 @@ let lastSyncMessageKey = null;
 let lastSignedOutLabelKey = 'sync.btnLabel';
 let googleAccessToken = null;   // current OAuth access token string
 let driveFileIdCache = new Map(); // weekKey → Drive file ID
+// Drive has no get-by-name: turning 'zenit-week-2026-34.json' into a file id
+// costs a query, and on sign-in that query sits between the user and their week.
+// The ids are stable per account, so the map is kept across sessions and the
+// pull starts on the first frame after the token. Stale entries are cheap to
+// detect (a 404 on read) and are dropped on the spot; a different account never
+// sees them at all, because the record is stamped with the email that made it.
+const DRIVE_FILE_IDS_KEY = 'zenit-week-drive-file-ids';
 let lastSyncedHash = new Map();   // weekKey → FNV-1a hash of last uploaded JSON
 let lastSeenRemoteHash = new Map(); // weekKey → Drive appProperty contentHash the poll last reconciled (may be a legacy raw-JSON hash; decouples poll convergence from our canonical lastSyncedHash)
 let etagCache = new Map();        // weekKey → ETag from last Drive pull
@@ -7031,6 +7038,9 @@ async function onTokensReceived(accessToken) {
 
   if (!_driveSessionStarted) {
     _driveSessionStarted = true;
+    // Before any request goes out: last session's file ids let the current
+    // week's download start immediately instead of after a name lookup.
+    loadDriveFileIds(getStoredAuth()?.email || '');
     startDriveSession(); // avatar + full Drive seed (first sign-in only)
   } else {
     // Token renewal: authFetch reads googleAccessToken directly, nothing to update.
@@ -7147,8 +7157,7 @@ async function signOut() {
   googleAccessToken = null;
   _driveSessionStarted = false;
   _isFirstConnection = false;
-  driveFileIdCache.clear();
-  _driveFileMissSince.clear();
+  clearDriveFileIds();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
   _changesPageToken = null;
@@ -7226,7 +7235,28 @@ function setSyncStatus(status, messageKey) {
 // weeks from Drive, and starts the poll. Plain authenticated REST throughout —
 // no Google client library is loaded, so the CSP stays hash-only.
 async function startDriveSession() {
+  // A device that has signed in before already knows the name and photo — show
+  // them from that cache and the avatar costs nothing at all.
+  const cached = getStoredAuth();
+  if (cached?.email) {
+    showSignedInState({
+      emailAddress: cached.email,
+      displayName:  cached.displayName || '',
+      photoLink:    cached.photoLink   || '',
+    });
+    traceMilestone('avatar painted (from cache)');
+  }
+
+  // The data comes first, in every sense: the pull starts now, and the profile
+  // lookup — which only refreshes a name and a photo — waits until the week the
+  // user is looking at is on screen. Signing in to look at your week and being
+  // shown your own face instead is the wrong order of business.
+  let shownWeekDone;
+  const shownWeekReady = new Promise(resolve => { shownWeekDone = resolve; });
+  const sessionSync = initDriveSync(shownWeekDone); // TASK-09 — list all files + 3-phase seed
   try {
+    // Whichever settles first: the week landing, or the whole sync giving up.
+    await Promise.race([shownWeekReady, sessionSync]);
     // Fetch user info via Drive about (works with drive.appdata scope)
     const endAbout = traceSpan('drive:about');
     const aboutResp = await driveApiRequest({
@@ -7240,6 +7270,9 @@ async function startDriveSession() {
     // Cache user info so avatar renders instantly on next page load
     const storedAuth = getStoredAuth();
     if (storedAuth) {
+      // A different account than the one the cached ids were stamped with —
+      // those ids address files this session cannot see.
+      if (storedAuth.email && storedAuth.email !== (user?.emailAddress || '')) clearDriveFileIds();
       storedAuth.email       = user?.emailAddress || '';
       storedAuth.displayName = user?.displayName  || '';
       // Sized before caching so the inline first-paint script requests the same
@@ -7248,12 +7281,15 @@ async function startDriveSession() {
       localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(storedAuth));
     }
     setSyncStatus('connected', 'sync.msg.synced');
-    await initDriveSync(); // TASK-09 — list all files + 3-phase seed
+    await sessionSync;
     startDrivePoll(currentWeekKey);
     traceMilestone('sign-in sync settled');
     flowFinish('drive session ready');
   } catch (err) {
     traceMark('drive:session-error', err && err.message);
+    // The avatar half failed; the data half is still running and owns its own
+    // error reporting, so let it finish rather than leaving it unawaited.
+    await sessionSync.catch(() => {});
     flowFinish('drive session failed');
     console.error('[Drive] First sync init error:', err);
     setSyncStatus('error', 'sync.msg.initFailedRetry');
@@ -7579,6 +7615,7 @@ async function syncWeekFromDrive(wKey, { force = false } = {}) {
 
   const MAX_RETRIES = 5;
   let delay = 1000;
+  let idRetried = false;   // a persisted id gets exactly one second chance
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const fetchHeaders = {};
@@ -7592,6 +7629,17 @@ async function syncWeekFromDrive(wKey, { force = false } = {}) {
 
       if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
       if (resp.status === 304) return; // not modified — skip merge
+
+      // The id came from a cache that outlived the file. Drop it and resolve the
+      // name once more; a second miss means there is genuinely nothing to pull.
+      if (resp.status === 404) {
+        forgetDriveFileId(wKey);
+        etagCache.delete(wKey);
+        if (idRetried) return;
+        idRetried = true;
+        fileId = await getDriveFileId(wKey);
+        continue;
+      }
 
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, delay + Math.random() * 500));
@@ -7682,6 +7730,39 @@ async function driveApiRequest(config) {
 // every RETRY_MS; a positive one populates driveFileIdCache and never repeats.
 const _driveFileMissSince = new Map();
 const _DRIVE_LOOKUP_RETRY_MS = 5 * 60 * 1000;
+function loadDriveFileIds(email) {
+  if (!email) return;
+  let rec = null;
+  try { rec = JSON.parse(localStorage.getItem(DRIVE_FILE_IDS_KEY)); } catch { return; }
+  if (!rec || rec.email !== email || !rec.ids) return;
+  for (const [k, id] of Object.entries(rec.ids)) {
+    if (typeof id === 'string' && !driveFileIdCache.has(k)) driveFileIdCache.set(k, id);
+  }
+}
+
+function persistDriveFileIds() {
+  const email = getStoredAuth()?.email || '';
+  if (!email) return;   // no owner to stamp them with — keep them in memory only
+  try {
+    localStorage.setItem(DRIVE_FILE_IDS_KEY,
+      JSON.stringify({ email, ids: Object.fromEntries(driveFileIdCache) }));
+  } catch { /* quota — the cache still works for this session */ }
+}
+
+// One id turned out not to exist (deleted elsewhere, or belonging to a Drive we
+// no longer have). Forget it so the next lookup goes to the network.
+function forgetDriveFileId(key) {
+  driveFileIdCache.delete(key);
+  _driveFileMissSince.delete(key);
+  persistDriveFileIds();
+}
+
+function clearDriveFileIds() {
+  driveFileIdCache.clear();
+  _driveFileMissSince.clear();
+  try { localStorage.removeItem(DRIVE_FILE_IDS_KEY); } catch { /* nothing to drop */ }
+}
+
 async function findDriveFileId(wKey) {
   if (driveFileIdCache.has(wKey)) return driveFileIdCache.get(wKey);
   const lastMiss = _driveFileMissSince.get(wKey);
@@ -7700,6 +7781,7 @@ async function findDriveFileId(wKey) {
     if (id) {
       driveFileIdCache.set(wKey, id);
       _driveFileMissSince.delete(wKey);
+      persistDriveFileIds();
       return id;
     }
   } catch (err) {
@@ -7729,6 +7811,7 @@ async function getDriveFileId(wKey) {
   const files = searchResp.result?.files ?? [];
   if (files.length > 0) {
     driveFileIdCache.set(wKey, files[0].id);
+    persistDriveFileIds();
     return files[0].id;
   }
 
@@ -7743,6 +7826,7 @@ async function getDriveFileId(wKey) {
 
   const fileId = createResp.result?.id;
   driveFileIdCache.set(wKey, fileId);
+  persistDriveFileIds();
   return fileId;
 }
 
@@ -7785,6 +7869,7 @@ async function listAllDriveWeekFiles() {
     }
     pageToken = resp.result?.nextPageToken ?? null;
   } while (pageToken);
+  persistDriveFileIds();
   return found;
 }
 
@@ -7794,22 +7879,45 @@ async function listAllDriveWeekFiles() {
 //   Step 3 — classify every week: drive-only / local-only / conflict / skip
 //   Step 4a — process current ±1 week first, sequentially
 //   Step 4b — process rest sorted by proximity to today, 5 concurrent
-async function initDriveSync() {
+// onShownWeekReady fires as soon as the week on screen is reconciled (or as soon
+// as it is clear it will not be), so the caller can start work that must not run
+// in front of it.
+async function initDriveSync(onShownWeekReady = () => {}) {
   // If an import is pending, bypass normal reconciliation — local is source of truth
   if (await isImportPending()) {
+    onShownWeekReady();
     await forcePushAllToDrive();
     return;
   }
   try {
-    // Sync global colors (not week-specific)
-    const endColors = traceSpan('drive:colors');
-    await syncColorsFromDrive();
-    await syncColorsToDrive();
-    endColors();
+    // Step 0 — the week on screen, and nothing in front of it.
+    //
+    // Every file in appDataFolder has a name this app derives, so the current
+    // week does not need the file listing to be found: with an id from the
+    // previous session it is one request, and without one it is a name query
+    // that runs alongside the listing rather than behind it. The colors blob and
+    // the listing start in the same tick; the colors *upload* is deliberately
+    // left until the week is on screen, since nothing visible waits for it.
+    const shownKey = currentWeekKey || todayWeekKey();
+    const endFirst = traceSpan('drive:shown-week ' + shownKey);
+    const colorsPull = syncColorsFromDrive();
+    const endColors = traceSpan('drive:colors-pull');
+    colorsPull.then(() => endColors(), () => endColors('failed'));
+    const endList = traceSpan('drive:list-weeks');
+    const listPull = listAllDriveWeekFiles();
+    let shownPulled = false;
+    try {
+      await syncWeekFromDrive(shownKey);
+      shownPulled = true;
+    } catch (err) {
+      console.warn('[Drive] first-week pull failed, falling back to reconciliation:', err);
+    }
+    endFirst();
+    traceMilestone('current week reconciled');
+    onShownWeekReady();
 
     // Step 1 — Drive metadata only (no content downloads)
-    const endList = traceSpan('drive:list-weeks');
-    const driveWeeks = await listAllDriveWeekFiles();
+    const driveWeeks = await listPull;
     endList(driveWeeks.length + ' files');
     const driveMap = new Map(driveWeeks.map(({ wKey, savedAt, contentHash }) => [wKey, { savedAt, contentHash }]));
 
@@ -7859,13 +7967,21 @@ async function initDriveSync() {
     const hadConflict = _isFirstConnection && [...toMerge, ...toUpload].some(k => prioritySet.has(k));
     traceMark('drive:classified', toMerge.length + ' to merge, ' + toUpload.length + ' to upload');
     for (const k of prioritySet) {
+      // Step 0 already merged this one, and a merge that produced something new
+      // scheduled its own upload — re-running it would only re-download it.
+      if (k === shownKey && shownPulled && !toUpload.includes(k)) continue;
       const endWeek = traceSpan('drive:priority-week ' + k,
         toMerge.includes(k) ? 'merge' : toUpload.includes(k) ? 'upload' : 'skip');
       if (toMerge.includes(k))  await syncWeekFromDrive(k);
       else if (toUpload.includes(k)) await syncWeekToDrive(k);
       endWeek();
-      if (k === currentWeekKey) traceMilestone('current week reconciled');
     }
+
+    // The week is on screen — now the settings blob may go up.
+    const endColorsPush = traceSpan('drive:colors-push');
+    await colorsPull;          // never push over a newer remote we have not read
+    await syncColorsToDrive();
+    endColorsPush();
 
     if (hadConflict) {
       setSyncStatus('connected', 'sync.msg.driveLoaded');
@@ -7882,7 +7998,7 @@ async function initDriveSync() {
     const restAll = [
       ...byProximity(toMerge).map(k => ({ k, isDownload: true })),
       ...byProximity(toUpload).map(k => ({ k, isDownload: false })),
-    ];
+    ].filter(({ k, isDownload }) => !(k === shownKey && shownPulled && isDownload));
     const CONCURRENCY = 5;
     const endRest = traceSpan('drive:remaining-weeks', restAll.length + ' weeks');
     for (let i = 0; i < restAll.length; i += CONCURRENCY) {
@@ -7898,6 +8014,8 @@ async function initDriveSync() {
   } catch (err) {
     console.error('[Drive] initDriveSync error:', err);
     setSyncStatus('error', 'sync.msg.driveInitFailed');
+  } finally {
+    onShownWeekReady();   // idempotent — a failed sync must not strand the caller
   }
 }
 
@@ -8035,6 +8153,7 @@ async function _uploadColorsToDrive(resetToken) {
         { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
       );
       if (resp.status === 401) return false;
+      if (resp.status === 404) { forgetDriveFileId(wKey); continue; } // stale id — re-resolve
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, delay + Math.random() * 500));
         delay *= 2;
@@ -8070,8 +8189,7 @@ async function forcePushAllToDrive() {
   if (!googleAccessToken) return;
 
   stopDrivePoll();
-  driveFileIdCache.clear();
-  _driveFileMissSince.clear();
+  clearDriveFileIds();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
   _changesPageToken = null;
@@ -8260,6 +8378,7 @@ async function syncColorsToDrive() {
         { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
       );
       if (resp.status === 401) return;
+      if (resp.status === 404) { forgetDriveFileId('colors'); continue; } // stale id — re-resolve
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, delay + Math.random() * 500));
         delay *= 2;
@@ -8318,7 +8437,7 @@ async function syncColorsFromDrive() {
       `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
     );
     if (resp.status === 401) return;
-    if (resp.status === 404) return;
+    if (resp.status === 404) { forgetDriveFileId('colors'); return; }
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const remoteJson = await resp.text();
     if (!remoteJson.trim()) return;
@@ -8559,8 +8678,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
     console.error('[Drive] reset: failed to clear local IndexedDB:', e);
   }
   // Clear sync caches so initDriveSync fetches fresh
-  driveFileIdCache.clear();
-  _driveFileMissSince.clear();
+  clearDriveFileIds();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
   _changesPageToken = null;

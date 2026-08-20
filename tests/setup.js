@@ -536,6 +536,13 @@ _state.loadValueIDB = function(key) {
 _state.setDriveFileId = function(wk, id) {
   driveFileIdCache.set(wk, id);
 };
+_state.getDriveFileId = function(wk) {
+  return driveFileIdCache.get(wk) ?? null;
+};
+_state.persistDriveFileIds = function() { persistDriveFileIds(); };
+_state.loadDriveFileIds = function(email) { loadDriveFileIds(email); };
+_state.forgetDriveFileId = function(key) { forgetDriveFileId(key); };
+_state.resolveDriveFileId = function(wk) { return getDriveFileId(wk); };
 _state.setLastSyncedHash = function(wk, hash) {
   lastSyncedHash.set(wk, hash);
 };
