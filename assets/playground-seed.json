@@ -1,5 +1,5 @@
 {
-  "_comment": "Playground onboarding seed. Loaded into an empty IndexedDB on first run (#playground). The loader stamps _demo:true + fresh _ts per node and sets the week key to the current ISO week. Tune labels/structure here directly.",
+  "_comment": "Playground onboarding seed. Loaded into an empty IndexedDB on first run (#playground). The loader stamps _demo:true + fresh _ts per node and sets the week key to the current ISO week. Tune labels/structure here directly; labelCs holds the Czech label where it differs from the English one.",
   "week": {
     "nodes": [
       {
@@ -7,6 +7,7 @@
         "type": "branch",
         "branch": "family",
         "label": "Family",
+        "labelCs": "Rodina",
         "children": [
           "n08eceff4b1b1",
           "n86d7bb85b7a0",
@@ -23,6 +24,7 @@
         "type": "branch",
         "branch": "work",
         "label": "Work",
+        "labelCs": "Práce",
         "children": [
           "nc615d740acdd",
           "nbc765cabdc86",
@@ -38,6 +40,7 @@
         "type": "branch",
         "branch": "me",
         "label": "Me",
+        "labelCs": "Já",
         "children": [
           "ne9adc6b8de35",
           "n674c41539736",
@@ -52,6 +55,7 @@
         "type": "branch",
         "branch": "growth",
         "label": "Growth",
+        "labelCs": "Rozvoj",
         "side": "left",
         "children": [
           "ne123a2b09d2e",
@@ -66,6 +70,7 @@
         "branch": "work",
         "parent": "work",
         "label": "Q1 OKR draft",
+        "labelCs": "Návrh OKR na Q1",
         "done": false,
         "unplanned": false,
         "children": [],
@@ -79,6 +84,7 @@
         "branch": "work",
         "parent": "work",
         "label": "1:1 with Sara",
+        "labelCs": "1:1 se Sárou",
         "done": true,
         "unplanned": false,
         "children": [],
@@ -109,6 +115,7 @@
         "branch": "work",
         "parent": "nc0e506d5cc89",
         "label": "Prep",
+        "labelCs": "Příprava",
         "done": true,
         "unplanned": false,
         "children": [],
@@ -137,6 +144,7 @@
         "branch": "work",
         "parent": "nc0e506d5cc89",
         "label": "Debrief",
+        "labelCs": "Vyhodnocení",
         "done": false,
         "unplanned": false,
         "children": [],
@@ -366,6 +374,7 @@
         "branch": "growth",
         "parent": "ne123a2b09d2e",
         "label": "Build MVP app",
+        "labelCs": "Postavit MVP aplikaci",
         "done": true,
         "unplanned": false,
         "children": [],
@@ -380,6 +389,7 @@
         "branch": "growth",
         "parent": "growth",
         "label": "Watch Tristan Harris video",
+        "labelCs": "Pustit si video Tristana Harrise",
         "done": false,
         "unplanned": true,
         "children": [],
@@ -393,6 +403,7 @@
         "branch": "family",
         "parent": "family",
         "label": "Birthday cake for Mia",
+        "labelCs": "Narozeninový dort pro Janču",
         "done": true,
         "unplanned": false,
         "children": [],
@@ -407,6 +418,7 @@
         "branch": "family",
         "parent": "family",
         "label": "Plan summer trip",
+        "labelCs": "Naplánovat letní dovolenou",
         "done": true,
         "unplanned": false,
         "children": [
@@ -424,6 +436,7 @@
         "branch": "family",
         "parent": "n86d7bb85b7a0",
         "label": "Trips",
+        "labelCs": "Výlety",
         "done": true,
         "unplanned": false,
         "children": [],
@@ -438,6 +451,7 @@
         "branch": "family",
         "parent": "n86d7bb85b7a0",
         "label": "Requirements",
+        "labelCs": "Požadavky",
         "done": true,
         "unplanned": false,
         "children": [],
@@ -452,6 +466,7 @@
         "branch": "family",
         "parent": "family",
         "label": "Park walk together",
+        "labelCs": "Společná procházka v parku",
         "done": false,
         "unplanned": false,
         "children": [
@@ -497,6 +512,7 @@
         "branch": "family",
         "parent": "family",
         "label": "Call grandma",
+        "labelCs": "Zavolat babičce",
         "done": true,
         "unplanned": false,
         "children": [],
@@ -511,6 +527,7 @@
         "branch": "family",
         "parent": "family",
         "label": "Buy a flower to Lucy",
+        "labelCs": "Koupit kytičku pro Lucku",
         "done": false,
         "unplanned": false,
         "inbox": true,
@@ -524,6 +541,7 @@
         "branch": "me",
         "parent": "me",
         "label": "Pushups 50",
+        "labelCs": "Kliky 50",
         "done": false,
         "unplanned": false,
         "children": [
@@ -574,6 +592,7 @@
         "branch": "me",
         "parent": "me",
         "label": "Read 15 min",
+        "labelCs": "Číst si 15 min",
         "done": false,
         "unplanned": false,
         "children": [
@@ -702,6 +721,7 @@
         "branch": "me",
         "parent": "me",
         "label": "Drop off donations",
+        "labelCs": "Odvézt věci na charitu",
         "done": false,
         "unplanned": true,
         "children": [],
