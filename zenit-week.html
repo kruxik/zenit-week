@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-E/ay0Kzd6MLRasJdo2zy7uC2Nb099lRPvuQg/1Nr5Vc='
+               'sha256-EMyzdLuOVXcHCiTIUib0tJZGt5U65PT4UHrnR4XxvMQ='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -18567,7 +18567,23 @@ function armTouchHintGate(el, id, pulseTarget, anchorEl) {
   }
   _touchHintGates.push({ el, id, pulseTarget, anchorEl: anchorEl || el });
 }
-, true);
+
+// Nodes are rebuilt on every render, so they gate through one delegated
+// listener instead of the registry: the hint a node teaches is whatever
+// hoverHintId picks for it, resolved at tap time.
+function armNodeTouchHintGate() {
+  document.addEventListener('click', (e) => {
+    if (coachmarkKeysApply() || !_tipsEnabled) return;
+    const g = e.target.closest && e.target.closest('.node-group');
+    if (!g) return;
+    const nodeId = g.dataset.id;
+    const id = (nodeId === 'center') ? 'root' : hoverHintId(findNode(nodeId));
+    if (!id || isHintSeen(id)) return;
+    maybeShowHint(id, g);
+    markHintSeen(id);
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
 }
 
 // Entry point from trigger sites.
@@ -18656,6 +18672,7 @@ window.addEventListener('load', async () => {
   });
 
   // Coachmark: teach the view controls on first hover of either bar.
+  armNodeTouchHintGate();
   const _viewToggleBar = document.getElementById('view-toggle-bar');
   if (_viewToggleBar) {
     _viewToggleBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewToggleBar));
