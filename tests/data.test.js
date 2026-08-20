@@ -130,13 +130,18 @@ describe('genId', () => {
 });
 
 describe('defaultWeekData', () => {
-  test('returns exactly three branch nodes', () => {
-    expect(defaultWeekData().nodes).toHaveLength(3);
+  test('returns the playground\'s four branch nodes', () => {
+    expect(defaultWeekData().nodes).toHaveLength(4);
   });
 
-  test('branch ids are work, family, me', () => {
+  test('branch ids and order match the playground seed', () => {
     const ids = defaultWeekData().nodes.map(n => n.id);
-    expect(ids).toEqual(['work', 'family', 'me']);
+    expect(ids).toEqual(['family', 'work', 'me', 'growth']);
+  });
+
+  test('every branch keeps the side the playground puts it on', () => {
+    const sides = Object.fromEntries(defaultWeekData().nodes.map(n => [n.id, n.side]));
+    expect(sides).toEqual({ family: 'right', work: 'left', me: 'right', growth: 'left' });
   });
 
   test('every node has type "branch" and an empty children array', () => {
@@ -153,7 +158,7 @@ describe('validateAndRepair', () => {
     const result = validateAndRepair(null);
     expect(spy).toHaveBeenCalledOnce();
     spy.mockRestore();
-    expect(result.nodes.map(n => n.id)).toEqual(['work', 'family', 'me']);
+    expect(result.nodes.map(n => n.id)).toEqual(['family', 'work', 'me', 'growth']);
   });
 
   test('object without nodes array returns default week data shape', () => {
@@ -161,7 +166,7 @@ describe('validateAndRepair', () => {
     const result = validateAndRepair({});
     expect(spy).toHaveBeenCalledOnce();
     spy.mockRestore();
-    expect(result.nodes.map(n => n.id)).toEqual(['work', 'family', 'me']);
+    expect(result.nodes.map(n => n.id)).toEqual(['family', 'work', 'me', 'growth']);
   });
 
   test('strips _editing flag from all nodes', () => {
@@ -197,27 +202,42 @@ describe('validateAndRepair', () => {
 
   test('repairs dangling parent ref when parent exists in the tree', () => {
     const data = defaultWeekData();
-    data.nodes[0].children = ['task-1'];
+    data.nodes.find(n => n.id === 'work').children = ['task-1'];
     data.nodes.push({ id: 'task-1', type: 'activity', parent: 'WRONG', label: 'Task', children: [] });
     validateAndRepair(data);
     const task = data.nodes.find(n => n.id === 'task-1');
     expect(task.parent).toBe('work');
   });
 
-  test('reconstructs a missing branch node', () => {
+  test('reconstructs a missing branch node whose children survived', () => {
     const data = defaultWeekData();
+    data.nodes.push({ id: 'task-1', type: 'activity', parent: 'work', label: 'Task', children: [] });
     data.nodes = data.nodes.filter(n => n.id !== 'work');
     validateAndRepair(data);
     expect(data.nodes.find(n => n.id === 'work')).toBeDefined();
   });
 
-  test('reconstructed missing branch has correct type and empty children', () => {
+  test('reconstructed missing branch has correct type and adopts its children', () => {
     const data = defaultWeekData();
+    data.nodes.push({ id: 'task-1', type: 'activity', parent: 'family', label: 'Task', children: [] });
     data.nodes = data.nodes.filter(n => n.id !== 'family');
     validateAndRepair(data);
     const family = data.nodes.find(n => n.id === 'family');
     expect(family.type).toBe('branch');
-    expect(family.children).toEqual([]);
+    expect(family.children).toEqual(['task-1']);
+  });
+
+  test('does not resurrect a branch the user deleted', () => {
+    const data = defaultWeekData();
+    data.nodes = data.nodes.filter(n => n.id !== 'growth');
+    validateAndRepair(data);
+    expect(data.nodes.find(n => n.id === 'growth')).toBeUndefined();
+  });
+
+  test('restores the whole default set when no branch is left', () => {
+    const data = { nodes: [], tombstones: [], crdtVersion: 0 };
+    validateAndRepair(data);
+    expect(data.nodes.map(n => n.id)).toEqual(['growth', 'me', 'work', 'family']); // unshifted
   });
 
   test('children of a missing branch are not silently lost', () => {
@@ -225,7 +245,7 @@ describe('validateAndRepair', () => {
     // the repair must not garbage-collect those children once the branch is restored.
     // (Current behaviour GCs them — this test documents the expectation after the fix.)
     const data = defaultWeekData();
-    data.nodes[0].children = ['task-1'];
+    data.nodes.find(n => n.id === 'work').children = ['task-1'];
     data.nodes.push({ id: 'task-1', type: 'activity', parent: 'work', label: 'Task', children: [] });
     data.nodes = data.nodes.filter(n => n.id !== 'work'); // drop the branch
     validateAndRepair(data);

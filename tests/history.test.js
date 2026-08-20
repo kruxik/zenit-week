@@ -60,11 +60,12 @@ describe('History & Global State restoration', () => {
     _state.set({ nodes: [mkBranch('work')] });
     takeSnapshot();
     
-    // Change week
+    // Change week. No second snapshot — takeSnapshot captures the state to
+    // return to, so snapshotting after the change would make undo a no-op.
+    // (It used to pass anyway: the repair pass resurrected the missing branch.)
     _state.setWeekKey('2026-02');
     _state.set({ nodes: [mkBranch('family')] });
-    takeSnapshot();
-    
+
     await undo();
     expect(_state.get().nodes.find(n => n.id === 'work')).toBeDefined();
     

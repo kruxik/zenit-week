@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-u/vosow5F/fzkPipRwnLth5uvOHUz+sZ1iyb1W2gQ1o='
+               'sha256-mApzg9UfwC6Zrp+0HCYgcktqNJzAOmZnRaovaoheEjk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5595,10 +5595,13 @@ async function redo() {
 }
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
+// Light/text are the light-theme output of deriveBranchPalette(main); the
+// theme swap re-derives them. Keep in step with the playground seed's colors.
 const DEFAULT_BRANCH_COLORS = {
   work:   { main: '#F24E1E', light: '#FFF0ED', text: '#D03000' },
   family: { main: '#A259FF', light: '#F3EBFF', text: '#7000FF' },
   me:     { main: '#1ABCFE', light: '#E8F8FF', text: '#0070A0' },
+  growth: { main: '#0ACF83', light: '#EBFBF5', text: '#07915C' },
 };
 
 // Palette for auto-picking colors on new branches (ordered by distinctiveness)
@@ -5613,6 +5616,7 @@ let BRANCH_COLORS = {
   work:   { ...DEFAULT_BRANCH_COLORS.work },
   family: { ...DEFAULT_BRANCH_COLORS.family },
   me:     { ...DEFAULT_BRANCH_COLORS.me },
+  growth: { ...DEFAULT_BRANCH_COLORS.growth },
 };
 
 function pickBranchColor() {
@@ -9108,9 +9112,14 @@ function validateAndRepair(data) {
     }
   });
 
-  // 2. Reconstruct any missing default branches (individually, not just when all are gone)
+  // 2. Reconstruct missing default branches — but only the ones still needed:
+  // a branch whose children survived, or the whole set when the week has no
+  // branch left at all. Restoring unconditionally would push a branch back into
+  // every week that never had it (and undelete one the user removed).
+  const hasAnyBranch = data.nodes.some(n => n.type === 'branch');
   defaultWeekData().nodes.forEach(template => {
-    if (!nodeMap.has(template.id)) {
+    const isNeeded = !hasAnyBranch || data.nodes.some(n => n.parent === template.id);
+    if (isNeeded && !nodeMap.has(template.id)) {
       const orphanChildren = data.nodes
         .filter(n => n.parent === template.id)
         .map(n => n.id);
@@ -10025,17 +10034,23 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
   applyAutoLayout();
 }
 
+// A fresh week gets the playground's branches — same ids, labels, sides and
+// order, minus the example tasks — so the app looks the same whether or not the
+// playground was ever seeded. Their colors live in DEFAULT_BRANCH_COLORS.
 function defaultWeekData(prevLabels) {
   const l = prevLabels || {};
-  const d = currentLang === 'cs'
-    ? { work: 'Práce', family: 'Rodina', me: 'Já' }
-    : { work: 'Work',  family: 'Family', me: 'Me' };
   return {
-    nodes: [
-      { id: 'work',   type: 'branch', branch: 'work',   label: l.work   || d.work,   children: [], _ts: 0 },
-      { id: 'family', type: 'branch', branch: 'family', label: l.family || d.family, children: [], _ts: 0 },
-      { id: 'me',     type: 'branch', branch: 'me',     label: l.me     || d.me,     children: [], _ts: 0 },
-    ],
+    nodes: PLAYGROUND_SEED.week.nodes
+      .filter(n => n.type === 'branch')
+      .map(n => ({
+        id: n.id,
+        type: 'branch',
+        branch: n.branch,
+        label: l[n.id] || ((currentLang === 'cs' && n.labelCs) || n.label),
+        children: [],
+        side: n.side,
+        _ts: 0,
+      })),
     tombstones: [],
     crdtVersion: 0,
   };
