@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-DDVgQ5fp2siYxTNX/z7fjc2n30qicasDMtShPAN35VM='
+               'sha256-0mlRsubut5yEkbTsIJ1N4mFThRmkT2ejyLD3jiJTNi4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -632,16 +632,20 @@
   #playground-nudge {
     position: fixed;
     bottom: 68px;
-    left: 50%;
-    transform: translateX(-50%) translateY(8px);
+    /* Span the same gutters as the bottom bars (#undo-redo-bar, #fab-pill),
+       so on a phone the banner uses the full width they leave free. */
+    left: 12px;
+    right: 12px;
+    margin-inline: auto;
+    transform: translateY(8px);
     display: flex;
-    align-items: center;
-    gap: 14px;
-    max-width: min(92vw, 480px);
+    flex-direction: column;
+    gap: 10px;
+    max-width: 460px;
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: 10px;
-    padding: 10px 12px 10px 16px;
+    padding: 12px 14px;
     box-shadow: 0 4px 16px var(--shadow-md);
     z-index: 3000;
     font-size: 13px;
@@ -654,12 +658,13 @@
   #playground-nudge.visible {
     opacity: 1;
     pointer-events: auto;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
+  #playground-nudge-text { white-space: pre-line; }
   #playground-nudge-actions {
     display: flex;
+    justify-content: flex-end;
     gap: 8px;
-    flex-shrink: 0;
   }
   #playground-nudge-actions .agenda-action-btn {
     white-space: nowrap;
@@ -724,7 +729,8 @@
     .coachmark-pulse { display: none; }
   }
   #coachmark-text { margin-bottom: 10px; white-space: pre-line; }
-  #coachmark-text .coachmark-caption { font-weight: 600; margin-bottom: 4px; }
+  .coachmark-caption { font-weight: 600; }
+  #coachmark-text .coachmark-caption { margin-bottom: 4px; }
   #coachmark-text .coachmark-intro { margin-bottom: 8px; }
   #coachmark-text .coachmark-intro:last-child { margin-bottom: 0; }
   #coachmark-text .help-row { margin-bottom: 6px; }
@@ -3798,11 +3804,13 @@
 <div id="view-level-toast"></div>
 
 <div id="playground-nudge" role="status" aria-live="polite">
-  <span id="playground-nudge-text" data-i18n="onboarding.nudge">Done exploring? Clear the example tasks and keep your own — you can also do this anytime in Settings → Help.</span>
-  <span id="playground-nudge-actions">
-    <button type="button" class="agenda-action-btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Dismiss</button>
+  <div class="coachmark-caption" data-i18n="onboarding.nudgeCaption">Done exploring?</div>
+  <div id="playground-nudge-text" data-i18n="onboarding.nudge">Clear the example tasks and keep just your own.
+Or remove them later in Settings → Help.</div>
+  <div id="playground-nudge-actions">
+    <button type="button" class="agenda-action-btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Keep exploring</button>
     <button type="button" class="agenda-action-btn danger" id="playground-nudge-clear" data-i18n="onboarding.clearExample">Clear example tasks</button>
-  </span>
+  </div>
 </div>
 
 <div id="coachmark" role="dialog" aria-live="polite" hidden>
@@ -8452,8 +8460,9 @@ const TRANSLATIONS = {
     'onboarding.clearConfirmTitle': 'Clear example tasks?',
     'onboarding.clearConfirmBody':  'This removes the remaining example tasks you haven’t touched. Anything you edited or added stays. You can undo this.',
     'onboarding.clearConfirmOk':  'Clear',
-    'onboarding.nudge':           'Done exploring? Clear the example tasks and keep your own — you can also do this anytime in Settings → Help.',
-    'onboarding.nudgeDismiss':    'Dismiss',
+    'onboarding.nudgeCaption':    'Done exploring?',
+    'onboarding.nudge':           'Clear the example tasks and keep just your own.\nOr remove them later in Settings → Help.',
+    'onboarding.nudgeDismiss':    'Keep exploring',
     'help.aboutTitle':            'What it solves',
     'help.aboutP1':               'Most planners are flat lists — checklists or todos.',
     'help.aboutP2Lead':           'Rocks first',
@@ -8770,8 +8779,9 @@ const TRANSLATIONS = {
     'onboarding.clearConfirmTitle': 'Smazat ukázkové úkoly?',
     'onboarding.clearConfirmBody':  'Odebere zbývající ukázkové úkoly, kterých jste se nedotkli. Co jste upravili nebo přidali, zůstane. Akci lze vrátit zpět.',
     'onboarding.clearConfirmOk':  'Smazat',
-    'onboarding.nudge':           'Hotovo s prozkoumáváním? Smažte ukázkové úkoly a nechte si jen své — kdykoli to lze i v Nastavení → Nápověda.',
-    'onboarding.nudgeDismiss':    'Zavřít',
+    'onboarding.nudgeCaption':    'Hotovo s prozkoumáváním?',
+    'onboarding.nudge':           'Smažte ukázkové úkoly a nechte si jen ty své.\nNebo si je odstraňte později v Nastavení → Nápověda.',
+    'onboarding.nudgeDismiss':    'Zkoumat dál',
     'help.aboutTitle':            'Co řeší',
     'help.aboutP1':               'Většina plánovačů je jen plochý seznam — checklist nebo todo.',
     'help.aboutP2Lead':           'Velké kameny první',
