@@ -72,9 +72,9 @@ describe('pointer handlers never start the view slide inline', () => {
   test('the mobile reveal pan is deferred too', () => {
     // _openInlineInput runs from the add-button tap; its optimistic pan is a rAF
     // tween and would otherwise animate downstream of that discrete input event.
-    expect(SRC).toMatch(
-      /deferFromInput\(\(\) => _panEditNodeToVisibleArea\(\{ optimistic: true \}\)\)/
-    );
+    const call = /if \(isMobile\) deferFromInput\(([\s\S]{0,300}?)\n  \}\);/.exec(SRC);
+    expect(call).not.toBeNull();
+    expect(call[1]).toMatch(/_panEditNodeToVisibleArea\(\{ optimistic: true \}\)/);
   });
 
   test('the pan tween never measures the inline input per frame', () => {

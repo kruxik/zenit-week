@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-s1GlYq5PeSpBjNnH7hIw7kWKsS49sSIHdq+cxV5e8W4='
+               'sha256-DDVgQ5fp2siYxTNX/z7fjc2n30qicasDMtShPAN35VM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3332,6 +3332,96 @@
     margin: 0;
   }
 
+  /* Dev perf probe — only ever visible on a development host. */
+  #perf-probe-badge {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 4000;
+    background: var(--accent-danger);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 10px;
+    pointer-events: none;
+  }
+
+  /* Cable-free arming: shown only for a URL carrying #perftrace, so a phone can
+     record a trace against any deployed build without USB debugging. */
+  #perf-probe-arm {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    z-index: 4000;
+    background: var(--accent-danger);
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 10px 14px;
+    border-radius: 18px;
+    box-shadow: 0 4px 15px var(--shadow-lg);
+  }
+
+  #perf-probe-last {
+    position: fixed;
+    bottom: 12px;
+    left: 84px;
+    z-index: 4000;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 10px 14px;
+    border-radius: 18px;
+  }
+
+  #perf-probe-arm[hidden],
+  #perf-probe-last[hidden] { display: none; }
+
+  #perf-probe-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 4001;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+  }
+
+  #perf-probe-panel[hidden] { display: none; }
+
+  #perf-probe-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  #perf-probe-bar span { flex: 1; }
+
+  #perf-probe-output {
+    flex: 1;
+    margin: 0;
+    padding: 8px;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    line-height: 1.35;
+    white-space: pre;
+    color: var(--text-primary);
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
   #inline-sizer {
     position: absolute;
     top: 0;
@@ -3939,8 +4029,22 @@
   <div class="settings-separator" id="settings-dev-separator" hidden></div>
   <div class="settings-section" id="settings-dev-section" hidden>
     <div class="settings-label">Development</div>
+    <button type="button" class="agenda-action-btn" id="dev-probe-btn" title="Record the next tap: phase marks, delivered frames, long animation frames" style="width:100%;">Record perf trace</button>
     <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor" style="width:100%;">Reset to first visit</button>
   </div>
+</div>
+
+<button type="button" id="perf-probe-arm" hidden>REC</button>
+<button type="button" id="perf-probe-last" hidden>LAST</button>
+<div id="perf-probe-badge" hidden>REC</div>
+<div id="perf-probe-panel" hidden>
+  <div id="perf-probe-bar">
+    <span>perf trace</span>
+    <button type="button" class="agenda-action-btn" id="perf-probe-copy">Copy</button>
+    <button type="button" class="agenda-action-btn" id="perf-probe-share">Share</button>
+    <button type="button" class="agenda-action-btn" id="perf-probe-close">Close</button>
+  </div>
+  <pre id="perf-probe-output"></pre>
 </div>
 
 <div id="help-overlay"></div>
@@ -4779,6 +4883,249 @@ function isDevResetAllowed(hostname, protocol) {
 
 function devResetEnabled() {
   return isDevResetAllowed(location.hostname, location.protocol);
+}
+
+// ---------------------------------------------------------------------------
+// Dev perf probe. Records what actually happens between a tap and the last
+// frame of the reveal pan: our own phase marks, every frame the browser
+// delivered, long-animation-frame entries (blocking time, style/layout, the
+// scripts inside them) and slow input events. Same host guard as the reset
+// switch, and disarmed by default — probeMark() is a no-op until armed, so
+// nothing here costs anything in normal use.
+//
+// It exists because this class of jank is invisible to scripted benchmarks:
+// the pathology (see deferFromInput) only appears when the work hangs off a
+// real touch, on a real device, with a soft keyboard opening at the same time.
+// ---------------------------------------------------------------------------
+let _probe = null;
+const PROBE_TRACE_KEY = 'zenit-week-perf-trace';
+const PROBE_HARD_STOP_MS = 9000;   // never record longer than this
+const PROBE_TAIL_MS = 1500;        // keep sampling this long after the pan ends
+
+function probeMark(name, detail) {
+  if (!_probe) return;
+  _probe.marks.push({ t: performance.now() - _probe.t0, name, detail });
+}
+
+function startPerfProbe() {
+  if (_probe) { stopPerfProbe(); return; }
+  const t0 = performance.now();
+  _probe = { t0, marks: [], frames: [], loaf: [], events: [], obs: [], rafId: null,
+             hardTimer: null, tailTimer: null };
+
+  // Frame sampler: one rAF chain running for the whole trace, so a gap shows up
+  // whether or not the pan tween was the thing that missed the frame.
+  const sample = (now) => {
+    if (!_probe) return;
+    _probe.frames.push(now - _probe.t0);
+    _probe.rafId = requestAnimationFrame(sample);
+  };
+  _probe.rafId = requestAnimationFrame(sample);
+
+  try {
+    const o = new PerformanceObserver(list => {
+      if (!_probe) return;
+      for (const e of list.getEntries()) {
+        _probe.loaf.push({
+          start: e.startTime, dur: e.duration,
+          blocking: e.blockingDuration,
+          renderStart: e.renderStart ? e.renderStart - e.startTime : 0,
+          styleLayout: e.styleAndLayoutStart ? e.startTime + e.duration - e.styleAndLayoutStart : 0,
+          scripts: (e.scripts || []).slice(0, 3).map(sc => ({
+            name: sc.name, invoker: sc.invoker, type: sc.invokerType,
+            dur: Math.round(sc.duration), fwd: Math.round(sc.forcedStyleAndLayoutDuration || 0),
+          })),
+        });
+      }
+    });
+    o.observe({ type: 'long-animation-frame', buffered: false });
+    _probe.obs.push(o);
+  } catch { /* Safari has no LoAF — the frame gaps still tell the story */ }
+
+  try {
+    const o = new PerformanceObserver(list => {
+      if (!_probe) return;
+      for (const e of list.getEntries()) {
+        _probe.events.push({
+          name: e.name, start: e.startTime, dur: e.duration,
+          delay: Math.round(e.processingStart - e.startTime),
+          handler: Math.round(e.processingEnd - e.processingStart),
+        });
+      }
+    });
+    o.observe({ type: 'event', durationThreshold: 16 });
+    _probe.obs.push(o);
+  } catch { /* no Event Timing */ }
+
+  if (window.visualViewport) {
+    _probe.vvListener = () => probeMark('vv:resize',
+      'inset=' + Math.round(window.innerHeight - window.visualViewport.height) +
+      ' h=' + Math.round(window.visualViewport.height));
+    window.visualViewport.addEventListener('resize', _probe.vvListener);
+  }
+
+  _probe.hardTimer = setTimeout(stopPerfProbe, PROBE_HARD_STOP_MS);
+  probeMark('probe:armed');
+  showProbeBadge(true);
+}
+
+// Called when the pan reports it is done: keep sampling a moment longer so a
+// late frame or a keyboard settle after the tween still lands in the trace.
+function probeScheduleTail() {
+  if (!_probe) return;
+  // Re-armed on every pan that finishes: the optimistic pan is usually followed
+  // by a second one once the keyboard settles, and both belong in the trace.
+  clearTimeout(_probe.tailTimer);
+  _probe.tailTimer = setTimeout(stopPerfProbe, PROBE_TAIL_MS);
+}
+
+function stopPerfProbe() {
+  if (!_probe) return;
+  const p = _probe;
+  _probe = null;
+  cancelAnimationFrame(p.rafId);
+  clearTimeout(p.hardTimer);
+  clearTimeout(p.tailTimer);
+  p.obs.forEach(o => { try { o.disconnect(); } catch {} });
+  if (p.vvListener && window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', p.vvListener);
+  }
+  showProbeBadge(false);
+  const report = buildProbeReport(p);
+  // Kept on the device: a phone loses a report to any stray tap, and re-running
+  // the trace costs another cold reset.
+  try { localStorage.setItem(PROBE_TRACE_KEY, report); } catch {}
+  showProbeReport(report);
+}
+
+function _gapStats(gaps) {
+  if (!gaps.length) return 'none';
+  const sorted = gaps.slice().sort((a, b) => a - b);
+  const q = f => Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * f))]);
+  return sorted.length + ' frames, median ' + q(0.5) + 'ms, p90 ' + q(0.9) + 'ms, worst ' + q(1) + 'ms';
+}
+
+// Pairs x:start with the next x:end. Names repeat freely — two pans in one trace
+// produce two windows, reported in the order they ran.
+function _probeSpans(marks) {
+  const spans = [], open = new Map();
+  for (const m of marks) {
+    const i = m.name.indexOf(':');
+    if (i < 0) continue;
+    const name = m.name.slice(0, i), kind = m.name.slice(i + 1);
+    if (kind === 'start') open.set(name, m.t);
+    else if (kind === 'end' && open.has(name)) {
+      spans.push({ name, from: open.get(name), to: m.t });
+      open.delete(name);
+    }
+  }
+  return spans;
+}
+
+function buildProbeReport(p) {
+  const L = [];
+  const nodeCount = document.querySelectorAll('.node-group').length;
+  const svgCount = document.getElementById('map-root')
+    ? document.getElementById('map-root').getElementsByTagName('*').length : 0;
+  L.push('== zenit perf trace ==');
+  L.push('ua: ' + navigator.userAgent);
+  L.push('viewport: ' + window.innerWidth + 'x' + window.innerHeight +
+         ' dpr=' + window.devicePixelRatio +
+         ' vv=' + (window.visualViewport ? Math.round(window.visualViewport.height) : '-'));
+  L.push('map: ' + nodeCount + ' node groups, ' + svgCount + ' svg elements, zoom=' +
+         (typeof zoom === 'number' ? zoom.toFixed(2) : '?') +
+         ' level=' + (typeof currentViewLevel !== 'undefined' ? currentViewLevel : '?') +
+         ' reduce=' + document.documentElement.classList.contains('reduce-effects'));
+
+  L.push('');
+  L.push('-- timeline (ms from arm) --');
+  let prev = 0;
+  for (const m of p.marks) {
+    L.push(m.t.toFixed(1).padStart(8) + '  +' + (m.t - prev).toFixed(1).padStart(6) +
+           '  ' + m.name + (m.detail ? '  ' + m.detail : ''));
+    prev = m.t;
+  }
+
+  const gapsAll = [];
+  for (let i = 1; i < p.frames.length; i++) gapsAll.push(p.frames[i] - p.frames[i - 1]);
+  L.push('');
+  L.push('-- frames --');
+  L.push('whole trace: ' + _gapStats(gapsAll));
+  // Any pair of marks named x:start / x:end becomes a measured window, so a new
+  // animation only has to name its marks that way to get its own frame stats.
+  for (const sp of _probeSpans(p.marks)) {
+    const inside = [];
+    for (let i = 1; i < p.frames.length; i++) {
+      if (p.frames[i] >= sp.from && p.frames[i] <= sp.to) inside.push(p.frames[i] - p.frames[i - 1]);
+    }
+    L.push('during ' + sp.name + ' (' + Math.round(sp.from) + '-' + Math.round(sp.to) + 'ms): ' +
+           _gapStats(inside));
+  }
+  const slow = [];
+  for (let i = 1; i < p.frames.length; i++) {
+    const gap = p.frames[i] - p.frames[i - 1];
+    if (gap > 32) slow.push('  at ' + p.frames[i].toFixed(0) + 'ms  gap ' + gap.toFixed(0) + 'ms');
+  }
+  if (slow.length) { L.push('dropped frames (>32ms):'); L.push(...slow.slice(0, 40)); }
+
+  L.push('');
+  L.push('-- long animation frames --');
+  if (!p.loaf.length) L.push('(none recorded — no LoAF support, or no frame over 50ms)');
+  for (const e of p.loaf) {
+    L.push('  at ' + (e.start - p.t0).toFixed(0) + 'ms  dur ' + Math.round(e.dur) +
+           'ms  blocking ' + Math.round(e.blocking) +
+           'ms  renderStart +' + Math.round(e.renderStart) +
+           'ms  styleLayout ' + Math.round(e.styleLayout) + 'ms');
+    for (const sc of e.scripts) {
+      L.push('      script ' + sc.dur + 'ms  ' + (sc.invoker || sc.name || '?') +
+             (sc.fwd ? '  forcedLayout ' + sc.fwd + 'ms' : ''));
+    }
+  }
+
+  L.push('');
+  L.push('-- slow input events (>16ms) --');
+  if (!p.events.length) L.push('(none)');
+  for (const e of p.events) {
+    L.push('  ' + e.name + ' at ' + (e.start - p.t0).toFixed(0) + 'ms  total ' +
+           Math.round(e.dur) + 'ms  delay ' + e.delay + 'ms  handler ' + e.handler + 'ms');
+  }
+  return L.join('\n');
+}
+
+// #perftrace in the URL puts a standalone arm button on screen whatever the
+// host. The Settings entry stays dev-host-only; this is the same probe reached
+// from a phone that cannot open a console.
+function initProbeArmButton() {
+  if (!location.hash.toLowerCase().includes('perftrace')) return;
+  const btn = document.getElementById('perf-probe-arm');
+  const last = document.getElementById('perf-probe-last');
+  if (!btn) return;
+  btn.hidden = false;
+  btn.addEventListener('click', () => {
+    btn.hidden = true;
+    if (last) last.hidden = true;
+    deferFromInput(startPerfProbe);
+  });
+  let stored = null;
+  try { stored = localStorage.getItem(PROBE_TRACE_KEY); } catch {}
+  if (last && stored) {
+    last.hidden = false;
+    last.addEventListener('click', () => showProbeReport(stored));
+  }
+}
+
+function showProbeBadge(on) {
+  const badge = document.getElementById('perf-probe-badge');
+  if (badge) badge.hidden = !on;
+}
+
+function showProbeReport(text) {
+  const panel = document.getElementById('perf-probe-panel');
+  const pre = document.getElementById('perf-probe-output');
+  if (!panel || !pre) { console.log(text); return; }
+  pre.textContent = text;   // never innerHTML — the report quotes live app state
+  panel.hidden = false;
+  console.log(text);
 }
 
 // Deletes the IndexedDB database outright. A still-open connection would block
@@ -11026,6 +11373,7 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
   if (_panAnimating && _panTargetX !== null &&
       Math.abs(targetPanX - _panTargetX) < PAN_RETARGET_EPS &&
       Math.abs(targetPanY - _panTargetY) < PAN_RETARGET_EPS) {
+    probeMark('pan:skip', 'same target');
     return;
   }
   // Already parked where we were asked to go. The 500 ms fallback normally lands
@@ -11033,6 +11381,7 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
   // 300 ms tween — twenty frames of transform writes — travelling a pixel.
   if (Math.abs(targetPanX - panX) < PAN_RETARGET_EPS &&
       Math.abs(targetPanY - panY) < PAN_RETARGET_EPS) {
+    probeMark('pan:skip', 'already there');
     return;
   }
   // A genuine retarget mid-flight continues out of the motion already on screen
@@ -11041,6 +11390,9 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
   _panTargetX = targetPanX;
   _panTargetY = targetPanY;
   const startX = panX, startY = panY;
+  let panFrames = 0;
+  probeMark('pan:start', 'dx=' + Math.round(targetPanX - panX) +
+    ' dy=' + Math.round(targetPanY - panY) + ' dur=' + duration);
   const startTime = performance.now();
   const myToken = ++_panAnimToken;     // claim this animation slot (cancels any in-flight)
   _panAnimating = true;
@@ -11059,6 +11411,7 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
   function step(now) {
     if (myToken !== _panAnimToken) return;   // superseded by a newer call
     const t = Math.min((now - startTime) / duration, 1);
+    if (panFrames++ === 0) probeMark('pan:frame1');
     const e = ease(t);
     panX = startX + (targetPanX - startX) * e;
     panY = startY + (targetPanY - startY) * e;
@@ -11072,7 +11425,7 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
     }
 
     if (t < 1) requestAnimationFrame(step);
-    else endPanAnimation();
+    else { probeMark('pan:end', panFrames + ' frames'); endPanAnimation(); }
   }
   requestAnimationFrame(step);
 }
@@ -11082,6 +11435,7 @@ function endPanAnimation() {
   if (!_panAnimating) return;
   _panAnimating = false;
   _panTargetX = _panTargetY = null;
+  probeScheduleTail();
   if (typeof flushPendingHint === 'function') flushPendingHint();
 }
 
@@ -11686,7 +12040,9 @@ function startAddNode(parentId) {
   const parent = findNode(parentId);
   if (!parent) return;
   if (parent.dayChild || parent.tickChild) return; // managed leaves — no children allowed
+  probeMark('add:start');
   takeSnapshot();
+  probeMark('add:snapshot');
   const branch = parent.branch || parent.id;
   const id = genId();
   const node = {
@@ -11701,6 +12057,7 @@ function startAddNode(parentId) {
   weekData.nodes.push(node);
   rebuildNodeMap();
   parent.children.push(id);
+  probeMark('add:data');
   // Defer status propagation until commit: a discard (cancel/empty label)
   // would otherwise leave a done parent stuck in the not-done state.
 
@@ -11774,6 +12131,7 @@ function startAgendaRename(nodeId) {
 function _openInlineInput(nodeId, isNew) {
   const node = findNode(nodeId);
   if (!node) return;
+  probeMark('edit:open');
 
   beginAtomicOp();
   const type = node.type || 'activity';
@@ -11807,12 +12165,14 @@ function _openInlineInput(nodeId, isNew) {
   inlineInput.style.display      = 'block';
 
   resizeInlineInput(true);
+  probeMark('edit:sized');
 
   // preventScroll keeps the browser from auto-scrolling the body to bring the
   // focused input into view — we manage canvas pan ourselves once the soft
   // keyboard has finished animating open (see vv.resize listener below).
   inlineInput.focus({ preventScroll: true });
   if (!isNew) inlineInput.select();
+  probeMark('edit:focused');
 
   // Mobile optimistic pan: if we've measured this device's keyboard before,
   // start animating to the centered position immediately so the motion runs
@@ -11821,7 +12181,10 @@ function _openInlineInput(nodeId, isNew) {
   // deferFromInput, not a direct call: this runs from the add-button tap, and a
   // rAF tween started inside a discrete input handler is serialised input-to-paint
   // (same pathology as the view slide — see deferFromInput).
-  if (isMobile) deferFromInput(() => _panEditNodeToVisibleArea({ optimistic: true }));
+  if (isMobile) deferFromInput(() => {
+    probeMark('defer:task-ran');
+    _panEditNodeToVisibleArea({ optimistic: true });
+  });
 
   // Fallback for devices where visualViewport.resize fires unreliably:
   // re-pan after the keyboard has had time to settle.
@@ -12058,6 +12421,8 @@ function _panEditNodeToVisibleArea(opts) {
   const targetScreenY = (visTop  + visBottom) / 2;
   const targetPanX = targetScreenX - rect.left - pos.x * zoom;
   const targetPanY = targetScreenY - rect.top  - pos.y * zoom;
+  probeMark('pan:request', (optimistic ? 'optimistic' : 'settled') +
+    ' kbOpen=' + kbOpen + ' inset=' + Math.round(effectiveInset));
   animatePanTo(targetPanX, targetPanY, editState.nodeId, 300);
 }
 
@@ -13346,6 +13711,7 @@ function setCenterRingArcs(arcs, stats, perimeter) {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
+  probeMark('render:start');
   // A full rebuild supersedes anything scheduleRender() has queued.
   if (_pendingRenderFrame !== null) {
     cancelAnimationFrame(_pendingRenderFrame);
@@ -13466,6 +13832,7 @@ function render() {
   updateSummary();
 
   document.body.classList.remove('app-loading');
+  probeMark('render:end', document.querySelectorAll('.node-group').length + ' groups');
   return positions;
 }
 
@@ -14157,7 +14524,9 @@ function attachNodeListeners() {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
+        probeMark('tap:add-btn');
         startAddNode(btn.getAttribute('data-parent'));
+        probeMark('tap:handler-end');
       });
     });
 
@@ -17117,9 +17486,11 @@ function deferFromInput(fn) {
 }
 
 function repackWithSlide(mutate) {
+  probeMark('repack:start');
   const fromPos = computeLayout(); // snapshot the layout we're leaving
   mutate();
   repackLayout(); // moves the existing SVG into the repacked layout
+  probeMark('repack:end');
   // reduce-effects already folds in prefers-reduced-motion (set at load).
   if (document.documentElement.classList.contains('reduce-effects')) return;
   animateViewSlide(fromPos);
@@ -17385,6 +17756,8 @@ function animateViewSlide(fromPos) {
     ed.p.setAttribute('d', taperedPathD(x1, y1, x2, y2, ed.sws, ed.swe));
   };
   let t0 = null;
+  probeMark('slide:start', nodeTweens.length + ' nodes, ' + edgeTweens.length +
+    ' edges, ' + fadeIns.length + ' fading');
   const frame = (now) => {
     if (t0 === null) {
       t0 = now;
@@ -17407,6 +17780,8 @@ function animateViewSlide(fromPos) {
     edgeTweens.forEach(ed => setEdge(ed, ed.fx1, ed.fy1, ed.fx2, ed.fy2));
     fadeIns.forEach(f => { f.el.style.opacity = ''; });
     applyFilters(); // re-settle virtual-done styling the tween may have skipped
+    probeMark('slide:end');
+    probeScheduleTail();
   };
   requestAnimationFrame(frame);
 }
@@ -18834,11 +19209,59 @@ window.addEventListener('load', async () => {
     });
   }
 
+  // Host-independent on purpose: the URL opt-in is what gates it, and the report
+  // panel's own buttons must work wherever the trace was recorded.
+  initProbeArmButton();
+
+  const probeCopy = document.getElementById('perf-probe-copy');
+  if (probeCopy) {
+    probeCopy.addEventListener('click', () => {
+      const text = document.getElementById('perf-probe-output').textContent;
+      navigator.clipboard?.writeText(text).then(
+        () => { probeCopy.textContent = 'Copied'; },
+        () => { probeCopy.textContent = 'Select manually'; }
+      );
+    });
+  }
+  const probeShare = document.getElementById('perf-probe-share');
+  if (probeShare) {
+    // The phone that records the trace is not the machine that reads it; the
+    // share sheet is the shortest way off the device (mail, chat, notes).
+    probeShare.hidden = !navigator.share;
+    probeShare.addEventListener('click', () => {
+      const text = document.getElementById('perf-probe-output').textContent;
+      navigator.share({ title: 'zenit perf trace', text }).catch(() => {});
+    });
+  }
+  const probeClose = document.getElementById('perf-probe-close');
+  if (probeClose) {
+    probeClose.addEventListener('click', () => {
+      document.getElementById('perf-probe-panel').hidden = true;
+      if (probeCopy) probeCopy.textContent = 'Copy';
+      // Back to the launcher, so a second trace needs no reload.
+      const arm = document.getElementById('perf-probe-arm');
+      const last = document.getElementById('perf-probe-last');
+      if (arm && location.hash.toLowerCase().includes('perftrace')) arm.hidden = false;
+      if (last && location.hash.toLowerCase().includes('perftrace')) last.hidden = false;
+    });
+  }
+
   if (devResetEnabled()) {
     const devSection = document.getElementById('settings-dev-section');
     const devSeparator = document.getElementById('settings-dev-separator');
     if (devSection) devSection.hidden = false;
     if (devSeparator) devSeparator.hidden = false;
+
+    const devProbeBtn = document.getElementById('dev-probe-btn');
+    if (devProbeBtn) {
+      devProbeBtn.addEventListener('click', () => {
+        // Close settings first, then arm on a fresh task: the trace must start
+        // from an idle main thread, not from inside this click.
+        settingsDropdown.classList.remove('visible');
+        settingsFab.classList.remove('active');
+        deferFromInput(startPerfProbe);
+      });
+    }
     const devResetBtn = document.getElementById('dev-reset-btn');
     if (devResetBtn) {
       devResetBtn.addEventListener('click', () => {
