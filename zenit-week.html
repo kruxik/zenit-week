@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-EMyzdLuOVXcHCiTIUib0tJZGt5U65PT4UHrnR4XxvMQ='
+               'sha256-BG3+o+ku7tf0mMsN0EKyUX5chfjaBwjxZeoVkkbdFFo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -13688,6 +13688,12 @@ function _windowKeydownHandler(e) {
   if (e.key === 'Escape') {
     const settings = document.getElementById('settings-dropdown');
 
+    // The tip sits on top of whatever opened it, so it is what Esc closes
+    // first — the menu underneath stays where the user left it.
+    if (_coachmarkVisible) {
+      dismissCoachmark();
+      return;
+    }
     if (isDayFilterMenuOpen()) {
       closeDayFilterMenu();
       return;
@@ -16979,7 +16985,7 @@ function toggleViewLevels() {
 // closed here before its click handler can toggle it.
 document.addEventListener('pointerdown', (e) => {
   if (!areViewLevelsOpen()) return;
-  if (e.target.closest('#view-toggle-bar, #day-filter-menu')) return;
+  if (e.target.closest('#view-toggle-bar, #day-filter-menu, #coachmark')) return;
   closeViewLevels();
 });
 
@@ -17370,6 +17376,7 @@ document.getElementById('day-filter-btn').addEventListener('click', () => {
 // outside the button — which is exactly when the menu should close.
 document.addEventListener('pointerdown', (e) => {
   const menu = document.getElementById('day-filter-menu');
+  if (e.target.closest('#coachmark')) return; // dismissing the tip is not a tap outside
   if (menu.classList.contains('visible') && !menu.contains(e.target)) closeDayFilterMenu();
 });
 
@@ -17934,9 +17941,7 @@ if (tipsReplayBtn) {
 
 const coachmarkGotIt = document.getElementById('coachmark-got-it');
 if (coachmarkGotIt) coachmarkGotIt.addEventListener('click', dismissCoachmark);
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && _coachmarkVisible) dismissCoachmark();
-});
+
 
 // ─── Lang select ──────────────────────────────────────────────────────────────
 document.getElementById('lang-select').addEventListener('change', e => {
