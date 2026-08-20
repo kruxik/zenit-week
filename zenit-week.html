@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-mApzg9UfwC6Zrp+0HCYgcktqNJzAOmZnRaovaoheEjk='
+               'sha256-aHGBwOV+JMyWWMiVPuUlNzekAZ+m54zyYLs++rvgmmg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9254,6 +9254,39 @@ function migrateDayCounters(data) {
   return data;
 }
 
+// The week whose branches a brand-new week copies. Whatever the user has made
+// of their root+1 nodes — renamed, recoloured, added, deleted — is the model for
+// every empty week they open next. Nearest earlier week first (the one they just
+// came from), then the nearest later one, so opening a week before or beyond a
+// gap still lands on their own layout rather than the defaults.
+async function findBranchModelWeek(wk) {
+  let keys = [];
+  try { keys = await listWeekKeysIDB(); } catch (e) { return null; }
+  const rank = k => {
+    const { year, week } = parseWeekKey(k);
+    return Number.isFinite(year) && Number.isFinite(week) ? year * 100 + week : null;
+  };
+  const target = rank(wk);
+  if (target == null) return null;
+
+  const earlier = [], later = [];
+  keys.forEach(k => {
+    if (k === wk) return;
+    const r = rank(k);
+    if (r == null) return;
+    (r < target ? earlier : later).push({ k, r });
+  });
+  earlier.sort((a, b) => b.r - a.r);   // closest before wk first
+  later.sort((a, b) => a.r - b.r);     // then closest after
+
+  for (const { k } of earlier.concat(later)) {
+    let data = null;
+    try { data = await loadWeekIDB(k); } catch (e) { continue; }
+    if (data && (data.nodes || []).some(n => n.type === 'branch')) return data;
+  }
+  return null;
+}
+
 async function loadWeek(wk) {
   let data = null;
   try {
@@ -9277,11 +9310,12 @@ async function loadWeek(wk) {
     return migrateCrdt(migrateDayCounters(repaired));
   }
 
-  // New week — inherit all branch nodes (IDs, labels, colors) from the previous week
-  const prevWk = offsetWeek(wk, -1);
-  let prevData = await loadWeekIDB(prevWk);
+  // New week — inherit all branch nodes (IDs, labels, colors) from the week the
+  // user last shaped, not from the defaults.
+  let prevData = await findBranchModelWeek(wk);
   if (!prevData) {
-    const prevRaw = localStorage.getItem(storageKey(prevWk));
+    // Pre-migration data still sitting in localStorage.
+    const prevRaw = localStorage.getItem(storageKey(offsetWeek(wk, -1)));
     if (prevRaw) {
       try { prevData = JSON.parse(prevRaw); } catch(e) {}
     }
