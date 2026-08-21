@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.08.21] - 2026-08-21
+
+### Added
+
+- **perf:** Trace the sign-in and import flows end to end
+- **onboarding:** Keep the tour state across a wipe and across devices
+- **week:** Model a new week on the last week the user shaped
+- **week:** Give a fresh week the playground's branches
+- **onboarding:** Seed the playground week in the user's language
+- **dev:** In-app perf probe — phase marks, frame gaps and LoAF, on device
+- **mindmap:** Keep the view-level row open while it names an active filter
+- **mindmap:** Drop the day-filter chip; the row shows the filter
+- **onboarding:** Gate the first touch on node tips too
+- **onboarding:** Spend the first touch on the tip, not the control
+- **onboarding:** Rework the detail-levels coachmark and teach its hotkey
+- **onboarding:** Teach the view hotkeys in the views coachmark
+- **onboarding:** Teach touch gestures where the quick-keys tip taught keys
+- **onboarding:** Drop coachmark key rows on touch devices
+- **onboarding:** Teach dragging and reparenting on the centre node
+- **onboarding:** Teach sign-in on the sync button
+- **onboarding:** Teach week navigation on the week bar
+- **onboarding:** Teach quick add on the + button
+- **onboarding:** Seed an inbox task and teach what parked captures are
+- **onboarding:** Split the day-filter tip off the levels tip, ring only the level buttons
+- **onboarding:** Split the detail-levels tip onto the level bar, off the views tip
+- **onboarding:** Add the undo/redo tip on the undo bar, with OS-correct key labels
+- **onboarding:** Give every tip a bold caption above its description
+- **onboarding:** Add the priority hint, taught on hover of a high or critical task
+- **onboarding:** Add the done hint, taught on hover as no. 6
+- **onboarding:** Teach hints on hover per node kind, add the unplanned hint
+- **onboarding:** Animate the coachmark in — ring pulse, bubble grows from its arrow
+- **dev:** Add a host-gated "Reset to first visit" switch in Settings
+- **onboarding:** Add "Replay tips" button in Settings (PB4)
+- **onboarding:** Views coachmark on first hover of view bars (PB3)
+- **onboarding:** Coachmark engine + hover-keys tip + Show tips toggle (PB1)
+- **onboarding:** Gentle one-time nudge to clear example tasks (S4)
+- **onboarding:** Add "Clear example tasks" cleanup in Help (S3)
+- **onboarding:** Drop _demo flag when a seed node is touched (S2)
+- **onboarding:** Seed an example playground week on first run (S1)
+
+### Changed
+
+- **coachmark:** Stop forcing layout every frame to track a still bubble
+- **view-slide:** Stop fading revealed nodes — it promoted 400 layers
+- **sync:** Put the week on screen ahead of everything else on sign-in
+- **onboarding:** Restack the cleanup nudge and widen it on phones
+- **reveal-pan:** Start the mobile pan with the keyboard, and never restart it
+- **cs:** Call the unscheduled day filter "Bez termínu"
+- **onboarding:** Rework the sign-in coachmark in both locales
+- **onboarding:** Tighten the week-nav coachmark in both locales
+- **onboarding:** Tighten the undo coachmark in both locales
+- **onboarding:** Tighten the inbox coachmark in both locales
+- **onboarding:** Tighten the priority coachmark in both locales
+- **onboarding:** Tighten the days coachmark in both locales
+- **onboarding:** Tighten the counter coachmark in both locales
+- **onboarding:** Tighten the unplanned coachmark in both locales
+- **onboarding:** Order hints by an explicit priority field, state before syntax
+- **input:** Defer the two remaining day-filter clears, and guard the whole class
+- **view-switch:** Run the switch from a fresh task, not inside the click handler
+- **view-switch:** Repack the existing SVG instead of rebuilding it
+- **view-slide:** Stop re-anchoring edge gradients on every tween frame
+- **view-slide:** Hand the appear-fade to CSS instead of writing opacity per frame
+- **center:** Shrink avatar to r96 and widen the completion ring to 24
+
+### Fixed
+
+- **quick-add:** Keep the filter row from floating over the panel
+- **sync:** Keep onboarding state through a reset-token resync
+- **onboarding:** Count a tip as seen once it has been read
+- **sync:** Strip playground scaffolding from both sides of a merge
+- **sync:** Keep the playground out of an existing Drive account
+- **onboarding:** Count only real tasks toward the cleanup nudge
+- **onboarding:** Show a node tip only after the reveal pan settles
+- **mindmap:** Make adding and re-dating work under a day filter
+- **mindmap:** No add button where the view level would hide the child
+- **onboarding:** Dismissing a tip no longer closes what opened it
+- **onboarding:** Paint the coachmark over the day-filter menu
+- **onboarding:** Drop the native tooltips that fought the coachmarks
+- **onboarding:** Drop the native tooltips the coachmarks now replace
+- **onboarding:** Drop the duplicated D and U rows from the hover-keys tip
+- **onboarding:** Use "Kliky 50 2x" in the Czech counter tip
+- **onboarding:** Rewrite the counter and days tips for hover, not for the commit that made them
+- **onboarding:** Mention Stats in the views coachmark, in both languages
+- **onboarding:** Coachmark follows its node; days hint covers single-day tokens (PB2)
+- **mindmap:** Draw filled discs as polygons to dodge a Chrome rasterisation bug
+
 ## [v2026.08.17] - 2026-08-17
 
 ### Added
