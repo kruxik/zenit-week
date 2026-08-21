@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-qFp41juYbCmyk7BFlXmrINWIs/MZwpzP6JVHX7XW++U='
+               'sha256-0/LXTZBpFbmxZwscuRY5ADLShB2FfyRDZ3RXG2urKHI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -14327,6 +14327,15 @@ function setCenterRingArcs(arcs, stats, perimeter) {
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
+// Everything that can move a node group inside the map bumps this: a full
+// render, a repack, each frame of the view slide, each frame of a drag. It lets
+// the coachmark tracker tell "the anchor may have moved" from "nothing has
+// happened" without measuring anything, and measuring is the expensive part.
+// Pan and zoom stay out of it — the tracker folds panX/panY/zoom into its own
+// key, and applyTransform runs far too often to be worth a second signal.
+let _mapGeometrySeq = 0;
+function markMapGeometryChanged() { _mapGeometrySeq++; }
+
 function render() {
   const endRender = traceSpan('render');
   probeMark('render:start');
@@ -14449,6 +14458,7 @@ function render() {
   applyFilters();
   updateSummary();
 
+  markMapGeometryChanged();
   document.body.classList.remove('app-loading');
   probeMark('render:end', document.querySelectorAll('.node-group').length + ' groups');
   endRender(document.querySelectorAll('.node-group').length + ' groups');
@@ -17443,6 +17453,7 @@ function updateDraggedVisuals(clientX, clientY) {
     const el = nodeEls[id];
     if (el) el.setAttribute('transform', `translate(${pos.x + dx},${pos.y + dy})`);
   }
+  markMapGeometryChanged();
 
   // Walk only edges touching the dragged subtree (precomputed at drag start).
   const edges = dragState.edges;
@@ -18085,6 +18096,7 @@ function repackLayout() {
   dropHoverIfPruned(positions);
   applyFilters();
   updateSummary();
+  markMapGeometryChanged();
   return positions;
 }
 
@@ -18391,6 +18403,7 @@ function animateViewSlide(fromPos) {
   probeMark('slide:start', nodeTweens.length + ' nodes, ' + edgeTweens.length + ' edges');
   const frame = (now) => {
     if (t0 === null) t0 = now;
+    markMapGeometryChanged();
     const raw = Math.min(1, (now - t0) / VIEW_SLIDE_MS);
     const e = ease(raw);
     nodeTweens.forEach(n => {
@@ -19523,17 +19536,44 @@ function _resolveCoachmarkAnchor() {
   return _coachmarkAnchorEl;
 }
 
+// A tip usually sits still on screen for many seconds. Repositioning it costs a
+// getBoundingClientRect on the anchor and offsetWidth/offsetHeight on the bubble,
+// and each of those forces the browser to flush style and layout synchronously —
+// over the whole document, the ~2900-element SVG included. Doing that every frame
+// for a bubble that is not moving is pure waste, and during a view slide it is
+// worse than waste: the read lands mid-tween and flushes the couple of hundred
+// attribute writes the tween has queued so far, so layout runs twice a frame.
+//
+// So measure only when something that can have moved the anchor happened: pan,
+// zoom, a viewport change, or anything that bumps _mapGeometrySeq. A slow resync
+// backs that up, so an anchor moved by a path nobody thought to flag drifts for
+// at most half a second rather than forever — the key is a cheap guess about
+// whether to measure, never the source of truth for where the bubble goes.
+const COACHMARK_RESYNC_MS = 500;
+
+function _mapGeometryKey() {
+  return panX + '|' + panY + '|' + zoom + '|' +
+         window.innerWidth + '|' + window.innerHeight + '|' + _mapGeometrySeq;
+}
+
 // Keep the bubble glued to its anchor while it moves (pan, zoom, auto-layout
 // animation). Stops when dismissed or the anchored node disappears.
 function startCoachmarkTracking() {
   cancelCoachmarkTracking();
   if (typeof requestAnimationFrame !== 'function') return;
-  const tick = () => {
+  let lastKey = null;
+  let lastAt = -Infinity;
+  const tick = (now) => {
     if (!_coachmarkVisible) { _coachmarkRaf = null; return; }
-    const cm = document.getElementById('coachmark');
-    const el = _resolveCoachmarkAnchor();
-    if (!cm || !el || el.isConnected === false) { hideCoachmark(); return; }
-    positionCoachmark(cm, el);
+    const key = _mapGeometryKey();
+    if (key !== lastKey || now - lastAt >= COACHMARK_RESYNC_MS) {
+      const cm = document.getElementById('coachmark');
+      const el = _resolveCoachmarkAnchor();
+      if (!cm || !el || el.isConnected === false) { hideCoachmark(); return; }
+      positionCoachmark(cm, el);
+      lastKey = key;
+      lastAt = now;
+    }
     _coachmarkRaf = requestAnimationFrame(tick);
   };
   _coachmarkRaf = requestAnimationFrame(tick);
