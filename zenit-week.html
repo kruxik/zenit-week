@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-GVyLVx5VGjZ8Oiqpyv9nBUC3yBQayijYd9PRupYn75o='
+               'sha256-qFp41juYbCmyk7BFlXmrINWIs/MZwpzP6JVHX7XW++U='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -18304,24 +18304,39 @@ function animateViewSlide(fromPos) {
   const toPos = computeLayout(); // matches what render() just drew (new level)
   const originFor = (id) => nearestPlacedPos(fromPos, id);
 
-  // Elements that fade in. Writing style.opacity on each of them every frame was
-  // the single most expensive thing in this animation — with .node-group and
-  // #lines-layer path both carrying `transition: opacity`, every write retargets
-  // a live transition, and the style engine redoes that for the whole set 60
-  // times a second. Measured on a 197-node week at 6x CPU throttle: 360 such
-  // writes per frame cost 33.3 ms/frame on their own, against 8.3 ms — free, the
-  // idle floor — for the same fade handed to CSS. So we write opacity exactly
-  // twice: pinned to 0 during setup, released to the target on the first frame.
-  // The CSS rule then runs the fade, on the same 300 ms clock as the slide.
+  // Newly revealed elements do not fade. They slide out of their nearest still
+  // visible ancestor and are painted at full opacity from the first frame.
   //
-  // Target is the element's own opacity attribute where it has one (inbox nodes
-  // render at 0.55), so the fade settles on the value the node is meant to keep.
-  const fadeIns = [];
-  const markFadeIn = (el) => {
-    fadeIns.push({ el, target: el.getAttribute('opacity') || '1' });
-    el.style.transition = 'none';
-    el.style.opacity = '0';
-  };
+  // Two earlier attempts are worth not repeating. Writing style.opacity per
+  // frame retargets a live CSS transition on every appearing element sixty
+  // times a second: 33.3 ms/frame for 360 elements at 6x CPU throttle, against
+  // an 8.3 ms idle floor. Handing the same fade to CSS — pin to 0 during setup,
+  // release to the target on the first frame — moved that cost off the main
+  // thread but onto the compositor, where it is far worse. A running opacity
+  // transition promotes its element to its own composited layer, and the tween
+  // rewrites every appearing element's transform (or its path `d`) on every
+  // frame, so each of those layers has to be re-rastered every frame.
+  //
+  // Traced on a Galaxy S22 Ultra, one Rocks -> Sand switch, 215 nodes and 215
+  // edges with 386 of them appearing:
+  //
+  //   transitions dormant ... 4 layers,   33 raster tasks,  34 dropped frames
+  //   transitions running ... 412 layers, 1602 raster tasks, 111 dropped frames
+  //
+  // With them running, raster and the GPU process both sit at 80-90% for the
+  // length of the slide and keep draining for 650 ms after it ends.
+  //
+  // The fade was in fact dormant nearly always: an appearing element leaves
+  // display:none in the repack task and has its opacity released in the very
+  // next rAF, so its first resolved style is already the target and CSS starts
+  // no transition. A style recalc landing between those two points is enough to
+  // wake it — after a soft keyboard has opened and closed, one reliably does.
+  // That made the switch smooth or unusable depending on whether the user had
+  // typed recently, which is the actual bug being fixed here. Not fading is the
+  // behaviour the device already had whenever it was fast.
+  //
+  // A fade belongs after the slide settles, where geometry is static and a
+  // composited opacity animation costs what it is supposed to cost.
 
   // Node tweens: from old (or ancestor origin) center → new center.
   const nodeTweens = [];
@@ -18330,7 +18345,6 @@ function animateViewSlide(fromPos) {
     if (!to) return;
     const appearing = !fromPos[g.dataset.id];
     const from = appearing ? originFor(g.dataset.id) : fromPos[g.dataset.id];
-    if (appearing) markFadeIn(g);
     if (!appearing && from.x === to.x && from.y === to.y) return;
     nodeTweens.push({ g, fx: from.x, fy: from.y, tx: to.x, ty: to.y });
   });
@@ -18354,12 +18368,11 @@ function animateViewSlide(fromPos) {
     const sx1 = fx1 + (pOld.x - pNew.x), sy1 = fy1 + (pOld.y - pNew.y);
     const sx2 = fx2 + (cOld.x - cNew.x), sy2 = fy2 + (cOld.y - cNew.y);
     const appearing = !fromPos[toId];
-    if (appearing) markFadeIn(p);
     if (!appearing && sx1 === fx1 && sy1 === fy1 && sx2 === fx2 && sy2 === fy2) return;
     edgeTweens.push({ p, sx1, sy1, sx2, sy2, fx1, fy1, fx2, fy2, sws, swe });
   });
 
-  if (!nodeTweens.length && !edgeTweens.length && !fadeIns.length) return;
+  if (!nodeTweens.length && !edgeTweens.length) return;
 
   const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
   // Only the path is re-derived per frame. Each edge's gradient is
@@ -18375,14 +18388,9 @@ function animateViewSlide(fromPos) {
     ed.p.setAttribute('d', taperedPathD(x1, y1, x2, y2, ed.sws, ed.swe));
   };
   let t0 = null;
-  probeMark('slide:start', nodeTweens.length + ' nodes, ' + edgeTweens.length +
-    ' edges, ' + fadeIns.length + ' fading');
+  probeMark('slide:start', nodeTweens.length + ' nodes, ' + edgeTweens.length + ' edges');
   const frame = (now) => {
-    if (t0 === null) {
-      t0 = now;
-      // One frame after the pin above, so 0 is the resolved value CSS starts from.
-      fadeIns.forEach(f => { f.el.style.transition = ''; f.el.style.opacity = f.target; });
-    }
+    if (t0 === null) t0 = now;
     const raw = Math.min(1, (now - t0) / VIEW_SLIDE_MS);
     const e = ease(raw);
     nodeTweens.forEach(n => {
@@ -18394,10 +18402,9 @@ function animateViewSlide(fromPos) {
         ed.sx2 + (ed.fx2 - ed.sx2) * e, ed.sy2 + (ed.fy2 - ed.sy2) * e);
     });
     if (raw < 1) { requestAnimationFrame(frame); return; }
-    // Settle on exact final geometry and drop transient inline styles.
+    // Settle on exact final geometry.
     nodeTweens.forEach(n => n.g.setAttribute('transform', `translate(${n.tx},${n.ty})`));
     edgeTweens.forEach(ed => setEdge(ed, ed.fx1, ed.fy1, ed.fx2, ed.fy2));
-    fadeIns.forEach(f => { f.el.style.opacity = ''; });
     applyFilters(); // re-settle virtual-done styling the tween may have skipped
     probeMark('slide:end');
     probeScheduleTail();
