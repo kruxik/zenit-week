@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-wafg/EGheeyq1N42eg6lbQJE7nk8UF5QWbT9lPskSp8='
+               'sha256-o8bXujKjhzNuuDAiy647Hxanb7Lse0DMkzReHlPI8j4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5851,6 +5851,10 @@ const NUDGED_KEY      = 'zenit-week-playground-nudged';
 const TIPS_ON_KEY     = 'zenit-week-tips-enabled';
 const TIPS_SEEN_KEY   = 'zenit-week-tips-seen';
 const MAX_TIPS_SEEN   = 200;   // cap on a synced blob we didn't write ourselves
+// Device facts, not user data: every local wipe keeps them (sign-out-and-clear
+// and the reset-token resync alike), or the browser replays a tour it has
+// already been given — and then pushes that emptied state out to the others.
+const ONBOARDING_DEVICE_KEYS = [ONBOARDED_KEY, NUDGED_KEY, TIPS_ON_KEY, TIPS_SEEN_KEY];
 
 function readBoolPref(key, fallback) {
   try {
@@ -7187,10 +7191,7 @@ const SIGNOUT_PRESERVE_KEYS = new Set([
   'zenit-week-storage-migrated',
   // Onboarding state: a wipe clears the data, not the fact that this browser
   // has already seen the tour.
-  'zenit-week-onboarded',
-  'zenit-week-playground-nudged',
-  'zenit-week-tips-enabled',
-  'zenit-week-tips-seen',
+  ...ONBOARDING_DEVICE_KEYS,
 ]);
 async function signOutAndClear() {
   await signOut();
@@ -8413,10 +8414,16 @@ function mergeRemoteOnboarding(remote, remoteIsNewer) {
     writeBoolPref(NUDGED_KEY, true);
     _playgroundNudgeDone = true;
   }
+  // Union against the *stored* map, not the in-memory one: a local wipe empties
+  // localStorage while this tab keeps running, and comparing against memory
+  // then found nothing new to write and left the store empty — every tip came
+  // back on the next load, and the empty map went out to the other devices.
+  const stored = readTipsSeen();
   let seenChanged = false;
-  Object.keys(remote.seen || {}).forEach(id => {
-    if (!_tipsSeen[id]) { _tipsSeen[id] = true; seenChanged = true; }
+  Object.keys(remote.seen || {}).concat(Object.keys(_tipsSeen)).forEach(id => {
+    if (!stored[id]) { stored[id] = true; seenChanged = true; }
   });
+  _tipsSeen = stored;
   if (seenChanged) writeTipsSeen(_tipsSeen);
 
   if (remoteIsNewer && !!remote.tipsEnabled !== _tipsEnabled) {
@@ -8425,6 +8432,11 @@ function mergeRemoteOnboarding(remote, remoteIsNewer) {
     if (!_tipsEnabled) hideCoachmark();
     if (typeof syncTipsToggleUI === 'function') syncTipsToggleUI();
   }
+  // Same wipe, same trap for the switch: with the key gone, readBoolPref falls
+  // back to "on" and a device that had tips off would publish that default.
+  try {
+    if (localStorage.getItem(TIPS_ON_KEY) === null) writeBoolPref(TIPS_ON_KEY, _tipsEnabled);
+  } catch (e) { /* private mode */ }
 
   return JSON.stringify(onboardingSettings()) !== JSON.stringify(remote);
 }
@@ -8659,6 +8671,9 @@ async function _handleResetTokenMismatch(remoteResetToken) {
     GOOGLE_AUTH_STORAGE_KEY,
     'zenit-week-storage-migrated',
     'zenit-week-reset-token',
+    // Same reasoning as SIGNOUT_PRESERVE_KEYS: an import on another device
+    // discards this device's data, not its memory of having seen the tour.
+    ...ONBOARDING_DEVICE_KEYS,
   ]);
   const keysToWipe = [];
   for (let i = 0; i < localStorage.length; i++) {

@@ -13,6 +13,7 @@ import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import {
   _state, validateAndRepair, syncWeekToDrive, syncWeekFromDrive, pollDriveMeta,
+  readBoolPref, writeBoolPref, readTipsSeen,
 } from './setup.js';
 
 const mkBranch = (id, children = []) =>
@@ -78,6 +79,20 @@ describe('reset from another device clears IndexedDB too', () => {
     expect(_state.getLocalStorage('zenit-week-google-auth')).toBeTruthy();
     // User data in localStorage is discarded.
     expect(_state.getLocalStorage('zenit-week-theme')).toBeUndefined();
+  });
+
+  test('onboarding state survives — the reset discards data, not the tour', async () => {
+    writeBoolPref('zenit-week-onboarded', true);
+    writeBoolPref('zenit-week-playground-nudged', true);
+    writeBoolPref('zenit-week-tips-enabled', false);
+    _state.setTipsSeen({ done: true });
+
+    await _state.handleResetTokenMismatch('fresh-token');
+
+    expect(readBoolPref('zenit-week-onboarded', false)).toBe(true);
+    expect(readBoolPref('zenit-week-playground-nudged', false)).toBe(true);
+    expect(readBoolPref('zenit-week-tips-enabled', true)).toBe(false);
+    expect(readTipsSeen()).toEqual({ done: true });
   });
 
   test('the undo stack is dropped so it cannot rewrite the discarded data', async () => {

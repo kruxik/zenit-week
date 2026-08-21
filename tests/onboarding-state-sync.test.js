@@ -72,6 +72,26 @@ describe('Onboarding state in the settings blob', () => {
     expect(readBoolPref('zenit-week-tips-enabled', true)).toBe(true);
   });
 
+  // An import on another device force-pushes a reset token; every other device
+  // wipes its local zenit-week-* keys and resyncs. The tab keeps running, so the
+  // in-memory seen map survives the wipe — comparing against it found nothing
+  // new to store, and the emptied store then replayed every tip on next load.
+  it('re-persists the seen map after a local wipe', () => {
+    _state.setTipsSeen({ 'tip-a': true });
+    _state.clearLocalStorage();                       // reset-token resync
+    mergeRemoteOnboarding(remote({ seen: { 'tip-b': true } }), false);
+    expect(readTipsSeen()).toEqual({ 'tip-a': true, 'tip-b': true });
+  });
+
+  it('re-persists the Show tips switch after a local wipe', () => {
+    writeBoolPref('zenit-week-tips-enabled', false);
+    mergeRemoteOnboarding(remote({ tipsEnabled: false }), true);   // adopt "off"
+    _state.clearLocalStorage();
+    mergeRemoteOnboarding(remote({ tipsEnabled: false }), false);
+    expect(readBoolPref('zenit-week-tips-enabled', true)).toBe(false);
+    _state.resetTips();   // the switch lives in memory too — don't leak "off"
+  });
+
   it('asks for a push only when this device knows more', () => {
     _state.setTipsSeen({ 'tip-a': true });
     expect(mergeRemoteOnboarding(remote({ seen: { 'tip-a': true } }), false)).toBe(false);
