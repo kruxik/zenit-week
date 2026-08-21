@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-o8bXujKjhzNuuDAiy647Hxanb7Lse0DMkzReHlPI8j4='
+               'sha256-GVyLVx5VGjZ8Oiqpyv9nBUC3yBQayijYd9PRupYn75o='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2159,6 +2159,11 @@
   }
   body:has(#quick-add-panel.is-open) #fab-pill,
   body:has(#quick-add-panel.is-open) #undo-redo-bar,
+  /* The level row survives closeViewLevels() while a filter is on — it is the
+     only thing naming that filter — so it has to yield here instead, or it
+     floats over the panel it is supposed to be behind. display, not opacity:
+     the row is still open underneath and comes back when the panel closes. */
+  body:has(#quick-add-panel.is-open) #view-level-bar,
   body:has(#quick-add-panel.is-open) #view-toggle-bar {
     display: none;
   }
@@ -18795,6 +18800,9 @@ document.addEventListener('click', (e) => {
     }
 
     closeViewLevels(); // quick-add takes the bottom of the screen; the row yields
+    // A filter keeps the row open (see closeViewLevels), and the day menu hangs
+    // off it at z9001 — well over the panel. Shut the menu; CSS parks the row.
+    closeDayFilterMenu();
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     input.value = '';
