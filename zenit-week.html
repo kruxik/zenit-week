@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-xODNqvzj+z1/idrA33BB/hvxZLR/ygU8o1WqA+t92D0='
+               'sha256-yqgX+EF8mHgOPMB7raT0XK8BexQkiFc6PfjPSQfmZNM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -627,9 +627,12 @@
   }
   #view-level-toast.visible { opacity: 1; }
 
-  /* Onboarding nudge — gentle, actionable banner offering to clear leftover
-     example tasks once the user has started their own week. */
-  #playground-nudge {
+  /* Bottom banner — a gentle, actionable strip in the slot above the bottom
+     bars. Two of them: the onboarding nudge offering to clear leftover example
+     tasks, and the update-ready hint. One component, so they cannot drift
+     apart; only one is ever visible at a time. */
+  #playground-nudge,
+  #update-banner {
     position: fixed;
     bottom: 68px;
     /* Span the same gutters as the bottom bars (#undo-redo-bar, #fab-pill),
@@ -655,7 +658,8 @@
     pointer-events: none;
     transition: opacity 0.2s ease, transform 0.2s ease;
   }
-  #playground-nudge.visible {
+  #playground-nudge.visible,
+  #update-banner.visible {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);
@@ -683,6 +687,42 @@
   #playground-nudge-actions .agenda-action-btn.danger:hover::before {
     background: var(--accent-danger-bg);
   }
+
+  /* The update hint is one sentence and two controls, so it lays out as a row
+     rather than the nudge's stack — and stays narrower, since it never grows
+     past the one line. */
+  #update-banner {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    /* Hug the content: stretched to the full slot the sentence and the button
+       ended up at opposite edges with a lake between them. It still caps at the
+       slot width, so a narrow phone wraps the sentence instead of overflowing. */
+    width: fit-content;
+    max-width: 420px;
+    padding: 8px 8px 8px 14px;
+    /* On the bottom ladder rather than the nudge's fixed offset: the nudge is an
+       onboarding moment with nothing else open, while this can appear at any
+       time — including with the view-level row disclosed. L1 clears the bottom
+       bar; open the row and it climbs to L2, the same rung and the same trigger
+       the view-level toast uses. Nothing here may sit on top of navigation. */
+    bottom: var(--stack-l1);
+    transition: opacity 0.2s ease, transform 0.2s ease, bottom 0.15s ease;
+  }
+  html.view-levels-open #update-banner { bottom: var(--stack-l2); }
+  /* The X is borderless and carries its own 8px of padding, so an equal flex gap
+     reads as a wider space beside it than beside the bordered button. Match what
+     the eye measures — glyph to glyph — not what the box model does. */
+  #update-banner-text { margin-right: 8px; }
+  #update-banner .agenda-action-btn {
+    white-space: nowrap;
+    height: 32px;
+    padding: 0 12px;
+    font-weight: 400;
+  }
+  /* Match the action button beside it — the panel headers this class comes from
+     are one size up. */
+  #update-banner .help-close-btn { height: 32px; padding: 0 8px; }
 
   /* Coachmark — anchored just-in-time tip bubble (Part B). */
   #coachmark {
@@ -3816,6 +3856,19 @@ Or remove them later in Settings → Help.</div>
     <button type="button" class="agenda-action-btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Keep exploring</button>
     <button type="button" class="agenda-action-btn danger" id="playground-nudge-clear" data-i18n="onboarding.clearExample">Clear example tasks</button>
   </div>
+</div>
+
+<!-- Update ready — the escape hatch for the quiet refresh. The reload takes the
+     first idle moment on its own, so this only appears when the app has stayed
+     busy long enough for that moment not to have come. Same slot and the same
+     surface as the onboarding nudge above; the two never show at once. -->
+<div id="update-banner" role="status" aria-live="polite">
+  <div id="update-banner-text" data-i18n="update.body">There is a new version of Zenit Week.</div>
+  <button type="button" class="agenda-action-btn" id="update-banner-reload" data-i18n="update.reload">Reload</button>
+  <button type="button" class="help-close-btn" id="update-banner-dismiss"
+    data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+    <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+  </button>
 </div>
 
 <div id="coachmark" role="dialog" aria-live="polite" hidden>
@@ -9088,6 +9141,8 @@ const TRANSLATIONS = {
     'onboarding.nudgeCaption':    'Done exploring?',
     'onboarding.nudge':           'Clear the example tasks and keep just your own.\nOr remove them later in Settings → Help.',
     'onboarding.nudgeDismiss':    'Keep exploring',
+    'update.body':                'There is a new version of Zenit Week.',
+    'update.reload':              'Reload',
     'help.aboutTitle':            'What it solves',
     'help.aboutP1':               'Most planners are flat lists — checklists or todos.',
     'help.aboutP2Lead':           'Rocks first',
@@ -9407,6 +9462,8 @@ const TRANSLATIONS = {
     'onboarding.nudgeCaption':    'Hotovo s prozkoumáváním?',
     'onboarding.nudge':           'Smažte ukázkové úkoly a nechte si jen ty své.\nNebo si je odstraňte později v Nastavení → Nápověda.',
     'onboarding.nudgeDismiss':    'Zkoumat dál',
+    'update.body':                'Je k dispozici nová verze Zenit Week.',
+    'update.reload':              'Načíst',
     'help.aboutTitle':            'Co řeší',
     'help.aboutP1':               'Většina plánovačů je jen plochý seznam — checklist nebo todo.',
     'help.aboutP2Lead':           'Velké kameny první',
