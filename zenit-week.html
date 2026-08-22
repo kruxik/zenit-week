@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-yqgX+EF8mHgOPMB7raT0XK8BexQkiFc6PfjPSQfmZNM='
+               'sha256-kaK8JhxMQr+JR9XDS5+LIRY2mnyxa8dEUhVebjp5ifc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4742,9 +4742,17 @@ function tryQuietReload() {
       console.debug('[quiet-refresh] reload-deferred', { reason: result.reason });
       _lastDeferReason = result.reason;
     }
+    _maybeShowUpdateBanner();
     return;
   }
   _lastDeferReason = null;
+  _fireQuietReload();
+}
+
+// The reload itself, with no gate in front of it — `tryQuietReload` applies the
+// gate, and the banner's button deliberately does not: the person tapping it is
+// the reason the gate exists.
+function _fireQuietReload() {
   const spent = _readPendingReload();
   const attempts = spent ? spent.n : 0;
   if (attempts >= PENDING_RELOAD_MAX_ATTEMPTS) {
@@ -4755,8 +4763,10 @@ function tryQuietReload() {
     console.debug('[quiet-refresh] reload-giving-up', attempts);
     _pendingReload = false;
     _disarmPendingReload();
+    _hideUpdateBanner();
     return;
   }
+  _hideUpdateBanner();
   _writePendingReload({ v: APP_VERSION, n: attempts + 1 });
   const payload = buildRestorePayload({
     panX, panY, zoom,
@@ -4784,6 +4794,7 @@ let _reloadRetryTimer = null;
 
 function _armPendingReload() {
   _pendingReload = true;
+  if (!_pendingReloadSince) _pendingReloadSince = Date.now();
   if (_reloadRetryTimer !== null) return;
   _reloadRetryTimer = setInterval(tryQuietReload, RELOAD_RETRY_INTERVAL_MS);
 }
@@ -4792,6 +4803,60 @@ function _disarmPendingReload() {
   if (_reloadRetryTimer === null) return;
   clearInterval(_reloadRetryTimer);
   _reloadRetryTimer = null;
+}
+
+// ─── Update-ready banner ─────────────────────────────────────────────────────
+// The reload takes the first quiet moment on its own, so this is only for the
+// case where that moment never comes — an app kept busy, a panel left open, a
+// week that will not finish syncing. Announcing it the instant a new build
+// lands would turn an invisible mechanism into a chore, so it waits out a
+// stretch of being deferred first. Dismissing it does not cancel the reload;
+// it only stops asking, for this session.
+const UPDATE_BANNER_DELAY_MS = 5 * 60 * 1000;
+let _pendingReloadSince = 0;
+let _updateBannerDismissed = false;
+
+function shouldShowUpdateBanner(state) {
+  if (!state.pending || state.dismissed) return false;
+  // The onboarding nudge owns this slot, and it is answering a question the
+  // user is in the middle of. Yield; the next retry tick asks again.
+  if (state.nudgeVisible) return false;
+  return state.owedForMs >= UPDATE_BANNER_DELAY_MS;
+}
+
+function _maybeShowUpdateBanner() {
+  const nudge = document.getElementById('playground-nudge');
+  const show = shouldShowUpdateBanner({
+    pending:      _pendingReload,
+    dismissed:    _updateBannerDismissed,
+    nudgeVisible: !!(nudge && nudge.classList.contains('visible')),
+    owedForMs:    _pendingReloadSince ? Date.now() - _pendingReloadSince : 0,
+  });
+  if (!show) return;
+  const el = document.getElementById('update-banner');
+  if (!el || el.classList.contains('visible')) return;
+  el.classList.add('visible');
+  console.debug('[quiet-refresh] banner-shown');
+}
+
+function _hideUpdateBanner() {
+  const el = document.getElementById('update-banner');
+  if (el) el.classList.remove('visible');
+}
+
+{
+  const _reloadBtn  = document.getElementById('update-banner-reload');
+  const _dismissBtn = document.getElementById('update-banner-dismiss');
+  if (_reloadBtn) _reloadBtn.addEventListener('click', () => {
+    console.debug('[quiet-refresh] banner-reload');
+    _hideUpdateBanner();
+    _fireQuietReload();
+  });
+  if (_dismissBtn) _dismissBtn.addEventListener('click', () => {
+    console.debug('[quiet-refresh] banner-dismissed');
+    _updateBannerDismissed = true;
+    _hideUpdateBanner();
+  });
 }
 
 // The cheapest quiet moment there is: the app is on its way to the background,
