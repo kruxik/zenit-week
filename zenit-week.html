@@ -116,6 +116,14 @@
 })();
 </script>
 <style>
+  /* The hidden attribute wins over every component rule in this file. The UA
+     stylesheet gives it only `[hidden] { display: none }`, which any class or
+     id rule setting `display` outranks — so an element left hidden in the
+     markup renders anyway, and the leak is silent because the markup looks
+     right. That is how the dev-only Settings block shipped visible on
+     production. Stated once, with !important, so no future rule can undo it. */
+  [hidden] { display: none !important; }
+
   :root {
     /* Backgrounds */
     --bg-page: #f9f9f9;
