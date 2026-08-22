@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-0/LXTZBpFbmxZwscuRY5ADLShB2FfyRDZ3RXG2urKHI='
+               'sha256-xODNqvzj+z1/idrA33BB/hvxZLR/ygU8o1WqA+t92D0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4312,14 +4312,60 @@ function netFetch(input, options = {}) {
   );
 }
 
-// ─── Quiet refresh: asset version probe (Slice 2 — observability only) ───────
+// ─── Quiet refresh: asset version probe ──────────────────────────────────────
 // Probes the deployed asset's ETag on foreground/focus. Loop guard: the new
 // ETag is persisted to localStorage *before* `_pendingReload` is flagged, so a
-// broken deploy can only reload once. `_pendingReload` is currently observed
-// but not acted upon; Slice 4 will wire it to an actual reload.
+// deploy is only ever chased once — and the attempt count below caps how many
+// reloads that one chase may spend.
 let _pendingReload = false;
 let _newAssetEtag  = null;
 const ASSET_ETAG_KEY = 'zenit-week-asset-etag';
+
+// ─── Quiet refresh: an owed reload survives a kill ───────────────────────────
+// The deferred reload used to live only in `_pendingReload`. Close the tab — or,
+// on a phone, have the installed app frozen and then killed — and the fact was
+// gone, while the version token had already been recorded as seen. The shell the
+// worker rewrote in the background usually covers that, but not when the write
+// never landed (evicted cache, a link that died mid-revalidate): the app then
+// sits a build behind with nothing left to tell it so.
+//
+// The record names the build that was found stale. Booting into that same build
+// means the reload is still owed; booting into any other means the launch
+// already picked the new one up and the record is spent. `n` counts reloads
+// already spent on it, so a reload that cannot reach a newer build gives up
+// rather than looping.
+const PENDING_RELOAD_KEY = 'zenit-week-pending-reload';
+const PENDING_RELOAD_MAX_ATTEMPTS = 3;
+// A dev build carries no real version, so "am I still on the stale one?" cannot
+// be answered and every launch would look owed. Persist only for a built one.
+const _versionIsBuilt = !APP_VERSION.startsWith('__');
+
+function _readPendingReload() {
+  if (!_versionIsBuilt) return null;
+  let raw = null;
+  try { raw = localStorage.getItem(PENDING_RELOAD_KEY); } catch (_) { return null; }
+  if (!raw) return null;
+  let rec = null;
+  try { rec = JSON.parse(raw); } catch (_) { rec = null; }
+  if (!rec || typeof rec.v !== 'string') { _clearPendingReload(); return null; }
+  return { v: rec.v, n: Number.isFinite(rec.n) ? rec.n : 0 };
+}
+
+function _writePendingReload(rec) {
+  if (!_versionIsBuilt) return;
+  try { localStorage.setItem(PENDING_RELOAD_KEY, JSON.stringify(rec)); } catch (_) {}
+}
+
+function _clearPendingReload() {
+  try { localStorage.removeItem(PENDING_RELOAD_KEY); } catch (_) {}
+}
+
+// The boot question on its own: is this launch still the build the record was
+// written against, and has the chase attempts left?
+function isPendingReloadOwed(rec, version, maxAttempts = PENDING_RELOAD_MAX_ATTEMPTS) {
+  if (!rec || typeof rec.v !== 'string' || rec.v !== version) return false;
+  return (Number.isFinite(rec.n) ? rec.n : 0) < maxAttempts;
+}
 function _assetProbeUrl() {
   // Probe whatever document URL actually served the page (works on Vercel
   // `/app`, plain `/zenit-week.html`, or any rewrite). Strip hash + search.
@@ -4378,8 +4424,11 @@ function _noteAssetVersion(token) {
   if (prev === token) return;
   localStorage.setItem(ASSET_ETAG_KEY, token);
   _newAssetEtag  = token;
-  _pendingReload = true;
   console.debug('[quiet-refresh] update-detected', { etag: token, prevEtag: prev });
+  // A new token starts the count over: attempts spent chasing an earlier one
+  // say nothing about this build.
+  _writePendingReload({ v: APP_VERSION, n: 0 });
+  _armPendingReload();
   tryQuietReload();
 }
 
@@ -4643,6 +4692,19 @@ function tryQuietReload() {
     return;
   }
   _lastDeferReason = null;
+  const spent = _readPendingReload();
+  const attempts = spent ? spent.n : 0;
+  if (attempts >= PENDING_RELOAD_MAX_ATTEMPTS) {
+    // Reloading is plainly not reaching a newer build — a cache handing back the
+    // same document, or a link that cannot fetch one. Stand down and wait for a
+    // genuinely new version token to arm this again, rather than reloading the
+    // app out from under someone once a minute forever.
+    console.debug('[quiet-refresh] reload-giving-up', attempts);
+    _pendingReload = false;
+    _disarmPendingReload();
+    return;
+  }
+  _writePendingReload({ v: APP_VERSION, n: attempts + 1 });
   const payload = buildRestorePayload({
     panX, panY, zoom,
     currentView, currentWeekKey,
@@ -4657,6 +4719,51 @@ function tryQuietReload() {
 document.addEventListener('mouseup',   tryQuietReload);
 document.addEventListener('touchend',  tryQuietReload);
 document.addEventListener('keyup',     tryQuietReload);
+
+// Those three cover the moment someone finishes an action, which is when the
+// app most often falls quiet. What they never cover is a blocker clearing
+// without one — an upload draining, a menu closing, a pan ended by the pointer
+// leaving the window. A reload deferred at such a moment used to stay deferred
+// for the life of the tab. A slow re-check closes that: it reads nothing but
+// in-memory state, spends no request, and only runs while a reload is owed.
+const RELOAD_RETRY_INTERVAL_MS = 60 * 1000;
+let _reloadRetryTimer = null;
+
+function _armPendingReload() {
+  _pendingReload = true;
+  if (_reloadRetryTimer !== null) return;
+  _reloadRetryTimer = setInterval(tryQuietReload, RELOAD_RETRY_INTERVAL_MS);
+}
+
+function _disarmPendingReload() {
+  if (_reloadRetryTimer === null) return;
+  clearInterval(_reloadRetryTimer);
+  _reloadRetryTimer = null;
+}
+
+// The cheapest quiet moment there is: the app is on its way to the background,
+// so nobody watches the reload and nobody loses a keystroke to it. On an
+// installed app this is the ordinary path — a phone is put down far more often
+// than the app is left idle in front of its owner. The quiescence gate still
+// applies: a node left mid-edit blocks this exactly as it blocks the rest.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') tryQuietReload();
+});
+
+// Pick an owed reload back up after a kill. Deliberately not attempted here:
+// this runs mid-script, before the state the quiescence gate reads exists. Arm
+// it and let the timer and the listeners above take the first quiet moment,
+// exactly as they would for an update found while the app was running.
+{
+  const _owed = _readPendingReload();
+  if (isPendingReloadOwed(_owed, APP_VERSION)) {
+    console.debug('[quiet-refresh] reload-still-owed', _owed);
+    _armPendingReload();
+  } else if (_owed) {
+    console.debug('[quiet-refresh] reload-record-spent', _owed);
+    _clearPendingReload();
+  }
+}
 
 // ─── OAuth redirect callback capture ──────────────────────────────────────────
 // Detects ?code= / ?error= on app load, captures, then strips URL before app init.

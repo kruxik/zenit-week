@@ -757,6 +757,7 @@ export const {
   buildRestorePayload,
   validateRestorePayload,
   isAppQuiescent,
+  isPendingReloadOwed,
   // Google Drive Sync
   attemptSilentRestore,
   authFetch,
