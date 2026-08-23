@@ -115,7 +115,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - **Dark mode**: Full light/dark theme with toggle in settings; respects `prefers-color-scheme` on first load; stored in `localStorage` as `zenit-week-theme`
 - **Feedback**: Provide visual cues for hover states and active operations (e.g., "panning" cursor, context menu with context-aware options)
 - **Context menus**: Hide options that don't apply to the current node type
-- **Todo panel**: Sidebar listing all incomplete activity nodes across the week; accessible via toolbar button
+- **Agenda view**: One of the three top-level views (`M` / `A` / `S`), not a sidebar. A day-tab strip (`1`–`7`, plus an Overdue tab on `0`) over a list of that day's activities, grouped into `Scheduled`, `Any day` and `Done`. Rows drag to reorder, swipe right to toggle done/undone, swipe left for the context menu
 - **Daily log panel**: Floating panel showing completed/ticked activities for the day, with timestamps and branch color dots
 - **Summary panel**: Expandable drawer showing per-branch done/total stats and a global completion percentage
 - **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week

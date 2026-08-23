@@ -125,13 +125,26 @@ After any of these, re-sync the parents for the new property, alongside the exis
 
 ### Agenda view
 
-Dropped tasks get **their own section below Done**, built with the existing `makeSectionDivider(labelText, count)` (`zenit-week.html:~17139`):
+A day tab renders three groups today, in this order (`zenit-week.html:~17272`):
 
 ```
-PENDING     3      drag-orderable, the do-list
-DONE        2      chronological, swipe-right → undone
-DROPPED     1      ← new; hidden when count is 0, like Done
+Scheduled   3   renderGroup(pendingRows, 'pending', t('agenda.scheduled'))
+Done        2   renderDoneSection(done) — chronological, swipe-right → undone
+Any day     4   renderGroup(anyRows, 'anyday', t('agenda.anyDay'))
 ```
+
+Dropped tasks get **a fourth group, rendered last** — after `Any day`, not directly under `Done`. Everything above it is still actionable; the dropped group is the only one that is not, so it belongs at the bottom of the tab rather than wedged into the middle of the live work.
+
+```
+Scheduled   3
+Done        2
+Any day     4
+Dropped     1   ← new; hidden when count is 0, like Done
+```
+
+It uses the same `makeSectionDivider(labelText, count)` that the Done section uses (`zenit-week.html:~17139`). The i18n string is sentence case — `.today-done-divider` applies `text-transform: uppercase` (`zenit-week.html:1551`), so the label is stored as "Dropped" / "Vyřazeno", not shouted.
+
+On the **Overdue tab** the layout is different — `pending` is grouped by weekday name instead. Dropped tasks must not appear there at all, which the `getOverdueItems()` fix below already handles.
 
 Rows render at reduced opacity with the ⊘ badge. The diagonal slash is a mind-map mark and does not translate to a list row, so the badge plus opacity carries it here. Swipe-right **undrops**, mirroring the Done section's swipe-to-undone, so a mistaken drop is recoverable from the same surface that shows it.
 
@@ -183,7 +196,7 @@ Dropping is a state toggle, so it takes **both** forms — each in its own class
 | Surface | Class | English | Czech |
 |---|---|---|---|
 | Context menu item | A | Dropped | Vyřazeno |
-| Agenda section divider | A | DROPPED | VYŘAZENO |
+| Agenda section divider | A | Dropped | Vyřazeno |
 | Stats headline row | A | Dropped | Vyřazeno |
 | Delete dialog button | B | Drop | Vyřadit |
 | Return to open | A (existing) | Undone | Nesplněno |
