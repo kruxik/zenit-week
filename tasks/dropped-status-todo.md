@@ -8,14 +8,14 @@ Order: **S1 first, always.** S3 / S4 / S5 are independent of each other once S1 
 
 ## S1 — Core state (logic only) ← regression cliff
 
-- [ ] T1.1 — `setStatus()` (`:11129`): add `'dropped'` branch — set `dropped` + `droppedAt`, clear `done`/`doneAt`/`donedOn`, `touchNode`, `setDescendants`, `syncStatusUp`. Set `fullRenderNeeded = true` (mirrors `unplanned`, since the badge changes node width).
-- [ ] T1.2 — `setStatus()`: add `'undropped'` branch — clear `dropped` + `droppedAt`, cascade, re-sync.
-- [ ] T1.3 — `setStatus()` `'done'` branch: clear `dropped`/`droppedAt` so D1 holds from both directions.
-- [ ] T1.4 — `setDescendants()` (`:11134`): handle both new statuses.
-- [ ] T1.5 — D3: the `'dropped'` branch must **not** touch `val` on a counter node (unlike `'done'`, which sets `val = max`).
-- [ ] T1.6 — `syncStatusUp()` (`:13306`) per spec §3.3: `parent.dropped` = every child dropped; `parent.done` = every child closed (`done || dropped`) **and** at least one child done. Manage `droppedAt` on the parent the way `doneAt` is managed.
-- [ ] T1.7 — `tests/dropped-status.test.js`: T1–T9 + T17 (set/clear, D1 both directions, D2 independence, D3 counter freeze, cascade down, all-dropped roll-up, mixed roll-up, one-open roll-up, no-dropped regression, undo).
-- [ ] T1.8 — `npm test` + `npm run validate` green. **`tests/status-propagation.test.js` must pass unmodified.**
+- [x] T1.1 — `setStatus()` (`:11129`): add `'dropped'` branch — set `dropped` + `droppedAt`, clear `done`/`doneAt`/`donedOn`, `touchNode`, `setDescendants`, `syncStatusUp`. Set `fullRenderNeeded = true` (mirrors `unplanned`, since the badge changes node width).
+- [x] T1.2 — `setStatus()`: add `'undropped'` branch — clear `dropped` + `droppedAt`, cascade, re-sync.
+- [x] T1.3 — `setStatus()` `'done'` branch: clear `dropped`/`droppedAt` so D1 holds from both directions.
+- [x] T1.4 — `setDescendants()` (`:11134`): handle both new statuses.
+- [x] T1.5 — D3: the `'dropped'` branch must **not** touch `val` on a counter node (unlike `'done'`, which sets `val = max`).
+- [x] T1.6 — `syncStatusUp()` (`:13306`) per spec §3.3: `parent.dropped` = every child dropped; `parent.done` = every child closed (`done || dropped`) **and** at least one child done. Manage `droppedAt` on the parent the way `doneAt` is managed.
+- [x] T1.7 — `tests/dropped-status.test.js`: T1–T9 + T17 (set/clear, D1 both directions, D2 independence, D3 counter freeze, cascade down, all-dropped roll-up, mixed roll-up, one-open roll-up, no-dropped regression, undo).
+- [x] T1.8 — `npm test` + `npm run validate` green. **`tests/status-propagation.test.js` must pass unmodified.**
 
 **AC:** dropping a node sets the flag and cascades; a mixed done+dropped subtree rolls up to done; an all-dropped one rolls up to dropped and never done; a week with no dropped nodes rolls up byte-identically to today.
 **Verify:** `npm test`. No visual change expected anywhere.

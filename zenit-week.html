@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-kaK8JhxMQr+JR9XDS5+LIRY2mnyxa8dEUhVebjp5ifc='
+               'sha256-GnhDd94W6cGu+ACtFRCVsPJjGwjei5GTCI1qmS/+yec='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -11146,6 +11146,9 @@ function setStatus(id, status) {
         }
         child.doneAt  = new Date().toISOString();
         child.donedOn = localDateStr();
+        // D1 — done and dropped are mutually exclusive at every write site.
+        child.dropped = false;
+        delete child.droppedAt;
         setDescendants(cid, 'done');
       } else if (newStatus === 'undone') {
         child.done = false;
@@ -11164,6 +11167,19 @@ function setStatus(id, status) {
         child.unplanned = false;
         if (isLeafActivity(child)) delete child.unplannedAt;
         setDescendants(cid, 'planned');
+      } else if (newStatus === 'dropped') {
+        child.dropped   = true;
+        child.droppedAt = new Date().toISOString();
+        // D1 — clear the done side, timestamps included.
+        child.done = false;
+        delete child.doneAt;
+        delete child.donedOn;
+        // D3 — a dropped counter freezes where it stands; val is left alone.
+        setDescendants(cid, 'dropped');
+      } else if (newStatus === 'undropped') {
+        child.dropped = false;
+        delete child.droppedAt;
+        setDescendants(cid, 'undropped');
       }
     });
   }
@@ -11188,6 +11204,9 @@ function setStatus(id, status) {
     node.doneAt  = new Date().toISOString();
     node.donedOn = localDateStr();
     if (node.type === 'counter') node.val = node.max;
+    // D1 — marking a node done clears any drop, timestamp included.
+    node.dropped = false;
+    delete node.droppedAt;
     touchNode(id);
     setDescendants(id, 'done');
     syncStatusUp(id, 'done');
@@ -11213,6 +11232,26 @@ function setStatus(id, status) {
     touchNode(id);
     setDescendants(id, 'planned');
     syncStatusUp(id, 'unplanned');
+    fullRenderNeeded = true;
+  } else if (status === 'dropped') {
+    node.dropped   = true;
+    node.droppedAt = new Date().toISOString();
+    // D1 — dropping clears done and both of its timestamps.
+    node.done = false;
+    delete node.doneAt;
+    delete node.donedOn;
+    // D3 — the counter value is frozen, not zeroed and not filled to max.
+    touchNode(id);
+    setDescendants(id, 'dropped');
+    syncStatusUp(id, 'dropped');
+    // The badge changes the node width, so the layout has to be recomputed.
+    fullRenderNeeded = true;
+  } else if (status === 'undropped') {
+    node.dropped = false;
+    delete node.droppedAt;
+    touchNode(id);
+    setDescendants(id, 'undropped');
+    syncStatusUp(id, 'dropped');
     fullRenderNeeded = true;
   } else if (status === 'prio-high') {
     const newVal = (node.priority === 'high') ? null : 'high';
@@ -13312,19 +13351,53 @@ function syncStatusUp(nodeId, prop) {
 
   const siblings = parent.children.map(findNode).filter(Boolean);
   if (siblings.length === 0) return;
-  const allTrue = siblings.every(s => s[prop]);
 
   // Branch nodes participate too: a branch whose activities are all done is
   // itself done. Coerce with !! so nodes that never carried the flag (branches
-  // are created without done/unplanned) don't count as a change on first sync.
+  // are created without done/unplanned/dropped) don't count as a change on
+  // first sync.
+
+  // 'done' and 'dropped' are two values on one outcome axis, so they roll up
+  // together: a subtree that is part done and part dropped, with nothing left
+  // open, is a done subtree. A generic every(s => s[prop]) cannot say that, so
+  // both flags are recomputed whichever of the two triggered the sync.
+  //
+  // With no dropped node anywhere this reduces exactly to the old rule:
+  // done || dropped collapses to done, and "at least one done" is implied by
+  // "every child done" for any non-empty sibling list.
+  if (prop === 'done' || prop === 'dropped') {
+    const allDropped = siblings.every(s => s.dropped);
+    const allClosed  = siblings.every(s => s.done || s.dropped);
+    const anyDone    = siblings.some(s => s.done);
+    const nextDone   = allClosed && anyDone;
+    let changed = false;
+
+    if (!!parent.done !== nextDone) {
+      parent.done = nextDone;
+      if (nextDone) { parent.doneAt = new Date().toISOString(); parent.donedOn = localDateStr(); }
+      else { delete parent.doneAt; delete parent.donedOn; }
+      changed = true;
+    }
+    if (!!parent.dropped !== allDropped) {
+      parent.dropped = allDropped;
+      if (allDropped) parent.droppedAt = new Date().toISOString();
+      else delete parent.droppedAt;
+      changed = true;
+    }
+
+    if (changed) {
+      touchNode(parent.id);
+      updateNodeUI(parent.id);
+      syncStatusUp(parent.id, prop);
+    }
+    return;
+  }
+
+  const allTrue = siblings.every(s => s[prop]);
   if (!!parent[prop] !== allTrue) {
     parent[prop] = allTrue;
     touchNode(parent.id);
-    if (prop === 'done') {
-      if (allTrue) { parent.doneAt = new Date().toISOString(); parent.donedOn = localDateStr(); }
-      else { delete parent.doneAt; delete parent.donedOn; }
-      updateNodeUI(parent.id);
-    } else if (prop === 'unplanned') {
+    if (prop === 'unplanned') {
       if (allTrue) parent.unplannedAt = new Date().toISOString();
       else delete parent.unplannedAt;
     }
