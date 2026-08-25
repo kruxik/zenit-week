@@ -21,12 +21,13 @@ A visually rich, single-file web application for planning weeks using a Mind Map
 weekData = {
   nodes: [
     { id, type, branch, label, parent, children,
-      done, unplanned, priority, reusable, offX, offY, side, _editing,
+      done, unplanned, dropped, priority, reusable, offX, offY, side, _editing,
       // counter nodes only:
       val, max, ticks,       // ticks: ISO timestamp per increment (drives daily log)
       // timestamps:
       doneAt,                // set when marked done
       unplannedAt,           // set when marked unplanned
+      droppedAt,             // set when marked dropped
       _ts }                  // epoch ms — Drive merge conflict resolution
   ]
 }
@@ -60,7 +61,9 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - `moveNodeToNextWeek(nodeId)` — moves a single node (and subtree) to the next ISO week
 - `addBranch(side)` / `deleteBranch(id)` — dynamic branch management
 - `applyBranchColor(branch, hex)` — updates branch color palette and re-renders
-- `syncStatusUp(nodeId, prop)` — propagates done/unplanned status up the tree after a child changes
+- `syncStatusUp(nodeId, prop)` — propagates status up the tree after a child changes. `'unplanned'` uses the plain `every()` rule; `'done'` and `'dropped'` are two values on one outcome axis and are recomputed together — a parent is `dropped` when every child is dropped, and `done` when every child is closed (`done || dropped`) **and** at least one is done
+- `getDroppedItems(dateStr)` — agenda rows for tasks dropped on a given date, keyed on `droppedAt` exactly as the Done log is keyed on `doneAt`
+- `isAgendaRowNode(n)` — whether a node is eligible to be an agenda row of its own; shared by the cross-day Done scan and the Dropped group
 
 ## Coding Standards & Conventions
 - **Single File Policy**: Keep everything in `zenit-week.html` — never split into separate files. The one exception is `sw.js`: browsers only accept a service worker from a same-origin script URL, so it cannot be inlined or loaded from a `blob:`. Nothing else may leave the single file; do not treat `sw.js` as licence to split further. It holds exactly two concerns — shell caching, and draining the offline upload queue on a Background Sync event. Keep application logic out of both: the page serializes the upload payload and its content hash, and the worker only decides whether pushing is safe (`canPushEntry`). CRDT merging, hashing and layout never move into the worker.
@@ -76,8 +79,10 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
   - Use kebab-case for IDs and class names
   - Keep all styles in the `<style>` tag in `<head>`
 - **Cascading behavior**:
-  - Done status and priority changes cascade to all descendants
+  - Done, dropped and priority changes cascade to all descendants
   - Counter nodes auto-mark done when reaching max value
+  - `done` and `dropped` are mutually exclusive — setting either clears the other and its timestamps, at **every** write site, not just `setStatus`
+  - Dropping a counter freezes `val` where it stands; it is not zeroed and not filled to `max`
 
 ## Workflows
 - **Running**: Open `zenit-week.html` directly in any modern browser — no server needed
@@ -98,6 +103,7 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
   - `Backspace` / `Delete` — delete hovered node (clear the week on the root)
   - `D` — toggle done on hovered node
   - `U` — toggle unplanned on hovered node
+  - `X` — toggle dropped on hovered node
   - `P` — cycle priority on hovered node
   - `C` — comment on hovered node
   - `R` — toggle reusable on hovered node
@@ -115,12 +121,14 @@ Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-w
 - **Dark mode**: Full light/dark theme with toggle in settings; respects `prefers-color-scheme` on first load; stored in `localStorage` as `zenit-week-theme`
 - **Feedback**: Provide visual cues for hover states and active operations (e.g., "panning" cursor, context menu with context-aware options)
 - **Context menus**: Hide options that don't apply to the current node type
-- **Agenda view**: One of the three top-level views (`M` / `A` / `S`), not a sidebar. A day-tab strip (`1`–`7`, plus an Overdue tab on `0`) over a list of that day's activities, grouped into `Scheduled`, `Any day` and `Done`. Rows drag to reorder, swipe right to toggle done/undone, swipe left for the context menu
+- **Agenda view**: One of the three top-level views (`M` / `A` / `S`), not a sidebar. A day-tab strip (`1`–`7`, plus an Overdue tab on `0`) over a list of that day's activities, grouped into `Scheduled`, `Done`, `Any day` and `Dropped` — in that render order. Rows drag to reorder, swipe right to toggle done/undone (undrop, in the Dropped group), swipe left for the context menu
+- **Dropped status**: A third value on the outcome axis (open / done / dropped) — "this will not happen", without erasing the task. On the map: branch colour at ~45% opacity, a corner-to-corner diagonal slash and a ⊘ badge; never Done's grey or horizontal strike-through, never the dashed stroke reserved for keyboard focus. Dropped tasks stay in the stats denominator in their own grey band, never arrive via `Transfer Unfinished`, never show as overdue, and are revived (flag cleared) by `Transfer Reusable` and `Next week`. `ctx-undone` is the shared way back to open from either closed state — there is no separate un-drop menu item
 - **Daily log**: Not a separate panel — the Agenda's `Done` section is the day log: one row per activity completed or tick recorded that day, ordered by `doneAt`, with branch color dots and `n/total` tick pills. The `daily-log-*` class prefix is legacy naming for the shared agenda-row internals built by `buildAgendaItem()`; it is only ever called from the Agenda
 - **Week statistics**: Live in the Stats view (`S`) — donut, per-branch follow-through, effort baseline and the multi-week cumulative flow, all fed by `computeWeekStats()`. `updateSummary()` does not render a drawer; it rebuilds the Help legend's branch items, refreshes the root node's completion ring via `updateCenterRing()`, and re-renders the Stats panel when it is open
 - **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week
 - **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive — Zenit Week runs no servers that hold user data (the sole backend is `/api/token`, an OAuth token-exchange function) and never stores user data itself
 - **Internationalization**: English and Czech UI supported; `t(key)` helper reads from `TRANSLATIONS[currentLang]`; language persisted as `zenit-week-lang` in `localStorage` and synced via Drive
+- **Deleting a task**: The three UI entry points (context menu, `Backspace`/`Delete` on the map, `Delete` in the Agenda) pass `deleteNode(id, { ask: true })`, which confirms with three buttons — `Cancel` / `Drop` / `Delete` — so Drop is discoverable at the moment a task is about to be erased. Programmatic callers omit `ask` and delete immediately. Tick-children and day-children are never interrupted
 - **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog — `showAppConfirm({ title, body, okLabel, danger, onConfirm })` — or add a new styled dialog following the `#app-confirm-overlay` / `#app-confirm-dialog` pattern
 
 ## Workflow Rules

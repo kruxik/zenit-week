@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-vughOP1X2y8+C4RYR47UJ/gQF3bvEjsUMEYJX7ptuD0='
+               'sha256-1JAarUGlnzx9U6UNo7Fg8v/hDTKQQq4I4ljDMIJxDOE='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4204,6 +4204,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="help.delete">Delete</span> <span><kbd>Backspace</kbd> <kbd>Delete</kbd></span></div>
         <div class="help-row"><span data-i18n="help.toggleDone">Toggle Done</span> <kbd>D</kbd></div>
         <div class="help-row"><span data-i18n="help.toggleUnplanned">Toggle Unplanned</span> <kbd>U</kbd></div>
+        <div class="help-row"><span data-i18n="help.toggleDropped">Toggle Dropped</span> <kbd>X</kbd></div>
         <div class="help-row"><span data-i18n="help.scheduleDay">Schedule day</span> <span><kbd>1</kbd>–<kbd>7</kbd></span></div>
         <div class="help-row"><span data-i18n="help.clearDays">Clear days</span> <kbd>8</kbd></div>
         <div class="help-row"><span data-i18n="help.cyclePriority">Cycle priority</span> <kbd>P</kbd></div>
@@ -4295,6 +4296,7 @@ Or remove them later in Settings → Help.</div>
         <div id="help-legend">
           <div class="legend-item"><div class="legend-dot" style="background:var(--accent-warning-bg); border: 1px solid var(--accent-warning-border)"></div><span data-i18n="help.unplanned">Unplanned</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--node-done-bg); border: 1px solid var(--node-done-border)"></div><span data-i18n="help.done">Done</span></div>
+          <div class="legend-item"><svg class="icon" aria-hidden="true"><use href="#icon-ban"/></svg><span data-i18n="help.dropped">Dropped</span></div>
           <div class="legend-item"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg><span data-i18n="menu.reusable">Reusable</span></div>
           <div class="legend-item"><svg class="icon" aria-hidden="true"><use href="#icon-message"/></svg><span data-i18n="menu.comment">Comment</span></div>
         </div>
@@ -9309,6 +9311,7 @@ const TRANSLATIONS = {
     'help.delete':                'Delete',
     'help.toggleDone':            'Toggle Done',
     'help.toggleUnplanned':       'Toggle Unplanned',
+    'help.toggleDropped':         'Toggle Dropped',
     'help.quickOptions':          'Quick Options',
     'help.scheduleDay':           'Schedule day',
     'help.clearDays':             'Clear days',
@@ -9638,6 +9641,7 @@ const TRANSLATIONS = {
     'help.delete':                'Smazat',
     'help.toggleDone':            'Přepnout hotovo',
     'help.toggleUnplanned':       'Přepnout neplánované',
+    'help.toggleDropped':         'Přepnout vyřazení',
     'help.quickOptions':          'Rychlé možnosti',
     'help.scheduleDay':           'Naplánovat den',
     'help.clearDays':             'Zrušit dny',

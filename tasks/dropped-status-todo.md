@@ -187,13 +187,29 @@ not wanted.
 
 ## S7 — Polish and ship gate
 
-- [ ] T7.1 — Daily-log badge for dropped rows via the existing `.daily-log-badge` pattern (`:1590`).
-- [ ] T7.2 — Help legend entry + `help.dropped` wiring (`~4286`).
-- [ ] T7.3 — Update `CLAUDE.md`: data model, hotkey list (`X`), UI/UX guidelines.
+- [x] T7.1 — Daily-log badge for dropped rows via the existing `.daily-log-badge` pattern (`:1590`).
+- [x] T7.2 — Help legend entry + `help.dropped` wiring (`~4286`).
+- [x] T7.3 — Update `CLAUDE.md`: data model, hotkey list (`X`), UI/UX guidelines.
 - [ ] T7.4 — CHANGELOG entry.
 - [ ] T7.5 — Full manual pass: both themes, all three view levels, mobile width, undo/redo, Drive sync round trip.
-- [ ] T7.6 — `npm test` + `npm run validate` + `npm run csp` green.
-- [ ] T7.7 — Walk spec §11 acceptance criteria, tick every box.
+- [x] T7.6 — `npm test` + `npm run validate` + `npm run csp` green.
+- [x] T7.7 — Walk spec §11 acceptance criteria, tick every box.
+
+### S7 notes
+- **T7.1 already landed in S5.** The `.daily-log-badge.dropped` variant and the ⊘
+  on Dropped rows shipped with the agenda group. Nothing left to add.
+- **T7.4 — no handwritten CHANGELOG entry.** `npm run release` regenerates
+  `CHANGELOG.md` with git-cliff from conventional commit messages and prepends the
+  new version section. A hand-written entry would be overwritten at release and
+  would conflict in the meantime. The five slice commits already carry the right
+  `feat(...)` subjects, which are the entry.
+- **T7.5 is the user's pass**, not something the suite can stand in for. Left
+  unticked until it happens.
+- **One extra i18n key:** `help.toggleDropped` (Toggle Dropped / Přepnout
+  vyřazení), so the `X` row matches the `Toggle Done` / `Toggle Unplanned` form
+  beside it. `help.dropped` from S2 labels the Legend swatch.
+- **T7.7 walked.** Every §11 box holds against the code; the three
+  `text-decoration: line-through` sites all gate on `done`, never `dropped`.
 
 ### ⛔ CHECKPOINT 4 — ship gate
 
