@@ -664,6 +664,8 @@ export const {
   getAgendaItems,
   getOverdueItems,
   getAnyDayItems,
+  getDroppedItems,
+  isAgendaRowNode,
   computeDayReschedule,
   localDateStr,
   tabDateString,

@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-8zzcErWfiHQvipB5i2bQTwu8tCsacStQsIHnEegFbwo='
+               'sha256-h7bs8tvehGni5ID2pxkNwSzrY/2ChlltgbdG0OvewZk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1612,6 +1612,10 @@
     background: var(--badge-comment-bg);
     color: var(--badge-comment-text);
   }
+  .daily-log-badge.dropped {
+    background: color-mix(in srgb, var(--stats-dropped) 22%, transparent);
+    color: var(--stats-dropped);
+  }
   .agenda-item .daily-log-badge.comment { cursor: pointer; }
   .agenda-item .daily-log-badge.comment:hover { filter: brightness(1.08); }
 
@@ -2809,8 +2813,10 @@
   .agenda-drag-handle:active { cursor: grabbing; }
 
   .agenda-item-dragging { opacity: 0.35; }
-  .agenda-item-done > * { opacity: 0.5; }
-  .agenda-swipe-wrapper:has(.agenda-item-done) .agenda-swipe-action { opacity: 0.5; }
+  .agenda-item-done > *,
+  .agenda-item-dropped > * { opacity: 0.5; }
+  .agenda-swipe-wrapper:has(.agenda-item-done) .agenda-swipe-action,
+  .agenda-swipe-wrapper:has(.agenda-item-dropped) .agenda-swipe-action { opacity: 0.5; }
   .agenda-item-drop-above .agenda-item { box-shadow: inset 0 2px 0 0 var(--accent, #1ABCFE); }
   .agenda-item-drop-below .agenda-item { box-shadow: inset 0 -2px 0 0 var(--accent, #1ABCFE); }
 
@@ -9149,6 +9155,7 @@ const TRANSLATIONS = {
     'agenda.emptyDay':            'No tasks for this day.',
     'agenda.emptyOverdue':        'No overdue tasks.',
     'agenda.anyDay':              'Any day',
+    'agenda.dropped':             'Dropped',
     'agenda.scheduled':           'Scheduled',
     'menu.reschedule':            'Reschedule',
     'menu.now':                   'Now',
@@ -9473,6 +9480,7 @@ const TRANSLATIONS = {
     'agenda.emptyDay':            'Pro tento den žádné úkoly.',
     'agenda.emptyOverdue':        'Žádné zpožděné úkoly.',
     'agenda.anyDay':              'Kdykoli',
+    'agenda.dropped':             'Vyřazeno',
     'agenda.scheduled':           'Naplánováno',
     'menu.reschedule':            'Přeplánovat',
     'menu.now':                   'Nyní',
@@ -12894,6 +12902,28 @@ function getAnyDayItems() {
     }
     return isLeafActivity(n);
   });
+}
+
+// Eligible as an agenda row of its own — the rule the cross-day Done scan uses,
+// shared so the Dropped group applies exactly the same one.
+function isAgendaRowNode(n) {
+  if (!n || n.type !== 'activity' || n.tickChild) return false;
+  const hasCounter = !!getCounterChild(n);
+  const hasTicks = (n.children || []).some(cid => findNode(cid)?.tickChild);
+  const p = findNode(n.parent);
+  const isAnnotatedParent = p && p.type === 'activity' && parseTodoDays(p.label).size > 0;
+  return n.dayChild === true || hasCounter || hasTicks || isAnnotatedParent
+      || (_hasNoDayLeaves(n) && (parseTodoDays(n.label || '').size > 0 || isLeafActivity(n)));
+}
+
+// Tasks dropped on a given calendar date. Keyed on droppedAt exactly as the
+// Done log is keyed on doneAt — the day you gave up, not the day the task was
+// scheduled for. That keeps an unscheduled dropped task visible somewhere, and
+// stops a multi-day one repeating across all seven tabs.
+function getDroppedItems(dateStr) {
+  return weekData.nodes.filter(n =>
+    n.dropped && n.droppedAt && localDateStr(new Date(n.droppedAt)) === dateStr
+    && isAgendaRowNode(n));
 }
 
 // Pending agenda rows for ticks pinned to a specific weekday. Each scheduled,
@@ -16693,6 +16723,9 @@ function buildAgendaItem(node, label, opts = {}) {
   // anyDay: the Any-day aggregate row of a tick parent. Its pill and Done
   // action consider only unscheduled ticks — scheduled ones live on their days.
   const anyDay = !!opts.anyDay;
+  // A row in the Dropped group. Reduced opacity and the ⊘ badge, but no
+  // diagonal slash — that is a mind-map mark and does not translate to a list.
+  const isDroppedRow = !!opts.dropped;
   const cc = getCounterChild(node);
   const tickInfo = getTickInfo(node);
   const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
@@ -16726,6 +16759,7 @@ function buildAgendaItem(node, label, opts = {}) {
     ? label
     : { prefix: '', main: label || nodeDisplayLabel(node) || t('todo.noLabel') };
   if (node.done || inDoneSection) item.classList.add('agenda-item-done');
+  if (isDroppedRow) item.classList.add('agenda-item-dropped');
   const labelEl = document.createElement('div');
   labelEl.className = 'daily-log-label';
   if (lbl.prefix) {
@@ -16795,6 +16829,16 @@ function buildAgendaItem(node, label, opts = {}) {
     item.appendChild(bolt);
   }
 
+  // Dropped badge
+  if (isDroppedRow) {
+    const ban = document.createElement('span');
+    ban.className = 'daily-log-badge dropped';
+    ban.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;';
+    ban.innerHTML = iconSvg('ban');
+    ban.title = t('agenda.dropped');
+    item.appendChild(ban);
+  }
+
   // Reusable badge
   if (node.reusable) {
     const rep = document.createElement('span');
@@ -16853,12 +16897,15 @@ function buildAgendaItem(node, label, opts = {}) {
   // Action button. In the Done section, partial-progress rows (counter/tick
   // parents ticked today but not yet at max) also show Undone so the user
   // can revert just-completed steps without seeing a second Done button.
-  const showUndone = node.done || (inDoneSection && (cc || tickInfo));
+  const showUndone = node.done || isDroppedRow || (inDoneSection && (cc || tickInfo));
   const btn = document.createElement('button');
   btn.className = 'agenda-action-btn';
   if (showUndone) {
     btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
     const undoneAction = () => {
+      // Undone is the shared way back to open, so the Dropped group's rows
+      // reuse it — button and swipe-right both undrop.
+      if (isDroppedRow) { setStatus(node.id, 'undropped'); renderAgenda(); return; }
       if (tickRecord) {
         // Untick THIS specific tick log entry.
         setStatus(tickRecord.tick.id, 'undone');
@@ -16955,7 +17002,8 @@ function renderAgendaTabContent() {
   // Pending: scheduled for this tab and not yet done. Counter / tick-children
   // parents stay here even after a tick-today so the user can keep ticking
   // (the same activity also appears in Done as a record of today's progress).
-  const pending = items.filter(n => !n.done);
+  const pending = items.filter(n => !n.done && !n.dropped);
+
 
   // Done section (non-overdue tabs only).
   let scheduledDone = [];
@@ -16969,16 +17017,8 @@ function renderAgendaTabContent() {
     };
     
     scheduledDone = items.filter(logOnTab);
-    crossDayDone = weekData.nodes.filter(n => {
-      if (n.type !== 'activity' || !logOnTab(n) || scheduledIds.has(n.id)) return false;
-      // Include if it's a day-leaf, has a counter, or is a leaf activity
-      if (n.tickChild) return false; // managed by parent — never appears as its own agenda row
-      const hasCounter = !!getCounterChild(n);
-      const hasTicks = (n.children || []).some(cid => findNode(cid)?.tickChild);
-      const p = findNode(n.parent);
-      const isAnnotatedParent = p && p.type === 'activity' && parseTodoDays(p.label).size > 0;
-      return n.dayChild === true || hasCounter || hasTicks || isAnnotatedParent || (_hasNoDayLeaves(n) && (parseTodoDays(n.label || '').size > 0 || isLeafActivity(n)));
-    });
+    crossDayDone = weekData.nodes.filter(n =>
+      logOnTab(n) && !scheduledIds.has(n.id) && isAgendaRowNode(n));
   }
   const done = [...scheduledDone, ...crossDayDone];
 
@@ -16993,7 +17033,11 @@ function renderAgendaTabContent() {
   // render as empty.
   const scheduledTickRows = isOverdue ? [] : getScheduledTickRows(agendaActiveTab);
 
-  if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0 && scheduledTickRows.length === 0) {
+  // Never on the Overdue tab — dropped work is not outstanding work.
+  const droppedItems = isOverdue ? [] : getDroppedItems(tabDate);
+
+  if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0
+      && scheduledTickRows.length === 0 && droppedItems.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'daily-log-empty';
     empty.textContent = isOverdue ? t('agenda.emptyOverdue') : t('agenda.emptyDay');
@@ -17433,6 +17477,34 @@ function renderAgendaTabContent() {
     });
   }
 
+  // Fourth group, after Any day: everything above it is actionable, this one is
+  // not. Chronological by droppedAt, no drag-reorder — the same contract the
+  // Done log has. Hidden entirely when empty.
+  function renderDroppedSection(nodes) {
+    if (nodes.length === 0) return;
+    const rows = [...nodes].sort((a, b) =>
+      new Date(a.droppedAt).getTime() - new Date(b.droppedAt).getTime());
+    if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
+    list.appendChild(makeSectionDivider(t('agenda.dropped'), rows.length));
+    rows.forEach(n => {
+      const item = buildAgendaItem(n, getAgendaNodeLabel(n), { dropped: true });
+      const swipeLeft = document.createElement('div');
+      swipeLeft.className = 'agenda-swipe-action agenda-swipe-action-left undone';
+      swipeLeft.innerHTML = iconSvg('circle-dashed-check');
+      const swipeRight = document.createElement('div');
+      swipeRight.className = 'agenda-swipe-action agenda-swipe-action-right';
+      swipeRight.innerHTML = iconSvg('menu-2');
+      const wrapper = document.createElement('div');
+      wrapper.className = 'agenda-swipe-wrapper';
+      wrapper.dataset.nodeId = n.id;
+      wrapper.appendChild(swipeLeft);
+      wrapper.appendChild(swipeRight);
+      wrapper.appendChild(item);
+      list.appendChild(wrapper);
+      addSwipeGesture(item, n);
+    });
+  }
+
   function renderGroup(nodes, groupKey, dividerLabel, buildFn) {
     const saved = loadAgendaGroupOrder(tabKey, groupKey);
     let ordered;
@@ -17502,6 +17574,7 @@ function renderAgendaTabContent() {
     renderGroup(pendingRows, 'pending', t('agenda.scheduled'), buildRow);
     renderDoneSection(done);
     renderGroup(anyRows, 'anyday', t('agenda.anyDay'), buildRow);
+    renderDroppedSection(droppedItems);
   }
 }
 

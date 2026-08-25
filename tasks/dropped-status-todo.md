@@ -108,18 +108,42 @@ Order: **S1 first, always.** S3 / S4 / S5 are independent of each other once S1 
 
 ## S5 — Agenda
 
-- [ ] T5.1 — Fourth group rendered **last**, after `Any day` (`~17272`).
-- [ ] T5.2 — `makeSectionDivider` (`~17139`) with a sentence-case label — `.today-done-divider` uppercases via CSS (`:1551`).
-- [ ] T5.3 — Hide the group entirely at count 0, as Done does.
-- [ ] T5.4 — Rows at reduced opacity + ⊘ badge. No diagonal slash — it does not translate to a list row.
-- [ ] T5.5 — Swipe-right undrops, mirroring Done's swipe-to-undone.
-- [ ] T5.6 — Confirm dropped tasks never appear on the Overdue tab (falls out of T3.5 — assert it).
-- [ ] T5.7 — i18n `agenda.dropped`, both languages.
-- [ ] T5.8 — Tests: group ordering, empty-hiding, swipe-to-undrop.
-- [ ] T5.9 — `npm test` green; `tests/agenda-order.test.js` unmodified.
+- [x] T5.1 — Fourth group rendered **last**, after `Any day` (`~17272`).
+- [x] T5.2 — `makeSectionDivider` (`~17139`) with a sentence-case label — `.today-done-divider` uppercases via CSS (`:1551`).
+- [x] T5.3 — Hide the group entirely at count 0, as Done does.
+- [x] T5.4 — Rows at reduced opacity + ⊘ badge. No diagonal slash — it does not translate to a list row.
+- [x] T5.5 — Swipe-right undrops, mirroring Done's swipe-to-undone.
+- [x] T5.6 — Confirm dropped tasks never appear on the Overdue tab (falls out of T3.5 — assert it).
+- [x] T5.7 — i18n `agenda.dropped`, both languages.
+- [x] T5.8 — Tests: group ordering, empty-hiding, swipe-to-undrop.
+- [x] T5.9 — `npm test` green; `tests/agenda-order.test.js` unmodified.
 
 **AC:** the Dropped group sits last, hides when empty, and swipe-right returns a task to open.
 **Verify:** browser, a day with all four groups populated.
+
+### S5 interpretation — which tab a dropped task lands on
+The todo says "fourth group, rendered last" but not what fills it. Two readings:
+the tasks *scheduled for* that tab, or the tasks *dropped on* that tab's date.
+Chose the second, keyed on `droppedAt` exactly as the Done log is keyed on
+`doneAt`. It is the only reading that makes spec §4.5 true ("a record of *when*
+you gave up, free"), it keeps an unscheduled dropped task visible somewhere —
+S3's T3.5 removed those from Any day — and it stops one multi-day task repeating
+across all seven tabs. Push back if the other reading was meant.
+
+### S5 additions beyond the todo
+- **`getDroppedItems(dateStr)` + `isAgendaRowNode(n)` hoisted to module level**,
+  beside `getOverdueItems`/`getAnyDayItems`. `isAgendaRowNode` is the cross-day
+  Done scan's eligibility rule, lifted verbatim so both groups apply one rule
+  rather than two copies that can drift. Also what makes T5.8 testable —
+  `renderAgendaTabContent` builds no real DOM under the test harness.
+- **`pending` now excludes dropped**, or a dropped task would still sit in
+  Scheduled as actionable.
+- **The empty-day early return** counts dropped rows, or a day whose only content
+  was dropped work rendered "nothing here" and skipped the group entirely.
+- **CSS:** `.agenda-item-dropped` joins the existing `.agenda-item-done` opacity
+  rules rather than duplicating them; `.daily-log-badge.dropped` follows the four
+  existing badge variants and reuses S4's `--stats-dropped`.
+
 
 ---
 

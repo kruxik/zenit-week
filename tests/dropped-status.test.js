@@ -1,7 +1,7 @@
 import {
   setStatus, syncStatusUp, findNode, undo, showContextMenu, t,
   transferUnfinished, transferReusable, moveNodeToNextWeek,
-  getOverdueItems, getAnyDayItems,
+  getOverdueItems, getAnyDayItems, getDroppedItems, localDateStr,
   computeWeekStats, _computeSummarySignature,
   _state,
 } from './setup.js';
@@ -793,5 +793,119 @@ describe('T16 – the summary signature notices a drop', () => {
     setStatus('a1', 'undropped');
 
     expect(_computeSummarySignature()).toBe(before);
+  });
+});
+
+// ─── S5 — agenda ─────────────────────────────────────────────────────────────
+
+describe('the Agenda Dropped group', () => {
+  const AT = (d, h = 9) => `2026-01-0${d}T0${h}:00:00.000Z`;
+  const day = (d, h = 9) => localDateStr(new Date(AT(d, h)));
+
+  test('lists the tasks dropped on that date, oldest first', () => {
+    setUp([
+      mkBranch('work', ['a1', 'a2', 'a3']),
+      mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: AT(2, 8) }),
+      mkActivity('a2', 'work', 'work', { dropped: true, droppedAt: AT(2, 6) }),
+      mkActivity('a3', 'work', 'work', { dropped: true, droppedAt: AT(3, 6) }),
+    ]);
+
+    const rows = getDroppedItems(day(2));
+    expect(rows.map(n => n.id).sort()).toEqual(['a1', 'a2']);
+    expect(getDroppedItems(day(3)).map(n => n.id)).toEqual(['a3']);
+  });
+
+  test('is empty on a day with nothing dropped, so the group hides', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: AT(2) }),
+    ]);
+
+    expect(getDroppedItems(day(5))).toEqual([]);
+  });
+
+  test('an unscheduled dropped task still appears, on the day it was dropped', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: AT(4) }),
+    ]);
+
+    // It is gone from Any day (S3) but not lost — it lands here instead.
+    expect(getAnyDayItems()).toEqual([]);
+    expect(getDroppedItems(day(4)).map(n => n.id)).toEqual(['a1']);
+  });
+
+  test('a dropped parent with children is not a row of its own', () => {
+    setUp([
+      mkBranch('work', ['p1']),
+      mkActivity('p1', 'work', 'work', { dropped: true, droppedAt: AT(2), children: ['c1'] }),
+      mkActivity('c1', 'p1', 'work', { dropped: true, droppedAt: AT(2) }),
+    ]);
+
+    expect(getDroppedItems(day(2)).map(n => n.id)).toEqual(['c1']);
+  });
+
+  test('tick-children never become rows of their own', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: AT(2), children: ['t1'] }),
+      { id: 't1', type: 'activity', tickChild: true, tickIndex: 1, branch: 'work',
+        parent: 'a1', label: '1', children: [], done: false, dropped: true,
+        droppedAt: AT(2), _ts: 0 },
+    ]);
+
+    expect(getDroppedItems(day(2)).map(n => n.id)).toEqual(['a1']);
+  });
+
+  test('a dropped node with no droppedAt produces no row', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { dropped: true }),
+    ]);
+
+    expect(getDroppedItems(day(2))).toEqual([]);
+  });
+
+  test('an open or done task never lands in the group', () => {
+    setUp([
+      mkBranch('work', ['a1', 'a2']),
+      mkActivity('a1', 'work', 'work'),
+      mkActivity('a2', 'work', 'work', { done: true, doneAt: AT(2), donedOn: day(2) }),
+    ]);
+
+    expect(getDroppedItems(day(2))).toEqual([]);
+  });
+
+  test('T5.6 — a dropped task scheduled for a past day is still not overdue', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { label: 'Yoga (tu)', dropped: true, droppedAt: AT(2) }),
+    ]);
+
+    expect(getOverdueItems({ getDay: () => 5 })).toEqual([]);
+    expect(getDroppedItems(day(2)).map(n => n.id)).toEqual(['a1']);
+  });
+
+  test("swipe-right's target status returns the task to open", () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: AT(2) }),
+    ]);
+
+    // The Dropped row's button and swipe-right share one closure, which fires
+    // 'undropped' — not 'undone', which would leave the flag set.
+    setStatus('a1', 'undropped');
+
+    expect(findNode('a1').dropped).toBe(false);
+    expect(findNode('a1').droppedAt).toBeUndefined();
+    expect(getDroppedItems(day(2))).toEqual([]);
+  });
+
+  test('i18n — agenda.dropped exists in both languages', () => {
+    _state.setLang('en');
+    expect(t('agenda.dropped')).toBe('Dropped');
+    _state.setLang('cs');
+    expect(t('agenda.dropped')).toBe('Vyřazeno');
+    _state.setLang('en');
   });
 });
