@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-h7bs8tvehGni5ID2pxkNwSzrY/2ChlltgbdG0OvewZk='
+               'sha256-vughOP1X2y8+C4RYR47UJ/gQF3bvEjsUMEYJX7ptuD0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9167,6 +9167,9 @@ const TRANSLATIONS = {
     'menu.transferReusable':      'Transfer Reusable',
     'menu.clearWeek':             'Clear the Week',
     'confirm.clearWeek':          'This will remove all tasks from the current week. This cannot be undone.',
+    'confirm.deleteTitle':        'Delete task?',
+    'confirm.deleteBody':         'This removes it permanently.',
+    'confirm.deleteDropHint':     'A dropped task stays in the week and counts toward your stats.',
     'menu.done':                  'Done',
     'menu.undone':                'Undone',
     'menu.dropped':               'Dropped',
@@ -9379,6 +9382,7 @@ const TRANSLATIONS = {
     'sync.signOutConfirm.keepLocal':  'Keep data',
     'sync.signOutConfirm.clearLocal': 'Clear & sign out',
     'app-confirm.cancel':         'Cancel',
+    'app-confirm.drop':           'Drop',
     'sync.reconnect':             'Reconnect',
     'sync.badge.disconnected':    'Not connected to Google Drive',
     'sync.badge.connected':       'Synced with Google Drive',
@@ -9492,6 +9496,9 @@ const TRANSLATIONS = {
     'menu.transferReusable':      'Přenést opakované',
     'menu.clearWeek':             'Vymazat týden',
     'confirm.clearWeek':          'Tímto odstraníte všechny úkoly z aktuálního týdne. Tuto akci nelze vrátit.',
+    'confirm.deleteTitle':        'Smazat úkol?',
+    'confirm.deleteBody':         'Tato akce ho odstraní natrvalo.',
+    'confirm.deleteDropHint':     'Vyřazený úkol zůstane v týdnu a započítá se do statistik.',
     'menu.done':                  'Hotovo',
     'menu.undone':                'Nesplněno',
     'menu.dropped':               'Vyřazeno',
@@ -9704,6 +9711,7 @@ const TRANSLATIONS = {
     'sync.signOutConfirm.keepLocal':  'Ponechat data',
     'sync.signOutConfirm.clearLocal': 'Smazat a odhlásit',
     'app-confirm.cancel':         'Zrušit',
+    'app-confirm.drop':           'Vyřadit',
     'sync.reconnect':             'Připojit znovu',
     'sync.badge.disconnected':    'Nepřipojeno k Disku Google',
     'sync.badge.connected':       'Synchronizováno s Diskem Google',
@@ -11109,10 +11117,36 @@ function deleteBranch(id) {
   applyAutoLayout();
 }
 
-function deleteNode(id) {
+// `ask` is opt-in, and only the UI entry points set it: the context menu, the
+// mindmap's Backspace/Delete and the agenda's. Everything programmatic — and
+// every existing test — keeps the immediate delete it has always had.
+function deleteNode(id, { ask = false } = {}) {
   const node = findNode(id);
   if (!node) return;
   if (node.type === 'branch') { deleteBranch(id); return; }
+
+  // Drop is only an alternative for a task you could still have kept. Tick- and
+  // day-children are mechanical sub-rows of their parent — interrupting those
+  // deletes would be noise, not a choice.
+  const offersDrop = ask && node.type === 'activity' && !node.tickChild && !node.dayChild;
+  if (offersDrop) {
+    showAppConfirm({
+      title:          t('confirm.deleteTitle'),
+      body:           t('confirm.deleteBody') + '\n' + t('confirm.deleteDropHint'),
+      okLabel:        t('menu.delete'),
+      danger:         true,
+      onConfirm:      () => _performDelete(id),
+      secondaryLabel: t('app-confirm.drop'),
+      onSecondary:    () => setStatus(id, 'dropped'),
+    });
+    return;
+  }
+  _performDelete(id);
+}
+
+function _performDelete(id) {
+  const node = findNode(id);
+  if (!node) return;
 
   takeSnapshot();
   const wasTick = node.tickChild === true;
@@ -11141,6 +11175,7 @@ function deleteNode(id) {
   saveWeek(currentWeekKey, weekData);
   renderIfVisible();
   applyAutoLayout();
+  if (currentView === 'agenda') renderAgenda();
 }
 
 function isLeafActivity(node) {
@@ -15321,8 +15356,7 @@ function _windowKeydownHandler(e) {
       }
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      deleteNode(rowId);
-      renderAgenda();
+      deleteNode(rowId, { ask: true });
     } else if (e.key === 'Enter') {
       e.preventDefault();
       startAgendaRename(node.id);
@@ -15391,7 +15425,7 @@ function _windowKeydownHandler(e) {
     }
     if (node.type === 'branch' && weekData.nodes.filter(n => n.type === 'branch').length <= 1) return;
     e.preventDefault();
-    deleteNode(id);
+    deleteNode(id, { ask: true });
   }
  else if (e.key.toLowerCase() === 'd') {
     if (id !== 'center' && node.type !== 'branch') {
@@ -16401,8 +16435,7 @@ document.getElementById('ctx-add-child').addEventListener('click', () => {
 
 document.getElementById('ctx-delete').addEventListener('click', () => {
   if (!contextTarget) { hideContextMenu(); return; }
-  deleteNode(_agendaTickRedirect(contextTarget, true));
-  if (currentView === 'agenda') renderAgenda();
+  deleteNode(_agendaTickRedirect(contextTarget, true), { ask: true });
   hideContextMenu();
 });
 

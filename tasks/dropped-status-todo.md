@@ -149,15 +149,39 @@ across all seven tabs. Push back if the other reading was meant.
 
 ## S6 — Delete dialog
 
-- [ ] T6.1 — `deleteNode` confirm path (`:11059`, `showAppConfirm` at `:18894`): pass `secondaryLabel` + `onSecondary` to drop instead of deleting.
-- [ ] T6.2 — Body copy gains the explanatory line; set with `textContent` (node labels are user data).
-- [ ] T6.3 — i18n `app-confirm.drop` (Drop / Vyřadit) + `confirm.deleteDropHint`, both languages.
-- [ ] T6.4 — Verify no two buttons in the dialog share a word: `Zrušit` / `Vyřadit` / `Smazat`.
-- [ ] T6.5 — Tests: secondary button present, drops rather than deletes, node survives.
-- [ ] T6.6 — `npm test` + `npm run validate` + `npm run csp` green.
+- [x] T6.1 — `deleteNode` confirm path (`:11059`, `showAppConfirm` at `:18894`): pass `secondaryLabel` + `onSecondary` to drop instead of deleting.
+- [x] T6.2 — Body copy gains the explanatory line; set with `textContent` (node labels are user data).
+- [x] T6.3 — i18n `app-confirm.drop` (Drop / Vyřadit) + `confirm.deleteDropHint`, both languages.
+- [x] T6.4 — Verify no two buttons in the dialog share a word: `Zrušit` / `Vyřadit` / `Smazat`.
+- [x] T6.5 — Tests: secondary button present, drops rather than deletes, node survives.
+- [x] T6.6 — `npm test` + `npm run validate` + `npm run csp` green.
 
 **AC:** the delete dialog offers Drop alongside Delete; choosing it leaves the node in the week, dropped.
 **Verify:** browser at mobile width — three buttons must not wrap.
+
+### S6 discrepancy — there was no delete dialog
+T6.1 and spec §4.4 both assume a delete confirm already exists ("Gains a secondary
+button", "the confirm dialog gains an alternative"). It does not: `deleteNode()`
+deleted immediately from the context menu, the mindmap's Backspace/Delete and the
+agenda's. The only `showAppConfirm` near delete is Clear the Week.
+
+Built the dialog rather than skipping the slice — without it Drop has no
+discoverable entry point outside the `X` hotkey, which is most of the point of the
+feature. Scoped so the new friction is as small as possible:
+- **`deleteNode(id, { ask })`.** Only the three UI entry points pass `ask: true`.
+  Every programmatic caller keeps the immediate delete — which is also what keeps
+  `tests/status-propagation.test.js` passing unmodified, as spec §9 requires.
+- **Standard activities only.** Tick-children and day-children are mechanical
+  sub-rows of their parent; interrupting those deletes would be noise. Branches
+  still route to `deleteBranch()` untouched.
+- **Two new i18n keys beyond the spec's table** — `confirm.deleteTitle` and
+  `confirm.deleteBody` — because the spec's copy block specifies a title and a
+  first body line that had no keys to hang on.
+
+**This adds a confirmation step to deleting a task, where there was none.** It is
+one line to revert (drop the three `{ ask: true }` call sites) if the friction is
+not wanted.
+
 
 ---
 
