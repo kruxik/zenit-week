@@ -2,6 +2,7 @@ import {
   setStatus, syncStatusUp, findNode, undo, showContextMenu, t,
   transferUnfinished, transferReusable, moveNodeToNextWeek,
   getOverdueItems, getAnyDayItems,
+  computeWeekStats, _computeSummarySignature,
   _state,
 } from './setup.js';
 
@@ -645,5 +646,152 @@ describe('T13 – dropped tasks never surface as overdue or unscheduled', () => 
     ]);
 
     expect(getAnyDayItems().map(n => n.id)).toEqual(['a2']);
+  });
+});
+
+// ─── S4 — stats ──────────────────────────────────────────────────────────────
+
+describe('T14 – computeWeekStats peels dropped into its own bucket', () => {
+  test('dropped stays in total, is absent from done, and leaves the open buckets', () => {
+    setUp([
+      mkBranch('work', ['a1', 'a2', 'a3', 'a4']),
+      mkActivity('a1', 'work', 'work', { done: true, doneAt: 'ts' }),
+      mkActivity('a2', 'work', 'work', { done: true, doneAt: 'ts' }),
+      mkActivity('a3', 'work', 'work'),
+      mkActivity('a4', 'work', 'work', { dropped: true, droppedAt: 'ts' }),
+    ]);
+
+    const c = computeWeekStats().global;
+
+    expect(c.total).toBe(4);
+    expect(c.done).toBe(2);
+    expect(c.plannedDone).toBe(2);
+    expect(c.plannedOpen).toBe(1);   // a4 no longer counted here
+    expect(c.dropped).toBe(1);
+  });
+
+  test('dropping a task lowers the completion percentage', () => {
+    const week = (extra) => [
+      mkBranch('work', ['a1', 'a2']),
+      mkActivity('a1', 'work', 'work', { done: true, doneAt: 'ts' }),
+      mkActivity('a2', 'work', 'work', extra),
+    ];
+
+    setUp(week({}));
+    expect(computeWeekStats().global.percent).toBe(50);
+
+    setUp(week({ dropped: true, droppedAt: 'ts' }));
+    const c = computeWeekStats().global;
+    expect(c.percent).toBe(50);      // still in the denominator, still not done
+    expect(c.total).toBe(2);
+  });
+
+  test('an unplanned dropped task lands in the dropped bucket, not unplannedOpen', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { unplanned: true, unplannedAt: 'ts', dropped: true, droppedAt: 'ts' }),
+    ]);
+
+    const c = computeWeekStats().global;
+
+    expect(c.unplannedOpen).toBe(0);
+    expect(c.dropped).toBe(1);
+    expect(c.total).toBe(1);
+  });
+
+  test('D3 — a dropped counter keeps its ticks as done and freezes the remainder', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { children: ['c1'] }),
+      mkCounter('c1', 'a1', 'work', 3, 10),
+    ]);
+    findNode('c1').dropped = true;
+
+    const c = computeWeekStats().global;
+
+    expect(c.total).toBe(10);
+    expect(c.done).toBe(3);          // the three that actually happened
+    expect(c.dropped).toBe(7);       // the frozen remainder
+    expect(c.plannedOpen).toBe(0);
+  });
+
+  test('priority weight applies to the dropped bucket like every other', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { priority: 'critical', dropped: true, droppedAt: 'ts' }),
+    ]);
+
+    expect(computeWeekStats().global.dropped).toBe(5);
+  });
+});
+
+describe('T15 – drop-rate maths', () => {
+  // The plan's hand-computed week: 4 planned, 2 done, 1 dropped
+  // → 4 units total, 2 done (50%), 1 dropped (25%), 1 still open (25%).
+  test('4 planned / 2 done / 1 dropped reads 50% done and 25% dropped', () => {
+    setUp([
+      mkBranch('work', ['a1', 'a2', 'a3', 'a4']),
+      mkActivity('a1', 'work', 'work', { done: true, doneAt: 'ts' }),
+      mkActivity('a2', 'work', 'work', { done: true, doneAt: 'ts' }),
+      mkActivity('a3', 'work', 'work', { dropped: true, droppedAt: 'ts' }),
+      mkActivity('a4', 'work', 'work'),
+    ]);
+
+    const c = computeWeekStats().global;
+
+    expect(c.percent).toBe(50);
+    expect(Math.round((c.dropped / c.total) * 100)).toBe(25);
+    expect(c.plannedOpen).toBe(1);
+  });
+
+  test('a week with nothing dropped reports a zero bucket, so the row is hidden', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work'),
+    ]);
+
+    expect(computeWeekStats().global.dropped).toBe(0);
+  });
+
+  test('the four buckets plus dropped always add up to total', () => {
+    setUp([
+      mkBranch('work', ['a1', 'a2', 'a3']),
+      mkActivity('a1', 'work', 'work', { done: true, doneAt: 'ts', priority: 'high' }),
+      mkActivity('a2', 'work', 'work', { unplanned: true, unplannedAt: 'ts' }),
+      mkActivity('a3', 'work', 'work', { dropped: true, droppedAt: 'ts', priority: 'critical' }),
+    ]);
+
+    const c = computeWeekStats().global;
+
+    expect(c.plannedDone + c.plannedOpen + c.unplannedDone + c.unplannedOpen + c.dropped)
+      .toBe(c.total);
+    expect(c.total).toBe(3 + 1 + 5);
+  });
+});
+
+describe('T16 – the summary signature notices a drop', () => {
+  test('dropping a node changes the signature', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work'),
+    ]);
+    const before = _computeSummarySignature();
+
+    setStatus('a1', 'dropped');
+
+    expect(_computeSummarySignature()).not.toBe(before);
+  });
+
+  test('undropping restores the original signature', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work'),
+    ]);
+    const before = _computeSummarySignature();
+
+    setStatus('a1', 'dropped');
+    setStatus('a1', 'undropped');
+
+    expect(_computeSummarySignature()).toBe(before);
   });
 });

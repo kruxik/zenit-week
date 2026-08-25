@@ -73,16 +73,36 @@ Order: **S1 first, always.** S3 / S4 / S5 are independent of each other once S1 
 
 ## S4 — Stats
 
-- [ ] T4.1 — `computeWeekStats()` (`~13608`): peel dropped out of `plannedOpen`/`unplannedOpen` into its own bucket. `total` unchanged; `done` unchanged.
-- [ ] T4.2 — `STATS_SPLIT_BANDS` (`~13680`): add the grey/slate faded band. Donut, CFD and root ring all follow from this one list.
-- [ ] T4.3 — `Dropped` headline row via `_statsHeadline` (`~13790`), rendered **last**, denominator `c.total`, guarded by `hasDropped`.
-- [ ] T4.4 — `_computeSummarySignature()` (`:13588`): include `n.dropped`.
-- [ ] T4.5 — i18n `stats.dropped`, both languages.
-- [ ] T4.6 — Tests T14–T16.
-- [ ] T4.7 — `npm test` green; `tests/stats.test.js` + `tests/summary.test.js` unmodified.
+- [x] T4.1 — `computeWeekStats()` (`~13608`): peel dropped out of `plannedOpen`/`unplannedOpen` into its own bucket. `total` unchanged; `done` unchanged.
+- [x] T4.2 — `STATS_SPLIT_BANDS` (`~13680`): add the grey/slate faded band. Donut, CFD and root ring all follow from this one list.
+- [x] T4.3 — `Dropped` headline row via `_statsHeadline` (`~13790`), rendered **last**, denominator `c.total`, guarded by `hasDropped`.
+- [x] T4.4 — `_computeSummarySignature()` (`:13588`): include `n.dropped`.
+- [x] T4.5 — i18n `stats.dropped`, both languages.
+- [x] T4.6 — Tests T14–T16.
+- [x] T4.7 — `npm test` green; `tests/stats.test.js` + `tests/summary.test.js` unmodified.
 
 **AC:** dropping a task lowers completion %; the grey band appears in donut, CFD and root ring together; the headline row vanishes in a week with nothing dropped.
 **Verify:** hand-compute a small week (e.g. 4 planned / 2 done / 1 dropped → 50% done, 25% dropped) and check the panel matches.
+
+### S4 additions beyond the todo
+- **New theme token `--stats-dropped`** (slate; lighter in dark, matching how
+  `--stats-plan`/`--stats-unplan` behave). §10 says ask before adding a token
+  *rather than deriving from the branch colour* — but the spec mandates one grey
+  band that is deliberately **not** branch-coloured, so there is nothing to derive
+  from. Added alongside the two existing stats hues.
+- **Three call sites T4.1 would have broken.** Peeling `dropped` out of the open
+  buckets leaves a hole wherever the four buckets were summed against `total`:
+  the per-branch bars (`_statsBranchRow`) grew a fifth neutral segment, and the
+  CFD's morph shape (`ZERO` + `lerpShape`) grew the field. `_weekCompletion()`
+  gained the same bucket so historical weeks split identically.
+- **Legend entries.** An undecodable grey wedge is worse than no wedge: the donut/
+  CFD legend and the branch-bar legend each gained a Dropped swatch, both guarded
+  the way the unplanned ones are.
+- **`tests/trend-completion.test.js` touched.** Four `toEqual` assertions compare
+  the whole `_weekCompletion()` object, which now carries `dropped`. Added
+  `dropped: 0` to each. It is not in the spec §9 regression net; `stats.test.js`
+  and `summary.test.js` are, and both pass unmodified.
+
 
 ---
 

@@ -27,7 +27,7 @@ describe('_weekCompletion (4-week CFD)', () => {
       { id: 'a4', type: 'activity', branch: 'b1', parent: 'b1', unplanned: true, done: false },         // unpl open w1
     ] };
     expect(_weekCompletion(data)).toEqual({
-      plannedDone: 1, plannedOpen: 3, unplannedDone: 5, unplannedOpen: 1,
+      plannedDone: 1, plannedOpen: 3, unplannedDone: 5, unplannedOpen: 1, dropped: 0,
       total: 10, done: 6, percent: 60,
     });
   });
@@ -41,7 +41,7 @@ describe('_weekCompletion (4-week CFD)', () => {
     ] };
     // only c1 counts: planned done 2, planned open 2 → 50%
     expect(_weekCompletion(data)).toEqual({
-      plannedDone: 2, plannedOpen: 2, unplannedDone: 0, unplannedOpen: 0,
+      plannedDone: 2, plannedOpen: 2, unplannedDone: 0, unplannedOpen: 0, dropped: 0,
       total: 4, done: 2, percent: 50,
     });
   });
@@ -54,7 +54,7 @@ describe('_weekCompletion (4-week CFD)', () => {
     ] };
     // weight 3 → done 1*3=3, open 3*3=9, total 12 → 25%
     expect(_weekCompletion(data)).toEqual({
-      plannedDone: 3, plannedOpen: 9, unplannedDone: 0, unplannedOpen: 0,
+      plannedDone: 3, plannedOpen: 9, unplannedDone: 0, unplannedOpen: 0, dropped: 0,
       total: 12, done: 3, percent: 25,
     });
   });
@@ -87,7 +87,7 @@ describe('_weekCompletion (4-week CFD)', () => {
     ] };
     // a2 skipped → planned done 1, total 1 → 100%
     expect(_weekCompletion(data)).toEqual({
-      plannedDone: 1, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0,
+      plannedDone: 1, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, dropped: 0,
       total: 1, done: 1, percent: 100,
     });
   });

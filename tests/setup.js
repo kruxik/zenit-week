@@ -650,6 +650,7 @@ export const {
   deleteBranch,
   applyBranchColor,
   updateSummary,
+  _computeSummarySignature,
   computeWeekStats,
   _weekCompletion,
   openStatsPanel,

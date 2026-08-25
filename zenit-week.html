@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-U3rIVeFpbRyQOszOs/CVCM5P0Mgo33mVir2d/FFYG2g='
+               'sha256-8zzcErWfiHQvipB5i2bQTwu8tCsacStQsIHnEegFbwo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -223,6 +223,7 @@
     /* Stats-panel accent — modern green/orange, shared by the donut, The Week and the CFD */
     --stats-plan: #15C9A0;
     --stats-unplan: #F5A524;
+    --stats-dropped: #8A94A6;
     --badge-progress-bg: #e8f0fe;
     --badge-progress-text: #1a73e8;
     --badge-comment-bg: #f3e8ff;
@@ -349,6 +350,7 @@
     /* Stats-panel accent — modern green/orange, shared by the donut, The Week and the CFD */
     --stats-plan: #34E6BE;
     --stats-unplan: #FFB54D;
+    --stats-dropped: #9AA4B8;
     --badge-progress-bg: #0f1e3a;
     --badge-progress-text: #4da3ff;
     --badge-comment-bg: #2a1840;
@@ -9194,6 +9196,7 @@ const TRANSLATIONS = {
     'stats.planVsReality':        'Plan vs Reality',
     'stats.planCompletion':       'Plan completion',
     'stats.unplannedLoad':        'Unplanned load',
+    'stats.dropped':              'Dropped',
     'stats.unplannedCompletion':  'Unplanned completion',
     'stats.legCatPlanned':        'Planned',
     'stats.legCatUnplanned':      'Unplanned',
@@ -9517,6 +9520,7 @@ const TRANSLATIONS = {
     'stats.planVsReality':        'Plán vs realita',
     'stats.planCompletion':       'Splnění plánu',
     'stats.unplannedLoad':        'Neplánovaná zátěž',
+    'stats.dropped':              'Vyřazeno',
     'stats.unplannedCompletion':  'Splnění neplánovaného',
     'stats.legCatPlanned':        'Plánováno',
     'stats.legCatUnplanned':      'Neplánováno',
@@ -13746,7 +13750,8 @@ function _computeSummarySignature() {
     sig += '|' + n.id + ':' + n.type + ':' + (n.done ? 1 : 0)
          + ':' + (n.val ?? 0) + ':' + (n.max ?? 0)
          + ':' + (n.priority || '') + ':' + (n.branch || '')
-         + ':' + (n.unplanned ? 1 : 0);
+         + ':' + (n.unplanned ? 1 : 0)
+         + ':' + (n.dropped ? 1 : 0);
   }
   return sig;
 }
@@ -13773,7 +13778,7 @@ function computeWeekStats() {
   // weight as done and (max-val) as open, so partial progress counts fractionally. total/
   // done/percent equal the old weighted figures, so the summary box stays identical.
   function statsOf(nodes) {
-    let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0;
+    let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0, dropped = 0;
     for (const n of nodes) {
       const w = getPriorityWeight(n.id);
       let doneAmt, openAmt;
@@ -13786,13 +13791,21 @@ function computeWeekStats() {
         doneAmt = n.done ? w : 0;
         openAmt = n.done ? 0 : w;
       }
-      if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
+      // Dropped work stays in the denominator but leaves the open buckets: "still
+      // could happen" and "will not happen" are different facts. What a dropped
+      // counter already ticked off still counts as done — only the frozen
+      // remainder is recorded as never-happening (D3).
+      if (n.dropped) {
+        dropped += openAmt;
+        if (n.unplanned) unplannedDone += doneAmt; else plannedDone += doneAmt;
+      }
+      else if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
       else { plannedDone += doneAmt; plannedOpen += openAmt; }
     }
-    const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen;
+    const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen + dropped;
     const done = plannedDone + unplannedDone;
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, total, done, percent };
+    return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, dropped, total, done, percent };
   }
 
   const global = statsOf(leaves);
@@ -13837,6 +13850,10 @@ const STATS_SPLIT_BANDS = [
   { key: 'unplannedDone', color: 'var(--stats-unplan)', opacity: 1    },
   { key: 'plannedOpen',   color: 'var(--stats-plan)',   opacity: 0.32 },
   { key: 'unplannedOpen', color: 'var(--stats-unplan)', opacity: 0.32 },
+  // Grey deliberately: red is priority-critical, amber is unplanned. One band,
+  // not split by provenance — where a dropped task came from is rarely the
+  // interesting part. Last, so the closed-but-not-done share ends the run.
+  { key: 'dropped',       color: 'var(--stats-dropped)', opacity: 0.55 },
 ];
 
 // ─── Stats Panel (Plan vs Reality) ────────────────────────────────────────────
@@ -13899,7 +13916,7 @@ function _statsDonut(c) {
 // "Planned"/"Unplanned" appear once instead of being repeated per state. Laid out as a
 // two-column grid (category | states) so the Done/Open swatches align across rows
 // regardless of how wide the category label is in the current language.
-function _statsLegend(hasUnplanned) {
+function _statsLegend(hasUnplanned, hasDropped = false) {
   const PLAN = 'var(--stats-plan)', UNPL = 'var(--stats-unplan)';
   const cats = [{ color: PLAN, key: 'stats.legCatPlanned' }];
   if (hasUnplanned) cats.push({ color: UNPL, key: 'stats.legCatUnplanned' });
@@ -13933,6 +13950,26 @@ function _statsLegend(hasUnplanned) {
     }
     wrap.appendChild(group);
   }
+  // Dropped has no done/open split of its own, so it takes the states column
+  // with an empty category cell — the grid keeps its swatch aligned with the
+  // Done/Open ones above it.
+  if (hasDropped) {
+    wrap.appendChild(document.createElement('span'));
+    const group = document.createElement('span');
+    group.className = 'stats-legend-states';
+    const item = document.createElement('span');
+    item.className = 'stats-legend-item';
+    const dot = document.createElement('span');
+    dot.className = 'stats-legend-dot';
+    dot.style.background = 'var(--stats-dropped)';
+    dot.style.opacity = 0.55;
+    item.appendChild(dot);
+    const label = document.createElement('span');
+    label.textContent = t('stats.dropped');
+    item.appendChild(label);
+    group.appendChild(item);
+    wrap.appendChild(group);
+  }
   return wrap;
 }
 
@@ -13964,6 +14001,7 @@ function _renderStatsDonutSection(c) {
   const plannedTotal = c.plannedDone + c.plannedOpen;
   const unplannedTotal = c.unplannedDone + c.unplannedOpen;
   const hasUnplanned = unplannedTotal > 0;
+  const hasDropped = (c.dropped || 0) > 0;
 
   // Three equal-width columns: ① donut, ② completion headlines, ③ the week (appended as a
   // sibling by _renderStatsTimelineSection). Each takes one third; tops align via titles.
@@ -13978,7 +14016,7 @@ function _renderStatsDonutSection(c) {
   const donutWrap = document.createElement('div');
   donutWrap.className = 'stats-donut-wrap';
   donutWrap.appendChild(_statsDonut(c));
-  donutWrap.appendChild(_statsLegend(hasUnplanned));
+  donutWrap.appendChild(_statsLegend(hasUnplanned, hasDropped));
   pvr.appendChild(donutWrap);
   donut.appendChild(pvr);
 
@@ -14002,6 +14040,13 @@ function _renderStatsDonutSection(c) {
     headlines.appendChild(_statsHeadline('stats.unplannedCompletion',
       _pct(c.unplannedDone, unplannedTotal), c.unplannedDone, unplannedTotal));
   }
+  // Last, and only when there is something to report — same denominator as
+  // Unplanned load, so the two read on one scale. A week with nothing dropped
+  // has no row at all.
+  if (hasDropped) {
+    headlines.appendChild(_statsHeadline('stats.dropped',
+      _pct(c.dropped, c.total), c.dropped, c.total));
+  }
   headlinesCol.appendChild(headlines);
   donut.appendChild(headlinesCol);
 }
@@ -14023,12 +14068,13 @@ function _statsBarSeg(widthPct, bgColor, hatch) {
 
 // Neutral status legend (solid = done, faded = open, hatched = unplanned) — decodes the
 // shading shared by every branch-tinted bar.
-function _statsStatusLegend(hasUnplanned) {
+function _statsStatusLegend(hasUnplanned, hasDropped = false) {
   const items = [
     { key: 'stats.legendDone',      opacity: 1,   hatch: false },
     { key: 'stats.legendOpen',      opacity: 0.4, hatch: false },
   ];
   if (hasUnplanned) items.push({ key: 'stats.legendUnplanned', opacity: 1, hatch: true });
+  if (hasDropped) items.push({ key: 'stats.dropped', opacity: 0.55, hatch: false, dropped: true });
   const wrap = document.createElement('div');
   wrap.className = 'stats-bar-legend';
   for (const it of items) {
@@ -14036,7 +14082,7 @@ function _statsStatusLegend(hasUnplanned) {
     row.className = 'stats-legend-item';
     const dot = document.createElement('span');
     dot.className = 'stats-legend-dot' + (it.hatch ? ' stats-seg-hatch' : '');
-    dot.style.background = 'var(--text-placeholder)';
+    dot.style.background = it.dropped ? 'var(--stats-dropped)' : 'var(--text-placeholder)';
     dot.style.opacity = it.opacity;
     row.appendChild(dot);
     const label = document.createElement('span');
@@ -14085,6 +14131,10 @@ function _statsBranchRow(branch, c) {
     bar.appendChild(_statsBarSeg(w(c.unplannedDone), solid, true));
     bar.appendChild(_statsBarSeg(w(c.plannedOpen),   faded, false));
     bar.appendChild(_statsBarSeg(w(c.unplannedOpen), faded, true));
+    // Neutral, not branch-tinted — it matches the donut's grey band rather than
+    // the bar's own hue, because the fact it carries is "closed, not done".
+    bar.appendChild(_statsBarSeg(w(c.dropped || 0),
+      'color-mix(in srgb, var(--stats-dropped) 55%, transparent)', false));
   }
   row.appendChild(bar);
   return row;
@@ -14100,13 +14150,14 @@ function _renderStatsBranchesSection(perBranch) {
   sec.appendChild(title);
   weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
     const c = perBranch[b.id]
-      || { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
+      || { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, dropped: 0, total: 0 };
     sec.appendChild(_statsBranchRow(b, c));
   });
   // Legend below the bars, mirroring Plan vs Reality where the legend sits under the donut.
   const hasUnplanned = Object.values(perBranch).some(
     c => (c.unplannedDone + c.unplannedOpen) > 0);
-  sec.appendChild(_statsStatusLegend(hasUnplanned));
+  const hasDropped = Object.values(perBranch).some(c => (c.dropped || 0) > 0);
+  sec.appendChild(_statsStatusLegend(hasUnplanned, hasDropped));
 }
 
 // ③ Effort & Balance — priority-weighted load vs baseline + branch share of that load.
@@ -14275,7 +14326,7 @@ function _weekCompletion(data, branchId) {
   if (!data || !Array.isArray(data.nodes)) return null;
   const byId = new Map(data.nodes.map(n => [n.id, n]));
   const weightOf = (n) => n.priority === 'critical' ? 5 : n.priority === 'high' ? 3 : 1;
-  let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0;
+  let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0, dropped = 0;
   for (const n of data.nodes) {
     if (n._editing || n.type === 'branch' || n.type === 'center') continue;
     if (branchId && n.branch !== branchId) continue;
@@ -14293,13 +14344,17 @@ function _weekCompletion(data, branchId) {
     } else {
       doneAmt = n.done ? w : 0; openAmt = n.done ? 0 : w;
     }
-    if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
+    if (n.dropped) {
+      dropped += openAmt;
+      if (n.unplanned) unplannedDone += doneAmt; else plannedDone += doneAmt;
+    }
+    else if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
     else { plannedDone += doneAmt; plannedOpen += openAmt; }
   }
-  const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen;
+  const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen + dropped;
   if (total <= 0) return null; // blank week → an empty column in the diagram
   const done = plannedDone + unplannedDone;
-  return { plannedDone, plannedOpen, unplannedDone, unplannedOpen,
+  return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, dropped,
            total, done, percent: Math.round((done / total) * 100) };
 }
 
@@ -14499,7 +14554,7 @@ async function _renderStatsTrendSection() {
 
   // Morph state: the per-week numeric buckets last painted, so a lens switch tweens
   // FROM the currently shown shape (not from zero). Null buckets become flat columns.
-  const ZERO = { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, total: 0 };
+  const ZERO = { plannedDone: 0, plannedOpen: 0, unplannedDone: 0, unplannedOpen: 0, dropped: 0, total: 0 };
   let prevShape = null;   // [{...buckets}] per shown week, length === _cfdRange
   let shownWeeks = [];    // the week slice prevShape was painted from
   let animId = 0;
@@ -14507,8 +14562,9 @@ async function _renderStatsTrendSection() {
     const aw = a[i];
     const m = (k) => aw[k] + (bw[k] - aw[k]) * e;
     const s = { plannedDone: m('plannedDone'), plannedOpen: m('plannedOpen'),
-                unplannedDone: m('unplannedDone'), unplannedOpen: m('unplannedOpen') };
-    s.total = s.plannedDone + s.plannedOpen + s.unplannedDone + s.unplannedOpen;
+                unplannedDone: m('unplannedDone'), unplannedOpen: m('unplannedOpen'),
+                dropped: m('dropped') };
+    s.total = s.plannedDone + s.plannedOpen + s.unplannedDone + s.unplannedOpen + s.dropped;
     return s;
   });
   const paintSvg = (shape) => {
@@ -14538,7 +14594,8 @@ async function _renderStatsTrendSection() {
     const target = weeks.map(w => w.stats || ZERO);
     chart.appendChild(_buildCfdSvg(weeks)); // final frame (also the no-anim result)
     const hasUnplanned = weeks.some(w => w.stats && (w.stats.unplannedDone + w.stats.unplannedOpen) > 0);
-    chart.appendChild(_statsLegend(hasUnplanned));
+    const hasDropped = weeks.some(w => w.stats && (w.stats.dropped || 0) > 0);
+    chart.appendChild(_statsLegend(hasUnplanned, hasDropped));
 
     const reduce = document.documentElement.classList.contains('reduce-effects');
     if (animate && prevShape && !reduce) {
