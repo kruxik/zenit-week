@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-l6uGyZp8O8seRYMPuUcsYyyA6NJveAFj8z6zlBzBLcM='
+               'sha256-U3rIVeFpbRyQOszOs/CVCM5P0Mgo33mVir2d/FFYG2g='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -10437,7 +10437,9 @@ async function transferUnfinished() {
   const branchIds = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
   const lookup = id => prevById.get(id);
 
-  const candidates = prevData.nodes.filter(n => !n.done && n.type !== 'branch');
+  // A dropped task is closed, not unfinished — declining to carry it forward is
+  // precisely what dropping it meant.
+  const candidates = prevData.nodes.filter(n => !n.done && !n.dropped && n.type !== 'branch');
 
   // Resolve parents before their children so name-merge can match against an
   // already-mapped destination parent.
@@ -10465,9 +10467,11 @@ async function transferUnfinished() {
         prevId: c.id,
         done: false,
         unplanned: false,
+        dropped: false,
         children: [],
         _ts: Date.now(),
       };
+      delete newNode.droppedAt;
       // Transferring an unplanned task re-plans it: it was chosen for this week,
       // so the badge and its arrival stamp don't carry over.
       delete newNode.unplannedAt;
@@ -10614,6 +10618,10 @@ async function transferReusable() {
       };
       delete newNode.doneAt;
       delete newNode.unplannedAt;
+      // A weekly recurring task must not be killed forever by one bad week.
+      // Same reasoning the unplanned flag already gets.
+      newNode.dropped = false;
+      delete newNode.droppedAt;
       if (isAncestor) {
         delete newNode.reusable; // shell — not marked reusable
       } else {
@@ -10744,10 +10752,12 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
           parent: destParentId,
           done: false,
           unplanned: false,
+          dropped: false,
           _ts: Date.now(),
         };
         delete shell.doneAt;
         delete shell.unplannedAt;
+        delete shell.droppedAt;
         delete shell.reusable;
         nextData.nodes.push(shell);
         nextById.set(ancestor.id, shell);
@@ -10774,11 +10784,14 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
         parent: oldToNew.get(n.parent) || n.parent,
         children: n.children.map(cid => oldToNew.get(cid)).filter(Boolean),
         // Moving an unplanned task re-plans it: it was chosen for the new week,
-        // so the badge and its arrival stamp don't carry over.
+        // so the badge and its arrival stamp don't carry over. An explicit move
+        // is a decision to re-plan, so a drop does not carry over either.
         unplanned: false,
+        dropped: false,
         _ts: Date.now(),
       };
       delete newNode.unplannedAt;
+      delete newNode.droppedAt;
       nextData.nodes.push(newNode);
       nextById.set(newId, newNode);
       addedIds.push(newId);
@@ -12841,7 +12854,9 @@ function getOverdueItems(today = new Date()) {
   const todayPos = isoWeekPos(today.getDay());
   const result = [];
   weekData.nodes.forEach(n => {
-    if (n.type !== 'activity' || n.done) return;
+    // A dropped task is closed: without this guard it would nag as overdue
+    // for the rest of the week.
+    if (n.type !== 'activity' || n.done || n.dropped) return;
     if (n.tickChild) {
       // A tick pinned to a past weekday is overdue, just like a day-leaf.
       if (n.dayIndex != null && isoWeekPos(n.dayIndex) < todayPos) result.push(n);
@@ -12865,12 +12880,12 @@ function getOverdueItems(today = new Date()) {
 // drops out of Any day.
 function getAnyDayItems() {
   return weekData.nodes.filter(n => {
-    if (n.type !== 'activity' || n.dayChild || n.tickChild) return false;
+    if (n.type !== 'activity' || n.dayChild || n.tickChild || n.dropped) return false;
     if (getEffectiveDays(n).size > 0) return false;
     if (hasTickChildren(n)) {
       return (n.children || []).some(cid => {
         const c = findNode(cid);
-        return c?.tickChild && c.dayIndex == null && !c.done;
+        return c?.tickChild && c.dayIndex == null && !c.done && !c.dropped;
       });
     }
     return isLeafActivity(n);
@@ -12884,7 +12899,7 @@ function getAnyDayItems() {
 function getScheduledTickRows(dayIndex) {
   const rows = [];
   weekData.nodes.forEach(n => {
-    if (!n.tickChild || n.done || n.dayIndex !== dayIndex) return;
+    if (!n.tickChild || n.done || n.dropped || n.dayIndex !== dayIndex) return;
     const parent = findNode(n.parent);
     if (!parent) return;
     const ti = getTickInfo(parent);

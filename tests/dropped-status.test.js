@@ -1,5 +1,7 @@
 import {
   setStatus, syncStatusUp, findNode, undo, showContextMenu, t,
+  transferUnfinished, transferReusable, moveNodeToNextWeek,
+  getOverdueItems, getAnyDayItems,
   _state,
 } from './setup.js';
 
@@ -505,5 +507,143 @@ describe('i18n — new keys exist in both languages', () => {
     expect(t('menu.dropped')).toBe('Vyřazeno');
     expect(t('help.dropped')).toBe('Vyřazeno');
     _state.setLang('en');
+  });
+});
+
+// ─── S3 — lifecycle: transfers, movement and overdue ─────────────────────────
+
+describe('T10 – transferUnfinished skips dropped nodes', () => {
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+  });
+
+  test('a dropped task does not arrive in the next week', async () => {
+    _state.setLocalStorage('zenit-week-2026-01', {
+      nodes: [
+        mkBranch('work', ['a1', 'a2']),
+        mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: 'ts' }),
+        mkActivity('a2', 'work', 'work'),
+      ],
+    });
+    _state.setWeekKey('2026-02');
+    _state.set({ nodes: [mkBranch('work')] });
+
+    await transferUnfinished();
+
+    const carried = _state.get().nodes.filter(n => n.type === 'activity');
+    expect(carried.map(n => n.prevId)).toEqual(['a2']);
+  });
+
+  test('a dropped subtree is skipped whole', async () => {
+    _state.setLocalStorage('zenit-week-2026-01', {
+      nodes: [
+        mkBranch('work', ['p1']),
+        mkActivity('p1', 'work', 'work', { dropped: true, droppedAt: 'ts', children: ['c1'] }),
+        mkActivity('c1', 'p1', 'work', { dropped: true, droppedAt: 'ts' }),
+      ],
+    });
+    _state.setWeekKey('2026-02');
+    _state.set({ nodes: [mkBranch('work')] });
+
+    await transferUnfinished();
+
+    expect(_state.get().nodes.filter(n => n.type === 'activity')).toHaveLength(0);
+  });
+});
+
+describe('T11 – transferReusable revives a dropped reusable node', () => {
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+  });
+
+  test('the copy arrives open, with no droppedAt', async () => {
+    _state.setLocalStorage('zenit-week-2026-01', {
+      nodes: [
+        mkBranch('work', ['a1']),
+        mkActivity('a1', 'work', 'work', { reusable: true, dropped: true, droppedAt: 'ts' }),
+      ],
+    });
+    _state.setWeekKey('2026-02');
+    _state.set({ nodes: [mkBranch('work')] });
+
+    await transferReusable();
+
+    const copy = _state.get().nodes.find(n => n.prevId === 'a1');
+    expect(copy).toBeDefined();
+    expect(copy.dropped).toBe(false);
+    expect(copy.droppedAt).toBeUndefined();
+    expect(copy.reusable).toBe(true);
+  });
+});
+
+describe('T12 – moveNodeToNextWeek revives a dropped node', () => {
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+  });
+
+  test('the moved copy arrives open, with no droppedAt', async () => {
+    _state.set({
+      nodes: [
+        mkBranch('work', ['a1']),
+        mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: 'ts' }),
+      ],
+    });
+    _state.setWeekKey('2026-01');
+    _state.setLocalStorage('zenit-week-2026-02', { nodes: [mkBranch('work')] });
+
+    await moveNodeToNextWeek('a1');
+
+    const next = JSON.parse(_state.getLocalStorage('zenit-week-2026-02'));
+    const moved = next.nodes.find(n => n.label === 'a1');
+    expect(moved).toBeDefined();
+    expect(moved.dropped).toBe(false);
+    expect(moved.droppedAt).toBeUndefined();
+  });
+});
+
+describe('T13 – dropped tasks never surface as overdue or unscheduled', () => {
+  function d(dowJS) { return { getDay: () => dowJS }; }
+
+  function mkDayLeaf(id, parentId, dayIndex, extra = {}) {
+    return { id, type: 'activity', dayChild: true, dayIndex,
+      branch: 'work', parent: parentId, label: id,
+      done: false, unplanned: false, children: [], _ts: 0, ...extra };
+  }
+
+  test('a dropped day-leaf on a past weekday is not overdue', () => {
+    setUp([
+      mkBranch('work', ['p1']),
+      mkActivity('p1', 'work', 'work', { children: ['mo', 'tu'] }),
+      mkDayLeaf('mo', 'p1', 1, { dropped: true, droppedAt: 'ts' }),
+      mkDayLeaf('tu', 'p1', 2),
+    ]);
+
+    expect(getOverdueItems(d(3)).map(n => n.id)).toEqual(['tu']);
+  });
+
+  test('a dropped day-annotated activity is not overdue, an open one is', () => {
+    const week = (extra) => [
+      mkBranch('work', ['p1']),
+      mkActivity('p1', 'work', 'work', { label: 'Yoga (tu)', ...extra }),
+    ];
+
+    setUp(week({}));
+    expect(getOverdueItems(d(3)).map(n => n.id)).toEqual(['p1']);
+
+    setUp(week({ dropped: true, droppedAt: 'ts' }));
+    expect(getOverdueItems(d(3))).toEqual([]);
+  });
+
+  test('a dropped unscheduled activity drops out of Any day', () => {
+    setUp([
+      mkBranch('work', ['a1', 'a2']),
+      mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: 'ts' }),
+      mkActivity('a2', 'work', 'work'),
+    ]);
+
+    expect(getAnyDayItems().map(n => n.id)).toEqual(['a2']);
   });
 });

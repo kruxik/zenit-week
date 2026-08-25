@@ -48,16 +48,26 @@ Order: **S1 first, always.** S3 / S4 / S5 are independent of each other once S1 
 
 ## S3 — Lifecycle: transfers + overdue
 
-- [ ] T3.1 — `transferUnfinished()` (`~10419`): candidate filter `!n.done` → `!n.done && !n.dropped`.
-- [ ] T3.2 — `transferReusable()` (`~10590`): copy dropped nodes with `dropped`/`droppedAt` cleared.
-- [ ] T3.3 — `moveNodeToNextWeek()` (`~10725`): move with the flag cleared, mirroring the `unplanned` handling at `:10755`.
-- [ ] T3.4 — Add `syncStatusUp(n.id, 'dropped')` next to the existing `'done'` / `'unplanned'` re-syncs in all three paths.
-- [ ] T3.5 — `getOverdueItems()` (`:12738`): guard `!n.done && !n.dropped`. Same for the unscheduled bucket below it.
-- [ ] T3.6 — Tests T10–T13.
-- [ ] T3.7 — `npm test` green; `tests/transfer*.test.js` unmodified.
+- [x] T3.1 — `transferUnfinished()` (`~10419`): candidate filter `!n.done` → `!n.done && !n.dropped`.
+- [x] T3.2 — `transferReusable()` (`~10590`): copy dropped nodes with `dropped`/`droppedAt` cleared.
+- [x] T3.3 — `moveNodeToNextWeek()` (`~10725`): move with the flag cleared, mirroring the `unplanned` handling at `:10755`.
+- [x] T3.4 — Add `syncStatusUp(n.id, 'dropped')` next to the existing `'done'` / `'unplanned'` re-syncs in all three paths.
+- [x] T3.5 — `getOverdueItems()` (`:12738`): guard `!n.done && !n.dropped`. Same for the unscheduled bucket below it.
+- [x] T3.6 — Tests T10–T13.
+- [x] T3.7 — `npm test` green; `tests/transfer*.test.js` unmodified.
 
 **AC:** dropped tasks never arrive via Transfer Unfinished; Transfer Reusable and Next week both revive them; a dropped task never shows as overdue.
 **Verify:** `npm test`, then manually drop a task, run Transfer Unfinished into next week, confirm absence.
+
+### S3 deviation from the plan
+- **T3.4 dropped.** S1 merged the `done` and `dropped` roll-ups into one branch of
+  `syncStatusUp`, so the existing `syncStatusUp(n.id, 'done')` calls in all three
+  paths already recompute `dropped`. A second call with `'dropped'` would run the
+  identical code a second time. Not added — it would be dead code, not a safeguard.
+- **One guard beyond the todo.** `getScheduledTickRows()` also needed `!n.dropped`,
+  or a dropped tick would still render as a pending row on its weekday. Same class
+  of guard as T3.5; nothing in S5 needs those rows.
+
 
 ---
 
