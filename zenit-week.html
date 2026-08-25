@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-GnhDd94W6cGu+ACtFRCVsPJjGwjei5GTCI1qmS/+yec='
+               'sha256-l6uGyZp8O8seRYMPuUcsYyyA6NJveAFj8z6zlBzBLcM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3633,6 +3633,7 @@
   <symbol id="icon-circle-dashed" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/></symbol>
   <symbol id="icon-circle-dashed-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/><path d="M9 12l2 2l4 -4"/></symbol>
   <symbol id="icon-bolt" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></symbol>
+  <symbol id="icon-ban" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></symbol>
   <symbol id="icon-bolt-off" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 3l18 18"/><path d="M15.212 15.21l-4.212 5.79v-7h-6l3.79 -5.21m1.685 -2.32l2.525 -3.47v6m1 1h5l-2.104 2.893"/></symbol>
   <symbol id="icon-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/></symbol>
   <symbol id="icon-alert-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
@@ -3897,6 +3898,7 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item danger" id="ctx-clear-week"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.clearWeek">Clear the Week</span></div>
   <div class="ctx-item" id="ctx-done"><svg class="icon" aria-hidden="true"><use href="#icon-circle-check"/></svg> <span data-i18n="menu.done">Done</span></div>
   <div class="ctx-item" id="ctx-undone"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed-check"/></svg> <span data-i18n="menu.undone">Undone</span></div>
+  <div class="ctx-item" id="ctx-dropped"><svg class="icon" aria-hidden="true"><use href="#icon-ban"/></svg> <span data-i18n="menu.dropped">Dropped</span></div>
   <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> <span data-i18n="menu.reset">Reset</span></div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
@@ -6070,6 +6072,20 @@ function deriveBranchPalette(hex) {
   return { main: hex, light, text };
 }
 
+// Branch colour at reduced strength, composited over the canvas the same way
+// deriveBranchPalette does — so a dropped node stays branch-hued and no new
+// theme token is needed. ~45% is the fill/border weight the spec calls for;
+// labels take a gentler fade so they stay readable.
+const DROPPED_ALPHA      = 0.45;
+const DROPPED_TEXT_ALPHA = 0.62;
+
+function fadeBranchHex(hex, alpha = DROPPED_ALPHA) {
+  const { r, g, b } = hexToRgb(hex);
+  const bg = document.documentElement.dataset.theme === 'dark' ? 26 : 255;
+  const k = 1 - alpha;
+  return rgbToHex(r * alpha + bg * k, g * alpha + bg * k, b * alpha + bg * k);
+}
+
 function reloadBranchPalettes() {
   Object.keys(BRANCH_COLORS).forEach(b => {
     BRANCH_COLORS[b] = deriveBranchPalette(BRANCH_COLORS[b].main);
@@ -6776,6 +6792,7 @@ function _computeNodeSize(nodeId) {
         if (node.unplanned) lineW += nodeBadgeSize + nodeBadgeGap;
         if (node.reusable) lineW += nodeBadgeSize + nodeBadgeGap;
         if (node.comments) lineW += nodeBadgeSize + nodeBadgeGap;
+        if (node.dropped) lineW += nodeBadgeSize + nodeBadgeGap;
       }
       return Math.max(max, lineW);
     }, 0);
@@ -9143,6 +9160,7 @@ const TRANSLATIONS = {
     'confirm.clearWeek':          'This will remove all tasks from the current week. This cannot be undone.',
     'menu.done':                  'Done',
     'menu.undone':                'Undone',
+    'menu.dropped':               'Dropped',
     'menu.reset':                 'Reset',
     'menu.unplanned':             'Unplanned',
     'menu.planned':               'Planned',
@@ -9328,6 +9346,7 @@ const TRANSLATIONS = {
     'help.appVersion':            'App version',
     'help.unplanned':             'Unplanned',
     'help.done':                  'Done',
+    'help.dropped':               'Dropped',
     'help.close':                 'Close',
     'filter.unscheduled':         'Unscheduled',
     'blocked.title':              'Storage busy',
@@ -9464,6 +9483,7 @@ const TRANSLATIONS = {
     'confirm.clearWeek':          'Tímto odstraníte všechny úkoly z aktuálního týdne. Tuto akci nelze vrátit.',
     'menu.done':                  'Hotovo',
     'menu.undone':                'Nesplněno',
+    'menu.dropped':               'Vyřazeno',
     'menu.reset':                 'Resetovat',
     'menu.unplanned':             'Neplánované',
     'menu.planned':               'Plánované',
@@ -9649,6 +9669,7 @@ const TRANSLATIONS = {
     'help.appVersion':            'Verze aplikace',
     'help.unplanned':             'Neplánované',
     'help.done':                  'Hotovo',
+    'help.dropped':               'Vyřazeno',
     'help.close':                 'Zavřít',
     'filter.unscheduled':         'Bez termínu',
     'blocked.title':              'Úložiště je zaneprázdněné',
@@ -10982,7 +11003,14 @@ function getNodeVisuals(nodeId) {
   if (type === 'center') {
     bgColor = CENTER_COLOR.main; borderColor = CENTER_COLOR.main; textColor = CENTER_COLOR.text;
   } else {
-    if (node.done && node.unplanned) {
+    if (node.dropped) {
+      // Deliberately not Done's grey: the branch that bled stays visible, and a
+      // dropped node must never read as a done one. Ahead of the unplanned case
+      // so a dropped+unplanned node reads as dropped.
+      bgColor = bc.light;
+      borderColor = fadeBranchHex(bc.main);
+      textColor = fadeBranchHex(bc.text, DROPPED_TEXT_ALPHA);
+    } else if (node.done && node.unplanned) {
       bgColor = DONE_UNPLANNED_BG; borderColor = DONE_BORDER; textColor = DONE_TEXT;
     } else if (node.done) {
       bgColor = DONE_BG; borderColor = DONE_BORDER; textColor = DONE_TEXT;
@@ -11674,7 +11702,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   
   let fillAttr = bgColor;
-  if (!node?.done && !node?.unplanned) {
+  if (!node?.done && !node?.unplanned && !node?.dropped) {
     if (isCenter) fillAttr = 'url(#node-grad-center)';
     else if (branch && BRANCH_COLORS[branch]) fillAttr = `url(#node-grad-${branch})`;
   }
@@ -11696,6 +11724,25 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     ? svgDisc(boxW / 2, paint)
     : svgEl('rect', Object.assign({ x: -boxW / 2, y: -boxH / 2, width: boxW, height: boxH, rx: rx }, paint));
   g.appendChild(rect);
+
+  // Dropped: one corner-to-corner slash across the node. Done strikes the text
+  // horizontally; Dropped strikes the node diagonally, so the two never read as
+  // each other. Inset by rx*0.29 so the ends land on the outline rather than
+  // outside a rounded corner — the same figure turns the day-child disc's
+  // diagonal into a clean chord.
+  if (node?.dropped && !isCenter) {
+    const inset = rx * 0.29;
+    g.appendChild(svgEl('line', {
+      class: 'node-slash',
+      x1: -boxW / 2 + inset, y1: -boxH / 2 + inset,
+      x2:  boxW / 2 - inset, y2:  boxH / 2 - inset,
+      stroke: BRANCH_COLORS[branch]?.main || borderColor,
+      'stroke-width': Math.max(1.5, sw),
+      'stroke-opacity': '0.55',
+      'stroke-linecap': 'round',
+      'pointer-events': 'none',
+    }));
+  }
 
   if (isCenter) {
     // Named, so a screen reader and a hover both get something better than an
@@ -11804,14 +11851,16 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     const hasUnplannedIcon = node && (isActivity || isBranch) && i === 0 && node.unplanned;
     const hasReusableIcon  = node && isActivity && i === 0 && node.reusable;
     const hasCommentIcon   = node && isActivity && i === 0 && !!node.comments;
+    const hasDroppedIcon   = node && (isActivity || isBranch) && i === 0 && node.dropped;
 
-    if (hasPriorityIcon || hasUnplannedIcon || hasReusableIcon || hasCommentIcon) {
+    if (hasPriorityIcon || hasUnplannedIcon || hasReusableIcon || hasCommentIcon || hasDroppedIcon) {
       const textOnlyW = measureText(line, fontSize, fontWeight);
       const leftW  = hasPriorityIcon ? badgeSize + badgeGap : 0;
       const rightW = (hasUnplannedIcon ? badgeGap + badgeSize : 0)
                    + (hasReusableIcon  ? badgeGap + badgeSize : 0)
-                   + (hasCommentIcon   ? badgeGap + badgeSize : 0);
-      // Center [priorityIcon?][text][boltIcon?][repeatIcon?][commentIcon?] around x=0
+                   + (hasCommentIcon   ? badgeGap + badgeSize : 0)
+                   + (hasDroppedIcon   ? badgeGap + badgeSize : 0);
+      // Center [priorityIcon?][text][boltIcon?][repeatIcon?][commentIcon?][banIcon?] around x=0
       const textX = (leftW - rightW) / 2;
       t.setAttribute('x', textX);
 
@@ -11872,6 +11921,19 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
           'pointer-events': 'none',
         }));
         g.appendChild(cmtG);
+        rightCursor += badgeSize + badgeGap;
+      }
+
+      if (hasDroppedIcon) {
+        // Survives greyscale, colour-blindness and the zoomed-out Rocks view,
+        // where the diagonal alone gets thin.
+        g.appendChild(svgEl('use', {
+          href: '#icon-ban',
+          width: badgeSize, height: badgeSize,
+          x: rightCursor,
+          y: textY - badgeSize / 2 - fontSize * 0.35,
+          style: `color:${textColor};fill:none;stroke:currentColor`,
+        }));
       }
     }
     t.textContent = line;
@@ -12069,12 +12131,13 @@ function edgeEndpoints(fromId, toId, at) {
     : { x1: pPos.x + pW / 2, y1: pPos.y, x2: cPos.x - cW / 2, y2: cPos.y };
 }
 
-// Edge color: done child uses muted DONE_BORDER, else branch color.
-// Mirrors the cascade: when a parent is marked done, all descendants get
-// node.done=true, so each of their incoming edges turns muted in turn.
+// Edge color: a closed child (done or dropped) uses muted DONE_BORDER, else
+// branch color. Mirrors the cascade: when a parent is closed, all descendants
+// are too, so each of their incoming edges turns muted in turn. Both closed
+// states share one muted edge — a second style would buy nothing.
 function edgeColorFor(childId, branchId) {
   const child = (childId === 'center') ? null : findNode(childId);
-  if (child && child.done) {
+  if (child && (child.done || child.dropped)) {
     return getThemeColors().DONE_BORDER;
   }
   return BRANCH_COLORS[branchId]?.main || '#888';
@@ -15238,6 +15301,11 @@ function _windowKeydownHandler(e) {
       e.preventDefault();
       setStatus(id, node.unplanned ? 'planned' : 'unplanned');
     }
+  } else if (e.key.toLowerCase() === 'x') {
+    if (id !== 'center' && node.type !== 'branch') {
+      e.preventDefault();
+      setStatus(id, node.dropped ? 'undropped' : 'dropped');
+    }
   } else if (e.key.toLowerCase() === 'c') {
     // Same targets the context menu offers a comment for.
     if (node.type === 'activity' && !node.tickChild && !node.dayChild) {
@@ -15514,8 +15582,12 @@ function showContextMenu(x, y, nodeId) {
 
   // Show/hide items depending on node type and status
   const isDone = node && node.done === true;
+  const isDropped = node && node.dropped === true;
   document.getElementById('ctx-done').style.display      = (isBranch || isCenter || isDone)         ? 'none' : '';
-  document.getElementById('ctx-undone').style.display    = (isBranch || isCenter || !isDone)        ? 'none' : '';
+  // Undone is the shared way back to open from either closed state, so a
+  // dropped node shows it too — there is no separate un-drop item.
+  document.getElementById('ctx-undone').style.display    = (isBranch || isCenter || (!isDone && !isDropped)) ? 'none' : '';
+  document.getElementById('ctx-dropped').style.display   = (isBranch || isCenter || isDropped)      ? 'none' : '';
   document.getElementById('ctx-reset').style.display     = isCounter                                ? ''     : 'none';
   const isUnplanned = node && node.unplanned === true;
   document.getElementById('ctx-unplanned').innerHTML = isUnplanned
@@ -15567,8 +15639,9 @@ function showContextMenu(x, y, nodeId) {
       const specific = !!agendaTickCtx.specificTickId;
       const anyPending = ti.done < ti.total;
       const anyDone = ti.done > 0;
-      document.getElementById('ctx-done').style.display   = (!specific && anyPending) ? '' : 'none';
-      document.getElementById('ctx-undone').style.display = (specific || anyDone)     ? '' : 'none';
+      document.getElementById('ctx-done').style.display    = (!specific && anyPending) ? '' : 'none';
+      document.getElementById('ctx-undone').style.display  = (specific || anyDone)     ? '' : 'none';
+      document.getElementById('ctx-dropped').style.display = (!specific && anyPending) ? '' : 'none';
 
       const repTickId = pickRepresentativeTick(nodeId, true);
       const repTick = repTickId ? findNode(repTickId) : null;
@@ -16065,7 +16138,18 @@ document.getElementById('ctx-done').addEventListener('click', () => {
 });
 
 document.getElementById('ctx-undone').addEventListener('click', () => {
-  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget, false), 'undone');
+  if (contextTarget) {
+    // One item, two closed states to return from: a dropped node needs
+    // 'undropped', or it would keep the flag and stay closed.
+    const target = _agendaTickRedirect(contextTarget, false);
+    setStatus(target, findNode(target)?.dropped ? 'undropped' : 'undone');
+  }
+  if (currentView === 'agenda') renderAgenda();
+  hideContextMenu();
+});
+
+document.getElementById('ctx-dropped').addEventListener('click', () => {
+  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget, true), 'dropped');
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
 });

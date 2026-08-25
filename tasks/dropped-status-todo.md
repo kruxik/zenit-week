@@ -26,18 +26,18 @@ Order: **S1 first, always.** S3 / S4 / S5 are independent of each other once S1 
 
 ## S2 — Mind map + entry points
 
-- [ ] T2.1 — Node fill/border selection (`:10985`): dropped branch keeps branch colour at ~45% opacity. Must sit **before** the `unplanned` case so a dropped+unplanned node reads as dropped.
-- [ ] T2.2 — Diagonal slash: one SVG `line` corner-to-corner across the node rect, branch-coloured, `pointer-events: none`. Created with `createElementNS`.
-- [ ] T2.3 — ⊘ badge: add the `<symbol>` to the sprite `<defs>` if absent; render in the existing badge row.
-- [ ] T2.4 — Feed the badge width into the `rightW` / `textX` centering maths (`~11765`), exactly as the comment badge does.
-- [ ] T2.5 — Confirm no `text-decoration: line-through` is applied to a dropped node (`:11839` is Done's mark only).
-- [ ] T2.6 — Edge muting (`~12038`): treat dropped like done.
-- [ ] T2.7 — Hotkey `X` on the hovered node, toggling drop/undrop. Register alongside `D`/`U`/`P`.
-- [ ] T2.8 — `ctx-dropped` menu item (`:3898`) + show/hide wiring (hidden on center and branch nodes) + click handler.
-- [ ] T2.9 — Show the existing `ctx-undone` for dropped nodes — it is the shared return-to-open path. **No new un-drop menu item.**
-- [ ] T2.10 — i18n `menu.dropped` (Dropped / Vyřazeno) + `help.dropped`, both `en` and `cs`.
-- [ ] T2.11 — Tests: hotkey dispatch, context-menu visibility per node type, i18n parity.
-- [ ] T2.12 — `npm test` + `npm run validate` + **`npm run csp`** green.
+- [x] T2.1 — Node fill/border selection (`:10985`): dropped branch keeps branch colour at ~45% opacity. Must sit **before** the `unplanned` case so a dropped+unplanned node reads as dropped.
+- [x] T2.2 — Diagonal slash: one SVG `line` corner-to-corner across the node rect, branch-coloured, `pointer-events: none`. Created with `createElementNS`.
+- [x] T2.3 — ⊘ badge: add the `<symbol>` to the sprite `<defs>` if absent; render in the existing badge row.
+- [x] T2.4 — Feed the badge width into the `rightW` / `textX` centering maths (`~11765`), exactly as the comment badge does.
+- [x] T2.5 — Confirm no `text-decoration: line-through` is applied to a dropped node (`:11839` is Done's mark only).
+- [x] T2.6 — Edge muting (`~12038`): treat dropped like done.
+- [x] T2.7 — Hotkey `X` on the hovered node, toggling drop/undrop. Register alongside `D`/`U`/`P`.
+- [x] T2.8 — `ctx-dropped` menu item (`:3898`) + show/hide wiring (hidden on center and branch nodes) + click handler.
+- [x] T2.9 — Show the existing `ctx-undone` for dropped nodes — it is the shared return-to-open path. **No new un-drop menu item.**
+- [x] T2.10 — i18n `menu.dropped` (Dropped / Vyřazeno) + `help.dropped`, both `en` and `cs`.
+- [x] T2.11 — Tests: hotkey dispatch, context-menu visibility per node type, i18n parity.
+- [x] T2.12 — `npm test` + `npm run validate` + **`npm run csp`** green.
 
 **AC:** `X` drops and undrops; a dropped node is unmistakable from a done node at a glance in both themes; its label stays centred with any combination of badges.
 **Verify:** browser, light + dark, all three view levels (Sand / Pebbles / Rocks). Screenshot a dropped node beside a done node.

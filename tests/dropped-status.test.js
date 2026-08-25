@@ -1,5 +1,5 @@
 import {
-  setStatus, syncStatusUp, findNode, undo,
+  setStatus, syncStatusUp, findNode, undo, showContextMenu, t,
   _state,
 } from './setup.js';
 
@@ -369,5 +369,141 @@ describe('T17 – undo restores the pre-drop state', () => {
 
     expect(findNode('a1').dropped).toBeFalsy();
     expect(findNode('a2').dropped).toBeFalsy();
+  });
+});
+
+// ─── S2 — entry points ───────────────────────────────────────────────────────
+
+describe('hotkey X on the hovered node', () => {
+  function pressX(extra = {}) {
+    _state.triggerKeydown({
+      key: 'x',
+      preventDefault: () => {},
+      stopPropagation: () => {},
+      target: { tagName: 'DIV' },
+      metaKey: false, ctrlKey: false, shiftKey: false, altKey: false,
+      ...extra,
+    });
+  }
+
+  beforeEach(() => {
+    _state.setCurrentView('mindmap');
+    _state.setEditState(null);
+  });
+
+  test('X drops an open activity', () => {
+    setUp([mkBranch('work', ['a1']), mkActivity('a1', 'work', 'work')]);
+    _state.setHoveredNode('a1');
+
+    pressX();
+
+    expect(findNode('a1').dropped).toBe(true);
+  });
+
+  test('X again returns it to open', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: 'ts' }),
+    ]);
+    _state.setHoveredNode('a1');
+
+    pressX();
+
+    expect(findNode('a1').dropped).toBe(false);
+    expect(findNode('a1').droppedAt).toBeUndefined();
+  });
+
+  test('X does nothing on a branch node', () => {
+    setUp([mkBranch('work', ['a1']), mkActivity('a1', 'work', 'work')]);
+    _state.setHoveredNode('work');
+
+    pressX();
+
+    expect(findNode('work').dropped).toBeUndefined();
+  });
+
+  test('X does nothing on the root', () => {
+    setUp([mkBranch('work', ['a1']), mkActivity('a1', 'work', 'work')]);
+    _state.setHoveredNode('center');
+
+    pressX();
+
+    expect(findNode('a1').dropped).toBeFalsy();
+  });
+});
+
+describe('context menu — Dropped item visibility', () => {
+  const isVisible = (id) => _state.getElement(id).style.display !== 'none';
+
+  beforeEach(() => {
+    _state.setCurrentView('mindmap');
+  });
+
+  test('an open activity offers Dropped, not Undone', () => {
+    setUp([mkBranch('work', ['a1']), mkActivity('a1', 'work', 'work')]);
+
+    showContextMenu(100, 100, 'a1');
+
+    expect(isVisible('ctx-dropped')).toBe(true);
+    expect(isVisible('ctx-undone')).toBe(false);
+  });
+
+  test('a dropped activity hides Dropped and offers the shared Undone', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: 'ts' }),
+    ]);
+
+    showContextMenu(100, 100, 'a1');
+
+    expect(isVisible('ctx-dropped')).toBe(false);
+    expect(isVisible('ctx-undone')).toBe(true);
+  });
+
+  test('a done activity still offers Undone and no Dropped duplication', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { done: true, doneAt: 'ts' }),
+    ]);
+
+    showContextMenu(100, 100, 'a1');
+
+    expect(isVisible('ctx-undone')).toBe(true);
+    expect(isVisible('ctx-dropped')).toBe(true);
+  });
+
+  test('branch and root nodes never offer Dropped', () => {
+    setUp([mkBranch('work', ['a1']), mkActivity('a1', 'work', 'work')]);
+
+    showContextMenu(100, 100, 'work');
+    expect(isVisible('ctx-dropped')).toBe(false);
+
+    showContextMenu(100, 100, 'center');
+    expect(isVisible('ctx-dropped')).toBe(false);
+  });
+
+  test('a counter offers Dropped — D3 freezes it rather than filling it', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { children: ['c1'] }),
+      mkCounter('c1', 'a1', 'work', 2, 5),
+    ]);
+
+    showContextMenu(100, 100, 'c1');
+
+    expect(isVisible('ctx-dropped')).toBe(true);
+  });
+});
+
+describe('i18n — new keys exist in both languages', () => {
+  test('menu.dropped and help.dropped resolve in en and cs', () => {
+    _state.setLang('en');
+    expect(t('menu.dropped')).toBe('Dropped');
+    expect(t('help.dropped')).toBe('Dropped');
+
+    _state.setLang('cs');
+    expect(t('menu.dropped')).toBe('Vyřazeno');
+    expect(t('help.dropped')).toBe('Vyřazeno');
+    _state.setLang('en');
   });
 });
