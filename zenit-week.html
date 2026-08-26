@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-1JAarUGlnzx9U6UNo7Fg8v/hDTKQQq4I4ljDMIJxDOE='
+               'sha256-cx7OcoIUxgS48B5WZAGjy98dAwxHWg6IRmbDbmvEdfY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -11218,6 +11218,16 @@ function getCounterChild(node) {
   return (node.children || []).map(findNode).find(n => n && n.type === 'counter') || null;
 }
 
+// The ⊘ badge changes node width and the diagonal slash is built in
+// makeNodeGroup, so entering or leaving the dropped state is structural:
+// updateNodeUI repaints fill, stroke and text only and can neither remove the
+// slash nor reflow the label. Callers check this *before* mutating, to decide
+// between a full render and the surgical path.
+function subtreeHasDropped(id) {
+  if (findNode(id)?.dropped) return true;
+  return getDescendantIds(id).some(cid => findNode(cid)?.dropped);
+}
+
 function setStatus(id, status) {
   const node = findNode(id);
   if (!node) return;
@@ -11292,6 +11302,9 @@ function setStatus(id, status) {
   let fullRenderNeeded = false;
 
   if (status === 'done') {
+    // Read before the mutation: the cascade below clears the flag, and the
+    // marks it leaves on screen have to be rebuilt, not just repainted.
+    const wasDropped = subtreeHasDropped(id);
     node.done    = true;
     node.doneAt  = new Date().toISOString();
     node.donedOn = localDateStr();
@@ -11302,6 +11315,7 @@ function setStatus(id, status) {
     touchNode(id);
     setDescendants(id, 'done');
     syncStatusUp(id, 'done');
+    if (wasDropped) fullRenderNeeded = true;
   } else if (status === 'undone') {
     node.done = false;
     delete node.doneAt;
@@ -15526,6 +15540,7 @@ function updateCounter(id, dir) {
   const newVal = (node.val || 0) + dir;
   if (newVal >= 0 && newVal <= (node.max || 999)) {
     takeSnapshot();
+    const wasDropped = subtreeHasDropped(id);
     node.val = newVal;
 
     // Auto-done logic
@@ -15533,6 +15548,11 @@ function updateCounter(id, dir) {
     node.done = isMax;
     if (isMax) node.doneAt = new Date().toISOString();
     else delete node.doneAt;
+
+    // Ticking a dropped counter revives it: D1 forbids done+dropped at max, and
+    // below max the drop's promise — that the remainder will never happen — is
+    // contradicted the moment the count moves up.
+    if (dir === 1) { node.dropped = false; delete node.droppedAt; }
 
     // Tick log: push on increment (skip final — covered by doneAt), pop on decrement
     if (!node.ticks) node.ticks = [];
@@ -15543,9 +15563,15 @@ function updateCounter(id, dir) {
     syncStatusUp(id, 'done');
 
     saveWeek(currentWeekKey, weekData);
-    
-    updateNodeUI(id);
-    updateSummary();
+
+    // Same reason as setStatus: clearing a drop removes a badge and a slash,
+    // which the surgical path cannot do.
+    if (wasDropped && dir === 1) {
+      renderIfVisible();
+    } else {
+      updateNodeUI(id);
+      updateSummary();
+    }
   }
 }
 

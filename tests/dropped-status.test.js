@@ -3,6 +3,7 @@ import {
   transferUnfinished, transferReusable, moveNodeToNextWeek,
   getOverdueItems, getAnyDayItems, getDroppedItems, localDateStr,
   computeWeekStats, _computeSummarySignature, deleteNode, sandboxGlobal,
+  subtreeHasDropped, updateCounter,
   _state,
 } from './setup.js';
 
@@ -1017,5 +1018,124 @@ describe('the delete dialog offers Drop alongside Delete', () => {
     _state.setLang('cs');
     expect(t('app-confirm.drop')).toBe('Vyřadit');
     _state.setLang('en');
+  });
+});
+
+// ─── Regressions ─────────────────────────────────────────────────────────────
+
+describe('done wins over dropped, everywhere it is set', () => {
+  test('drop then done leaves nothing of the drop behind', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work'),
+    ]);
+
+    setStatus('a1', 'dropped');
+    setStatus('a1', 'done');
+
+    const n = findNode('a1');
+    expect(n.done).toBe(true);
+    expect(n.dropped).toBe(false);
+    expect(n.droppedAt).toBeUndefined();
+    // The badge and the slash are structural, so this transition must redraw
+    // the map rather than repaint the node in place.
+    expect(subtreeHasDropped('a1')).toBe(false);
+  });
+
+  test('marking a parent done clears the drop on every descendant', () => {
+    setUp([
+      mkBranch('work', ['p1']),
+      mkActivity('p1', 'work', 'work', { children: ['c1'] }),
+      mkActivity('c1', 'p1', 'work'),
+    ]);
+
+    setStatus('p1', 'dropped');
+    expect(subtreeHasDropped('p1')).toBe(true);
+
+    setStatus('p1', 'done');
+
+    expect(findNode('c1').done).toBe(true);
+    expect(findNode('c1').dropped).toBe(false);
+    expect(findNode('c1').droppedAt).toBeUndefined();
+    expect(subtreeHasDropped('p1')).toBe(false);
+  });
+
+  test('subtreeHasDropped sees a dropped descendant under an open parent', () => {
+    setUp([
+      mkBranch('work', ['p1']),
+      mkActivity('p1', 'work', 'work', { children: ['c1', 'c2'] }),
+      mkActivity('c1', 'p1', 'work', { dropped: true, droppedAt: 'ts' }),
+      mkActivity('c2', 'p1', 'work'),
+    ]);
+
+    expect(findNode('p1').dropped).toBeFalsy();
+    expect(subtreeHasDropped('p1')).toBe(true);
+  });
+
+  test('a counter reaching max clears the drop rather than holding both', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { children: ['c1'] }),
+      mkCounter('c1', 'a1', 'work', 2, 3),
+    ]);
+    setStatus('c1', 'dropped');
+    expect(findNode('c1').val).toBe(2);   // D3 froze it
+
+    updateCounter('c1', +1);
+
+    const c = findNode('c1');
+    expect(c.val).toBe(3);
+    expect(c.done).toBe(true);
+    expect(c.dropped).toBe(false);
+    expect(c.droppedAt).toBeUndefined();
+  });
+
+  test('ticking a dropped counter below max revives it', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { children: ['c1'] }),
+      mkCounter('c1', 'a1', 'work', 1, 10),
+    ]);
+    setStatus('c1', 'dropped');
+
+    updateCounter('c1', +1);
+
+    const c = findNode('c1');
+    expect(c.val).toBe(2);
+    expect(c.done).toBe(false);
+    expect(c.dropped).toBe(false);
+  });
+
+  test('decrementing does not revive a dropped counter', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { children: ['c1'] }),
+      mkCounter('c1', 'a1', 'work', 4, 10),
+    ]);
+    setStatus('c1', 'dropped');
+
+    updateCounter('c1', -1);
+
+    expect(findNode('c1').dropped).toBe(true);
+  });
+
+  test('the roll-up follows: a dropped parent flips to done, not both', () => {
+    setUp([
+      mkBranch('work', ['p1']),
+      mkActivity('p1', 'work', 'work', { children: ['c1', 'c2'] }),
+      mkActivity('c1', 'p1', 'work'),
+      mkActivity('c2', 'p1', 'work'),
+    ]);
+
+    setStatus('p1', 'dropped');
+    expect(findNode('p1').dropped).toBe(true);
+
+    setStatus('c1', 'done');
+    setStatus('c2', 'done');
+
+    const p = findNode('p1');
+    expect(p.done).toBe(true);
+    expect(p.dropped).toBe(false);
+    expect(p.droppedAt).toBeUndefined();
   });
 });

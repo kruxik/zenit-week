@@ -612,6 +612,7 @@ export const {
   deleteNode,
   setStatus,
   syncStatusUp,
+  subtreeHasDropped,
   findNode,
   rebuildNodeMap,
   isLeafActivity,
