@@ -190,7 +190,7 @@ not wanted.
 - [x] T7.1 — Daily-log badge for dropped rows via the existing `.daily-log-badge` pattern (`:1590`).
 - [x] T7.2 — Help legend entry + `help.dropped` wiring (`~4286`).
 - [x] T7.3 — Update `CLAUDE.md`: data model, hotkey list (`X`), UI/UX guidelines.
-- [ ] T7.4 — CHANGELOG entry.
+- [x] T7.4 — CHANGELOG entry (Unreleased block; release regenerates it from the commits).
 - [ ] T7.5 — Full manual pass: both themes, all three view levels, mobile width, undo/redo, Drive sync round trip.
 - [x] T7.6 — `npm test` + `npm run validate` + `npm run csp` green.
 - [x] T7.7 — Walk spec §11 acceptance criteria, tick every box.
@@ -198,11 +198,11 @@ not wanted.
 ### S7 notes
 - **T7.1 already landed in S5.** The `.daily-log-badge.dropped` variant and the ⊘
   on Dropped rows shipped with the agenda group. Nothing left to add.
-- **T7.4 — no handwritten CHANGELOG entry.** `npm run release` regenerates
-  `CHANGELOG.md` with git-cliff from conventional commit messages and prepends the
-  new version section. A hand-written entry would be overwritten at release and
-  would conflict in the meantime. The five slice commits already carry the right
-  `feat(...)` subjects, which are the entry.
+- **T7.4 — written as an `[Unreleased]` block, on request.** `npm run release`
+  regenerates `CHANGELOG.md` with git-cliff from the conventional commit subjects
+  and prepends the new version section, so the block carries an HTML comment
+  saying to delete it when the release is cut — otherwise the same entries appear
+  twice.
 - **T7.5 is the user's pass**, not something the suite can stand in for. Left
   unticked until it happens.
 - **One extra i18n key:** `help.toggleDropped` (Toggle Dropped / Přepnout
