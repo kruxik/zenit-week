@@ -5,26 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
-<!-- `npm run release` regenerates the version sections below from the commit
-     log with git-cliff. Delete this Unreleased block when cutting the release —
-     the same entries are produced from the feat(...) commits. -->
-
-## [Unreleased]
-
-### Added
-
-- **status:** Dropped — close a task without doing it, and without erasing it
-- **mindmap:** Mark a dropped task with a faded branch colour, a diagonal slash and a ⊘ badge; toggle it with `X`
-- **agenda:** Show a Dropped group last, with swipe-right to return a task to open
-- **stats:** Count dropped work in its own grey band, with a Dropped rate alongside plan completion
-- **delete:** Offer Drop alongside Delete when removing a task
-
-### Changed
-
-- **status:** Roll a parent up to done when every child is closed and at least one is done, so a mixed done-and-dropped subtree still reads as done
-- **transfer:** Leave dropped tasks behind in `Transfer Unfinished`; `Transfer Reusable` and `Next week` revive them
-- **agenda:** Keep dropped tasks off the Overdue tab and out of `Any day`
-
 ## [v2026.08.21] - 2026-08-21
 
 ### Added
