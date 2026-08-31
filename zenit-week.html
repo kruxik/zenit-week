@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-cx7OcoIUxgS48B5WZAGjy98dAwxHWg6IRmbDbmvEdfY='
+               'sha256-mb30lM5EtwObG5r7BlSKH29Cc2A815LKQY5zJipWHGg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -15170,6 +15170,80 @@ function cyclePriority(nodeId) {
   setStatus(nodeId, `prio-${next}`);
 }
 
+// ─── What Esc dismisses ───────────────────────────────────────────────────────
+// One ordered list instead of a hand-rolled if-chain, so the whole Esc policy is
+// readable in one place — and so a dismiss that declines can say so. Esc walks
+// the list from the top and stops at the first entry that actually dismisses
+// something: `dismiss` returning false means "not me", and the walk carries on
+// instead of spending the press on a no-op. That is what used to strand the key
+// on the level row while a filter held it open, with Help stuck behind it.
+//
+// Order is by depth, not by recency: transient overlays first, then the level
+// row — state the user set, not something that popped up over the work — and
+// only then the two view exits that have always been here. Dismiss-only: Esc
+// never walks back through week or view navigation the user chose deliberately.
+const ESC_DISMISSALS = [
+  // The tip sits on top of whatever opened it, so it goes first — the menu
+  // underneath stays where the user left it.
+  { isOpen: () => _coachmarkVisible,
+    dismiss: () => { dismissCoachmark(); } },
+  // Quick add is modal and sits over every view, so it answers early — and it
+  // has to be here rather than in its own listener: a second handler closing it
+  // left this walk to fall straight through to the map state underneath, which
+  // is how one press both shut the panel and reset Rocks to Sand.
+  { isOpen: () => !!window.isQuickAddOpen && window.isQuickAddOpen(),
+    dismiss: () => { window.closeQuickAdd(); } },
+  { isOpen: () => isDayFilterMenuOpen(),
+    dismiss: () => { closeDayFilterMenu(); } },
+  { isOpen: () => !!ctxMenu && ctxMenu.classList.contains('visible'),
+    dismiss: () => { hideContextMenu(); } },
+  // Help sits on top of any view (Stats included), so it dismisses before the
+  // view does — otherwise leaving Stats would close both on a single press.
+  { isOpen: () => isHelpOpen(),
+    dismiss: () => { closeHelp(); } },
+  { isOpen: () => isCommentDialogOpen(),
+    dismiss: () => { closeCommentDialog(); } },
+  { isOpen: () => isSettingsDropdownOpen(),
+    dismiss: () => { closeSettingsDropdown(); } },
+  // Mindmap-only from here down, and gated on it: the ring and the level row
+  // are invisible from Agenda or Stats, and Esc must never spend itself on
+  // something the user cannot see — that is what made leaving Agenda reset the
+  // map instead. The gate is also what makes the walk read as last-in-first-out
+  // without a stack: a view switch always outranks the map state beneath it.
+  { isOpen: () => currentView === 'mindmap' && kbFocusId !== null,
+    dismiss: () => { clearKbFocus(); } },
+  // The views the user can back out of, before the map state they were set on
+  // top of: leaving Stats or Agenda hands back the Mindmap exactly as it was,
+  // Rocks and day filter included. Only the next press unwinds those.
+  { isOpen: () => _statsPanelOpen,
+    dismiss: () => { switchView('mindmap'); } }, // leave Stats → default view
+  { isOpen: () => currentView === 'agenda' && window.innerWidth >= 768,
+    dismiss: () => { switchView('mindmap'); } },
+  // Last: everything transient has cleared and the Mindmap is what's on screen,
+  // so the map springs back to Sand as one motion the user can actually watch.
+  { isOpen: () => currentView === 'mindmap' && (areViewLevelsOpen() || viewFiltersActive()),
+    dismiss: () => resetViewLevels() },
+];
+
+// True when the press was spent on something.
+function runEscDismiss() {
+  for (const entry of ESC_DISMISSALS) {
+    if (!entry.isOpen()) continue;
+    if (entry.dismiss() !== false) return true;
+  }
+  return false;
+}
+
+function isSettingsDropdownOpen() {
+  const d = document.getElementById('settings-dropdown');
+  return !!d && d.classList.contains('visible');
+}
+
+function closeSettingsDropdown() {
+  document.getElementById('settings-dropdown')?.classList.remove('visible');
+  document.getElementById('fab-settings')?.classList.remove('active');
+}
+
 // Global keyboard shortcuts for hovered node
 function _windowKeydownHandler(e) {
   if (editState) return; // Don't interfere with inline editing
@@ -15253,55 +15327,7 @@ function _windowKeydownHandler(e) {
   }
 
   if (e.key === 'Escape') {
-    const settings = document.getElementById('settings-dropdown');
-
-    // The tip sits on top of whatever opened it, so it is what Esc closes
-    // first — the menu underneath stays where the user left it.
-    if (_coachmarkVisible) {
-      dismissCoachmark();
-      return;
-    }
-    if (isDayFilterMenuOpen()) {
-      closeDayFilterMenu();
-      return;
-    }
-    if (areViewLevelsOpen()) {
-      closeViewLevels();
-      return;
-    }
-    if (ctxMenu && ctxMenu.classList.contains('visible')) {
-      hideContextMenu();
-      return;
-    }
-    // Help sits on top of any view (Stats included), so it dismisses first —
-    // otherwise leaving Stats would close both panels on a single press.
-    if (isHelpOpen()) {
-      closeHelp();
-      return;
-    }
-    if (_statsPanelOpen) {
-      switchView('mindmap'); // leave Stats → default view
-      return;
-    }
-    const commentPanel = document.getElementById('comment-panel');
-    if (commentPanel && commentPanel.classList.contains('visible')) {
-      closeCommentDialog();
-      return;
-    }
-    if (settings && settings.classList.contains('visible')) {
-      settings.classList.remove('visible');
-      const sFab = document.getElementById('fab-settings');
-      if (sFab) sFab.classList.remove('active');
-      return;
-    }
-    if (kbFocusId) {
-      clearKbFocus();
-      return;
-    }
-    if (currentView === 'agenda' && window.innerWidth >= 768) {
-      switchView('mindmap');
-      return;
-    }
+    if (runEscDismiss()) return;
   }
 
   // Undo / Redo
@@ -18620,21 +18646,30 @@ function viewFiltersActive() {
 // Esc, quick-add and canvas taps, so it must be a no-op when already shut.
 // While a filter is on, the row is the only thing naming it, so it stays put
 // until the Mindmap tab clears the filters and closes it deliberately.
+// Returns whether the row actually shut, so callers that spend a gesture on it
+// (the Esc chain) can tell a real dismiss from a declined one.
 function closeViewLevels({ force = false } = {}) {
-  if (!areViewLevelsOpen()) return;
-  if (!force && viewFiltersActive()) return;
+  if (!areViewLevelsOpen()) return false;
+  if (!force && viewFiltersActive()) return false;
   document.documentElement.classList.remove('view-levels-open');
   document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'false');
   closeDayFilterMenu(); // the day menu hangs off the row; it can't outlive it
+  return true;
+}
+
+// Put the map back the way it was found: every day, every level, row shut. The
+// deliberate "undo the filtering" gesture, shared by the Mindmap tab and Esc.
+function resetViewLevels() {
+  if (!areViewLevelsOpen() && !viewFiltersActive()) return false;
+  if (activeDayFilter !== null) setDayFilter(null);
+  if (currentViewLevel !== 'full') switchViewLevel('full');
+  closeViewLevels({ force: true });
+  return true;
 }
 
 function toggleViewLevels() {
   if (!areViewLevelsOpen()) { openViewLevels(); return; }
-  // Closing from the tab is the deliberate gesture, so it also puts the map
-  // back the way it was found: every day, every level.
-  if (activeDayFilter !== null) setDayFilter(null);
-  if (currentViewLevel !== 'full') switchViewLevel('full');
-  closeViewLevels({ force: true });
+  resetViewLevels();
 }
 
 // Tapping the canvas dismisses the row. #view-level-bar swallows its own
@@ -19510,6 +19545,9 @@ document.addEventListener('click', (e) => {
     }
   }
   window.toggleQuickAdd = toggleQuickAdd;
+  // The Esc registry owns the dismiss; these are how it reaches the closure.
+  window.isQuickAddOpen = () => panel.classList.contains('is-open');
+  window.closeQuickAdd = closeQuickAdd;
 
   fabAdd.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -19526,7 +19564,6 @@ document.addEventListener('click', (e) => {
       if (!input.value.trim()) closeQuickAdd();
       else submitQuickAdd();
     }
-    if (e.key === 'Escape') { e.preventDefault(); closeQuickAdd(); }
   });
 
   backdrop.addEventListener('click', closeQuickAdd);
@@ -19536,10 +19573,6 @@ document.addEventListener('click', (e) => {
     if (panel.classList.contains('is-open') && e.touches.length > 1) e.preventDefault();
   }, { passive: false });
 
-  // Close on global Esc (already handled in keydown on input, but cover backdrop focus too)
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && panel.classList.contains('is-open')) closeQuickAdd();
-  });
 })();
 
 
