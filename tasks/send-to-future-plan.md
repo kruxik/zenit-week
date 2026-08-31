@@ -59,22 +59,30 @@ S4 (*Send to date…*) is the tempting first slice because it is the visible one
 
 With S3 first, an entry seeded by a test (or by hand in the console) materialises correctly, and S4 then closes the loop the moment it lands.
 
-## Where the risk actually is
+## Risk register — resolved during implementation, not now
 
-**S3 is the regression cliff.** It is the only slice that changes what happens when an ordinary week opens, on every week, including for users who never create a single entry.
+**None of these is resolved up front.** Each is carried until the slice that actually meets it. The rule for every one of them is the same:
 
-Four specific hazards, each with its mitigation:
+> When the slice reaches the task tagged with a risk, **flag it in the report for that slice** — state what was found, whether the mitigation held, and what was done. If the mitigation does not hold, stop at the task rather than working around it.
 
-1. **Three week-open paths, not one.** `loadAndRender` (`zenit-week.html:19136`), the `hashchange` handler (`:19175`) and the boot path all load a week independently. Materialisation must hook **one** shared function that all three call after `loadWeek` and before `rebuildNodeMap`, or weeks opened by URL hash will silently behave differently from weeks opened by the arrows.
-2. **Re-entrancy.** `withWeekLock` (`:5062`) is explicitly **not** re-entrant. Materialisation runs under the lock for the week being opened; nothing it calls may take that lock again.
-3. **`validateAndRepair` (`:9843`) is a garbage collector.** It must be taught to preserve `schedId` / `schedDate` the way it already preserves `dayChild` / `dayIndex`, or every occurrence node is stripped of its identity on the next load and re-plants as a duplicate.
-4. **CRDT merge field lists.** `migrateCrdt` (`:9978`) and the week-merge path must carry the two new fields, or a Drive round-trip drops them — same failure as (3), but only on synced devices, which is worse because it is invisible locally.
+Deciding these in advance would mean guessing at code that has not been read yet. Deciding them silently during the slice is how a wrong guess ships. Flagging is the middle path.
 
-The regression net is the existing suite unchanged: `week-record-invariants.test.js`, `persistence.test.js`, `crdt.test.js`, `sync-convergence.test.js`, `transfer.test.js`, `week-rollover.test.js`. If S3 needs any of those edited, that is the signal to stop and re-read the spec.
+**S3 is the regression cliff.** It is the only slice that changes what happens when an ordinary week opens, on every week, including for users who never create a single entry. Five of the ten risks live there.
 
-**Second risk, S3's core invariant:** the deterministic occurrence node id. It must be derived from `schedId` + `schedDate`, be shaped exactly like a `genId()` result so nothing downstream can distinguish it, and be checked against both `nodes` **and** `tombstones` before planting. Every idempotence property in the spec — reopening a week, two offline devices converging, a deleted occurrence staying deleted — rests on this single check.
+| # | Risk | Resolve at | Flag when |
+|---|---|---|---|
+| **R1** | **Three week-open paths, not one.** `loadAndRender` (`zenit-week.html:19136`), the `hashchange` handler (`:19175`) and boot each load a week independently. Materialisation must hook **one** shared function all three reach, or weeks opened by URL behave differently from weeks opened by the arrows. | S3 / T3.1 | The shared point turns out not to exist, or requires refactoring the three paths to create it. |
+| **R2** | **`withWeekLock` (`:5062`) is not re-entrant.** Materialisation runs under the lock for the week being opened; nothing it calls may take that lock again. | S3 / T3.4 | Anything on the materialisation path already takes a week lock of its own. |
+| **R3** | **`validateAndRepair` (`:9843`) is a garbage collector.** It must preserve `schedId` / `schedDate` as it preserves `dayChild` / `dayIndex` (`:9855`), or occurrences lose their identity on reload and re-plant as duplicates. | S3 / T3.7 | The repair pass has a field allow-list that is not obvious, or strips unknown fields by default. |
+| **R4** | **CRDT merge field lists.** `migrateCrdt` (`:9978`) and the week-merge path must carry both new fields, or a Drive round-trip drops them — R3's failure, but only on synced devices, so invisible locally. | S3 / T3.8 | The merge enumerates fields explicitly anywhere. |
+| **R5** | **Deterministic occurrence id.** Derived from `schedId` + `schedDate`, shaped exactly like a `genId()` result, checked against `nodes` **and** `tombstones` before planting. Every idempotence property in the spec rests on this one check. | S2 / T2.4, exercised S3 / T3.3 | The derivation cannot produce a `genId()`-shaped value without a hash dependency the single-file policy does not allow. |
+| **R6** | **Undo after materialisation.** Materialisation takes no undo snapshot (T3.5). An undo that removes a freshly planted node leaves no tombstone, so the next week open re-plants it. Believed harmless; confirm rather than assume. | S3 / T3.5 | The re-plant is observable in a way that reads as a bug rather than as a refresh. |
+| **R7** | **Sweep vs. future-browse double-plant.** The `planted` list and the deterministic id are supposed to cover this jointly. | S5 / T5.5 | Either mechanism alone turns out to be load-bearing — that means the other has a hole. |
+| **R8** | **Agenda strip memoisation.** The strip is memoised on active tab, overdue count, week and language. A tab outside that key renders stale. | S6 / T6.2 | The Later tab's content depends on something the key cannot cheaply express. |
+| **R9** | **`L` hotkey.** Believed unbound (`X` is dropped, `9` collides with the numeric day strip). Must also not fire during inline rename or in a text field. | S6 / T6.3 | `L` turns out to be taken, or the global handler cannot distinguish focus context at that point. |
+| **R10** | **Drive failure independence.** A schedule sync failure must never block or corrupt a week sync, or the reverse. | S8 / T8.5 | The sync scheduler shares retry or backoff state across files. |
 
-**Third risk, S6:** the agenda strip is memoised on a small set of inputs (active tab, overdue count, week, language). A new tab that is not part of that key will render stale. Extend the key in the same edit that adds the tab.
+The regression net for R1–R6 is the existing suite unchanged: `week-record-invariants.test.js`, `persistence.test.js`, `crdt.test.js`, `sync-convergence.test.js`, `transfer.test.js`, `week-rollover.test.js`. **If S3 needs any of those edited, stop and re-read the spec** — that is not a risk to flag, it is a design error to fix.
 
 ## Slices
 

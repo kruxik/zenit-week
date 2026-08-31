@@ -2,6 +2,8 @@
 
 Plan: `tasks/send-to-future-plan.md` · Spec: `docs/specs/send-to-future.md` · Branch: `feature/send-to-future`
 
+Tasks tagged ⚠ **R#** carry a risk from the plan's risk register. They are **not** resolved in advance: when you reach one, report what you found and whether the mitigation held, and stop at the task if it did not.
+
 Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → S8 → S9. Check off only when AC + verification both pass.
 
 ---
@@ -27,7 +29,7 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 - [ ] T2.1 — `loadSchedule()` / `saveSchedule()` on the IDB `misc` store key `schedule`, using the existing `loadValueIDB` (`:5094`) / `saveValueIDB` (`:5106`). A missing record returns an empty schedule, never throws.
 - [ ] T2.2 — Record shape per spec §3.1: `entries[]`, `tombstones[]`, `crdtVersion`.
 - [ ] T2.3 — `validateAndRepairSchedule()` mirroring `validateAndRepair` (`:9843`): drop entries with no label or invalid anchor; coerce `repeat.every` to a positive integer; re-home an entry whose branch no longer exists onto the first branch rather than deleting it.
-- [ ] T2.4 — `occurrenceNodeId(schedId, schedDate)`: deterministic, collision-free, and shaped exactly like a `genId()` result so nothing downstream can distinguish it. Same inputs always yield the same id, on every device.
+- [ ] T2.4 ⚠ R5 — `occurrenceNodeId(schedId, schedDate)`: deterministic, collision-free, and shaped exactly like a `genId()` result so nothing downstream can distinguish it. Same inputs always yield the same id, on every device.
 - [ ] T2.5 — A schedule write never writes a week record, and a week write never touches the schedule.
 - [ ] T2.6 — `tests/schedule.test.js`: round-trip through IDB; missing record; repair drops invalid entries and re-homes orphan branches; `occurrenceNodeId` determinism and shape.
 - [ ] T2.7 — `npm test` + `npm run validate` green.
@@ -41,14 +43,14 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S3 — Materialisation on week open ← regression cliff
 
-- [ ] T3.1 — Identify the **single** shared point every week-open path reaches after `loadWeek` and before `rebuildNodeMap` — `loadAndRender` (`:19136`), the `hashchange` handler (`:19175`) and boot all route through it. Hook materialisation there once; do not add three call sites.
+- [ ] T3.1 ⚠ R1 — Identify the **single** shared point every week-open path reaches after `loadWeek` and before `rebuildNodeMap` — `loadAndRender` (`:19136`), the `hashchange` handler (`:19175`) and boot all route through it. Hook materialisation there once; do not add three call sites.
 - [ ] T3.2 — `materialiseWeek(wk, weekData)`: for each entry, every occurrence inside that week's Mon–Sun bounds (`getWeekBounds`, `:9065`) becomes an `activity` node under its branch with a `dayChild` leaf on the matching weekday, carrying `schedId` and `schedDate`.
-- [ ] T3.3 — **Idempotence:** plant only if `occurrenceNodeId(...)` is absent from **both** `nodes` and `tombstones` of that week record. Reopening plants nothing; a deleted occurrence never returns.
-- [ ] T3.4 — Runs under the week lock for the week being opened. `withWeekLock` (`:5062`) is **not** re-entrant — nothing inside may take that lock again.
-- [ ] T3.5 — Materialisation takes **no** undo snapshot; it is not a user edit.
+- [ ] T3.3 ⚠ R5 — **Idempotence:** plant only if `occurrenceNodeId(...)` is absent from **both** `nodes` and `tombstones` of that week record. Reopening plants nothing; a deleted occurrence never returns.
+- [ ] T3.4 ⚠ R2 — Runs under the week lock for the week being opened. `withWeekLock` (`:5062`) is **not** re-entrant — nothing inside may take that lock again.
+- [ ] T3.5 ⚠ R6 — Materialisation takes **no** undo snapshot; it is not a user edit.
 - [ ] T3.6 — Opening a future week plants there and appends the date to the entry's `planted`, without advancing `plantedThrough`.
-- [ ] T3.7 — `validateAndRepair` (`:9843`) preserves `schedId` / `schedDate`, exactly as it preserves `dayChild` / `dayIndex` (`:9855`).
-- [ ] T3.8 — `migrateCrdt` (`:9978`) and the week-merge path carry both new fields through a Drive round-trip.
+- [ ] T3.7 ⚠ R3 — `validateAndRepair` (`:9843`) preserves `schedId` / `schedDate`, exactly as it preserves `dayChild` / `dayIndex` (`:9855`).
+- [ ] T3.8 ⚠ R4 — `migrateCrdt` (`:9978`) and the week-merge path carry both new fields through a Drive round-trip.
 - [ ] T3.9 — An `Nx` label materialises with its counter child auto-created, with no schedule-specific code.
 - [ ] T3.10 — `tests/schedule.test.js`: plants in the right week and on the right weekday; a second open plants nothing; a tombstoned occurrence never returns; two week records built independently from the same entry converge on one node after merge; a future-week open does not advance `plantedThrough`.
 - [ ] T3.11 — **These suites must pass unmodified:** `week-record-invariants.test.js`, `persistence.test.js`, `crdt.test.js`, `sync-convergence.test.js`, `transfer.test.js`, `week-rollover.test.js`. Editing any of them is the signal to stop and re-read the spec.
@@ -86,7 +88,7 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 - [ ] T5.2 — A swept occurrence is placed on the **Monday** day-leaf of the current week; its `schedDate` still records the real original date.
 - [ ] T5.3 — After the pass, `plantedThrough` becomes the current week's Sunday and `planted` entries at or before it are pruned.
 - [ ] T5.4 — A device whose `plantedThrough` is a year old materialises each entry's outstanding occurrences **once**, not a year of them per entry.
-- [ ] T5.5 — Browsing ahead and later arriving at that week does not double-plant (the `planted` list plus the deterministic id both cover it).
+- [ ] T5.5 ⚠ R7 — Browsing ahead and later arriving at that week does not double-plant (the `planted` list plus the deterministic id both cover it).
 - [ ] T5.6 — `transferUnfinished` (`:10452`) strips `schedId` / `schedDate` from the copy it carries forward.
 - [ ] T5.7 — Swept occurrences read as overdue via the existing `getOverdueItems` (`:12918`) with no changes to it.
 - [ ] T5.8 — `tests/schedule.test.js` + an addition to `tests/transfer.test.js` covering T5.1–T5.6.
@@ -100,8 +102,8 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 ## S6 — Later tab
 
 - [ ] T6.1 — New tab after Sunday in `AGENDA_TAB_ORDER` (`:16733`), rendered by `renderAgendaStrip` (`:16754`), reachable with `←` / `→` like any other tab.
-- [ ] T6.2 — **Extend the strip memoisation key** (active tab, overdue count, week, language) to include whatever the Later tab renders from, or it will show stale content.
-- [ ] T6.3 — `L` from any view opens the Agenda on the Later tab. Confirm `L` is unbound (`X` is dropped, `9` collides with the numeric day strip) and that it does not fire while a text field or an inline rename is focused.
+- [ ] T6.2 ⚠ R8 — **Extend the strip memoisation key** (active tab, overdue count, week, language) to include whatever the Later tab renders from, or it will show stale content.
+- [ ] T6.3 ⚠ R9 — `L` from any view opens the Agenda on the Later tab. Confirm `L` is unbound (`X` is dropped, `9` collides with the numeric day strip) and that it does not fire while a text field or an inline rename is focused.
 - [ ] T6.4 — Rows built with `buildAgendaItem()` (`:16806`), grouped by month, each showing date, label and branch colour. Localised month names.
 - [ ] T6.5 — Tapping a row reopens S4's dialog against the **entry**; edits affect future occurrences only.
 - [ ] T6.6 — Renaming a materialised occurrence node changes that node only and never rewrites the entry label.
@@ -135,7 +137,7 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 - [ ] T8.2 — Same `appProperties` `savedAt` / `contentHash` guards and the same self-echo suppression as week files.
 - [ ] T8.3 — `_wKeyForDriveFileName` (`:8850`) recognises the `schedule` key alongside `colors` and the week keys.
 - [ ] T8.4 — Merge is per-entry LWW on `_ts`, with a tombstone beating a stale live entry.
-- [ ] T8.5 — A schedule sync failure never blocks or corrupts a week sync, and the reverse.
+- [ ] T8.5 ⚠ R10 — A schedule sync failure never blocks or corrupts a week sync, and the reverse.
 - [ ] T8.6 — `tests/schedule.test.js` + additions to the sync suites: per-entry LWW, tombstone precedence, filename mapping, independent failure.
 - [ ] T8.7 — `npm test` + `npm run validate` + `npm run csp` green.
 
