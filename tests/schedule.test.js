@@ -9,6 +9,12 @@ import {
   saveSchedule,
   materialiseWeek,
   weekDayStrings,
+  canSendToDate,
+  sendNodeToDate,
+  findNode,
+  saveWeek,
+  undo,
+  redo,
   validateAndRepair,
   migrateCrdt,
   mergeWeekData,
@@ -661,5 +667,136 @@ describe('Materialisation on week open', () => {
     await _state.loadAndRender(WK);
     expect(occurrences(_state.get())).toEqual([]);
     expect(_state.get().nodes.filter(n => n.dayChild)).toEqual([]);
+  });
+});
+
+describe('Send to date…', () => {
+  const WK = '2026-20';
+
+  const seedWeek = () => {
+    _state.set({
+      nodes: [
+        { id: 'center', type: 'center', children: ['work'] },
+        { id: 'work', type: 'branch', branch: 'work', parent: 'center', label: 'Work', children: ['a1', 'a2'] },
+        { id: 'a1', type: 'activity', branch: 'work', parent: 'work', label: 'Pay tax', priority: 'high', children: [] },
+        { id: 'a2', type: 'activity', branch: 'work', parent: 'work', label: 'Big project', children: ['a3'] },
+        { id: 'a3', type: 'activity', branch: 'work', parent: 'a2', label: 'Sub-task', children: [] },
+      ],
+      tombstones: [],
+      crdtVersion: 0,
+    });
+  };
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setWeekKey(WK);
+    seedWeek();
+  });
+
+  afterEach(() => _state.setSchedule(emptySchedule()));
+
+  it('offers the menu entry only for a childless activity', () => {
+    expect(canSendToDate(findNode('a1'))).toBe(true);
+    expect(canSendToDate(findNode('a2'))).toBe(false); // has a sub-task
+    expect(canSendToDate(findNode('work'))).toBe(false);
+    expect(canSendToDate({ type: 'center' })).toBe(false);
+    expect(canSendToDate({ type: 'counter' })).toBe(false);
+    expect(canSendToDate({ type: 'activity', tickChild: true, children: [] })).toBe(false);
+    expect(canSendToDate({ type: 'activity', dayChild: true, children: [] })).toBe(false);
+    expect(canSendToDate({ type: 'activity', inbox: true, children: [] })).toBe(false);
+  });
+
+  it('moves the node out of the week and creates an entry carrying its state', () => {
+    const entry = sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+
+    expect(findNode('a1')).toBeUndefined();
+    expect(_state.get().nodes.find(n => n.label === 'Pay tax')).toBeUndefined();
+    expect(_state.get().nodes.find(n => n.id === 'work').children).not.toContain('a1');
+    expect(_state.get().tombstones).toContain('a1');
+
+    expect(_state.getSchedule().entries).toHaveLength(1);
+    expect(entry.label).toBe('Pay tax');
+    expect(entry.branch).toBe('work');
+    expect(entry.priority).toBe('high');
+    expect(entry.anchor).toBe('2026-09-14');
+    expect(entry.repeat).toBeNull();
+    expect(entry.end).toEqual({ type: 'never' });
+  });
+
+  it('leaves no copy or stub behind', () => {
+    const before = _state.get().nodes.length;
+    sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    const nodes = _state.get().nodes;
+    expect(nodes).toHaveLength(before - 1);
+    expect(nodes.map(n => n.label).filter(Boolean)).toEqual(['Work', 'Big project', 'Sub-task']);
+  });
+
+  it('records the repeat rule and end condition from the dialog', () => {
+    const e = sendNodeToDate('a1', { date: '2026-09-14', every: '2', unit: 'month', endType: 'count', endCount: '6' });
+    expect(e.repeat).toEqual({ every: 2, unit: 'month' });
+    expect(e.end).toEqual({ type: 'count', n: 6 });
+
+    seedWeek();
+    const u = sendNodeToDate('a1', { date: '2026-09-14', every: 1, unit: 'year', endType: 'until', endDate: '2030-01-01' });
+    expect(u.end).toEqual({ type: 'until', date: '2030-01-01' });
+  });
+
+  it('ignores an end condition when there is no repeat', () => {
+    const e = sendNodeToDate('a1', { date: '2026-09-14', unit: null, endType: 'count', endCount: '6' });
+    expect(e.repeat).toBeNull();
+    expect(e.end).toEqual({ type: 'never' });
+  });
+
+  it('refuses a node with children and an invalid date', () => {
+    expect(sendNodeToDate('a2', { date: '2026-09-14', unit: null })).toBeNull();
+    expect(sendNodeToDate('a1', { date: '2026-02-30', unit: null })).toBeNull();
+    expect(sendNodeToDate('a1', { date: 'soon', unit: null })).toBeNull();
+    expect(findNode('a1')).toBeDefined();
+    expect(_state.getSchedule().entries).toEqual([]);
+  });
+
+  it('arrives in the target week when that week is opened', async () => {
+    const e = sendNodeToDate('a1', { date: '2026-05-13', unit: null });
+    await saveWeek(WK, _state.get());
+
+    _state.setWeekKey('2026-19');
+    await _state.loadAndRender(WK);
+    const arrived = _state.get().nodes.find(n => n.schedId === e.id);
+    expect(arrived.label).toBe('Pay tax');
+    expect(arrived.priority).toBe('high');
+    expect(arrived.schedDate).toBe('2026-05-13');
+  });
+
+  it('reverses both halves in a single undo', async () => {
+    const e = sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    expect(_state.getUndoStack()).toHaveLength(1);
+
+    await undo();
+
+    expect(_state.get().nodes.find(n => n.label === 'Pay tax')).toBeDefined();
+    expect(_state.getSchedule().entries.find(x => x.id === e.id)).toBeUndefined();
+  });
+
+  it('restores the entry on redo', async () => {
+    const e = sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    await undo();
+    await redo();
+
+    expect(_state.get().nodes.find(n => n.label === 'Pay tax')).toBeUndefined();
+    expect(_state.getSchedule().entries.map(x => x.id)).toEqual([e.id]);
+  });
+
+  it('leaves entries it did not create alone when undoing', async () => {
+    const first = sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    seedWeek();
+    const second = sendNodeToDate('a1', { date: '2026-10-14', unit: null });
+
+    await undo();
+
+    const ids = _state.getSchedule().entries.map(x => x.id);
+    expect(ids).toEqual([first.id]);
+    expect(ids).not.toContain(second.id);
   });
 });

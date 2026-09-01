@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-GzboGzrO7K5EzPUFp55sR4T//nc2UpzwGAmY41vSZVw='
+               'sha256-KB7G0FsJ+6wzW44C+Tj5L4LG0jJCZ5k0xUGIifug/Fs='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3111,7 +3111,8 @@
   }
 
   /* Generic confirm dialog — reuses overlay/dialog/actions pattern */
-  #app-confirm-overlay {
+  #app-confirm-overlay,
+  #send-future-overlay {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
@@ -3124,11 +3125,13 @@
     opacity: 0;
     transition: opacity 0.15s ease;
   }
-  #app-confirm-overlay.visible {
+  #app-confirm-overlay.visible,
+  #send-future-overlay.visible {
     display: flex;
     opacity: 1;
   }
-  #app-confirm-dialog {
+  #app-confirm-dialog,
+  #send-future-dialog {
     background: var(--bg-surface);
     border-radius: 8px;
     box-shadow: 0 20px 60px var(--shadow-xl);
@@ -3147,6 +3150,7 @@
     white-space: pre-line;
   }
   #app-confirm-actions .agenda-action-btn,
+  #send-future-actions .agenda-action-btn,
   #import-confirm-actions .agenda-action-btn,
   #bp-buttons .agenda-action-btn,
   #cp-buttons .agenda-action-btn,
@@ -3177,10 +3181,12 @@
   #import-confirm-actions .agenda-action-btn.danger:hover::before {
     background: var(--accent-danger-bg);
   }
-  #app-confirm-overlay.visible #app-confirm-dialog {
+  #app-confirm-overlay.visible #app-confirm-dialog,
+  #send-future-overlay.visible #send-future-dialog {
     transform: translateY(0);
   }
-  #app-confirm-title {
+  #app-confirm-title,
+  #send-future-title {
     font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
@@ -3190,11 +3196,56 @@
     color: var(--text-secondary);
     line-height: 1.5;
   }
-  #app-confirm-actions {
+  #app-confirm-actions,
+  #send-future-actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
     margin-top: 4px;
+  }
+
+  /* Send to date… — the only app dialog that asks for values rather than a
+     yes/no, so it borrows the confirm dialog's shell and adds a field grid. */
+  #send-future-fields {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 10px 12px;
+    margin-top: 4px;
+  }
+  #send-future-fields label {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  #send-future-fields .send-future-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #send-future-fields input,
+  #send-future-fields select {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    height: 32px;
+    padding: 0 8px;
+    min-width: 0;
+  }
+  #send-future-fields input[type="number"] {
+    width: 64px;
+  }
+  #send-future-fields input:focus,
+  #send-future-fields select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+  }
+  #send-future-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-width: 360px;
   }
 
   .help-section {
@@ -3911,6 +3962,7 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
   <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.nextWeek">Next week</span></div>
+  <div class="ctx-item" id="ctx-send-future"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.sendToDate">Send to date…</span></div>
   <div class="ctx-item" id="ctx-reschedule"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.reschedule">Reschedule</span><span class="ctx-submenu-arrow">▶</span></div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
   <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> <span data-i18n="menu.prioNormal">Priority Normal</span></div>
@@ -3969,6 +4021,42 @@ Or remove them later in Settings → Help.</div>
       <button type="button" class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
       <button type="button" class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
       <button type="button" class="agenda-action-btn" id="app-confirm-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="send-future-overlay">
+  <div id="send-future-dialog">
+    <div id="send-future-title" data-i18n="sendFuture.title">Send to the future</div>
+    <div id="send-future-fields">
+      <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
+      <input type="date" id="send-future-date">
+      <label for="send-future-unit" data-i18n="sendFuture.repeat">Repeat</label>
+      <div class="send-future-row">
+        <input type="number" id="send-future-every" min="1" max="999" value="1" aria-label="Interval">
+        <select id="send-future-unit">
+          <option value="none" data-i18n="sendFuture.noRepeat">No repeat</option>
+          <option value="day" data-i18n="sendFuture.unitDay">days</option>
+          <option value="week" data-i18n="sendFuture.unitWeek">weeks</option>
+          <option value="month" data-i18n="sendFuture.unitMonth">months</option>
+          <option value="year" data-i18n="sendFuture.unitYear">years</option>
+        </select>
+      </div>
+      <label for="send-future-end-type" data-i18n="sendFuture.end">Ends</label>
+      <div class="send-future-row">
+        <select id="send-future-end-type">
+          <option value="never" data-i18n="sendFuture.endNever">Never</option>
+          <option value="count" data-i18n="sendFuture.endCount">After</option>
+          <option value="until" data-i18n="sendFuture.endUntil">On date</option>
+        </select>
+        <input type="number" id="send-future-end-count" min="1" max="999" value="10" aria-label="Occurrences" hidden>
+        <input type="date" id="send-future-end-date" aria-label="End date" hidden>
+      </div>
+    </div>
+    <div id="send-future-hint" data-i18n="sendFuture.hint">Only a task without sub-tasks can be sent.</div>
+    <div id="send-future-actions">
+      <button type="button" class="agenda-action-btn" id="send-future-cancel" data-i18n="app-confirm.cancel">Cancel</button>
+      <button type="button" class="agenda-action-btn" id="send-future-ok" data-i18n="sendFuture.ok">Send</button>
     </div>
   </div>
 </div>
@@ -4694,6 +4782,7 @@ window.__quietRefreshReloadNow = function() {
 const QUIESCENCE_PANEL_IDS = [
   'single-tab-overlay',
   'app-confirm-overlay',
+  'send-future-overlay',
   'context-menu',
   'ctx-reschedule-submenu',
   'day-filter-menu',
@@ -5903,6 +5992,9 @@ function takeSnapshot() {
     nextWeekRaw:   _nextWeekRawCache,
     theme:         localStorage.getItem('zenit-week-theme'),
     lang:          localStorage.getItem('zenit-week-lang'),
+    // Read back only for the ids an operation reports touching, so this is a
+    // lookup table and not a whole-schedule rollback.
+    scheduleRaw:   JSON.stringify(scheduleData),
   };
   undoStack.push(JSON.stringify(snapshot));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
@@ -5928,13 +6020,26 @@ function _noteNextWeekAdditions(nextWeekKey, addedIds) {
   undoStack[i] = JSON.stringify(snap);
 }
 
+// Record which schedule entries an operation just created, on the snapshot the
+// next undo will restore — the schedule half of _noteNextWeekAdditions, and for
+// the same reason: takeSnapshot runs before the operation knows the entry id.
+function _noteScheduleAdditions(entryIds) {
+  if (!entryIds?.length || undoStack.length === 0) return;
+  const i = undoStack.length - 1;
+  let snap;
+  try { snap = JSON.parse(undoStack[i]); } catch { return; }
+  snap.scheduleTouched = [...new Set([...(snap.scheduleTouched || []), ...entryIds])];
+  undoStack[i] = JSON.stringify(snap);
+}
+
 // Carry an operation's next-week additions onto the counter-snapshot pushed to
 // the opposite stack, so redo re-inserts exactly what undo removed (and back).
-function _withNextWeekAdded(rawSnapshot, addedIds) {
-  if (!addedIds?.length) return rawSnapshot;
+function _withUndoScope(rawSnapshot, addedIds, scheduleTouched) {
+  if (!addedIds?.length && !scheduleTouched?.length) return rawSnapshot;
   try {
     const s = JSON.parse(rawSnapshot);
-    s.nextWeekAdded = [...addedIds];
+    if (addedIds?.length) s.nextWeekAdded = [...addedIds];
+    if (scheduleTouched?.length) s.scheduleTouched = [...scheduleTouched];
     return JSON.stringify(s);
   } catch { return rawSnapshot; }
 }
@@ -5979,6 +6084,27 @@ async function _applySnapshot(raw) {
     _undoRedoForcePush.add(primaryKey);
     await saveWeek(primaryKey, restoredPrimary);
   });
+
+  // ── Schedule entries ──────────────────────────────────────────────────────
+  // Reversed exactly the way the next week's additions are: for each id the
+  // operation reported touching, make the live schedule agree with this
+  // snapshot's copy of it. Every other entry is left alone, so an undo of a
+  // send never disturbs a series created before it.
+  const schedTouched = Array.isArray(snapshot.scheduleTouched) ? snapshot.scheduleTouched : [];
+  if (schedTouched.length) {
+    let snapSchedule = { entries: [] };
+    if (snapshot.scheduleRaw) {
+      try { snapSchedule = JSON.parse(snapshot.scheduleRaw); } catch { snapSchedule = { entries: [] }; }
+    }
+    const snapEntries = new Map((snapSchedule.entries || []).map(e => [e.id, e]));
+    const touched = new Set(schedTouched);
+    scheduleData.entries = scheduleData.entries.filter(e => !touched.has(e.id));
+    for (const id of schedTouched) {
+      const e = snapEntries.get(id);
+      if (e) scheduleData.entries.push({ ...e, _ts: tsNow });
+    }
+    await saveSchedule();
+  }
 
   // ── Next week ─────────────────────────────────────────────────────────────
   // Reverse only what this operation did to the next week, node by node.
@@ -6134,6 +6260,7 @@ async function _currentSnapshot(wk = currentWeekKey) {
     nextWeekRaw:   nextRaw,
     theme:         localStorage.getItem('zenit-week-theme'),
     lang:          localStorage.getItem('zenit-week-lang'),
+    scheduleRaw:   JSON.stringify(scheduleData),
   });
 }
 
@@ -6142,7 +6269,7 @@ async function undo() {
   const raw = undoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
-  redoStack.push(_withNextWeekAdded(await _currentSnapshot(wk), snap.nextWeekAdded));
+  redoStack.push(_withUndoScope(await _currentSnapshot(wk), snap.nextWeekAdded, snap.scheduleTouched));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -6152,7 +6279,7 @@ async function redo() {
   const raw = redoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
-  undoStack.push(_withNextWeekAdded(await _currentSnapshot(wk), snap.nextWeekAdded));
+  undoStack.push(_withUndoScope(await _currentSnapshot(wk), snap.nextWeekAdded, snap.scheduleTouched));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -9458,6 +9585,22 @@ const TRANSLATIONS = {
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
     'toast.movedToNextWeek':      'Added to next week',
+    'menu.sendToDate':            'Send to date…',
+    'sendFuture.title':           'Send to the future',
+    'sendFuture.date':            'Date',
+    'sendFuture.repeat':          'Repeat',
+    'sendFuture.noRepeat':        'No repeat',
+    'sendFuture.unitDay':         'days',
+    'sendFuture.unitWeek':        'weeks',
+    'sendFuture.unitMonth':       'months',
+    'sendFuture.unitYear':        'years',
+    'sendFuture.end':             'Ends',
+    'sendFuture.endNever':        'Never',
+    'sendFuture.endCount':        'After',
+    'sendFuture.endUntil':        'On date',
+    'sendFuture.ok':              'Send',
+    'sendFuture.hint':            'Only a task with no sub-tasks can be sent. It leaves this week and arrives in the week that owns the date.',
+    'toast.sentToFuture':         'Sent to {date}',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
     'menu.prioCritical':          'Priority Critical',
@@ -9788,6 +9931,22 @@ const TRANSLATIONS = {
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
+    'menu.sendToDate':            'Odeslat na datum…',
+    'sendFuture.title':           'Odeslat do budoucnosti',
+    'sendFuture.date':            'Datum',
+    'sendFuture.repeat':          'Opakování',
+    'sendFuture.noRepeat':        'Bez opakování',
+    'sendFuture.unitDay':         'dní',
+    'sendFuture.unitWeek':        'týdnů',
+    'sendFuture.unitMonth':       'měsíců',
+    'sendFuture.unitYear':        'let',
+    'sendFuture.end':             'Konec',
+    'sendFuture.endNever':        'Nikdy',
+    'sendFuture.endCount':        'Po',
+    'sendFuture.endUntil':        'K datu',
+    'sendFuture.ok':              'Odeslat',
+    'sendFuture.hint':            'Odeslat lze jen úkol bez podúkolů. Zmizí z tohoto týdne a objeví se v týdnu, do kterého datum patří.',
+    'toast.sentToFuture':         'Odesláno na {date}',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
     'menu.prioCritical':          'Priorita Kritická',
@@ -11557,11 +11716,14 @@ function deleteNode(id, { ask = false } = {}) {
   _performDelete(id);
 }
 
-function _performDelete(id) {
+// `snapshot: false` for callers that already took one and want the whole
+// operation to be a single undo step (Send to date… removes the node as the
+// second half of one move).
+function _performDelete(id, { snapshot = true } = {}) {
   const node = findNode(id);
   if (!node) return;
 
-  takeSnapshot();
+  if (snapshot) takeSnapshot();
   const wasTick = node.tickChild === true;
   const origParentId = node.parent;
   const toRemove = new Set([id, ...getDescendantIds(id)]);
@@ -15600,6 +15762,8 @@ const ESC_DISMISSALS = [
   // has to be here rather than in its own listener: a second handler closing it
   // left this walk to fall straight through to the map state underneath, which
   // is how one press both shut the panel and reset Rocks to Sand.
+  { isOpen: () => !!window.isSendFutureOpen && window.isSendFutureOpen(),
+    dismiss: () => { window.closeSendFuture(); } },
   { isOpen: () => !!window.isQuickAddOpen && window.isQuickAddOpen(),
     dismiss: () => { window.closeQuickAdd(); } },
   { isOpen: () => isDayFilterMenuOpen(),
@@ -16161,6 +16325,131 @@ function attachNodeListeners() {
   else paintKbFocus();
 }
 
+
+// ─── Send to date… ────────────────────────────────────────────────────────────
+// Hands a task to a date instead of a week. The node leaves this week and
+// becomes a schedule entry; the week that owns the date materialises it back
+// into an ordinary node when it is opened. This is deliberately not a copy —
+// a stub left behind would be a task the user has to close twice.
+//
+// Only a childless activity can be sent: one entry is one activity, and there
+// is no partial or lossy variant that would silently drop a subtree.
+function canSendToDate(node) {
+  if (!node || node.type !== 'activity') return false;
+  if (node.dayChild || node.tickChild || node.inbox) return false;
+  return !(node.children || []).length;
+}
+
+// The node's own state becomes the entry's: label, branch and priority travel,
+// nothing else. Everything a week gives a node — done, comments, day tags — is
+// a property of that week's copy, not of the standing intention.
+function sendNodeToDate(nodeId, options) {
+  const node = findNode(nodeId);
+  if (!canSendToDate(node)) return null;
+  const anchor = options && options.date;
+  if (!parseDayString(anchor)) return null;
+
+  const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
+  const every = Math.max(1, Math.floor(Number(options.every)) || 1);
+  const entry = {
+    id: genId(),
+    label: node.label || '',
+    branch: node.branch || '',
+    priority: node.priority || 'normal',
+    anchor,
+    repeat: unit ? { every, unit } : null,
+    end: { type: 'never' },
+    plantedThrough: null,
+    planted: [],
+    _ts: Date.now(),
+  };
+  if (unit && options.endType === 'count') {
+    const n = Math.max(1, Math.floor(Number(options.endCount)) || 1);
+    entry.end = { type: 'count', n };
+  } else if (unit && options.endType === 'until' && parseDayString(options.endDate)) {
+    entry.end = { type: 'until', date: options.endDate };
+  }
+
+  // One snapshot covers both halves, so a single undo puts the node back and
+  // takes the entry away again — see _noteScheduleAdditions.
+  takeSnapshot();
+  scheduleData.entries.push(entry);
+  _noteScheduleAdditions([entry.id]);
+  _performDelete(nodeId, { snapshot: false });
+  saveSchedule();
+  return entry;
+}
+
+(function () {
+  'use strict';
+
+  const overlay  = document.getElementById('send-future-overlay');
+  const dateEl   = document.getElementById('send-future-date');
+  const everyEl  = document.getElementById('send-future-every');
+  const unitEl   = document.getElementById('send-future-unit');
+  const endEl    = document.getElementById('send-future-end-type');
+  const countEl  = document.getElementById('send-future-end-count');
+  const untilEl  = document.getElementById('send-future-end-date');
+  const cancelEl = document.getElementById('send-future-cancel');
+  const okEl     = document.getElementById('send-future-ok');
+  let _targetId  = null;
+
+  // Repeat and end are one control in two halves: with no repeat there is
+  // nothing for an end condition to end, so the whole row stands down.
+  function syncFields() {
+    const repeats = unitEl.value !== 'none';
+    everyEl.hidden = !repeats;
+    endEl.hidden = !repeats;
+    countEl.hidden = !repeats || endEl.value !== 'count';
+    untilEl.hidden = !repeats || endEl.value !== 'until';
+  }
+
+  window.isSendFutureOpen = () => overlay.classList.contains('visible');
+
+  window.closeSendFuture = function () {
+    overlay.classList.remove('visible');
+    _targetId = null;
+  };
+
+  window.openSendFuture = function (nodeId) {
+    const node = findNode(nodeId);
+    if (!canSendToDate(node)) return;
+    _targetId = nodeId;
+    // A week out is the default because that is the shortest horizon this
+    // dialog is for; anything nearer is what N and the day tags already do.
+    const start = dayStringFromNumber(dayNumber(parseDayString(localDateStr())) + 7);
+    dateEl.value = start;
+    everyEl.value = '1';
+    unitEl.value = 'none';
+    endEl.value = 'never';
+    countEl.value = '10';
+    untilEl.value = start;
+    syncFields();
+    overlay.classList.add('visible');
+    dateEl.focus();
+  };
+
+  unitEl.addEventListener('change', syncFields);
+  endEl.addEventListener('change', syncFields);
+  cancelEl.addEventListener('click', () => window.closeSendFuture());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) window.closeSendFuture(); });
+
+  okEl.addEventListener('click', () => {
+    const id = _targetId;
+    const opts = {
+      date: dateEl.value,
+      every: everyEl.value,
+      unit: unitEl.value === 'none' ? null : unitEl.value,
+      endType: endEl.value,
+      endCount: countEl.value,
+      endDate: untilEl.value,
+    };
+    window.closeSendFuture();
+    const entry = sendNodeToDate(id, opts);
+    if (entry) showToast(t('toast.sentToFuture', { date: entry.anchor }));
+  });
+})();
+
 // ─── Context menu ─────────────────────────────────────────────────────────────
 const ctxMenu = document.getElementById('context-menu');
 
@@ -16205,6 +16494,9 @@ function showContextMenu(x, y, nodeId) {
     : `${iconSvg('repeat')} ${t('menu.reusable')}`;
   document.getElementById('ctx-reusable').style.display       = (isStdActivity || isTick) ? '' : 'none';
   document.getElementById('ctx-move-next-week').style.display = (isStdActivity || isTick) ? '' : 'none';
+  // A subtree cannot be sent: one entry is one activity, and there is no
+  // partial variant that would leave the children behind.
+  document.getElementById('ctx-send-future').style.display = canSendToDate(node) ? '' : 'none';
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
@@ -16504,6 +16796,12 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
   if (contextTarget) await moveNodeToNextWeek(_agendaTickRedirect(contextTarget, true));
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
+});
+
+document.getElementById('ctx-send-future').addEventListener('click', () => {
+  const id = contextTarget;
+  hideContextMenu();
+  if (id) window.openSendFuture(id);
 });
 
 // Labels a menu row with its day text plus a small blue dot when that day is

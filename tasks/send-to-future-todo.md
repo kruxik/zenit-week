@@ -65,15 +65,15 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S4 — Send to date…
 
-- [ ] T4.1 — Context-menu entry, placed with the other `ctx-*` entries and following their hide rules: `activity` nodes only — hidden for center, branch, counter, tick, day-leaf and inbox nodes.
-- [ ] T4.2 — **Hidden for any node that has children.** One activity per entry; there is no partial or lossy variant.
-- [ ] T4.3 — App-styled dialog following the `#app-confirm-overlay` pattern — never a browser dialog. Fields: date, repeat interval + unit, end condition. Defaults: today + 1 week, no repeat, end never.
-- [ ] T4.4 — On confirm the node **moves**: removed from the current week, entry created carrying label, branch and priority. No copy, no stub left behind.
-- [ ] T4.5 — One undo step reverses both halves — node restored, entry removed.
-- [ ] T4.6 — `N` / `moveNodeToNextWeek` (`:10709`) is untouched.
-- [ ] T4.7 — EN + CS strings for the menu entry, every dialog label and unit, and the childless-node rule.
-- [ ] T4.8 — `tests/schedule.test.js`: node leaves the week and the entry carries label/branch/priority; the menu entry is hidden for a node with children; the whole move is a single undo step.
-- [ ] T4.9 — `npm test` + `npm run validate` + `npm run csp` green.
+- [x] T4.1 — Context-menu entry, placed with the other `ctx-*` entries and following their hide rules: `activity` nodes only — hidden for center, branch, counter, tick, day-leaf and inbox nodes.
+- [x] T4.2 — **Hidden for any node that has children.** One activity per entry; there is no partial or lossy variant.
+- [x] T4.3 — App-styled dialog following the `#app-confirm-overlay` pattern — never a browser dialog. Fields: date, repeat interval + unit, end condition. Defaults: today + 1 week, no repeat, end never.
+- [x] T4.4 — On confirm the node **moves**: removed from the current week, entry created carrying label, branch and priority. No copy, no stub left behind.
+- [x] T4.5 — One undo step reverses both halves — node restored, entry removed.
+- [x] T4.6 — `N` / `moveNodeToNextWeek` (`:10709`) is untouched.
+- [x] T4.7 — EN + CS strings for the menu entry, every dialog label and unit, and the childless-node rule.
+- [x] T4.8 — `tests/schedule.test.js`: node leaves the week and the entry carries label/branch/priority; the menu entry is hidden for a node with children; the whole move is a single undo step.
+- [x] T4.9 — `npm test` + `npm run validate` + `npm run csp` green.
 
 **AC:** sending a task three weeks out removes it from this week and it arrives there on the chosen day; undo puts it back.
 **Verify:** `npm test`, then in the browser: send, navigate forward, confirm arrival, navigate back, confirm absence, undo.

@@ -608,6 +608,8 @@ export const {
   nextOccurrence,
   occurrencesInRange,
   // Schedule store
+  canSendToDate,
+  sendNodeToDate,
   materialiseWeek,
   weekDayStrings,
   emptySchedule,
