@@ -692,6 +692,7 @@ export const {
   // Onboarding cleanup
   clearExampleTasks,
   hasDemoActivityNodes,
+  relabelDemoNodes,
   // Onboarding nudge
   shouldShowPlaygroundNudge,
   playgroundUserNodeCount,

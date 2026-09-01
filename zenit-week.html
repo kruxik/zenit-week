@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-mb30lM5EtwObG5r7BlSKH29Cc2A815LKQY5zJipWHGg='
+               'sha256-XwjxikZ8ZujBTx3UKnkHPv3A9dLtAWxp8QUvkrSgfL4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9776,6 +9776,7 @@ function setLanguage(lang) {
   takeSnapshot();
   currentLang = lang;
   localStorage.setItem('zenit-week-lang', lang);
+  relabelDemoNodes();
   applyTranslations();
   if (currentView === 'agenda') renderAgenda();
   renderIfVisible();
@@ -19739,7 +19740,7 @@ async function maybeSeedPlayground() {
   // the current language is stored — from here on the node is plain user data.
   const nodes = (PLAYGROUND_SEED.week.nodes || []).map(n => {
     const { labelCs, ...rest } = n;
-    return { ...rest, label: (currentLang === 'cs' && labelCs) || n.label, _demo: true, _ts: now };
+    return { ...rest, label: seedLabel(n), _demo: true, _ts: now };
   });
   const week = { nodes, tombstones: [], crdtVersion: 0 };
   await saveWeekIDB(wk, week);
@@ -19762,6 +19763,45 @@ async function maybeSeedPlayground() {
     history.replaceState(null, '', location.pathname + location.search);
   }
   return true;
+}
+
+// The seed node's label in the current language: `labelCs` wherever the Czech
+// wording differs, the English `label` otherwise (terms like "Code review" read
+// the same in both).
+function seedLabel(seedNode) {
+  return (currentLang === 'cs' && seedNode.labelCs) || seedNode.label;
+}
+
+// id -> seed node, for looking an untouched demo node's wording back up.
+let _seedById = null;
+function seedNodeById(id) {
+  if (!_seedById) {
+    _seedById = new Map();
+    (PLAYGROUND_SEED.week.nodes || []).forEach(n => _seedById.set(n.id, n));
+  }
+  return _seedById.get(id);
+}
+
+// Re-labels the still-untouched playground nodes of the loaded week into the
+// current language, so switching language on a fresh install doesn't leave the
+// example week stranded in the language it was seeded with. Only `_demo` nodes
+// qualify: touchNode() drops that flag the moment the user claims a node, so a
+// renamed or edited task is never rewritten. Returns the number relabelled.
+function relabelDemoNodes() {
+  if (!weekData || !Array.isArray(weekData.nodes)) return 0;
+  let changed = 0;
+  weekData.nodes.forEach(n => {
+    if (!n._demo) return;
+    const seed = seedNodeById(n.id);
+    if (!seed) return;
+    const label = seedLabel(seed);
+    if (label === n.label) return;
+    n.label = label;
+    n._ts = Date.now();   // carry the new wording out to the other devices
+    changed++;
+  });
+  if (changed) saveWeek(currentWeekKey, weekData);
+  return changed;
 }
 
 // True when the current week still holds untouched example (seed) tasks —
