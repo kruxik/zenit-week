@@ -13,6 +13,12 @@ import {
   weekDayStrings,
   canSendToDate,
   sendNodeToDate,
+  updateScheduleEntry,
+  getLaterOccurrences,
+  laterMonthKey,
+  laterMonthLabel,
+  laterRowNode,
+  occurrenceNodeId,
   findNode,
   saveWeek,
   undo,
@@ -1005,5 +1011,172 @@ describe('Past-due sweep', () => {
     _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
     expect(materialiseWeek(WK, data)).toBe(false);
     expect(occurrences(data)).toEqual([]);
+  });
+});
+
+describe('Later tab', () => {
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Pay the bill', branch: 'work', priority: 'normal',
+    anchor: '2026-09-14', repeat: null, end: { type: 'never' },
+    plantedThrough: null, planted: [], _ts: 1,
+    ...over,
+  });
+  const seed = (...entries) => _state.setSchedule({ entries, tombstones: [], crdtVersion: 0 });
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setLang('en');
+  });
+
+  afterEach(() => {
+    _state.setSchedule(emptySchedule());
+    _state.setLang('en');
+  });
+
+  it('sits last in the tab order, after Sunday', () => {
+    const order = _state.getAgendaTabOrder();
+    expect(order[0]).toBe('overdue');
+    expect(order[order.length - 1]).toBe('later');
+    expect(order[order.length - 2]).toBe(0); // Sunday
+    expect(order).toHaveLength(9);
+  });
+
+  it('lists upcoming occurrences in date order across entries', () => {
+    seed(
+      entry({ id: 's1', label: 'Later one', anchor: '2026-11-02' }),
+      entry({ id: 's2', label: 'Sooner', anchor: '2026-09-20' }),
+    );
+    expect(getLaterOccurrences('2026-09-01').map(r => r.date))
+      .toEqual(['2026-09-20', '2026-11-02']);
+  });
+
+  it('starts at the given date and ignores what is already past', () => {
+    seed(entry({ anchor: '2026-01-05', repeat: { every: 1, unit: 'month' } }));
+    const rows = getLaterOccurrences('2026-09-01');
+    expect(rows[0].date).toBe('2026-09-05');
+    expect(rows.every(r => r.date >= '2026-09-01')).toBe(true);
+  });
+
+  it('looks a year ahead', () => {
+    seed(entry({ anchor: '2026-09-01', repeat: { every: 1, unit: 'year' } }));
+    const dates = getLaterOccurrences('2026-09-01').map(r => r.date);
+    expect(dates).toEqual(['2026-09-01', '2027-09-01']);
+  });
+
+  it('caps a daily entry so it cannot bury the yearly ones', () => {
+    seed(
+      entry({ id: 'daily', label: 'Vitamins', anchor: '2026-09-01', repeat: { every: 1, unit: 'day' } }),
+      entry({ id: 'yearly', label: 'Insurance', anchor: '2027-06-01' }),
+    );
+    const rows = getLaterOccurrences('2026-09-01');
+    expect(rows.filter(r => r.entry.id === 'daily')).toHaveLength(12);
+    expect(rows.some(r => r.entry.id === 'yearly')).toBe(true);
+  });
+
+  it('is empty when nothing is scheduled', () => {
+    expect(getLaterOccurrences('2026-09-01')).toEqual([]);
+  });
+
+  it('groups by month, with localised month names', () => {
+    expect(laterMonthKey('2026-11-02')).toBe('2026-11');
+    expect(laterMonthLabel('2026-11')).toBe('Nov 2026');
+    _state.setLang('cs');
+    expect(laterMonthLabel('2026-11')).toBe('listopad 2026');
+  });
+
+  it('builds a row that carries the id the occurrence would get', () => {
+    const e = entry();
+    const row = laterRowNode(e, '2026-09-14');
+    expect(row.id).toBe(occurrenceNodeId('s1', '2026-09-14'));
+    expect(row.label).toBe('Pay the bill');
+    expect(row.branch).toBe('work');
+    expect(row.schedDate).toBe('2026-09-14');
+  });
+
+  it('carries priority onto the row but normalises normal away', () => {
+    expect(laterRowNode(entry({ priority: 'critical' }), '2026-09-14').priority).toBe('critical');
+    expect(laterRowNode(entry(), '2026-09-14').priority).toBeNull();
+  });
+});
+
+describe('Editing an entry from the Later tab', () => {
+  const WK = '2026-20';
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Pay the bill', branch: 'work', priority: 'normal',
+    anchor: '2026-05-13', repeat: null, end: { type: 'never' },
+    plantedThrough: null, planted: [], _ts: 1,
+    ...over,
+  });
+  const week = () => ({
+    nodes: [
+      { id: 'center', type: 'center', children: ['work'] },
+      { id: 'work', type: 'branch', branch: 'work', parent: 'center', label: 'Work', children: [] },
+    ],
+    tombstones: [],
+    crdtVersion: 0,
+  });
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setWeekKey(WK);
+    _state.setTodayWeekKey('2026-10');
+  });
+
+  afterEach(() => {
+    _state.setSchedule(emptySchedule());
+    _state.clearTodayWeekKeyOverride();
+  });
+
+  it('rewrites the schedule and leaves label, branch and priority alone', () => {
+    const e = entry({ priority: 'high' });
+    _state.setSchedule({ entries: [e], tombstones: [], crdtVersion: 0 });
+
+    const out = updateScheduleEntry('s1', {
+      date: '2026-07-01', every: '3', unit: 'month', endType: 'count', endCount: '4',
+    });
+    expect(out.anchor).toBe('2026-07-01');
+    expect(out.repeat).toEqual({ every: 3, unit: 'month' });
+    expect(out.end).toEqual({ type: 'count', n: 4 });
+    expect(out.label).toBe('Pay the bill');
+    expect(out.branch).toBe('work');
+    expect(out.priority).toBe('high');
+  });
+
+  it('refuses an unknown entry or an invalid date', () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    expect(updateScheduleEntry('nope', { date: '2026-07-01' })).toBeNull();
+    expect(updateScheduleEntry('s1', { date: '2026-02-30' })).toBeNull();
+    expect(_state.getSchedule().entries[0].anchor).toBe('2026-05-13');
+  });
+
+  it('affects future occurrences only — a materialised node is untouched', () => {
+    const e = entry();
+    _state.setSchedule({ entries: [e], tombstones: [], crdtVersion: 0 });
+    const data = week();
+    materialiseWeek(WK, data);
+    const before = JSON.stringify(data.nodes.find(n => n.schedId === 's1'));
+
+    updateScheduleEntry('s1', { date: '2026-07-01', unit: null });
+
+    expect(JSON.stringify(data.nodes.find(n => n.schedId === 's1'))).toBe(before);
+    expect(getLaterOccurrences('2026-06-01').map(r => r.date)).toEqual(['2026-07-01']);
+  });
+
+  it('never rewrites the entry when the occurrence node is renamed', () => {
+    const e = entry();
+    _state.setSchedule({ entries: [e], tombstones: [], crdtVersion: 0 });
+    const data = week();
+    materialiseWeek(WK, data);
+    _state.set(data);
+
+    const node = _state.get().nodes.find(n => n.schedId === 's1');
+    node.label = 'Pay the bill (renamed)';
+
+    expect(_state.getSchedule().entries[0].label).toBe('Pay the bill');
+    expect(laterRowNode(_state.getSchedule().entries[0], '2026-05-13').label).toBe('Pay the bill');
   });
 });

@@ -101,16 +101,16 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S6 — Later tab
 
-- [ ] T6.1 — New tab after Sunday in `AGENDA_TAB_ORDER` (`:16733`), rendered by `renderAgendaStrip` (`:16754`), reachable with `←` / `→` like any other tab.
-- [ ] T6.2 ⚠ R8 — **Extend the strip memoisation key** (active tab, overdue count, week, language) to include whatever the Later tab renders from, or it will show stale content.
-- [ ] T6.3 ⚠ R9 — `L` from any view opens the Agenda on the Later tab. Confirm `L` is unbound (`X` is dropped, `9` collides with the numeric day strip) and that it does not fire while a text field or an inline rename is focused.
-- [ ] T6.4 — Rows built with `buildAgendaItem()` (`:16806`), grouped by month, each showing date, label and branch colour. Localised month names.
-- [ ] T6.5 — Tapping a row reopens S4's dialog against the **entry**; edits affect future occurrences only.
-- [ ] T6.6 — Renaming a materialised occurrence node changes that node only and never rewrites the entry label.
-- [ ] T6.7 — **No badge on the tab.**
-- [ ] T6.8 — Empty state, tab label and every new string in EN + CS.
-- [ ] T6.9 — `tests/schedule.test.js`: tab order includes Later last; editing an entry does not touch already-materialised nodes; renaming an occurrence does not touch its entry.
-- [ ] T6.10 — `npm test` + `npm run validate` + `npm run csp` green.
+- [x] T6.1 — New tab after Sunday in `AGENDA_TAB_ORDER` (`:16733`), rendered by `renderAgendaStrip` (`:16754`), reachable with `←` / `→` like any other tab.
+- [x] T6.2 ⚠ R8 — **Extend the strip memoisation key** (active tab, overdue count, week, language) to include whatever the Later tab renders from, or it will show stale content.
+- [x] T6.3 ⚠ R9 — `L` from any view opens the Agenda on the Later tab. Confirm `L` is unbound (`X` is dropped, `9` collides with the numeric day strip) and that it does not fire while a text field or an inline rename is focused.
+- [x] T6.4 — Rows built with `buildAgendaItem()` (`:16806`), grouped by month, each showing date, label and branch colour. Localised month names.
+- [x] T6.5 — Tapping a row reopens S4's dialog against the **entry**; edits affect future occurrences only.
+- [x] T6.6 — Renaming a materialised occurrence node changes that node only and never rewrites the entry label.
+- [x] T6.7 — **No badge on the tab.**
+- [x] T6.8 — Empty state, tab label and every new string in EN + CS.
+- [x] T6.9 — `tests/schedule.test.js`: tab order includes Later last; editing an entry does not touch already-materialised nodes; renaming an occurrence does not touch its entry.
+- [x] T6.10 — `npm test` + `npm run validate` + `npm run csp` green.
 
 **AC:** `L` opens a month-grouped list of what is coming; entries are editable there; no badge appears.
 **Verify:** `npm test`, then in the browser check both languages and both themes.

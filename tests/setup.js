@@ -515,6 +515,7 @@ _state.useRealIDB = function(v) {
   _dbPromise = null;
   updateIDBMethods();
 };
+_state.getAgendaTabOrder = function() { return AGENDA_TAB_ORDER; };
 _state.getSchedule = function() { return scheduleData; };
 _state.setSchedule = function(v) { scheduleData = v; };
 _state.resetIDB = function() {
@@ -611,6 +612,12 @@ export const {
   // Schedule store
   canSendToDate,
   sendNodeToDate,
+  updateScheduleEntry,
+  // Later tab
+  getLaterOccurrences,
+  laterMonthKey,
+  laterMonthLabel,
+  laterRowNode,
   materialiseWeek,
   weekDayStrings,
   emptySchedule,

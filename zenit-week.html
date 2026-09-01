@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-S/cpeHgzGUkLxy8SNV8kJZ9Ojiz0jGdUJkAR9/z9ZCo='
+               'sha256-g0sPj+8NSXrrCO2jr/EJWGO9tzUFaeyTtsALsETtWZM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9628,6 +9628,8 @@ const TRANSLATIONS = {
     'menu.nextWeek':              'Next week',
     'toast.movedToNextWeek':      'Added to next week',
     'menu.sendToDate':            'Send to date…',
+    'agenda.later':               'Later',
+    'agenda.emptyLater':          'Nothing scheduled beyond this week.',
     'sendFuture.title':           'Send to the future',
     'sendFuture.date':            'Date',
     'sendFuture.repeat':          'Repeat',
@@ -9974,6 +9976,8 @@ const TRANSLATIONS = {
     'menu.nextWeek':              'Příští týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
     'menu.sendToDate':            'Odeslat na datum…',
+    'agenda.later':               'Později',
+    'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
     'sendFuture.title':           'Odeslat do budoucnosti',
     'sendFuture.date':            'Datum',
     'sendFuture.repeat':          'Opakování',
@@ -15952,6 +15956,18 @@ function _windowKeydownHandler(e) {
         return;
       }
     }
+    // Later is a tab, not a view, so L both switches to the Agenda and lands on
+    // it. Free: X is dropped and 9 belongs to the numeric day strip. The
+    // editState guard at the top of this handler keeps it off inline renames.
+    if (key === 'l') {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        agendaActiveTab = 'later';
+        if (currentView !== 'agenda') switchView('agenda');
+        else renderAgenda();
+        return;
+      }
+    }
     if (key === 's') {
       if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
@@ -16498,6 +16514,29 @@ function sendNodeToDate(nodeId, options) {
   return entry;
 }
 
+// Rewrites an entry's schedule. The label, branch and priority are not
+// touched: those belong to the task, and the Later tab is where its dates are
+// edited, not its wording. Occurrences already materialised are ordinary nodes
+// and keep whatever their week made of them.
+function updateScheduleEntry(entryId, options) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry || !parseDayString(options && options.date)) return null;
+
+  const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
+  const every = Math.max(1, Math.floor(Number(options.every)) || 1);
+  entry.anchor = options.date;
+  entry.repeat = unit ? { every, unit } : null;
+  entry.end = { type: 'never' };
+  if (unit && options.endType === 'count') {
+    entry.end = { type: 'count', n: Math.max(1, Math.floor(Number(options.endCount)) || 1) };
+  } else if (unit && options.endType === 'until' && parseDayString(options.endDate)) {
+    entry.end = { type: 'until', date: options.endDate };
+  }
+  entry._ts = Date.now();
+  saveSchedule();
+  return entry;
+}
+
 (function () {
   'use strict';
 
@@ -16510,7 +16549,8 @@ function sendNodeToDate(nodeId, options) {
   const untilEl  = document.getElementById('send-future-end-date');
   const cancelEl = document.getElementById('send-future-cancel');
   const okEl     = document.getElementById('send-future-ok');
-  let _targetId  = null;
+  let _targetId  = null;   // node being sent
+  let _entryId   = null;   // entry being edited from the Later tab
 
   // Repeat and end are one control in two halves: with no repeat there is
   // nothing for an end condition to end, so the whole row stands down.
@@ -16527,12 +16567,35 @@ function sendNodeToDate(nodeId, options) {
   window.closeSendFuture = function () {
     overlay.classList.remove('visible');
     _targetId = null;
+    _entryId = null;
   };
 
-  window.openSendFuture = function (nodeId) {
+  function openForEntry(entryId) {
+    const entry = scheduleData.entries.find(e => e.id === entryId);
+    if (!entry) return;
+    _targetId = null;
+    _entryId = entryId;
+    dateEl.value = entry.anchor;
+    everyEl.value = String(entry.repeat ? entry.repeat.every : 1);
+    unitEl.value = entry.repeat ? entry.repeat.unit : 'none';
+    endEl.value = entry.end ? entry.end.type : 'never';
+    countEl.value = String(entry.end && entry.end.type === 'count' ? entry.end.n : 10);
+    untilEl.value = (entry.end && entry.end.type === 'until') ? entry.end.date : entry.anchor;
+    syncFields();
+    overlay.classList.add('visible');
+    dateEl.focus();
+  }
+
+  // Two callers, one dialog: a node being sent for the first time, and an
+  // entry being edited from the Later tab. Editing changes future occurrences
+  // only — nodes already materialised are ordinary nodes in their own weeks.
+  window.openSendFuture = function (target) {
+    if (target && target.entryId) return openForEntry(target.entryId);
+    const nodeId = target;
     const node = findNode(nodeId);
     if (!canSendToDate(node)) return;
     _targetId = nodeId;
+    _entryId = null;
     // A week out is the default because that is the shortest horizon this
     // dialog is for; anything nearer is what N and the day tags already do.
     const start = dayStringFromNumber(dayNumber(parseDayString(localDateStr())) + 7);
@@ -16554,6 +16617,7 @@ function sendNodeToDate(nodeId, options) {
 
   okEl.addEventListener('click', () => {
     const id = _targetId;
+    const editing = _entryId;
     const opts = {
       date: dateEl.value,
       every: everyEl.value,
@@ -16563,8 +16627,10 @@ function sendNodeToDate(nodeId, options) {
       endDate: untilEl.value,
     };
     window.closeSendFuture();
-    const entry = sendNodeToDate(id, opts);
-    if (entry) showToast(t('toast.sentToFuture', { date: entry.anchor }));
+    const entry = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
+    if (!entry) return;
+    if (editing) renderAgenda();
+    else showToast(t('toast.sentToFuture', { date: entry.anchor }));
   });
 })();
 
@@ -17555,7 +17621,67 @@ function navigateAgendaItem(down) {
 // ISO week day-tab order: Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
 const AGENDA_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-const AGENDA_TAB_ORDER = ['overdue', ...AGENDA_DAY_ORDER];
+const AGENDA_TAB_ORDER = ['overdue', ...AGENDA_DAY_ORDER, 'later'];
+
+// ─── Later tab ────────────────────────────────────────────────────────────────
+// A reference list of what the schedule is holding, not a call to action — that
+// is why the tab carries no badge. The rows show occurrences, but they edit the
+// entry behind them: already-materialised nodes are ordinary nodes and are
+// edited in their own week.
+
+// How far ahead the list looks, and how many rows any one entry may contribute.
+// A daily entry would otherwise fill the tab by itself and bury every yearly
+// obligation the list exists to surface.
+const LATER_HORIZON_MONTHS = 12;
+const LATER_ROWS_PER_ENTRY = 12;
+
+function getLaterOccurrences(fromDate = localDateStr()) {
+  const from = parseDayString(fromDate);
+  if (!from || !scheduleData || !Array.isArray(scheduleData.entries)) return [];
+  const months = from.y * 12 + (from.m - 1) + LATER_HORIZON_MONTHS;
+  const ty = Math.floor(months / 12);
+  const tm = months % 12 + 1;
+  const to = formatDayString(ty, tm, Math.min(from.d, daysInMonth(ty, tm)));
+
+  const rows = [];
+  scheduleData.entries.forEach(entry => {
+    occurrencesInRange(entry, fromDate, to)
+      .slice(0, LATER_ROWS_PER_ENTRY)
+      .forEach(date => rows.push({ entry, date }));
+  });
+  rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return rows;
+}
+
+// 'YYYY-MM' — the grouping key, and the month a divider names.
+function laterMonthKey(date) {
+  return date.slice(0, 7);
+}
+
+function laterMonthLabel(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const names = MONTH_NAMES[currentLang] ?? MONTH_NAMES.en;
+  return `${names[m - 1]} ${y}`;
+}
+
+// The stand-in a Later row is drawn from. It is shaped like an activity so
+// buildAgendaItem needs no second code path for the parts that are the same —
+// branch dot, priority icon, label — and it carries the id the occurrence will
+// have if that week is ever opened, so nothing about it is invented.
+function laterRowNode(entry, date) {
+  return {
+    id: occurrenceNodeId(entry.id, date),
+    type: 'activity',
+    branch: entry.branch,
+    label: entry.label,
+    priority: entry.priority && entry.priority !== 'normal' ? entry.priority : null,
+    children: [],
+    done: false,
+    schedId: entry.id,
+    schedDate: date,
+  };
+}
+
 
 function navigateAgendaTab(right) {
   const idx = AGENDA_TAB_ORDER.indexOf(agendaActiveTab);
@@ -17626,6 +17752,34 @@ function renderAgendaStrip() {
       requestAnimationFrame(() => scrollAgendaTabIntoView(strip, btn));
     }
   });
+
+  // Later — no badge, deliberately. It is a reference list, and a count on it
+  // would read as work owed this week. That is also why this tab needs nothing
+  // added to the strip's staleness key: only the active tab and the language
+  // change what it draws, and both are already in it.
+  addSeparator();
+  const laterBtn = document.createElement('button');
+  laterBtn.className = 'agenda-tab' + (agendaActiveTab === 'later' ? ' active' : '');
+  laterBtn.dataset.tab = 'later';
+  laterBtn.textContent = t('agenda.later');
+  laterBtn.addEventListener('click', () => { agendaActiveTab = 'later'; renderAgenda(); });
+  strip.appendChild(laterBtn);
+  if (agendaActiveTab === 'later') {
+    requestAnimationFrame(() => scrollAgendaTabIntoView(strip, laterBtn));
+  }
+}
+
+// Group heading inside an agenda list. Shared by the day tabs and the Later
+// tab, so it lives beside the row builder rather than inside one renderer.
+function makeSectionDivider(labelText, count) {
+  const div = document.createElement('div');
+  div.className = 'today-done-divider';
+  div.textContent = labelText;
+  const badge = document.createElement('span');
+  badge.className = 'agenda-section-count';
+  badge.textContent = String(count);
+  div.appendChild(badge);
+  return div;
 }
 
 function buildAgendaItem(node, label, opts = {}) {
@@ -17640,6 +17794,11 @@ function buildAgendaItem(node, label, opts = {}) {
   // A row in the Dropped group. Reduced opacity and the ⊘ badge, but no
   // diagonal slash — that is a mind-map mark and does not translate to a list.
   const isDroppedRow = !!opts.dropped;
+  // A Later row stands for a schedule entry, not for a node in this week. It
+  // shows the date it is due and opens the entry when tapped; everything that
+  // acts on a live node — Done, drag, swipe, the context menu, hover hotkeys —
+  // is left off, because there is no node yet for any of it to act on.
+  const entryRow = opts.entry || null;
   const cc = getCounterChild(node);
   const tickInfo = getTickInfo(node);
   const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
@@ -17649,10 +17808,12 @@ function buildAgendaItem(node, label, opts = {}) {
   item.dataset.nodeId = node.id;
 
   // Grip handle
-  const handle = document.createElement('div');
-  handle.className = 'agenda-drag-handle';
-  handle.innerHTML = iconSvg('grip-vertical');
-  item.appendChild(handle);
+  if (!entryRow) {
+    const handle = document.createElement('div');
+    handle.className = 'agenda-drag-handle';
+    handle.innerHTML = iconSvg('grip-vertical');
+    item.appendChild(handle);
+  }
 
   // Branch dot
   const dot = document.createElement('div');
@@ -17734,6 +17895,16 @@ function buildAgendaItem(node, label, opts = {}) {
   });
   item.appendChild(labelEl);
 
+  // The real date this occurrence is due — the whole point of the row, and for
+  // a swept occurrence the only place its original date is visible.
+  if (entryRow) {
+    const when = document.createElement('span');
+    when.className = 'daily-log-badge';
+    when.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;font-variant-numeric:tabular-nums;';
+    when.textContent = opts.date;
+    item.appendChild(when);
+  }
+
   // Unplanned badge
   if (node.unplanned) {
     const bolt = document.createElement('span');
@@ -17812,6 +17983,11 @@ function buildAgendaItem(node, label, opts = {}) {
   // parents ticked today but not yet at max) also show Undone so the user
   // can revert just-completed steps without seeing a second Done button.
   const showUndone = node.done || isDroppedRow || (inDoneSection && (cc || tickInfo));
+  if (entryRow) {
+    item.classList.add('agenda-item-entry');
+    item.addEventListener('click', () => window.openSendFuture({ entryId: entryRow.id }));
+    return item;
+  }
   const btn = document.createElement('button');
   btn.className = 'agenda-action-btn';
   if (showUndone) {
@@ -17894,6 +18070,13 @@ function renderAgendaTabContent() {
   // Rows get destroyed on full rebuild — drop the focus tracker so the next
   // mouseenter on a fresh row doesn't try to clear class from a detached node.
   _agendaFocusedEl = null;
+
+  // Later is a list of entries, not of this week's nodes, so it answers before
+  // any of the day machinery below runs.
+  if (agendaActiveTab === 'later') {
+    renderLaterTab(content);
+    return;
+  }
 
   const isOverdue = agendaActiveTab === 'overdue';
   const tabDate = isOverdue ? null : tabDateString(agendaActiveTab);
@@ -18323,17 +18506,6 @@ function renderAgendaTabContent() {
     });
   }
 
-  function makeSectionDivider(labelText, count) {
-    const div = document.createElement('div');
-    div.className = 'today-done-divider';
-    div.textContent = labelText;
-    const badge = document.createElement('span');
-    badge.className = 'agenda-section-count';
-    badge.textContent = String(count);
-    div.appendChild(badge);
-    return div;
-  }
-
   // Per-tick log rendering for the Done section. Each tick-child completed
   // today becomes one row "Pushups n/total" (cumulative position). Legacy
   // counters and plain done activities each contribute one row. Sorted by
@@ -18490,6 +18662,37 @@ function renderAgendaTabContent() {
     renderGroup(anyRows, 'anyday', t('agenda.anyDay'), buildRow);
     renderDroppedSection(droppedItems);
   }
+}
+
+// Month-grouped list of what the schedule is holding. Rows reuse the shared
+// agenda row so Later looks like every other tab; they are not draggable and
+// carry no Done button, because an occurrence that has not been delivered yet
+// is not work you can close.
+function renderLaterTab(content) {
+  const rows = getLaterOccurrences();
+  if (!rows.length) {
+    const empty = document.createElement('div');
+    empty.className = 'daily-log-empty';
+    empty.textContent = t('agenda.emptyLater');
+    content.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'agenda-item-list';
+  content.appendChild(list);
+
+  let month = null;
+  rows.forEach(({ entry, date }) => {
+    const key = laterMonthKey(date);
+    if (key !== month) {
+      month = key;
+      const count = rows.filter(r => laterMonthKey(r.date) === key).length;
+      if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
+      list.appendChild(makeSectionDivider(laterMonthLabel(key), count));
+    }
+    list.appendChild(buildAgendaItem(laterRowNode(entry, date), entry.label, { entry, date }));
+  });
 }
 
 // Coalesces rapid renderAgenda() calls (e.g. counter+1 fires renderAgenda,
