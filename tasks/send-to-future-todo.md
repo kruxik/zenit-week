@@ -43,18 +43,18 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S3 — Materialisation on week open ← regression cliff
 
-- [ ] T3.1 ⚠ R1 — Identify the **single** shared point every week-open path reaches after `loadWeek` and before `rebuildNodeMap` — `loadAndRender` (`:19136`), the `hashchange` handler (`:19175`) and boot all route through it. Hook materialisation there once; do not add three call sites.
-- [ ] T3.2 — `materialiseWeek(wk, weekData)`: for each entry, every occurrence inside that week's Mon–Sun bounds (`getWeekBounds`, `:9065`) becomes an `activity` node under its branch with a `dayChild` leaf on the matching weekday, carrying `schedId` and `schedDate`.
-- [ ] T3.3 ⚠ R5 — **Idempotence:** plant only if `occurrenceNodeId(...)` is absent from **both** `nodes` and `tombstones` of that week record. Reopening plants nothing; a deleted occurrence never returns.
-- [ ] T3.4 ⚠ R2 — Runs under the week lock for the week being opened. `withWeekLock` (`:5062`) is **not** re-entrant — nothing inside may take that lock again.
-- [ ] T3.5 ⚠ R6 — Materialisation takes **no** undo snapshot; it is not a user edit.
-- [ ] T3.6 — Opening a future week plants there and appends the date to the entry's `planted`, without advancing `plantedThrough`.
-- [ ] T3.7 ⚠ R3 — `validateAndRepair` (`:9843`) preserves `schedId` / `schedDate`, exactly as it preserves `dayChild` / `dayIndex` (`:9855`).
-- [ ] T3.8 ⚠ R4 — `migrateCrdt` (`:9978`) and the week-merge path carry both new fields through a Drive round-trip.
-- [ ] T3.9 — An `Nx` label materialises with its counter child auto-created, with no schedule-specific code.
-- [ ] T3.10 — `tests/schedule.test.js`: plants in the right week and on the right weekday; a second open plants nothing; a tombstoned occurrence never returns; two week records built independently from the same entry converge on one node after merge; a future-week open does not advance `plantedThrough`.
-- [ ] T3.11 — **These suites must pass unmodified:** `week-record-invariants.test.js`, `persistence.test.js`, `crdt.test.js`, `sync-convergence.test.js`, `transfer.test.js`, `week-rollover.test.js`. Editing any of them is the signal to stop and re-read the spec.
-- [ ] T3.12 — `npm test` + `npm run validate` + `npm run csp` green.
+- [x] T3.1 ⚠ R1 — Identify the **single** shared point every week-open path reaches after `loadWeek` and before `rebuildNodeMap` — `loadAndRender` (`:19136`), the `hashchange` handler (`:19175`) and boot all route through it. Hook materialisation there once; do not add three call sites.
+- [x] T3.2 — `materialiseWeek(wk, weekData)`: for each entry, every occurrence inside that week's Mon–Sun bounds (`getWeekBounds`, `:9065`) becomes an `activity` node under its branch with a `dayChild` leaf on the matching weekday, carrying `schedId` and `schedDate`.
+- [x] T3.3 ⚠ R5 — **Idempotence:** plant only if `occurrenceNodeId(...)` is absent from **both** `nodes` and `tombstones` of that week record. Reopening plants nothing; a deleted occurrence never returns.
+- [x] T3.4 ⚠ R2 — Runs under the week lock for the week being opened. `withWeekLock` (`:5062`) is **not** re-entrant — nothing inside may take that lock again.
+- [x] T3.5 ⚠ R6 — Materialisation takes **no** undo snapshot; it is not a user edit.
+- [x] T3.6 — Opening a future week plants there and appends the date to the entry's `planted`, without advancing `plantedThrough`.
+- [x] T3.7 ⚠ R3 — `validateAndRepair` (`:9843`) preserves `schedId` / `schedDate`, exactly as it preserves `dayChild` / `dayIndex` (`:9855`).
+- [x] T3.8 ⚠ R4 — `migrateCrdt` (`:9978`) and the week-merge path carry both new fields through a Drive round-trip.
+- [x] T3.9 — An `Nx` label materialises with its counter child auto-created, with no schedule-specific code.
+- [x] T3.10 — `tests/schedule.test.js`: plants in the right week and on the right weekday; a second open plants nothing; a tombstoned occurrence never returns; two week records built independently from the same entry converge on one node after merge; a future-week open does not advance `plantedThrough`.
+- [x] T3.11 — **These suites must pass unmodified:** `week-record-invariants.test.js`, `persistence.test.js`, `crdt.test.js`, `sync-convergence.test.js`, `transfer.test.js`, `week-rollover.test.js`. Editing any of them is the signal to stop and re-read the spec.
+- [x] T3.12 — `npm test` + `npm run validate` + `npm run csp` green.
 
 **AC:** a seeded entry arrives in its week on its weekday, exactly once, no matter how the week is opened or how many times; a week with no entries behaves byte-identically to today.
 **Verify:** `npm test`, then manually seed an entry in the console and open its week twice.

@@ -608,6 +608,8 @@ export const {
   nextOccurrence,
   occurrencesInRange,
   // Schedule store
+  materialiseWeek,
+  weekDayStrings,
   emptySchedule,
   occurrenceNodeId,
   validateAndRepairSchedule,

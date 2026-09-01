@@ -7,6 +7,11 @@ import {
   validateAndRepairSchedule,
   loadSchedule,
   saveSchedule,
+  materialiseWeek,
+  weekDayStrings,
+  validateAndRepair,
+  migrateCrdt,
+  mergeWeekData,
   genId,
   openDB,
   loadWeekIDB,
@@ -433,5 +438,228 @@ describe('Schedule store — persistence', () => {
     const before = await loadValueIDB('schedule');
     await saveWeekIDB('2026-21', { nodes: [{ id: 'center', type: 'center' }] });
     expect(await loadValueIDB('schedule')).toEqual(before);
+  });
+});
+
+describe('Materialisation on week open', () => {
+  // 2026-W20 runs Mon 2026-05-11 … Sun 2026-05-17.
+  const WK = '2026-20';
+
+  const week = () => ({
+    nodes: [
+      { id: 'center', type: 'center', children: ['work', 'me'] },
+      { id: 'work', type: 'branch', branch: 'work', parent: 'center', label: 'Work', children: [], side: 'left' },
+      { id: 'me', type: 'branch', branch: 'me', parent: 'center', label: 'Me', children: [], side: 'right' },
+    ],
+    tombstones: [],
+    crdtVersion: 0,
+  });
+
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Tax return', branch: 'work', priority: 'normal',
+    anchor: '2026-05-13', repeat: null, end: { type: 'never' },
+    plantedThrough: null, planted: [], _ts: 1,
+    ...over,
+  });
+
+  const seed = (...entries) => _state.setSchedule({ entries, tombstones: [], crdtVersion: 0 });
+  const occurrences = (data) => data.nodes.filter(n => n.schedId);
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setWeekKey(WK);
+  });
+
+  afterEach(() => _state.setSchedule(emptySchedule()));
+
+  it('knows the seven local dates of a week, Monday first', () => {
+    expect(weekDayStrings(WK)).toEqual([
+      '2026-05-11', '2026-05-12', '2026-05-13', '2026-05-14', '2026-05-15', '2026-05-16', '2026-05-17',
+    ]);
+  });
+
+  it('plants a due occurrence under its branch on the right weekday', () => {
+    seed(entry());
+    const data = week();
+    expect(materialiseWeek(WK, data)).toBe(true);
+
+    const node = data.nodes.find(n => n.schedId === 's1');
+    expect(node.type).toBe('activity');
+    expect(node.label).toBe('Tax return');
+    expect(node.parent).toBe('work');
+    expect(node.schedDate).toBe('2026-05-13');
+    expect(data.nodes.find(n => n.id === 'work').children).toContain(node.id);
+
+    const leaf = data.nodes.find(n => n.dayChild);
+    expect(leaf.parent).toBe(node.id);
+    expect(leaf.dayIndex).toBe(3); // 2026-05-13 is a Wednesday
+    expect(node.children).toEqual([leaf.id]);
+  });
+
+  it('carries the entry priority onto the occurrence', () => {
+    seed(entry({ priority: 'critical' }));
+    const data = week();
+    materialiseWeek(WK, data);
+    expect(data.nodes.find(n => n.schedId === 's1').priority).toBe('critical');
+    expect(data.nodes.find(n => n.dayChild).priority).toBe('critical');
+  });
+
+  it('plants nothing when the occurrence falls outside the week', () => {
+    seed(entry({ anchor: '2026-05-18' }));
+    const data = week();
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(occurrences(data)).toEqual([]);
+  });
+
+  it('leaves a week with no entries byte-identical', () => {
+    const data = week();
+    const before = JSON.stringify(data);
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(JSON.stringify(data)).toBe(before);
+  });
+
+  it('plants every occurrence of a repeating entry that falls in the week', () => {
+    seed(entry({ anchor: '2026-05-11', repeat: { every: 2, unit: 'day' } }));
+    const data = week();
+    materialiseWeek(WK, data);
+    expect(occurrences(data).map(n => n.schedDate))
+      .toEqual(['2026-05-11', '2026-05-13', '2026-05-15', '2026-05-17']);
+  });
+
+  it('is idempotent: a second pass plants nothing', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    const after = JSON.stringify(data);
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(JSON.stringify(data)).toBe(after);
+    expect(occurrences(data)).toHaveLength(1);
+  });
+
+  it('never returns a tombstoned occurrence', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    const node = data.nodes.find(n => n.schedId === 's1');
+    const leaf = data.nodes.find(n => n.dayChild);
+    data.nodes = data.nodes.filter(n => n.id !== node.id && n.id !== leaf.id);
+    data.tombstones = [node.id, leaf.id];
+
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(occurrences(data)).toEqual([]);
+  });
+
+  it('re-homes an occurrence whose branch is missing from this week', () => {
+    seed(entry({ branch: 'deleted' }));
+    const data = week();
+    materialiseWeek(WK, data);
+    const node = data.nodes.find(n => n.schedId === 's1');
+    expect(node.parent).toBe('work');
+    expect(data.nodes.find(n => n.id === 'work').children).toContain(node.id);
+  });
+
+  it('plants nothing into a week that has no branches at all', () => {
+    seed(entry());
+    const data = { nodes: [{ id: 'center', type: 'center', children: [] }], tombstones: [], crdtVersion: 0 };
+    expect(materialiseWeek(WK, data)).toBe(false);
+  });
+
+  it('records the date in planted without advancing plantedThrough', () => {
+    const e = entry();
+    seed(e);
+    materialiseWeek(WK, week());
+    expect(e.planted).toEqual(['2026-05-13']);
+    expect(e.plantedThrough).toBeNull();
+  });
+
+  it('does not re-record a date already listed as planted', () => {
+    const e = entry({ planted: ['2026-05-13'] });
+    seed(e);
+    materialiseWeek(WK, week());
+    expect(e.planted).toEqual(['2026-05-13']);
+  });
+
+  it('lets the day win over an Nx label, as a hand-typed "(we)" would', () => {
+    seed(entry({ label: 'Pushups 10x' }));
+    const data = week();
+    materialiseWeek(WK, data);
+    const node = data.nodes.find(n => n.schedId === 's1');
+    expect(node.label).toBe('Pushups 10x');
+    expect(data.nodes.filter(n => n.tickChild)).toEqual([]);
+    expect(data.nodes.filter(n => n.dayChild)).toHaveLength(1);
+  });
+
+  it('converges on one node when two devices materialise the same week alone', () => {
+    seed(entry());
+    const a = week();
+    const b = week();
+    materialiseWeek(WK, a);
+    materialiseWeek(WK, b);
+    a.savedAt = 1000;
+    b.savedAt = 2000;
+
+    const merged = mergeWeekData(a, b);
+    expect(merged.nodes.filter(n => n.schedId === 's1')).toHaveLength(1);
+    expect(merged.nodes.filter(n => n.dayChild)).toHaveLength(1);
+    const node = merged.nodes.find(n => n.schedId === 's1');
+    expect(node.schedDate).toBe('2026-05-13');
+    expect(node.children).toHaveLength(1);
+  });
+
+  it('carries schedId and schedDate through validateAndRepair', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    const repaired = validateAndRepair(JSON.parse(JSON.stringify(data)));
+    const node = repaired.nodes.find(n => n.id === data.nodes.find(x => x.schedId).id);
+    expect(node.schedId).toBe('s1');
+    expect(node.schedDate).toBe('2026-05-13');
+    expect(repaired.nodes.find(n => n.dayChild).dayIndex).toBe(3);
+  });
+
+  it('carries schedId and schedDate through a Drive round-trip', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    data.savedAt = 1000;
+    // Serialise → parse → migrate → merge, the shape a Drive pull takes.
+    const remote = migrateCrdt(JSON.parse(JSON.stringify(data)));
+    const merged = mergeWeekData(week(), remote);
+    const node = merged.nodes.find(n => n.schedId === 's1');
+    expect(node).toBeDefined();
+    expect(node.schedDate).toBe('2026-05-13');
+    expect(node._ts).toBeGreaterThan(0);
+  });
+
+  it('takes no undo snapshot', () => {
+    seed(entry());
+    _state.reset();
+    materialiseWeek(WK, week());
+    expect(_state.getUndoStack()).toHaveLength(0);
+  });
+
+  it('plants once no matter how the week is opened, and saves the week', async () => {
+    seed(entry());
+    _state.setLocalStorage('zenit-week-' + WK, week());
+    _state.setWeekKey('2026-19');
+
+    await _state.loadAndRender(WK);
+    expect(occurrences(_state.get())).toHaveLength(1);
+
+    // Reopening from the persisted record must not plant a second copy.
+    await _state.loadAndRender('2026-19');
+    await _state.loadAndRender(WK);
+    expect(occurrences(_state.get())).toHaveLength(1);
+    expect(_state.get().nodes.filter(n => n.dayChild)).toHaveLength(1);
+  });
+
+  it('leaves a week untouched on open when the schedule is empty', async () => {
+    _state.setLocalStorage('zenit-week-' + WK, week());
+    _state.setWeekKey('2026-19');
+    await _state.loadAndRender(WK);
+    expect(occurrences(_state.get())).toEqual([]);
+    expect(_state.get().nodes.filter(n => n.dayChild)).toEqual([]);
   });
 });

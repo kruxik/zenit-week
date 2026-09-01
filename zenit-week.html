@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-hMoVBAQ/GGnS/Qd3yMWQ4f5pDJwyv4T6kDeoEFXm+Sc='
+               'sha256-GzboGzrO7K5EzPUFp55sR4T//nc2UpzwGAmY41vSZVw='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -10834,6 +10834,139 @@ async function transferUnfinished() {
   applyAutoLayout();
 }
 
+// ─── Materialisation ──────────────────────────────────────────────────────────
+// A schedule entry is a standing intention; it becomes visible only when the
+// week that owns its date is opened. Nothing runs on a timer, in the background
+// or in the service worker — the weekly ritual is the delivery mechanism.
+
+// The seven local calendar dates of an ISO week, Monday first. getWeekBounds
+// returns UTC-midnight Dates, so they are read back through getUTC* rather than
+// through localDateStr, which would shift the week by a day west of Greenwich.
+function weekDayStrings(wk) {
+  const { year, week } = parseWeekKey(wk);
+  if (!Number.isFinite(year) || !Number.isFinite(week)) return null;
+  const { monday } = getWeekBounds(year, week);
+  const start = dayNumber({ y: monday.getUTCFullYear(), m: monday.getUTCMonth() + 1, d: monday.getUTCDate() });
+  return Array.from({ length: 7 }, (_, i) => dayStringFromNumber(start + i));
+}
+
+// Weekday index in the app's convention (0 = Sunday … 6 = Saturday), matching
+// dayIndex on day-children and the 1–7 hotkeys via isoWeekPos.
+function weekdayOfDayString(str) {
+  const part = parseDayString(str);
+  if (!part) return null;
+  return new Date(dayNumber(part) * 86400000).getUTCDay();
+}
+
+// Both nodes an occurrence plants carry derived ids, the parent and its day
+// leaf alike. A genId() day leaf would converge badly: two devices opening the
+// same week offline would agree on the activity and then merge two different
+// day children under it.
+function occurrenceDayNodeId(schedId, schedDate) {
+  return occurrenceNodeId(schedId, schedDate + ':day');
+}
+
+// Plants every occurrence the schedule owes this week into `data`, in place.
+// Returns whether anything was planted, so the caller can skip the write when
+// there is nothing to save — a week with no due occurrences must come out of
+// this byte-identical to how it went in.
+//
+// Idempotence rests entirely on the derived node id being checked against both
+// `nodes` and `tombstones`: reopening a week plants nothing, a deleted
+// occurrence never returns, and two devices converge on one node rather than
+// two. The entry's own bookkeeping is never consulted for that question.
+function materialiseWeek(wk, data) {
+  if (!data || !Array.isArray(data.nodes)) return false;
+  if (!scheduleData || !Array.isArray(scheduleData.entries) || !scheduleData.entries.length) return false;
+
+  const week = weekDayStrings(wk);
+  if (!week) return false;
+
+  const branchIds = data.nodes.filter(n => n.type === 'branch').map(n => n.id);
+  if (!branchIds.length) return false;
+
+  const byId = new Map(data.nodes.map(n => [n.id, n]));
+  const tombstoned = new Set(Array.isArray(data.tombstones) ? data.tombstones : []);
+  let planted = false;
+
+  scheduleData.entries.forEach(entry => {
+    occurrencesInRange(entry, week[0], week[6]).forEach(date => {
+      const id = occurrenceNodeId(entry.id, date);
+      const dayId = occurrenceDayNodeId(entry.id, date);
+      if (byId.has(id) || byId.has(dayId)) return;
+      if (tombstoned.has(id) || tombstoned.has(dayId)) return;
+
+      // An entry filed under a branch this week does not have lands on the
+      // first branch rather than nowhere — the obligation outlives the
+      // category, exactly as validateAndRepairSchedule decides it.
+      const branch = branchIds.includes(entry.branch) ? entry.branch : branchIds[0];
+      const branchNode = byId.get(branch);
+      const stamp = Date.now();
+
+      const node = {
+        id, type: 'activity', branch, parent: branch,
+        label: entry.label, done: false, unplanned: false,
+        priority: entry.priority && entry.priority !== 'normal' ? entry.priority : null,
+        reusable: false,
+        children: [dayId],
+        schedId: entry.id, schedDate: date,
+        _ts: stamp,
+      };
+      const dayNode = {
+        id: dayId, type: 'activity', dayChild: true, dayIndex: weekdayOfDayString(date),
+        branch, parent: id,
+        label: dayAbbr(weekdayOfDayString(date)),
+        done: false, unplanned: false,
+        priority: node.priority, reusable: false,
+        children: [], _ts: stamp,
+      };
+      data.nodes.push(node, dayNode);
+      byId.set(id, node);
+      byId.set(dayId, dayNode);
+      branchNode.children = Array.isArray(branchNode.children) ? branchNode.children : [];
+      branchNode.children.push(id);
+      planted = true;
+
+      // `planted` records occurrences delivered ahead of the low-water mark, so
+      // the current-week sweep does not deliver them a second time. Only the
+      // sweep itself may move plantedThrough (spec §3.3).
+      if (!Array.isArray(entry.planted)) entry.planted = [];
+      if ((!entry.plantedThrough || date > entry.plantedThrough) && !entry.planted.includes(date)) {
+        entry.planted.push(date);
+        entry.planted.sort();
+        entry._ts = stamp;
+      }
+    });
+  });
+
+  return planted;
+}
+
+// The one place a week becomes the week on screen. loadAndRender (arrows, week
+// bar, boot) and the hashchange handler (URL, back/forward) both route through
+// it, so materialisation is hooked once rather than at every entry point.
+//
+// The lock is the same one the transfer paths take, so a Drive pull or peer-tab
+// merge cannot interleave between the plant and the write. It is NOT re-entrant:
+// nothing called from inside it may take a week lock of its own. saveWeek and
+// saveSchedule only queue their sync work, which is why they are safe here.
+// No snapshot is taken — materialisation is delivery, not a user edit.
+async function openWeekIntoView(wk) {
+  weekData = await loadWeek(wk);
+  if (scheduleData.entries.length) {
+    await withWeekLock(wk, async () => {
+      if (!materialiseWeek(wk, weekData)) return;
+      await saveWeek(wk, weekData);
+      await saveSchedule();
+    });
+  }
+  rebuildNodeMap();
+  syncBranchConfig();
+  // Keep the next-week cache aligned with the week we just navigated to, or a
+  // later move/undo snapshot restores the wrong next-week record.
+  await refreshNextWeekCache();
+}
+
 async function transferReusable() {
   const prevWeekKey = offsetWeek(currentWeekKey, -1);
   const prevData = await loadWeek(prevWeekKey);
@@ -19422,15 +19555,10 @@ async function loadAndRender(wk) {
     await importWeekOnDemand(wk);
     hideImportSpinner();
   }
-  weekData = await loadWeek(wk);
-  rebuildNodeMap();
-  syncBranchConfig();
-  // Keep the next-week cache aligned with the week we just navigated to. This is
-  // the primary navigation path (prev/next buttons); the hashchange handler
-  // no-ops here because we set currentWeekKey ourselves above. Without this the
-  // cache holds the previous week's "next week", so a later move/undo snapshot
-  // restores the wrong next-week record (duplication / failed un-resurrect).
-  await refreshNextWeekCache();
+  // Shared week-open path (materialisation included). The hashchange handler
+  // no-ops on the next-week cache refresh inside because we set currentWeekKey
+  // ourselves above.
+  await openWeekIntoView(wk);
   if (wk === todayWeekKey()) {
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   } else {
@@ -19459,13 +19587,7 @@ window.addEventListener('hashchange', async () => {
       await importWeekOnDemand(target);
       hideImportSpinner();
     }
-    weekData = await loadWeek(currentWeekKey);
-    rebuildNodeMap();
-    syncBranchConfig();
-    // Refresh the next-week cache for the new current week. Without this the
-    // cache keeps the previous week's "next week" data, and any later undo/redo
-    // snapshot would write that stale blob into the wrong next-week record.
-    await refreshNextWeekCache();
+    await openWeekIntoView(currentWeekKey);
     updateWeekBar();
     renderIfVisible();
     fitMindmapView();   // new week, new extent — see loadAndRender's refit note
@@ -20682,6 +20804,9 @@ window.addEventListener('load', async () => {
   await loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   await bootstrapColorsSettings();
+  // Entries must be in memory before the first week opens, or that week would
+  // be the one week of the session that never materialises.
+  await loadSchedule();
   updateSvgFilters();
   traceMark('boot:settings-ready');
   initGoogleAuth(); // legacy-token purge, OAuth callback handling, silent session restore
