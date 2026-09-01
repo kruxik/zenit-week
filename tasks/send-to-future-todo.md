@@ -84,15 +84,15 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S5 — Lifecycle: sweep + transfer
 
-- [ ] T5.1 — On opening the **current** week, every occurrence dated after `plantedThrough`, before this week's Monday, and absent from `planted`, materialises into the current week.
-- [ ] T5.2 — A swept occurrence is placed on the **Monday** day-leaf of the current week; its `schedDate` still records the real original date.
-- [ ] T5.3 — After the pass, `plantedThrough` becomes the current week's Sunday and `planted` entries at or before it are pruned.
-- [ ] T5.4 — A device whose `plantedThrough` is a year old materialises each entry's outstanding occurrences **once**, not a year of them per entry.
-- [ ] T5.5 ⚠ R7 — Browsing ahead and later arriving at that week does not double-plant (the `planted` list plus the deterministic id both cover it).
-- [ ] T5.6 — `transferUnfinished` (`:10452`) strips `schedId` / `schedDate` from the copy it carries forward.
-- [ ] T5.7 — Swept occurrences read as overdue via the existing `getOverdueItems` (`:12918`) with no changes to it.
-- [ ] T5.8 — `tests/schedule.test.js` + an addition to `tests/transfer.test.js` covering T5.1–T5.6.
-- [ ] T5.9 — `npm test` + `npm run validate` + `npm run csp` green.
+- [x] T5.1 — On opening the **current** week, every occurrence dated after `plantedThrough`, before this week's Monday, and absent from `planted`, materialises into the current week.
+- [x] T5.2 — A swept occurrence is placed on the **Monday** day-leaf of the current week; its `schedDate` still records the real original date.
+- [x] T5.3 — After the pass, `plantedThrough` becomes the current week's Sunday and `planted` entries at or before it are pruned.
+- [x] T5.4 — A device whose `plantedThrough` is a year old materialises each entry's outstanding occurrences **once**, not a year of them per entry.
+- [x] T5.5 ⚠ R7 — Browsing ahead and later arriving at that week does not double-plant (the `planted` list plus the deterministic id both cover it).
+- [x] T5.6 — `transferUnfinished` (`:10452`) strips `schedId` / `schedDate` from the copy it carries forward.
+- [x] T5.7 — Swept occurrences read as overdue via the existing `getOverdueItems` (`:12918`) with no changes to it.
+- [x] T5.8 — `tests/schedule.test.js` + an addition to `tests/transfer.test.js` covering T5.1–T5.6.
+- [x] T5.9 — `npm test` + `npm run validate` + `npm run csp` green.
 
 **AC:** a missed occurrence appears in the current week on Monday and reads as overdue; nothing is delivered twice; a long absence produces one item per entry.
 **Verify:** `npm test`, then set a `plantedThrough` in the past by hand and open the current week.

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   nextOccurrence,
   occurrencesInRange,
+  occurrencesBefore,
+  getOverdueItems,
   emptySchedule,
   occurrenceNodeId,
   validateAndRepairSchedule,
@@ -476,9 +478,15 @@ describe('Materialisation on week open', () => {
     _state.reset();
     _state.setSchedule(emptySchedule());
     _state.setWeekKey(WK);
+    // Pin "today" well before WK so these cover the plain materialisation pass
+    // only; the past-due sweep has its own block below.
+    _state.setTodayWeekKey('2026-10');
   });
 
-  afterEach(() => _state.setSchedule(emptySchedule()));
+  afterEach(() => {
+    _state.setSchedule(emptySchedule());
+    _state.clearTodayWeekKeyOverride();
+  });
 
   it('knows the seven local dates of a week, Monday first', () => {
     expect(weekDayStrings(WK)).toEqual([
@@ -798,5 +806,204 @@ describe('Send to date…', () => {
     const ids = _state.getSchedule().entries.map(x => x.id);
     expect(ids).toEqual([first.id]);
     expect(ids).not.toContain(second.id);
+  });
+});
+
+describe('Occurrence math — walking backwards', () => {
+  const e = (anchor, repeat, end = { type: 'never' }) => ({ id: 'e1', label: 'T', anchor, repeat, end });
+
+  it('finds the last occurrence on or before a date', () => {
+    expect(occurrencesBefore(e('2026-01-01', { every: 1, unit: 'week' }), '2026-02-10'))
+      .toEqual(['2026-02-05']);
+    expect(occurrencesBefore(e('2026-01-08', { every: 1, unit: 'week' }), '2026-01-08'))
+      .toEqual(['2026-01-08']);
+  });
+
+  it('returns the requested number of trailing occurrences, ascending', () => {
+    expect(occurrencesBefore(e('2026-01-01', { every: 1, unit: 'month' }), '2026-06-30', 3))
+      .toEqual(['2026-04-01', '2026-05-01', '2026-06-01']);
+  });
+
+  it('is empty before the anchor', () => {
+    expect(occurrencesBefore(e('2026-06-01', { every: 1, unit: 'day' }), '2026-05-31')).toEqual([]);
+  });
+
+  it('stops at a count or until limit rather than at the date asked for', () => {
+    expect(occurrencesBefore(e('2026-01-05', { every: 1, unit: 'week' }, { type: 'count', n: 3 }), '2026-12-31'))
+      .toEqual(['2026-01-19']);
+    expect(occurrencesBefore(e('2026-01-05', { every: 1, unit: 'week' }, { type: 'until', date: '2026-01-19' }), '2026-12-31'))
+      .toEqual(['2026-01-19']);
+  });
+
+  it('yields the anchor alone for a non-repeating entry', () => {
+    expect(occurrencesBefore(e('2026-03-31', null), '2026-12-31', 5)).toEqual(['2026-03-31']);
+  });
+
+  it('reaches a decade back in one step, not ten years of them', () => {
+    const dates = occurrencesBefore(e('2016-01-01', { every: 1, unit: 'day' }), '2026-01-01', 2);
+    expect(dates).toEqual(['2025-12-31', '2026-01-01']);
+  });
+
+  it('clamps a month-end anchor when walking back', () => {
+    expect(occurrencesBefore(e('2026-01-31', { every: 1, unit: 'month' }), '2026-02-28', 2))
+      .toEqual(['2026-01-31', '2026-02-28']);
+  });
+});
+
+describe('Past-due sweep', () => {
+  // 2026-W20 runs Mon 2026-05-11 … Sun 2026-05-17; it is "today" throughout.
+  const WK = '2026-20';
+  const MONDAY = '2026-05-11';
+  const SUNDAY = '2026-05-17';
+
+  const week = () => ({
+    nodes: [
+      { id: 'center', type: 'center', children: ['work'] },
+      { id: 'work', type: 'branch', branch: 'work', parent: 'center', label: 'Work', children: [] },
+    ],
+    tombstones: [],
+    crdtVersion: 0,
+  });
+
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Pay the bill', branch: 'work', priority: 'normal',
+    anchor: '2026-04-01', repeat: null, end: { type: 'never' },
+    plantedThrough: null, planted: [], _ts: 1,
+    ...over,
+  });
+
+  const seed = (...entries) => _state.setSchedule({ entries, tombstones: [], crdtVersion: 0 });
+  const occurrences = (data) => data.nodes.filter(n => n.schedId);
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setWeekKey(WK);
+    _state.setTodayWeekKey(WK);
+  });
+
+  afterEach(() => {
+    _state.setSchedule(emptySchedule());
+    _state.clearTodayWeekKeyOverride();
+  });
+
+  it('sweeps a missed occurrence onto this week Monday, keeping its real date', () => {
+    seed(entry());
+    const data = week();
+    expect(materialiseWeek(WK, data)).toBe(true);
+
+    const node = data.nodes.find(n => n.schedId === 's1');
+    expect(node.schedDate).toBe('2026-04-01');
+    const leaf = data.nodes.find(n => n.dayChild);
+    expect(leaf.dayIndex).toBe(1); // Monday
+  });
+
+  it('reads as overdue from Tuesday on, through the existing machinery', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    _state.set(data);
+
+    const tuesday = new Date('2026-05-12T09:00:00');
+    expect(getOverdueItems(tuesday).some(n => n.dayChild)).toBe(true);
+    const monday = new Date('2026-05-11T09:00:00');
+    expect(getOverdueItems(monday)).toEqual([]);
+  });
+
+  it('advances plantedThrough to this Sunday and prunes planted', () => {
+    const e = entry({ planted: ['2026-04-20', '2026-06-01'] });
+    seed(e);
+    materialiseWeek(WK, week());
+    expect(e.plantedThrough).toBe(SUNDAY);
+    expect(e.planted).toEqual(['2026-06-01']);
+  });
+
+  it('does not sweep an occurrence already listed as planted', () => {
+    const e = entry({ planted: ['2026-04-01'] });
+    seed(e);
+    const data = week();
+    expect(occurrences(data)).toEqual([]);
+    materialiseWeek(WK, data);
+    expect(occurrences(data)).toEqual([]);
+    expect(e.plantedThrough).toBe(SUNDAY);
+  });
+
+  it('does not sweep anything at or below plantedThrough', () => {
+    const e = entry({ plantedThrough: '2026-05-01' });
+    seed(e);
+    const data = week();
+    materialiseWeek(WK, data);
+    expect(occurrences(data)).toEqual([]);
+  });
+
+  it('produces one item per entry after a year away, not a year of them', () => {
+    const e = entry({ anchor: '2025-01-01', repeat: { every: 1, unit: 'day' } });
+    seed(e);
+    const data = week();
+    materialiseWeek(WK, data);
+
+    // One swept item (dated the last missed day) plus the seven that genuinely
+    // fall inside this week.
+    const swept = occurrences(data).filter(n => n.schedDate < MONDAY);
+    expect(swept).toHaveLength(1);
+    expect(swept[0].schedDate).toBe('2026-05-10');
+    expect(occurrences(data).filter(n => n.schedDate >= MONDAY)).toHaveLength(7);
+  });
+
+  it('gives each entry its own swept item', () => {
+    seed(entry(), entry({ id: 's2', label: 'Renew pass', anchor: '2026-03-03' }));
+    const data = week();
+    materialiseWeek(WK, data);
+    expect(occurrences(data).map(n => n.schedId).sort()).toEqual(['s1', 's2']);
+  });
+
+  it('never sweeps into a past or future week', () => {
+    for (const other of ['2026-19', '2026-21']) {
+      seed(entry());
+      const data = week();
+      materialiseWeek(other, data);
+      expect(occurrences(data)).toEqual([]);
+    }
+  });
+
+  it('does not double-plant when the user browsed ahead first', () => {
+    // The user opens a future week, the occurrence plants there and is recorded
+    // in `planted`; the sweep must not deliver it again when that week is past.
+    const e = entry({ anchor: '2026-05-06', plantedThrough: '2026-05-03' });
+    seed(e);
+    _state.setTodayWeekKey('2026-18');
+    const ahead = week();
+    materialiseWeek('2026-19', ahead); // week of 2026-05-04 … 05-10
+    expect(occurrences(ahead)).toHaveLength(1);
+    expect(e.planted).toEqual(['2026-05-06']);
+
+    _state.setTodayWeekKey(WK);
+    const now = week();
+    materialiseWeek(WK, now);
+    expect(occurrences(now)).toEqual([]);
+    expect(e.plantedThrough).toBe(SUNDAY);
+  });
+
+  it('is idempotent across repeated opens of the current week', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    const after = JSON.stringify(data);
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(JSON.stringify(data)).toBe(after);
+  });
+
+  it('never returns a swept occurrence the user deleted', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    const ids = data.nodes.filter(n => n.schedId || n.dayChild).map(n => n.id);
+    data.nodes = data.nodes.filter(n => !ids.includes(n.id));
+    data.tombstones = ids;
+
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(occurrences(data)).toEqual([]);
   });
 });

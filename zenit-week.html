@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-KB7G0FsJ+6wzW44C+Tj5L4LG0jJCZ5k0xUGIifug/Fs='
+               'sha256-S/cpeHgzGUkLxy8SNV8kJZ9Ojiz0jGdUJkAR9/z9ZCo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5223,6 +5223,11 @@ const SCHEDULE_STORAGE_KEY = 'schedule';
 const SCHEDULE_PRIORITIES = new Set(['normal', 'high', 'critical']);
 
 let scheduleData = emptySchedule(); // in-memory schedule record
+// Set whenever a pass mutates an entry's cursor fields. Materialisation can
+// advance the schedule without planting a single node — a sweep that finds
+// nothing still moves plantedThrough — so "write the week" and "write the
+// schedule" are two answers, not one.
+let _scheduleDirty = false;
 
 function emptySchedule() {
   return { entries: [], tombstones: [], crdtVersion: 0 };
@@ -9476,6 +9481,43 @@ function occurrencesInRange(entry, fromDate, toDate) {
   return out;
 }
 
+// The last `limit` occurrences ending on or before `toDate`, ascending. The
+// sweep needs the newest missed occurrence, not the oldest, and a device that
+// has been away for years must not pay for the whole gap to find it — so this
+// lands on the final index by arithmetic and walks back a bounded number of
+// steps, never forward across the absence.
+function occurrencesBefore(entry, toDate, limit = 1) {
+  const out = [];
+  const rule = scheduleRule(entry);
+  if (!rule || !parseDayString(toDate) || rule.anchorStr > toDate) return out;
+
+  let k;
+  if (rule.stepDays) {
+    k = Math.floor((dayNumber(parseDayString(toDate)) - dayNumber(rule.anchor)) / rule.stepDays);
+  } else if (rule.stepMonths) {
+    const to = parseDayString(toDate);
+    const months = (to.y * 12 + to.m - 1) - (rule.anchor.y * 12 + rule.anchor.m - 1);
+    k = Math.max(0, Math.floor(months / rule.stepMonths));
+    while (k > 0 && occurrenceAt(rule, k) > toDate) k--;
+    while (occurrenceAt(rule, k + 1) <= toDate) k++;
+  } else {
+    k = 0;
+  }
+  if (Number.isFinite(rule.maxIndex)) k = Math.min(k, rule.maxIndex);
+  // An `until` that falls inside the requested range ends the series earlier
+  // than `toDate` does.
+  while (k > 0 && rule.until && occurrenceAt(rule, k) > rule.until) k--;
+  if (k < 0) return out;
+
+  for (let i = 0; i < limit && k - i >= 0; i++) {
+    const date = occurrenceAt(rule, k - i);
+    if (date > toDate) continue;
+    if (rule.until && date > rule.until) continue;
+    out.unshift(date);
+  }
+  return out;
+}
+
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const MONTH_NAMES = {
   en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
@@ -10931,6 +10973,11 @@ async function transferUnfinished() {
         _ts: Date.now(),
       };
       delete newNode.droppedAt;
+      // A carried-forward copy is an ordinary task, not the occurrence it came
+      // from: keeping the pair would let a later materialisation mistake it for
+      // a delivery it had already made.
+      delete newNode.schedId;
+      delete newNode.schedDate;
       // Transferring an unplanned task re-plans it: it was chosen for this week,
       // so the badge and its arrival stamp don't carry over.
       delete newNode.unplannedAt;
@@ -11034,68 +11081,137 @@ function occurrenceDayNodeId(schedId, schedDate) {
 // `nodes` and `tombstones`: reopening a week plants nothing, a deleted
 // occurrence never returns, and two devices converge on one node rather than
 // two. The entry's own bookkeeping is never consulted for that question.
-function materialiseWeek(wk, data) {
-  if (!data || !Array.isArray(data.nodes)) return false;
-  if (!scheduleData || !Array.isArray(scheduleData.entries) || !scheduleData.entries.length) return false;
+// Plants one occurrence into `data` on `dayIndex`, or returns false when the
+// week already has it, has tombstoned it, or has nowhere to put it.
+//
+// `dayIndex` is passed rather than derived because a swept occurrence lands on
+// this week's Monday while its schedDate still records the day it was really
+// due — the agenda row and the Later tab show that real date.
+function plantOccurrence(ctx, entry, date, dayIndex) {
+  const id = occurrenceNodeId(entry.id, date);
+  const dayId = occurrenceDayNodeId(entry.id, date);
+  if (ctx.byId.has(id) || ctx.byId.has(dayId)) return false;
+  if (ctx.tombstoned.has(id) || ctx.tombstoned.has(dayId)) return false;
 
+  // An entry filed under a branch this week does not have lands on the first
+  // branch rather than nowhere — the obligation outlives the category, exactly
+  // as validateAndRepairSchedule decides it.
+  const branch = ctx.branchIds.includes(entry.branch) ? entry.branch : ctx.branchIds[0];
+  const branchNode = ctx.byId.get(branch);
+  const stamp = Date.now();
+  const priority = entry.priority && entry.priority !== 'normal' ? entry.priority : null;
+
+  const node = {
+    id, type: 'activity', branch, parent: branch,
+    label: entry.label, done: false, unplanned: false,
+    priority, reusable: false,
+    children: [dayId],
+    schedId: entry.id, schedDate: date,
+    _ts: stamp,
+  };
+  const dayNode = {
+    id: dayId, type: 'activity', dayChild: true, dayIndex,
+    branch, parent: id,
+    label: dayAbbr(dayIndex),
+    done: false, unplanned: false,
+    priority, reusable: false,
+    children: [], _ts: stamp,
+  };
+  ctx.data.nodes.push(node, dayNode);
+  ctx.byId.set(id, node);
+  ctx.byId.set(dayId, dayNode);
+  branchNode.children = Array.isArray(branchNode.children) ? branchNode.children : [];
+  branchNode.children.push(id);
+  return true;
+}
+
+// Shared preamble for both passes: the week's own branches, the ids it already
+// holds, and the ids it has buried. Returns null when the week cannot receive
+// an occurrence at all.
+function occurrenceContext(data) {
+  if (!data || !Array.isArray(data.nodes)) return null;
+  const branchIds = data.nodes.filter(n => n.type === 'branch').map(n => n.id);
+  if (!branchIds.length) return null;
+  return {
+    data,
+    branchIds,
+    byId: new Map(data.nodes.map(n => [n.id, n])),
+    tombstoned: new Set(Array.isArray(data.tombstones) ? data.tombstones : []),
+  };
+}
+
+function materialiseWeek(wk, data) {
+  if (!scheduleData || !Array.isArray(scheduleData.entries) || !scheduleData.entries.length) return false;
   const week = weekDayStrings(wk);
   if (!week) return false;
+  const ctx = occurrenceContext(data);
+  if (!ctx) return false;
 
-  const branchIds = data.nodes.filter(n => n.type === 'branch').map(n => n.id);
-  if (!branchIds.length) return false;
-
-  const byId = new Map(data.nodes.map(n => [n.id, n]));
-  const tombstoned = new Set(Array.isArray(data.tombstones) ? data.tombstones : []);
   let planted = false;
-
   scheduleData.entries.forEach(entry => {
     occurrencesInRange(entry, week[0], week[6]).forEach(date => {
-      const id = occurrenceNodeId(entry.id, date);
-      const dayId = occurrenceDayNodeId(entry.id, date);
-      if (byId.has(id) || byId.has(dayId)) return;
-      if (tombstoned.has(id) || tombstoned.has(dayId)) return;
-
-      // An entry filed under a branch this week does not have lands on the
-      // first branch rather than nowhere — the obligation outlives the
-      // category, exactly as validateAndRepairSchedule decides it.
-      const branch = branchIds.includes(entry.branch) ? entry.branch : branchIds[0];
-      const branchNode = byId.get(branch);
-      const stamp = Date.now();
-
-      const node = {
-        id, type: 'activity', branch, parent: branch,
-        label: entry.label, done: false, unplanned: false,
-        priority: entry.priority && entry.priority !== 'normal' ? entry.priority : null,
-        reusable: false,
-        children: [dayId],
-        schedId: entry.id, schedDate: date,
-        _ts: stamp,
-      };
-      const dayNode = {
-        id: dayId, type: 'activity', dayChild: true, dayIndex: weekdayOfDayString(date),
-        branch, parent: id,
-        label: dayAbbr(weekdayOfDayString(date)),
-        done: false, unplanned: false,
-        priority: node.priority, reusable: false,
-        children: [], _ts: stamp,
-      };
-      data.nodes.push(node, dayNode);
-      byId.set(id, node);
-      byId.set(dayId, dayNode);
-      branchNode.children = Array.isArray(branchNode.children) ? branchNode.children : [];
-      branchNode.children.push(id);
+      if (!plantOccurrence(ctx, entry, date, weekdayOfDayString(date))) return;
       planted = true;
-
       // `planted` records occurrences delivered ahead of the low-water mark, so
-      // the current-week sweep does not deliver them a second time. Only the
-      // sweep itself may move plantedThrough (spec §3.3).
+      // the sweep does not deliver them a second time. Only the sweep itself
+      // may move plantedThrough (spec §3.3).
       if (!Array.isArray(entry.planted)) entry.planted = [];
       if ((!entry.plantedThrough || date > entry.plantedThrough) && !entry.planted.includes(date)) {
         entry.planted.push(date);
         entry.planted.sort();
-        entry._ts = stamp;
+        entry._ts = Date.now();
+        _scheduleDirty = true;
       }
     });
+  });
+
+  // The past-due sweep belongs to the current week alone: a week in the past is
+  // history, and a week in the future has not happened yet. Running it here
+  // rather than at a second hook keeps one call site on the week-open path.
+  if (wk === todayWeekKey() && sweepPastDue(week, ctx)) planted = true;
+  return planted;
+}
+
+// Delivers what the schedule owed while nobody was looking. Anything due after
+// the entry's low-water mark and before this Monday is missed; it arrives on
+// this week's Monday leaf, so it reads as overdue from Tuesday on through the
+// existing machinery and as simply due today on Monday itself.
+//
+// One item per entry, not one per missed date. A device restored from a
+// year-old backup owes the user an obligation, not a year of identical rows —
+// the newest missed occurrence is the one still worth acting on.
+function sweepPastDue(week, ctx) {
+  const monday = week[0];
+  const sunday = week[6];
+  const lastPast = dayStringFromNumber(dayNumber(parseDayString(monday)) - 1);
+  let planted = false;
+
+  scheduleData.entries.forEach(entry => {
+    if (!Array.isArray(entry.planted)) entry.planted = [];
+    const floor = entry.plantedThrough;
+    if (!floor || floor < lastPast) {
+      // Walk back only as far as the ahead-of-time deliveries could reach: an
+      // occurrence already planted when the user browsed into its own week must
+      // not arrive a second time here (the deterministic id covers the same
+      // case independently, and both are meant to hold).
+      const candidates = occurrencesBefore(entry, lastPast, entry.planted.length + 1);
+      for (let i = candidates.length - 1; i >= 0; i--) {
+        const date = candidates[i];
+        if (floor && date <= floor) break;
+        if (entry.planted.includes(date)) continue;
+        if (plantOccurrence(ctx, entry, date, 1)) planted = true;
+        break;
+      }
+    }
+    // Everything up to this Sunday is now accounted for, so the sparse list of
+    // early deliveries below that line has nothing left to remember.
+    const pruned = entry.planted.filter(d => d > sunday);
+    if (entry.plantedThrough !== sunday || pruned.length !== entry.planted.length) {
+      entry.plantedThrough = sunday;
+      entry.planted = pruned;
+      entry._ts = Date.now();
+      _scheduleDirty = true;
+    }
   });
 
   return planted;
@@ -11114,9 +11230,11 @@ async function openWeekIntoView(wk) {
   weekData = await loadWeek(wk);
   if (scheduleData.entries.length) {
     await withWeekLock(wk, async () => {
-      if (!materialiseWeek(wk, weekData)) return;
-      await saveWeek(wk, weekData);
-      await saveSchedule();
+      if (materialiseWeek(wk, weekData)) await saveWeek(wk, weekData);
+      if (_scheduleDirty) {
+        _scheduleDirty = false;
+        await saveSchedule();
+      }
     });
   }
   rebuildNodeMap();

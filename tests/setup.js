@@ -607,6 +607,7 @@ export const {
   // Occurrence math
   nextOccurrence,
   occurrencesInRange,
+  occurrencesBefore,
   // Schedule store
   canSendToDate,
   sendNodeToDate,

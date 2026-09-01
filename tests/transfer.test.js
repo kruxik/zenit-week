@@ -119,6 +119,26 @@ describe('Transfers - Week to Week', () => {
     });
   });
 
+  describe('materialised occurrences', () => {
+    test('strips schedId and schedDate from the copy carried forward', async () => {
+      // A carried-forward copy is an ordinary task. Keeping the pair would let a
+      // later materialisation mistake it for a delivery it had already made.
+      const b = mkBranch('work', ['o1']);
+      const o1 = mkActivity('o1', 'work', 'work', { schedId: 's1', schedDate: '2026-05-06' });
+
+      _state.setLocalStorage('zenit-week-2026-01', { nodes: [b, o1] });
+      _state.setWeekKey('2026-02');
+      _state.set({ nodes: [mkBranch('work')] });
+
+      await transferUnfinished();
+
+      const carried = _state.get().nodes.find(n => n.label === 'o1');
+      expect(carried).toBeDefined();
+      expect(carried.schedId).toBeUndefined();
+      expect(carried.schedDate).toBeUndefined();
+    });
+  });
+
   describe('transferReusable', () => {
     test('clones nodes marked reusable:true even if done', async () => {
       const b = mkBranch('work', ['a1']);
