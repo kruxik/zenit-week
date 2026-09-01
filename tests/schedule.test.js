@@ -1,5 +1,21 @@
-import { describe, it, expect } from 'vitest';
-import { nextOccurrence, occurrencesInRange } from './setup.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  nextOccurrence,
+  occurrencesInRange,
+  emptySchedule,
+  occurrenceNodeId,
+  validateAndRepairSchedule,
+  loadSchedule,
+  saveSchedule,
+  genId,
+  openDB,
+  loadWeekIDB,
+  saveWeekIDB,
+  listWeekKeysIDB,
+  loadValueIDB,
+  saveValueIDB,
+  _state,
+} from './setup.js';
 
 // Minimal entry factory — S1 only exercises the occurrence math, so nothing
 // beyond anchor / repeat / end is needed here.
@@ -166,5 +182,256 @@ describe('Occurrence math — dates and robustness', () => {
   it('returns a single-day range when from equals to', () => {
     const e = entry('2026-01-01', { every: 1, unit: 'day' });
     expect(occurrencesInRange(e, '2026-05-05', '2026-05-05')).toEqual(['2026-05-05']);
+  });
+});
+
+describe('Schedule store — validate and repair', () => {
+  const good = () => ({
+    id: 's1', label: 'Tax return', branch: 'work', priority: 'high',
+    anchor: '2026-03-31', repeat: { every: 1, unit: 'year' }, end: { type: 'never' },
+    plantedThrough: '2026-03-29', planted: ['2026-03-31'], _ts: 1234,
+  });
+
+  it('returns an empty schedule for a missing or junk record', () => {
+    expect(validateAndRepairSchedule(null, ['work'])).toEqual(emptySchedule());
+    expect(validateAndRepairSchedule(undefined, ['work'])).toEqual(emptySchedule());
+    expect(validateAndRepairSchedule('nope', ['work'])).toEqual(emptySchedule());
+    expect(validateAndRepairSchedule({}, ['work'])).toEqual(emptySchedule());
+  });
+
+  it('keeps a well-formed entry verbatim', () => {
+    const out = validateAndRepairSchedule({ entries: [good()], tombstones: [], crdtVersion: 3 }, ['work', 'me']);
+    expect(out.entries).toEqual([good()]);
+    expect(out.crdtVersion).toBe(3);
+  });
+
+  it('drops entries with no label or no valid anchor', () => {
+    const raw = { entries: [
+      good(),
+      { ...good(), id: 's2', label: '' },
+      { ...good(), id: 's3', label: '   ' },
+      { ...good(), id: 's4', label: 42 },
+      { ...good(), id: 's5', anchor: '2026-02-30' },
+      { ...good(), id: 's6', anchor: 'whenever' },
+      { ...good(), id: 's7', anchor: undefined },
+      { ...good(), id: undefined },
+      null,
+    ] };
+    expect(validateAndRepairSchedule(raw, ['work']).entries.map(e => e.id)).toEqual(['s1']);
+  });
+
+  it('re-homes an entry whose branch no longer exists onto the first branch', () => {
+    const raw = { entries: [{ ...good(), branch: 'deleted-branch' }] };
+    expect(validateAndRepairSchedule(raw, ['me', 'work']).entries[0].branch).toBe('me');
+  });
+
+  it('leaves the branch alone when the branch list is unknown', () => {
+    const raw = { entries: [{ ...good(), branch: 'deleted-branch' }] };
+    expect(validateAndRepairSchedule(raw, []).entries[0].branch).toBe('deleted-branch');
+  });
+
+  it('never deletes an entry just because its branch went away', () => {
+    const raw = { entries: [{ ...good(), branch: 'gone' }, { ...good(), id: 's2', branch: 7 }] };
+    const out = validateAndRepairSchedule(raw, ['work']);
+    expect(out.entries.map(e => e.id)).toEqual(['s1', 's2']);
+    expect(out.entries.every(e => e.branch === 'work')).toBe(true);
+  });
+
+  it('coerces repeat.every to a positive integer', () => {
+    const cases = [
+      [{ every: 3, unit: 'day' }, { every: 3, unit: 'day' }],
+      [{ every: '4', unit: 'week' }, { every: 4, unit: 'week' }],
+      [{ every: 2.9, unit: 'month' }, { every: 2, unit: 'month' }],
+      [{ every: 0, unit: 'year' }, { every: 1, unit: 'year' }],
+      [{ every: -5, unit: 'day' }, { every: 1, unit: 'day' }],
+      [{ every: 'lots', unit: 'day' }, { every: 1, unit: 'day' }],
+      [{ unit: 'day' }, { every: 1, unit: 'day' }],
+    ];
+    for (const [input, want] of cases) {
+      expect(validateAndRepairSchedule({ entries: [{ ...good(), repeat: input }] }, ['work']).entries[0].repeat)
+        .toEqual(want);
+    }
+  });
+
+  it('drops a repeat with an unknown unit down to a one-off', () => {
+    for (const repeat of [{ every: 2, unit: 'fortnight' }, { every: 2 }, 'weekly', 5]) {
+      expect(validateAndRepairSchedule({ entries: [{ ...good(), repeat }] }, ['work']).entries[0].repeat)
+        .toBeNull();
+    }
+  });
+
+  it('normalises end conditions and falls back to never', () => {
+    const end = (v) => validateAndRepairSchedule({ entries: [{ ...good(), end: v }] }, ['work']).entries[0].end;
+    expect(end({ type: 'count', n: 5 })).toEqual({ type: 'count', n: 5 });
+    expect(end({ type: 'count', n: '5' })).toEqual({ type: 'count', n: 5 });
+    expect(end({ type: 'until', date: '2030-01-01' })).toEqual({ type: 'until', date: '2030-01-01' });
+    expect(end({ type: 'count', n: 0 })).toEqual({ type: 'never' });
+    expect(end({ type: 'until', date: '2030-02-31' })).toEqual({ type: 'never' });
+    expect(end({ type: 'forever' })).toEqual({ type: 'never' });
+    expect(end(undefined)).toEqual({ type: 'never' });
+  });
+
+  it('normalises the cursor fields', () => {
+    const out = validateAndRepairSchedule({ entries: [{
+      ...good(),
+      plantedThrough: 'someday',
+      planted: ['2026-05-05', 'nope', '2026-01-01', '2026-05-05', 17],
+      _ts: 'recently',
+    }] }, ['work']).entries[0];
+    expect(out.plantedThrough).toBeNull();
+    expect(out.planted).toEqual(['2026-01-01', '2026-05-05']);
+    expect(out._ts).toBe(0);
+  });
+
+  it('sanitises priority and clips an over-long label', () => {
+    const out = validateAndRepairSchedule({ entries: [
+      { ...good(), priority: 'urgent' },
+      { ...good(), id: 's2', label: 'x'.repeat(500) },
+    ] }, ['work']).entries;
+    expect(out[0].priority).toBe('normal');
+    expect(out[1].label).toHaveLength(200);
+  });
+
+  it('drops tombstoned and duplicate entries', () => {
+    const raw = {
+      entries: [good(), { ...good(), label: 'Dupe' }, { ...good(), id: 's2' }],
+      tombstones: ['s2', 's2', 3, ''],
+    };
+    const out = validateAndRepairSchedule(raw, ['work']);
+    expect(out.entries.map(e => e.id)).toEqual(['s1']);
+    expect(out.entries[0].label).toBe('Tax return');
+    expect(out.tombstones).toEqual(['s2']);
+  });
+
+  it('carries no unknown fields through from a tampered record', () => {
+    // JSON.parse, not a literal: a literal __proto__ key sets the prototype
+    // instead of creating the own property a tampered Drive file would carry.
+    const tampered = JSON.parse('{"__proto__":{"polluted":true},"evil":"<img onerror=1>"}');
+    const raw = { entries: [Object.assign(tampered, good())] };
+    const out = validateAndRepairSchedule(raw, ['work']).entries[0];
+    expect(out.evil).toBeUndefined();
+    expect({}.polluted).toBeUndefined();
+    expect(Object.keys(out).sort()).toEqual([
+      '_ts', 'anchor', 'branch', 'end', 'id', 'label', 'planted', 'plantedThrough', 'priority', 'repeat',
+    ]);
+  });
+});
+
+describe('Schedule store — occurrenceNodeId', () => {
+  it('is deterministic for the same inputs', () => {
+    expect(occurrenceNodeId('s1', '2026-03-31')).toBe(occurrenceNodeId('s1', '2026-03-31'));
+  });
+
+  it('is shaped exactly like a genId() result', () => {
+    const shape = /^n[0-9a-f]{12}$/;
+    expect(occurrenceNodeId('s1', '2026-03-31')).toMatch(shape);
+    expect(genId()).toMatch(shape);
+    for (const d of ['2026-01-01', '2026-12-31', '2030-06-15']) {
+      expect(occurrenceNodeId('entry-with-a-very-long-identifier', d)).toMatch(shape);
+    }
+  });
+
+  it('separates the entry id from the date so neighbours cannot collide', () => {
+    expect(occurrenceNodeId('s1', '2026-03-31')).not.toBe(occurrenceNodeId('s1 2026', '-03-31'));
+    expect(occurrenceNodeId('s1', '2026-03-31')).not.toBe(occurrenceNodeId('s2', '2026-03-31'));
+    expect(occurrenceNodeId('s1', '2026-03-31')).not.toBe(occurrenceNodeId('s1', '2026-04-01'));
+  });
+
+  it('produces distinct ids across a decade of daily occurrences', () => {
+    const ids = new Set();
+    let n = 0;
+    for (const entryId of ['s1', 's2', 's3']) {
+      for (const date of occurrencesInRange(
+        { id: entryId, anchor: '2026-01-01', repeat: { every: 1, unit: 'day' }, end: { type: 'never' } },
+        '2026-01-01', '2035-12-31')) {
+        ids.add(occurrenceNodeId(entryId, date));
+        n++;
+      }
+    }
+    expect(n).toBeGreaterThan(3000);
+    expect(ids.size).toBe(n);
+  });
+});
+
+describe('Schedule store — persistence', () => {
+  beforeEach(async () => {
+    _state.useRealIDB(true);
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['weeks', 'misc'], 'readwrite');
+      tx.objectStore('weeks').clear();
+      tx.objectStore('misc').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    _state.clearLocalStorage();
+    _state.setSchedule(emptySchedule());
+    _state.set({ nodes: [
+      { id: 'center', type: 'center' },
+      { id: 'work', type: 'branch', parent: 'center', label: 'Work', children: [] },
+      { id: 'me', type: 'branch', parent: 'center', label: 'Me', children: [] },
+    ] });
+  });
+
+  afterEach(() => {
+    _state.useRealIDB(false);
+    _state.setSchedule(emptySchedule());
+  });
+
+  it('returns an empty schedule when no record exists, without throwing', async () => {
+    await expect(loadSchedule()).resolves.toEqual(emptySchedule());
+  });
+
+  it('round-trips entries through IndexedDB', async () => {
+    const entry = {
+      id: 's1', label: 'Roadworthy check', branch: 'me', priority: 'critical',
+      anchor: '2026-09-14', repeat: { every: 2, unit: 'year' }, end: { type: 'count', n: 5 },
+      plantedThrough: null, planted: [], _ts: 99,
+    };
+    expect(await saveSchedule({ entries: [entry], tombstones: [], crdtVersion: 1 })).toBe(true);
+    _state.setSchedule(emptySchedule());
+    const loaded = await loadSchedule();
+    expect(loaded.entries).toEqual([entry]);
+    expect(loaded.crdtVersion).toBe(1);
+  });
+
+  it('repairs a corrupt stored record instead of throwing', async () => {
+    await saveValueIDB('schedule', { entries: [
+      { id: 's1', label: 'Keep me', branch: 'ghost', anchor: '2026-05-01', repeat: { every: '2', unit: 'week' } },
+      { id: 's2', label: '', anchor: '2026-05-01' },
+    ], tombstones: 'not an array' });
+    const loaded = await loadSchedule();
+    expect(loaded.entries.map(e => e.id)).toEqual(['s1']);
+    expect(loaded.entries[0].branch).toBe('work'); // re-homed onto the first branch
+    expect(loaded.entries[0].repeat).toEqual({ every: 2, unit: 'week' });
+    expect(loaded.tombstones).toEqual([]);
+  });
+
+  it('turns a stored value that is not a record into an empty schedule', async () => {
+    await saveValueIDB('schedule', 'garbage');
+    expect(await loadSchedule()).toEqual(emptySchedule());
+    await saveValueIDB('schedule', 42);
+    expect(await loadSchedule()).toEqual(emptySchedule());
+  });
+
+  it('writes the schedule without writing any week record', async () => {
+    await saveWeekIDB('2026-20', { nodes: [{ id: 'center', type: 'center' }] });
+    const before = await loadWeekIDB('2026-20');
+    await saveSchedule({ entries: [{
+      id: 's1', label: 'Bill', branch: 'work', priority: 'normal', anchor: '2026-05-20',
+      repeat: null, end: { type: 'never' }, plantedThrough: null, planted: [], _ts: 1,
+    }], tombstones: [], crdtVersion: 0 });
+    expect(await loadWeekIDB('2026-20')).toEqual(before);
+    expect(await listWeekKeysIDB()).toEqual(['2026-20']);
+  });
+
+  it('writes a week record without touching the schedule', async () => {
+    await saveSchedule({ entries: [{
+      id: 's1', label: 'Bill', branch: 'work', priority: 'normal', anchor: '2026-05-20',
+      repeat: null, end: { type: 'never' }, plantedThrough: null, planted: [], _ts: 1,
+    }], tombstones: [], crdtVersion: 0 });
+    const before = await loadValueIDB('schedule');
+    await saveWeekIDB('2026-21', { nodes: [{ id: 'center', type: 'center' }] });
+    expect(await loadValueIDB('schedule')).toEqual(before);
   });
 });

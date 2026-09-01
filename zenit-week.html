@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-mA/XZHwybv/VIOgg9tbxSifmaffauG/FWb1FHvpQjuk='
+               'sha256-hMoVBAQ/GGnS/Qd3yMWQ4f5pDJwyv4T6kDeoEFXm+Sc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5123,6 +5123,152 @@ async function deleteValueIDB(key) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+// ─── Schedule store ───────────────────────────────────────────────────────────
+// The schedule is a single record in the `misc` store, holding standing
+// intentions ("entries") that later materialise into ordinary week nodes
+// ("occurrences"). It is deliberately NOT part of any week record: writing the
+// schedule never writes a week, and writing a week never touches the schedule.
+const SCHEDULE_STORAGE_KEY = 'schedule';
+const SCHEDULE_PRIORITIES = new Set(['normal', 'high', 'critical']);
+
+let scheduleData = emptySchedule(); // in-memory schedule record
+
+function emptySchedule() {
+  return { entries: [], tombstones: [], crdtVersion: 0 };
+}
+
+// The node id an occurrence will carry, derived only from the entry id and the
+// occurrence date. This is the single mechanism that keeps materialisation
+// idempotent: two devices, two tabs or two opens of the same week all compute
+// the same id, so the "already there?" check works without either side asking
+// the other. It is the one node id in the app that does not come from genId(),
+// and it is shaped exactly like one ('n' + 12 hex) so nothing downstream can
+// tell the difference. 48 bits of FNV-1a over two different salts — collisions
+// need ~16M occurrences in one week record to reach even coin-flip odds.
+function occurrenceNodeId(schedId, schedDate) {
+  const key = `${schedId} ${schedDate}`;
+  const hi = fnv1a32('zw-occ:' + key);
+  const lo = fnv1a32(key + ':zw-occ');
+  return 'n' + hi.toString(16).padStart(8, '0') + (lo & 0xffff).toString(16).padStart(4, '0');
+}
+
+// Whitelist + repair for the schedule blob, the analogue of validateAndRepair
+// for week data and sanitizeColorsData for the settings blob. It arrives from
+// IndexedDB, a Drive pull or a JSON import and is otherwise unchecked.
+//
+// Repair, not deletion, wherever intent survives: an entry whose branch was
+// deleted is re-homed onto the first branch rather than dropped, because the
+// obligation it records ("pay the tax on 31 March") outlives the category the
+// user filed it under. Only entries with nothing left to act on — no label, no
+// usable anchor date — are dropped.
+//
+// `branchIds` is passed in rather than read from weekData so the pass stays
+// pure and testable; an empty list means "branches unknown", and branch values
+// are then left exactly as they are instead of being re-homed onto nothing.
+function validateAndRepairSchedule(raw, branchIds) {
+  const out = emptySchedule();
+  if (!raw || typeof raw !== 'object') return out;
+
+  const branches = (Array.isArray(branchIds) ? branchIds : [])
+    .filter(b => typeof b === 'string' && BRANCH_ID_RE.test(b));
+  const tombstones = (Array.isArray(raw.tombstones) ? raw.tombstones : [])
+    .filter(id => typeof id === 'string' && id);
+  const dead = new Set(tombstones);
+  out.tombstones = [...dead];
+  out.crdtVersion = Number.isFinite(raw.crdtVersion) ? raw.crdtVersion : 0;
+
+  const seen = new Set();
+  (Array.isArray(raw.entries) ? raw.entries : []).forEach(e => {
+    if (!e || typeof e !== 'object') return;
+    if (typeof e.id !== 'string' || !e.id) return;
+    if (seen.has(e.id) || dead.has(e.id)) return;
+    if (typeof e.label !== 'string' || !e.label.trim()) return;
+    if (!parseDayString(e.anchor)) return;
+    seen.add(e.id);
+    out.entries.push({
+      id: e.id,
+      label: e.label.slice(0, 200),
+      branch: repairScheduleBranch(e.branch, branches),
+      priority: SCHEDULE_PRIORITIES.has(e.priority) ? e.priority : 'normal',
+      anchor: e.anchor,
+      repeat: repairScheduleRepeat(e.repeat),
+      end: repairScheduleEnd(e.end),
+      plantedThrough: parseDayString(e.plantedThrough) ? e.plantedThrough : null,
+      planted: repairPlantedList(e.planted),
+      _ts: Number.isFinite(e._ts) ? e._ts : 0,
+    });
+  });
+  return out;
+}
+
+function repairScheduleBranch(branch, branches) {
+  const shaped = typeof branch === 'string' && BRANCH_ID_RE.test(branch);
+  if (shaped && (!branches.length || branches.includes(branch))) return branch;
+  return branches.length ? branches[0] : '';
+}
+
+// A repeat with an unknown unit has no salvageable meaning and becomes "once".
+// `every` does have one — the user asked for a recurrence — so it is coerced to
+// a positive integer rather than throwing the whole rule away.
+function repairScheduleRepeat(repeat) {
+  if (!repeat || typeof repeat !== 'object') return null;
+  if (!SCHEDULE_UNITS.includes(repeat.unit)) return null;
+  const every = Math.max(1, Math.floor(Number(repeat.every)) || 1);
+  return { every, unit: repeat.unit };
+}
+
+function repairScheduleEnd(end) {
+  if (end && typeof end === 'object') {
+    if (end.type === 'count') {
+      const n = Math.floor(Number(end.n));
+      if (Number.isFinite(n) && n >= 1) return { type: 'count', n };
+    } else if (end.type === 'until' && parseDayString(end.date)) {
+      return { type: 'until', date: end.date };
+    }
+  }
+  return { type: 'never' };
+}
+
+function repairPlantedList(planted) {
+  if (!Array.isArray(planted)) return [];
+  return [...new Set(planted.filter(d => parseDayString(d)))].sort();
+}
+
+// Branch ids as the schedule sees them: whatever the currently loaded week has.
+// Branches are a global concept that week records happen to carry, so the
+// loaded week is the only place to read them from.
+function scheduleBranchIds() {
+  const nodes = weekData && Array.isArray(weekData.nodes) ? weekData.nodes : [];
+  return nodes.filter(n => n.type === 'branch').map(n => n.id);
+}
+
+// A missing record is an empty schedule, never an error — the overwhelmingly
+// common case is a user who has never sent anything to the future.
+async function loadSchedule() {
+  let raw = null;
+  try {
+    raw = await loadValueIDB(SCHEDULE_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[zenit-week] Failed to load schedule from IndexedDB:', e);
+  }
+  scheduleData = validateAndRepairSchedule(raw, scheduleBranchIds());
+  return scheduleData;
+}
+
+// Returns whether the write landed. A failed schedule write must never take a
+// week open down with it: the schedule is an accessory to the week, not a
+// prerequisite for it.
+async function saveSchedule(data) {
+  if (data) scheduleData = data;
+  try {
+    await saveValueIDB(SCHEDULE_STORAGE_KEY, scheduleData);
+    return true;
+  } catch (e) {
+    console.warn('[zenit-week] Failed to save schedule to IndexedDB:', e);
+    return false;
+  }
 }
 
 // ─── Dev-only reset ───────────────────────────────────────────────────────────

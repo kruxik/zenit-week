@@ -26,13 +26,13 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S2 — Schedule store
 
-- [ ] T2.1 — `loadSchedule()` / `saveSchedule()` on the IDB `misc` store key `schedule`, using the existing `loadValueIDB` (`:5094`) / `saveValueIDB` (`:5106`). A missing record returns an empty schedule, never throws.
-- [ ] T2.2 — Record shape per spec §3.1: `entries[]`, `tombstones[]`, `crdtVersion`.
-- [ ] T2.3 — `validateAndRepairSchedule()` mirroring `validateAndRepair` (`:9843`): drop entries with no label or invalid anchor; coerce `repeat.every` to a positive integer; re-home an entry whose branch no longer exists onto the first branch rather than deleting it.
-- [ ] T2.4 ⚠ R5 — `occurrenceNodeId(schedId, schedDate)`: deterministic, collision-free, and shaped exactly like a `genId()` result so nothing downstream can distinguish it. Same inputs always yield the same id, on every device.
-- [ ] T2.5 — A schedule write never writes a week record, and a week write never touches the schedule.
-- [ ] T2.6 — `tests/schedule.test.js`: round-trip through IDB; missing record; repair drops invalid entries and re-homes orphan branches; `occurrenceNodeId` determinism and shape.
-- [ ] T2.7 — `npm test` + `npm run validate` green.
+- [x] T2.1 — `loadSchedule()` / `saveSchedule()` on the IDB `misc` store key `schedule`, using the existing `loadValueIDB` (`:5094`) / `saveValueIDB` (`:5106`). A missing record returns an empty schedule, never throws.
+- [x] T2.2 — Record shape per spec §3.1: `entries[]`, `tombstones[]`, `crdtVersion`.
+- [x] T2.3 — `validateAndRepairSchedule()` mirroring `validateAndRepair` (`:9843`): drop entries with no label or invalid anchor; coerce `repeat.every` to a positive integer; re-home an entry whose branch no longer exists onto the first branch rather than deleting it.
+- [x] T2.4 ⚠ R5 — `occurrenceNodeId(schedId, schedDate)`: deterministic, collision-free, and shaped exactly like a `genId()` result so nothing downstream can distinguish it. Same inputs always yield the same id, on every device.
+- [x] T2.5 — A schedule write never writes a week record, and a week write never touches the schedule.
+- [x] T2.6 — `tests/schedule.test.js`: round-trip through IDB; missing record; repair drops invalid entries and re-homes orphan branches; `occurrenceNodeId` determinism and shape.
+- [x] T2.7 — `npm test` + `npm run validate` green.
 
 **AC:** entries persist across a reload; a corrupt record repairs instead of throwing; occurrence ids are reproducible.
 **Verify:** `npm test`. No visual change anywhere.

@@ -515,6 +515,8 @@ _state.useRealIDB = function(v) {
   _dbPromise = null;
   updateIDBMethods();
 };
+_state.getSchedule = function() { return scheduleData; };
+_state.setSchedule = function(v) { scheduleData = v; };
 _state.resetIDB = function() {
   _db = null;
   _dbPromise = null;
@@ -605,6 +607,12 @@ export const {
   // Occurrence math
   nextOccurrence,
   occurrencesInRange,
+  // Schedule store
+  emptySchedule,
+  occurrenceNodeId,
+  validateAndRepairSchedule,
+  loadSchedule,
+  saveSchedule,
   genId,
   defaultWeekData,
   validateAndRepair,
