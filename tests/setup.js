@@ -602,6 +602,9 @@ export const {
   weekKey,
   parseWeekKey,
   weekKeysByProximity,
+  // Occurrence math
+  nextOccurrence,
+  occurrencesInRange,
   genId,
   defaultWeekData,
   validateAndRepair,

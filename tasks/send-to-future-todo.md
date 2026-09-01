@@ -10,14 +10,14 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S1 — Occurrence engine (pure)
 
-- [ ] T1.1 — New pure-function block after the week utilities (`:9061`): `nextOccurrence(entry, fromDate)` returning the first occurrence on or after `fromDate`, or `null` when the end condition is exhausted.
-- [ ] T1.2 — `occurrencesInRange(entry, fromDate, toDate)` returning every occurrence in an inclusive range, used by both materialisation and the sweep.
-- [ ] T1.3 — Units `day` / `week` / `month` / `year` with any positive integer `N`; `repeat: null` yields exactly the anchor.
-- [ ] T1.4 — Month and year arithmetic clamps **into** the month: 31 Jan + 1 month → 28/29 Feb, and the following step returns to 31 Mar. Clamping never permanently shifts the anchor.
-- [ ] T1.5 — End conditions: `never`; `count` (N total, anchor included); `until` (inclusive).
-- [ ] T1.6 — All dates are local-calendar `'YYYY-MM-DD'` strings. No `Date` time-of-day semantics leak in, and no UTC round-trip shifts a date across a day boundary.
-- [ ] T1.7 — `tests/schedule.test.js`: every unit, month-end clamping both directions, leap day, `count` and `until` exhaustion, `repeat: null`, a 2-year interval crossing a leap year.
-- [ ] T1.8 — `npm test` + `npm run validate` green.
+- [x] T1.1 — New pure-function block after the week utilities (`:9061`): `nextOccurrence(entry, fromDate)` returning the first occurrence on or after `fromDate`, or `null` when the end condition is exhausted.
+- [x] T1.2 — `occurrencesInRange(entry, fromDate, toDate)` returning every occurrence in an inclusive range, used by both materialisation and the sweep.
+- [x] T1.3 — Units `day` / `week` / `month` / `year` with any positive integer `N`; `repeat: null` yields exactly the anchor.
+- [x] T1.4 — Month and year arithmetic clamps **into** the month: 31 Jan + 1 month → 28/29 Feb, and the following step returns to 31 Mar. Clamping never permanently shifts the anchor.
+- [x] T1.5 — End conditions: `never`; `count` (N total, anchor included); `until` (inclusive).
+- [x] T1.6 — All dates are local-calendar `'YYYY-MM-DD'` strings. No `Date` time-of-day semantics leak in, and no UTC round-trip shifts a date across a day boundary.
+- [x] T1.7 — `tests/schedule.test.js`: every unit, month-end clamping both directions, leap day, `count` and `until` exhaustion, `repeat: null`, a 2-year interval crossing a leap year.
+- [x] T1.8 — `npm test` + `npm run validate` green.
 
 **AC:** given an entry, the engine answers "what is the next occurrence" and "which occurrences fall in this week" correctly for every case in spec §5 F2.
 **Verify:** `npm test`. No visual change anywhere.
