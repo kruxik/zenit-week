@@ -17,6 +17,7 @@ import {
   sendNodeToDate,
   updateScheduleEntry,
   setEntryPriority,
+  renameScheduleEntry,
   pullOccurrenceIntoWeek,
   scheduleContentHash,
   mergeSchedule,
@@ -1246,7 +1247,7 @@ describe('Editing an entry from the Later tab', () => {
     materialiseWeek(WK, data);
     const plantedLabel = data.nodes.find(n => n.schedId === 's1').label;
 
-    updateScheduleEntry('s1', { date: e.anchor, unit: null, label: '  Renewed bill  ' });
+    expect(renameScheduleEntry('s1', '  Renewed bill  ')).toBe(true);
 
     expect(_state.getSchedule().entries[0].label).toBe('Renewed bill');
     // The occurrence already delivered keeps the label its week gave it.
@@ -1255,7 +1256,17 @@ describe('Editing an entry from the Later tab', () => {
 
   it('refuses a blank label rather than storing one repair would drop', () => {
     _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
-    updateScheduleEntry('s1', { date: '2026-05-13', unit: null, label: '   ' });
+    expect(renameScheduleEntry('s1', '   ')).toBe(false);
+    expect(renameScheduleEntry('s1', '')).toBe(false);
+    expect(renameScheduleEntry('nope', 'Anything')).toBe(false);
+    expect(_state.getSchedule().entries[0].label).toBe('Pay the bill');
+  });
+
+  it('leaves the entry alone when the date dialog is used', () => {
+    // Dates are the dialog's business; the label is renamed on the row, the
+    // same gesture every other agenda row uses.
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    updateScheduleEntry('s1', { date: '2026-07-01', unit: null });
     expect(_state.getSchedule().entries[0].label).toBe('Pay the bill');
   });
 

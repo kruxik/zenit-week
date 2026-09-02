@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-1EOrrE/8piw9EVOJsNP75ek5eEVwAU/6jsx3wKgdK/w='
+               'sha256-GNWzBF7n+mcAJlevZ6bPPcGgH9SLQFY+n6kqHh5S9c0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4040,8 +4040,6 @@ Or remove them later in Settings → Help.</div>
   <div id="send-future-dialog">
     <div id="send-future-title" data-i18n="sendFuture.title">Set a date</div>
     <div id="send-future-fields">
-      <label for="send-future-label" id="send-future-label-label" data-i18n="sendFuture.label">Task</label>
-      <input type="text" id="send-future-label" maxlength="200">
       <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
       <div class="send-future-row">
         <input type="date" id="send-future-date">
@@ -9850,7 +9848,6 @@ const TRANSLATIONS = {
     'help.sendToDateHint':        'Right-click a task with no sub-tasks → Reschedule → Date.',
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
     'sendFuture.title':           'Set a date',
-    'sendFuture.label':           'Task',
     'sendFuture.date':            'Date',
     'sendFuture.repeat':          'Repeat',
     'sendFuture.noRepeat':        'No repeat',
@@ -10206,7 +10203,6 @@ const TRANSLATIONS = {
     'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů → Přeplánovat → Datum.',
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
     'sendFuture.title':           'Nastavit datum',
-    'sendFuture.label':           'Úkol',
     'sendFuture.date':            'Datum',
     'sendFuture.repeat':          'Opakování',
     'sendFuture.noRepeat':        'Bez opakování',
@@ -14052,23 +14048,15 @@ function startRenameNode(nodeId) {
   _openInlineInput(nodeId, false);
 }
 
-function startAgendaRename(nodeId) {
-  const node = findNode(nodeId);
-  if (!node) return;
-  const targetId = (node.dayChild || node.tickChild) ? node.parent : nodeId;
-  const target = findNode(targetId);
-  if (!target) return;
-
-  const itemEl = document.querySelector(`#agenda-tab-content .agenda-item[data-node-id="${CSS.escape(nodeId)}"]`);
-  if (!itemEl) return;
+// The inline rename an agenda row uses: the row's label becomes an input in
+// place, Enter and blur commit, Escape reverts. Extracted so a Later row
+// renames by exactly this gesture rather than by one that merely resembles it —
+// only what a commit means differs, and that is the caller's business.
+function openAgendaRowRename(rowId, originalLabel, onCommit, onCancel) {
+  const itemEl = document.querySelector(`#agenda-tab-content .agenda-item[data-node-id="${CSS.escape(rowId)}"]`);
+  if (!itemEl) return false;
   const labelEl = itemEl.querySelector('.daily-log-label');
-  if (!labelEl) return;
-
-  const originalLabel = target.label;
-  takeSnapshot();
-  target._editing = true;
-  editState = { nodeId: targetId, isNew: false, originalLabel, initialNodeW: 0 };
-  beginAtomicOp();
+  if (!labelEl) return false;
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -14085,8 +14073,7 @@ function startAgendaRename(nodeId) {
     if (done) return;
     done = true;
     labelEl.textContent = input.value.trim() || originalLabel;
-    inlineInput.value = input.value;
-    commitEdit();
+    onCommit(input.value);
     if (currentView === 'agenda') renderAgenda();
   }
 
@@ -14094,8 +14081,7 @@ function startAgendaRename(nodeId) {
     if (done) return;
     done = true;
     labelEl.textContent = originalLabel;
-    delete target._editing;
-    cancelEdit();
+    onCancel();
   }
 
   input.addEventListener('keydown', e => {
@@ -14104,6 +14090,55 @@ function startAgendaRename(nodeId) {
     e.stopPropagation();
   });
   input.addEventListener('blur', doCommit);
+  return true;
+}
+
+function startAgendaRename(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
+  const targetId = (node.dayChild || node.tickChild) ? node.parent : nodeId;
+  const target = findNode(targetId);
+  if (!target) return;
+
+  const originalLabel = target.label;
+  takeSnapshot();
+  target._editing = true;
+  editState = { nodeId: targetId, isNew: false, originalLabel, initialNodeW: 0 };
+  beginAtomicOp();
+
+  const opened = openAgendaRowRename(
+    nodeId,
+    originalLabel,
+    value => { inlineInput.value = value; commitEdit(); },
+    () => { delete target._editing; cancelEdit(); },
+  );
+  if (!opened) { delete target._editing; cancelEdit(); }
+}
+
+// Renames the standing intention. Future occurrences carry the new label;
+// occurrences already delivered are ordinary nodes and keep the label their
+// week gave them. A blank name is refused rather than stored, since an entry
+// without one is an entry validateAndRepairSchedule would drop.
+function renameScheduleEntry(entryId, label) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry) return false;
+  const next = typeof label === 'string' ? label.trim().slice(0, 200) : '';
+  if (!next || next === entry.label) return false;
+  entry.label = next;
+  entry._ts = Date.now();
+  saveSchedule();
+  return true;
+}
+
+function startEntryRename(entryId, rowId) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  openAgendaRowRename(
+    rowId,
+    entry.label || '',
+    value => { renameScheduleEntry(entryId, value); },
+    () => {},
+  );
 }
 
 function _openInlineInput(nodeId, isNew) {
@@ -16854,20 +16889,16 @@ function confirmDeleteFromLater(entryId, date) {
   });
 }
 
-// Rewrites an entry. Branch and priority are untouched here — priority has a
-// menu entry of its own — and a blank label is refused rather than stored,
-// since an entry with no label is one validateAndRepairSchedule would drop.
-// Occurrences already materialised are ordinary nodes and keep whatever their
-// week made of them; only future ones follow the entry.
+// Rewrites an entry's dates. Label, branch and priority each have their own
+// menu entry and are untouched here. Occurrences already materialised are
+// ordinary nodes and keep whatever their week made of them; only future ones
+// follow the entry.
 function updateScheduleEntry(entryId, options) {
   const entry = scheduleData.entries.find(e => e.id === entryId);
   if (!entry || !parseDayString(options && options.date)) return null;
 
   const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
   const every = Math.max(1, Math.floor(Number(options.every)) || 1);
-  if (typeof options.label === 'string' && options.label.trim()) {
-    entry.label = options.label.trim().slice(0, 200);
-  }
   entry.anchor = options.date;
   entry.repeat = unit ? { every, unit } : null;
   entry.end = { type: 'never' };
@@ -16885,8 +16916,6 @@ function updateScheduleEntry(entryId, options) {
   'use strict';
 
   const overlay  = document.getElementById('send-future-overlay');
-  const labelEl  = document.getElementById('send-future-label');
-  const labelLbl = document.getElementById('send-future-label-label');
   const dateEl   = document.getElementById('send-future-date');
   const everyEl  = document.getElementById('send-future-every');
   const unitEl   = document.getElementById('send-future-unit');
@@ -16916,14 +16945,11 @@ function updateScheduleEntry(entryId, options) {
     _entryId = null;
   };
 
-  function openForEntry(entryId, focus) {
+  function openForEntry(entryId) {
     const entry = scheduleData.entries.find(e => e.id === entryId);
     if (!entry) return;
     _targetId = null;
     _entryId = entryId;
-    labelEl.hidden = false;
-    labelLbl.hidden = false;
-    labelEl.value = entry.label || '';
     dateEl.value = entry.anchor;
     everyEl.value = String(entry.repeat ? entry.repeat.every : 1);
     unitEl.value = entry.repeat ? entry.repeat.unit : 'none';
@@ -16933,24 +16959,19 @@ function updateScheduleEntry(entryId, options) {
     syncFields();
     syncEcho();
     overlay.classList.add('visible');
-    if (focus === 'label') { labelEl.focus(); labelEl.select(); }
-    else dateEl.focus();
+    dateEl.focus();
   }
 
   // Two callers, one dialog: a node being sent for the first time, and an
   // entry being edited from the Later tab. Editing changes future occurrences
   // only — nodes already materialised are ordinary nodes in their own weeks.
   window.openSendFuture = function (target) {
-    if (target && target.entryId) return openForEntry(target.entryId, target.focus);
+    if (target && target.entryId) return openForEntry(target.entryId);
     const nodeId = target;
     const node = findNode(nodeId);
     if (!canSendToDate(node)) return;
     _targetId = nodeId;
     _entryId = null;
-    // Sending a node: its label is the node's own and is renamed on the map,
-    // so a field here would be a second place to do one thing.
-    labelEl.hidden = true;
-    labelLbl.hidden = true;
     // A week out is the default because that is the shortest horizon this
     // dialog is for; anything nearer is what N and the day tags already do.
     const start = dayStringFromNumber(dayNumber(parseDayString(localDateStr())) + 7);
@@ -16990,7 +17011,6 @@ function updateScheduleEntry(entryId, options) {
       endDate: untilEl.value,
     };
     window.closeSendFuture();
-    if (editing) opts.label = labelEl.value;
     const entry = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
     if (!entry) return;
     if (editing) renderAgenda();
@@ -17773,9 +17793,7 @@ document.getElementById('ctx-rename').addEventListener('click', () => {
   const id = contextTarget;
   const entryCtx = agendaEntryCtx;
   hideContextMenu();
-  // An entry has no node to edit in place, so renaming it opens the one dialog
-  // that edits entries, with the label field focused.
-  if (entryCtx) { window.openSendFuture({ entryId: entryCtx.entryId, focus: 'label' }); return; }
+  if (entryCtx) { startEntryRename(entryCtx.entryId, occurrenceNodeId(entryCtx.entryId, entryCtx.date)); return; }
   if (!id) return;
   if (currentView === 'agenda') startAgendaRename(id);
   else startRenameNode(id);

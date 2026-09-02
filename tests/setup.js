@@ -616,6 +616,7 @@ export const {
   sendNodeToDate,
   updateScheduleEntry,
   setEntryPriority,
+  renameScheduleEntry,
   pullOccurrenceIntoWeek,
   // Drive sync
   scheduleContentHash,
