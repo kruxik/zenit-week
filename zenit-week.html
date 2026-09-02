@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-2pBfLHECKsp1Y1fTyfl1Uw9fncjCDksHgC4Kv/e6FZ8='
+               'sha256-AADTfREU/BSNXEc8sKf6Jd0RYeG2WqrYe8zZ1T++HDk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1547,12 +1547,23 @@
   #bp-cancel, #bp-apply { flex: 1; }
 
   /* Today Panel */
-  /* Agenda done section divider */
+  /* Agenda section divider. Sticks under the floating day-strip header while its
+     section scrolls, so the group a row belongs to stays readable in a list
+     longer than the viewport. `top: 0` is the whole offset: sticky positions
+     against the scroll container's content box, and #agenda-tab-content already
+     pads the toolbar + header height off the top, so 0 lands flush under the
+     header — adding that height again would push the label a header down the
+     list. The opaque background + padding — rather than the former margin —
+     keep rows from showing through the label. */
   .today-done-divider {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--bg-surface);
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 4px 0 2px;
+    padding: 6px 0 4px;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -10486,6 +10497,7 @@ function setLanguage(lang) {
   takeSnapshot();
   currentLang = lang;
   localStorage.setItem('zenit-week-lang', lang);
+  relabelDemoNodes();
   applyTranslations();
   if (currentView === 'agenda') renderAgenda();
   renderIfVisible();
@@ -11146,6 +11158,50 @@ function _isBridgeContainer(source, lookup) {
     (source.children || []).some(cid => lookup(cid)?.type === 'activity');
 }
 
+// --- Cross-week position anchoring -------------------------------------------
+// A node arriving from another week used to be appended last, so the order in
+// which tasks were sent forward decided the order they appeared in — the first
+// one sent always ended up on top. Instead, place it where it sat in the source
+// week.
+//
+// Anchoring on the live source order alone is not enough: sending items forward
+// one at a time erodes that order behind you (moveNodeToNextWeek prunes ancestors
+// it just emptied), so by the third weekend move the earlier siblings are gone
+// from the source. Every arriving node therefore records the position it left
+// from — `prevParent` + `prevOrd` — and later arrivals compare against that.
+//
+// `srcOrd` is the arriving node's index in its source parent's children, and
+// `ordOf` maps a destination sibling to its own index in that same source order
+// (a recorded `prevOrd`, else its live index if it is still there). Siblings
+// belonging to neither week's order are transparent to the comparison. We insert
+// before the first sibling that sat strictly later in the source — strictly, so
+// that indices which slid down as siblings were removed still resolve to the
+// original relative order. Nothing already in the destination is re-sorted.
+function orderedInsertIndex(destIds, srcOrd, ordOf) {
+  // A negative ordinal is an `indexOf` miss — the node is not in the source
+  // order at all, so there is nothing to anchor against: append, as before.
+  if (typeof srcOrd !== 'number' || srcOrd < 0) return destIds.length;
+  for (let i = 0; i < destIds.length; i++) {
+    const ord = ordOf(destIds[i]);
+    if (typeof ord === 'number' && ord > srcOrd) return i;
+  }
+  return destIds.length;
+}
+
+// Splice `newId` into `destParent.children` at its source-week position.
+// Tick-children own the tail of a children array (validateAndRepair re-sorts
+// them there and moveNodeToNextWeek renumbers them), so an ordinary node never
+// lands among them.
+function insertChildInSourceOrder(destParent, newId, srcOrd, ordOf, destLookup) {
+  const children = destParent.children;
+  let idx = orderedInsertIndex(children, srcOrd, ordOf);
+  if (!destLookup(newId)?.tickChild) {
+    const firstTick = children.findIndex(cid => destLookup(cid)?.tickChild);
+    if (firstTick !== -1 && idx > firstTick) idx = firstTick;
+  }
+  children.splice(idx, 0, newId);
+}
+
 function findReuseTarget(source, destNodes, destParentId, lookup) {
   let hit = destNodes.find(n => n.id === source.id || n.prevId === source.id);
   if (hit) return hit;
@@ -11651,6 +11707,20 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
 
     const nextData = await loadWeek(nextKey);
     const nextById = new Map(nextData.nodes.map(n => [n.id, n]));
+    const nextLookup = id => nextById.get(id);
+    // Where a destination sibling sat in `srcOrder`. An earlier move's recorded
+    // position wins, because the source may since have lost that sibling; a node
+    // still present in the source falls back to its live index, by id (branches,
+    // bridging shells) or by `prevId` (copies).
+    const ordLookup = (srcParentId, srcOrder) => destId => {
+      const d = nextById.get(destId);
+      if (!d) return null;
+      if (d.prevParent === srcParentId && typeof d.prevOrd === 'number') return d.prevOrd;
+      const byId = srcOrder.indexOf(d.id);
+      if (byId !== -1) return byId;
+      const byPrev = d.prevId != null ? srcOrder.indexOf(d.prevId) : -1;
+      return byPrev === -1 ? null : byPrev;
+    };
 
     // 1. Ensure the branch exists in next week (same id)
     const branchId = live.branch;
@@ -11660,7 +11730,20 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
         // Neutral _ts (like a default branch) so this structurally-created branch
         // never LWW-overrides a genuinely-edited branch label/color on another device.
         const branchCopy = { ...branchNode, children: [], _ts: 0 };
-        nextData.nodes.push(branchCopy);
+        // Branch order is array order (computeLayout reads it straight off
+        // weekData.nodes), so a pushed branch always lands bottom-most on its
+        // side. Slot it among the destination's branches the way the source
+        // week has it instead. Branches keep their id across weeks, so their
+        // ordinals resolve by id and need no recorded position.
+        const srcBranchIds = weekData.nodes.filter(n => n.type === 'branch').map(n => n.id);
+        const destBranches = nextData.nodes.filter(n => n.type === 'branch');
+        const slot = orderedInsertIndex(
+          destBranches.map(n => n.id),
+          srcBranchIds.indexOf(branchId),
+          ordLookup('center', srcBranchIds));
+        const anchorNode = slot < destBranches.length ? destBranches[slot] : null;
+        const at = anchorNode ? nextData.nodes.indexOf(anchorNode) : nextData.nodes.length;
+        nextData.nodes.splice(at, 0, branchCopy);
         nextById.set(branchId, branchCopy);
       }
     }
@@ -11696,6 +11779,8 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
           done: false,
           unplanned: false,
           dropped: false,
+          prevParent: ancestor.parent,
+          prevOrd: (findNode(ancestor.parent)?.children || []).indexOf(ancestor.id),
           _ts: Date.now(),
         };
         delete shell.doneAt;
@@ -11708,7 +11793,10 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
         addedIds.push(ancestor.id);
         const shellParentInNext = nextById.get(shell.parent);
         if (shellParentInNext && !shellParentInNext.children.includes(ancestor.id)) {
-          shellParentInNext.children.push(ancestor.id);
+          const srcOrder = findNode(ancestor.parent)?.children || [];
+          insertChildInSourceOrder(
+            shellParentInNext, ancestor.id, shell.prevOrd,
+            ordLookup(ancestor.parent, srcOrder), nextLookup);
         }
       }
     });
@@ -11724,6 +11812,16 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
       const newNode = {
         ...n,
         id: newId,
+        // Where this copy came from, so a later move can anchor its position
+        // against it — `prevId` is the same identity marker transferUnfinished
+        // stamps; `prevParent`/`prevOrd` survive the source pruning that a move
+        // performs behind itself. Only the moved node itself is ever anchor-
+        // inserted; its descendants ride along in copied children arrays.
+        prevId: n.id,
+        ...(n.id === nodeId && {
+          prevParent: live.parent,
+          prevOrd: (findNode(live.parent)?.children || []).indexOf(nodeId),
+        }),
         parent: oldToNew.get(n.parent) || n.parent,
         children: n.children.map(cid => oldToNew.get(cid)).filter(Boolean),
         // Moving an unplanned task re-plans it: it was chosen for the new week,
@@ -11753,7 +11851,10 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
       return null;
     }
     if (!parentInNext.children.includes(nodeNewId)) {
-      parentInNext.children.push(nodeNewId);
+      const srcOrder = findNode(live.parent)?.children || [];
+      insertChildInSourceOrder(
+        parentInNext, nodeNewId, srcOrder.indexOf(nodeId),
+        ordLookup(live.parent, srcOrder), nextLookup);
     }
 
     // 4b. Renumber the destination's tick-children so indices stay contiguous
@@ -21306,7 +21407,7 @@ async function maybeSeedPlayground() {
   // the current language is stored — from here on the node is plain user data.
   const nodes = (PLAYGROUND_SEED.week.nodes || []).map(n => {
     const { labelCs, ...rest } = n;
-    return { ...rest, label: (currentLang === 'cs' && labelCs) || n.label, _demo: true, _ts: now };
+    return { ...rest, label: seedLabel(n), _demo: true, _ts: now };
   });
   const week = { nodes, tombstones: [], crdtVersion: 0 };
   await saveWeekIDB(wk, week);
@@ -21329,6 +21430,45 @@ async function maybeSeedPlayground() {
     history.replaceState(null, '', location.pathname + location.search);
   }
   return true;
+}
+
+// The seed node's label in the current language: `labelCs` wherever the Czech
+// wording differs, the English `label` otherwise (terms like "Code review" read
+// the same in both).
+function seedLabel(seedNode) {
+  return (currentLang === 'cs' && seedNode.labelCs) || seedNode.label;
+}
+
+// id -> seed node, for looking an untouched demo node's wording back up.
+let _seedById = null;
+function seedNodeById(id) {
+  if (!_seedById) {
+    _seedById = new Map();
+    (PLAYGROUND_SEED.week.nodes || []).forEach(n => _seedById.set(n.id, n));
+  }
+  return _seedById.get(id);
+}
+
+// Re-labels the still-untouched playground nodes of the loaded week into the
+// current language, so switching language on a fresh install doesn't leave the
+// example week stranded in the language it was seeded with. Only `_demo` nodes
+// qualify: touchNode() drops that flag the moment the user claims a node, so a
+// renamed or edited task is never rewritten. Returns the number relabelled.
+function relabelDemoNodes() {
+  if (!weekData || !Array.isArray(weekData.nodes)) return 0;
+  let changed = 0;
+  weekData.nodes.forEach(n => {
+    if (!n._demo) return;
+    const seed = seedNodeById(n.id);
+    if (!seed) return;
+    const label = seedLabel(seed);
+    if (label === n.label) return;
+    n.label = label;
+    n._ts = Date.now();   // carry the new wording out to the other devices
+    changed++;
+  });
+  if (changed) saveWeek(currentWeekKey, weekData);
+  return changed;
 }
 
 // True when the current week still holds untouched example (seed) tasks —

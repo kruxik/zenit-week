@@ -725,11 +725,13 @@ export const {
   // Transfers
   transferUnfinished,
   moveNodeToNextWeek,
+  orderedInsertIndex,
   // Onboarding _demo drop-on-touch
   touchNode,
   // Onboarding cleanup
   clearExampleTasks,
   hasDemoActivityNodes,
+  relabelDemoNodes,
   // Onboarding nudge
   shouldShowPlaygroundNudge,
   playgroundUserNodeCount,
