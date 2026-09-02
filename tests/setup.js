@@ -626,6 +626,7 @@ export const {
   deleteScheduleSeries,
   // Later tab
   getLaterOccurrences,
+  formatDayLabel,
   laterMonthKey,
   laterMonthLabel,
   laterRowNode,

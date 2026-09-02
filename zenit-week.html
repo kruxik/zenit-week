@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-lVMh+grLJ5B3fxDeOsTvR3ch0YdyuG23HGmEH2gjeso='
+               'sha256-RnR8NJyNmQ6qaMz+OLcfMv8wb7O9MYBC6OlYRyh3Jdc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3241,11 +3241,13 @@
   #send-future-fields input[type="number"] {
     width: 64px;
   }
-  /* Grid items stretch by default, which blew the date field out to the full
-     dialog width. The end-date input sits in a flex row and keeps its intrinsic
-     size, so anchoring this one to the start makes the two match. */
-  #send-future-fields > input[type="date"] {
-    justify-self: start;
+  /* <input type="date"> renders in the browser's OS locale and cannot be told
+     otherwise, so the echo beside it says the date in the UI language — the
+     same form the Later tab uses. */
+  #send-future-date-echo {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
   }
   /* Native select arrow is painted inside the box: without room reserved for
      it, the arrow sits on top of the last character. */
@@ -4039,7 +4041,10 @@ Or remove them later in Settings → Help.</div>
     <div id="send-future-title" data-i18n="sendFuture.title">Set a date</div>
     <div id="send-future-fields">
       <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
-      <input type="date" id="send-future-date">
+      <div class="send-future-row">
+        <input type="date" id="send-future-date">
+        <span id="send-future-date-echo"></span>
+      </div>
       <label for="send-future-unit" data-i18n="sendFuture.repeat">Repeat</label>
       <div class="send-future-row">
         <input type="number" id="send-future-every" min="1" max="999" value="1" aria-label="Interval">
@@ -9711,6 +9716,14 @@ function occurrencesBefore(entry, toDate, limit = 1) {
 const MONTH_NAMES = {
   en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
   cs: ['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec'],
+};
+
+// Czech puts the month in the genitive when a day precedes it — "2. ledna",
+// never "2. leden". MONTH_NAMES is nominative because it names a month on its
+// own, which is what a month heading does; a date needs this list instead.
+const MONTH_NAMES_OF = {
+  en: MONTH_NAMES.en,
+  cs: ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince'],
 };
 
 const TRANSLATIONS = {
@@ -16856,6 +16869,7 @@ function updateScheduleEntry(entryId, options) {
     countEl.value = String(entry.end && entry.end.type === 'count' ? entry.end.n : 10);
     untilEl.value = (entry.end && entry.end.type === 'until') ? entry.end.date : entry.anchor;
     syncFields();
+    syncEcho();
     overlay.classList.add('visible');
     dateEl.focus();
   }
@@ -16880,10 +16894,18 @@ function updateScheduleEntry(entryId, options) {
     countEl.value = '10';
     untilEl.value = start;
     syncFields();
+    syncEcho();
     overlay.classList.add('visible');
     dateEl.focus();
   };
 
+  const echoEl = document.getElementById('send-future-date-echo');
+  function syncEcho() {
+    echoEl.textContent = formatDayLabel(dateEl.value);
+  }
+
+  dateEl.addEventListener('input', syncEcho);
+  dateEl.addEventListener('change', syncEcho);
   unitEl.addEventListener('change', syncFields);
   endEl.addEventListener('change', syncFields);
   cancelEl.addEventListener('click', () => window.closeSendFuture());
@@ -16904,7 +16926,7 @@ function updateScheduleEntry(entryId, options) {
     const entry = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
     if (!entry) return;
     if (editing) renderAgenda();
-    else showToast(t('toast.sentToFuture', { date: entry.anchor }));
+    else showToast(t('toast.sentToFuture', { date: formatDayLabel(entry.anchor) }));
   });
 })();
 
@@ -17936,6 +17958,19 @@ function getLaterOccurrences(fromDate = localDateStr()) {
   return rows;
 }
 
+// A calendar date in the convention of the UI language: "Sep 2, 2026" in
+// English, "2. září 2026" in Czech. English avoids an all-numeric date on
+// purpose — 9/2/2026 is two different days either side of the Atlantic.
+function formatDayLabel(date, lang = currentLang) {
+  const part = parseDayString(date);
+  if (!part) return date || '';
+  const months = MONTH_NAMES_OF[lang] ?? MONTH_NAMES_OF.en;
+  const month = months[part.m - 1];
+  return lang === 'cs'
+    ? `${part.d}. ${month} ${part.y}`
+    : `${month} ${part.d}, ${part.y}`;
+}
+
 // 'YYYY-MM' — the grouping key, and the month a divider names.
 function laterMonthKey(date) {
   return date.slice(0, 7);
@@ -18184,7 +18219,7 @@ function buildAgendaItem(node, label, opts = {}) {
     const when = document.createElement('span');
     when.className = 'daily-log-badge';
     when.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;font-variant-numeric:tabular-nums;';
-    when.textContent = opts.date;
+    when.textContent = formatDayLabel(opts.date);
     item.appendChild(when);
   }
 

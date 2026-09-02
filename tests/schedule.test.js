@@ -25,6 +25,7 @@ import {
   deleteScheduleSeries,
   deleteNode,
   getLaterOccurrences,
+  formatDayLabel,
   laterMonthKey,
   laterMonthLabel,
   laterRowNode,
@@ -1577,3 +1578,55 @@ describe('Schedule and week sync fail independently', () => {
     expect(_state.getScheduleSyncedHash()).toBeNull();
   });
 });
+
+
+describe('Date formatting', () => {
+  it('uses the English medium form, never an all-numeric date', () => {
+    // 9/2/2026 is two different days either side of the Atlantic, so the month
+    // is always named.
+    expect(formatDayLabel('2026-09-02', 'en')).toBe('Sep 2, 2026');
+    expect(formatDayLabel('2026-01-31', 'en')).toBe('Jan 31, 2026');
+    expect(formatDayLabel('2026-12-01', 'en')).toBe('Dec 1, 2026');
+  });
+
+  it('uses the Czech genitive and drops the leading zero', () => {
+    expect(formatDayLabel('2026-01-02', 'cs')).toBe('2. ledna 2026');
+    expect(formatDayLabel('2026-09-02', 'cs')).toBe('2. září 2026');
+    expect(formatDayLabel('2026-12-24', 'cs')).toBe('24. prosince 2026');
+  });
+
+  it('never says the nominative month a heading would use', () => {
+    // "2. leden 2026" is the mistake this exists to prevent. September is
+    // skipped because its two forms are the same word.
+    for (let m = 1; m <= 12; m++) {
+      if (m === 9) continue;
+      const date = `2026-${String(m).padStart(2, '0')}-02`;
+      expect(formatDayLabel(date, 'cs')).not.toContain(MONTH_NAMES_NOMINATIVE[m - 1] + ' ');
+    }
+  });
+
+  it('falls back to English for an unknown language', () => {
+    expect(formatDayLabel('2026-09-02', 'de')).toBe('Sep 2, 2026');
+  });
+
+  it('returns junk unchanged rather than inventing a date', () => {
+    expect(formatDayLabel('2026-02-30', 'en')).toBe('2026-02-30');
+    expect(formatDayLabel('', 'en')).toBe('');
+    expect(formatDayLabel(null, 'en')).toBe('');
+  });
+
+  it('month headings stay nominative — a month named alone is not a date', () => {
+    expect(laterMonthLabel('2026-01')).toBe('Jan 2026');
+    _state.setLang('cs');
+    expect(laterMonthLabel('2026-01')).toBe('leden 2026');
+    expect(formatDayLabel('2026-01-02')).toBe('2. ledna 2026');
+    _state.setLang('en');
+  });
+});
+
+// The nominative list, duplicated here on purpose: the test must fail if the
+// genitive list is ever replaced by it.
+const MONTH_NAMES_NOMINATIVE = [
+  'leden', 'únor', 'březen', 'duben', 'květen', 'červen',
+  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec',
+];
