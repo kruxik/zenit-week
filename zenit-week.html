@@ -622,6 +622,12 @@
     bottom: 68px;
     left: 50%;
     transform: translateX(-50%);
+    /* Anchored at left:50%, the box may only use the 50vw to the right of that
+       point, so it wrapped at half the screen with the other half empty.
+       max-content sizes it to its text; the cap is the viewport, not the half. */
+    width: max-content;
+    max-width: calc(100vw - 24px);
+    text-align: center;
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: 8px;
