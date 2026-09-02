@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
 import {
   nextOccurrence,
   occurrencesInRange,
@@ -14,6 +16,10 @@ import {
   canSendToDate,
   sendNodeToDate,
   updateScheduleEntry,
+  scheduleContentHash,
+  mergeSchedule,
+  syncScheduleToDrive,
+  pollDriveMeta,
   weekKeyForDayString,
   deleteOccurrence,
   deleteScheduleSeries,
@@ -1313,5 +1319,181 @@ describe('Delete semantics', () => {
     const data = week();
     expect(materialiseWeek(WK, data)).toBe(false);
     expect(getLaterOccurrences('2026-05-01')).toEqual([]);
+  });
+});
+
+describe('Schedule Drive sync', () => {
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Pay the bill', branch: 'work', priority: 'normal',
+    anchor: '2026-05-13', repeat: null, end: { type: 'never' },
+    plantedThrough: null, planted: [], _ts: 100,
+    ...over,
+  });
+  const sched = (entries = [], tombstones = [], crdtVersion = 0) => ({ entries, tombstones, crdtVersion });
+
+  describe('filename mapping', () => {
+    it('recognises the schedule key alongside colors and week keys', () => {
+      expect(_state.wKeyForDriveFileName('zenit-week-schedule.json')).toBe('schedule');
+      expect(_state.wKeyForDriveFileName('zenit-week-colors.json')).toBe('colors');
+      expect(_state.wKeyForDriveFileName('zenit-week-2026-20.json')).toBe('2026-20');
+      expect(_state.wKeyForDriveFileName('zenit-week-nonsense.json')).toBeNull();
+      expect(_state.wKeyForDriveFileName('something-else.json')).toBeNull();
+    });
+  });
+
+  describe('content hash', () => {
+    it('ignores entry order — two devices need not agree on it', () => {
+      const a = entry({ id: 'a' });
+      const b = entry({ id: 'b' });
+      expect(scheduleContentHash(sched([a, b]))).toBe(scheduleContentHash(sched([b, a])));
+    });
+
+    it('ignores key order inside an entry', () => {
+      const a = { id: 'a', label: 'x', _ts: 1 };
+      const b = { _ts: 1, label: 'x', id: 'a' };
+      expect(scheduleContentHash(sched([a]))).toBe(scheduleContentHash(sched([b])));
+    });
+
+    it('changes when an entry does', () => {
+      expect(scheduleContentHash(sched([entry()])))
+        .not.toBe(scheduleContentHash(sched([entry({ anchor: '2026-06-01' })])));
+      expect(scheduleContentHash(sched([entry()])))
+        .not.toBe(scheduleContentHash(sched([entry({ _ts: 200 })])));
+    });
+
+    it('changes when a tombstone appears', () => {
+      expect(scheduleContentHash(sched([], []))).not.toBe(scheduleContentHash(sched([], ['s1'])));
+    });
+  });
+
+  describe('merge', () => {
+    it('keeps entries only one side has', () => {
+      const merged = mergeSchedule(sched([entry({ id: 'a' })]), sched([entry({ id: 'b' })]));
+      expect(merged.entries.map(e => e.id).sort()).toEqual(['a', 'b']);
+    });
+
+    it('resolves a conflicting entry by _ts, remote winning a tie', () => {
+      const local = sched([entry({ label: 'local', _ts: 200 })]);
+      const remote = sched([entry({ label: 'remote', _ts: 100 })]);
+      expect(mergeSchedule(local, remote).entries[0].label).toBe('local');
+      expect(mergeSchedule(sched([entry({ label: 'local', _ts: 100 })]), remote).entries[0].label)
+        .toBe('remote');
+    });
+
+    it('lets a tombstone beat a live entry from either side', () => {
+      const live = sched([entry({ _ts: 999 })]);
+      const dead = sched([], ['s1']);
+      expect(mergeSchedule(live, dead).entries).toEqual([]);
+      expect(mergeSchedule(dead, live).entries).toEqual([]);
+    });
+
+    it('unions tombstones and takes the higher crdtVersion', () => {
+      const merged = mergeSchedule(sched([], ['a'], 3), sched([], ['b'], 7));
+      expect(merged.tombstones.sort()).toEqual(['a', 'b']);
+      expect(merged.crdtVersion).toBe(7);
+    });
+
+    it('converges regardless of which side is called local', () => {
+      const a = sched([entry({ id: 'a', _ts: 100 }), entry({ id: 'shared', label: 'A', _ts: 300 })], ['x']);
+      const b = sched([entry({ id: 'b', _ts: 200 }), entry({ id: 'shared', label: 'B', _ts: 100 })], ['y']);
+      expect(scheduleContentHash(mergeSchedule(a, b))).toBe(scheduleContentHash(mergeSchedule(b, a)));
+    });
+
+    it('survives a missing or malformed side', () => {
+      expect(mergeSchedule(null, null)).toEqual(emptySchedule());
+      expect(mergeSchedule(sched([entry()]), 'junk').entries).toHaveLength(1);
+      expect(mergeSchedule(sched([null, entry(), { label: 'no id' }]), null).entries).toHaveLength(1);
+    });
+
+    it('two devices editing different entries offline converge on both edits', () => {
+      const base = entry({ id: 'base', label: 'Base', _ts: 10 });
+      const deviceA = sched([{ ...base }, entry({ id: 'a', label: 'From A', _ts: 50 })]);
+      const deviceB = sched([{ ...base }, entry({ id: 'b', label: 'From B', _ts: 60 })]);
+
+      const onA = mergeSchedule(deviceA, deviceB);
+      const onB = mergeSchedule(deviceB, deviceA);
+      expect(onA.entries.map(e => e.id).sort()).toEqual(['a', 'b', 'base']);
+      expect(scheduleContentHash(onA)).toBe(scheduleContentHash(onB));
+    });
+
+    it('a deleted entry stays deleted after a round trip', () => {
+      const afterDelete = sched([], ['s1']);
+      const stillHasIt = sched([entry()]);
+      const once = mergeSchedule(afterDelete, stillHasIt);
+      const twice = mergeSchedule(once, stillHasIt);
+      expect(twice.entries).toEqual([]);
+      expect(twice.tombstones).toEqual(['s1']);
+    });
+  });
+});
+
+// R10: the two files must fail apart. A schedule that cannot be reached is a
+// missing convenience; a week that cannot be reached is the user's work.
+describe('Schedule and week sync fail independently', () => {
+  const seen = [];
+  let scheduleStatus = 200;
+  let weekStatus = 200;
+
+  const server = setupServer(
+    http.get('https://www.googleapis.com/drive/v3/files', () => HttpResponse.json({ files: [] })),
+    http.get('https://www.googleapis.com/drive/v3/files/:id', ({ request, params }) => {
+      const url = new URL(request.url);
+      const isSchedule = params.id === 'file_schedule';
+      const status = isSchedule ? scheduleStatus : weekStatus;
+      if (url.searchParams.get('alt') === 'media') {
+        seen.push({ kind: 'download', id: params.id });
+        if (status !== 200) return new HttpResponse(null, { status });
+        return HttpResponse.json({ entries: [], tombstones: [], crdtVersion: 0, nodes: [] });
+      }
+      seen.push({ kind: 'meta', id: params.id });
+      if (status !== 200) return new HttpResponse(null, { status });
+      return HttpResponse.json({ appProperties: { contentHash: 'remote-hash-' + params.id } });
+    }),
+    http.patch('https://www.googleapis.com/upload/drive/v3/files/:id', ({ params }) => {
+      seen.push({ kind: 'upload', id: params.id });
+      const status = params.id === 'file_schedule' ? scheduleStatus : weekStatus;
+      if (status !== 200) return new HttpResponse(null, { status });
+      return HttpResponse.json({ id: params.id });
+    }),
+  );
+
+  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  afterAll(() => server.close());
+
+  beforeEach(() => {
+    seen.length = 0;
+    scheduleStatus = 200;
+    weekStatus = 200;
+    _state.clearLocalStorage();
+    _state.resetSyncState();
+    _state.setAccessToken('test-token');
+    _state.setWeekKey('2026-20');
+    _state.setDriveFileId('schedule', 'file_schedule');
+    _state.setDriveFileId('2026-20', 'file_week');
+  });
+
+  afterEach(() => _state.setAccessToken(null));
+
+  it('a failing schedule poll still lets the week check run', async () => {
+    scheduleStatus = 500;
+    await pollDriveMeta('2026-20');
+    expect(seen.some(r => r.id === 'file_schedule')).toBe(true);
+    expect(seen.some(r => r.id === 'file_week')).toBe(true);
+  });
+
+  it('a failing week poll leaves the schedule state untouched', async () => {
+    weekStatus = 500;
+    await pollDriveMeta('2026-20');
+    expect(seen.some(r => r.id === 'file_schedule')).toBe(true);
+  });
+
+  it('a failing schedule upload never marks it synced and never touches a week', async () => {
+    scheduleStatus = 500;
+    await _state.saveValueIDB('schedule', { entries: [], tombstones: [], crdtVersion: 0 });
+    await syncScheduleToDrive();
+    expect(seen.every(r => r.id !== 'file_week')).toBe(true);
+    // Left unsynced so the next change retries, rather than silently believing
+    // the file is up to date.
+    expect(_state.getScheduleSyncedHash()).toBeNull();
   });
 });

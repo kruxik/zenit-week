@@ -133,13 +133,13 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S8 — Drive sync
 
-- [ ] T8.1 — The schedule syncs as `zenit-week-schedule.json` in the appDataFolder, beside `zenit-week-colors.json`.
-- [ ] T8.2 — Same `appProperties` `savedAt` / `contentHash` guards and the same self-echo suppression as week files.
-- [ ] T8.3 — `_wKeyForDriveFileName` (`:8850`) recognises the `schedule` key alongside `colors` and the week keys.
-- [ ] T8.4 — Merge is per-entry LWW on `_ts`, with a tombstone beating a stale live entry.
-- [ ] T8.5 ⚠ R10 — A schedule sync failure never blocks or corrupts a week sync, and the reverse.
-- [ ] T8.6 — `tests/schedule.test.js` + additions to the sync suites: per-entry LWW, tombstone precedence, filename mapping, independent failure.
-- [ ] T8.7 — `npm test` + `npm run validate` + `npm run csp` green.
+- [x] T8.1 — The schedule syncs as `zenit-week-schedule.json` in the appDataFolder, beside `zenit-week-colors.json`.
+- [x] T8.2 — Same `appProperties` `savedAt` / `contentHash` guards and the same self-echo suppression as week files.
+- [x] T8.3 — `_wKeyForDriveFileName` (`:8850`) recognises the `schedule` key alongside `colors` and the week keys.
+- [x] T8.4 — Merge is per-entry LWW on `_ts`, with a tombstone beating a stale live entry.
+- [x] T8.5 ⚠ R10 — A schedule sync failure never blocks or corrupts a week sync, and the reverse.
+- [x] T8.6 — `tests/schedule.test.js` + additions to the sync suites: per-entry LWW, tombstone precedence, filename mapping, independent failure.
+- [x] T8.7 — `npm test` + `npm run validate` + `npm run csp` green.
 
 **AC:** two devices editing different entries offline converge on both edits; a deleted entry stays deleted.
 **Verify:** `npm test`, then the two-profile check below.

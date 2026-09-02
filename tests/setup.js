@@ -515,6 +515,8 @@ _state.useRealIDB = function(v) {
   _dbPromise = null;
   updateIDBMethods();
 };
+_state.getScheduleSyncedHash = function() { return scheduleSyncedHash; };
+_state.wKeyForDriveFileName = function(name) { return _wKeyForDriveFileName(name); };
 _state.getAgendaTabOrder = function() { return AGENDA_TAB_ORDER; };
 _state.getSchedule = function() { return scheduleData; };
 _state.setSchedule = function(v) { scheduleData = v; };
@@ -613,6 +615,11 @@ export const {
   canSendToDate,
   sendNodeToDate,
   updateScheduleEntry,
+  // Drive sync
+  scheduleContentHash,
+  mergeSchedule,
+  syncScheduleToDrive,
+  syncScheduleFromDrive,
   // Delete semantics
   weekKeyForDayString,
   deleteOccurrence,

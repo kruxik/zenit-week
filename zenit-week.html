@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-4B5cHhNn4SQ2ccr2d41A0z6rAUa3MokLCeHiRPb9jSI='
+               'sha256-uPOgQpjLW5PTWUxkcIyBcXUCMDExp4tRYyEU2ZTjqLA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5358,6 +5358,7 @@ async function saveSchedule(data) {
   if (data) scheduleData = data;
   try {
     await saveValueIDB(SCHEDULE_STORAGE_KEY, scheduleData);
+    scheduleScheduleSync();
     return true;
   } catch (e) {
     console.warn('[zenit-week] Failed to save schedule to IndexedDB:', e);
@@ -7153,6 +7154,9 @@ let etagCache = new Map();        // weekKey → ETag from last Drive pull
 let syncDebounceTimers = new Map(); // wKey → debounce timer id (per-week)
 let colorsSyncDebounceTimer = null;
 let colorsSyncedHash = null;
+let scheduleSyncDebounceTimer = null;
+let scheduleSyncedHash = null;
+let lastSeenRemoteScheduleHash = null; // Drive appProperty contentHash the poll last reconciled for the schedule
 let lastSeenRemoteColorsHash = null; // Drive appProperty contentHash the poll last reconciled for colors (may be a legacy raw-JSON hash; same decoupling as lastSeenRemoteHash for weeks)
 let tokenRenewalTimer = null;
 let _tokenReceivedAt = 0;         // epoch ms when current access token was obtained
@@ -7678,6 +7682,7 @@ async function signOut() {
   if (tokenRenewalTimer)        { clearInterval(tokenRenewalTimer);        tokenRenewalTimer = null; }
   clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer)  { clearTimeout(colorsSyncDebounceTimer);   colorsSyncDebounceTimer = null; }
+  if (scheduleSyncDebounceTimer) { clearTimeout(scheduleSyncDebounceTimer); scheduleSyncDebounceTimer = null; }
 
   // Flush pending uploads BEFORE tearing down auth so no edits are lost
   if (googleAccessToken) {
@@ -7700,6 +7705,8 @@ async function signOut() {
 
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  scheduleSyncedHash = null;
+  lastSeenRemoteScheduleHash = null;
   const token  = googleAccessToken;
   googleAccessToken = null;
   _driveSessionStarted = false;
@@ -8445,6 +8452,9 @@ async function initDriveSync(onShownWeekReady = () => {}) {
     const shownKey = currentWeekKey || todayWeekKey();
     const endFirst = traceSpan('drive:shown-week ' + shownKey);
     const colorsPull = syncColorsFromDrive();
+    // Started here and never awaited on the critical path: nothing on screen
+    // waits for it, and a schedule that fails to pull must not delay the week.
+    syncScheduleFromDrive().then(() => syncScheduleToDrive(), () => {});
     const endColors = traceSpan('drive:colors-pull');
     colorsPull.then(() => endColors(), () => endColors('failed'));
     const endList = traceSpan('drive:list-weeks');
@@ -8740,6 +8750,8 @@ async function forcePushAllToDrive() {
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  scheduleSyncedHash = null;
+  lastSeenRemoteScheduleHash = null;
 
   setSyncStatus('syncing', 'sync.msg.uploadingImport');
 
@@ -9051,6 +9063,141 @@ function scheduleColorsSync() {
   }, 10000);
 }
 
+// ─── Schedule sync ────────────────────────────────────────────────────────────
+// The schedule is its own Drive file, beside the colors blob, for the reason
+// week files are their own: it changes on its own schedule and must fail on its
+// own too. A schedule upload that errors never touches a week's sync state, and
+// a week that fails to upload never blocks the schedule — the two paths share
+// no retry counter, no debounce timer and no hash.
+
+// Content signature for the schedule, the analogue of weekContentHash. Entry
+// order is not content — two devices can hold the same entries in a different
+// order — so entries sort by id, and _ts is kept because it is the merge input
+// rather than churn: a bumped _ts is a real change the other device must see.
+function scheduleContentHash(data) {
+  if (!data || typeof data !== 'object') return fnv1a32(JSON.stringify(data));
+  const entries = [...(data.entries || [])]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map(e => JSON.stringify(e, Object.keys(e).sort()));
+  const tombstones = [...(data.tombstones || [])].sort();
+  return fnv1a32(JSON.stringify({ entries, tombstones }));
+}
+
+// Per-entry last-write-wins on _ts, with tombstones winning outright. An entry
+// the other device retired stays retired even when this one edited it more
+// recently: the user deleted a standing intention, and a stale edit to it is
+// not an argument for bringing it back.
+function mergeSchedule(local, remote) {
+  const l = local && typeof local === 'object' ? local : emptySchedule();
+  const r = remote && typeof remote === 'object' ? remote : emptySchedule();
+  const tombstones = new Set([...(l.tombstones || []), ...(r.tombstones || [])]);
+
+  const byId = new Map();
+  for (const e of (l.entries || [])) if (e && e.id) byId.set(e.id, { ...e });
+  for (const e of (r.entries || [])) {
+    if (!e || !e.id) continue;
+    const existing = byId.get(e.id);
+    // Remote wins a tie, the same convention mergeWeekData uses.
+    if (!existing || (e._ts || 0) >= (existing._ts || 0)) byId.set(e.id, { ...e });
+  }
+  for (const id of tombstones) byId.delete(id);
+
+  return {
+    entries: [...byId.values()],
+    tombstones: [...tombstones],
+    crdtVersion: Math.max(l.crdtVersion || 0, r.crdtVersion || 0),
+  };
+}
+
+async function syncScheduleToDrive() {
+  if (!googleAccessToken) return;
+  const stored = await loadValueIDB(SCHEDULE_STORAGE_KEY);
+  if (!stored) return;
+  const json = JSON.stringify(stored);
+  const hash = scheduleContentHash(stored);
+  if (scheduleSyncedHash === hash) return;
+  const savedAt = stored.savedAt ?? 0;
+  const MAX_RETRIES = 3;
+  let delay = 1000;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const fileId = await getDriveFileId('schedule');
+      const boundary = 'ZenitWeek_' + Date.now();
+      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
+      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
+      const resp = await authFetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+      );
+      if (resp.status === 401) return;
+      if (resp.status === 404) { forgetDriveFileId('schedule'); continue; } // stale id — re-resolve
+      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+        delay *= 2;
+        continue;
+      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      scheduleSyncedHash = hash;
+      return;
+    } catch (err) {
+      if (attempt >= MAX_RETRIES) {
+        // Logged, not surfaced as a sync failure: the weeks are what the status
+        // line speaks for, and a schedule that will retry on the next change
+        // must not make a healthy week sync look broken.
+        console.error('[Drive] syncScheduleToDrive error:', err);
+        return;
+      }
+    }
+  }
+}
+
+async function syncScheduleFromDrive() {
+  if (!googleAccessToken) return;
+  try {
+    const fileId = await getDriveFileId('schedule');
+    const resp = await authFetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+    );
+    if (resp.status === 401) return;
+    if (resp.status === 404) { forgetDriveFileId('schedule'); return; }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const remoteJson = await resp.text();
+    if (!remoteJson.trim()) return;
+
+    const rawRemote = JSON.parse(remoteJson);
+    const remoteHash = scheduleContentHash(rawRemote);
+    const remote = validateAndRepairSchedule(rawRemote, scheduleBranchIds());
+    const local = await loadValueIDB(SCHEDULE_STORAGE_KEY);
+    const merged = mergeSchedule(local || emptySchedule(), remote);
+
+    const mergedHash = scheduleContentHash(merged);
+    const localHash = scheduleContentHash(local || emptySchedule());
+    if (mergedHash !== localHash) {
+      merged.crdtVersion = (merged.crdtVersion || 0) + 1;
+      scheduleData = merged;
+      await saveValueIDB(SCHEDULE_STORAGE_KEY, merged);
+      if (currentView === 'agenda') renderAgenda();
+    }
+    // The merge added nothing the file lacks — record it as synced so the poll
+    // stops re-downloading an unchanged schedule every cycle. When the merge
+    // taught us something the file does not have, leave the hash alone so the
+    // next upload carries it back.
+    if (mergedHash === remoteHash) scheduleSyncedHash = remoteHash;
+    else scheduleSyncedHash = null;
+  } catch (err) {
+    console.error('[Drive] syncScheduleFromDrive error:', err);
+  }
+}
+
+function scheduleScheduleSync() {
+  if (!googleAccessToken) return;
+  if (scheduleSyncDebounceTimer) clearTimeout(scheduleSyncDebounceTimer);
+  scheduleSyncDebounceTimer = setTimeout(() => {
+    scheduleSyncDebounceTimer = null;
+    syncScheduleToDrive();
+  }, 10000);
+}
+
 // ─── Background poll: cheap metadata-only check every 10s ────────────────────
 async function pollDriveMeta(wKey) {
   if (!googleAccessToken) return;
@@ -9083,6 +9230,30 @@ async function pollDriveMeta(wKey) {
           lastSeenRemoteColorsHash = remoteColorsHash;
         }
       }
+    }
+
+    // The schedule, guarded and contained on its own: wrapped so a failure here
+    // cannot skip the week checks below, which is the whole of its claim to
+    // being independent of them.
+    try {
+      const scheduleId = driveFileIdCache.get('schedule');
+      if (scheduleId) {
+        const sResp = await authFetch(
+          `https://www.googleapis.com/drive/v3/files/${scheduleId}?fields=appProperties`
+        );
+        if (sResp.ok) {
+          const { appProperties: sProps } = await sResp.json();
+          const remoteScheduleHash = sProps?.contentHash;
+          if (remoteScheduleHash &&
+              remoteScheduleHash !== scheduleSyncedHash &&
+              remoteScheduleHash !== lastSeenRemoteScheduleHash) {
+            await syncScheduleFromDrive();
+            lastSeenRemoteScheduleHash = remoteScheduleHash;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Drive] schedule poll error:', err);
     }
 
     // Week file hash check for the current week ±1. At week boundaries the user
@@ -9129,7 +9300,7 @@ function _wKeyForDriveFileName(name) {
   const m = /^zenit-week-(.+)\.json$/.exec(name || '');
   if (!m) return null;
   const key = m[1];
-  if (key === 'colors') return 'colors';
+  if (key === 'colors' || key === 'schedule') return key;
   return /^\d{4}-\d{2}$/.test(key) ? key : null;
 }
 
@@ -9183,6 +9354,11 @@ async function pollDriveChanges(_wKey) {
           if (remoteHash !== colorsSyncedHash && remoteHash !== lastSeenRemoteColorsHash) {
             await syncColorsFromDrive();
             lastSeenRemoteColorsHash = remoteHash;
+          }
+        } else if (k === 'schedule') {
+          if (remoteHash !== scheduleSyncedHash && remoteHash !== lastSeenRemoteScheduleHash) {
+            await syncScheduleFromDrive();
+            lastSeenRemoteScheduleHash = remoteHash;
           }
         } else if (remoteHash !== String(lastSyncedHash.get(k)) &&
                    remoteHash !== lastSeenRemoteHash.get(k)) {
@@ -9243,6 +9419,8 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  scheduleSyncedHash = null;
+  lastSeenRemoteScheduleHash = null;
   _remoteOriginIds.clear();
   // The undo stack describes data that no longer exists; replaying it would
   // write the discarded content straight back.
@@ -20347,6 +20525,7 @@ function flushAllPendingSyncToDrive() {
   const pendingWeeks = new Set([...syncDebounceTimers.keys(), currentWeekKey]);
   clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
+  if (scheduleSyncDebounceTimer) { clearTimeout(scheduleSyncDebounceTimer); scheduleSyncDebounceTimer = null; }
   // Offline this is the last moment the page gets: an upload attempt would only
   // fail and be forgotten, so hand the weeks to the worker instead.
   if (isDefinitelyOffline()) {
@@ -20355,6 +20534,7 @@ function flushAllPendingSyncToDrive() {
   }
   pendingWeeks.forEach(wk => syncWeekToDrive(wk));
   syncColorsToDrive();
+  syncScheduleToDrive();
 }
 
 // Flush pending sync when tab hides; pull + restart poll on tab restore
