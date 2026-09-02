@@ -119,12 +119,12 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S7 — Delete semantics
 
-- [ ] T7.1 — Deleting an occurrence node in its week is an ordinary node delete; the tombstone is what stops it returning (already guaranteed by T3.3). No schedule-specific code on this path.
-- [ ] T7.2 — Deleting from the Later tab asks via `showAppConfirm`: **this occurrence** or **the whole series**.
-- [ ] T7.3 — Deleting the series tombstones the entry; already-materialised nodes in past and current weeks stay exactly where they are.
-- [ ] T7.4 — EN + CS strings for both confirm variants.
-- [ ] T7.5 — `tests/schedule.test.js`: series delete tombstones the entry and leaves existing nodes; occurrence delete leaves the series intact and never re-plants.
-- [ ] T7.6 — `npm test` + `npm run validate` + `npm run csp` green.
+- [x] T7.1 — Deleting an occurrence node in its week is an ordinary node delete; the tombstone is what stops it returning (already guaranteed by T3.3). No schedule-specific code on this path.
+- [x] T7.2 — Deleting from the Later tab asks via `showAppConfirm`: **this occurrence** or **the whole series**.
+- [x] T7.3 — Deleting the series tombstones the entry; already-materialised nodes in past and current weeks stay exactly where they are.
+- [x] T7.4 — EN + CS strings for both confirm variants.
+- [x] T7.5 — `tests/schedule.test.js`: series delete tombstones the entry and leaves existing nodes; occurrence delete leaves the series intact and never re-plants.
+- [x] T7.6 — `npm test` + `npm run validate` + `npm run csp` green.
 
 **AC:** both delete paths do exactly what their wording promises, and neither resurrects anything.
 **Verify:** `npm test`, then delete one occurrence and one series in the browser.

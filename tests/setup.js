@@ -613,6 +613,10 @@ export const {
   canSendToDate,
   sendNodeToDate,
   updateScheduleEntry,
+  // Delete semantics
+  weekKeyForDayString,
+  deleteOccurrence,
+  deleteScheduleSeries,
   // Later tab
   getLaterOccurrences,
   laterMonthKey,

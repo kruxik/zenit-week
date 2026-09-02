@@ -14,6 +14,10 @@ import {
   canSendToDate,
   sendNodeToDate,
   updateScheduleEntry,
+  weekKeyForDayString,
+  deleteOccurrence,
+  deleteScheduleSeries,
+  deleteNode,
   getLaterOccurrences,
   laterMonthKey,
   laterMonthLabel,
@@ -1178,5 +1182,136 @@ describe('Editing an entry from the Later tab', () => {
 
     expect(_state.getSchedule().entries[0].label).toBe('Pay the bill');
     expect(laterRowNode(_state.getSchedule().entries[0], '2026-05-13').label).toBe('Pay the bill');
+  });
+});
+
+describe('Delete semantics', () => {
+  const WK = '2026-20';
+  const DATE = '2026-05-13';
+
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Pay the bill', branch: 'work', priority: 'normal',
+    anchor: DATE, repeat: { every: 1, unit: 'week' }, end: { type: 'never' },
+    plantedThrough: null, planted: [], _ts: 1,
+    ...over,
+  });
+  const week = () => ({
+    nodes: [
+      { id: 'center', type: 'center', children: ['work'] },
+      { id: 'work', type: 'branch', branch: 'work', parent: 'center', label: 'Work', children: [] },
+    ],
+    tombstones: [],
+    crdtVersion: 0,
+  });
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setWeekKey(WK);
+    _state.setTodayWeekKey('2026-10');
+  });
+
+  afterEach(() => {
+    _state.setSchedule(emptySchedule());
+    _state.clearTodayWeekKeyOverride();
+  });
+
+  it('knows which week owns a date', () => {
+    expect(weekKeyForDayString('2026-05-11')).toBe('2026-20'); // Monday
+    expect(weekKeyForDayString('2026-05-17')).toBe('2026-20'); // Sunday
+    expect(weekKeyForDayString('2026-05-18')).toBe('2026-21');
+    expect(weekKeyForDayString('nope')).toBeNull();
+  });
+
+  it('deleting an occurrence node in its week is an ordinary delete', () => {
+    _state.setSchedule({ entries: [entry({ repeat: null })], tombstones: [], crdtVersion: 0 });
+    const data = week();
+    materialiseWeek(WK, data);
+    _state.set(data);
+
+    const id = _state.get().nodes.find(n => n.schedId === 's1').id;
+    deleteNode(id);
+
+    expect(_state.get().nodes.find(n => n.schedId === 's1')).toBeUndefined();
+    expect(_state.get().tombstones).toContain(id);
+    // The series is untouched, and the week never re-plants it.
+    expect(_state.getSchedule().entries).toHaveLength(1);
+    expect(materialiseWeek(WK, _state.get())).toBe(false);
+  });
+
+  it('deleting one occurrence buries it in the week that owns it', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    _state.set(week());
+
+    expect(await deleteOccurrence('s1', DATE)).toBe(true);
+
+    const ids = [occurrenceNodeId('s1', DATE), occurrenceNodeId('s1', DATE + ':day')];
+    expect(_state.get().tombstones).toEqual(expect.arrayContaining(ids));
+
+    // This week now yields nothing, but the series survives — the following
+    // week's occurrence still arrives.
+    expect(materialiseWeek(WK, _state.get())).toBe(false);
+    const next = week();
+    expect(materialiseWeek('2026-21', next)).toBe(true);
+    expect(next.nodes.filter(n => n.schedId).map(n => n.schedDate)).toEqual(['2026-05-20']);
+  });
+
+  it('never re-plants a deleted occurrence, before or after it was due', async () => {
+    _state.setSchedule({ entries: [entry({ repeat: null })], tombstones: [], crdtVersion: 0 });
+    _state.set(week());
+    await deleteOccurrence('s1', DATE);
+
+    const data = _state.get();
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(data.nodes.filter(n => n.schedId)).toEqual([]);
+  });
+
+  it('refuses to delete an occurrence of an unknown entry or an invalid date', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    _state.set(week());
+    expect(await deleteOccurrence('nope', DATE)).toBe(false);
+    expect(await deleteOccurrence('s1', '2026-02-30')).toBe(false);
+    expect(_state.get().tombstones).toEqual([]);
+  });
+
+  it('deleting the series tombstones the entry', async () => {
+    _state.setSchedule({ entries: [entry(), entry({ id: 's2' })], tombstones: [], crdtVersion: 0 });
+
+    expect(await deleteScheduleSeries('s1')).toBe(true);
+
+    const sched = _state.getSchedule();
+    expect(sched.entries.map(e => e.id)).toEqual(['s2']);
+    expect(sched.tombstones).toEqual(['s1']);
+    expect(await deleteScheduleSeries('s1')).toBe(false);
+  });
+
+  it('leaves already-materialised nodes exactly where they are', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    const data = week();
+    materialiseWeek(WK, data);
+    _state.set(data);
+    const before = JSON.stringify(_state.get());
+
+    await deleteScheduleSeries('s1');
+
+    expect(JSON.stringify(_state.get())).toBe(before);
+    expect(_state.get().nodes.find(n => n.schedId === 's1')).toBeDefined();
+  });
+
+  it('never revives a tombstoned entry through repair', () => {
+    _state.setSchedule({ entries: [], tombstones: ['s1'], crdtVersion: 0 });
+    const repaired = validateAndRepairSchedule(
+      { entries: [entry()], tombstones: ['s1'], crdtVersion: 0 }, ['work']);
+    expect(repaired.entries).toEqual([]);
+    expect(repaired.tombstones).toEqual(['s1']);
+  });
+
+  it('stops the series producing anything further', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    await deleteScheduleSeries('s1');
+    const data = week();
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(getLaterOccurrences('2026-05-01')).toEqual([]);
   });
 });
