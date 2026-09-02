@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Y6cTjMemvnI0TbGsvN0AxPbYtKg+RWaL6PrI/km5Pm4='
+               'sha256-yezjO6/2X6qLCXTEcafm3/Sl8u3gcNKJtGKlAaZmBMg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3962,7 +3962,6 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
   <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.nextWeek">Next week</span></div>
-  <div class="ctx-item" id="ctx-send-future"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.sendToDate">Send to date…</span></div>
   <div class="ctx-item" id="ctx-reschedule"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.reschedule">Reschedule</span><span class="ctx-submenu-arrow">▶</span></div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
   <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> <span data-i18n="menu.prioNormal">Priority Normal</span></div>
@@ -4300,7 +4299,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="menu.comment">Comment</span> <kbd>C</kbd></div>
         <div class="help-row"><span data-i18n="help.toggleReusable">Toggle Reusable</span> <kbd>R</kbd></div>
         <div class="help-row"><span data-i18n="help.moveNextWeek">Move to next week</span> <kbd>N</kbd></div>
-        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.sendToDateHint">Right-click a task with no sub-tasks for “Send to date…”.</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.sendToDateHint">Right-click a task with no sub-tasks → Reschedule → Date.</span></div>
         <div class="help-row"><span data-i18n="help.quickOptions">Quick Options</span> <kbd>Right Click</kbd></div>
         <div class="help-row"><span data-i18n="help.clearWeek">Clear week (root node)</span> <span><kbd>Backspace</kbd> <kbd>Delete</kbd></span></div>
       </div>
@@ -9812,12 +9811,12 @@ const TRANSLATIONS = {
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
     'toast.movedToNextWeek':      'Added to next week',
-    'menu.sendToDate':            'Send to date…',
+    'menu.sendToDate':            'Date',
     'agenda.later':               'Later',
     'help.laterTab':              'Later (upcoming dates)',
     'help.featureSendFutureLead': 'Send to date',
     'help.featureSendFutureBody': ' — hand a task without sub-tasks to a future date, once or repeating; it arrives in the week that owns that date',
-    'help.sendToDateHint':        'Right-click a task with no sub-tasks for “Send to date…”.',
+    'help.sendToDateHint':        'Right-click a task with no sub-tasks → Reschedule → Date.',
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
     'sendFuture.title':           'Send to the future',
     'sendFuture.date':            'Date',
@@ -10168,12 +10167,12 @@ const TRANSLATIONS = {
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
-    'menu.sendToDate':            'Odeslat na datum…',
+    'menu.sendToDate':            'Datum',
     'agenda.later':               'Později',
     'help.laterTab':              'Později (nadcházející data)',
     'help.featureSendFutureLead': 'Odeslat na datum',
     'help.featureSendFutureBody': ' — pošli úkol bez podúkolů na budoucí datum, jednorázově nebo opakovaně; objeví se v týdnu, do kterého datum patří',
-    'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů a zvol „Odeslat na datum…“.',
+    'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů → Přeplánovat → Datum.',
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
     'sendFuture.title':           'Odeslat do budoucnosti',
     'sendFuture.date':            'Datum',
@@ -16946,9 +16945,6 @@ function showContextMenu(x, y, nodeId) {
     : `${iconSvg('repeat')} ${t('menu.reusable')}`;
   document.getElementById('ctx-reusable').style.display       = (isStdActivity || isTick) ? '' : 'none';
   document.getElementById('ctx-move-next-week').style.display = (isStdActivity || isTick) ? '' : 'none';
-  // A subtree cannot be sent: one entry is one activity, and there is no
-  // partial variant that would leave the children behind.
-  document.getElementById('ctx-send-future').style.display = canSendToDate(node) ? '' : 'none';
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
@@ -17250,12 +17246,6 @@ document.getElementById('ctx-move-next-week').addEventListener('click', async ()
   hideContextMenu();
 });
 
-document.getElementById('ctx-send-future').addEventListener('click', () => {
-  const id = contextTarget;
-  hideContextMenu();
-  if (id) window.openSendFuture(id);
-});
-
 // Labels a menu row with its day text plus a small blue dot when that day is
 // today — the same indicator the agenda day-strip uses. Shared by the reschedule
 // submenu (abbreviations) and the day-filter menu (full names). A dayIdx outside
@@ -17414,6 +17404,24 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
         });
         rescheduleSubmenu.appendChild(btn);
       });
+    }
+
+    // A date is the same choice as a weekday, one horizon further out: this
+    // week's Monday, or the 31st of March. Only a childless activity can be
+    // sent, which also excludes ticks and day-leaves without a second check.
+    if (canSendToDate(findNode(targetId))) {
+      const dateSep = document.createElement('div');
+      dateSep.className = 'ctx-separator';
+      rescheduleSubmenu.appendChild(dateSep);
+      const dateBtn = document.createElement('div');
+      dateBtn.className = 'ctx-item';
+      dateBtn.textContent = t('menu.sendToDate');
+      dateBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        hideContextMenu();
+        window.openSendFuture(targetId);
+      });
+      rescheduleSubmenu.appendChild(dateBtn);
     }
 
     // "Clear all" — only when any day is assigned
