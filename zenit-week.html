@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-RnR8NJyNmQ6qaMz+OLcfMv8wb7O9MYBC6OlYRyh3Jdc='
+               'sha256-1EOrrE/8piw9EVOJsNP75ek5eEVwAU/6jsx3wKgdK/w='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4040,6 +4040,8 @@ Or remove them later in Settings → Help.</div>
   <div id="send-future-dialog">
     <div id="send-future-title" data-i18n="sendFuture.title">Set a date</div>
     <div id="send-future-fields">
+      <label for="send-future-label" id="send-future-label-label" data-i18n="sendFuture.label">Task</label>
+      <input type="text" id="send-future-label" maxlength="200">
       <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
       <div class="send-future-row">
         <input type="date" id="send-future-date">
@@ -9499,6 +9501,13 @@ let contextTarget = null;  // node id
 // resolved via pickRepresentativeTick. specificTickId is set for per-tick log
 // rows in the Done section; null means "pick by tick state at click time".
 let agendaTickCtx = null; // { parentId, specificTickId|null } or null
+// Set while the context menu belongs to a Later row. A Later row is an entry
+// and a future date, not a node — its id names a node that does not exist yet —
+// so every node-level action would be handed undefined. The menu therefore
+// hides everything by default in this mode and shows only what acts on an
+// entry, which also means a menu item added later cannot appear here by
+// accident and act on a phantom.
+let agendaEntryCtx = null; // { entryId, date } or null
 let editState = null;           // { nodeId, isNew, originalLabel }
 let _editJustCommitted = false; // true for 600ms after commit, guards resize handler
 let hoveredNodeId = null;  // Track currently hovered node
@@ -9841,6 +9850,7 @@ const TRANSLATIONS = {
     'help.sendToDateHint':        'Right-click a task with no sub-tasks → Reschedule → Date.',
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
     'sendFuture.title':           'Set a date',
+    'sendFuture.label':           'Task',
     'sendFuture.date':            'Date',
     'sendFuture.repeat':          'Repeat',
     'sendFuture.noRepeat':        'No repeat',
@@ -10196,6 +10206,7 @@ const TRANSLATIONS = {
     'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů → Přeplánovat → Datum.',
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
     'sendFuture.title':           'Nastavit datum',
+    'sendFuture.label':           'Úkol',
     'sendFuture.date':            'Datum',
     'sendFuture.repeat':          'Opakování',
     'sendFuture.noRepeat':        'Bez opakování',
@@ -16786,6 +16797,48 @@ async function deleteScheduleSeries(entryId) {
   return true;
 }
 
+
+// Brings one future occurrence into the current week, on the weekday the user
+// picked. Two halves, and both are required: plant it here, and bury it in the
+// week that owns its date. Without the second half the same task arrives twice
+// and closing one does nothing to the other.
+//
+// The series is untouched. `schedDate` still records the date it was really
+// due, exactly as it does for a swept occurrence, so the Later tab and the
+// agenda row can say what day this actually belongs to.
+async function pullOccurrenceIntoWeek(entryId, date, dayIndex) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry || !parseDayString(date)) return false;
+
+  const ctx = occurrenceContext(weekData);
+  if (!ctx) return false;
+
+  let planted = false;
+  await withWeekLock(currentWeekKey, async () => {
+    planted = plantOccurrence(ctx, entry, date, dayIndex);
+    if (planted) await saveWeek(currentWeekKey, weekData);
+  });
+  if (!planted) return false;
+
+  // Bury it where it was going to appear — unless that is this week, in which
+  // case it has already arrived and there is nothing left to bury.
+  if (weekKeyForDayString(date) !== currentWeekKey) await deleteOccurrence(entryId, date);
+
+  // Delivered, so the sweep must not offer it again.
+  if (!Array.isArray(entry.planted)) entry.planted = [];
+  if (!entry.planted.includes(date)) {
+    entry.planted.push(date);
+    entry.planted.sort();
+    entry._ts = Date.now();
+    await saveSchedule();
+  }
+
+  rebuildNodeMap();
+  renderIfVisible();
+  if (currentView === 'agenda') renderAgenda();
+  return true;
+}
+
 // The Later tab's delete: one occurrence, or the series behind it.
 function confirmDeleteFromLater(entryId, date) {
   const entry = scheduleData.entries.find(e => e.id === entryId);
@@ -16801,16 +16854,20 @@ function confirmDeleteFromLater(entryId, date) {
   });
 }
 
-// Rewrites an entry's schedule. The label, branch and priority are not
-// touched: those belong to the task, and the Later tab is where its dates are
-// edited, not its wording. Occurrences already materialised are ordinary nodes
-// and keep whatever their week made of them.
+// Rewrites an entry. Branch and priority are untouched here — priority has a
+// menu entry of its own — and a blank label is refused rather than stored,
+// since an entry with no label is one validateAndRepairSchedule would drop.
+// Occurrences already materialised are ordinary nodes and keep whatever their
+// week made of them; only future ones follow the entry.
 function updateScheduleEntry(entryId, options) {
   const entry = scheduleData.entries.find(e => e.id === entryId);
   if (!entry || !parseDayString(options && options.date)) return null;
 
   const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
   const every = Math.max(1, Math.floor(Number(options.every)) || 1);
+  if (typeof options.label === 'string' && options.label.trim()) {
+    entry.label = options.label.trim().slice(0, 200);
+  }
   entry.anchor = options.date;
   entry.repeat = unit ? { every, unit } : null;
   entry.end = { type: 'never' };
@@ -16828,6 +16885,8 @@ function updateScheduleEntry(entryId, options) {
   'use strict';
 
   const overlay  = document.getElementById('send-future-overlay');
+  const labelEl  = document.getElementById('send-future-label');
+  const labelLbl = document.getElementById('send-future-label-label');
   const dateEl   = document.getElementById('send-future-date');
   const everyEl  = document.getElementById('send-future-every');
   const unitEl   = document.getElementById('send-future-unit');
@@ -16857,11 +16916,14 @@ function updateScheduleEntry(entryId, options) {
     _entryId = null;
   };
 
-  function openForEntry(entryId) {
+  function openForEntry(entryId, focus) {
     const entry = scheduleData.entries.find(e => e.id === entryId);
     if (!entry) return;
     _targetId = null;
     _entryId = entryId;
+    labelEl.hidden = false;
+    labelLbl.hidden = false;
+    labelEl.value = entry.label || '';
     dateEl.value = entry.anchor;
     everyEl.value = String(entry.repeat ? entry.repeat.every : 1);
     unitEl.value = entry.repeat ? entry.repeat.unit : 'none';
@@ -16871,19 +16933,24 @@ function updateScheduleEntry(entryId, options) {
     syncFields();
     syncEcho();
     overlay.classList.add('visible');
-    dateEl.focus();
+    if (focus === 'label') { labelEl.focus(); labelEl.select(); }
+    else dateEl.focus();
   }
 
   // Two callers, one dialog: a node being sent for the first time, and an
   // entry being edited from the Later tab. Editing changes future occurrences
   // only — nodes already materialised are ordinary nodes in their own weeks.
   window.openSendFuture = function (target) {
-    if (target && target.entryId) return openForEntry(target.entryId);
+    if (target && target.entryId) return openForEntry(target.entryId, target.focus);
     const nodeId = target;
     const node = findNode(nodeId);
     if (!canSendToDate(node)) return;
     _targetId = nodeId;
     _entryId = null;
+    // Sending a node: its label is the node's own and is renamed on the map,
+    // so a field here would be a second place to do one thing.
+    labelEl.hidden = true;
+    labelLbl.hidden = true;
     // A week out is the default because that is the shortest horizon this
     // dialog is for; anything nearer is what N and the day tags already do.
     const start = dayStringFromNumber(dayNumber(parseDayString(localDateStr())) + 7);
@@ -16923,6 +16990,7 @@ function updateScheduleEntry(entryId, options) {
       endDate: untilEl.value,
     };
     window.closeSendFuture();
+    if (editing) opts.label = labelEl.value;
     const entry = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
     if (!entry) return;
     if (editing) renderAgenda();
@@ -16941,6 +17009,30 @@ function showContextMenu(x, y, nodeId) {
   const isCenter   = nodeId === 'center';
   const isActivity = node && node.type === 'activity';
   const isCounter  = node && node.type === 'counter';
+
+  // Entry mode: answered before any node rule runs, because there is no node for one to
+  // read. Only the four that act on an entry are shown, and everything else is
+  // hidden first, so a menu item added later cannot appear here by accident.
+  // Reschedule, priority, rename and delete all affect future occurrences;
+  // nodes already materialised are ordinary nodes edited in their own week.
+  if (agendaEntryCtx) {
+    ctxMenu.querySelectorAll('.ctx-item, .ctx-separator').forEach(el => { el.style.display = 'none'; });
+    const entry = scheduleData.entries.find(e => e.id === agendaEntryCtx.entryId);
+    const prio = entry ? (entry.priority || 'normal') : 'normal';
+    const allowed = ['ctx-reschedule', 'ctx-sep-1', 'ctx-prio-normal', 'ctx-prio-high',
+                     'ctx-prio-critical', 'ctx-sep-2', 'ctx-rename', 'ctx-sep-3', 'ctx-delete'];
+    allowed.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = '';
+    });
+    // The priority it already has is not a choice, exactly as for a node.
+    document.getElementById('ctx-prio-normal').style.display   = prio === 'normal'   ? 'none' : '';
+    document.getElementById('ctx-prio-high').style.display     = prio === 'high'     ? 'none' : '';
+    document.getElementById('ctx-prio-critical').style.display = prio === 'critical' ? 'none' : '';
+    positionContextMenu(x, y);
+    return;
+  }
+
 
   // Transfer items (Center only)
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
@@ -17039,8 +17131,13 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-sep-2').style.display = isStdActivity                              ? '' : 'none';
   document.getElementById('ctx-sep-3').style.display = (isStdActivity || isTick || canDeleteBranch) ? '' : 'none';
 
-  // Measure actual menu size, then position by quadrant so it always opens
-  // toward the center of the screen — never clips any edge.
+  positionContextMenu(x, y);
+}
+
+// Measure actual menu size, then position by quadrant so it always opens
+// toward the center of the screen — never clips any edge. Shared by the node
+// menu and the Later-row menu, which differ only in what they show.
+function positionContextMenu(x, y) {
   ctxMenu.style.visibility = 'hidden';
   ctxMenu.style.left = '0';
   ctxMenu.style.top  = '0';
@@ -17062,6 +17159,7 @@ function hideContextMenu() {
   ctxMenu.classList.remove('visible');
   contextTarget = null;
   agendaTickCtx = null;
+  agendaEntryCtx = null;
   document.getElementById('ctx-reschedule-submenu').classList.remove('visible');
   setAgendaFocus(null);
 }
@@ -17296,6 +17394,71 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   const rescheduleSubmenu = document.getElementById('ctx-reschedule-submenu');
   let _hideSubTimer = null;
 
+  function positionRescheduleSubmenu() {
+    rescheduleSubmenu.style.visibility = 'hidden';
+    rescheduleSubmenu.classList.add('visible');
+    const ctxRect  = ctxMenu.getBoundingClientRect();
+    const itemRect = rescheduleItem.getBoundingClientRect();
+    const subW = rescheduleSubmenu.offsetWidth;
+    const subH = rescheduleSubmenu.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
+    let left = ctxRect.right + 4;
+    if (left + subW > vw - pad) left = ctxRect.left - subW - 4;
+    let top = Math.max(pad, Math.min(itemRect.top, vh - subH - pad));
+    rescheduleSubmenu.style.left = left + 'px';
+    rescheduleSubmenu.style.top  = top  + 'px';
+    rescheduleSubmenu.style.visibility = '';
+  }
+
+  // Same shape as the node submenu — Now, the seven weekdays, then Date — but
+  // every weekday here means "bring this occurrence into the current week on
+  // that day", and there is no Any: an occurrence is a date by definition.
+  function buildEntryRescheduleSubmenu() {
+    const { entryId, date } = agendaEntryCtx;
+    const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+    const todayIdx = new Date().getDay();
+
+    const pull = dayIdx => async e => {
+      e.stopPropagation();
+      hideContextMenu();
+      const moved = await pullOccurrenceIntoWeek(entryId, date, dayIdx);
+      if (moved && dayIdx === todayIdx) pinToTopOfAgenda(occurrenceNodeId(entryId, date));
+      renderAgenda();
+    };
+
+    const nowBtn = document.createElement('div');
+    nowBtn.className = 'ctx-item';
+    nowBtn.textContent = t('menu.now') || 'Now';
+    nowBtn.addEventListener('click', pull(todayIdx));
+    rescheduleSubmenu.appendChild(nowBtn);
+
+    const nowSep = document.createElement('div');
+    nowSep.className = 'ctx-separator';
+    rescheduleSubmenu.appendChild(nowSep);
+
+    AGENDA_DAY_ORDER.forEach(dayIdx => {
+      const btn = document.createElement('div');
+      btn.className = 'ctx-item';
+      appendDayLabel(btn, langLabels[dayIdx], dayIdx, todayIdx);
+      btn.addEventListener('click', pull(dayIdx));
+      rescheduleSubmenu.appendChild(btn);
+    });
+
+    const dateSep = document.createElement('div');
+    dateSep.className = 'ctx-separator';
+    rescheduleSubmenu.appendChild(dateSep);
+
+    const dateBtn = document.createElement('div');
+    dateBtn.className = 'ctx-item';
+    dateBtn.textContent = t('menu.sendToDate');
+    dateBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      hideContextMenu();
+      window.openSendFuture({ entryId });
+    });
+    rescheduleSubmenu.appendChild(dateBtn);
+  }
+
   function showRescheduleSubmenu() {
     clearTimeout(_hideSubTimer);
     rescheduleSubmenu.innerHTML = '';
@@ -17315,6 +17478,16 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
         if (next) ctxTickId = next.id;
       }
     }
+    // A Later row has no node: the same weekday choices mean "bring this
+    // occurrence into the current week on that day", and Any is left off —
+    // an occurrence with no date is not an occurrence. Date stays, because
+    // moving the series itself is still a thing to want.
+    if (agendaEntryCtx) {
+      buildEntryRescheduleSubmenu();
+      positionRescheduleSubmenu();
+      return;
+    }
+
     const node = ctxTickId ? findNode(ctxTickId) : findNode(contextTarget);
     if (!node) return;
 
@@ -17473,19 +17646,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       rescheduleSubmenu.appendChild(clearBtn);
     }
 
-    rescheduleSubmenu.style.visibility = 'hidden';
-    rescheduleSubmenu.classList.add('visible');
-    const ctxRect  = ctxMenu.getBoundingClientRect();
-    const itemRect = rescheduleItem.getBoundingClientRect();
-    const subW = rescheduleSubmenu.offsetWidth;
-    const subH = rescheduleSubmenu.offsetHeight;
-    const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
-    let left = ctxRect.right + 4;
-    if (left + subW > vw - pad) left = ctxRect.left - subW - 4;
-    let top = Math.max(pad, Math.min(itemRect.top, vh - subH - pad));
-    rescheduleSubmenu.style.left = left + 'px';
-    rescheduleSubmenu.style.top  = top  + 'px';
-    rescheduleSubmenu.style.visibility = '';
+    positionRescheduleSubmenu();
   }
 
   rescheduleItem.addEventListener('mouseenter', showRescheduleSubmenu);
@@ -17583,27 +17744,38 @@ document.getElementById('ctx-reusable').addEventListener('click', () => {
   hideContextMenu();
 });
 
-document.getElementById('ctx-prio-normal').addEventListener('click', () => {
-  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-normal');
-  if (currentView === 'agenda') renderAgenda();
-  hideContextMenu();
-});
+// An entry's priority travels onto every occurrence it has yet to produce.
+// Occurrences already materialised keep the priority their week gave them.
+function setEntryPriority(entryId, priority) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry) return false;
+  entry.priority = priority;
+  entry._ts = Date.now();
+  saveSchedule();
+  return true;
+}
 
-document.getElementById('ctx-prio-high').addEventListener('click', () => {
-  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-high');
-  if (currentView === 'agenda') renderAgenda();
-  hideContextMenu();
-});
-
-document.getElementById('ctx-prio-critical').addEventListener('click', () => {
-  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-critical');
-  if (currentView === 'agenda') renderAgenda();
-  hideContextMenu();
+['normal', 'high', 'critical'].forEach(prio => {
+  document.getElementById('ctx-prio-' + prio).addEventListener('click', () => {
+    if (agendaEntryCtx) {
+      setEntryPriority(agendaEntryCtx.entryId, prio);
+      hideContextMenu();
+      renderAgenda();
+      return;
+    }
+    if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-' + prio);
+    if (currentView === 'agenda') renderAgenda();
+    hideContextMenu();
+  });
 });
 
 document.getElementById('ctx-rename').addEventListener('click', () => {
   const id = contextTarget;
+  const entryCtx = agendaEntryCtx;
   hideContextMenu();
+  // An entry has no node to edit in place, so renaming it opens the one dialog
+  // that edits entries, with the label field focused.
+  if (entryCtx) { window.openSendFuture({ entryId: entryCtx.entryId, focus: 'label' }); return; }
   if (!id) return;
   if (currentView === 'agenda') startAgendaRename(id);
   else startRenameNode(id);
@@ -17686,6 +17858,12 @@ document.getElementById('ctx-add-child').addEventListener('click', () => {
 });
 
 document.getElementById('ctx-delete').addEventListener('click', () => {
+  const entryCtx = agendaEntryCtx;
+  if (entryCtx) {
+    hideContextMenu();
+    confirmDeleteFromLater(entryCtx.entryId, entryCtx.date);
+    return;
+  }
   if (!contextTarget) { hideContextMenu(); return; }
   deleteNode(_agendaTickRedirect(contextTarget, true), { ask: true });
   hideContextMenu();
@@ -17950,7 +18128,12 @@ function getLaterOccurrences(fromDate = localDateStr()) {
 
   const rows = [];
   scheduleData.entries.forEach(entry => {
+    // An occurrence the entry records as planted has already been delivered —
+    // pulled into this week, or met by browsing ahead. It is a task somewhere
+    // now, so listing it as still upcoming would be listing it twice.
+    const delivered = new Set(Array.isArray(entry.planted) ? entry.planted : []);
     occurrencesInRange(entry, fromDate, to)
+      .filter(date => !delivered.has(date))
       .slice(0, LATER_ROWS_PER_ENTRY)
       .forEach(date => rows.push({ entry, date }));
   });
@@ -18304,6 +18487,16 @@ function buildAgendaItem(node, label, opts = {}) {
   if (entryRow) {
     item.classList.add('agenda-item-entry');
     item.addEventListener('click', () => window.openSendFuture({ entryId: entryRow.id }));
+    const openEntryMenu = (x, y) => {
+      agendaEntryCtx = { entryId: entryRow.id, date: opts.date };
+      showContextMenu(x, y, null);
+    };
+    item._openCtxMenu = openEntryMenu;
+    item.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      openEntryMenu(e.clientX, e.clientY);
+    });
     const del = document.createElement('button');
     del.className = 'agenda-action-btn';
     del.innerHTML = `${iconSvg('trash')} ${t('menu.delete')}`;

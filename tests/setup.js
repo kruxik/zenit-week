@@ -615,6 +615,8 @@ export const {
   canSendToDate,
   sendNodeToDate,
   updateScheduleEntry,
+  setEntryPriority,
+  pullOccurrenceIntoWeek,
   // Drive sync
   scheduleContentHash,
   mergeSchedule,

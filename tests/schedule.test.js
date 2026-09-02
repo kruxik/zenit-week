@@ -16,6 +16,8 @@ import {
   canSendToDate,
   sendNodeToDate,
   updateScheduleEntry,
+  setEntryPriority,
+  pullOccurrenceIntoWeek,
   scheduleContentHash,
   mergeSchedule,
   syncScheduleToDrive,
@@ -1237,6 +1239,40 @@ describe('Editing an entry from the Later tab', () => {
     expect(out.priority).toBe('high');
   });
 
+  it('renames the entry, affecting future occurrences only', () => {
+    const e = entry();
+    _state.setSchedule({ entries: [e], tombstones: [], crdtVersion: 0 });
+    const data = week();
+    materialiseWeek(WK, data);
+    const plantedLabel = data.nodes.find(n => n.schedId === 's1').label;
+
+    updateScheduleEntry('s1', { date: e.anchor, unit: null, label: '  Renewed bill  ' });
+
+    expect(_state.getSchedule().entries[0].label).toBe('Renewed bill');
+    // The occurrence already delivered keeps the label its week gave it.
+    expect(data.nodes.find(n => n.schedId === 's1').label).toBe(plantedLabel);
+  });
+
+  it('refuses a blank label rather than storing one repair would drop', () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    updateScheduleEntry('s1', { date: '2026-05-13', unit: null, label: '   ' });
+    expect(_state.getSchedule().entries[0].label).toBe('Pay the bill');
+  });
+
+  it('sets the entry priority without touching a materialised node', () => {
+    const e = entry();
+    _state.setSchedule({ entries: [e], tombstones: [], crdtVersion: 0 });
+    const data = week();
+    materialiseWeek(WK, data);
+    const before = data.nodes.find(n => n.schedId === 's1').priority;
+
+    expect(setEntryPriority('s1', 'critical')).toBe(true);
+
+    expect(_state.getSchedule().entries[0].priority).toBe('critical');
+    expect(data.nodes.find(n => n.schedId === 's1').priority).toBe(before);
+    expect(setEntryPriority('nope', 'high')).toBe(false);
+  });
+
   it('refuses an unknown entry or an invalid date', () => {
     _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
     expect(updateScheduleEntry('nope', { date: '2026-07-01' })).toBeNull();
@@ -1630,3 +1666,104 @@ const MONTH_NAMES_NOMINATIVE = [
   'leden', 'únor', 'březen', 'duben', 'květen', 'červen',
   'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec',
 ];
+
+
+describe('Pulling an occurrence into the current week', () => {
+  // 2026-W20 is "today"; the occurrence is due in W22 (Mon 2026-05-25).
+  const WK = '2026-20';
+  const FUTURE = '2026-05-25';
+
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Pay the bill', branch: 'work', priority: 'normal',
+    anchor: FUTURE, repeat: null, end: { type: 'never' },
+    plantedThrough: null, planted: [], _ts: 1,
+    ...over,
+  });
+  const week = () => ({
+    nodes: [
+      { id: 'center', type: 'center', children: ['work'] },
+      { id: 'work', type: 'branch', branch: 'work', parent: 'center', label: 'Work', children: [] },
+    ],
+    tombstones: [],
+    crdtVersion: 0,
+  });
+  const occurrences = (data) => data.nodes.filter(n => n.schedId);
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setWeekKey(WK);
+    _state.setTodayWeekKey(WK);
+    _state.set(week());
+  });
+
+  afterEach(() => {
+    _state.setSchedule(emptySchedule());
+    _state.clearTodayWeekKeyOverride();
+  });
+
+  it('plants it here on the chosen weekday, keeping the real date', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+
+    expect(await pullOccurrenceIntoWeek('s1', FUTURE, 3)).toBe(true);
+
+    const node = _state.get().nodes.find(n => n.schedId === 's1');
+    expect(node.schedDate).toBe(FUTURE); // the day it was really due
+    const leaf = _state.get().nodes.find(n => n.dayChild);
+    expect(leaf.dayIndex).toBe(3); // Wednesday of this week
+  });
+
+  it('buries it in the week that owned it, so it cannot arrive twice', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    await pullOccurrenceIntoWeek('s1', FUTURE, 1);
+
+    // Read the week back as it was stored: the tombstone lives in the record,
+    // which is exactly what stops the next open from planting it.
+    const owning = JSON.parse(_state.getLocalStorage('zenit-week-2026-22'));
+    expect(owning.tombstones).toContain(occurrenceNodeId('s1', FUTURE));
+    expect(materialiseWeek('2026-22', owning)).toBe(false);
+    expect(occurrences(owning)).toEqual([]);
+  });
+
+  it('records it as delivered, so the sweep and the Later tab drop it', async () => {
+    const e = entry();
+    _state.setSchedule({ entries: [e], tombstones: [], crdtVersion: 0 });
+    expect(getLaterOccurrences('2026-05-11').map(r => r.date)).toEqual([FUTURE]);
+
+    await pullOccurrenceIntoWeek('s1', FUTURE, 1);
+
+    expect(e.planted).toContain(FUTURE);
+    expect(getLaterOccurrences('2026-05-11')).toEqual([]);
+  });
+
+  it('leaves the rest of a repeating series alone', async () => {
+    _state.setSchedule({
+      entries: [entry({ repeat: { every: 1, unit: 'week' } })],
+      tombstones: [], crdtVersion: 0,
+    });
+
+    await pullOccurrenceIntoWeek('s1', FUTURE, 1);
+
+    // The following week's occurrence is untouched and still arrives.
+    const next = week();
+    expect(materialiseWeek('2026-23', next)).toBe(true);
+    expect(occurrences(next).map(n => n.schedDate)).toEqual(['2026-06-01']);
+  });
+
+  it('is idempotent — a second pull plants nothing further', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    await pullOccurrenceIntoWeek('s1', FUTURE, 1);
+    const after = _state.get().nodes.length;
+
+    expect(await pullOccurrenceIntoWeek('s1', FUTURE, 1)).toBe(false);
+    expect(_state.get().nodes).toHaveLength(after);
+  });
+
+  it('refuses an unknown entry or an invalid date', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    expect(await pullOccurrenceIntoWeek('nope', FUTURE, 1)).toBe(false);
+    expect(await pullOccurrenceIntoWeek('s1', '2026-02-30', 1)).toBe(false);
+    expect(occurrences(_state.get())).toEqual([]);
+  });
+});
