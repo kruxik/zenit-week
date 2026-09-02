@@ -515,6 +515,11 @@ _state.useRealIDB = function(v) {
   _dbPromise = null;
   updateIDBMethods();
 };
+_state.getScheduleSyncedHash = function() { return scheduleSyncedHash; };
+_state.wKeyForDriveFileName = function(name) { return _wKeyForDriveFileName(name); };
+_state.getAgendaTabOrder = function() { return AGENDA_TAB_ORDER; };
+_state.getSchedule = function() { return scheduleData; };
+_state.setSchedule = function(v) { scheduleData = v; };
 _state.resetIDB = function() {
   _db = null;
   _dbPromise = null;
@@ -602,6 +607,39 @@ export const {
   weekKey,
   parseWeekKey,
   weekKeysByProximity,
+  // Occurrence math
+  nextOccurrence,
+  occurrencesInRange,
+  occurrencesBefore,
+  // Schedule store
+  canSendToDate,
+  sendNodeToDate,
+  updateScheduleEntry,
+  setEntryPriority,
+  renameScheduleEntry,
+  pullOccurrenceIntoWeek,
+  // Drive sync
+  scheduleContentHash,
+  mergeSchedule,
+  syncScheduleToDrive,
+  syncScheduleFromDrive,
+  // Delete semantics
+  weekKeyForDayString,
+  deleteOccurrence,
+  deleteScheduleSeries,
+  // Later tab
+  getLaterOccurrences,
+  formatDayLabel,
+  laterMonthKey,
+  laterMonthLabel,
+  laterRowNode,
+  materialiseWeek,
+  weekDayStrings,
+  emptySchedule,
+  occurrenceNodeId,
+  validateAndRepairSchedule,
+  loadSchedule,
+  saveSchedule,
   genId,
   defaultWeekData,
   validateAndRepair,

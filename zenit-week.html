@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-wigIvrJU+GKHBzpqZERuJ+prz8JxdsubhIQsVUNRdkg='
+               'sha256-AADTfREU/BSNXEc8sKf6Jd0RYeG2WqrYe8zZ1T++HDk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -622,6 +622,12 @@
     bottom: 68px;
     left: 50%;
     transform: translateX(-50%);
+    /* Anchored at left:50%, the box may only use the 50vw to the right of that
+       point, so it wrapped at half the screen with the other half empty.
+       max-content sizes it to its text; the cap is the viewport, not the half. */
+    width: max-content;
+    max-width: calc(100vw - 24px);
+    text-align: center;
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: 8px;
@@ -3122,7 +3128,8 @@
   }
 
   /* Generic confirm dialog — reuses overlay/dialog/actions pattern */
-  #app-confirm-overlay {
+  #app-confirm-overlay,
+  #send-future-overlay {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
@@ -3135,11 +3142,13 @@
     opacity: 0;
     transition: opacity 0.15s ease;
   }
-  #app-confirm-overlay.visible {
+  #app-confirm-overlay.visible,
+  #send-future-overlay.visible {
     display: flex;
     opacity: 1;
   }
-  #app-confirm-dialog {
+  #app-confirm-dialog,
+  #send-future-dialog {
     background: var(--bg-surface);
     border-radius: 8px;
     box-shadow: 0 20px 60px var(--shadow-xl);
@@ -3158,6 +3167,7 @@
     white-space: pre-line;
   }
   #app-confirm-actions .agenda-action-btn,
+  #send-future-actions .agenda-action-btn,
   #import-confirm-actions .agenda-action-btn,
   #bp-buttons .agenda-action-btn,
   #cp-buttons .agenda-action-btn,
@@ -3188,10 +3198,12 @@
   #import-confirm-actions .agenda-action-btn.danger:hover::before {
     background: var(--accent-danger-bg);
   }
-  #app-confirm-overlay.visible #app-confirm-dialog {
+  #app-confirm-overlay.visible #app-confirm-dialog,
+  #send-future-overlay.visible #send-future-dialog {
     transform: translateY(0);
   }
-  #app-confirm-title {
+  #app-confirm-title,
+  #send-future-title {
     font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
@@ -3201,11 +3213,68 @@
     color: var(--text-secondary);
     line-height: 1.5;
   }
-  #app-confirm-actions {
+  #app-confirm-actions,
+  #send-future-actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
     margin-top: 4px;
+  }
+
+  /* Send to date… — the only app dialog that asks for values rather than a
+     yes/no, so it borrows the confirm dialog's shell and adds a field grid. */
+  #send-future-fields {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 10px 12px;
+    margin-top: 4px;
+  }
+  #send-future-fields label {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  #send-future-fields .send-future-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* Ends holds nothing while there is no repeat to end. Without a floor the
+       row collapses to its label's line height and the three rows stop sharing
+       a rhythm, even though every gap between them is the same. */
+    min-height: 32px;
+  }
+  #send-future-fields input,
+  #send-future-fields select {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    height: 32px;
+    padding: 0 8px;
+    min-width: 0;
+  }
+  #send-future-fields input[type="number"] {
+    width: 64px;
+  }
+  /* <input type="date"> renders in the browser's OS locale and cannot be told
+     otherwise, so the echo beside it says the date in the UI language — the
+     same form the Later tab uses. */
+  #send-future-date-echo {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  /* Native select arrow is painted inside the box: without room reserved for
+     it, the arrow sits on top of the last character. */
+  #send-future-fields select {
+    padding-right: 28px;
+  }
+  #send-future-fields input:focus,
+  #send-future-fields select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
   }
 
   .help-section {
@@ -3984,6 +4053,44 @@ Or remove them later in Settings → Help.</div>
   </div>
 </div>
 
+<div id="send-future-overlay">
+  <div id="send-future-dialog">
+    <div id="send-future-title" data-i18n="sendFuture.title">Set a date</div>
+    <div id="send-future-fields">
+      <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
+      <div class="send-future-row">
+        <input type="date" id="send-future-date">
+        <span id="send-future-date-echo"></span>
+      </div>
+      <label for="send-future-unit" data-i18n="sendFuture.repeat">Repeat</label>
+      <div class="send-future-row">
+        <input type="number" id="send-future-every" min="1" max="999" value="1" aria-label="Interval">
+        <select id="send-future-unit">
+          <option value="none" data-i18n="sendFuture.noRepeat">No repeat</option>
+          <option value="day" data-i18n="sendFuture.unitDay">days</option>
+          <option value="week" data-i18n="sendFuture.unitWeek">weeks</option>
+          <option value="month" data-i18n="sendFuture.unitMonth">months</option>
+          <option value="year" data-i18n="sendFuture.unitYear">years</option>
+        </select>
+      </div>
+      <label for="send-future-end-type" data-i18n="sendFuture.end">Ends</label>
+      <div class="send-future-row">
+        <select id="send-future-end-type">
+          <option value="never" data-i18n="sendFuture.endNever">Never</option>
+          <option value="count" data-i18n="sendFuture.endCount">After</option>
+          <option value="until" data-i18n="sendFuture.endUntil">On date</option>
+        </select>
+        <input type="number" id="send-future-end-count" min="1" max="999" value="10" aria-label="Occurrences" hidden>
+        <input type="date" id="send-future-end-date" aria-label="End date" hidden>
+      </div>
+    </div>
+    <div id="send-future-actions">
+      <button type="button" class="agenda-action-btn" id="send-future-cancel" data-i18n="app-confirm.cancel">Cancel</button>
+      <button type="button" class="agenda-action-btn" id="send-future-ok" data-i18n="sendFuture.ok">Set</button>
+    </div>
+  </div>
+</div>
+
 <div id="import-confirm-overlay">
   <div id="import-confirm-dialog">
     <div id="import-confirm-title" data-i18n="settings.importConfirmTitle">Overwrite all data?</div>
@@ -4200,6 +4307,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSyncLead">Google Drive sync</strong><span data-i18n="help.featureSyncBody"> — your own Drive only (optional)</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureCommentsLead">Comments</strong><span data-i18n="help.featureCommentsBody"> — attach a note to any activity</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureTransfersLead">Reusable &amp; transfers</strong><span data-i18n="help.featureTransfersBody"> — carry unfinished or repeating work into the next week</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSendFutureLead">Send to date</strong><span data-i18n="help.featureSendFutureBody"> — hand a task without sub-tasks to a future date, once or repeating; it arrives in the week that owns that date</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureQuickAddLead">Quick add</strong><span data-i18n="help.featureQuickAddBody"> — drop a task on a branch without touching the map</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureUndoLead">Undo / Redo</strong><span data-i18n="help.featureUndoBody"> — made a typo? Revert anytime</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureBackupLead">Export / Import</strong><span data-i18n="help.featureBackupBody"> — full backup of every week as one JSON file</span></div>
@@ -4222,6 +4330,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="menu.comment">Comment</span> <kbd>C</kbd></div>
         <div class="help-row"><span data-i18n="help.toggleReusable">Toggle Reusable</span> <kbd>R</kbd></div>
         <div class="help-row"><span data-i18n="help.moveNextWeek">Move to next week</span> <kbd>N</kbd></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.sendToDateHint">Right-click a task with no sub-tasks → Reschedule → Date.</span></div>
         <div class="help-row"><span data-i18n="help.quickOptions">Quick Options</span> <kbd>Right Click</kbd></div>
         <div class="help-row"><span data-i18n="help.clearWeek">Clear week (root node)</span> <span><kbd>Backspace</kbd> <kbd>Delete</kbd></span></div>
       </div>
@@ -4242,6 +4351,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="help.mindmapView">Mindmap view</span> <kbd>M</kbd></div>
         <div class="help-row"><span data-i18n="help.agendaView">Agenda view</span> <kbd>A</kbd></div>
         <div class="help-row"><span data-i18n="help.statsView">Stats view</span> <kbd>S</kbd></div>
+        <div class="help-row"><span data-i18n="help.laterTab">Later (upcoming dates)</span> <kbd>L</kbd></div>
         <div class="help-row"><span data-i18n="quick_add.title">Quick add</span> <kbd>Q</kbd></div>
         <div class="help-row"><span data-i18n="help.title">Help &amp; Hotkeys</span> <span><kbd>?</kbd> <kbd>H</kbd></span></div>
         <div class="help-row"><span data-i18n="help.escClose">Close panel / menu</span> <kbd>Esc</kbd></div>
@@ -4705,6 +4815,7 @@ window.__quietRefreshReloadNow = function() {
 const QUIESCENCE_PANEL_IDS = [
   'single-tab-overlay',
   'app-confirm-overlay',
+  'send-future-overlay',
   'context-menu',
   'ctx-reschedule-submenu',
   'day-filter-menu',
@@ -5134,6 +5245,158 @@ async function deleteValueIDB(key) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+// ─── Schedule store ───────────────────────────────────────────────────────────
+// The schedule is a single record in the `misc` store, holding standing
+// intentions ("entries") that later materialise into ordinary week nodes
+// ("occurrences"). It is deliberately NOT part of any week record: writing the
+// schedule never writes a week, and writing a week never touches the schedule.
+const SCHEDULE_STORAGE_KEY = 'schedule';
+const SCHEDULE_PRIORITIES = new Set(['normal', 'high', 'critical']);
+
+let scheduleData = emptySchedule(); // in-memory schedule record
+// Set whenever a pass mutates an entry's cursor fields. Materialisation can
+// advance the schedule without planting a single node — a sweep that finds
+// nothing still moves plantedThrough — so "write the week" and "write the
+// schedule" are two answers, not one.
+let _scheduleDirty = false;
+
+function emptySchedule() {
+  return { entries: [], tombstones: [], crdtVersion: 0 };
+}
+
+// The node id an occurrence will carry, derived only from the entry id and the
+// occurrence date. This is the single mechanism that keeps materialisation
+// idempotent: two devices, two tabs or two opens of the same week all compute
+// the same id, so the "already there?" check works without either side asking
+// the other. It is the one node id in the app that does not come from genId(),
+// and it is shaped exactly like one ('n' + 12 hex) so nothing downstream can
+// tell the difference. 48 bits of FNV-1a over two different salts — collisions
+// need ~16M occurrences in one week record to reach even coin-flip odds.
+function occurrenceNodeId(schedId, schedDate) {
+  const key = `${schedId} ${schedDate}`;
+  const hi = fnv1a32('zw-occ:' + key);
+  const lo = fnv1a32(key + ':zw-occ');
+  return 'n' + hi.toString(16).padStart(8, '0') + (lo & 0xffff).toString(16).padStart(4, '0');
+}
+
+// Whitelist + repair for the schedule blob, the analogue of validateAndRepair
+// for week data and sanitizeColorsData for the settings blob. It arrives from
+// IndexedDB, a Drive pull or a JSON import and is otherwise unchecked.
+//
+// Repair, not deletion, wherever intent survives: an entry whose branch was
+// deleted is re-homed onto the first branch rather than dropped, because the
+// obligation it records ("pay the tax on 31 March") outlives the category the
+// user filed it under. Only entries with nothing left to act on — no label, no
+// usable anchor date — are dropped.
+//
+// `branchIds` is passed in rather than read from weekData so the pass stays
+// pure and testable; an empty list means "branches unknown", and branch values
+// are then left exactly as they are instead of being re-homed onto nothing.
+function validateAndRepairSchedule(raw, branchIds) {
+  const out = emptySchedule();
+  if (!raw || typeof raw !== 'object') return out;
+
+  const branches = (Array.isArray(branchIds) ? branchIds : [])
+    .filter(b => typeof b === 'string' && BRANCH_ID_RE.test(b));
+  const tombstones = (Array.isArray(raw.tombstones) ? raw.tombstones : [])
+    .filter(id => typeof id === 'string' && id);
+  const dead = new Set(tombstones);
+  out.tombstones = [...dead];
+  out.crdtVersion = Number.isFinite(raw.crdtVersion) ? raw.crdtVersion : 0;
+
+  const seen = new Set();
+  (Array.isArray(raw.entries) ? raw.entries : []).forEach(e => {
+    if (!e || typeof e !== 'object') return;
+    if (typeof e.id !== 'string' || !e.id) return;
+    if (seen.has(e.id) || dead.has(e.id)) return;
+    if (typeof e.label !== 'string' || !e.label.trim()) return;
+    if (!parseDayString(e.anchor)) return;
+    seen.add(e.id);
+    out.entries.push({
+      id: e.id,
+      label: e.label.slice(0, 200),
+      branch: repairScheduleBranch(e.branch, branches),
+      priority: SCHEDULE_PRIORITIES.has(e.priority) ? e.priority : 'normal',
+      anchor: e.anchor,
+      repeat: repairScheduleRepeat(e.repeat),
+      end: repairScheduleEnd(e.end),
+      plantedThrough: parseDayString(e.plantedThrough) ? e.plantedThrough : null,
+      planted: repairPlantedList(e.planted),
+      _ts: Number.isFinite(e._ts) ? e._ts : 0,
+    });
+  });
+  return out;
+}
+
+function repairScheduleBranch(branch, branches) {
+  const shaped = typeof branch === 'string' && BRANCH_ID_RE.test(branch);
+  if (shaped && (!branches.length || branches.includes(branch))) return branch;
+  return branches.length ? branches[0] : '';
+}
+
+// A repeat with an unknown unit has no salvageable meaning and becomes "once".
+// `every` does have one — the user asked for a recurrence — so it is coerced to
+// a positive integer rather than throwing the whole rule away.
+function repairScheduleRepeat(repeat) {
+  if (!repeat || typeof repeat !== 'object') return null;
+  if (!SCHEDULE_UNITS.includes(repeat.unit)) return null;
+  const every = Math.max(1, Math.floor(Number(repeat.every)) || 1);
+  return { every, unit: repeat.unit };
+}
+
+function repairScheduleEnd(end) {
+  if (end && typeof end === 'object') {
+    if (end.type === 'count') {
+      const n = Math.floor(Number(end.n));
+      if (Number.isFinite(n) && n >= 1) return { type: 'count', n };
+    } else if (end.type === 'until' && parseDayString(end.date)) {
+      return { type: 'until', date: end.date };
+    }
+  }
+  return { type: 'never' };
+}
+
+function repairPlantedList(planted) {
+  if (!Array.isArray(planted)) return [];
+  return [...new Set(planted.filter(d => parseDayString(d)))].sort();
+}
+
+// Branch ids as the schedule sees them: whatever the currently loaded week has.
+// Branches are a global concept that week records happen to carry, so the
+// loaded week is the only place to read them from.
+function scheduleBranchIds() {
+  const nodes = weekData && Array.isArray(weekData.nodes) ? weekData.nodes : [];
+  return nodes.filter(n => n.type === 'branch').map(n => n.id);
+}
+
+// A missing record is an empty schedule, never an error — the overwhelmingly
+// common case is a user who has never sent anything to the future.
+async function loadSchedule() {
+  let raw = null;
+  try {
+    raw = await loadValueIDB(SCHEDULE_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[zenit-week] Failed to load schedule from IndexedDB:', e);
+  }
+  scheduleData = validateAndRepairSchedule(raw, scheduleBranchIds());
+  return scheduleData;
+}
+
+// Returns whether the write landed. A failed schedule write must never take a
+// week open down with it: the schedule is an accessory to the week, not a
+// prerequisite for it.
+async function saveSchedule(data) {
+  if (data) scheduleData = data;
+  try {
+    await saveValueIDB(SCHEDULE_STORAGE_KEY, scheduleData);
+    scheduleScheduleSync();
+    return true;
+  } catch (e) {
+    console.warn('[zenit-week] Failed to save schedule to IndexedDB:', e);
+    return false;
+  }
 }
 
 // ─── Dev-only reset ───────────────────────────────────────────────────────────
@@ -5768,6 +6031,9 @@ function takeSnapshot() {
     nextWeekRaw:   _nextWeekRawCache,
     theme:         localStorage.getItem('zenit-week-theme'),
     lang:          localStorage.getItem('zenit-week-lang'),
+    // Read back only for the ids an operation reports touching, so this is a
+    // lookup table and not a whole-schedule rollback.
+    scheduleRaw:   JSON.stringify(scheduleData),
   };
   undoStack.push(JSON.stringify(snapshot));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
@@ -5793,13 +6059,26 @@ function _noteNextWeekAdditions(nextWeekKey, addedIds) {
   undoStack[i] = JSON.stringify(snap);
 }
 
+// Record which schedule entries an operation just created, on the snapshot the
+// next undo will restore — the schedule half of _noteNextWeekAdditions, and for
+// the same reason: takeSnapshot runs before the operation knows the entry id.
+function _noteScheduleAdditions(entryIds) {
+  if (!entryIds?.length || undoStack.length === 0) return;
+  const i = undoStack.length - 1;
+  let snap;
+  try { snap = JSON.parse(undoStack[i]); } catch { return; }
+  snap.scheduleTouched = [...new Set([...(snap.scheduleTouched || []), ...entryIds])];
+  undoStack[i] = JSON.stringify(snap);
+}
+
 // Carry an operation's next-week additions onto the counter-snapshot pushed to
 // the opposite stack, so redo re-inserts exactly what undo removed (and back).
-function _withNextWeekAdded(rawSnapshot, addedIds) {
-  if (!addedIds?.length) return rawSnapshot;
+function _withUndoScope(rawSnapshot, addedIds, scheduleTouched) {
+  if (!addedIds?.length && !scheduleTouched?.length) return rawSnapshot;
   try {
     const s = JSON.parse(rawSnapshot);
-    s.nextWeekAdded = [...addedIds];
+    if (addedIds?.length) s.nextWeekAdded = [...addedIds];
+    if (scheduleTouched?.length) s.scheduleTouched = [...scheduleTouched];
     return JSON.stringify(s);
   } catch { return rawSnapshot; }
 }
@@ -5844,6 +6123,27 @@ async function _applySnapshot(raw) {
     _undoRedoForcePush.add(primaryKey);
     await saveWeek(primaryKey, restoredPrimary);
   });
+
+  // ── Schedule entries ──────────────────────────────────────────────────────
+  // Reversed exactly the way the next week's additions are: for each id the
+  // operation reported touching, make the live schedule agree with this
+  // snapshot's copy of it. Every other entry is left alone, so an undo of a
+  // send never disturbs a series created before it.
+  const schedTouched = Array.isArray(snapshot.scheduleTouched) ? snapshot.scheduleTouched : [];
+  if (schedTouched.length) {
+    let snapSchedule = { entries: [] };
+    if (snapshot.scheduleRaw) {
+      try { snapSchedule = JSON.parse(snapshot.scheduleRaw); } catch { snapSchedule = { entries: [] }; }
+    }
+    const snapEntries = new Map((snapSchedule.entries || []).map(e => [e.id, e]));
+    const touched = new Set(schedTouched);
+    scheduleData.entries = scheduleData.entries.filter(e => !touched.has(e.id));
+    for (const id of schedTouched) {
+      const e = snapEntries.get(id);
+      if (e) scheduleData.entries.push({ ...e, _ts: tsNow });
+    }
+    await saveSchedule();
+  }
 
   // ── Next week ─────────────────────────────────────────────────────────────
   // Reverse only what this operation did to the next week, node by node.
@@ -5999,6 +6299,7 @@ async function _currentSnapshot(wk = currentWeekKey) {
     nextWeekRaw:   nextRaw,
     theme:         localStorage.getItem('zenit-week-theme'),
     lang:          localStorage.getItem('zenit-week-lang'),
+    scheduleRaw:   JSON.stringify(scheduleData),
   });
 }
 
@@ -6007,7 +6308,7 @@ async function undo() {
   const raw = undoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
-  redoStack.push(_withNextWeekAdded(await _currentSnapshot(wk), snap.nextWeekAdded));
+  redoStack.push(_withUndoScope(await _currentSnapshot(wk), snap.nextWeekAdded, snap.scheduleTouched));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -6017,7 +6318,7 @@ async function redo() {
   const raw = redoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
-  undoStack.push(_withNextWeekAdded(await _currentSnapshot(wk), snap.nextWeekAdded));
+  undoStack.push(_withUndoScope(await _currentSnapshot(wk), snap.nextWeekAdded, snap.scheduleTouched));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -6886,6 +7187,9 @@ let etagCache = new Map();        // weekKey → ETag from last Drive pull
 let syncDebounceTimers = new Map(); // wKey → debounce timer id (per-week)
 let colorsSyncDebounceTimer = null;
 let colorsSyncedHash = null;
+let scheduleSyncDebounceTimer = null;
+let scheduleSyncedHash = null;
+let lastSeenRemoteScheduleHash = null; // Drive appProperty contentHash the poll last reconciled for the schedule
 let lastSeenRemoteColorsHash = null; // Drive appProperty contentHash the poll last reconciled for colors (may be a legacy raw-JSON hash; same decoupling as lastSeenRemoteHash for weeks)
 let tokenRenewalTimer = null;
 let _tokenReceivedAt = 0;         // epoch ms when current access token was obtained
@@ -7411,6 +7715,7 @@ async function signOut() {
   if (tokenRenewalTimer)        { clearInterval(tokenRenewalTimer);        tokenRenewalTimer = null; }
   clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer)  { clearTimeout(colorsSyncDebounceTimer);   colorsSyncDebounceTimer = null; }
+  if (scheduleSyncDebounceTimer) { clearTimeout(scheduleSyncDebounceTimer); scheduleSyncDebounceTimer = null; }
 
   // Flush pending uploads BEFORE tearing down auth so no edits are lost
   if (googleAccessToken) {
@@ -7433,6 +7738,8 @@ async function signOut() {
 
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  scheduleSyncedHash = null;
+  lastSeenRemoteScheduleHash = null;
   const token  = googleAccessToken;
   googleAccessToken = null;
   _driveSessionStarted = false;
@@ -8178,6 +8485,9 @@ async function initDriveSync(onShownWeekReady = () => {}) {
     const shownKey = currentWeekKey || todayWeekKey();
     const endFirst = traceSpan('drive:shown-week ' + shownKey);
     const colorsPull = syncColorsFromDrive();
+    // Started here and never awaited on the critical path: nothing on screen
+    // waits for it, and a schedule that fails to pull must not delay the week.
+    syncScheduleFromDrive().then(() => syncScheduleToDrive(), () => {});
     const endColors = traceSpan('drive:colors-pull');
     colorsPull.then(() => endColors(), () => endColors('failed'));
     const endList = traceSpan('drive:list-weeks');
@@ -8473,6 +8783,8 @@ async function forcePushAllToDrive() {
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  scheduleSyncedHash = null;
+  lastSeenRemoteScheduleHash = null;
 
   setSyncStatus('syncing', 'sync.msg.uploadingImport');
 
@@ -8784,6 +9096,141 @@ function scheduleColorsSync() {
   }, 10000);
 }
 
+// ─── Schedule sync ────────────────────────────────────────────────────────────
+// The schedule is its own Drive file, beside the colors blob, for the reason
+// week files are their own: it changes on its own schedule and must fail on its
+// own too. A schedule upload that errors never touches a week's sync state, and
+// a week that fails to upload never blocks the schedule — the two paths share
+// no retry counter, no debounce timer and no hash.
+
+// Content signature for the schedule, the analogue of weekContentHash. Entry
+// order is not content — two devices can hold the same entries in a different
+// order — so entries sort by id, and _ts is kept because it is the merge input
+// rather than churn: a bumped _ts is a real change the other device must see.
+function scheduleContentHash(data) {
+  if (!data || typeof data !== 'object') return fnv1a32(JSON.stringify(data));
+  const entries = [...(data.entries || [])]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map(e => JSON.stringify(e, Object.keys(e).sort()));
+  const tombstones = [...(data.tombstones || [])].sort();
+  return fnv1a32(JSON.stringify({ entries, tombstones }));
+}
+
+// Per-entry last-write-wins on _ts, with tombstones winning outright. An entry
+// the other device retired stays retired even when this one edited it more
+// recently: the user deleted a standing intention, and a stale edit to it is
+// not an argument for bringing it back.
+function mergeSchedule(local, remote) {
+  const l = local && typeof local === 'object' ? local : emptySchedule();
+  const r = remote && typeof remote === 'object' ? remote : emptySchedule();
+  const tombstones = new Set([...(l.tombstones || []), ...(r.tombstones || [])]);
+
+  const byId = new Map();
+  for (const e of (l.entries || [])) if (e && e.id) byId.set(e.id, { ...e });
+  for (const e of (r.entries || [])) {
+    if (!e || !e.id) continue;
+    const existing = byId.get(e.id);
+    // Remote wins a tie, the same convention mergeWeekData uses.
+    if (!existing || (e._ts || 0) >= (existing._ts || 0)) byId.set(e.id, { ...e });
+  }
+  for (const id of tombstones) byId.delete(id);
+
+  return {
+    entries: [...byId.values()],
+    tombstones: [...tombstones],
+    crdtVersion: Math.max(l.crdtVersion || 0, r.crdtVersion || 0),
+  };
+}
+
+async function syncScheduleToDrive() {
+  if (!googleAccessToken) return;
+  const stored = await loadValueIDB(SCHEDULE_STORAGE_KEY);
+  if (!stored) return;
+  const json = JSON.stringify(stored);
+  const hash = scheduleContentHash(stored);
+  if (scheduleSyncedHash === hash) return;
+  const savedAt = stored.savedAt ?? 0;
+  const MAX_RETRIES = 3;
+  let delay = 1000;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const fileId = await getDriveFileId('schedule');
+      const boundary = 'ZenitWeek_' + Date.now();
+      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
+      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
+      const resp = await authFetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+      );
+      if (resp.status === 401) return;
+      if (resp.status === 404) { forgetDriveFileId('schedule'); continue; } // stale id — re-resolve
+      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+        delay *= 2;
+        continue;
+      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      scheduleSyncedHash = hash;
+      return;
+    } catch (err) {
+      if (attempt >= MAX_RETRIES) {
+        // Logged, not surfaced as a sync failure: the weeks are what the status
+        // line speaks for, and a schedule that will retry on the next change
+        // must not make a healthy week sync look broken.
+        console.error('[Drive] syncScheduleToDrive error:', err);
+        return;
+      }
+    }
+  }
+}
+
+async function syncScheduleFromDrive() {
+  if (!googleAccessToken) return;
+  try {
+    const fileId = await getDriveFileId('schedule');
+    const resp = await authFetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+    );
+    if (resp.status === 401) return;
+    if (resp.status === 404) { forgetDriveFileId('schedule'); return; }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const remoteJson = await resp.text();
+    if (!remoteJson.trim()) return;
+
+    const rawRemote = JSON.parse(remoteJson);
+    const remoteHash = scheduleContentHash(rawRemote);
+    const remote = validateAndRepairSchedule(rawRemote, scheduleBranchIds());
+    const local = await loadValueIDB(SCHEDULE_STORAGE_KEY);
+    const merged = mergeSchedule(local || emptySchedule(), remote);
+
+    const mergedHash = scheduleContentHash(merged);
+    const localHash = scheduleContentHash(local || emptySchedule());
+    if (mergedHash !== localHash) {
+      merged.crdtVersion = (merged.crdtVersion || 0) + 1;
+      scheduleData = merged;
+      await saveValueIDB(SCHEDULE_STORAGE_KEY, merged);
+      if (currentView === 'agenda') renderAgenda();
+    }
+    // The merge added nothing the file lacks — record it as synced so the poll
+    // stops re-downloading an unchanged schedule every cycle. When the merge
+    // taught us something the file does not have, leave the hash alone so the
+    // next upload carries it back.
+    if (mergedHash === remoteHash) scheduleSyncedHash = remoteHash;
+    else scheduleSyncedHash = null;
+  } catch (err) {
+    console.error('[Drive] syncScheduleFromDrive error:', err);
+  }
+}
+
+function scheduleScheduleSync() {
+  if (!googleAccessToken) return;
+  if (scheduleSyncDebounceTimer) clearTimeout(scheduleSyncDebounceTimer);
+  scheduleSyncDebounceTimer = setTimeout(() => {
+    scheduleSyncDebounceTimer = null;
+    syncScheduleToDrive();
+  }, 10000);
+}
+
 // ─── Background poll: cheap metadata-only check every 10s ────────────────────
 async function pollDriveMeta(wKey) {
   if (!googleAccessToken) return;
@@ -8816,6 +9263,30 @@ async function pollDriveMeta(wKey) {
           lastSeenRemoteColorsHash = remoteColorsHash;
         }
       }
+    }
+
+    // The schedule, guarded and contained on its own: wrapped so a failure here
+    // cannot skip the week checks below, which is the whole of its claim to
+    // being independent of them.
+    try {
+      const scheduleId = driveFileIdCache.get('schedule');
+      if (scheduleId) {
+        const sResp = await authFetch(
+          `https://www.googleapis.com/drive/v3/files/${scheduleId}?fields=appProperties`
+        );
+        if (sResp.ok) {
+          const { appProperties: sProps } = await sResp.json();
+          const remoteScheduleHash = sProps?.contentHash;
+          if (remoteScheduleHash &&
+              remoteScheduleHash !== scheduleSyncedHash &&
+              remoteScheduleHash !== lastSeenRemoteScheduleHash) {
+            await syncScheduleFromDrive();
+            lastSeenRemoteScheduleHash = remoteScheduleHash;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Drive] schedule poll error:', err);
     }
 
     // Week file hash check for the current week ±1. At week boundaries the user
@@ -8862,7 +9333,7 @@ function _wKeyForDriveFileName(name) {
   const m = /^zenit-week-(.+)\.json$/.exec(name || '');
   if (!m) return null;
   const key = m[1];
-  if (key === 'colors') return 'colors';
+  if (key === 'colors' || key === 'schedule') return key;
   return /^\d{4}-\d{2}$/.test(key) ? key : null;
 }
 
@@ -8916,6 +9387,11 @@ async function pollDriveChanges(_wKey) {
           if (remoteHash !== colorsSyncedHash && remoteHash !== lastSeenRemoteColorsHash) {
             await syncColorsFromDrive();
             lastSeenRemoteColorsHash = remoteHash;
+          }
+        } else if (k === 'schedule') {
+          if (remoteHash !== scheduleSyncedHash && remoteHash !== lastSeenRemoteScheduleHash) {
+            await syncScheduleFromDrive();
+            lastSeenRemoteScheduleHash = remoteHash;
           }
         } else if (remoteHash !== String(lastSyncedHash.get(k)) &&
                    remoteHash !== lastSeenRemoteHash.get(k)) {
@@ -8976,6 +9452,8 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  scheduleSyncedHash = null;
+  lastSeenRemoteScheduleHash = null;
   _remoteOriginIds.clear();
   // The undo stack describes data that no longer exists; replaying it would
   // write the discarded content straight back.
@@ -9038,6 +9516,13 @@ let contextTarget = null;  // node id
 // resolved via pickRepresentativeTick. specificTickId is set for per-tick log
 // rows in the Done section; null means "pick by tick state at click time".
 let agendaTickCtx = null; // { parentId, specificTickId|null } or null
+// Set while the context menu belongs to a Later row. A Later row is an entry
+// and a future date, not a node — its id names a node that does not exist yet —
+// so every node-level action would be handed undefined. The menu therefore
+// hides everything by default in this mode and shows only what acts on an
+// entry, which also means a menu item added later cannot appear here by
+// accident and act on a phantom.
+let agendaEntryCtx = null; // { entryId, date } or null
 let editState = null;           // { nodeId, isNew, originalLabel }
 let _editJustCommitted = false; // true for 600ms after commit, guards resize handler
 let hoveredNodeId = null;  // Track currently hovered node
@@ -9084,10 +9569,185 @@ function getWeekBounds(year, week) {
   return { monday, sunday };
 }
 
+// ─── Occurrence math ──────────────────────────────────────────────────────────
+// Pure calendar arithmetic over 'YYYY-MM-DD' strings for schedule entries.
+// Nothing here reads app state, touches the DOM or carries a time of day: an
+// occurrence is a local calendar date, never a moment. Date.UTC values are only
+// ever read back through getUTC*, so no local offset can shift a date across a
+// day boundary. 'YYYY-MM-DD' strings with a 4-digit year compare chronologically
+// under plain string comparison, which is how ordering is decided below.
+
+const SCHEDULE_UNITS = ['day', 'week', 'month', 'year'];
+const OCCURRENCE_SCAN_LIMIT = 4000; // guard against a pathologically wide range
+
+function daysInMonth(y, m) {
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  return [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
+}
+
+function parseDayString(str) {
+  if (typeof str !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (mo < 1 || mo > 12) return null;
+  if (d < 1 || d > daysInMonth(y, mo)) return null;
+  return { y, m: mo, d };
+}
+
+function formatDayString(y, m, d) {
+  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function dayNumber(part) {
+  const dt = new Date(0);
+  dt.setUTCFullYear(part.y, part.m - 1, part.d);
+  return Math.round(dt.getTime() / 86400000);
+}
+
+function dayStringFromNumber(n) {
+  const dt = new Date(n * 86400000);
+  return formatDayString(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+}
+
+// Normalised repeat rule for an entry, or null when it can never produce an
+// occurrence. `stepDays` / `stepMonths` are mutually exclusive; both zero means
+// the entry yields its anchor alone.
+function scheduleRule(entry) {
+  if (!entry) return null;
+  const anchor = parseDayString(entry.anchor);
+  if (!anchor) return null;
+  const rule = { anchor, anchorStr: entry.anchor, stepDays: 0, stepMonths: 0, maxIndex: 0, until: null };
+  const rep = entry.repeat;
+  const every = rep ? Math.floor(Number(rep.every)) : 0;
+  if (rep && SCHEDULE_UNITS.includes(rep.unit) && Number.isFinite(every) && every > 0) {
+    if (rep.unit === 'day') rule.stepDays = every;
+    else if (rep.unit === 'week') rule.stepDays = every * 7;
+    else if (rep.unit === 'month') rule.stepMonths = every;
+    else rule.stepMonths = every * 12;
+    rule.maxIndex = Infinity;
+  }
+  const end = entry.end;
+  if (end && end.type === 'count') {
+    const n = Math.floor(Number(end.n));
+    if (!Number.isFinite(n) || n < 1) return null;
+    rule.maxIndex = Math.min(rule.maxIndex, n - 1);
+  } else if (end && end.type === 'until' && parseDayString(end.date)) {
+    rule.until = end.date;
+  }
+  return rule;
+}
+
+// The k-th occurrence (k = 0 is the anchor). Month and year steps are measured
+// from the anchor every time, so a clamped month never shifts the anchor
+// permanently: 31 Jan + 1 month is 28/29 Feb, + 2 months is back to 31 Mar.
+function occurrenceAt(rule, k) {
+  if (rule.stepMonths) {
+    const total = rule.anchor.y * 12 + (rule.anchor.m - 1) + k * rule.stepMonths;
+    const y = Math.floor(total / 12);
+    const m = total % 12 + 1;
+    return formatDayString(y, m, Math.min(rule.anchor.d, daysInMonth(y, m)));
+  }
+  if (rule.stepDays) return dayStringFromNumber(dayNumber(rule.anchor) + k * rule.stepDays);
+  return rule.anchorStr;
+}
+
+// Index of the first occurrence on or after `fromStr`, ignoring end conditions.
+// null when a non-repeating entry's anchor is already in the past.
+function firstIndexFrom(rule, fromStr) {
+  if (fromStr <= rule.anchorStr) return 0;
+  if (rule.stepDays) {
+    const diff = dayNumber(parseDayString(fromStr)) - dayNumber(rule.anchor);
+    return Math.max(0, Math.ceil(diff / rule.stepDays));
+  }
+  if (rule.stepMonths) {
+    const from = parseDayString(fromStr);
+    const months = (from.y * 12 + from.m - 1) - (rule.anchor.y * 12 + rule.anchor.m - 1);
+    let k = Math.max(0, Math.floor(months / rule.stepMonths));
+    while (k > 0 && occurrenceAt(rule, k - 1) >= fromStr) k--;
+    while (occurrenceAt(rule, k) < fromStr) k++;
+    return k;
+  }
+  return null;
+}
+
+// First occurrence on or after `fromDate`, or null when the end condition is
+// exhausted. Both arguments and the result are 'YYYY-MM-DD'.
+function nextOccurrence(entry, fromDate) {
+  const rule = scheduleRule(entry);
+  if (!rule || !parseDayString(fromDate)) return null;
+  const k = firstIndexFrom(rule, fromDate);
+  if (k === null || k > rule.maxIndex) return null;
+  const date = occurrenceAt(rule, k);
+  if (rule.until && date > rule.until) return null;
+  return date;
+}
+
+// Every occurrence in the inclusive range, in ascending order.
+function occurrencesInRange(entry, fromDate, toDate) {
+  const out = [];
+  const rule = scheduleRule(entry);
+  if (!rule || !parseDayString(fromDate) || !parseDayString(toDate) || toDate < fromDate) return out;
+  let k = firstIndexFrom(rule, fromDate);
+  if (k === null) return out;
+  for (let i = 0; i < OCCURRENCE_SCAN_LIMIT && k <= rule.maxIndex; i++, k++) {
+    const date = occurrenceAt(rule, k);
+    if (date > toDate) break;
+    if (rule.until && date > rule.until) break;
+    out.push(date);
+  }
+  return out;
+}
+
+// The last `limit` occurrences ending on or before `toDate`, ascending. The
+// sweep needs the newest missed occurrence, not the oldest, and a device that
+// has been away for years must not pay for the whole gap to find it — so this
+// lands on the final index by arithmetic and walks back a bounded number of
+// steps, never forward across the absence.
+function occurrencesBefore(entry, toDate, limit = 1) {
+  const out = [];
+  const rule = scheduleRule(entry);
+  if (!rule || !parseDayString(toDate) || rule.anchorStr > toDate) return out;
+
+  let k;
+  if (rule.stepDays) {
+    k = Math.floor((dayNumber(parseDayString(toDate)) - dayNumber(rule.anchor)) / rule.stepDays);
+  } else if (rule.stepMonths) {
+    const to = parseDayString(toDate);
+    const months = (to.y * 12 + to.m - 1) - (rule.anchor.y * 12 + rule.anchor.m - 1);
+    k = Math.max(0, Math.floor(months / rule.stepMonths));
+    while (k > 0 && occurrenceAt(rule, k) > toDate) k--;
+    while (occurrenceAt(rule, k + 1) <= toDate) k++;
+  } else {
+    k = 0;
+  }
+  if (Number.isFinite(rule.maxIndex)) k = Math.min(k, rule.maxIndex);
+  // An `until` that falls inside the requested range ends the series earlier
+  // than `toDate` does.
+  while (k > 0 && rule.until && occurrenceAt(rule, k) > rule.until) k--;
+  if (k < 0) return out;
+
+  for (let i = 0; i < limit && k - i >= 0; i++) {
+    const date = occurrenceAt(rule, k - i);
+    if (date > toDate) continue;
+    if (rule.until && date > rule.until) continue;
+    out.unshift(date);
+  }
+  return out;
+}
+
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const MONTH_NAMES = {
   en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
   cs: ['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec'],
+};
+
+// Czech puts the month in the genitive when a day precedes it — "2. ledna",
+// never "2. leden". MONTH_NAMES is nominative because it names a month on its
+// own, which is what a month heading does; a date needs this list instead.
+const MONTH_NAMES_OF = {
+  en: MONTH_NAMES.en,
+  cs: ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince'],
 };
 
 const TRANSLATIONS = {
@@ -9183,6 +9843,10 @@ const TRANSLATIONS = {
     'confirm.deleteTitle':        'Delete task?',
     'confirm.deleteBody':         'This removes it permanently.',
     'confirm.deleteDropHint':     'A dropped task stays in the week and counts toward your stats.',
+    'confirm.deleteEntryTitle':   'Delete scheduled task?',
+    'confirm.deleteEntryBody':    'Delete only this occurrence, or the whole series? Occurrences already delivered to a week stay exactly where they are.',
+    'confirm.deleteEntryOccurrence': 'This occurrence',
+    'confirm.deleteEntrySeries':  'Whole series',
     'menu.done':                  'Done',
     'menu.undone':                'Undone',
     'menu.dropped':               'Dropped',
@@ -9193,6 +9857,27 @@ const TRANSLATIONS = {
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
     'toast.movedToNextWeek':      'Added to next week',
+    'menu.sendToDate':            'Date',
+    'agenda.later':               'Later',
+    'help.laterTab':              'Later (upcoming dates)',
+    'help.featureSendFutureLead': 'Send to date',
+    'help.featureSendFutureBody': ' — hand a task without sub-tasks to a future date, once or repeating; it arrives in the week that owns that date',
+    'help.sendToDateHint':        'Right-click a task with no sub-tasks → Reschedule → Date.',
+    'agenda.emptyLater':          'Nothing scheduled beyond this week.',
+    'sendFuture.title':           'Set a date',
+    'sendFuture.date':            'Date',
+    'sendFuture.repeat':          'Repeat',
+    'sendFuture.noRepeat':        'No repeat',
+    'sendFuture.unitDay':         'days',
+    'sendFuture.unitWeek':        'weeks',
+    'sendFuture.unitMonth':       'months',
+    'sendFuture.unitYear':        'years',
+    'sendFuture.end':             'Ends',
+    'sendFuture.endNever':        'Never',
+    'sendFuture.endCount':        'After',
+    'sendFuture.endUntil':        'On date',
+    'sendFuture.ok':              'Set',
+    'toast.sentToFuture':         'Set for {date}',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
     'menu.prioCritical':          'Priority Critical',
@@ -9513,6 +10198,10 @@ const TRANSLATIONS = {
     'confirm.deleteTitle':        'Smazat úkol?',
     'confirm.deleteBody':         'Tato akce ho odstraní natrvalo.',
     'confirm.deleteDropHint':     'Vyřazený úkol zůstane v týdnu a započítá se do statistik.',
+    'confirm.deleteEntryTitle':   'Smazat naplánovaný úkol?',
+    'confirm.deleteEntryBody':    'Smazat jen tento výskyt, nebo celou sérii? Výskyty, které už do nějakého týdne dorazily, zůstanou beze změny.',
+    'confirm.deleteEntryOccurrence': 'Tento výskyt',
+    'confirm.deleteEntrySeries':  'Celou sérii',
     'menu.done':                  'Hotovo',
     'menu.undone':                'Nesplněno',
     'menu.dropped':               'Vyřazeno',
@@ -9523,6 +10212,27 @@ const TRANSLATIONS = {
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
+    'menu.sendToDate':            'Datum',
+    'agenda.later':               'Později',
+    'help.laterTab':              'Později (nadcházející data)',
+    'help.featureSendFutureLead': 'Odeslat na datum',
+    'help.featureSendFutureBody': ' — pošli úkol bez podúkolů na budoucí datum, jednorázově nebo opakovaně; objeví se v týdnu, do kterého datum patří',
+    'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů → Přeplánovat → Datum.',
+    'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
+    'sendFuture.title':           'Nastavit datum',
+    'sendFuture.date':            'Datum',
+    'sendFuture.repeat':          'Opakování',
+    'sendFuture.noRepeat':        'Bez opakování',
+    'sendFuture.unitDay':         'dní',
+    'sendFuture.unitWeek':        'týdnů',
+    'sendFuture.unitMonth':       'měsíců',
+    'sendFuture.unitYear':        'let',
+    'sendFuture.end':             'Konec',
+    'sendFuture.endNever':        'Nikdy',
+    'sendFuture.endCount':        'Po',
+    'sendFuture.endUntil':        'K datu',
+    'sendFuture.ok':              'Nastavit',
+    'toast.sentToFuture':         'Nastaveno na {date}',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
     'menu.prioCritical':          'Priorita Kritická',
@@ -10552,6 +11262,11 @@ async function transferUnfinished() {
         _ts: Date.now(),
       };
       delete newNode.droppedAt;
+      // A carried-forward copy is an ordinary task, not the occurrence it came
+      // from: keeping the pair would let a later materialisation mistake it for
+      // a delivery it had already made.
+      delete newNode.schedId;
+      delete newNode.schedDate;
       // Transferring an unplanned task re-plans it: it was chosen for this week,
       // so the badge and its arrival stamp don't carry over.
       delete newNode.unplannedAt;
@@ -10612,6 +11327,210 @@ async function transferUnfinished() {
   endAtomicOp();
   renderIfVisible();
   applyAutoLayout();
+}
+
+// ─── Materialisation ──────────────────────────────────────────────────────────
+// A schedule entry is a standing intention; it becomes visible only when the
+// week that owns its date is opened. Nothing runs on a timer, in the background
+// or in the service worker — the weekly ritual is the delivery mechanism.
+
+// The seven local calendar dates of an ISO week, Monday first. getWeekBounds
+// returns UTC-midnight Dates, so they are read back through getUTC* rather than
+// through localDateStr, which would shift the week by a day west of Greenwich.
+function weekDayStrings(wk) {
+  const { year, week } = parseWeekKey(wk);
+  if (!Number.isFinite(year) || !Number.isFinite(week)) return null;
+  const { monday } = getWeekBounds(year, week);
+  const start = dayNumber({ y: monday.getUTCFullYear(), m: monday.getUTCMonth() + 1, d: monday.getUTCDate() });
+  return Array.from({ length: 7 }, (_, i) => dayStringFromNumber(start + i));
+}
+
+// Weekday index in the app's convention (0 = Sunday … 6 = Saturday), matching
+// dayIndex on day-children and the 1–7 hotkeys via isoWeekPos.
+function weekdayOfDayString(str) {
+  const part = parseDayString(str);
+  if (!part) return null;
+  return new Date(dayNumber(part) * 86400000).getUTCDay();
+}
+
+// Both nodes an occurrence plants carry derived ids, the parent and its day
+// leaf alike. A genId() day leaf would converge badly: two devices opening the
+// same week offline would agree on the activity and then merge two different
+// day children under it.
+function occurrenceDayNodeId(schedId, schedDate) {
+  return occurrenceNodeId(schedId, schedDate + ':day');
+}
+
+// Plants every occurrence the schedule owes this week into `data`, in place.
+// Returns whether anything was planted, so the caller can skip the write when
+// there is nothing to save — a week with no due occurrences must come out of
+// this byte-identical to how it went in.
+//
+// Idempotence rests entirely on the derived node id being checked against both
+// `nodes` and `tombstones`: reopening a week plants nothing, a deleted
+// occurrence never returns, and two devices converge on one node rather than
+// two. The entry's own bookkeeping is never consulted for that question.
+// Plants one occurrence into `data` on `dayIndex`, or returns false when the
+// week already has it, has tombstoned it, or has nowhere to put it.
+//
+// `dayIndex` is passed rather than derived because a swept occurrence lands on
+// this week's Monday while its schedDate still records the day it was really
+// due — the agenda row and the Later tab show that real date.
+function plantOccurrence(ctx, entry, date, dayIndex) {
+  const id = occurrenceNodeId(entry.id, date);
+  const dayId = occurrenceDayNodeId(entry.id, date);
+  if (ctx.byId.has(id) || ctx.byId.has(dayId)) return false;
+  if (ctx.tombstoned.has(id) || ctx.tombstoned.has(dayId)) return false;
+
+  // An entry filed under a branch this week does not have lands on the first
+  // branch rather than nowhere — the obligation outlives the category, exactly
+  // as validateAndRepairSchedule decides it.
+  const branch = ctx.branchIds.includes(entry.branch) ? entry.branch : ctx.branchIds[0];
+  const branchNode = ctx.byId.get(branch);
+  const stamp = Date.now();
+  const priority = entry.priority && entry.priority !== 'normal' ? entry.priority : null;
+
+  const node = {
+    id, type: 'activity', branch, parent: branch,
+    label: entry.label, done: false, unplanned: false,
+    priority, reusable: false,
+    children: [dayId],
+    schedId: entry.id, schedDate: date,
+    _ts: stamp,
+  };
+  const dayNode = {
+    id: dayId, type: 'activity', dayChild: true, dayIndex,
+    branch, parent: id,
+    label: dayAbbr(dayIndex),
+    done: false, unplanned: false,
+    priority, reusable: false,
+    children: [], _ts: stamp,
+  };
+  ctx.data.nodes.push(node, dayNode);
+  ctx.byId.set(id, node);
+  ctx.byId.set(dayId, dayNode);
+  branchNode.children = Array.isArray(branchNode.children) ? branchNode.children : [];
+  branchNode.children.push(id);
+  return true;
+}
+
+// Shared preamble for both passes: the week's own branches, the ids it already
+// holds, and the ids it has buried. Returns null when the week cannot receive
+// an occurrence at all.
+function occurrenceContext(data) {
+  if (!data || !Array.isArray(data.nodes)) return null;
+  const branchIds = data.nodes.filter(n => n.type === 'branch').map(n => n.id);
+  if (!branchIds.length) return null;
+  return {
+    data,
+    branchIds,
+    byId: new Map(data.nodes.map(n => [n.id, n])),
+    tombstoned: new Set(Array.isArray(data.tombstones) ? data.tombstones : []),
+  };
+}
+
+function materialiseWeek(wk, data) {
+  if (!scheduleData || !Array.isArray(scheduleData.entries) || !scheduleData.entries.length) return false;
+  const week = weekDayStrings(wk);
+  if (!week) return false;
+  const ctx = occurrenceContext(data);
+  if (!ctx) return false;
+
+  let planted = false;
+  scheduleData.entries.forEach(entry => {
+    occurrencesInRange(entry, week[0], week[6]).forEach(date => {
+      if (!plantOccurrence(ctx, entry, date, weekdayOfDayString(date))) return;
+      planted = true;
+      // `planted` records occurrences delivered ahead of the low-water mark, so
+      // the sweep does not deliver them a second time. Only the sweep itself
+      // may move plantedThrough (spec §3.3).
+      if (!Array.isArray(entry.planted)) entry.planted = [];
+      if ((!entry.plantedThrough || date > entry.plantedThrough) && !entry.planted.includes(date)) {
+        entry.planted.push(date);
+        entry.planted.sort();
+        entry._ts = Date.now();
+        _scheduleDirty = true;
+      }
+    });
+  });
+
+  // The past-due sweep belongs to the current week alone: a week in the past is
+  // history, and a week in the future has not happened yet. Running it here
+  // rather than at a second hook keeps one call site on the week-open path.
+  if (wk === todayWeekKey() && sweepPastDue(week, ctx)) planted = true;
+  return planted;
+}
+
+// Delivers what the schedule owed while nobody was looking. Anything due after
+// the entry's low-water mark and before this Monday is missed; it arrives on
+// this week's Monday leaf, so it reads as overdue from Tuesday on through the
+// existing machinery and as simply due today on Monday itself.
+//
+// One item per entry, not one per missed date. A device restored from a
+// year-old backup owes the user an obligation, not a year of identical rows —
+// the newest missed occurrence is the one still worth acting on.
+function sweepPastDue(week, ctx) {
+  const monday = week[0];
+  const sunday = week[6];
+  const lastPast = dayStringFromNumber(dayNumber(parseDayString(monday)) - 1);
+  let planted = false;
+
+  scheduleData.entries.forEach(entry => {
+    if (!Array.isArray(entry.planted)) entry.planted = [];
+    const floor = entry.plantedThrough;
+    if (!floor || floor < lastPast) {
+      // Walk back only as far as the ahead-of-time deliveries could reach: an
+      // occurrence already planted when the user browsed into its own week must
+      // not arrive a second time here (the deterministic id covers the same
+      // case independently, and both are meant to hold).
+      const candidates = occurrencesBefore(entry, lastPast, entry.planted.length + 1);
+      for (let i = candidates.length - 1; i >= 0; i--) {
+        const date = candidates[i];
+        if (floor && date <= floor) break;
+        if (entry.planted.includes(date)) continue;
+        if (plantOccurrence(ctx, entry, date, 1)) planted = true;
+        break;
+      }
+    }
+    // Everything up to this Sunday is now accounted for, so the sparse list of
+    // early deliveries below that line has nothing left to remember.
+    const pruned = entry.planted.filter(d => d > sunday);
+    if (entry.plantedThrough !== sunday || pruned.length !== entry.planted.length) {
+      entry.plantedThrough = sunday;
+      entry.planted = pruned;
+      entry._ts = Date.now();
+      _scheduleDirty = true;
+    }
+  });
+
+  return planted;
+}
+
+// The one place a week becomes the week on screen. loadAndRender (arrows, week
+// bar, boot) and the hashchange handler (URL, back/forward) both route through
+// it, so materialisation is hooked once rather than at every entry point.
+//
+// The lock is the same one the transfer paths take, so a Drive pull or peer-tab
+// merge cannot interleave between the plant and the write. It is NOT re-entrant:
+// nothing called from inside it may take a week lock of its own. saveWeek and
+// saveSchedule only queue their sync work, which is why they are safe here.
+// No snapshot is taken — materialisation is delivery, not a user edit.
+async function openWeekIntoView(wk) {
+  weekData = await loadWeek(wk);
+  if (scheduleData.entries.length) {
+    await withWeekLock(wk, async () => {
+      if (materialiseWeek(wk, weekData)) await saveWeek(wk, weekData);
+      if (_scheduleDirty) {
+        _scheduleDirty = false;
+        await saveSchedule();
+      }
+    });
+  }
+  rebuildNodeMap();
+  syncBranchConfig();
+  // Keep the next-week cache aligned with the week we just navigated to, or a
+  // later move/undo snapshot restores the wrong next-week record.
+  await refreshNextWeekCache();
 }
 
 async function transferReusable() {
@@ -11249,11 +12168,14 @@ function deleteNode(id, { ask = false } = {}) {
   _performDelete(id);
 }
 
-function _performDelete(id) {
+// `snapshot: false` for callers that already took one and want the whole
+// operation to be a single undo step (Send to date… removes the node as the
+// second half of one move).
+function _performDelete(id, { snapshot = true } = {}) {
   const node = findNode(id);
   if (!node) return;
 
-  takeSnapshot();
+  if (snapshot) takeSnapshot();
   const wasTick = node.tickChild === true;
   const origParentId = node.parent;
   const toRemove = new Set([id, ...getDescendantIds(id)]);
@@ -13233,23 +14155,15 @@ function startRenameNode(nodeId) {
   _openInlineInput(nodeId, false);
 }
 
-function startAgendaRename(nodeId) {
-  const node = findNode(nodeId);
-  if (!node) return;
-  const targetId = (node.dayChild || node.tickChild) ? node.parent : nodeId;
-  const target = findNode(targetId);
-  if (!target) return;
-
-  const itemEl = document.querySelector(`#agenda-tab-content .agenda-item[data-node-id="${CSS.escape(nodeId)}"]`);
-  if (!itemEl) return;
+// The inline rename an agenda row uses: the row's label becomes an input in
+// place, Enter and blur commit, Escape reverts. Extracted so a Later row
+// renames by exactly this gesture rather than by one that merely resembles it —
+// only what a commit means differs, and that is the caller's business.
+function openAgendaRowRename(rowId, originalLabel, onCommit, onCancel) {
+  const itemEl = document.querySelector(`#agenda-tab-content .agenda-item[data-node-id="${CSS.escape(rowId)}"]`);
+  if (!itemEl) return false;
   const labelEl = itemEl.querySelector('.daily-log-label');
-  if (!labelEl) return;
-
-  const originalLabel = target.label;
-  takeSnapshot();
-  target._editing = true;
-  editState = { nodeId: targetId, isNew: false, originalLabel, initialNodeW: 0 };
-  beginAtomicOp();
+  if (!labelEl) return false;
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -13266,8 +14180,7 @@ function startAgendaRename(nodeId) {
     if (done) return;
     done = true;
     labelEl.textContent = input.value.trim() || originalLabel;
-    inlineInput.value = input.value;
-    commitEdit();
+    onCommit(input.value);
     if (currentView === 'agenda') renderAgenda();
   }
 
@@ -13275,8 +14188,7 @@ function startAgendaRename(nodeId) {
     if (done) return;
     done = true;
     labelEl.textContent = originalLabel;
-    delete target._editing;
-    cancelEdit();
+    onCancel();
   }
 
   input.addEventListener('keydown', e => {
@@ -13285,6 +14197,55 @@ function startAgendaRename(nodeId) {
     e.stopPropagation();
   });
   input.addEventListener('blur', doCommit);
+  return true;
+}
+
+function startAgendaRename(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
+  const targetId = (node.dayChild || node.tickChild) ? node.parent : nodeId;
+  const target = findNode(targetId);
+  if (!target) return;
+
+  const originalLabel = target.label;
+  takeSnapshot();
+  target._editing = true;
+  editState = { nodeId: targetId, isNew: false, originalLabel, initialNodeW: 0 };
+  beginAtomicOp();
+
+  const opened = openAgendaRowRename(
+    nodeId,
+    originalLabel,
+    value => { inlineInput.value = value; commitEdit(); },
+    () => { delete target._editing; cancelEdit(); },
+  );
+  if (!opened) { delete target._editing; cancelEdit(); }
+}
+
+// Renames the standing intention. Future occurrences carry the new label;
+// occurrences already delivered are ordinary nodes and keep the label their
+// week gave them. A blank name is refused rather than stored, since an entry
+// without one is an entry validateAndRepairSchedule would drop.
+function renameScheduleEntry(entryId, label) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry) return false;
+  const next = typeof label === 'string' ? label.trim().slice(0, 200) : '';
+  if (!next || next === entry.label) return false;
+  entry.label = next;
+  entry._ts = Date.now();
+  saveSchedule();
+  return true;
+}
+
+function startEntryRename(entryId, rowId) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  openAgendaRowRename(
+    rowId,
+    entry.label || '',
+    value => { renameScheduleEntry(entryId, value); },
+    () => {},
+  );
 }
 
 function _openInlineInput(nodeId, isNew) {
@@ -15292,6 +16253,8 @@ const ESC_DISMISSALS = [
   // has to be here rather than in its own listener: a second handler closing it
   // left this walk to fall straight through to the map state underneath, which
   // is how one press both shut the panel and reset Rocks to Sand.
+  { isOpen: () => !!window.isSendFutureOpen && window.isSendFutureOpen(),
+    dismiss: () => { window.closeSendFuture(); } },
   { isOpen: () => !!window.isQuickAddOpen && window.isQuickAddOpen(),
     dismiss: () => { window.closeQuickAdd(); } },
   { isOpen: () => isDayFilterMenuOpen(),
@@ -15359,6 +16322,18 @@ function _windowKeydownHandler(e) {
           e.preventDefault();
           switchView(targetView);
         }
+        return;
+      }
+    }
+    // Later is a tab, not a view, so L both switches to the Agenda and lands on
+    // it. Free: X is dropped and 9 belongs to the numeric day strip. The
+    // editState guard at the top of this handler keeps it off inline renames.
+    if (key === 'l') {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        agendaActiveTab = 'later';
+        if (currentView !== 'agenda') switchView('agenda');
+        else renderAgenda();
         return;
       }
     }
@@ -15853,6 +16828,303 @@ function attachNodeListeners() {
   else paintKbFocus();
 }
 
+
+// ─── Send to date… ────────────────────────────────────────────────────────────
+// Hands a task to a date instead of a week. The node leaves this week and
+// becomes a schedule entry; the week that owns the date materialises it back
+// into an ordinary node when it is opened. This is deliberately not a copy —
+// a stub left behind would be a task the user has to close twice.
+//
+// Only a childless activity can be sent: one entry is one activity, and there
+// is no partial or lossy variant that would silently drop a subtree.
+function canSendToDate(node) {
+  if (!node || node.type !== 'activity') return false;
+  if (node.dayChild || node.tickChild || node.inbox) return false;
+  return !(node.children || []).length;
+}
+
+// The node's own state becomes the entry's: label, branch and priority travel,
+// nothing else. Everything a week gives a node — done, comments, day tags — is
+// a property of that week's copy, not of the standing intention.
+function sendNodeToDate(nodeId, options) {
+  const node = findNode(nodeId);
+  if (!canSendToDate(node)) return null;
+  const anchor = options && options.date;
+  if (!parseDayString(anchor)) return null;
+
+  const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
+  const every = Math.max(1, Math.floor(Number(options.every)) || 1);
+  const entry = {
+    id: genId(),
+    label: node.label || '',
+    branch: node.branch || '',
+    priority: node.priority || 'normal',
+    anchor,
+    repeat: unit ? { every, unit } : null,
+    end: { type: 'never' },
+    plantedThrough: null,
+    planted: [],
+    _ts: Date.now(),
+  };
+  if (unit && options.endType === 'count') {
+    const n = Math.max(1, Math.floor(Number(options.endCount)) || 1);
+    entry.end = { type: 'count', n };
+  } else if (unit && options.endType === 'until' && parseDayString(options.endDate)) {
+    entry.end = { type: 'until', date: options.endDate };
+  }
+
+  // One snapshot covers both halves, so a single undo puts the node back and
+  // takes the entry away again — see _noteScheduleAdditions.
+  takeSnapshot();
+  scheduleData.entries.push(entry);
+  _noteScheduleAdditions([entry.id]);
+  _performDelete(nodeId, { snapshot: false });
+  saveSchedule();
+  return entry;
+}
+
+
+// The week key that owns a calendar date. Built from local components so
+// getISOWeek, which reads local getters, sees the same day the string names.
+function weekKeyForDayString(date) {
+  const part = parseDayString(date);
+  if (!part) return null;
+  const { year, week } = getISOWeek(new Date(part.y, part.m - 1, part.d));
+  return weekKey(year, week);
+}
+
+// Deleting one occurrence writes the tombstone that its week would have written
+// had the user deleted it there. No new field records the exclusion: the
+// idempotence rule already refuses to plant an id the week has buried, so
+// deleting an occurrence before it arrives and deleting it after are the same
+// act performed at different times.
+async function deleteOccurrence(entryId, date) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry || !parseDayString(date)) return false;
+  const wk = weekKeyForDayString(date);
+  if (!wk) return false;
+  const ids = [occurrenceNodeId(entryId, date), occurrenceDayNodeId(entryId, date)];
+
+  await withWeekLock(wk, async () => {
+    const data = wk === currentWeekKey ? weekData : await loadWeek(wk);
+    if (!Array.isArray(data.tombstones)) data.tombstones = [];
+    const buried = new Set(data.tombstones);
+    const live = new Set(ids);
+    data.nodes = data.nodes.filter(n => !live.has(n.id));
+    data.nodes.forEach(n => {
+      if (Array.isArray(n.children)) n.children = n.children.filter(c => !live.has(c));
+    });
+    ids.forEach(id => { if (!buried.has(id)) data.tombstones.push(id); });
+    await saveWeek(wk, data);
+  });
+
+  if (wk === currentWeekKey) {
+    rebuildNodeMap();
+    renderIfVisible();
+  }
+  return true;
+}
+
+// Deleting the series retires the entry and nothing else. Occurrences already
+// delivered are ordinary nodes in weeks the user has already worked in — they
+// are that week's history, not the series', and removing them would rewrite a
+// past the user actually lived.
+async function deleteScheduleSeries(entryId) {
+  const i = scheduleData.entries.findIndex(e => e.id === entryId);
+  if (i === -1) return false;
+  scheduleData.entries.splice(i, 1);
+  if (!Array.isArray(scheduleData.tombstones)) scheduleData.tombstones = [];
+  if (!scheduleData.tombstones.includes(entryId)) scheduleData.tombstones.push(entryId);
+  await saveSchedule();
+  return true;
+}
+
+
+// Brings one future occurrence into the current week, on the weekday the user
+// picked. Two halves, and both are required: plant it here, and bury it in the
+// week that owns its date. Without the second half the same task arrives twice
+// and closing one does nothing to the other.
+//
+// The series is untouched. `schedDate` still records the date it was really
+// due, exactly as it does for a swept occurrence, so the Later tab and the
+// agenda row can say what day this actually belongs to.
+async function pullOccurrenceIntoWeek(entryId, date, dayIndex) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry || !parseDayString(date)) return false;
+
+  const ctx = occurrenceContext(weekData);
+  if (!ctx) return false;
+
+  let planted = false;
+  await withWeekLock(currentWeekKey, async () => {
+    planted = plantOccurrence(ctx, entry, date, dayIndex);
+    if (planted) await saveWeek(currentWeekKey, weekData);
+  });
+  if (!planted) return false;
+
+  // Bury it where it was going to appear — unless that is this week, in which
+  // case it has already arrived and there is nothing left to bury.
+  if (weekKeyForDayString(date) !== currentWeekKey) await deleteOccurrence(entryId, date);
+
+  // Delivered, so the sweep must not offer it again.
+  if (!Array.isArray(entry.planted)) entry.planted = [];
+  if (!entry.planted.includes(date)) {
+    entry.planted.push(date);
+    entry.planted.sort();
+    entry._ts = Date.now();
+    await saveSchedule();
+  }
+
+  rebuildNodeMap();
+  renderIfVisible();
+  if (currentView === 'agenda') renderAgenda();
+  return true;
+}
+
+// The Later tab's delete: one occurrence, or the series behind it.
+function confirmDeleteFromLater(entryId, date) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  showAppConfirm({
+    title:           t('confirm.deleteEntryTitle'),
+    body:            t('confirm.deleteEntryBody'),
+    okLabel:         t('confirm.deleteEntrySeries'),
+    danger:          true,
+    onConfirm:       async () => { await deleteScheduleSeries(entryId); renderAgenda(); },
+    secondaryLabel:  t('confirm.deleteEntryOccurrence'),
+    onSecondary:     async () => { await deleteOccurrence(entryId, date); renderAgenda(); },
+  });
+}
+
+// Rewrites an entry's dates. Label, branch and priority each have their own
+// menu entry and are untouched here. Occurrences already materialised are
+// ordinary nodes and keep whatever their week made of them; only future ones
+// follow the entry.
+function updateScheduleEntry(entryId, options) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry || !parseDayString(options && options.date)) return null;
+
+  const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
+  const every = Math.max(1, Math.floor(Number(options.every)) || 1);
+  entry.anchor = options.date;
+  entry.repeat = unit ? { every, unit } : null;
+  entry.end = { type: 'never' };
+  if (unit && options.endType === 'count') {
+    entry.end = { type: 'count', n: Math.max(1, Math.floor(Number(options.endCount)) || 1) };
+  } else if (unit && options.endType === 'until' && parseDayString(options.endDate)) {
+    entry.end = { type: 'until', date: options.endDate };
+  }
+  entry._ts = Date.now();
+  saveSchedule();
+  return entry;
+}
+
+(function () {
+  'use strict';
+
+  const overlay  = document.getElementById('send-future-overlay');
+  const dateEl   = document.getElementById('send-future-date');
+  const everyEl  = document.getElementById('send-future-every');
+  const unitEl   = document.getElementById('send-future-unit');
+  const endEl    = document.getElementById('send-future-end-type');
+  const countEl  = document.getElementById('send-future-end-count');
+  const untilEl  = document.getElementById('send-future-end-date');
+  const cancelEl = document.getElementById('send-future-cancel');
+  const okEl     = document.getElementById('send-future-ok');
+  let _targetId  = null;   // node being sent
+  let _entryId   = null;   // entry being edited from the Later tab
+
+  // Repeat and end are one control in two halves: with no repeat there is
+  // nothing for an end condition to end, so the whole row stands down.
+  function syncFields() {
+    const repeats = unitEl.value !== 'none';
+    everyEl.hidden = !repeats;
+    endEl.hidden = !repeats;
+    countEl.hidden = !repeats || endEl.value !== 'count';
+    untilEl.hidden = !repeats || endEl.value !== 'until';
+  }
+
+  window.isSendFutureOpen = () => overlay.classList.contains('visible');
+
+  window.closeSendFuture = function () {
+    overlay.classList.remove('visible');
+    _targetId = null;
+    _entryId = null;
+  };
+
+  function openForEntry(entryId) {
+    const entry = scheduleData.entries.find(e => e.id === entryId);
+    if (!entry) return;
+    _targetId = null;
+    _entryId = entryId;
+    dateEl.value = entry.anchor;
+    everyEl.value = String(entry.repeat ? entry.repeat.every : 1);
+    unitEl.value = entry.repeat ? entry.repeat.unit : 'none';
+    endEl.value = entry.end ? entry.end.type : 'never';
+    countEl.value = String(entry.end && entry.end.type === 'count' ? entry.end.n : 10);
+    untilEl.value = (entry.end && entry.end.type === 'until') ? entry.end.date : entry.anchor;
+    syncFields();
+    syncEcho();
+    overlay.classList.add('visible');
+    dateEl.focus();
+  }
+
+  // Two callers, one dialog: a node being sent for the first time, and an
+  // entry being edited from the Later tab. Editing changes future occurrences
+  // only — nodes already materialised are ordinary nodes in their own weeks.
+  window.openSendFuture = function (target) {
+    if (target && target.entryId) return openForEntry(target.entryId);
+    const nodeId = target;
+    const node = findNode(nodeId);
+    if (!canSendToDate(node)) return;
+    _targetId = nodeId;
+    _entryId = null;
+    // A week out is the default because that is the shortest horizon this
+    // dialog is for; anything nearer is what N and the day tags already do.
+    const start = dayStringFromNumber(dayNumber(parseDayString(localDateStr())) + 7);
+    dateEl.value = start;
+    everyEl.value = '1';
+    unitEl.value = 'none';
+    endEl.value = 'never';
+    countEl.value = '10';
+    untilEl.value = start;
+    syncFields();
+    syncEcho();
+    overlay.classList.add('visible');
+    dateEl.focus();
+  };
+
+  const echoEl = document.getElementById('send-future-date-echo');
+  function syncEcho() {
+    echoEl.textContent = formatDayLabel(dateEl.value);
+  }
+
+  dateEl.addEventListener('input', syncEcho);
+  dateEl.addEventListener('change', syncEcho);
+  unitEl.addEventListener('change', syncFields);
+  endEl.addEventListener('change', syncFields);
+  cancelEl.addEventListener('click', () => window.closeSendFuture());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) window.closeSendFuture(); });
+
+  okEl.addEventListener('click', () => {
+    const id = _targetId;
+    const editing = _entryId;
+    const opts = {
+      date: dateEl.value,
+      every: everyEl.value,
+      unit: unitEl.value === 'none' ? null : unitEl.value,
+      endType: endEl.value,
+      endCount: countEl.value,
+      endDate: untilEl.value,
+    };
+    window.closeSendFuture();
+    const entry = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
+    if (!entry) return;
+    if (editing) renderAgenda();
+    else showToast(t('toast.sentToFuture', { date: formatDayLabel(entry.anchor) }));
+  });
+})();
+
 // ─── Context menu ─────────────────────────────────────────────────────────────
 const ctxMenu = document.getElementById('context-menu');
 
@@ -15864,6 +17136,30 @@ function showContextMenu(x, y, nodeId) {
   const isCenter   = nodeId === 'center';
   const isActivity = node && node.type === 'activity';
   const isCounter  = node && node.type === 'counter';
+
+  // Entry mode: answered before any node rule runs, because there is no node for one to
+  // read. Only the four that act on an entry are shown, and everything else is
+  // hidden first, so a menu item added later cannot appear here by accident.
+  // Reschedule, priority, rename and delete all affect future occurrences;
+  // nodes already materialised are ordinary nodes edited in their own week.
+  if (agendaEntryCtx) {
+    ctxMenu.querySelectorAll('.ctx-item, .ctx-separator').forEach(el => { el.style.display = 'none'; });
+    const entry = scheduleData.entries.find(e => e.id === agendaEntryCtx.entryId);
+    const prio = entry ? (entry.priority || 'normal') : 'normal';
+    const allowed = ['ctx-reschedule', 'ctx-sep-1', 'ctx-prio-normal', 'ctx-prio-high',
+                     'ctx-prio-critical', 'ctx-sep-2', 'ctx-rename', 'ctx-sep-3', 'ctx-delete'];
+    allowed.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = '';
+    });
+    // The priority it already has is not a choice, exactly as for a node.
+    document.getElementById('ctx-prio-normal').style.display   = prio === 'normal'   ? 'none' : '';
+    document.getElementById('ctx-prio-high').style.display     = prio === 'high'     ? 'none' : '';
+    document.getElementById('ctx-prio-critical').style.display = prio === 'critical' ? 'none' : '';
+    positionContextMenu(x, y);
+    return;
+  }
+
 
   // Transfer items (Center only)
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
@@ -15962,8 +17258,13 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-sep-2').style.display = isStdActivity                              ? '' : 'none';
   document.getElementById('ctx-sep-3').style.display = (isStdActivity || isTick || canDeleteBranch) ? '' : 'none';
 
-  // Measure actual menu size, then position by quadrant so it always opens
-  // toward the center of the screen — never clips any edge.
+  positionContextMenu(x, y);
+}
+
+// Measure actual menu size, then position by quadrant so it always opens
+// toward the center of the screen — never clips any edge. Shared by the node
+// menu and the Later-row menu, which differ only in what they show.
+function positionContextMenu(x, y) {
   ctxMenu.style.visibility = 'hidden';
   ctxMenu.style.left = '0';
   ctxMenu.style.top  = '0';
@@ -15985,6 +17286,7 @@ function hideContextMenu() {
   ctxMenu.classList.remove('visible');
   contextTarget = null;
   agendaTickCtx = null;
+  agendaEntryCtx = null;
   document.getElementById('ctx-reschedule-submenu').classList.remove('visible');
   setAgendaFocus(null);
 }
@@ -16219,6 +17521,71 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   const rescheduleSubmenu = document.getElementById('ctx-reschedule-submenu');
   let _hideSubTimer = null;
 
+  function positionRescheduleSubmenu() {
+    rescheduleSubmenu.style.visibility = 'hidden';
+    rescheduleSubmenu.classList.add('visible');
+    const ctxRect  = ctxMenu.getBoundingClientRect();
+    const itemRect = rescheduleItem.getBoundingClientRect();
+    const subW = rescheduleSubmenu.offsetWidth;
+    const subH = rescheduleSubmenu.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
+    let left = ctxRect.right + 4;
+    if (left + subW > vw - pad) left = ctxRect.left - subW - 4;
+    let top = Math.max(pad, Math.min(itemRect.top, vh - subH - pad));
+    rescheduleSubmenu.style.left = left + 'px';
+    rescheduleSubmenu.style.top  = top  + 'px';
+    rescheduleSubmenu.style.visibility = '';
+  }
+
+  // Same shape as the node submenu — Now, the seven weekdays, then Date — but
+  // every weekday here means "bring this occurrence into the current week on
+  // that day", and there is no Any: an occurrence is a date by definition.
+  function buildEntryRescheduleSubmenu() {
+    const { entryId, date } = agendaEntryCtx;
+    const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+    const todayIdx = new Date().getDay();
+
+    const pull = dayIdx => async e => {
+      e.stopPropagation();
+      hideContextMenu();
+      const moved = await pullOccurrenceIntoWeek(entryId, date, dayIdx);
+      if (moved && dayIdx === todayIdx) pinToTopOfAgenda(occurrenceNodeId(entryId, date));
+      renderAgenda();
+    };
+
+    const nowBtn = document.createElement('div');
+    nowBtn.className = 'ctx-item';
+    nowBtn.textContent = t('menu.now') || 'Now';
+    nowBtn.addEventListener('click', pull(todayIdx));
+    rescheduleSubmenu.appendChild(nowBtn);
+
+    const nowSep = document.createElement('div');
+    nowSep.className = 'ctx-separator';
+    rescheduleSubmenu.appendChild(nowSep);
+
+    AGENDA_DAY_ORDER.forEach(dayIdx => {
+      const btn = document.createElement('div');
+      btn.className = 'ctx-item';
+      appendDayLabel(btn, langLabels[dayIdx], dayIdx, todayIdx);
+      btn.addEventListener('click', pull(dayIdx));
+      rescheduleSubmenu.appendChild(btn);
+    });
+
+    const dateSep = document.createElement('div');
+    dateSep.className = 'ctx-separator';
+    rescheduleSubmenu.appendChild(dateSep);
+
+    const dateBtn = document.createElement('div');
+    dateBtn.className = 'ctx-item';
+    dateBtn.textContent = t('menu.sendToDate');
+    dateBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      hideContextMenu();
+      window.openSendFuture({ entryId });
+    });
+    rescheduleSubmenu.appendChild(dateBtn);
+  }
+
   function showRescheduleSubmenu() {
     clearTimeout(_hideSubTimer);
     rescheduleSubmenu.innerHTML = '';
@@ -16238,6 +17605,16 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
         if (next) ctxTickId = next.id;
       }
     }
+    // A Later row has no node: the same weekday choices mean "bring this
+    // occurrence into the current week on that day", and Any is left off —
+    // an occurrence with no date is not an occurrence. Date stays, because
+    // moving the series itself is still a thing to want.
+    if (agendaEntryCtx) {
+      buildEntryRescheduleSubmenu();
+      positionRescheduleSubmenu();
+      return;
+    }
+
     const node = ctxTickId ? findNode(ctxTickId) : findNode(contextTarget);
     if (!node) return;
 
@@ -16358,6 +17735,24 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       });
     }
 
+    // A date is the same choice as a weekday, one horizon further out: this
+    // week's Monday, or the 31st of March. Only a childless activity can be
+    // sent, which also excludes ticks and day-leaves without a second check.
+    if (canSendToDate(findNode(targetId))) {
+      const dateSep = document.createElement('div');
+      dateSep.className = 'ctx-separator';
+      rescheduleSubmenu.appendChild(dateSep);
+      const dateBtn = document.createElement('div');
+      dateBtn.className = 'ctx-item';
+      dateBtn.textContent = t('menu.sendToDate');
+      dateBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        hideContextMenu();
+        window.openSendFuture(targetId);
+      });
+      rescheduleSubmenu.appendChild(dateBtn);
+    }
+
     // "Clear all" — only when any day is assigned
     if (assignedDays.size > 0) {
       const sep = document.createElement('div');
@@ -16378,19 +17773,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       rescheduleSubmenu.appendChild(clearBtn);
     }
 
-    rescheduleSubmenu.style.visibility = 'hidden';
-    rescheduleSubmenu.classList.add('visible');
-    const ctxRect  = ctxMenu.getBoundingClientRect();
-    const itemRect = rescheduleItem.getBoundingClientRect();
-    const subW = rescheduleSubmenu.offsetWidth;
-    const subH = rescheduleSubmenu.offsetHeight;
-    const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
-    let left = ctxRect.right + 4;
-    if (left + subW > vw - pad) left = ctxRect.left - subW - 4;
-    let top = Math.max(pad, Math.min(itemRect.top, vh - subH - pad));
-    rescheduleSubmenu.style.left = left + 'px';
-    rescheduleSubmenu.style.top  = top  + 'px';
-    rescheduleSubmenu.style.visibility = '';
+    positionRescheduleSubmenu();
   }
 
   rescheduleItem.addEventListener('mouseenter', showRescheduleSubmenu);
@@ -16488,27 +17871,36 @@ document.getElementById('ctx-reusable').addEventListener('click', () => {
   hideContextMenu();
 });
 
-document.getElementById('ctx-prio-normal').addEventListener('click', () => {
-  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-normal');
-  if (currentView === 'agenda') renderAgenda();
-  hideContextMenu();
-});
+// An entry's priority travels onto every occurrence it has yet to produce.
+// Occurrences already materialised keep the priority their week gave them.
+function setEntryPriority(entryId, priority) {
+  const entry = scheduleData.entries.find(e => e.id === entryId);
+  if (!entry) return false;
+  entry.priority = priority;
+  entry._ts = Date.now();
+  saveSchedule();
+  return true;
+}
 
-document.getElementById('ctx-prio-high').addEventListener('click', () => {
-  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-high');
-  if (currentView === 'agenda') renderAgenda();
-  hideContextMenu();
-});
-
-document.getElementById('ctx-prio-critical').addEventListener('click', () => {
-  if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-critical');
-  if (currentView === 'agenda') renderAgenda();
-  hideContextMenu();
+['normal', 'high', 'critical'].forEach(prio => {
+  document.getElementById('ctx-prio-' + prio).addEventListener('click', () => {
+    if (agendaEntryCtx) {
+      setEntryPriority(agendaEntryCtx.entryId, prio);
+      hideContextMenu();
+      renderAgenda();
+      return;
+    }
+    if (contextTarget) setStatus(_agendaTickRedirect(contextTarget), 'prio-' + prio);
+    if (currentView === 'agenda') renderAgenda();
+    hideContextMenu();
+  });
 });
 
 document.getElementById('ctx-rename').addEventListener('click', () => {
   const id = contextTarget;
+  const entryCtx = agendaEntryCtx;
   hideContextMenu();
+  if (entryCtx) { startEntryRename(entryCtx.entryId, occurrenceNodeId(entryCtx.entryId, entryCtx.date)); return; }
   if (!id) return;
   if (currentView === 'agenda') startAgendaRename(id);
   else startRenameNode(id);
@@ -16591,6 +17983,12 @@ document.getElementById('ctx-add-child').addEventListener('click', () => {
 });
 
 document.getElementById('ctx-delete').addEventListener('click', () => {
+  const entryCtx = agendaEntryCtx;
+  if (entryCtx) {
+    hideContextMenu();
+    confirmDeleteFromLater(entryCtx.entryId, entryCtx.date);
+    return;
+  }
   if (!contextTarget) { hideContextMenu(); return; }
   deleteNode(_agendaTickRedirect(contextTarget, true), { ask: true });
   hideContextMenu();
@@ -16831,7 +18229,85 @@ function navigateAgendaItem(down) {
 // ISO week day-tab order: Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
 const AGENDA_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-const AGENDA_TAB_ORDER = ['overdue', ...AGENDA_DAY_ORDER];
+const AGENDA_TAB_ORDER = ['overdue', ...AGENDA_DAY_ORDER, 'later'];
+
+// ─── Later tab ────────────────────────────────────────────────────────────────
+// A reference list of what the schedule is holding, not a call to action — that
+// is why the tab carries no badge. The rows show occurrences, but they edit the
+// entry behind them: already-materialised nodes are ordinary nodes and are
+// edited in their own week.
+
+// How far ahead the list looks, and how many rows any one entry may contribute.
+// A daily entry would otherwise fill the tab by itself and bury every yearly
+// obligation the list exists to surface.
+const LATER_HORIZON_MONTHS = 12;
+const LATER_ROWS_PER_ENTRY = 12;
+
+function getLaterOccurrences(fromDate = localDateStr()) {
+  const from = parseDayString(fromDate);
+  if (!from || !scheduleData || !Array.isArray(scheduleData.entries)) return [];
+  const months = from.y * 12 + (from.m - 1) + LATER_HORIZON_MONTHS;
+  const ty = Math.floor(months / 12);
+  const tm = months % 12 + 1;
+  const to = formatDayString(ty, tm, Math.min(from.d, daysInMonth(ty, tm)));
+
+  const rows = [];
+  scheduleData.entries.forEach(entry => {
+    // An occurrence the entry records as planted has already been delivered —
+    // pulled into this week, or met by browsing ahead. It is a task somewhere
+    // now, so listing it as still upcoming would be listing it twice.
+    const delivered = new Set(Array.isArray(entry.planted) ? entry.planted : []);
+    occurrencesInRange(entry, fromDate, to)
+      .filter(date => !delivered.has(date))
+      .slice(0, LATER_ROWS_PER_ENTRY)
+      .forEach(date => rows.push({ entry, date }));
+  });
+  rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return rows;
+}
+
+// A calendar date in the convention of the UI language: "Sep 2, 2026" in
+// English, "2. září 2026" in Czech. English avoids an all-numeric date on
+// purpose — 9/2/2026 is two different days either side of the Atlantic.
+function formatDayLabel(date, lang = currentLang) {
+  const part = parseDayString(date);
+  if (!part) return date || '';
+  const months = MONTH_NAMES_OF[lang] ?? MONTH_NAMES_OF.en;
+  const month = months[part.m - 1];
+  return lang === 'cs'
+    ? `${part.d}. ${month} ${part.y}`
+    : `${month} ${part.d}, ${part.y}`;
+}
+
+// 'YYYY-MM' — the grouping key, and the month a divider names.
+function laterMonthKey(date) {
+  return date.slice(0, 7);
+}
+
+function laterMonthLabel(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const names = MONTH_NAMES[currentLang] ?? MONTH_NAMES.en;
+  return `${names[m - 1]} ${y}`;
+}
+
+// The stand-in a Later row is drawn from. It is shaped like an activity so
+// buildAgendaItem needs no second code path for the parts that are the same —
+// branch dot, priority icon, label — and it carries the id the occurrence will
+// have if that week is ever opened, so nothing about it is invented.
+function laterRowNode(entry, date) {
+  return {
+    id: occurrenceNodeId(entry.id, date),
+    type: 'activity',
+    branch: entry.branch,
+    label: entry.label,
+    priority: entry.priority && entry.priority !== 'normal' ? entry.priority : null,
+    children: [],
+    done: false,
+    schedId: entry.id,
+    schedDate: date,
+  };
+}
+
 
 function navigateAgendaTab(right) {
   const idx = AGENDA_TAB_ORDER.indexOf(agendaActiveTab);
@@ -16902,6 +18378,54 @@ function renderAgendaStrip() {
       requestAnimationFrame(() => scrollAgendaTabIntoView(strip, btn));
     }
   });
+
+  // Later — no badge, deliberately. It is a reference list, and a count on it
+  // would read as work owed this week. That is also why this tab needs nothing
+  // added to the strip's staleness key: only the active tab and the language
+  // change what it draws, and both are already in it.
+  addSeparator();
+  const laterBtn = document.createElement('button');
+  laterBtn.className = 'agenda-tab' + (agendaActiveTab === 'later' ? ' active' : '');
+  laterBtn.dataset.tab = 'later';
+  laterBtn.textContent = t('agenda.later');
+  laterBtn.addEventListener('click', () => { agendaActiveTab = 'later'; renderAgenda(); });
+  strip.appendChild(laterBtn);
+  if (agendaActiveTab === 'later') {
+    requestAnimationFrame(() => scrollAgendaTabIntoView(strip, laterBtn));
+  }
+}
+
+// Group heading inside an agenda list. Shared by the day tabs and the Later
+// tab, so it lives beside the row builder rather than inside one renderer.
+function makeSectionDivider(labelText, count) {
+  const div = document.createElement('div');
+  div.className = 'today-done-divider';
+  div.textContent = labelText;
+  const badge = document.createElement('span');
+  badge.className = 'agenda-section-count';
+  badge.textContent = String(count);
+  div.appendChild(badge);
+  return div;
+}
+
+// The swipe shell every agenda row sits in: two action areas behind a sliding
+// row. Right-swipe reveals the left one, left-swipe the right one — which is
+// the context menu everywhere. Built here because four renderers need it and
+// were each building it by hand.
+function wrapAgendaRowForSwipe(item, rowId, leftIcon, leftClass = '') {
+  const swipeLeft = document.createElement('div');
+  swipeLeft.className = 'agenda-swipe-action agenda-swipe-action-left' + (leftClass ? ' ' + leftClass : '');
+  swipeLeft.innerHTML = leftIcon;
+  const swipeRight = document.createElement('div');
+  swipeRight.className = 'agenda-swipe-action agenda-swipe-action-right';
+  swipeRight.innerHTML = iconSvg('menu-2');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'agenda-swipe-wrapper';
+  wrapper.dataset.nodeId = rowId;
+  wrapper.appendChild(swipeLeft);
+  wrapper.appendChild(swipeRight);
+  wrapper.appendChild(item);
+  return wrapper;
 }
 
 function buildAgendaItem(node, label, opts = {}) {
@@ -16916,6 +18440,11 @@ function buildAgendaItem(node, label, opts = {}) {
   // A row in the Dropped group. Reduced opacity and the ⊘ badge, but no
   // diagonal slash — that is a mind-map mark and does not translate to a list.
   const isDroppedRow = !!opts.dropped;
+  // A Later row stands for a schedule entry, not for a node in this week. It
+  // shows the date it is due and opens the entry when tapped; everything that
+  // acts on a live node — Done, drag, swipe, the context menu, hover hotkeys —
+  // is left off, because there is no node yet for any of it to act on.
+  const entryRow = opts.entry || null;
   const cc = getCounterChild(node);
   const tickInfo = getTickInfo(node);
   const branchColor = (BRANCH_COLORS[node.branch] || {}).main || '#888888';
@@ -16925,10 +18454,12 @@ function buildAgendaItem(node, label, opts = {}) {
   item.dataset.nodeId = node.id;
 
   // Grip handle
-  const handle = document.createElement('div');
-  handle.className = 'agenda-drag-handle';
-  handle.innerHTML = iconSvg('grip-vertical');
-  item.appendChild(handle);
+  if (!entryRow) {
+    const handle = document.createElement('div');
+    handle.className = 'agenda-drag-handle';
+    handle.innerHTML = iconSvg('grip-vertical');
+    item.appendChild(handle);
+  }
 
   // Branch dot
   const dot = document.createElement('div');
@@ -17010,6 +18541,16 @@ function buildAgendaItem(node, label, opts = {}) {
   });
   item.appendChild(labelEl);
 
+  // The real date this occurrence is due — the whole point of the row, and for
+  // a swept occurrence the only place its original date is visible.
+  if (entryRow) {
+    const when = document.createElement('span');
+    when.className = 'daily-log-badge';
+    when.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;font-variant-numeric:tabular-nums;';
+    when.textContent = formatDayLabel(opts.date);
+    item.appendChild(when);
+  }
+
   // Unplanned badge
   if (node.unplanned) {
     const bolt = document.createElement('span');
@@ -17088,6 +18629,41 @@ function buildAgendaItem(node, label, opts = {}) {
   // parents ticked today but not yet at max) also show Undone so the user
   // can revert just-completed steps without seeing a second Done button.
   const showUndone = node.done || isDroppedRow || (inDoneSection && (cc || tickInfo));
+  if (entryRow) {
+    item.classList.add('agenda-item-entry');
+    const openEditor = () => {
+      // The right-swipe path stops the transition and leaves the row offset,
+      // because on a task row it is about to disappear into another group. This
+      // one is still here afterwards, so it restores itself.
+      item.style.transition = '';
+      item.style.transform = '';
+      window.openSendFuture({ entryId: entryRow.id });
+    };
+    // Mouse only. On touch the row is a swipe target, and a tap that opens a
+    // dialog turns every mis-aimed scroll into one.
+    if (window.matchMedia('(pointer: fine)').matches) item.addEventListener('click', openEditor);
+    item._doneAction = openEditor;
+    const openEntryMenu = (x, y) => {
+      agendaEntryCtx = { entryId: entryRow.id, date: opts.date };
+      showContextMenu(x, y, null);
+    };
+    item._openCtxMenu = openEntryMenu;
+    item.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      openEntryMenu(e.clientX, e.clientY);
+    });
+    const del = document.createElement('button');
+    del.className = 'agenda-action-btn';
+    del.innerHTML = `${iconSvg('trash')} ${t('menu.delete')}`;
+    del.title = t('menu.delete');
+    del.addEventListener('click', e => {
+      e.stopPropagation(); // the row itself opens the editor
+      confirmDeleteFromLater(entryRow.id, opts.date);
+    });
+    item.appendChild(del);
+    return item;
+  }
   const btn = document.createElement('button');
   btn.className = 'agenda-action-btn';
   if (showUndone) {
@@ -17170,6 +18746,13 @@ function renderAgendaTabContent() {
   // Rows get destroyed on full rebuild — drop the focus tracker so the next
   // mouseenter on a fresh row doesn't try to clear class from a detached node.
   _agendaFocusedEl = null;
+
+  // Later is a list of entries, not of this week's nodes, so it answers before
+  // any of the day machinery below runs.
+  if (agendaActiveTab === 'later') {
+    renderLaterTab(content);
+    return;
+  }
 
   const isOverdue = agendaActiveTab === 'overdue';
   const tabDate = isOverdue ? null : tabDateString(agendaActiveTab);
@@ -17319,17 +18902,12 @@ function renderAgendaTabContent() {
       const node = row.node;
       const item = buildFn(row); // .daily-log-item.agenda-item
 
-      // Build swipe wrapper: action areas sit behind the sliding item
-      const swipeLeft = document.createElement('div');
-      swipeLeft.className = 'agenda-swipe-action agenda-swipe-action-left' + (node.done ? ' undone' : '');
-      swipeLeft.innerHTML = node.done ? iconSvg('circle-dashed-check') : iconSvg('circle-check');
-      const swipeRight = document.createElement('div');
-      swipeRight.className = 'agenda-swipe-action agenda-swipe-action-right';
-      swipeRight.innerHTML = iconSvg('menu-2');
-      const el = document.createElement('div');
-      el.className = 'agenda-swipe-wrapper';
+      const el = wrapAgendaRowForSwipe(
+        item, row.id,
+        node.done ? iconSvg('circle-dashed-check') : iconSvg('circle-check'),
+        node.done ? 'undone' : '',
+      );
       el.dataset.group = groupKey;
-      el.dataset.nodeId = row.id;
       // Native HTML5 DnD opt-in is decided by primary-pointer type so mobile
       // long-press can't engage the broken native drag. On desktop, dragstart
       // gates on whether the mousedown originated on the grip handle.
@@ -17338,10 +18916,6 @@ function renderAgendaTabContent() {
       el.addEventListener('mousedown', (e) => {
         mousedownOnHandle = !!e.target.closest('.agenda-drag-handle');
       });
-      el.appendChild(swipeLeft);
-      el.appendChild(swipeRight);
-      el.appendChild(item);
-
       // ── Mobile touch-drag from grip handle ───────────────────────────────
       {
         let touchSrcId = null;
@@ -17599,17 +19173,6 @@ function renderAgendaTabContent() {
     });
   }
 
-  function makeSectionDivider(labelText, count) {
-    const div = document.createElement('div');
-    div.className = 'today-done-divider';
-    div.textContent = labelText;
-    const badge = document.createElement('span');
-    badge.className = 'agenda-section-count';
-    badge.textContent = String(count);
-    div.appendChild(badge);
-    return div;
-  }
-
   // Per-tick log rendering for the Done section. Each tick-child completed
   // today becomes one row "Pushups n/total" (cumulative position). Legacy
   // counters and plain done activities each contribute one row. Sorted by
@@ -17648,21 +19211,9 @@ function renderAgendaTabContent() {
         inDoneSection: true,
         tickRecord: rec.tickRecord || null,
       });
-      // Wrap in swipe wrapper so Done rows accept right-swipe → undone and
-      // left-swipe → context menu, matching Pending behavior.
-      const swipeLeft = document.createElement('div');
-      swipeLeft.className = 'agenda-swipe-action agenda-swipe-action-left undone';
-      swipeLeft.innerHTML = iconSvg('circle-dashed-check');
-      const swipeRight = document.createElement('div');
-      swipeRight.className = 'agenda-swipe-action agenda-swipe-action-right';
-      swipeRight.innerHTML = iconSvg('menu-2');
-      const wrapper = document.createElement('div');
-      wrapper.className = 'agenda-swipe-wrapper';
-      wrapper.dataset.nodeId = rec.node.id;
-      wrapper.appendChild(swipeLeft);
-      wrapper.appendChild(swipeRight);
-      wrapper.appendChild(item);
-      list.appendChild(wrapper);
+      // Done rows accept right-swipe → undone and left-swipe → context menu,
+      // matching Pending behaviour.
+      list.appendChild(wrapAgendaRowForSwipe(item, rec.node.id, iconSvg('circle-dashed-check'), 'undone'));
       addSwipeGesture(item, rec.node);
     });
   }
@@ -17678,19 +19229,7 @@ function renderAgendaTabContent() {
     list.appendChild(makeSectionDivider(t('agenda.dropped'), rows.length));
     rows.forEach(n => {
       const item = buildAgendaItem(n, getAgendaNodeLabel(n), { dropped: true });
-      const swipeLeft = document.createElement('div');
-      swipeLeft.className = 'agenda-swipe-action agenda-swipe-action-left undone';
-      swipeLeft.innerHTML = iconSvg('circle-dashed-check');
-      const swipeRight = document.createElement('div');
-      swipeRight.className = 'agenda-swipe-action agenda-swipe-action-right';
-      swipeRight.innerHTML = iconSvg('menu-2');
-      const wrapper = document.createElement('div');
-      wrapper.className = 'agenda-swipe-wrapper';
-      wrapper.dataset.nodeId = n.id;
-      wrapper.appendChild(swipeLeft);
-      wrapper.appendChild(swipeRight);
-      wrapper.appendChild(item);
-      list.appendChild(wrapper);
+      list.appendChild(wrapAgendaRowForSwipe(item, n.id, iconSvg('circle-dashed-check'), 'undone'));
       addSwipeGesture(item, n);
     });
   }
@@ -17766,6 +19305,43 @@ function renderAgendaTabContent() {
     renderGroup(anyRows, 'anyday', t('agenda.anyDay'), buildRow);
     renderDroppedSection(droppedItems);
   }
+}
+
+// Month-grouped list of what the schedule is holding. Rows reuse the shared
+// agenda row so Later looks like every other tab; they are not draggable and
+// carry no Done button, because an occurrence that has not been delivered yet
+// is not work you can close.
+function renderLaterTab(content) {
+  const rows = getLaterOccurrences();
+  if (!rows.length) {
+    const empty = document.createElement('div');
+    empty.className = 'daily-log-empty';
+    empty.textContent = t('agenda.emptyLater');
+    content.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'agenda-item-list';
+  content.appendChild(list);
+
+  let month = null;
+  rows.forEach(({ entry, date }) => {
+    const key = laterMonthKey(date);
+    if (key !== month) {
+      month = key;
+      const count = rows.filter(r => laterMonthKey(r.date) === key).length;
+      if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
+      list.appendChild(makeSectionDivider(laterMonthLabel(key), count));
+    }
+    const row = laterRowNode(entry, date);
+    const item = buildAgendaItem(row, entry.label, { entry, date });
+    // Same two gestures as every other row: right-swipe runs the row's primary
+    // action, left-swipe opens its context menu. Here the primary action is the
+    // date dialog, so it takes the place Done holds on a task row.
+    list.appendChild(wrapAgendaRowForSwipe(item, row.id, iconSvg('calendar-week')));
+    addSwipeGesture(item, row);
+  });
 }
 
 // Coalesces rapid renderAgenda() calls (e.g. counter+1 fires renderAgenda,
@@ -19247,15 +20823,10 @@ async function loadAndRender(wk) {
     await importWeekOnDemand(wk);
     hideImportSpinner();
   }
-  weekData = await loadWeek(wk);
-  rebuildNodeMap();
-  syncBranchConfig();
-  // Keep the next-week cache aligned with the week we just navigated to. This is
-  // the primary navigation path (prev/next buttons); the hashchange handler
-  // no-ops here because we set currentWeekKey ourselves above. Without this the
-  // cache holds the previous week's "next week", so a later move/undo snapshot
-  // restores the wrong next-week record (duplication / failed un-resurrect).
-  await refreshNextWeekCache();
+  // Shared week-open path (materialisation included). The hashchange handler
+  // no-ops on the next-week cache refresh inside because we set currentWeekKey
+  // ourselves above.
+  await openWeekIntoView(wk);
   if (wk === todayWeekKey()) {
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   } else {
@@ -19284,13 +20855,7 @@ window.addEventListener('hashchange', async () => {
       await importWeekOnDemand(target);
       hideImportSpinner();
     }
-    weekData = await loadWeek(currentWeekKey);
-    rebuildNodeMap();
-    syncBranchConfig();
-    // Refresh the next-week cache for the new current week. Without this the
-    // cache keeps the previous week's "next week" data, and any later undo/redo
-    // snapshot would write that stale blob into the wrong next-week record.
-    await refreshNextWeekCache();
+    await openWeekIntoView(currentWeekKey);
     updateWeekBar();
     renderIfVisible();
     fitMindmapView();   // new week, new extent — see loadAndRender's refit note
@@ -19343,6 +20908,7 @@ function flushAllPendingSyncToDrive() {
   const pendingWeeks = new Set([...syncDebounceTimers.keys(), currentWeekKey]);
   clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
+  if (scheduleSyncDebounceTimer) { clearTimeout(scheduleSyncDebounceTimer); scheduleSyncDebounceTimer = null; }
   // Offline this is the last moment the page gets: an upload attempt would only
   // fail and be forgotten, so hand the weeks to the worker instead.
   if (isDefinitelyOffline()) {
@@ -19351,6 +20917,7 @@ function flushAllPendingSyncToDrive() {
   }
   pendingWeeks.forEach(wk => syncWeekToDrive(wk));
   syncColorsToDrive();
+  syncScheduleToDrive();
 }
 
 // Flush pending sync when tab hides; pull + restart poll on tab restore
@@ -20546,6 +22113,9 @@ window.addEventListener('load', async () => {
   await loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   await bootstrapColorsSettings();
+  // Entries must be in memory before the first week opens, or that week would
+  // be the one week of the session that never materialises.
+  await loadSchedule();
   updateSvgFilters();
   traceMark('boot:settings-ready');
   initGoogleAuth(); // legacy-token purge, OAuth callback handling, silent session restore
