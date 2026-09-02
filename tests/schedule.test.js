@@ -685,6 +685,86 @@ describe('Materialisation on week open', () => {
     expect(_state.get().nodes.filter(n => n.dayChild)).toHaveLength(1);
   });
 
+  // R2: withWeekLock is not re-entrant. Materialisation runs under the lock for
+  // the week being opened, so nothing it calls may take that lock again — a
+  // re-entrant call would wait on a lock its own caller holds and never resolve.
+  it('opens a week under the lock without ever re-taking it', async () => {
+    seed(entry());
+    _state.setLocalStorage('zenit-week-' + WK, week());
+    _state.setWeekKey('2026-19');
+
+    const deadlock = Symbol('deadlock');
+    const result = await Promise.race([
+      _state.loadAndRender(WK).then(() => 'opened'),
+      new Promise(r => setTimeout(() => r(deadlock), 2000)),
+    ]);
+    expect(result).toBe('opened');
+    expect(occurrences(_state.get())).toHaveLength(1);
+  });
+
+  it('waits for the lock before planting, so a peer merge cannot interleave', async () => {
+    seed(entry());
+    _state.setLocalStorage('zenit-week-' + WK, week());
+    _state.setWeekKey('2026-19');
+
+    // Hold the week's lock the way a Drive pull or peer-tab merge would.
+    let release;
+    const held = _state.withWeekLock(WK, () => new Promise(r => { release = r; }));
+
+    const open = _state.loadAndRender(WK);
+    // Let the open get as far as it can: it loads the week, then blocks.
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    expect(occurrences(_state.get())).toEqual([]); // nothing planted while held
+
+    release();
+    await held;
+    await open;
+    expect(occurrences(_state.get())).toHaveLength(1);
+  });
+
+  // R6: materialisation takes no snapshot, so nothing can undo it. The worry
+  // was an undo restoring a state from before the plant — the node would leave
+  // with no tombstone, and the next open would re-plant it. It cannot happen:
+  // materialisation runs at week open, before any user action in that week, so
+  // every snapshot the week can hold was taken after the plant.
+  it('survives an undo of a later edit in the same week', async () => {
+    seed(entry());
+    _state.setLocalStorage('zenit-week-' + WK, week());
+    _state.setWeekKey('2026-19');
+    await _state.loadAndRender(WK);
+
+    const planted = _state.get().nodes.find(n => n.schedId === 's1');
+    expect(planted).toBeDefined();
+
+    // A user edit after the plant, then undo it.
+    _state.takeSnapshot();
+    const branch = _state.get().nodes.find(n => n.id === 'work');
+    branch.label = 'Renamed';
+    await undo();
+
+    const after = _state.get().nodes.find(n => n.schedId === 's1');
+    expect(after).toBeDefined();
+    expect(after.id).toBe(planted.id);
+    expect(_state.get().nodes.filter(n => n.schedId === 's1')).toHaveLength(1);
+  });
+
+  it('cannot be re-planted as a duplicate after an undo', async () => {
+    seed(entry());
+    _state.setLocalStorage('zenit-week-' + WK, week());
+    _state.setWeekKey('2026-19');
+    await _state.loadAndRender(WK);
+
+    _state.takeSnapshot();
+    _state.get().nodes.find(n => n.id === 'work').label = 'Renamed';
+    await undo();
+
+    // Reopening after the undo must still find the occurrence already there.
+    await _state.loadAndRender('2026-19');
+    await _state.loadAndRender(WK);
+    expect(_state.get().nodes.filter(n => n.schedId === 's1')).toHaveLength(1);
+    expect(_state.get().nodes.filter(n => n.dayChild)).toHaveLength(1);
+  });
+
   it('leaves a week untouched on open when the schedule is empty', async () => {
     _state.setLocalStorage('zenit-week-' + WK, week());
     _state.setWeekKey('2026-19');

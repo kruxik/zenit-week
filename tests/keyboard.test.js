@@ -242,3 +242,61 @@ describe('Mindmap keyboard focus', () => {
     expect(_state.getHoveredNode()).toBeNull();
   });
 });
+
+
+// R9: L opens the Agenda on the Later tab. It was free — X is dropped and 9
+// belongs to the numeric day strip — and it must stand down wherever the user
+// is typing, or "later" would land in a task name.
+describe('L — Later tab', () => {
+  function press(extra = {}) {
+    _state.triggerKeydown({
+      key: 'l',
+      preventDefault: () => {},
+      stopPropagation: () => {},
+      target: { tagName: 'DIV' },
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      ...extra,
+    });
+  }
+
+  beforeEach(() => {
+    _state.setCurrentView('mindmap');
+    _state.setEditState(null);
+    _state.setAgendaActiveTab(3);
+  });
+
+  test('switches to the Agenda on the Later tab', () => {
+    press();
+    expect(_state.getAgendaActiveTab()).toBe('later');
+    expect(_state.getCurrentView()).toBe('agenda');
+  });
+
+  test('works from the Agenda itself, from another tab', () => {
+    _state.setCurrentView('agenda');
+    press();
+    expect(_state.getAgendaActiveTab()).toBe('later');
+  });
+
+  test('stands down while an inline rename is open', () => {
+    _state.setEditState({ nodeId: 'a1', isNew: false });
+    press();
+    expect(_state.getAgendaActiveTab()).toBe(3);
+    expect(_state.getCurrentView()).toBe('mindmap');
+  });
+
+  test('stands down inside a text field', () => {
+    press({ target: { tagName: 'INPUT' } });
+    expect(_state.getAgendaActiveTab()).toBe(3);
+    press({ target: { tagName: 'TEXTAREA' } });
+    expect(_state.getAgendaActiveTab()).toBe(3);
+  });
+
+  test('leaves a modified L alone, so browser shortcuts still work', () => {
+    press({ metaKey: true });
+    press({ ctrlKey: true });
+    expect(_state.getAgendaActiveTab()).toBe(3);
+  });
+});
