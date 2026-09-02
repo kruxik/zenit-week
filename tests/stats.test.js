@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { _state, computeWeekStats } from './setup.js';
+import { _state, computeWeekStats, materialiseWeek, emptySchedule } from './setup.js';
 
 // T1 (revised) — single priority-weighted lens feeding both the summary box and the
 // Stats panel. Load is split planned/unplanned × done/open and weighted by priority
@@ -178,5 +178,58 @@ describe('computeWeekStats — box/panel agreement', () => {
     expect(g.done).toBe(7);
     expect(g.total).toBe(10);
     expect(g.percent).toBe(70);
+  });
+});
+
+
+// A materialised occurrence is an ordinary planned task. It never arrives with
+// the unplanned flag, so it must never land in the unplanned band — the whole
+// point of scheduling something ahead is that it was planned.
+describe('materialised occurrences count as planned', () => {
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.setSchedule(emptySchedule());
+    _state.setTodayWeekKey('2026-10');
+  });
+
+  it('lands in the planned band, open and then done', () => {
+    _state.setSchedule({
+      entries: [{
+        id: 's1', label: 'Pay the bill', branch: 'work', priority: 'normal',
+        anchor: '2026-05-13', repeat: null, end: { type: 'never' },
+        plantedThrough: null, planted: [], _ts: 1,
+      }],
+      tombstones: [],
+      crdtVersion: 0,
+    });
+    const data = {
+      nodes: [
+        { id: 'center', type: 'center', children: ['work'] },
+        { id: 'work', type: 'branch', branch: 'work', parent: 'center', children: [] },
+      ],
+      tombstones: [],
+      crdtVersion: 0,
+    };
+    materialiseWeek('2026-20', data);
+    _state.reset();
+    _state.set(data);
+
+    const node = _state.get().nodes.find(n => n.schedId === 's1');
+    expect(node.unplanned).toBe(false);
+
+    const open = computeWeekStats().global;
+    expect(open.unplannedOpen).toBe(0);
+    expect(open.unplannedDone).toBe(0);
+    expect(open.plannedOpen).toBeGreaterThan(0);
+    expect(open.dropped).toBe(0);
+
+    // Closing it moves it across the done axis, never into the unplanned band.
+    _state.get().nodes.forEach(n => { if (n.schedId || n.dayChild) n.done = true; });
+    const done = computeWeekStats().global;
+    expect(done.unplannedDone).toBe(0);
+    expect(done.plannedDone).toBeGreaterThan(0);
+
+    _state.setSchedule(emptySchedule());
+    _state.clearTodayWeekKeyOverride();
   });
 });

@@ -150,13 +150,13 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S9 — Polish and ship gate
 
-- [ ] T9.1 — Help & Hotkeys: `L` for Later, *Send to date…* including the childless-node rule.
-- [ ] T9.2 — CHANGELOG entry.
-- [ ] T9.3 — EN / CS parity sweep — `tests/i18n.test.js` must pass.
-- [ ] T9.4 — Confirm in `tests/stats.test.js` that occurrences count as **planned**, never `unplanned`.
-- [ ] T9.5 — Confirm no `innerHTML` anywhere near an entry label, branch name or any schedule-derived string.
-- [ ] T9.6 — `CLAUDE.md`: schedule record, `schedId` / `schedDate`, the `L` hotkey and the Later tab in the hotkey list.
-- [ ] T9.7 — Full `npm test` + `npm run validate` + `npm run csp` green; manual pass in both themes and both languages.
+- [x] T9.1 — Help & Hotkeys: `L` for Later, *Send to date…* including the childless-node rule.
+- [x] T9.2 — CHANGELOG entry. *(Generated: `CHANGELOG.md` comes from git-cliff over Conventional Commits — the `feat(schedule):` commits are the entry, written at `npm run release`.)*
+- [x] T9.3 — EN / CS parity sweep — `tests/i18n.test.js` must pass.
+- [x] T9.4 — Confirm in `tests/stats.test.js` that occurrences count as **planned**, never `unplanned`.
+- [x] T9.5 — Confirm no `innerHTML` anywhere near an entry label, branch name or any schedule-derived string.
+- [x] T9.6 — `CLAUDE.md`: schedule record, `schedId` / `schedDate`, the `L` hotkey and the Later tab in the hotkey list.
+- [x] T9.7 — Full `npm test` + `npm run validate` + `npm run csp` green; manual pass in both themes and both languages.
 
 **AC:** the feature is documented where the app documents itself, and every gate is green.
 **Verify:** the three commands, plus a browser pass.

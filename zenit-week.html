@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-uPOgQpjLW5PTWUxkcIyBcXUCMDExp4tRYyEU2ZTjqLA='
+               'sha256-Y6cTjMemvnI0TbGsvN0AxPbYtKg+RWaL6PrI/km5Pm4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4277,6 +4277,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSyncLead">Google Drive sync</strong><span data-i18n="help.featureSyncBody"> — your own Drive only (optional)</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureCommentsLead">Comments</strong><span data-i18n="help.featureCommentsBody"> — attach a note to any activity</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureTransfersLead">Reusable &amp; transfers</strong><span data-i18n="help.featureTransfersBody"> — carry unfinished or repeating work into the next week</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSendFutureLead">Send to date</strong><span data-i18n="help.featureSendFutureBody"> — hand a task without sub-tasks to a future date, once or repeating; it arrives in the week that owns that date</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureQuickAddLead">Quick add</strong><span data-i18n="help.featureQuickAddBody"> — drop a task on a branch without touching the map</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureUndoLead">Undo / Redo</strong><span data-i18n="help.featureUndoBody"> — made a typo? Revert anytime</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureBackupLead">Export / Import</strong><span data-i18n="help.featureBackupBody"> — full backup of every week as one JSON file</span></div>
@@ -4299,6 +4300,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="menu.comment">Comment</span> <kbd>C</kbd></div>
         <div class="help-row"><span data-i18n="help.toggleReusable">Toggle Reusable</span> <kbd>R</kbd></div>
         <div class="help-row"><span data-i18n="help.moveNextWeek">Move to next week</span> <kbd>N</kbd></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.sendToDateHint">Right-click a task with no sub-tasks for “Send to date…”.</span></div>
         <div class="help-row"><span data-i18n="help.quickOptions">Quick Options</span> <kbd>Right Click</kbd></div>
         <div class="help-row"><span data-i18n="help.clearWeek">Clear week (root node)</span> <span><kbd>Backspace</kbd> <kbd>Delete</kbd></span></div>
       </div>
@@ -4319,6 +4321,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="help.mindmapView">Mindmap view</span> <kbd>M</kbd></div>
         <div class="help-row"><span data-i18n="help.agendaView">Agenda view</span> <kbd>A</kbd></div>
         <div class="help-row"><span data-i18n="help.statsView">Stats view</span> <kbd>S</kbd></div>
+        <div class="help-row"><span data-i18n="help.laterTab">Later (upcoming dates)</span> <kbd>L</kbd></div>
         <div class="help-row"><span data-i18n="quick_add.title">Quick add</span> <kbd>Q</kbd></div>
         <div class="help-row"><span data-i18n="help.title">Help &amp; Hotkeys</span> <span><kbd>?</kbd> <kbd>H</kbd></span></div>
         <div class="help-row"><span data-i18n="help.escClose">Close panel / menu</span> <kbd>Esc</kbd></div>
@@ -9811,6 +9814,10 @@ const TRANSLATIONS = {
     'toast.movedToNextWeek':      'Added to next week',
     'menu.sendToDate':            'Send to date…',
     'agenda.later':               'Later',
+    'help.laterTab':              'Later (upcoming dates)',
+    'help.featureSendFutureLead': 'Send to date',
+    'help.featureSendFutureBody': ' — hand a task without sub-tasks to a future date, once or repeating; it arrives in the week that owns that date',
+    'help.sendToDateHint':        'Right-click a task with no sub-tasks for “Send to date…”.',
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
     'sendFuture.title':           'Send to the future',
     'sendFuture.date':            'Date',
@@ -10163,6 +10170,10 @@ const TRANSLATIONS = {
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
     'menu.sendToDate':            'Odeslat na datum…',
     'agenda.later':               'Později',
+    'help.laterTab':              'Později (nadcházející data)',
+    'help.featureSendFutureLead': 'Odeslat na datum',
+    'help.featureSendFutureBody': ' — pošli úkol bez podúkolů na budoucí datum, jednorázově nebo opakovaně; objeví se v týdnu, do kterého datum patří',
+    'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů a zvol „Odeslat na datum…“.',
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
     'sendFuture.title':           'Odeslat do budoucnosti',
     'sendFuture.date':            'Datum',
