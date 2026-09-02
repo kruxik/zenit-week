@@ -238,6 +238,13 @@ describe('Schedule store — validate and repair', () => {
     expect(out.crdtVersion).toBe(3);
   });
 
+  it('heals a stored weekday tag without touching _ts', () => {
+    const raw = { entries: [{ ...good(), label: 'Pay the bill (we)' }], tombstones: [], crdtVersion: 0 };
+    const out = validateAndRepairSchedule(raw, ['work']);
+    expect(out.entries[0].label).toBe('Pay the bill');
+    expect(out.entries[0]._ts).toBe(good()._ts);
+  });
+
   it('drops entries with no label or no valid anchor', () => {
     const raw = { entries: [
       good(),
@@ -833,6 +840,20 @@ describe('Send to date…', () => {
     expect(entry.end).toEqual({ type: 'never' });
   });
 
+  it('drops the weekday tag from the label it captures', () => {
+    // The date is the schedule now; a "(we)" left in the label would ride into
+    // every planted occurrence and fight the day leaf it gets there.
+    findNode('a1').label = 'Pay tax (we)';
+    const entry = sendNodeToDate('a1', { date: '2026-09-21', unit: null });
+    expect(entry.label).toBe('Pay tax');
+  });
+
+  it('keeps a label that is nothing but a day group', () => {
+    findNode('a1').label = '(we)';
+    const entry = sendNodeToDate('a1', { date: '2026-09-21', unit: null });
+    expect(entry.label).toBe('(we)');
+  });
+
   it('leaves no copy or stub behind', () => {
     const before = _state.get().nodes.length;
     sendNodeToDate('a1', { date: '2026-09-14', unit: null });
@@ -1252,6 +1273,14 @@ describe('Editing an entry from the Later tab', () => {
     expect(_state.getSchedule().entries[0].label).toBe('Renewed bill');
     // The occurrence already delivered keeps the label its week gave it.
     expect(data.nodes.find(n => n.schedId === 's1').label).toBe(plantedLabel);
+  });
+
+  it('drops a weekday tag typed into a rename', () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    expect(renameScheduleEntry('s1', 'Renewed bill (mo)')).toBe(true);
+    expect(_state.getSchedule().entries[0].label).toBe('Renewed bill');
+    // Stripping down to the label already stored is not a change.
+    expect(renameScheduleEntry('s1', 'Renewed bill (we)')).toBe(false);
   });
 
   it('refuses a blank label rather than storing one repair would drop', () => {

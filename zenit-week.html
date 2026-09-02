@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Mam5Q/0mr0RpXY2B9cFQs3UV3PRmKqNx2z9On6Dv7iU='
+               'sha256-HmEKpode8TM3LDKGJ4TajjU8b1T8AADDspYVKFTacYs='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5325,7 +5325,10 @@ function validateAndRepairSchedule(raw, branchIds) {
     seen.add(e.id);
     out.entries.push({
       id: e.id,
-      label: e.label.slice(0, 200),
+      // Heals entries captured before the label was stripped at write time.
+      // Deliberately does not touch _ts: this is a read-side repair, not a user
+      // edit, and bumping it would let a healed copy clobber a real one.
+      label: scheduleEntryLabel(e.label),
       branch: repairScheduleBranch(e.branch, branches),
       priority: SCHEDULE_PRIORITIES.has(e.priority) ? e.priority : 'normal',
       anchor: e.anchor,
@@ -14238,7 +14241,7 @@ function startAgendaRename(nodeId) {
 function renameScheduleEntry(entryId, label) {
   const entry = scheduleData.entries.find(e => e.id === entryId);
   if (!entry) return false;
-  const next = typeof label === 'string' ? label.trim().slice(0, 200) : '';
+  const next = scheduleEntryLabel(label);
   if (!next || next === entry.label) return false;
   entry.label = next;
   entry._ts = Date.now();
@@ -16846,6 +16849,16 @@ function attachNodeListeners() {
 //
 // Only a childless activity can be sent: one entry is one activity, and there
 // is no partial or lossy variant that would silently drop a subtree.
+// A schedule entry is dated, so a weekday tag in its label has nothing left to
+// say — the date decides the day, and the occurrence gets its own day leaf when
+// it is planted. Strip the day groups on the way in, and keep the raw text when
+// stripping would leave nothing (a task genuinely called "(mo)").
+function scheduleEntryLabel(raw) {
+  const text = typeof raw === 'string' ? raw : '';
+  const stripped = stripDayGroups(text).trim();
+  return (stripped || text.trim()).slice(0, 200);
+}
+
 function canSendToDate(node) {
   if (!node || node.type !== 'activity') return false;
   if (node.dayChild || node.tickChild || node.inbox) return false;
@@ -16865,7 +16878,7 @@ function sendNodeToDate(nodeId, options) {
   const every = Math.max(1, Math.floor(Number(options.every)) || 1);
   const entry = {
     id: genId(),
-    label: node.label || '',
+    label: scheduleEntryLabel(node.label),
     branch: node.branch || '',
     priority: node.priority || 'normal',
     anchor,
