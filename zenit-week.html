@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-AADTfREU/BSNXEc8sKf6Jd0RYeG2WqrYe8zZ1T++HDk='
+               'sha256-Mam5Q/0mr0RpXY2B9cFQs3UV3PRmKqNx2z9On6Dv7iU='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1559,7 +1559,10 @@
     position: sticky;
     top: 0;
     z-index: 3;
-    background: var(--bg-surface);
+    /* Sticky, so it needs an opaque fill to cover the rows sliding under it —
+       and that fill has to be the row background, or the heading reads as a
+       different surface. Follows .agenda-item across the 768px split. */
+    background: var(--bg-page);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -2804,6 +2807,11 @@
     padding-right: 16px;
   }
 
+  /* A Later row carries no grip, so the 8px that leaves room for one would put
+     its dot hard against the edge. Match the row's own right padding instead,
+     so the content sits symmetrically. */
+  .agenda-item-entry { padding-left: 16px; }
+
   .agenda-item.agenda-item-focused {
     /* Layer the semi-transparent hover tint as background-image so the row's
        opaque base color (set via `background:` shorthand below) keeps covering
@@ -2880,7 +2888,8 @@
     background: var(--bg-page);
   }
   @media (min-width: 768px) {
-    .agenda-item { background: var(--bg-surface); }
+    .agenda-item,
+    .today-done-divider { background: var(--bg-surface); }
   }
 
   .agenda-priority-icon {
@@ -18428,6 +18437,22 @@ function wrapAgendaRowForSwipe(item, rowId, leftIcon, leftClass = '') {
   return wrapper;
 }
 
+// Hover highlight for an agenda row. Every row gets it, Later rows included —
+// the tint is the only feedback that the pointer (or a tap's synthetic
+// mouseenter) is on that row, and a row without it reads as a different kind
+// of surface. `node` is null for rows that stand for no live node, so the
+// hovered-node hotkeys stay off them.
+function addAgendaHoverFocus(item, node) {
+  item.addEventListener('mouseenter', () => {
+    hoveredAgendaNode = node;
+    setAgendaFocus(item);
+  });
+  item.addEventListener('mouseleave', () => {
+    hoveredAgendaNode = null;
+    if (_agendaFocusedEl === item) setAgendaFocus(null);
+  });
+}
+
 function buildAgendaItem(node, label, opts = {}) {
   const inDoneSection = !!opts.inDoneSection;
   // tickRecord: when rendering one row per today-tick in the Done section,
@@ -18453,7 +18478,8 @@ function buildAgendaItem(node, label, opts = {}) {
   item.className = 'daily-log-item agenda-item';
   item.dataset.nodeId = node.id;
 
-  // Grip handle
+  // Grip handle. A Later row gets none, not even an empty one — its rows never
+  // reorder, so the space the grip reserves is dead width.
   if (!entryRow) {
     const handle = document.createElement('div');
     handle.className = 'agenda-drag-handle';
@@ -18662,6 +18688,7 @@ function buildAgendaItem(node, label, opts = {}) {
       confirmDeleteFromLater(entryRow.id, opts.date);
     });
     item.appendChild(del);
+    addAgendaHoverFocus(item, null);
     return item;
   }
   const btn = document.createElement('button');
@@ -18706,14 +18733,7 @@ function buildAgendaItem(node, label, opts = {}) {
   }
   item.appendChild(btn);
 
-  item.addEventListener('mouseenter', () => {
-    hoveredAgendaNode = node;
-    setAgendaFocus(item);
-  });
-  item.addEventListener('mouseleave', () => {
-    hoveredAgendaNode = null;
-    if (_agendaFocusedEl === item) setAgendaFocus(null);
-  });
+  addAgendaHoverFocus(item, node);
   // Open context menu on this agenda row. Sets agendaTickCtx so tick-affecting
   // ops (done/undone/move-next-week/delete) redirect to a single tick while
   // label-ops (rename / unplanned / reusable / priorities) stay on parent.
