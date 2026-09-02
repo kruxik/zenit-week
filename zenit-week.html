@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-yezjO6/2X6qLCXTEcafm3/Sl8u3gcNKJtGKlAaZmBMg='
+               'sha256-lVMh+grLJ5B3fxDeOsTvR3ch0YdyuG23HGmEH2gjeso='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3221,6 +3221,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    /* Ends holds nothing while there is no repeat to end. Without a floor the
+       row collapses to its label's line height and the three rows stop sharing
+       a rhythm, even though every gap between them is the same. */
+    min-height: 32px;
   }
   #send-future-fields input,
   #send-future-fields select {
@@ -3237,15 +3241,21 @@
   #send-future-fields input[type="number"] {
     width: 64px;
   }
+  /* Grid items stretch by default, which blew the date field out to the full
+     dialog width. The end-date input sits in a flex row and keeps its intrinsic
+     size, so anchoring this one to the start makes the two match. */
+  #send-future-fields > input[type="date"] {
+    justify-self: start;
+  }
+  /* Native select arrow is painted inside the box: without room reserved for
+     it, the arrow sits on top of the last character. */
+  #send-future-fields select {
+    padding-right: 28px;
+  }
   #send-future-fields input:focus,
   #send-future-fields select:focus {
     outline: none;
     border-color: var(--accent-primary);
-  }
-  #send-future-hint {
-    font-size: 12px;
-    color: var(--text-secondary);
-    max-width: 360px;
   }
 
   .help-section {
@@ -4026,7 +4036,7 @@ Or remove them later in Settings → Help.</div>
 
 <div id="send-future-overlay">
   <div id="send-future-dialog">
-    <div id="send-future-title" data-i18n="sendFuture.title">Send to the future</div>
+    <div id="send-future-title" data-i18n="sendFuture.title">Set a date</div>
     <div id="send-future-fields">
       <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
       <input type="date" id="send-future-date">
@@ -4052,10 +4062,9 @@ Or remove them later in Settings → Help.</div>
         <input type="date" id="send-future-end-date" aria-label="End date" hidden>
       </div>
     </div>
-    <div id="send-future-hint" data-i18n="sendFuture.hint">Only a task without sub-tasks can be sent.</div>
     <div id="send-future-actions">
       <button type="button" class="agenda-action-btn" id="send-future-cancel" data-i18n="app-confirm.cancel">Cancel</button>
-      <button type="button" class="agenda-action-btn" id="send-future-ok" data-i18n="sendFuture.ok">Send</button>
+      <button type="button" class="agenda-action-btn" id="send-future-ok" data-i18n="sendFuture.ok">Set</button>
     </div>
   </div>
 </div>
@@ -9818,7 +9827,7 @@ const TRANSLATIONS = {
     'help.featureSendFutureBody': ' — hand a task without sub-tasks to a future date, once or repeating; it arrives in the week that owns that date',
     'help.sendToDateHint':        'Right-click a task with no sub-tasks → Reschedule → Date.',
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
-    'sendFuture.title':           'Send to the future',
+    'sendFuture.title':           'Set a date',
     'sendFuture.date':            'Date',
     'sendFuture.repeat':          'Repeat',
     'sendFuture.noRepeat':        'No repeat',
@@ -9830,9 +9839,8 @@ const TRANSLATIONS = {
     'sendFuture.endNever':        'Never',
     'sendFuture.endCount':        'After',
     'sendFuture.endUntil':        'On date',
-    'sendFuture.ok':              'Send',
-    'sendFuture.hint':            'Only a task with no sub-tasks can be sent. It leaves this week and arrives in the week that owns the date.',
-    'toast.sentToFuture':         'Sent to {date}',
+    'sendFuture.ok':              'Set',
+    'toast.sentToFuture':         'Set for {date}',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
     'menu.prioCritical':          'Priority Critical',
@@ -10174,7 +10182,7 @@ const TRANSLATIONS = {
     'help.featureSendFutureBody': ' — pošli úkol bez podúkolů na budoucí datum, jednorázově nebo opakovaně; objeví se v týdnu, do kterého datum patří',
     'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů → Přeplánovat → Datum.',
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
-    'sendFuture.title':           'Odeslat do budoucnosti',
+    'sendFuture.title':           'Nastavit datum',
     'sendFuture.date':            'Datum',
     'sendFuture.repeat':          'Opakování',
     'sendFuture.noRepeat':        'Bez opakování',
@@ -10186,9 +10194,8 @@ const TRANSLATIONS = {
     'sendFuture.endNever':        'Nikdy',
     'sendFuture.endCount':        'Po',
     'sendFuture.endUntil':        'K datu',
-    'sendFuture.ok':              'Odeslat',
-    'sendFuture.hint':            'Odeslat lze jen úkol bez podúkolů. Zmizí z tohoto týdne a objeví se v týdnu, do kterého datum patří.',
-    'toast.sentToFuture':         'Odesláno na {date}',
+    'sendFuture.ok':              'Nastavit',
+    'toast.sentToFuture':         'Nastaveno na {date}',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
     'menu.prioCritical':          'Priorita Kritická',
