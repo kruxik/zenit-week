@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-cbbQkXqq7ofvIrV3ANr0IthxRGHPjOp4hTL/5qzfVOQ='
+               'sha256-1vauDtkkqyH4LGng6rP904CXk/WKfKO1ZjEblJuCktE='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -17121,6 +17121,7 @@ function updateScheduleEntry(entryId, options) {
     endEl.hidden = !repeats;
     countEl.hidden = !repeats || endEl.value !== 'count';
     untilEl.hidden = !repeats || endEl.value !== 'until';
+    syncUntilFloor();
     syncOk();
   }
 
@@ -17190,16 +17191,27 @@ function updateScheduleEntry(entryId, options) {
   // the writers would refuse must not look committable. checkValidity() covers
   // both the floor and the empty field, so the button follows the same rule the
   // red border does.
+  // Chrome keeps a per-segment typing buffer in a date input and throws it away
+  // when `min` is assigned. Writing the floor from the end field's own input
+  // handler therefore reset the field mid-keystroke — "1","1" landed as 01, and
+  // a leading "0" looked like the whole date had been wiped. The floor depends
+  // only on the anchor, so it is written when the anchor moves and never while
+  // the end field itself is being typed into. The guard covers the rest: an
+  // unchanged assignment still costs the buffer.
+  function syncUntilFloor() {
+    const floor = dateEl.value || '';
+    if (untilEl.min !== floor) untilEl.min = floor;
+  }
+
   function syncOk() {
     // The end date only has a say while it is the chosen end condition; hidden,
     // it keeps whatever value it was left with and is none of Set's business.
-    untilEl.min = dateEl.value || '';
     const endOk = untilEl.hidden || untilEl.checkValidity();
     okEl.disabled = !dateEl.checkValidity() || !endOk;
   }
 
-  dateEl.addEventListener('input', syncEcho);
-  dateEl.addEventListener('change', syncEcho);
+  dateEl.addEventListener('input', () => { syncUntilFloor(); syncEcho(); });
+  dateEl.addEventListener('change', () => { syncUntilFloor(); syncEcho(); });
   untilEl.addEventListener('input', syncOk);
   untilEl.addEventListener('change', syncOk);
   unitEl.addEventListener('change', syncFields);
