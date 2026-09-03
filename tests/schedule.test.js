@@ -860,6 +860,24 @@ describe('Send to date…', () => {
     expect(entry.end).toEqual({ type: 'never' });
   });
 
+  it('refuses an end date before the anchor', () => {
+    // Such a series yields nothing: the node would leave the week and never
+    // arrive anywhere.
+    expect(sendNodeToDate('a1', {
+      date: '2026-09-14', every: 1, unit: 'week', endType: 'until', endDate: '2026-09-01',
+    })).toBeNull();
+    expect(findNode('a1')).toBeDefined();
+    expect(_state.getSchedule().entries).toHaveLength(0);
+  });
+
+  it('accepts an end date equal to the anchor — a series of one', () => {
+    const e = sendNodeToDate('a1', {
+      date: '2026-09-14', every: 1, unit: 'week', endType: 'until', endDate: '2026-09-14',
+    });
+    expect(e.end).toEqual({ type: 'until', date: '2026-09-14' });
+    expect(occurrencesInRange(e, '2026-09-01', '2027-01-01')).toEqual(['2026-09-14']);
+  });
+
   it('refuses a date already past and leaves the node alone', () => {
     // Frozen today is 2026-05-11.
     expect(sendNodeToDate('a1', { date: '2026-05-10', unit: null })).toBeNull();
@@ -1306,6 +1324,17 @@ describe('Editing an entry from the Later tab', () => {
     expect(_state.getSchedule().entries[0].label).toBe('Renewed bill');
     // The occurrence already delivered keeps the label its week gave it.
     expect(data.nodes.find(n => n.schedId === 's1').label).toBe(plantedLabel);
+  });
+
+  it('refuses an end date before the anchor and leaves the entry whole', () => {
+    _state.setSchedule({ entries: [entry({ repeat: { every: 1, unit: 'month' } })], tombstones: [], crdtVersion: 0 });
+    expect(updateScheduleEntry('s1', {
+      date: '2026-06-01', every: '1', unit: 'month', endType: 'until', endDate: '2026-05-20',
+    })).toBeNull();
+    const stored = _state.getSchedule().entries[0];
+    expect(stored.anchor).toBe('2026-05-13');
+    expect(stored.repeat).toEqual({ every: 1, unit: 'month' });
+    expect(stored.end).toEqual({ type: 'never' });
   });
 
   it('refuses to move an anchor further into the past', () => {

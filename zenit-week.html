@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-kimzjtzbXLue2sKJ7Z0hNtxlszs2IHPuN5K7i9a7vGg='
+               'sha256-cbbQkXqq7ofvIrV3ANr0IthxRGHPjOp4hTL/5qzfVOQ='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3290,7 +3290,9 @@
      the writers anyway, so say so at the field and stand the Set button down.
      Listed after the :focus rule so focusing the field does not paint over it. */
   #send-future-date:invalid,
-  #send-future-date:invalid:focus {
+  #send-future-date:invalid:focus,
+  #send-future-end-date:invalid,
+  #send-future-end-date:invalid:focus {
     border-color: var(--accent-danger);
   }
   #send-future-date:invalid + #send-future-date-echo {
@@ -4101,7 +4103,7 @@ Or remove them later in Settings → Help.</div>
           <option value="until" data-i18n="sendFuture.endUntil">On date</option>
         </select>
         <input type="number" id="send-future-end-count" min="1" max="999" value="10" aria-label="Occurrences" hidden>
-        <input type="date" id="send-future-end-date" aria-label="End date" hidden>
+        <input type="date" id="send-future-end-date" aria-label="End date" required hidden>
       </div>
     </div>
     <div id="send-future-actions">
@@ -16934,6 +16936,10 @@ function sendNodeToDate(nodeId, options) {
     const n = Math.max(1, Math.floor(Number(options.endCount)) || 1);
     entry.end = { type: 'count', n };
   } else if (unit && options.endType === 'until' && parseDayString(options.endDate)) {
+    // An end before the anchor yields no occurrence at all — the task would
+    // leave the week and never arrive anywhere. Equal to the anchor is fine:
+    // that is a series of exactly one.
+    if (options.endDate < anchor) return null;
     entry.end = { type: 'until', date: options.endDate };
   }
 
@@ -17074,14 +17080,19 @@ function updateScheduleEntry(entryId, options) {
 
   const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
   const every = Math.max(1, Math.floor(Number(options.every)) || 1);
+  // Decided before anything is written: a refusal below must leave the entry
+  // exactly as it was, not half-rewritten.
+  let end = { type: 'never' };
+  if (unit && options.endType === 'count') {
+    end = { type: 'count', n: Math.max(1, Math.floor(Number(options.endCount)) || 1) };
+  } else if (unit && options.endType === 'until' && parseDayString(options.endDate)) {
+    // Same rule as sendNodeToDate: an end before the anchor empties the series.
+    if (options.endDate < options.date) return null;
+    end = { type: 'until', date: options.endDate };
+  }
   entry.anchor = options.date;
   entry.repeat = unit ? { every, unit } : null;
-  entry.end = { type: 'never' };
-  if (unit && options.endType === 'count') {
-    entry.end = { type: 'count', n: Math.max(1, Math.floor(Number(options.endCount)) || 1) };
-  } else if (unit && options.endType === 'until' && parseDayString(options.endDate)) {
-    entry.end = { type: 'until', date: options.endDate };
-  }
+  entry.end = end;
   entry._ts = Date.now();
   saveSchedule();
   return entry;
@@ -17110,6 +17121,7 @@ function updateScheduleEntry(entryId, options) {
     endEl.hidden = !repeats;
     countEl.hidden = !repeats || endEl.value !== 'count';
     untilEl.hidden = !repeats || endEl.value !== 'until';
+    syncOk();
   }
 
   window.isSendFutureOpen = () => overlay.classList.contains('visible');
@@ -17179,11 +17191,17 @@ function updateScheduleEntry(entryId, options) {
   // both the floor and the empty field, so the button follows the same rule the
   // red border does.
   function syncOk() {
-    okEl.disabled = !dateEl.checkValidity();
+    // The end date only has a say while it is the chosen end condition; hidden,
+    // it keeps whatever value it was left with and is none of Set's business.
+    untilEl.min = dateEl.value || '';
+    const endOk = untilEl.hidden || untilEl.checkValidity();
+    okEl.disabled = !dateEl.checkValidity() || !endOk;
   }
 
   dateEl.addEventListener('input', syncEcho);
   dateEl.addEventListener('change', syncEcho);
+  untilEl.addEventListener('input', syncOk);
+  untilEl.addEventListener('change', syncOk);
   unitEl.addEventListener('change', syncFields);
   endEl.addEventListener('change', syncFields);
   cancelEl.addEventListener('click', () => window.closeSendFuture());
