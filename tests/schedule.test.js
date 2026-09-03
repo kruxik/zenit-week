@@ -50,6 +50,25 @@ import {
   _state,
 } from './setup.js';
 
+// Both schedule writers refuse a date already past, so every test that calls
+// one needs a fixed "today" — otherwise the suite would start failing the day
+// the wall clock passed its fixtures.
+function freezeToday(iso) {
+  const when = new Date(`${iso}T12:00:00`);
+  let RealDate;
+  beforeEach(() => {
+    RealDate = global.Date;
+    global.Date = class extends RealDate {
+      constructor(...args) {
+        if (args.length === 0) return new RealDate(when.getTime());
+        return new RealDate(...args);
+      }
+      static now() { return when.getTime(); }
+    };
+  });
+  afterEach(() => { global.Date = RealDate; });
+}
+
 // Minimal entry factory — S1 only exercises the occurrence math, so nothing
 // beyond anchor / repeat / end is needed here.
 function entry(anchor, repeat = null, end = { type: 'never' }) {
@@ -787,6 +806,7 @@ describe('Materialisation on week open', () => {
 
 describe('Send to date…', () => {
   const WK = '2026-20';
+  freezeToday('2026-05-11');
 
   const seedWeek = () => {
     _state.set({
@@ -838,6 +858,18 @@ describe('Send to date…', () => {
     expect(entry.anchor).toBe('2026-09-14');
     expect(entry.repeat).toBeNull();
     expect(entry.end).toEqual({ type: 'never' });
+  });
+
+  it('refuses a date already past and leaves the node alone', () => {
+    // Frozen today is 2026-05-11.
+    expect(sendNodeToDate('a1', { date: '2026-05-10', unit: null })).toBeNull();
+    expect(findNode('a1')).toBeDefined();
+    expect(_state.getSchedule().entries).toHaveLength(0);
+  });
+
+  it('accepts today itself', () => {
+    const entry = sendNodeToDate('a1', { date: '2026-05-11', unit: null });
+    expect(entry.anchor).toBe('2026-05-11');
   });
 
   it('drops the weekday tag from the label it captures', () => {
@@ -1218,6 +1250,7 @@ describe('Later tab', () => {
 
 describe('Editing an entry from the Later tab', () => {
   const WK = '2026-20';
+  freezeToday('2026-05-11');
   const entry = (over = {}) => ({
     id: 's1', label: 'Pay the bill', branch: 'work', priority: 'normal',
     anchor: '2026-05-13', repeat: null, end: { type: 'never' },
@@ -1273,6 +1306,21 @@ describe('Editing an entry from the Later tab', () => {
     expect(_state.getSchedule().entries[0].label).toBe('Renewed bill');
     // The occurrence already delivered keeps the label its week gave it.
     expect(data.nodes.find(n => n.schedId === 's1').label).toBe(plantedLabel);
+  });
+
+  it('refuses to move an anchor further into the past', () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    expect(updateScheduleEntry('s1', { date: '2026-05-01', unit: null })).toBeNull();
+    expect(_state.getSchedule().entries[0].anchor).toBe('2026-05-13');
+  });
+
+  it('lets a series keep an anchor that is already past', () => {
+    // The anchor of a repeating series is where it started, so it is allowed to
+    // stay behind today — only moving it back further is refused.
+    _state.setSchedule({ entries: [entry({ anchor: '2026-01-05' })], tombstones: [], crdtVersion: 0 });
+    const out = updateScheduleEntry('s1', { date: '2026-01-05', every: '1', unit: 'month' });
+    expect(out.anchor).toBe('2026-01-05');
+    expect(out.repeat).toEqual({ every: 1, unit: 'month' });
   });
 
   it('drops a weekday tag typed into a rename', () => {

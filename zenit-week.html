@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-HmEKpode8TM3LDKGJ4TajjU8b1T8AADDspYVKFTacYs='
+               'sha256-kimzjtzbXLue2sKJ7Z0hNtxlszs2IHPuN5K7i9a7vGg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2380,7 +2380,8 @@
     color: var(--text-dim);
   }
 
-  .undo-redo-btn:disabled {
+  .undo-redo-btn:disabled,
+  #send-future-ok:disabled {
     opacity: 0.35;
     cursor: default;
     pointer-events: none;
@@ -3285,6 +3286,16 @@
     outline: none;
     border-color: var(--accent-primary);
   }
+  /* A date before `min` (or none at all — the field is required) is refused by
+     the writers anyway, so say so at the field and stand the Set button down.
+     Listed after the :focus rule so focusing the field does not paint over it. */
+  #send-future-date:invalid,
+  #send-future-date:invalid:focus {
+    border-color: var(--accent-danger);
+  }
+  #send-future-date:invalid + #send-future-date-echo {
+    color: var(--accent-danger);
+  }
 
   .help-section {
     margin-bottom: 24px;
@@ -4068,7 +4079,7 @@ Or remove them later in Settings → Help.</div>
     <div id="send-future-fields">
       <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
       <div class="send-future-row">
-        <input type="date" id="send-future-date">
+        <input type="date" id="send-future-date" required>
         <span id="send-future-date-echo"></span>
       </div>
       <label for="send-future-unit" data-i18n="sendFuture.repeat">Repeat</label>
@@ -9890,6 +9901,8 @@ const TRANSLATIONS = {
     'sendFuture.endUntil':        'On date',
     'sendFuture.ok':              'Set',
     'toast.sentToFuture':         'Set for {date}',
+    'toast.pastDate':             'Pick today or later — the schedule only delivers forward',
+    'sendFuture.pickDate':        'Pick today or later',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
     'menu.prioCritical':          'Priority Critical',
@@ -10245,6 +10258,8 @@ const TRANSLATIONS = {
     'sendFuture.endUntil':        'K datu',
     'sendFuture.ok':              'Nastavit',
     'toast.sentToFuture':         'Nastaveno na {date}',
+    'toast.pastDate':             'Vyber dnešek nebo pozdější den — plán doručuje jen dopředu',
+    'sendFuture.pickDate':        'Vyber dnešek nebo pozdější den',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
     'menu.prioCritical':          'Priorita Kritická',
@@ -11543,6 +11558,29 @@ async function openWeekIntoView(wk) {
   // Keep the next-week cache aligned with the week we just navigated to, or a
   // later move/undo snapshot restores the wrong next-week record.
   await refreshNextWeekCache();
+}
+
+// Materialisation normally runs only when a week is opened, which leaves the
+// view stale after a write to the schedule: send today's task to Friday of this
+// week and the node is gone from the week while its occurrence has not been
+// planted yet. This delivers into the week already on screen. It duplicates
+// openWeekIntoView's lock block rather than calling it, because that path
+// reloads the record and takes the same non-re-entrant lock.
+async function materialiseOpenWeek() {
+  const wk = currentWeekKey;
+  if (scheduleData.entries.length) {
+    await withWeekLock(wk, async () => {
+      if (materialiseWeek(wk, weekData)) await saveWeek(wk, weekData);
+      if (_scheduleDirty) {
+        _scheduleDirty = false;
+        await saveSchedule();
+      }
+    });
+  }
+  rebuildNodeMap();
+  renderIfVisible();
+  updateSummary();
+  if (currentView === 'agenda') renderAgenda();
 }
 
 async function transferReusable() {
@@ -16873,6 +16911,10 @@ function sendNodeToDate(nodeId, options) {
   if (!canSendToDate(node)) return null;
   const anchor = options && options.date;
   if (!parseDayString(anchor)) return null;
+  // A date already past cannot be scheduled: the schedule delivers forward, so
+  // such an entry only ever arrives as the sweep's overdue item. The dialog
+  // sets `min` too — this is the guard for every other caller.
+  if (anchor < localDateStr()) return null;
 
   const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
   const every = Math.max(1, Math.floor(Number(options.every)) || 1);
@@ -17025,6 +17067,10 @@ function confirmDeleteFromLater(entryId, date) {
 function updateScheduleEntry(entryId, options) {
   const entry = scheduleData.entries.find(e => e.id === entryId);
   if (!entry || !parseDayString(options && options.date)) return null;
+  // Same rule as sendNodeToDate, with one exception: an entry that repeats was
+  // anchored when its series started, and that anchor is legitimately in the
+  // past. Keeping it is allowed — moving it further back is not.
+  if (options.date < localDateStr() && options.date !== entry.anchor) return null;
 
   const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
   const every = Math.max(1, Math.floor(Number(options.every)) || 1);
@@ -17079,6 +17125,9 @@ function updateScheduleEntry(entryId, options) {
     if (!entry) return;
     _targetId = null;
     _entryId = entryId;
+    // A series anchored in the past keeps its anchor as the floor, so the value
+    // on screen stays valid; anything else floors at today.
+    dateEl.min = entry.anchor < localDateStr() ? entry.anchor : localDateStr();
     dateEl.value = entry.anchor;
     everyEl.value = String(entry.repeat ? entry.repeat.every : 1);
     unitEl.value = entry.repeat ? entry.repeat.unit : 'none';
@@ -17104,6 +17153,7 @@ function updateScheduleEntry(entryId, options) {
     // A week out is the default because that is the shortest horizon this
     // dialog is for; anything nearer is what N and the day tags already do.
     const start = dayStringFromNumber(dayNumber(parseDayString(localDateStr())) + 7);
+    dateEl.min = localDateStr();
     dateEl.value = start;
     everyEl.value = '1';
     unitEl.value = 'none';
@@ -17118,7 +17168,18 @@ function updateScheduleEntry(entryId, options) {
 
   const echoEl = document.getElementById('send-future-date-echo');
   function syncEcho() {
-    echoEl.textContent = formatDayLabel(dateEl.value);
+    echoEl.textContent = dateEl.value
+      ? formatDayLabel(dateEl.value)
+      : t('sendFuture.pickDate');
+    syncOk();
+  }
+
+  // The picker honours `min`, but the field can also be typed into, and a date
+  // the writers would refuse must not look committable. checkValidity() covers
+  // both the floor and the empty field, so the button follows the same rule the
+  // red border does.
+  function syncOk() {
+    okEl.disabled = !dateEl.checkValidity();
   }
 
   dateEl.addEventListener('input', syncEcho);
@@ -17128,7 +17189,7 @@ function updateScheduleEntry(entryId, options) {
   cancelEl.addEventListener('click', () => window.closeSendFuture());
   overlay.addEventListener('click', (e) => { if (e.target === overlay) window.closeSendFuture(); });
 
-  okEl.addEventListener('click', () => {
+  okEl.addEventListener('click', async () => {
     const id = _targetId;
     const editing = _entryId;
     const opts = {
@@ -17141,9 +17202,18 @@ function updateScheduleEntry(entryId, options) {
     };
     window.closeSendFuture();
     const entry = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
-    if (!entry) return;
-    if (editing) renderAgenda();
-    else showToast(t('toast.sentToFuture', { date: formatDayLabel(entry.anchor) }));
+    if (!entry) {
+      // The only refusal a user can provoke from the dialog: `min` keeps the
+      // picker honest, but a typed date still reaches here.
+      if (opts.date && parseDayString(opts.date) && opts.date < localDateStr()) {
+        showToast(t('toast.pastDate'));
+      }
+      return;
+    }
+    if (!editing) showToast(t('toast.sentToFuture', { date: formatDayLabel(entry.anchor) }));
+    // The entry may be due inside the week already on screen — deliver it now
+    // rather than leaving the task missing until the week is next opened.
+    await materialiseOpenWeek();
   });
 })();
 
