@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-YdJGKdqrFJSH6FAPVL9YiQOFlfZGimhp7V77UmNW1lA='
+               'sha256-jC1RVJOkqm3y6V/WBHnSccULxUFCy2leDMnmOfnE8gg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -21849,11 +21849,22 @@ function shouldShowHint(id) {
 
 function positionCoachmark(cm, anchorEl) {
   const r = anchorEl.getBoundingClientRect();
+  const margin = 8;
+  // The bubble is position:fixed with no width and no right, so it is
+  // shrink-to-fit and its available width is `innerWidth - left`. Measuring it
+  // where it currently sits would therefore measure a width the *previous* call
+  // caused, and the clamp below would answer with a new left, which changes the
+  // width again: the pair walks toward its fixed point one `margin` per call,
+  // and since the tracker re-runs this every COACHMARK_RESYNC_MS the walk is
+  // visible as a string of 8px hops for seconds after a rotation. So park it at
+  // the left edge first: available width is then the whole viewport and the
+  // measurement is a pure function of viewport and content — the same on every
+  // call, which makes positioning idempotent.
+  cm.style.left = '0px';
   // offsetWidth/Height, not getBoundingClientRect: the entrance animation scales
   // the bubble, and a scaled rect would place it against the wrong dimensions.
   const cmW = cm.offsetWidth, cmH = cm.offsetHeight;
   const vw = window.innerWidth, vh = window.innerHeight;
-  const margin = 8;
   // Prefer above the anchor; flip below if not enough room.
   const below = r.top - cmH - 12 < margin;
   const top = below ? r.bottom + 12 : r.top - cmH - 12;
