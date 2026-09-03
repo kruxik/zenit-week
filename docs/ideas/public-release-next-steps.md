@@ -34,7 +34,6 @@ queue for the next sessions, grouped by who has to do it.
 - [ ] **Czech privacy & terms** — `/privacy` and `/terms` are still EN-only. Create `cs/privacy.html` and `cs/terms.html` mirroring the EN structure (privacy.html GDPR pass already done; just translate). Update hreflang on both EN files to point at the new CZ alternates.
 - [ ] **App `?lang=` URL param** — `zenit-week.html` does not yet read the URL parameter, so a CZ user clicking *Otevřít aplikaci* from `/cs/` lands on the EN UI. Add a one-liner that reads `new URLSearchParams(location.search).get('lang')` on init and sets `currentLang` if it's a known value before the existing `localStorage.getItem('zenit-week-lang')` fallback. Update both EN and CS homepage CTAs to include `?lang=en` / `?lang=cs`.
 - [ ] **Backup-reminder UX** — `localStorage` data loss is the biggest privacy-friendly trap. Add a gentle in-app prompt suggesting Export → JSON after N weeks of use, dismissible. Spec lives in privacy/risk #4.
-- [ ] **`CLAUDE.md` / `GEMINI.md` sync decision** — both are 7253-byte verbatim copies. Pick one source of truth (likely `CLAUDE.md`), make the other a symlink, or delete the duplicate. Manual divergence is a footgun.
 - [ ] **HTML validator config** — extend `npm run validate` to also check `index.html`, `cs/index.html`, `privacy.html`, `terms.html`. The pre-existing `aria-label-misuse` and `no-inline-style` errors are not blocking but worth burning down once.
 
 ## Week 3 — Pre-launch validation (mostly off-keyboard)
