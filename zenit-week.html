@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-1vauDtkkqyH4LGng6rP904CXk/WKfKO1ZjEblJuCktE='
+               'sha256-GtkWMiLImCvI4g4BzTt5N01DIS9Xhl5b7l5HIuTgcG4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -659,12 +659,7 @@
     transform: translateY(8px);
     display: flex;
     flex-direction: column;
-    gap: 10px;
     max-width: 460px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: 10px;
-    padding: 12px 14px;
     box-shadow: 0 4px 16px var(--shadow-md);
     z-index: 3000;
     font-size: 13px;
@@ -681,27 +676,12 @@
     transform: translateY(0);
   }
   #playground-nudge-text { white-space: pre-line; }
-  #playground-nudge-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-  }
-  #playground-nudge-actions .agenda-action-btn {
-    white-space: nowrap;
-    height: 32px;
-    padding: 0 12px;
-    font-weight: 400;
-  }
-  #playground-nudge-actions .agenda-action-btn.danger {
-    color: var(--accent-danger);
-    border-color: var(--accent-danger-border);
-  }
-  #playground-nudge-actions .agenda-action-btn.danger:hover {
-    color: var(--accent-danger);
-    border-color: var(--accent-danger);
-  }
-  #playground-nudge-actions .agenda-action-btn.danger:hover::before {
-    background: var(--accent-danger-bg);
+  /* The nudge asks a question in the banner slot, so it is built from the
+     dialog parts like everything else that asks one — only its body is the
+     banner's tighter 12/14 rather than a modal's 20. */
+  #playground-nudge .dialog-body {
+    gap: 10px;
+    padding: 12px 14px;
   }
 
   /* The update hint is one sentence and two controls, so it lays out as a row
@@ -711,12 +691,12 @@
     flex-direction: row;
     align-items: center;
     gap: 8px;
+    padding: 8px 8px 8px 14px;
     /* Hug the content: stretched to the full slot the sentence and the button
        ended up at opposite edges with a lake between them. It still caps at the
        slot width, so a narrow phone wraps the sentence instead of overflowing. */
     width: fit-content;
     max-width: 420px;
-    padding: 8px 8px 8px 14px;
     /* On the bottom ladder rather than the nudge's fixed offset: the nudge is an
        onboarding moment with nothing else open, while this can appear at any
        time — including with the view-level row disclosed. L1 clears the bottom
@@ -747,14 +727,13 @@
        space; still under the confirm dialog overlay (10000). */
     z-index: 9100;
     max-width: min(86vw, 320px);
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: 10px;
     box-shadow: 0 6px 22px var(--shadow-md);
-    padding: 12px 14px;
     font-size: 13px;
     line-height: 1.45;
     color: var(--text-primary);
+    /* The one dialog whose arrow lives outside its own box, so it cannot clip
+       to the shell. The header's top corners are rounded by hand instead. */
+    overflow: visible;
     /* Grows out of its own arrow, so the bubble reads as belonging to the thing
        it points at rather than appearing from nowhere. --cm-origin-x is the
        arrow's offset, written by positionCoachmark. */
@@ -784,9 +763,14 @@
     #coachmark.visible { transform: none; }
     .coachmark-pulse { display: none; }
   }
-  #coachmark-text { margin-bottom: 10px; white-space: pre-line; }
+  #coachmark .dialog-header { border-radius: 9px 9px 0 0; }
+  /* A tip is read in a glance, so its body is tighter than a modal's. */
+  #coachmark .dialog-body {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  #coachmark-text { white-space: pre-line; }
   .coachmark-caption { font-weight: 600; }
-  #coachmark-text .coachmark-caption { margin-bottom: 4px; }
   #coachmark-text .coachmark-intro { margin-bottom: 8px; }
   #coachmark-text .coachmark-intro:last-child { margin-bottom: 0; }
   #coachmark-text .help-row { margin-bottom: 6px; }
@@ -814,9 +798,9 @@
     bottom: -7px;
     width: 12px;
     height: 12px;
-    background: var(--bg-surface);
-    border-right: 1px solid var(--border-default);
-    border-bottom: 1px solid var(--border-default);
+    background: var(--settings-bg);
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
     transform: translateX(-50%) rotate(45deg);
   }
   /* Bubble below the target — arrow points up. */
@@ -825,8 +809,11 @@
     top: -7px;
     border-right: none;
     border-bottom: none;
-    border-left: 1px solid var(--border-default);
-    border-top: 1px solid var(--border-default);
+    border-left: 1px solid var(--border-subtle);
+    border-top: 1px solid var(--border-subtle);
+    /* Pointing up means the arrow overlaps the caption bar, so it wears the
+       caption's fill rather than the body's. */
+    background: var(--bg-muted);
   }
 
   .view-level-btn {
@@ -1383,28 +1370,13 @@
   #color-picker-panel {
     display: none;
     position: fixed;
-    z-index: 1001;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: 8px;
+    z-index: 1200;
     box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
-    padding: 16px;
-    width: 192px;
+    width: 200px;
     flex-direction: column;
-    align-items: center;
-    gap: 12px;
     animation: fadeIn 0.1s ease-out;
   }
   #color-picker-panel.visible { display: flex; }
-
-  #cp-title {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-placeholder);
-    align-self: flex-start;
-  }
 
   #cp-sb-canvas {
     width: 160px;
@@ -1450,11 +1422,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    background: var(--bg-input);
-    border-radius: 8px;
-    padding: 7px 10px;
     width: 100%;
-    box-sizing: border-box;
   }
   #cp-hex-prefix {
     color: var(--text-subtle);
@@ -1474,47 +1442,24 @@
     color: var(--text-primary);
   }
 
-  #cp-buttons {
-    display: flex;
-    gap: 8px;
-    width: 100%;
-  }
-  #cp-cancel, #cp-apply { flex: 1; }
+  #cp-buttons { width: 100%; }
+  #cp-apply { flex: 1; }
 
   #baseline-panel {
     display: none;
     position: fixed;
-    z-index: 1001;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: 8px;
+    z-index: 1200;
     box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
-    padding: 16px;
-    width: 192px;
+    width: 200px;
     flex-direction: column;
-    align-items: center;
-    gap: 12px;
     animation: fadeIn 0.1s ease-out;
   }
   #baseline-panel.visible { display: flex; }
 
-  #bp-title {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-placeholder);
-    align-self: flex-start;
-  }
-
   #bp-input-row {
     display: flex;
     align-items: center;
-    background: var(--bg-input);
-    border-radius: 8px;
-    padding: 7px 10px;
     width: 100%;
-    box-sizing: border-box;
   }
 
   #bp-input {
@@ -1539,12 +1484,8 @@
     align-self: stretch;
   }
 
-  #bp-buttons {
-    display: flex;
-    gap: 8px;
-    width: 100%;
-  }
-  #bp-cancel, #bp-apply { flex: 1; }
+  #bp-buttons { width: 100%; }
+  #bp-apply { flex: 1; }
 
   /* Today Panel */
   /* Agenda section divider. Sticks under the floating day-strip header while its
@@ -2186,7 +2127,7 @@
     background: var(--overlay-sm);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    z-index: 1099;
+    z-index: 2590;
     opacity: 0;
     transition: opacity 0.3s ease;
   }
@@ -2197,14 +2138,14 @@
 
   #quick-add-panel {
     position: fixed;
-    z-index: 1100;
-    background: var(--settings-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border-subtle);
+    z-index: 2600;
     box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
     display: none;
     flex-direction: column;
+  }
+  /* Tighter than a modal body — the panel is 300px wide and lives in the
+     corner — but the same caption, field and buttons above it. */
+  #quick-add-panel .dialog-body {
     gap: 6px;
     padding: 10px;
   }
@@ -2241,12 +2182,6 @@
   body:has(#quick-add-panel.is-open) #view-toggle-bar {
     display: none;
   }
-  /* In Stats the desktop panel floats at z2000; lift the quick-add popup above
-     it (and its backdrop over it) so "+" opens an interactive input, not one
-     buried behind the panel. */
-  html[data-view="stats"] #quick-add-backdrop { z-index: 2550; }
-  html[data-view="stats"] #quick-add-panel    { z-index: 2560; }
-
   #quick-add-branches {
     display: flex;
     flex-wrap: wrap;
@@ -2269,22 +2204,6 @@
     z-index: -1;
   }
   .qab-pill-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-
-  #quick-add-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  #quick-add-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-subtle);
-  }
-  #quick-add-header .help-close-btn {
-    height: 28px;
-    padding: 0 8px;
-  }
 
   /* Receipt strip — the panel stays open after a submit, so each stored item
      is echoed here instead of firing a toast (the toast is a single slot and
@@ -2322,17 +2241,10 @@
 
   #quick-add-input {
     width: 100%;
-    box-sizing: border-box;
-    padding: 7px 10px;
-    background: var(--bg-input, var(--bg-surface));
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    color: var(--text-primary);
+    height: 36px;
     font-size: 14px;
-    outline: none;
     transition: border-color 0.15s;
   }
-  #quick-add-input:focus { border-color: var(--text-dim); }
   #quick-add-input::-webkit-search-cancel-button,
   #quick-add-input::-webkit-search-decoration,
   #quick-add-input::-webkit-contacts-auto-fill-button,
@@ -3087,54 +2999,89 @@
     }
   }
 
-  #import-confirm-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: var(--overlay-sm);
-    backdrop-filter: blur(4px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 3000;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-  }
-  #import-confirm-overlay.visible {
-    display: flex;
-    opacity: 1;
-  }
-  #import-confirm-dialog {
-    background: var(--bg-surface);
+  /* ─── One dialog vocabulary ────────────────────────────────────────────────
+     Every dialog in the app — the two centered modals, the two anchored
+     popovers and the quick-add popup — is built from the same four parts, so a
+     caption reads the same whether it sits over a 200px popover or a 360px
+     confirm. The shell is surface only: it deliberately sets no `display`,
+     because each dialog toggles its own (.visible / .is-open) and a display
+     here would make every one of them permanently open.
+
+     The tinted, full-bleed header is what asks for `overflow: hidden` — the
+     tint has to be clipped by the shell's radius, and the shell's padding is 0
+     for the same reason: the padding lives on .dialog-body instead. */
+  .dialog-shell {
+    background: var(--settings-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
-    box-shadow: 0 20px 60px var(--shadow-xl);
-    padding: 24px;
-    width: 360px;
-    max-width: calc(100vw - 40px);
+    overflow: hidden;
+  }
+  .dialog-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 40px;
+    padding: 0 6px 0 14px;
+    background: var(--bg-muted);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .dialog-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The X is the same button used to leave Help and the comment panel, one
+     size smaller so it fits a 40px caption bar. */
+  .dialog-header .help-close-btn {
+    height: 28px;
+    padding: 0 8px;
+    flex-shrink: 0;
+  }
+  .dialog-body {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    transform: translateY(12px);
-    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    padding: 20px;
   }
-  #import-confirm-overlay.visible #import-confirm-dialog {
-    transform: translateY(0);
-  }
-  #import-confirm-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-  #import-confirm-body {
-    font-size: 13px;
-    color: var(--text-muted);
-    line-height: 1.5;
-  }
-  #import-confirm-actions {
+  .dialog-actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
     margin-top: 4px;
+  }
+  /* One field idiom for every dialog: the bordered box the date dialog already
+     used, so a hex code, a baseline number and a quick-add line all read the
+     same. The two wrappers (#cp-hex-row, #bp-input-row) carry it with a
+     transparent input inside, which is why the ring is also :focus-within. */
+  .dialog-field {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    height: 32px;
+    padding: 0 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    min-width: 0;
+  }
+  .dialog-field:focus,
+  .dialog-field:focus-within {
+    outline: none;
+    border-color: var(--accent-primary);
+  }
+  /* Popovers are anchored and narrow: a tighter body and a full-width action
+     row, but the same caption, fields and buttons as the modals. */
+  #color-picker-panel .dialog-body,
+  #baseline-panel .dialog-body {
+    align-items: center;
+    padding: 16px;
   }
 
   /* Generic confirm dialog — reuses overlay/dialog/actions pattern */
@@ -3159,28 +3106,20 @@
   }
   #app-confirm-dialog,
   #send-future-dialog {
-    background: var(--bg-surface);
-    border-radius: 8px;
     box-shadow: 0 20px 60px var(--shadow-xl);
-    padding: 24px;
     width: auto;
     min-width: 360px;
     max-width: calc(100vw - 40px);
     display: flex;
     flex-direction: column;
-    gap: 12px;
     transform: translateY(12px);
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
-  #app-confirm-body {
-    max-width: 360px;
-    white-space: pre-line;
+  #app-confirm-overlay.visible #app-confirm-dialog,
+  #send-future-overlay.visible #send-future-dialog {
+    transform: translateY(0);
   }
-  #app-confirm-actions .agenda-action-btn,
-  #send-future-actions .agenda-action-btn,
-  #import-confirm-actions .agenda-action-btn,
-  #bp-buttons .agenda-action-btn,
-  #cp-buttons .agenda-action-btn,
+  .dialog-actions .agenda-action-btn,
   #settings-dropdown .agenda-action-btn {
     white-space: nowrap;
     height: 36px;
@@ -3190,45 +3129,26 @@
   /* Respect the hidden attribute — .agenda-action-btn sets its own display,
      which would otherwise override [hidden]{display:none} and show an empty
      secondary button on confirms that don't use one. */
-  #app-confirm-actions .agenda-action-btn[hidden],
-  #import-confirm-actions .agenda-action-btn[hidden] {
+  .dialog-actions .agenda-action-btn[hidden] {
     display: none;
   }
-  #app-confirm-actions .agenda-action-btn.danger,
-  #import-confirm-actions .agenda-action-btn.danger {
+  .agenda-action-btn.danger {
     color: var(--accent-danger);
     border-color: var(--accent-danger-border);
   }
-  #app-confirm-actions .agenda-action-btn.danger:hover,
-  #import-confirm-actions .agenda-action-btn.danger:hover {
+  .agenda-action-btn.danger:hover {
     color: var(--accent-danger);
     border-color: var(--accent-danger);
   }
-  #app-confirm-actions .agenda-action-btn.danger:hover::before,
-  #import-confirm-actions .agenda-action-btn.danger:hover::before {
+  .agenda-action-btn.danger:hover::before {
     background: var(--accent-danger-bg);
   }
-  #app-confirm-overlay.visible #app-confirm-dialog,
-  #send-future-overlay.visible #send-future-dialog {
-    transform: translateY(0);
-  }
-  #app-confirm-title,
-  #send-future-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
   #app-confirm-body {
+    max-width: 360px;
+    white-space: pre-line;
     font-size: 13px;
     color: var(--text-secondary);
     line-height: 1.5;
-  }
-  #app-confirm-actions,
-  #send-future-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    margin-top: 4px;
   }
 
   /* Send to date… — the only app dialog that asks for values rather than a
@@ -3253,18 +3173,6 @@
        a rhythm, even though every gap between them is the same. */
     min-height: 32px;
   }
-  #send-future-fields input,
-  #send-future-fields select {
-    font-family: inherit;
-    font-size: 13px;
-    color: var(--text-primary);
-    background: var(--bg-surface);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    height: 32px;
-    padding: 0 8px;
-    min-width: 0;
-  }
   #send-future-fields input[type="number"] {
     width: 64px;
   }
@@ -3280,11 +3188,6 @@
      it, the arrow sits on top of the last character. */
   #send-future-fields select {
     padding-right: 28px;
-  }
-  #send-future-fields input:focus,
-  #send-future-fields select:focus {
-    outline: none;
-    border-color: var(--accent-primary);
   }
   /* A date before `min` (or none at all — the field is required) is refused by
      the writers anyway, so say so at the field and stand the Set button down.
@@ -3967,13 +3870,21 @@
 
 <div id="view-level-toast"></div>
 
-<div id="playground-nudge" role="status" aria-live="polite">
-  <div class="coachmark-caption" data-i18n="onboarding.nudgeCaption">Done exploring?</div>
-  <div id="playground-nudge-text" data-i18n="onboarding.nudge">Clear the example tasks and keep just your own.
+<div id="playground-nudge" class="dialog-shell" role="status" aria-live="polite">
+  <div class="dialog-header">
+    <div class="dialog-title" data-i18n="onboarding.nudgeCaption">Done exploring?</div>
+    <button type="button" class="help-close-btn" id="playground-nudge-close"
+      data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+      <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    </button>
+  </div>
+  <div class="dialog-body">
+    <div id="playground-nudge-text" data-i18n="onboarding.nudge">Clear the example tasks and keep just your own.
 Or remove them later in Settings → Help.</div>
-  <div id="playground-nudge-actions">
-    <button type="button" class="agenda-action-btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Keep exploring</button>
-    <button type="button" class="agenda-action-btn danger" id="playground-nudge-clear" data-i18n="onboarding.clearExample">Clear example tasks</button>
+    <div id="playground-nudge-actions" class="dialog-actions">
+      <button type="button" class="agenda-action-btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Keep exploring</button>
+      <button type="button" class="agenda-action-btn danger" id="playground-nudge-clear" data-i18n="onboarding.clearExample">Clear example tasks</button>
+    </div>
   </div>
 </div>
 
@@ -3981,7 +3892,7 @@ Or remove them later in Settings → Help.</div>
      first idle moment on its own, so this only appears when the app has stayed
      busy long enough for that moment not to have come. Same slot and the same
      surface as the onboarding nudge above; the two never show at once. -->
-<div id="update-banner" role="status" aria-live="polite">
+<div id="update-banner" class="dialog-shell" role="status" aria-live="polite">
   <div id="update-banner-text" data-i18n="update.body">There is a new version of Zenit Week.</div>
   <button type="button" class="agenda-action-btn" id="update-banner-reload" data-i18n="update.reload">Reload</button>
   <button type="button" class="help-close-btn" id="update-banner-dismiss"
@@ -3990,11 +3901,20 @@ Or remove them later in Settings → Help.</div>
   </button>
 </div>
 
-<div id="coachmark" role="dialog" aria-live="polite" hidden>
-  <div id="coachmark-text"></div>
-  <div id="coachmark-footer">
-    <span id="coachmark-tip-off" data-i18n="tips.disableHint">Turn tips off in Settings.</span>
-    <button type="button" class="agenda-action-btn" id="coachmark-got-it" data-i18n="tips.gotIt">Got it</button>
+<div id="coachmark" class="dialog-shell" role="dialog" aria-live="polite" aria-labelledby="coachmark-caption" hidden>
+  <div class="dialog-header">
+    <div class="dialog-title" id="coachmark-caption"></div>
+    <button type="button" class="help-close-btn" id="coachmark-close"
+      data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+      <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    </button>
+  </div>
+  <div class="dialog-body">
+    <div id="coachmark-text"></div>
+    <div id="coachmark-footer">
+      <span id="coachmark-tip-off" data-i18n="tips.disableHint">Turn tips off in Settings.</span>
+      <button type="button" class="agenda-action-btn" id="coachmark-got-it" data-i18n="tips.gotIt">Got it</button>
+    </div>
   </div>
   <div id="coachmark-arrow"></div>
 </div>
@@ -4034,29 +3954,43 @@ Or remove them later in Settings → Help.</div>
 <textarea id="inline-input" autocomplete="off" spellcheck="false"></textarea>
 <span id="inline-sizer"></span>
 
-<div id="baseline-panel">
-  <div id="bp-title" data-i18n="baseline.title">Activity Baseline</div>
-  <div id="bp-input-row">
-    <input type="number" id="bp-input" min="1" max="999" step="1" value="105">
+<div id="baseline-panel" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="bp-title">
+  <div class="dialog-header">
+    <div class="dialog-title" id="bp-title" data-i18n="baseline.title">Activity Baseline</div>
+    <button type="button" class="help-close-btn" id="bp-close"
+        data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+      </button>
   </div>
-  <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
-  <div id="bp-buttons">
-    <button type="button" id="bp-cancel" class="agenda-action-btn" data-i18n="baseline.cancel">Cancel</button>
-    <button type="button" id="bp-apply" class="agenda-action-btn" data-i18n="baseline.apply">Apply</button>
+  <div class="dialog-body">
+    <div id="bp-input-row" class="dialog-field">
+      <input type="number" id="bp-input" min="1" max="999" step="1" value="105">
+    </div>
+    <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
+    <div id="bp-buttons" class="dialog-actions">
+      <button type="button" id="bp-apply" class="agenda-action-btn" data-i18n="baseline.apply">Apply</button>
+    </div>
   </div>
 </div>
 
-<div id="color-picker-panel">
-  <div id="cp-title" data-i18n="colorPicker.title">Branch color</div>
-  <canvas id="cp-sb-canvas" width="160" height="120"></canvas>
-  <input type="range" id="cp-hue-slider" min="0" max="359" step="1">
-  <div id="cp-hex-row">
-    <span id="cp-hex-prefix">#</span>
-    <input type="text" id="cp-hex" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
+<div id="color-picker-panel" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="cp-title">
+  <div class="dialog-header">
+    <div class="dialog-title" id="cp-title" data-i18n="colorPicker.title">Branch color</div>
+    <button type="button" class="help-close-btn" id="cp-close"
+        data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+      </button>
   </div>
-  <div id="cp-buttons">
-    <button type="button" id="cp-cancel" class="agenda-action-btn" data-i18n="colorPicker.cancel">Cancel</button>
-    <button type="button" id="cp-apply" class="agenda-action-btn" data-i18n="colorPicker.apply">Apply</button>
+  <div class="dialog-body">
+    <canvas id="cp-sb-canvas" width="160" height="120"></canvas>
+    <input type="range" id="cp-hue-slider" min="0" max="359" step="1">
+    <div id="cp-hex-row" class="dialog-field">
+      <span id="cp-hex-prefix">#</span>
+      <input type="text" id="cp-hex" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
+    </div>
+    <div id="cp-buttons" class="dialog-actions">
+      <button type="button" id="cp-apply" class="agenda-action-btn" data-i18n="colorPicker.apply">Apply</button>
+    </div>
   </div>
 </div>
 
@@ -4064,30 +3998,45 @@ Or remove them later in Settings → Help.</div>
 
 
 <div id="app-confirm-overlay">
-  <div id="app-confirm-dialog">
-    <div id="app-confirm-title"></div>
-    <div id="app-confirm-body"></div>
-    <div id="app-confirm-actions">
-      <button type="button" class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
-      <button type="button" class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
-      <button type="button" class="agenda-action-btn" id="app-confirm-ok">OK</button>
+  <div id="app-confirm-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title">
+    <div class="dialog-header">
+      <div class="dialog-title" id="app-confirm-title"></div>
+      <button type="button" class="help-close-btn" id="app-confirm-close"
+        data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <div id="app-confirm-body"></div>
+      <div id="app-confirm-actions" class="dialog-actions">
+        <button type="button" class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
+        <button type="button" class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
+        <button type="button" class="agenda-action-btn" id="app-confirm-ok">OK</button>
+      </div>
     </div>
   </div>
 </div>
 
 <div id="send-future-overlay">
-  <div id="send-future-dialog">
-    <div id="send-future-title" data-i18n="sendFuture.title">Set a date</div>
+  <div id="send-future-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="send-future-title">
+    <div class="dialog-header">
+      <div class="dialog-title" id="send-future-title" data-i18n="sendFuture.title">Set a date</div>
+      <button type="button" class="help-close-btn" id="send-future-close"
+        data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body">
     <div id="send-future-fields">
       <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
       <div class="send-future-row">
-        <input type="date" id="send-future-date" required>
+        <input type="date" id="send-future-date" class="dialog-field" required>
         <span id="send-future-date-echo"></span>
       </div>
       <label for="send-future-unit" data-i18n="sendFuture.repeat">Repeat</label>
       <div class="send-future-row">
-        <input type="number" id="send-future-every" min="1" max="999" value="1" aria-label="Interval">
-        <select id="send-future-unit">
+        <input type="number" id="send-future-every" class="dialog-field" min="1" max="999" value="1" aria-label="Interval">
+        <select id="send-future-unit" class="dialog-field">
           <option value="none" data-i18n="sendFuture.noRepeat">No repeat</option>
           <option value="day" data-i18n="sendFuture.unitDay">days</option>
           <option value="week" data-i18n="sendFuture.unitWeek">weeks</option>
@@ -4097,29 +4046,18 @@ Or remove them later in Settings → Help.</div>
       </div>
       <label for="send-future-end-type" data-i18n="sendFuture.end">Ends</label>
       <div class="send-future-row">
-        <select id="send-future-end-type">
+        <select id="send-future-end-type" class="dialog-field">
           <option value="never" data-i18n="sendFuture.endNever">Never</option>
           <option value="count" data-i18n="sendFuture.endCount">After</option>
           <option value="until" data-i18n="sendFuture.endUntil">On date</option>
         </select>
-        <input type="number" id="send-future-end-count" min="1" max="999" value="10" aria-label="Occurrences" hidden>
-        <input type="date" id="send-future-end-date" aria-label="End date" required hidden>
+        <input type="number" id="send-future-end-count" class="dialog-field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
+        <input type="date" id="send-future-end-date" class="dialog-field" aria-label="End date" required hidden>
       </div>
     </div>
-    <div id="send-future-actions">
-      <button type="button" class="agenda-action-btn" id="send-future-cancel" data-i18n="app-confirm.cancel">Cancel</button>
+    <div id="send-future-actions" class="dialog-actions">
       <button type="button" class="agenda-action-btn" id="send-future-ok" data-i18n="sendFuture.ok">Set</button>
     </div>
-  </div>
-</div>
-
-<div id="import-confirm-overlay">
-  <div id="import-confirm-dialog">
-    <div id="import-confirm-title" data-i18n="settings.importConfirmTitle">Overwrite all data?</div>
-    <div id="import-confirm-body" data-i18n="settings.importConfirmBody">This will replace all your current weeks, branches, and settings with the imported file. This cannot be undone.</div>
-    <div id="import-confirm-actions">
-      <button type="button" class="agenda-action-btn" id="import-confirm-cancel" data-i18n="settings.importConfirmCancel">Cancel</button>
-      <button type="button" class="agenda-action-btn danger" id="import-confirm-ok" data-i18n="settings.importConfirmOk">Yes, import</button>
     </div>
   </div>
 </div>
@@ -4169,20 +4107,22 @@ Or remove them later in Settings → Help.</div>
 </div>
 
 <div id="quick-add-backdrop"></div>
-<div id="quick-add-panel" role="dialog" aria-label="Quick add" aria-modal="true">
-  <div id="quick-add-header">
-    <span id="quick-add-title" data-i18n="quick_add.title">Quick add</span>
+<div id="quick-add-panel" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="quick-add-title">
+  <div class="dialog-header">
+    <div class="dialog-title" id="quick-add-title" data-i18n="quick_add.title">Quick add</div>
     <button type="button" class="help-close-btn" id="quick-add-close"
       data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
       <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     </button>
   </div>
-  <div id="quick-add-branches" role="group" aria-label="Branch"></div>
-  <div id="quick-add-recent" role="status" aria-live="polite"></div>
-  <input type="search" id="quick-add-input" maxlength="200"
-    data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…"
-    autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
-    enterkeyhint="done">
+  <div class="dialog-body">
+    <div id="quick-add-branches" role="group" aria-label="Branch"></div>
+    <div id="quick-add-recent" role="status" aria-live="polite"></div>
+    <input type="search" id="quick-add-input" class="dialog-field" maxlength="200"
+      data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…"
+      autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+      enterkeyhint="done">
+  </div>
 </div>
 
 <div id="settings-dropdown">
@@ -9799,7 +9739,6 @@ const TRANSLATIONS = {
     'settings.importConfirmTitle':'Overwrite all data?',
     'settings.importConfirmBody': 'This will replace all your current weeks, branches, and settings with the imported file. This cannot be undone.',
     'settings.importConfirmOk':   'Yes, import',
-    'settings.importConfirmCancel':'Cancel',
     'settings.importError':       'Invalid file — could not import.',
     'settings.importReloadHint':  'Data imported — refresh the page to see it.',
     'import.progress':            'Importing week {week}',
@@ -9916,10 +9855,8 @@ const TRANSLATIONS = {
     'menu.delete':                'Delete',
     'baseline.title':             'Activity Baseline',
     'baseline.hint':              'Activities per week considered a safe load.',
-    'baseline.cancel':            'Cancel',
     'baseline.apply':             'Apply',
     'colorPicker.title':          'Branch color',
-    'colorPicker.cancel':         'Cancel',
     'colorPicker.apply':          'Apply',
     'summary.tooltipNormal':      "A realistic load — you'll likely finish 80%+.",
     'summary.tooltipStretch':     "A stretch load — finishing 80% will be a challenge.",
@@ -10156,7 +10093,6 @@ const TRANSLATIONS = {
     'settings.importConfirmTitle':'Přepsat všechna data?',
     'settings.importConfirmBody': 'Tato akce nahradí všechny vaše týdny, větve a nastavení souborem z importu. Nelze vrátit zpět.',
     'settings.importConfirmOk':   'Ano, importovat',
-    'settings.importConfirmCancel':'Zrušit',
     'settings.importError':       'Neplatný soubor — import se nezdařil.',
     'settings.importReloadHint':  'Data importována — obnovte stránku pro zobrazení.',
     'import.progress':            'Import týdne {week}',
@@ -10273,10 +10209,8 @@ const TRANSLATIONS = {
     'menu.delete':                'Smazat',
     'baseline.title':             'Základní zátěž',
     'baseline.hint':              'Aktivity za týden považované za bezpečnou zátěž.',
-    'baseline.cancel':            'Zrušit',
     'baseline.apply':             'Použít',
     'colorPicker.title':          'Barva větve',
-    'colorPicker.cancel':         'Zrušit',
     'colorPicker.apply':          'Použít',
     'summary.tooltipNormal':      'Realistická zátěž — pravděpodobně dokončíte 80 % a více.',
     'summary.tooltipStretch':     'Náročná zátěž — dokončit 80 % bude výzva.',
@@ -16297,6 +16231,10 @@ function cyclePriority(nodeId) {
 // only then the two view exits that have always been here. Dismiss-only: Esc
 // never walks back through week or view navigation the user chose deliberately.
 const ESC_DISMISSALS = [
+  // The confirm is the only thing that can sit over everything else, coachmark
+  // included, so it answers first.
+  { isOpen: () => !!window.isAppConfirmOpen && window.isAppConfirmOpen(),
+    dismiss: () => { window.closeAppConfirm(); } },
   // The tip sits on top of whatever opened it, so it goes first — the menu
   // underneath stays where the user left it.
   { isOpen: () => _coachmarkVisible,
@@ -16309,6 +16247,12 @@ const ESC_DISMISSALS = [
     dismiss: () => { window.closeSendFuture(); } },
   { isOpen: () => !!window.isQuickAddOpen && window.isQuickAddOpen(),
     dismiss: () => { window.closeQuickAdd(); } },
+  // Both popovers close on their X, on a click outside and here — one path
+  // each, so the baseline panel's atomic op is never ended twice.
+  { isOpen: () => colorPickerBranch !== null,
+    dismiss: () => { closeColorPicker(); } },
+  { isOpen: () => bpPanel.classList.contains('visible'),
+    dismiss: () => { closeBaselinePanel(); } },
   { isOpen: () => isDayFilterMenuOpen(),
     dismiss: () => { closeDayFilterMenu(); } },
   { isOpen: () => !!ctxMenu && ctxMenu.classList.contains('visible'),
@@ -17108,7 +17052,7 @@ function updateScheduleEntry(entryId, options) {
   const endEl    = document.getElementById('send-future-end-type');
   const countEl  = document.getElementById('send-future-end-count');
   const untilEl  = document.getElementById('send-future-end-date');
-  const cancelEl = document.getElementById('send-future-cancel');
+  const closeEl  = document.getElementById('send-future-close');
   const okEl     = document.getElementById('send-future-ok');
   let _targetId  = null;   // node being sent
   let _entryId   = null;   // entry being edited from the Later tab
@@ -17216,7 +17160,7 @@ function updateScheduleEntry(entryId, options) {
   untilEl.addEventListener('change', syncOk);
   unitEl.addEventListener('change', syncFields);
   endEl.addEventListener('change', syncFields);
-  cancelEl.addEventListener('click', () => window.closeSendFuture());
+  closeEl.addEventListener('click', () => window.closeSendFuture());
   overlay.addEventListener('click', (e) => { if (e.target === overlay) window.closeSendFuture(); });
 
   okEl.addEventListener('click', async () => {
@@ -17533,14 +17477,10 @@ document.getElementById('cp-apply').addEventListener('click', () => {
   closeColorPicker();
 });
 
-document.getElementById('cp-cancel').addEventListener('click', closeColorPicker);
+document.getElementById('cp-close').addEventListener('click', closeColorPicker);
 
 document.addEventListener('pointerdown', (e) => {
   if (colorPickerBranch && !cpSbDragging && !cpPanel.contains(e.target)) closeColorPicker();
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && colorPickerBranch) closeColorPicker();
 });
 
 document.getElementById('ctx-change-color').addEventListener('click', () => {
@@ -17581,11 +17521,10 @@ document.getElementById('bp-apply').addEventListener('click', () => {
   closeBaselinePanel();
 });
 
-document.getElementById('bp-cancel').addEventListener('click', closeBaselinePanel);
+document.getElementById('bp-close').addEventListener('click', closeBaselinePanel);
 
 bpInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('bp-apply').click();
-  if (e.key === 'Escape') closeBaselinePanel();
 });
 
 document.addEventListener('pointerdown', (e) => {
@@ -21083,6 +21022,7 @@ window.addEventListener('pagehide', _flushOnTeardown);
   const titleEl      = document.getElementById('app-confirm-title');
   const bodyEl       = document.getElementById('app-confirm-body');
   const cancelBtn    = document.getElementById('app-confirm-cancel');
+  const closeBtn     = document.getElementById('app-confirm-close');
   const secondaryBtn = document.getElementById('app-confirm-secondary');
   const okBtn        = document.getElementById('app-confirm-ok');
   let _onConfirm     = null;
@@ -21091,6 +21031,10 @@ window.addEventListener('pagehide', _flushOnTeardown);
   function closeAppConfirm() {
     overlay.classList.remove('visible');
   }
+  // The X and Cancel are one outcome, and Esc reaches them through the shared
+  // dismissal walk rather than a listener of this dialog's own.
+  window.closeAppConfirm = closeAppConfirm;
+  window.isAppConfirmOpen = () => overlay.classList.contains('visible');
 
   window.showAppConfirm = function({
     title, body,
@@ -21118,6 +21062,7 @@ window.addEventListener('pagehide', _flushOnTeardown);
   };
 
   cancelBtn.addEventListener('click', closeAppConfirm);
+  closeBtn.addEventListener('click', closeAppConfirm);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAppConfirm(); });
   secondaryBtn.addEventListener('click', () => {
     closeAppConfirm();
@@ -21126,9 +21071,6 @@ window.addEventListener('pagehide', _flushOnTeardown);
   okBtn.addEventListener('click', () => {
     closeAppConfirm();
     if (_onConfirm) _onConfirm();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('visible')) closeAppConfirm();
   });
 })();
 
@@ -21439,6 +21381,8 @@ if (tipsReplayBtn) {
 
 const coachmarkGotIt = document.getElementById('coachmark-got-it');
 if (coachmarkGotIt) coachmarkGotIt.addEventListener('click', dismissCoachmark);
+const coachmarkClose = document.getElementById('coachmark-close');
+if (coachmarkClose) coachmarkClose.addEventListener('click', dismissCoachmark);
 
 
 // ─── Lang select ──────────────────────────────────────────────────────────────
@@ -21454,11 +21398,7 @@ document.getElementById('export-data-btn').addEventListener('click', () => {
 (function() {
   const importBtn    = document.getElementById('import-data-btn');
   const fileInput    = document.getElementById('import-file-input');
-  const overlay      = document.getElementById('import-confirm-overlay');
-  const cancelBtn    = document.getElementById('import-confirm-cancel');
-  const confirmBtn   = document.getElementById('import-confirm-ok');
   const errorEl      = document.getElementById('import-error');
-  let pendingFile    = null;
 
   importBtn.addEventListener('click', () => {
     errorEl.style.display = 'none';
@@ -21466,32 +21406,20 @@ document.getElementById('export-data-btn').addEventListener('click', () => {
     fileInput.click();
   });
 
+  // The overwrite warning is an ordinary destructive confirm, so it uses the
+  // one confirm dialog instead of a second copy of it. Declining clears the
+  // picked file, or picking the same file again fires no change event.
   fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
     if (!file) return;
-    pendingFile = file;
-    overlay.style.display = 'flex';
-    // Force reflow so transition fires
-    overlay.getBoundingClientRect();
-    overlay.classList.add('visible');
-  });
-
-  cancelBtn.addEventListener('click', () => {
-    overlay.classList.remove('visible');
-    pendingFile = null;
     fileInput.value = '';
-    setTimeout(() => { overlay.style.display = 'none'; }, 200);
-  });
-
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) cancelBtn.click();
-  });
-
-  confirmBtn.addEventListener('click', () => {
-    overlay.classList.remove('visible');
-    setTimeout(() => { overlay.style.display = 'none'; }, 200);
-    if (pendingFile) importAllData(pendingFile);
-    pendingFile = null;
+    showAppConfirm({
+      title:    t('settings.importConfirmTitle'),
+      body:     t('settings.importConfirmBody'),
+      okLabel:  t('settings.importConfirmOk'),
+      danger:   true,
+      onConfirm: () => importAllData(file),
+    });
   });
 })();
 
@@ -21970,13 +21898,11 @@ function renderCoachmarkContent(hint) {
   // touch device can substitute its own caption and body teaching the gesture.
   const keysApply = coachmarkKeysApply();
 
+  // The caption is the dialog caption bar, the same one the confirm and the
+  // colour picker wear — not the first line of the body.
+  const captionEl = document.getElementById('coachmark-caption');
   const captionKey = (!keysApply && hint.touchCaptionKey) || hint.captionKey;
-  if (captionKey) {
-    const caption = document.createElement('div');
-    caption.className = 'coachmark-caption';
-    caption.textContent = t(captionKey);
-    textEl.appendChild(caption);
-  }
+  if (captionEl) captionEl.textContent = captionKey ? t(captionKey) : '';
 
   const bodyKey = (!keysApply && hint.touchTextKey) || hint.introKey || hint.textKey;
   if (bodyKey) {
@@ -22374,6 +22300,11 @@ window.addEventListener('load', async () => {
   const nudgeDismissBtn = document.getElementById('playground-nudge-dismiss');
   if (nudgeDismissBtn) {
     nudgeDismissBtn.addEventListener('click', () => dismissPlaygroundNudge(true));
+  }
+  // The caption's X is the same answer as "Keep exploring".
+  const nudgeCloseBtn = document.getElementById('playground-nudge-close');
+  if (nudgeCloseBtn) {
+    nudgeCloseBtn.addEventListener('click', () => dismissPlaygroundNudge(true));
   }
   const nudgeClearBtn = document.getElementById('playground-nudge-clear');
   if (nudgeClearBtn) {
