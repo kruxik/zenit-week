@@ -36,8 +36,10 @@ describe('Zig-Zag Layout', () => {
 
     // Day-leaf circles take diameter from their parent activity height.
     // Parent a1 is a depth-1 activity (DEPTH1 style, minH 42 padded by text → h=48.1).
-    // Zig-zag vStep = (maxH + 12) / 2 = (48.1 + 12) / 2 = 30.05.
-    const expectedVStep = (48.1 + 12) / 2;
+    // Zig-zag vStep is the wider of half a slot and the clearance floor that
+    // keeps an outer-column edge off the inner column's discs:
+    // max((48.1 + 12) / 2, 48.1 / 2 + 12) = max(30.05, 36.05) = 36.05.
+    const expectedVStep = Math.max((48.1 + 12) / 2, 48.1 / 2 + 12);
     expect(positions['d2'].y - positions['d1'].y).toBeCloseTo(expectedVStep, 1);
     expect(positions['d3'].y - positions['d2'].y).toBeCloseTo(expectedVStep, 1);
 
@@ -63,8 +65,11 @@ describe('Zig-Zag Layout', () => {
     const positions = computeLayout();
 
     // Vertical spacing scales by highest-priority child: maxChildScale = 2 (critical d1)
-    // standardH = maxH + VERTICAL_GAP * maxChildScale = 48.1 + 12*2 = 72.1, vStep = 36.05
-    expect(positions['d2'].y - positions['d1'].y).toBeCloseTo((48.1 + 12 * 2) / 2, 1);
+    // standardH = maxH + VERTICAL_GAP * maxChildScale = 48.1 + 12*2 = 72.1, half of
+    // which is 36.05 — under the clearance floor 48.1 / 2 + 12*2 = 48.05, so the
+    // floor wins and the gap scales with priority through it.
+    expect(positions['d2'].y - positions['d1'].y).toBeCloseTo(
+      Math.max((48.1 + 12 * 2) / 2, 48.1 / 2 + 12 * 2), 1);
 
     // Horizontal stagger: (maxW1 + maxW2)/2 + 12
     // maxW1 is d1 (oval, width 86)
