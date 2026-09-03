@@ -911,15 +911,15 @@ describe('the Agenda Dropped group', () => {
   });
 });
 
-// ─── S6 — delete dialog ──────────────────────────────────────────────────────
+// ─── S6 — delete is delete ───────────────────────────────────────────────────
 
-describe('the delete dialog offers Drop alongside Delete', () => {
-  let captured;
+describe('delete never asks which of the two the user meant', () => {
+  let asked;
   const realConfirm = sandboxGlobal.showAppConfirm;
 
   beforeEach(() => {
-    captured = null;
-    sandboxGlobal.showAppConfirm = (opts) => { captured = opts; };
+    asked = false;
+    sandboxGlobal.showAppConfirm = () => { asked = true; };
   });
   afterEach(() => { sandboxGlobal.showAppConfirm = realConfirm; });
 
@@ -930,49 +930,18 @@ describe('the delete dialog offers Drop alongside Delete', () => {
     ];
   }
 
-  test('a UI delete asks first, with a secondary Drop button', () => {
-    setUp(week());
-    _state.setLang('en');
-
-    deleteNode('a1', { ask: true });
-
-    expect(captured).not.toBeNull();
-    expect(captured.secondaryLabel).toBe('Drop');
-    expect(captured.okLabel).toBe('Delete');
-    expect(findNode('a1')).toBeDefined();   // nothing gone yet
-  });
-
-  test('choosing Drop leaves the node in the week, dropped', () => {
-    setUp(week());
-
-    deleteNode('a1', { ask: true });
-    captured.onSecondary();
-
-    const n = findNode('a1');
-    expect(n).toBeDefined();
-    expect(n.dropped).toBe(true);
-    expect(n.droppedAt).toBeDefined();
-  });
-
-  test('choosing Delete still deletes', () => {
-    setUp(week());
-
-    deleteNode('a1', { ask: true });
-    captured.onConfirm();
-
-    expect(findNode('a1')).toBeUndefined();
-  });
-
-  test('a programmatic delete never asks — the regression net relies on it', () => {
+  // Drop is its own menu item and its own hotkey, so choosing Delete is
+  // already the answer to that question — asking again would be asking twice.
+  test('an activity deletes immediately', () => {
     setUp(week());
 
     deleteNode('a1');
 
-    expect(captured).toBeNull();
+    expect(asked).toBe(false);
     expect(findNode('a1')).toBeUndefined();
   });
 
-  test('tick- and day-children delete without the interruption', () => {
+  test('tick- and day-children delete immediately too', () => {
     setUp([
       mkBranch('work', ['a1']),
       mkActivity('a1', 'work', 'work', { children: ['t1', 'd1'] }),
@@ -982,42 +951,22 @@ describe('the delete dialog offers Drop alongside Delete', () => {
         parent: 'a1', label: 'd1', children: [], done: false, _ts: 0 },
     ]);
 
-    deleteNode('t1', { ask: true });
-    expect(captured).toBeNull();
-    expect(findNode('t1')).toBeUndefined();
+    deleteNode('t1');
+    deleteNode('d1');
 
-    deleteNode('d1', { ask: true });
-    expect(captured).toBeNull();
+    expect(asked).toBe(false);
+    expect(findNode('t1')).toBeUndefined();
     expect(findNode('d1')).toBeUndefined();
   });
 
-  test('the body carries the explanatory line', () => {
+  test('dropping is still reachable on its own', () => {
     setUp(week());
-    _state.setLang('en');
 
-    deleteNode('a1', { ask: true });
+    setStatus('a1', 'dropped');
 
-    expect(captured.body).toContain('stays in the week');
-    expect(captured.title).toBe('Delete task?');
-  });
-
-  test('T6.4 — no two buttons share a word, in either language', () => {
-    const words = (s) => s.toLocaleLowerCase().split(/\s+/).filter(Boolean);
-    for (const lang of ['en', 'cs']) {
-      _state.setLang(lang);
-      const labels = [t('app-confirm.cancel'), t('app-confirm.drop'), t('menu.delete')];
-      const all = labels.flatMap(words);
-      expect(new Set(all).size).toBe(all.length);
-    }
-    _state.setLang('en');
-  });
-
-  test('i18n — app-confirm.drop reads Drop / Vyřadit', () => {
-    _state.setLang('en');
-    expect(t('app-confirm.drop')).toBe('Drop');
-    _state.setLang('cs');
-    expect(t('app-confirm.drop')).toBe('Vyřadit');
-    _state.setLang('en');
+    const n = findNode('a1');
+    expect(n.dropped).toBe(true);
+    expect(n.droppedAt).toBeDefined();
   });
 });
 
