@@ -2208,21 +2208,35 @@
   /* Receipt strip — the panel stays open after a submit, so each stored item
      is echoed here instead of firing a toast (the toast is a single slot and
      sits at bottom:68px, right on top of this panel). */
+  /* The card's left inset — 1px border + 8px padding, inside the body's 10px —
+     puts the dot exactly where the input's text starts, so the strip and the
+     field share one left edge. */
   #quick-add-recent {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 0 8px;
   }
   #quick-add-recent:empty { display: none; }
   .qab-recent-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     min-width: 0;
-    font-size: 12px;
-    color: var(--text-dim);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-faint);
+    font-size: 13px;
+    color: var(--text-primary);
     animation: qab-recent-in 0.25s ease;
   }
+  .qab-recent-item:last-child { border-bottom: none; }
+  /* Age ramp — the newest item is the last child, directly above the input, so
+     the strip fades upwards into the older ones. */
+  .qab-recent-item:nth-last-child(2) { opacity: 0.85; }
+  .qab-recent-item:nth-last-child(3) { opacity: 0.7; }
+  .qab-recent-item:nth-last-child(4) { opacity: 0.55; }
   .qab-recent-item > span:nth-child(2) {
     overflow: hidden;
     text-overflow: ellipsis;
