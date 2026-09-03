@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-jC1RVJOkqm3y6V/WBHnSccULxUFCy2leDMnmOfnE8gg='
+               'sha256-eUcs+u4qM7LRpFS/+ic+E7WfE/Qk13SLHylyJbscNYI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -13148,7 +13148,8 @@ function roundedRectPathD(w, h, rx) {
   return { d, perimeter };
 }
 
-function taperedPathD(x1, y1, x2, y2, swStart, swEnd) {
+function taperedPathD(x1, y1, x2, y2, swStart, swEnd, dashed) {
+  if (dashed) return taperedDashPathD(x1, y1, x2, y2, swStart, swEnd);
   const dx = x2 - x1;
   const dy = y2 - y1;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -13175,6 +13176,82 @@ function taperedPathD(x1, y1, x2, y2, swStart, swEnd) {
 
   return `M ${t_x1} ${t_y1} C ${t_c1x} ${t_c1y} ${t_c2x} ${t_c2y} ${t_x2} ${t_y2} ` +
          `L ${b_x2} ${b_y2} C ${b_c2x} ${b_c2y} ${b_c1x} ${b_c1y} ${b_x1} ${b_y1} Z`;
+}
+
+// The same edge, cut into dashes — the line into a dropped node. A stroke
+// cannot change width along its length, and the taper is a filled shape with no
+// stroke to dash, so the dashes are built into the geometry: the centreline is
+// walked by arc length and each "on" run becomes its own little tapered shape,
+// carrying the width the full edge would have had at that point. So the dashes
+// start thick at the parent and end thin at the child, exactly like the solid
+// edge they replace, and dropping a node changes only this `d` — same anchors,
+// same gradient, same stroke widths, nothing moves.
+function taperedDashPathD(x1, y1, x2, y2, swStart, swEnd) {
+  const dx = x2 - x1;
+  const cp1x = x1 + dx * 0.45;
+  const cp2x = x1 + dx * 0.55;
+
+  // Flatten the centreline once; every dash boundary is then a lerp between
+  // two neighbouring samples rather than another cubic solve.
+  const N = 96;
+  const pts = [];
+  let total = 0;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, u = 1 - t;
+    const x = u * u * u * x1 + 3 * u * u * t * cp1x + 3 * u * t * t * cp2x + t * t * t * x2;
+    const y = u * u * u * y1 + 3 * u * u * t * y1   + 3 * u * t * t * y2   + t * t * t * y2;
+    if (i) total += Math.hypot(x - pts[i - 1].x, y - pts[i - 1].y);
+    pts.push({ x, y, t, s: total });
+  }
+  if (total < 1) return '';
+
+  const w = (swStart + swEnd) / 2;
+  const on = w * 1.7;
+  const off = w * 1.5;
+
+  // Distribute the leftover so a dash never ends mid-air at the child: the
+  // period is stretched to fit a whole number of them over the edge.
+  const cycles = Math.max(1, Math.round((total + off) / (on + off)));
+  const period = (total + off) / cycles;
+  const onLen = period * (on / (on + off));
+
+  const sampleAt = (s) => {
+    let i = 1;
+    while (i < pts.length - 1 && pts[i].s < s) i++;
+    const a = pts[i - 1], b = pts[i];
+    const span = b.s - a.s || 1;
+    const k = Math.max(0, Math.min(1, (s - a.s) / span));
+    return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, t: a.t + (b.t - a.t) * k };
+  };
+
+  let d = '';
+  for (let c = 0; c < cycles; c++) {
+    const s0 = c * period;
+    const s1 = Math.min(total, s0 + onLen);
+    if (s1 - s0 < 0.5) continue;
+
+    // Every flattened sample strictly inside the dash, plus its two ends, so a
+    // dash on a bent edge bends with it.
+    const run = [sampleAt(s0)];
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].s > s0 && pts[i].s < s1) run.push(pts[i]);
+    }
+    run.push(sampleAt(s1));
+
+    const top = [], bottom = [];
+    for (let i = 0; i < run.length; i++) {
+      const prev = run[Math.max(0, i - 1)];
+      const next = run[Math.min(run.length - 1, i + 1)];
+      const tx = next.x - prev.x, ty = next.y - prev.y;
+      const tl = Math.hypot(tx, ty) || 1;
+      const px = -ty / tl, py = tx / tl;
+      const hw = (swStart + (swEnd - swStart) * run[i].t) / 2;
+      top.push(`${(run[i].x + px * hw).toFixed(2)} ${(run[i].y + py * hw).toFixed(2)}`);
+      bottom.push(`${(run[i].x - px * hw).toFixed(2)} ${(run[i].y - py * hw).toFixed(2)}`);
+    }
+    d += `M ${top[0]} L ${top.slice(1).join(' L ')} L ${bottom.reverse().join(' L ')} Z `;
+  }
+  return d.trim();
 }
 
 // Nearest ancestor the given layout actually placed, the node itself included.
@@ -13249,8 +13326,14 @@ function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId
   grad.setAttribute('x1', x1); grad.setAttribute('y1', y1);
   grad.setAttribute('x2', x2); grad.setAttribute('y2', y2);
 
+  // Dashed for a dropped child, and only here: the flag is stamped on the path
+  // so the three places that re-derive `d` while the map moves (drag, repack,
+  // week slide) can read it back instead of looking the node up again.
+  const child = (toId && toId !== 'center') ? findNode(toId) : null;
+  const dashed = !!(child && child.dropped);
+
   const path = svgEl('path', {
-    d: taperedPathD(x1, y1, x2, y2, swStart, swEnd),
+    d: taperedPathD(x1, y1, x2, y2, swStart, swEnd, dashed),
     fill: `url(#${gradId})`,
     'pointer-events': 'none',
     'data-from': fromId || '',
@@ -13260,6 +13343,7 @@ function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId
     'data-sw-start': swStart,
     'data-sw-end':   swEnd
   });
+  if (dashed) path.setAttribute('data-dashed', '1');
   return path;
 }
 
@@ -19827,7 +19911,7 @@ function updateDraggedVisuals(clientX, clientY) {
     let nx1 = e.x1, ny1 = e.y1, nx2 = e.x2, ny2 = e.y2;
     if (e.isFromDragging) { nx1 += dx; ny1 += dy; }
     if (e.isToDragging)   { nx2 += dx; ny2 += dy; }
-    e.pathEl.setAttribute('d', taperedPathD(nx1, ny1, nx2, ny2, e.swStart, e.swEnd));
+    e.pathEl.setAttribute('d', taperedPathD(nx1, ny1, nx2, ny2, e.swStart, e.swEnd, e.dashed));
     const grad = e.gradEl;
     if (grad) {
       grad.setAttribute('x1', nx1); grad.setAttribute('y1', ny1);
@@ -19885,6 +19969,7 @@ function cacheDragSubtree(id, anchorClientX, anchorClientY, lastClientX, lastCli
       y2: parseFloat(path.getAttribute('data-y2')),
       swStart: parseFloat(path.getAttribute('data-sw-start')),
       swEnd:   parseFloat(path.getAttribute('data-sw-end')),
+      dashed:  path.getAttribute('data-dashed') === '1',
     });
   });
   const rect0 = container.getBoundingClientRect();
@@ -20457,7 +20542,8 @@ function repackLayout() {
     // Stroke widths come from the node's depth, which a repack never changes,
     // so they are read back off the path rather than re-derived.
     p.setAttribute('d', taperedPathD(e.x1, e.y1, e.x2, e.y2,
-      +p.getAttribute('data-sw-start'), +p.getAttribute('data-sw-end')));
+      +p.getAttribute('data-sw-start'), +p.getAttribute('data-sw-end'),
+      p.getAttribute('data-dashed') === '1'));
     p.setAttribute('data-x1', e.x1); p.setAttribute('data-y1', e.y1);
     p.setAttribute('data-x2', e.x2); p.setAttribute('data-y2', e.y2);
     const grad = defsEl && defsEl.querySelector(`#grad-${fromId || 'c'}-${toId || 'c'}`);
@@ -20755,7 +20841,8 @@ function animateViewSlide(fromPos) {
     const sx2 = fx2 + (cOld.x - cNew.x), sy2 = fy2 + (cOld.y - cNew.y);
     const appearing = !fromPos[toId];
     if (!appearing && sx1 === fx1 && sy1 === fy1 && sx2 === fx2 && sy2 === fy2) return;
-    edgeTweens.push({ p, sx1, sy1, sx2, sy2, fx1, fy1, fx2, fy2, sws, swe });
+    edgeTweens.push({ p, sx1, sy1, sx2, sy2, fx1, fy1, fx2, fy2, sws, swe,
+      dashed: p.getAttribute('data-dashed') === '1' });
   });
 
   if (!nodeTweens.length && !edgeTweens.length) return;
@@ -20771,7 +20858,7 @@ function animateViewSlide(fromPos) {
   // so a stale anchor costs at most a slightly flatter fade along an edge that
   // is itself mid-flight and mid-fade.
   const setEdge = (ed, x1, y1, x2, y2) => {
-    ed.p.setAttribute('d', taperedPathD(x1, y1, x2, y2, ed.sws, ed.swe));
+    ed.p.setAttribute('d', taperedPathD(x1, y1, x2, y2, ed.sws, ed.swe, ed.dashed));
   };
   let t0 = null;
   probeMark('slide:start', nodeTweens.length + ' nodes, ' + edgeTweens.length + ' edges');
