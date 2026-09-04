@@ -27,6 +27,7 @@ import {
   deleteOccurrence,
   deleteScheduleSeries,
   deleteNode,
+  loadWeek,
   sendSubtreeOverCap,
   getLaterOccurrences,
   formatDayLabel,
@@ -966,6 +967,79 @@ describe('Send to date…', () => {
     expect(arrived.label).toBe('Pay tax (We)');
     expect(arrived.priority).toBe('high');
     expect(arrived.schedDate).toBe('2026-05-20');
+  });
+
+  it('takes an already-planted occurrence out of its week when the send is undone', async () => {
+    const e = sendEntry('a1', { date: '2026-05-20', unit: null }); // next week
+    await saveWeek(WK, _state.get());
+
+    // Visiting the target week plants it there and writes that week's record.
+    await _state.loadAndRender('2026-21');
+    expect((await loadWeek('2026-21')).nodes.some(n => n.schedId === e.id)).toBe(true);
+
+    await _state.loadAndRender(WK);
+    await undo();
+
+    expect(findNode('a1')).toBeDefined();
+    const undone = await loadWeek('2026-21');
+    expect(undone.nodes.some(n => n.schedId === e.id)).toBe(false);
+    expect(undone.tombstones).toContain(occurrenceNodeId(e.id, '2026-05-20'));
+
+    // Redo lifts the burial, so reopening that week delivers it again.
+    await redo();
+    await _state.loadAndRender('2026-21');
+    expect(_state.get().nodes.some(n => n.schedId === e.id)).toBe(true);
+  });
+
+  it('takes down the scaffolding it put up when the send is undone', async () => {
+    // 'Big project' has a sub-task, so the send writes one leaf entry and the
+    // parent is rebuilt in the target week as scaffolding.
+    expect(sendNodeToDate('a2', { date: '2026-05-20', unit: null })).toHaveLength(1);
+    await saveWeek(WK, _state.get());
+
+    await _state.loadAndRender('2026-21');
+    expect(_state.get().nodes.filter(n => n.schedId)).toHaveLength(1);
+    expect(_state.get().nodes.some(n => n.label === 'Big project')).toBe(true);
+
+    await _state.loadAndRender(WK);
+    await undo();
+
+    const undone = await loadWeek('2026-21');
+    expect(undone.nodes.some(n => n.schedId)).toBe(false);
+    // The husk goes with it — an empty parent is not what the week looked like.
+    expect(undone.nodes.some(n => n.label === 'Big project')).toBe(false);
+
+    await redo();
+    await _state.loadAndRender('2026-21');
+    expect(_state.get().nodes.filter(n => n.schedId)).toHaveLength(1);
+    expect(_state.get().nodes.some(n => n.label === 'Big project')).toBe(true);
+  });
+
+  it('leaves a parent the user made standing when the send is undone', async () => {
+    // The target week already has its own 'Big project'; the occurrence lands
+    // under it by label match, and it is not this send's to take away.
+    _state.setLocalStorage('zenit-week-2026-21', {
+      nodes: [
+        { id: 'center', type: 'center', children: ['work'] },
+        { id: 'work', type: 'branch', branch: 'work', parent: 'center', label: 'Work', children: ['mine'] },
+        { id: 'mine', type: 'activity', branch: 'work', parent: 'work', label: 'Big project', children: [] },
+      ],
+      tombstones: [],
+      crdtVersion: 0,
+    });
+    sendNodeToDate('a2', { date: '2026-05-20', unit: null });
+    await saveWeek(WK, _state.get());
+
+    await _state.loadAndRender('2026-21');
+    expect(_state.get().nodes.find(n => n.schedId).parent).toBe('mine');
+
+    await _state.loadAndRender(WK);
+    await undo();
+
+    const undone = await loadWeek('2026-21');
+    expect(undone.nodes.some(n => n.schedId)).toBe(false);
+    expect(undone.nodes.find(n => n.id === 'mine')).toBeDefined();
+    expect(undone.nodes.find(n => n.id === 'mine').children).toEqual([]);
   });
 
   it('reverses both halves in a single undo', async () => {

@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-zuUJ8nRep1MG+kqPD2WnxUvO9K7uH0L8Ex65rI4NRd4='
+               'sha256-wFGOGpmXZr3kLmh4jIDAZWgYpJtd8lP7i7yiCzUQCwc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5241,6 +5241,9 @@ const SCHEDULE_PRIORITIES = new Set(['normal', 'high', 'critical']);
 // whole. Over the cap the send is refused with a message — never truncated,
 // because half a subtree delivered is exactly the lossy variant this refuses.
 const SCHEDULE_SEND_MAX_LEAVES = 200;
+// 'YYYY-WW' — tells a stored week record apart from the other zenit-week-*
+// localStorage keys (theme, lang) when the weeks have to be enumerated.
+const WEEK_KEY_RE = /^\d{4}-\d{1,2}$/;
 // The path is a re-homing hint rather than payload: keeping only the nearest
 // six ancestors drops no task, it just re-homes the occurrence one level higher
 // than it stood. So this one clips instead of refusing.
@@ -6080,6 +6083,123 @@ function _noteScheduleAdditions(entryIds) {
   undoStack[i] = JSON.stringify(snap);
 }
 
+// Undo and redo of a send, applied to the weeks the entry has already delivered
+// into. The weeks are found by asking the entry's own calendar which stored
+// weeks it has an occurrence in — never `planted`, which is a cursor's
+// bookkeeping and is pruned as that cursor advances, so it goes empty exactly
+// when the user is most likely to reach for undo.
+//
+// Removing buries the ids, the way the next-week undo buries what it drops.
+// Restoring lifts exactly those tombstones instead of re-inserting nodes,
+// because nothing re-inserts an occurrence — the entry replants it when its
+// week is next opened, and a buried id would refuse to. The week on screen is
+// replanted here rather than waiting for a reopen it may never get.
+async function _reverseOccurrences(entry, remove) {
+  const weeks = new Set([currentWeekKey]);
+  try { (await listWeekKeysIDB() || []).forEach(k => weeks.add(k)); } catch { /* IDB unavailable */ }
+  // loadWeek falls back to localStorage when IDB has no copy, so the search for
+  // weeks does too — otherwise a record only the fallback holds keeps its copy
+  // of an occurrence the undo just took away.
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith('zenit-week-')) continue;
+    const wk = k.slice('zenit-week-'.length);
+    if (WEEK_KEY_RE.test(wk)) weeks.add(wk);
+  }
+
+  for (const wk of weeks) {
+    const days = weekDayStrings(wk);
+    if (!days) continue;
+    const dates = occurrencesInRange(entry, days[0], days[6]);
+    if (!dates.length) continue;
+    const ids = new Set(dates.flatMap(d =>
+      [occurrenceNodeId(entry.id, d), occurrenceDayNodeId(entry.id, d)]));
+
+    await withWeekLock(wk, async () => {
+      const isOpen = wk === currentWeekKey;
+      const data = isOpen ? weekData : await loadWeek(wk);
+      if (!data || !Array.isArray(data.nodes)) return;
+      if (!Array.isArray(data.tombstones)) data.tombstones = [];
+      let touchedWeek = false;
+
+      if (remove) {
+        const before = data.nodes.length;
+        data.nodes = data.nodes.filter(n => !ids.has(n.id));
+        data.nodes.forEach(n => {
+          if (Array.isArray(n.children)) n.children = n.children.filter(c => !ids.has(c));
+        });
+        if (data.nodes.length !== before) touchedWeek = true;
+        // Only what was actually there is buried: a week that never received
+        // this occurrence has nothing to remember about it.
+        if (touchedWeek) {
+          ids.forEach(id => { if (!data.tombstones.includes(id)) data.tombstones.push(id); });
+          pruneOccurrencePath(data, entry).forEach(id => {
+            if (!data.tombstones.includes(id)) data.tombstones.push(id);
+          });
+        }
+      } else {
+        const buried = new Set([...ids, ...occurrencePathIds(data, entry)]);
+        const kept = data.tombstones.filter(t => !buried.has(t));
+        if (kept.length !== data.tombstones.length) {
+          data.tombstones = kept;
+          touchedWeek = true;
+        }
+        if (isOpen && materialiseWeek(wk, data)) touchedWeek = true;
+      }
+
+      if (touchedWeek) {
+        data.savedAt = Date.now();
+        await saveWeek(wk, data);
+        if (isOpen) {
+          rebuildNodeMap();
+          renderIfVisible();
+          if (currentView === 'agenda') renderAgenda();
+        }
+      }
+    });
+  }
+}
+
+// Every id the entry's path could have been scaffolded under in this week: one
+// per step of the path, per branch, since a re-homed occurrence scaffolds under
+// whichever branch received it. Derived, so an id that is present is one this
+// app built — a node the user made carries a genId() and cannot collide.
+function occurrencePathIds(data, entry) {
+  const labels = Array.isArray(entry.path) ? entry.path : [];
+  if (!labels.length) return [];
+  const out = [];
+  data.nodes.filter(n => n.type === 'branch').forEach(b => {
+    for (let i = 1; i <= labels.length; i++) out.push(occurrencePathNodeId(b.id, labels.slice(0, i)));
+  });
+  return out;
+}
+
+// Takes down the scaffolding an undone send put up, and only that. A step is
+// removed when its id is the derived one — meaning this app created it rather
+// than matching a node the user already had — and nothing is left hanging off
+// it. The walk runs deepest-first and stops at the first step that still holds
+// something, because everything above it holds that too. Returns the ids taken.
+function pruneOccurrencePath(data, entry) {
+  const labels = Array.isArray(entry.path) ? entry.path : [];
+  if (!labels.length) return [];
+  const removed = [];
+
+  data.nodes.filter(n => n.type === 'branch').forEach(b => {
+    for (let i = labels.length; i > 0; i--) {
+      const id = occurrencePathNodeId(b.id, labels.slice(0, i));
+      const node = data.nodes.find(n => n.id === id);
+      if (!node) continue;
+      if ((node.children || []).length) break;
+      data.nodes = data.nodes.filter(n => n.id !== id);
+      data.nodes.forEach(n => {
+        if (Array.isArray(n.children)) n.children = n.children.filter(c => c !== id);
+      });
+      removed.push(id);
+    }
+  });
+  return removed;
+}
+
 // Carry an operation's next-week additions onto the counter-snapshot pushed to
 // the opposite stack, so redo re-inserts exactly what undo removed (and back).
 function _withUndoScope(rawSnapshot, addedIds, scheduleTouched) {
@@ -6146,12 +6266,27 @@ async function _applySnapshot(raw) {
     }
     const snapEntries = new Map((snapSchedule.entries || []).map(e => [e.id, e]));
     const touched = new Set(schedTouched);
+    // Kept before the filter: an entry on its way out is the only record of the
+    // weeks it already delivered into.
+    const liveEntries = new Map(
+      scheduleData.entries.filter(e => touched.has(e.id)).map(e => [e.id, e])
+    );
     scheduleData.entries = scheduleData.entries.filter(e => !touched.has(e.id));
     for (const id of schedTouched) {
       const e = snapEntries.get(id);
       if (e) scheduleData.entries.push({ ...e, _ts: tsNow });
     }
     await saveSchedule();
+
+    // The occurrences the entry already planted follow it. Undoing a send while
+    // its week has been visited would otherwise put the task back here and
+    // leave a copy of it standing there — one task, closed twice.
+    for (const id of schedTouched) {
+      const live = liveEntries.get(id);
+      const snap = snapEntries.get(id);
+      if (live && !snap) await _reverseOccurrences(live, true);
+      else if (!live && snap) await _reverseOccurrences(snap, false);
+    }
   }
 
   // ── Next week ─────────────────────────────────────────────────────────────
