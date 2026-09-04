@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-eUcs+u4qM7LRpFS/+ic+E7WfE/Qk13SLHylyJbscNYI='
+               'sha256-2DSo82QM4b3QJ4Ts3pfhEZcWN8RLk1ghfnP8+EkUEdo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -12440,13 +12440,14 @@ function computeLayout() {
     });
     if (zigKids.length < 3) return nodeZigZagMetrics[nodeId] = null;
 
+    // Only the near column's width matters for placement: it sets the boundary
+    // the far column stands a gap away from, and each node is then flushed to
+    // that boundary by its own width.
     let maxW1 = 0;
-    let maxW2 = 0;
     let maxH = 0;
     zigKids.forEach((cid, i) => {
       const { w, h } = getNodeSize(cid);
       if (i % 2 === 0) maxW1 = Math.max(maxW1, w);
-      else maxW2 = Math.max(maxW2, w);
       maxH = Math.max(maxH, h);
     });
 
@@ -12457,9 +12458,12 @@ function computeLayout() {
     const vStep = standardH / 2;
     const metrics = {
       maxW1,
-      maxW2,
       maxH,
-      staggerX: (maxW1 + maxW2) / 2 + VERTICAL_GAP,
+      // Half the slot padding above the box, half below — exactly how a
+      // standard column slot is padded. Without it the whole gap sat below the
+      // box, so a regular sibling under the block landed 1.5 gaps away while
+      // two nodes inside the block sat one gap apart.
+      padTop: (VERTICAL_GAP * maxChildScale * V_SPACING_SCALE) / 2,
       vStep,
       totalH: standardH + (zigKids.length - 1) * vStep
     };
@@ -12728,8 +12732,16 @@ function computeLayout() {
         const childGap = depth === 0 ? 200 : (child.type === 'counter' ? 120 : 134);
         const isStaggered = di % 2 !== 0;
         const groupBaseX = parentX + dir * (parentW / 2 + childGap);
-        const x = groupBaseX + dir * (zig.maxW1 / 2 + (isStaggered ? zig.staggerX : 0));
-        const y = currentY + zig.maxH / 2;
+        // The two columns face each other across one VERTICAL_GAP: the inner
+        // edge of the near column is flush at maxW1, the outer column starts a
+        // gap past it. Centring each node on its column's widest member instead
+        // (what this used to do) left every narrower node short of the boundary,
+        // so a plain circle sat further from its neighbour than a badge-bearing
+        // oval did — the same nominal gap reading three different widths.
+        const x = isStaggered
+          ? groupBaseX + dir * (zig.maxW1 + VERTICAL_GAP + w / 2)
+          : groupBaseX + dir * (zig.maxW1 - w / 2);
+        const y = currentY + zig.padTop + zig.maxH / 2;
         currentY += zig.vStep;
         const finalX = x + (child.offX || 0);
         const finalY = y + (child.offY || 0);

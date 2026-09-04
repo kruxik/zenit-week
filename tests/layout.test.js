@@ -73,6 +73,56 @@ describe('Zig-Zag Layout', () => {
     expect(Math.abs(positions['d2'].x - positions['d1'].x)).toBeCloseTo(79.05, 1);
   });
 
+  test('every stagger pair is one gap apart, whatever the node widths', () => {
+    // d1 is a wide oval (critical badge), d3 a plain circle — both in the near
+    // column. Flushing them to the column boundary is what keeps the gap to the
+    // far column identical for both; centring on the widest member would leave
+    // the circle short of it.
+    const data = {
+      nodes: [
+        { id: 'center', type: 'center', label: 'Week', children: ['b1'] },
+        { id: 'b1', type: 'branch', parent: 'center', label: 'Work', side: 'right', children: ['a1'] },
+        mkActivity('a1', 'b1', 'b1', { children: ['d1', 'd2', 'd3'] }),
+        mkActivity('d1', 'a1', 'b1', { label: 'Mo', dayChild: true, priority: 'critical' }),
+        mkActivity('d2', 'a1', 'b1', { label: 'Tu', dayChild: true }),
+        mkActivity('d3', 'a1', 'b1', { label: 'We', dayChild: true }),
+      ]
+    };
+    _state.set(data);
+    rebuildNodeMap();
+
+    const positions = computeLayout();
+    // Columns face each other, so the clear space between two staggered nodes
+    // is the centre distance less both half-widths — direction-agnostic.
+    const innerGap = (a, b) =>
+      Math.abs(positions[b].x - positions[a].x) - (getNodeSize(a).w + getNodeSize(b).w) / 2;
+
+    expect(innerGap('d1', 'd2')).toBeCloseTo(12, 1);
+    expect(innerGap('d3', 'd2')).toBeCloseTo(12, 1);
+  });
+
+  test('a regular sibling under a zig-zag block sits one gap below it', () => {
+    const data = {
+      nodes: [
+        { id: 'center', type: 'center', label: 'Week', children: ['b1'] },
+        { id: 'b1', type: 'branch', parent: 'center', label: 'Work', side: 'right', children: ['a1'] },
+        mkActivity('a1', 'b1', 'b1', { children: ['d1', 'd2', 'd3', 's1'] }),
+        mkActivity('d1', 'a1', 'b1', { label: 'Mo', dayChild: true }),
+        mkActivity('d2', 'a1', 'b1', { label: 'Tu', dayChild: true }),
+        mkActivity('d3', 'a1', 'b1', { label: 'We', dayChild: true }),
+        mkActivity('s1', 'a1', 'b1', { label: 'Plain sibling' }),
+      ]
+    };
+    _state.set(data);
+    rebuildNodeMap();
+
+    const positions = computeLayout();
+    // d3 is the last zig kid (near column); s1 opens the standard column below.
+    const zigBottom = positions['d3'].y + getNodeSize('d3').h / 2;
+    const siblingTop = positions['s1'].y - getNodeSize('s1').h / 2;
+    expect(siblingTop - zigBottom).toBeCloseTo(12, 1);
+  });
+
   test('2 day-children uses standard vertical layout', () => {
     const data = {
       nodes: [
