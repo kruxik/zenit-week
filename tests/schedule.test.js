@@ -1962,6 +1962,15 @@ describe('Send to date — leaves and path', () => {
     expect(findNode('s1n')).toBeDefined(); // its sibling is untouched
   });
 
+  it('strips the day tag from a path step, as it does from the label', () => {
+    const data = _state.get();
+    data.nodes.find(n => n.id === 'r1').label = 'Running (fr)';
+    _state.set(data);
+
+    const entries = sendNodeToDate('r1', { date: '2026-09-14', unit: null });
+    entries.forEach(e => expect(e.path).toEqual(['Health', 'Running']));
+  });
+
   it('records the intermediate levels of a deeper subtree', () => {
     addNodes({ id: 'w1', type: 'activity', branch: 'me', parent: 'g1', label: 'Warm up', children: [] });
     const entries = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
@@ -2122,11 +2131,12 @@ describe('Materialisation — path', () => {
   it('reuses the user own ancestor node instead of building a second one', () => {
     seed(entry());
     const data = week();
-    data.nodes.push({ id: 'mine', type: 'activity', branch: 'me', parent: 'me', label: '  health ', children: [] });
+    data.nodes.push({ id: 'mine', type: 'activity', branch: 'me', parent: 'me', label: '  health (fr) ', children: [] });
     data.nodes.find(n => n.id === 'me').children.push('mine');
 
     materialiseWeek(WK, data);
-    expect(data.nodes.filter(n => String(n.label || '').trim().toLowerCase() === 'health')).toHaveLength(1);
+    // Matched through its day tag — one Health, not a second one beside it.
+    expect(data.nodes.filter(n => /health/i.test(n.label || ''))).toHaveLength(1);
     expect(byLabel(data, 'Running').parent).toBe('mine');
   });
 

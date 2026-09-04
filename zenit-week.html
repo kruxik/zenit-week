@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-gYJGVtcH6KSro5yoVVDPxFJCV3DYUdg5J2fjqQOSm5s='
+               'sha256-k5Qlnux9D/ae7twUs96Igzu6GD7jcHHsaHIV+M23GoA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5333,7 +5333,9 @@ function repairSchedulePath(path) {
   if (!Array.isArray(path)) return [];
   return path
     .filter(l => typeof l === 'string' && l.trim())
-    .map(l => l.trim().slice(0, 200))
+    // Heals paths captured before the day tag was stripped at write time, the
+    // same read-side repair the entry label gets.
+    .map(scheduleEntryLabel)
     .slice(-SCHEDULE_PATH_MAX);
 }
 
@@ -11368,9 +11370,10 @@ function occurrencePathNodeId(branch, labels) {
 }
 
 // Case- and space-insensitive label match, the rule by which a path step finds
-// the user's own node rather than making a second one beside it.
+// the user's own node rather than making a second one beside it. Day tags are
+// stripped on both sides, so "Running (fr)" is the Running the path means.
 function foldLabel(label) {
-  return String(label || '').trim().toLowerCase();
+  return scheduleEntryLabel(label).toLowerCase();
 }
 
 // Plants every occurrence the schedule owes this week into `data`, in place.
@@ -17114,7 +17117,9 @@ function captureSendLeaves(node) {
       out.push({ node: current, path: path.slice(-SCHEDULE_PATH_MAX) });
       return;
     }
-    const label = String(current.label || '').trim();
+    // The day tag goes with the date, on a path step exactly as on the entry
+    // label: the date decides the day now, so "(fr)" has nothing left to say.
+    const label = scheduleEntryLabel(current.label);
     const next = label ? path.concat(label) : path;
     (current.children || []).forEach(cid => {
       const child = findNode(cid);
@@ -17134,7 +17139,7 @@ function captureSendPath(node) {
   const path = [];
   let cur = findNode(node.parent);
   while (cur && cur.type === 'activity') {
-    path.unshift(String(cur.label || '').trim());
+    path.unshift(scheduleEntryLabel(cur.label));
     cur = findNode(cur.parent);
   }
   return path.filter(Boolean);
