@@ -889,9 +889,26 @@ describe('Send to date…', () => {
     expect(_state.getSchedule().entries).toHaveLength(0);
   });
 
-  it('accepts today itself', () => {
-    const entry = sendEntry('a1', { date: '2026-05-11', unit: null });
-    expect(entry.anchor).toBe('2026-05-11');
+  it('retags the node in place for a date inside this week', () => {
+    // Tuesday of the week already open — the weekday selector's job, not the
+    // schedule's. Nothing leaves the week and no entry is written.
+    expect(sendNodeToDate('a1', { date: '2026-05-12', unit: null })).toEqual([]);
+    expect(_state.getSchedule().entries).toEqual([]);
+    expect(findNode('a1').label).toBe('Pay tax (Tu)');
+    expect(findNode('work').children).toContain('a1');
+  });
+
+  it('keeps a parent whole when it is retagged rather than sent', () => {
+    expect(sendNodeToDate('a2', { date: '2026-05-12', unit: null })).toEqual([]);
+    expect(findNode('a2').label).toBe('Big project (Tu)');
+    expect(findNode('a2').children).toEqual(['a3']);
+    expect(findNode('a3')).toBeDefined();
+  });
+
+  it('sends a repeating series even when it starts inside this week', () => {
+    const entries = sendNodeToDate('a1', { date: '2026-05-12', unit: 'week', every: '1' });
+    expect(entries).toHaveLength(1);
+    expect(findNode('a1')).toBeUndefined();
   });
 
   it('drops the weekday tag from the label it captures', () => {
@@ -940,15 +957,15 @@ describe('Send to date…', () => {
   });
 
   it('arrives in the target week when that week is opened', async () => {
-    const e = sendEntry('a1', { date: '2026-05-13', unit: null });
+    const e = sendEntry('a1', { date: '2026-05-20', unit: null }); // next week
     await saveWeek(WK, _state.get());
 
     _state.setWeekKey('2026-19');
-    await _state.loadAndRender(WK);
+    await _state.loadAndRender('2026-21');
     const arrived = _state.get().nodes.find(n => n.schedId === e.id);
     expect(arrived.label).toBe('Pay tax (We)');
     expect(arrived.priority).toBe('high');
-    expect(arrived.schedDate).toBe('2026-05-13');
+    expect(arrived.schedDate).toBe('2026-05-20');
   });
 
   it('reverses both halves in a single undo', async () => {

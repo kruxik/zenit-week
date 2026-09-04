@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-aqGI3PbO98V7knI98lGPG96JxyM09GLMGzIohmQyFP4='
+               'sha256-zuUJ8nRep1MG+kqPD2WnxUvO9K7uH0L8Ex65rI4NRd4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -17160,13 +17160,28 @@ function sendNodeToDate(nodeId, options) {
   // sets `min` too — this is the guard for every other caller.
   if (anchor < localDateStr()) return null;
 
+  const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
+
+  // A one-off date inside the week the node already lives in is not a schedule
+  // at all — it is the weekday selector with a calendar in front of it. So it
+  // is answered the way the Reschedule submenu answers: retag the node where it
+  // stands. Nothing leaves the week, so nothing has to be rebuilt from a path,
+  // and a parent keeps its children instead of dissolving into its leaves.
+  // A repeat is a different matter: that is a standing intention, and it leaves
+  // even when its first occurrence falls this week.
+  if (!unit && weekKeyForDayString(anchor) === currentWeekKey) {
+    takeSnapshot();
+    setActivityDays(nodeId, new Set([weekdayOfDayString(anchor)]), false);
+    saveWeek(currentWeekKey, weekData);
+    return [];
+  }
+
   // Over cap the whole send is refused — see SCHEDULE_SEND_MAX_LEAVES. The
   // dialog checks the same rule before it opens, so this is the guard for
   // every other caller.
   const leaves = captureSendLeaves(node);
   if (!leaves || !leaves.length) return null;
 
-  const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
   const every = Math.max(1, Math.floor(Number(options.every)) || 1);
   // Decided once and shared by every entry the send writes: the dates were
   // asked for the thing as a whole, even though what leaves are leaves.
@@ -17492,8 +17507,7 @@ function updateScheduleEntry(entryId, options) {
     // Editing rewrites one entry; a send writes one per leaf. Either way the
     // dialog only needs to know it happened and on what date.
     const written = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
-    const entry = Array.isArray(written) ? written[0] : written;
-    if (!entry) {
+    if (!written) {
       // The only refusal a user can provoke from the dialog: `min` keeps the
       // picker honest, but a typed date still reaches here.
       if (opts.date && parseDayString(opts.date) && opts.date < localDateStr()) {
@@ -17501,7 +17515,11 @@ function updateScheduleEntry(entryId, options) {
       }
       return;
     }
-    if (!editing) showToast(t('toast.sentToFuture', { date: formatDayLabel(entry.anchor) }));
+    // An empty list is a date inside this week: the node was retagged where it
+    // stands, which needs no announcing — the weekday buttons announce nothing
+    // either.
+    const entry = Array.isArray(written) ? written[0] : written;
+    if (!editing && entry) showToast(t('toast.sentToFuture', { date: formatDayLabel(entry.anchor) }));
     // The entry may be due inside the week already on screen — deliver it now
     // rather than leaving the task missing until the week is next opened.
     await materialiseOpenWeek();
