@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-kUlxsoqBPbk15ipoQNVmxjX4TOmGY8AYnMplApjgG74='
+               'sha256-gYJGVtcH6KSro5yoVVDPxFJCV3DYUdg5J2fjqQOSm5s='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -14222,6 +14222,15 @@ function getScheduledTickRows(dayIndex) {
 // rows, the day-parent activity is treated as the leaf so the chain ends at
 // its parent — matching getAgendaNodeLabel's display contract.
 function getAgendaAncestorChain(node) {
+  // A Later row stands for an entry, not for a node in this week, so there is
+  // nothing to walk: its ancestors are the labels the entry carries, under the
+  // branch it is filed on. Same shape the walk below produces, so every label
+  // rule downstream treats the two alike.
+  if (node.schedPath) {
+    const branch = findNode(node.branch);
+    const head = branch ? (stripDayGroups(branch.label) || nodeDisplayLabel(branch)) : '';
+    return [head, ...node.schedPath].filter(Boolean);
+  }
   const leaf = node.dayChild ? findNode(node.parent) : node;
   const chain = [];
   let cur = leaf ? findNode(leaf.parent) : null;
@@ -14233,6 +14242,17 @@ function getAgendaAncestorChain(node) {
 }
 
 function getAgendaNodeLabel(node, includeDayHint = false) {
+  // Case 0: a Later row. Its prefix is the nearest name in the entry's path,
+  // exactly as a task row's prefix is its immediate parent; the day hint has
+  // nothing to add, because the row already carries its date.
+  if (node.schedPath) {
+    const chain = getAgendaAncestorChain(node);
+    return {
+      prefix: chain.length ? chain[chain.length - 1] : '',
+      main: stripDayGroups(node.label) || nodeDisplayLabel(node),
+    };
+  }
+
   const p = findNode(node.parent);
 
   let prefix = '';
@@ -18657,6 +18677,9 @@ function laterRowNode(entry, date) {
     id: occurrenceNodeId(entry.id, date),
     type: 'activity',
     branch: entry.branch,
+    // The ancestors the occurrence will be planted under, which are also the
+    // ones the row shows — a Later row reads like the task row it becomes.
+    schedPath: Array.isArray(entry.path) ? entry.path : [],
     label: entry.label,
     priority: entry.priority && entry.priority !== 'normal' ? entry.priority : null,
     children: [],
@@ -19704,7 +19727,7 @@ function renderLaterTab(content) {
       list.appendChild(makeSectionDivider(laterMonthLabel(key), count));
     }
     const row = laterRowNode(entry, date);
-    const item = buildAgendaItem(row, entry.label, { entry, date });
+    const item = buildAgendaItem(row, getAgendaNodeLabel(row), { entry, date });
     // Same two gestures as every other row: right-swipe runs the row's primary
     // action, left-swipe opens its context menu. Here the primary action is the
     // date dialog, so it takes the place Done holds on a task row.

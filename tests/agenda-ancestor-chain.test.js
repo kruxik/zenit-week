@@ -1,5 +1,7 @@
 import {
   getAgendaAncestorChain,
+  getAgendaNodeLabel,
+  laterRowNode,
   findNode, rebuildNodeMap,
   _state,
 } from './setup.js';
@@ -70,5 +72,41 @@ describe('getAgendaAncestorChain', () => {
     rebuildNodeMap();
     const chain = getAgendaAncestorChain(findNode('pushups'));
     expect(chain).toEqual(['me', 'Workouts']);
+  });
+});
+
+
+// A Later row stands for a schedule entry, not a node in this week, so the
+// chain cannot be walked — it comes from the path the entry carries. The rows
+// must still read exactly like the task rows they become.
+describe('Later rows use the same label logic as a day row', () => {
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Go for a run', branch: 'me', priority: 'normal',
+    path: ['Health', 'Running'], anchor: '2026-09-15', repeat: null,
+    end: { type: 'never' }, plantedThrough: null, planted: [], _ts: 1,
+    ...over,
+  });
+
+  beforeEach(() => setUp([branch('me', [])]));
+
+  test('chain is the branch followed by the entry path', () => {
+    expect(getAgendaAncestorChain(laterRowNode(entry(), '2026-09-15')))
+      .toEqual(['me', 'Health', 'Running']);
+  });
+
+  test('prefix is the nearest name in the path, as it is for a task row', () => {
+    expect(getAgendaNodeLabel(laterRowNode(entry(), '2026-09-15')))
+      .toEqual({ prefix: 'Running', main: 'Go for a run' });
+  });
+
+  test('an entry with no path falls back to its branch, like a top-level task', () => {
+    const row = laterRowNode(entry({ path: [] }), '2026-09-15');
+    expect(getAgendaAncestorChain(row)).toEqual(['me']);
+    expect(getAgendaNodeLabel(row)).toEqual({ prefix: 'me', main: 'Go for a run' });
+  });
+
+  test('a branch this week no longer has leaves the path standing alone', () => {
+    const row = laterRowNode(entry({ branch: 'gone' }), '2026-09-15');
+    expect(getAgendaAncestorChain(row)).toEqual(['Health', 'Running']);
   });
 });
