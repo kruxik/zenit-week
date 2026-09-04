@@ -28,7 +28,6 @@ import {
   deleteScheduleSeries,
   deleteNode,
   sendSubtreeOverCap,
-  occurrenceTreeNodeId,
   getLaterOccurrences,
   formatDayLabel,
   laterMonthKey,
@@ -69,6 +68,13 @@ function freezeToday(iso) {
     };
   });
   afterEach(() => { global.Date = RealDate; });
+}
+
+// A send writes one entry per leaf below the node, so it returns a list. Most
+// of these cases send a leaf and want the single entry that came of it.
+function sendEntry(...args) {
+  const written = sendNodeToDate(...args);
+  return Array.isArray(written) ? written[0] : written;
 }
 
 // Minimal entry factory — S1 only exercises the occurrence math, so nothing
@@ -242,7 +248,7 @@ describe('Occurrence math — dates and robustness', () => {
 describe('Schedule store — validate and repair', () => {
   const good = () => ({
     id: 's1', label: 'Tax return', branch: 'work', priority: 'high',
-    path: ['Admin'], tree: [{ key: '0', label: 'Collect receipts' }],
+    path: ['Admin'],
     anchor: '2026-03-31', repeat: { every: 1, unit: 'year' }, end: { type: 'never' },
     plantedThrough: '2026-03-29', planted: ['2026-03-31'], _ts: 1234,
   });
@@ -375,7 +381,7 @@ describe('Schedule store — validate and repair', () => {
     expect({}.polluted).toBeUndefined();
     expect(Object.keys(out).sort()).toEqual([
       '_ts', 'anchor', 'branch', 'end', 'id', 'label', 'path', 'planted', 'plantedThrough', 'priority',
-      'repeat', 'tree',
+      'repeat',
     ]);
   });
 });
@@ -448,7 +454,7 @@ describe('Schedule store — persistence', () => {
   it('round-trips entries through IndexedDB', async () => {
     const entry = {
       id: 's1', label: 'Roadworthy check', branch: 'me', priority: 'critical',
-      path: [], tree: [],
+      path: [],
       anchor: '2026-09-14', repeat: { every: 2, unit: 'year' }, end: { type: 'count', n: 5 },
       plantedThrough: null, planted: [], _ts: 99,
     };
@@ -849,7 +855,7 @@ describe('Send to date…', () => {
   });
 
   it('moves the node out of the week and creates an entry carrying its state', () => {
-    const entry = sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    const entry = sendEntry('a1', { date: '2026-09-14', unit: null });
 
     expect(findNode('a1')).toBeUndefined();
     expect(_state.get().nodes.find(n => n.label === 'Pay tax')).toBeUndefined();
@@ -868,7 +874,7 @@ describe('Send to date…', () => {
   it('refuses an end date before the anchor', () => {
     // Such a series yields nothing: the node would leave the week and never
     // arrive anywhere.
-    expect(sendNodeToDate('a1', {
+    expect(sendEntry('a1', {
       date: '2026-09-14', every: 1, unit: 'week', endType: 'until', endDate: '2026-09-01',
     })).toBeNull();
     expect(findNode('a1')).toBeDefined();
@@ -876,7 +882,7 @@ describe('Send to date…', () => {
   });
 
   it('accepts an end date equal to the anchor — a series of one', () => {
-    const e = sendNodeToDate('a1', {
+    const e = sendEntry('a1', {
       date: '2026-09-14', every: 1, unit: 'week', endType: 'until', endDate: '2026-09-14',
     });
     expect(e.end).toEqual({ type: 'until', date: '2026-09-14' });
@@ -885,13 +891,13 @@ describe('Send to date…', () => {
 
   it('refuses a date already past and leaves the node alone', () => {
     // Frozen today is 2026-05-11.
-    expect(sendNodeToDate('a1', { date: '2026-05-10', unit: null })).toBeNull();
+    expect(sendEntry('a1', { date: '2026-05-10', unit: null })).toBeNull();
     expect(findNode('a1')).toBeDefined();
     expect(_state.getSchedule().entries).toHaveLength(0);
   });
 
   it('accepts today itself', () => {
-    const entry = sendNodeToDate('a1', { date: '2026-05-11', unit: null });
+    const entry = sendEntry('a1', { date: '2026-05-11', unit: null });
     expect(entry.anchor).toBe('2026-05-11');
   });
 
@@ -899,49 +905,49 @@ describe('Send to date…', () => {
     // The date is the schedule now; a "(we)" left in the label would ride into
     // every planted occurrence and fight the day leaf it gets there.
     findNode('a1').label = 'Pay tax (we)';
-    const entry = sendNodeToDate('a1', { date: '2026-09-21', unit: null });
+    const entry = sendEntry('a1', { date: '2026-09-21', unit: null });
     expect(entry.label).toBe('Pay tax');
   });
 
   it('keeps a label that is nothing but a day group', () => {
     findNode('a1').label = '(we)';
-    const entry = sendNodeToDate('a1', { date: '2026-09-21', unit: null });
+    const entry = sendEntry('a1', { date: '2026-09-21', unit: null });
     expect(entry.label).toBe('(we)');
   });
 
   it('leaves no copy or stub behind', () => {
     const before = _state.get().nodes.length;
-    sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    sendEntry('a1', { date: '2026-09-14', unit: null });
     const nodes = _state.get().nodes;
     expect(nodes).toHaveLength(before - 1);
     expect(nodes.map(n => n.label).filter(Boolean)).toEqual(['Work', 'Big project', 'Sub-task']);
   });
 
   it('records the repeat rule and end condition from the dialog', () => {
-    const e = sendNodeToDate('a1', { date: '2026-09-14', every: '2', unit: 'month', endType: 'count', endCount: '6' });
+    const e = sendEntry('a1', { date: '2026-09-14', every: '2', unit: 'month', endType: 'count', endCount: '6' });
     expect(e.repeat).toEqual({ every: 2, unit: 'month' });
     expect(e.end).toEqual({ type: 'count', n: 6 });
 
     seedWeek();
-    const u = sendNodeToDate('a1', { date: '2026-09-14', every: 1, unit: 'year', endType: 'until', endDate: '2030-01-01' });
+    const u = sendEntry('a1', { date: '2026-09-14', every: 1, unit: 'year', endType: 'until', endDate: '2030-01-01' });
     expect(u.end).toEqual({ type: 'until', date: '2030-01-01' });
   });
 
   it('ignores an end condition when there is no repeat', () => {
-    const e = sendNodeToDate('a1', { date: '2026-09-14', unit: null, endType: 'count', endCount: '6' });
+    const e = sendEntry('a1', { date: '2026-09-14', unit: null, endType: 'count', endCount: '6' });
     expect(e.repeat).toBeNull();
     expect(e.end).toEqual({ type: 'never' });
   });
 
   it('refuses an invalid date', () => {
-    expect(sendNodeToDate('a1', { date: '2026-02-30', unit: null })).toBeNull();
-    expect(sendNodeToDate('a1', { date: 'soon', unit: null })).toBeNull();
+    expect(sendEntry('a1', { date: '2026-02-30', unit: null })).toBeNull();
+    expect(sendEntry('a1', { date: 'soon', unit: null })).toBeNull();
     expect(findNode('a1')).toBeDefined();
     expect(_state.getSchedule().entries).toEqual([]);
   });
 
   it('arrives in the target week when that week is opened', async () => {
-    const e = sendNodeToDate('a1', { date: '2026-05-13', unit: null });
+    const e = sendEntry('a1', { date: '2026-05-13', unit: null });
     await saveWeek(WK, _state.get());
 
     _state.setWeekKey('2026-19');
@@ -953,7 +959,7 @@ describe('Send to date…', () => {
   });
 
   it('reverses both halves in a single undo', async () => {
-    const e = sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    const e = sendEntry('a1', { date: '2026-09-14', unit: null });
     expect(_state.getUndoStack()).toHaveLength(1);
 
     await undo();
@@ -963,7 +969,7 @@ describe('Send to date…', () => {
   });
 
   it('restores the entry on redo', async () => {
-    const e = sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    const e = sendEntry('a1', { date: '2026-09-14', unit: null });
     await undo();
     await redo();
 
@@ -972,9 +978,9 @@ describe('Send to date…', () => {
   });
 
   it('leaves entries it did not create alone when undoing', async () => {
-    const first = sendNodeToDate('a1', { date: '2026-09-14', unit: null });
+    const first = sendEntry('a1', { date: '2026-09-14', unit: null });
     seedWeek();
-    const second = sendNodeToDate('a1', { date: '2026-10-14', unit: null });
+    const second = sendEntry('a1', { date: '2026-10-14', unit: null });
 
     await undo();
 
@@ -1890,13 +1896,14 @@ describe('Pulling an occurrence into the current week', () => {
 });
 
 
-// ─── Subtree and path ─────────────────────────────────────────────────────────
-// A dated task is sent whole: the sub-tasks below it travel as the entry's
-// `tree`, the activities it hung under as its `path`, and the week that owns
-// the date rebuilds both. These cover capture, the caps that refuse an
-// over-large send, and what materialisation makes of the two fields.
 
-describe('Send to date — subtree capture', () => {
+// ─── Leaves and path ──────────────────────────────────────────────────────────
+// An entry is one leaf task, because that is what the user acts on: you go for
+// a run, then you stretch. Sending a parent writes one entry per leaf below it,
+// each carrying the path it hung under, and the shared path is what puts those
+// leaves back under one node when the week that owns the date rebuilds them.
+
+describe('Send to date — leaves and path', () => {
   const WK = '2026-20';
   freezeToday('2026-05-11');
 
@@ -1907,13 +1914,23 @@ describe('Send to date — subtree capture', () => {
         { id: 'center', type: 'center', children: ['me'] },
         { id: 'me', type: 'branch', branch: 'me', parent: 'center', label: 'Me', children: ['h1'] },
         { id: 'h1', type: 'activity', branch: 'me', parent: 'me', label: 'Health', children: ['r1'] },
-        { id: 'r1', type: 'activity', branch: 'me', parent: 'h1', label: 'Running', children: ['g1', 's1n'] },
-        { id: 'g1', type: 'activity', branch: 'me', parent: 'r1', label: 'Go for a run', priority: 'high', children: [] },
+        { id: 'r1', type: 'activity', branch: 'me', parent: 'h1', label: 'Running', priority: 'high', children: ['g1', 's1n'] },
+        { id: 'g1', type: 'activity', branch: 'me', parent: 'r1', label: 'Go for a run', priority: 'critical', children: [] },
         { id: 's1n', type: 'activity', branch: 'me', parent: 'r1', label: 'Stretching', children: [] },
       ],
       tombstones: [],
       crdtVersion: 0,
     });
+  };
+
+  const addNodes = (...nodes) => {
+    const data = _state.get();
+    nodes.forEach(n => {
+      data.nodes.push(n);
+      data.nodes.find(x => x.id === n.parent).children.push(n.id);
+    });
+    _state.set(data);
+    return data;
   };
 
   beforeEach(() => {
@@ -1926,119 +1943,109 @@ describe('Send to date — subtree capture', () => {
 
   afterEach(() => _state.setSchedule(emptySchedule()));
 
-  it('carries the subtree and the ancestors it hung under', () => {
-    const entry = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+  it('writes one entry per leaf, each carrying the path it hung under', () => {
+    const entries = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
 
-    expect(entry.path).toEqual(['Health']);
-    expect(entry.tree).toEqual([
-      { key: '0', label: 'Go for a run', priority: 'high' },
-      { key: '1', label: 'Stretching' },
-    ]);
-    // The whole subtree leaves the week — a stub left behind would be a task
-    // the user has to close twice.
+    expect(entries.map(e => e.label)).toEqual(['Go for a run', 'Stretching']);
+    entries.forEach(e => expect(e.path).toEqual(['Health', 'Running']));
+    expect(entries.every(e => e.anchor === '2026-09-15')).toBe(true);
+    // The parent leaves with them — nothing of it stays behind to close twice.
     ['r1', 'g1', 's1n'].forEach(id => expect(findNode(id)).toBeUndefined());
-    expect(findNode('h1').children).not.toContain('r1');
+    expect(findNode('h1').children).toEqual([]);
   });
 
-  it('nests deeper sub-tasks by position key', () => {
-    const data = _state.get();
-    data.nodes.push({ id: 'w1', type: 'activity', branch: 'me', parent: 'g1', label: 'Warm up', children: [] });
-    data.nodes.find(n => n.id === 'g1').children.push('w1');
-    _state.set(data);
-    const entry = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
-    expect(entry.tree.map(t => t.key)).toEqual(['0', '0.0', '1']);
-    expect(entry.tree[1].label).toBe('Warm up');
+  it('sends a leaf as a single entry with its ancestors', () => {
+    const entries = sendNodeToDate('g1', { date: '2026-09-15', unit: null });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].label).toBe('Go for a run');
+    expect(entries[0].path).toEqual(['Health', 'Running']);
+    expect(findNode('s1n')).toBeDefined(); // its sibling is untouched
   });
 
-  it('leaves day children and legacy counters behind', () => {
-    const data = _state.get();
-    data.nodes.push(
-      { id: 'd1', type: 'activity', dayChild: true, dayIndex: 3, branch: 'me', parent: 'r1', label: 'we', children: [] },
-      { id: 'c1', type: 'counter', branch: 'me', parent: 'r1', label: '0/5', val: 0, max: 5, children: [] },
-    );
-    data.nodes.find(n => n.id === 'r1').children.push('d1', 'c1');
-    _state.set(data);
-    const entry = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
-    expect(entry.tree.map(t => t.label)).toEqual(['Go for a run', 'Stretching']);
-  });
-
-  it('carries tick leaves as a flag rather than a label', () => {
-    const data = _state.get();
-    data.nodes.push(
-      { id: 't1', type: 'activity', tickChild: true, tickIndex: 1, branch: 'me', parent: 'g1', label: '1', children: [] },
-      { id: 't2', type: 'activity', tickChild: true, tickIndex: 2, branch: 'me', parent: 'g1', label: '2', children: [] },
-    );
-    data.nodes.find(n => n.id === 'g1').children.push('t1', 't2');
-    _state.set(data);
-    const entry = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
-    expect(entry.tree.filter(t => t.tick)).toEqual([
-      { key: '0.0', label: '', tick: true },
-      { key: '0.1', label: '', tick: true },
+  it('records the intermediate levels of a deeper subtree', () => {
+    addNodes({ id: 'w1', type: 'activity', branch: 'me', parent: 'g1', label: 'Warm up', children: [] });
+    const entries = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+    expect(entries.map(e => [e.label, e.path.join('/')])).toEqual([
+      ['Warm up', 'Health/Running/Go for a run'],
+      ['Stretching', 'Health/Running'],
     ]);
+  });
+
+  it('gives day children, counters and ticks no entry of their own', () => {
+    addNodes(
+      { id: 'd1', type: 'activity', dayChild: true, dayIndex: 3, branch: 'me', parent: 's1n', label: 'we', children: [] },
+      { id: 'c1', type: 'counter', branch: 'me', parent: 's1n', label: '0/5', val: 0, max: 5, children: [] },
+      { id: 't1', type: 'activity', tickChild: true, tickIndex: 1, branch: 'me', parent: 'g1', label: '1', children: [] },
+    );
+    const entries = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+    // Both stay leaves: what hangs off them is the week's own machinery.
+    expect(entries.map(e => e.label)).toEqual(['Go for a run', 'Stretching']);
+  });
+
+  it('gives a leaf without a priority the one the parent was carrying', () => {
+    const entries = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+    expect(entries.find(e => e.label === 'Go for a run').priority).toBe('critical');
+    expect(entries.find(e => e.label === 'Stretching').priority).toBe('high');
+  });
+
+  it('shares one repeat rule and end condition across every entry', () => {
+    const entries = sendNodeToDate('r1', {
+      date: '2026-09-15', unit: 'week', every: '2', endType: 'count', endCount: '4',
+    });
+    expect(entries).toHaveLength(2);
+    entries.forEach(e => {
+      expect(e.repeat).toEqual({ every: 2, unit: 'week' });
+      expect(e.end).toEqual({ type: 'count', n: 4 });
+    });
   });
 
   it('keeps only the nearest six ancestors', () => {
-    // A chain of eight activities above the sent node.
-    const data = _state.get();
     let parent = 'me';
     for (let i = 0; i < 8; i++) {
-      const id = 'p' + i;
-      data.nodes.push({ id, type: 'activity', branch: 'me', parent, label: 'L' + i, children: [] });
-      data.nodes.find(n => n.id === parent).children.push(id);
-      parent = id;
+      addNodes({ id: 'p' + i, type: 'activity', branch: 'me', parent, label: 'L' + i, children: [] });
+      parent = 'p' + i;
     }
-    data.nodes.push({ id: 'leaf', type: 'activity', branch: 'me', parent, label: 'Leaf', children: [] });
-    data.nodes.find(n => n.id === parent).children.push('leaf');
-    _state.set(data);
+    addNodes({ id: 'leaf', type: 'activity', branch: 'me', parent, label: 'Leaf', children: [] });
 
-    const entry = sendNodeToDate('leaf', { date: '2026-09-15', unit: null });
-    expect(entry.path).toEqual(['L2', 'L3', 'L4', 'L5', 'L6', 'L7']);
+    const entries = sendNodeToDate('leaf', { date: '2026-09-15', unit: null });
+    expect(entries[0].path).toEqual(['L2', 'L3', 'L4', 'L5', 'L6', 'L7']);
   });
 
-  it('refuses a subtree deeper than six levels rather than truncating it', () => {
-    const data = _state.get();
-    let parent = 'r1';
-    for (let i = 0; i < 7; i++) {
-      const id = 'deep' + i;
-      data.nodes.push({ id, type: 'activity', branch: 'me', parent, label: 'D' + i, children: [] });
-      data.nodes.find(n => n.id === parent).children.push(id);
-      parent = id;
+  it('refuses more than 200 leaves rather than sending some of them', () => {
+    for (let i = 0; i < 201; i++) {
+      addNodes({ id: 'many' + i, type: 'activity', branch: 'me', parent: 'g1', label: 'M' + i, children: [] });
     }
-    _state.set(data);
     expect(sendSubtreeOverCap(findNode('r1'))).toBe(true);
     expect(sendNodeToDate('r1', { date: '2026-09-15', unit: null })).toBeNull();
     expect(findNode('r1')).toBeDefined();
     expect(_state.getSchedule().entries).toEqual([]);
   });
 
-  it('refuses a subtree of more than 200 nodes', () => {
-    const data = _state.get();
-    for (let i = 0; i < 201; i++) {
-      const id = 'many' + i;
-      data.nodes.push({ id, type: 'activity', branch: 'me', parent: 'g1', label: 'M' + i, children: [] });
-      data.nodes.find(n => n.id === 'g1').children.push(id);
+  it('sends a subtree that sits exactly on the cap', () => {
+    // 198 more leaves alongside 'Go for a run' and 'Stretching' makes 200.
+    for (let i = 0; i < 198; i++) {
+      addNodes({ id: 'ok' + i, type: 'activity', branch: 'me', parent: 'r1', label: 'K' + i, children: [] });
     }
-    _state.set(data);
-    expect(sendSubtreeOverCap(findNode('r1'))).toBe(true);
-    expect(sendNodeToDate('r1', { date: '2026-09-15', unit: null })).toBeNull();
-    expect(findNode('r1')).toBeDefined();
+    expect(sendSubtreeOverCap(findNode('r1'))).toBe(false);
+    expect(sendNodeToDate('r1', { date: '2026-09-15', unit: null })).toHaveLength(200);
   });
 
-  it('holds a subtree that sits exactly on the cap', () => {
-    // 198 more under the root brings the tree to exactly 200 with the two leaves.
-    const data = _state.get();
-    for (let i = 0; i < 198; i++) {
-      const id = 'ok' + i;
-      data.nodes.push({ id, type: 'activity', branch: 'me', parent: 'r1', label: 'K' + i, children: [] });
-      data.nodes.find(n => n.id === 'r1').children.push(id);
-    }
-    _state.set(data);
-    expect(sendSubtreeOverCap(findNode('r1'))).toBe(false);
-    expect(sendNodeToDate('r1', { date: '2026-09-15', unit: null }).tree).toHaveLength(200);
+  it('reverses the whole send in a single undo', async () => {
+    sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+    expect(_state.getSchedule().entries).toHaveLength(2);
+
+    await undo();
+    expect(_state.getSchedule().entries).toEqual([]);
+    expect(findNode('r1').children).toEqual(['g1', 's1n']);
+    expect(findNode('g1')).toBeDefined();
+
+    await redo();
+    expect(_state.getSchedule().entries).toHaveLength(2);
+    expect(findNode('r1')).toBeUndefined();
   });
 });
 
-describe('Materialisation — subtree and path', () => {
+describe('Materialisation — path', () => {
   // 2026-W20 runs Mon 2026-05-11 … Sun 2026-05-17.
   const WK = '2026-20';
   const DATE = '2026-05-13';
@@ -2053,12 +2060,8 @@ describe('Materialisation — subtree and path', () => {
   });
 
   const entry = (over = {}) => ({
-    id: 's1', label: 'Running', branch: 'me', priority: 'normal',
-    path: ['Health'],
-    tree: [
-      { key: '0', label: 'Go for a run', priority: 'high' },
-      { key: '1', label: 'Stretching' },
-    ],
+    id: 's1', label: 'Go for a run', branch: 'me', priority: 'normal',
+    path: ['Health', 'Running'],
     anchor: DATE, repeat: null, end: { type: 'never' },
     plantedThrough: null, planted: [], _ts: 1,
     ...over,
@@ -2080,30 +2083,40 @@ describe('Materialisation — subtree and path', () => {
     _state.clearTodayWeekKeyOverride();
   });
 
-  it('rebuilds the ancestors and the subtree in the week that owns the date', () => {
+  it('rebuilds the ancestor chain in the week that owns the date', () => {
     seed(entry());
     const data = week();
     expect(materialiseWeek(WK, data)).toBe(true);
 
     const health = byLabel(data, 'Health');
-    const running = data.nodes.find(n => n.schedId === 's1');
-    const run = byLabel(data, 'Go for a run');
-    const stretch = byLabel(data, 'Stretching');
+    const running = byLabel(data, 'Running');
+    const leaf = data.nodes.find(n => n.schedId === 's1');
 
     expect(health.parent).toBe('me');
-    expect(data.nodes.find(n => n.id === 'me').children).toEqual([health.id]);
     expect(running.parent).toBe(health.id);
-    expect(health.children).toEqual([running.id]);
-    expect(run.parent).toBe(running.id);
-    expect(stretch.parent).toBe(running.id);
-    // The day leaf still comes first, then the subtree in capture order.
-    const leaf = data.nodes.find(n => n.dayChild);
-    expect(running.children).toEqual([leaf.id, run.id, stretch.id]);
-    expect(run.priority).toBe('high');
-    expect(stretch.priority).toBeNull();
-    // Scaffolding is not an occurrence — only the sent node carries the stamps.
+    expect(leaf.parent).toBe(running.id);
+    expect(leaf.children).toEqual([data.nodes.find(n => n.dayChild).id]);
+    // Scaffolding is not an occurrence — only the leaf carries the stamps.
     expect(health.schedId).toBeUndefined();
-    expect(run.schedId).toBeUndefined();
+    expect(running.schedId).toBeUndefined();
+  });
+
+  it('puts the leaves of one send back under a single rebuilt parent', () => {
+    seed(entry(), entry({ id: 's2', label: 'Stretching' }));
+    const data = week();
+    materialiseWeek(WK, data);
+
+    expect(data.nodes.filter(n => n.label === 'Running')).toHaveLength(1);
+    const running = byLabel(data, 'Running');
+    expect(running.children).toHaveLength(2);
+    expect(data.nodes.filter(n => n.schedId).map(n => n.parent)).toEqual([running.id, running.id]);
+  });
+
+  it('plants under the branch when the entry has no path', () => {
+    seed(entry({ path: [] }));
+    const data = week();
+    materialiseWeek(WK, data);
+    expect(data.nodes.find(n => n.schedId === 's1').parent).toBe('me');
   });
 
   it('reuses the user own ancestor node instead of building a second one', () => {
@@ -2114,33 +2127,21 @@ describe('Materialisation — subtree and path', () => {
 
     materialiseWeek(WK, data);
     expect(data.nodes.filter(n => String(n.label || '').trim().toLowerCase() === 'health')).toHaveLength(1);
-    expect(data.nodes.find(n => n.schedId === 's1').parent).toBe('mine');
-  });
-
-  it('lands two entries sharing a path under one scaffold node', () => {
-    seed(entry(), entry({ id: 's2', label: 'Swimming', tree: [] }));
-    const data = week();
-    materialiseWeek(WK, data);
-
-    expect(data.nodes.filter(n => n.label === 'Health')).toHaveLength(1);
-    const health = byLabel(data, 'Health');
-    expect(health.children).toHaveLength(2);
-    expect(data.nodes.filter(n => n.schedId).map(n => n.parent)).toEqual([health.id, health.id]);
+    expect(byLabel(data, 'Running').parent).toBe('mine');
   });
 
   it('stops at a path step the user has buried and lands one level higher', () => {
     seed(entry());
     const first = week();
     materialiseWeek(WK, first);
-    const healthId = byLabel(first, 'Health').id;
+    const runningId = byLabel(first, 'Running').id;
 
-    // A fresh week that has buried that scaffold: the user deleted it there.
     const data = week();
-    data.tombstones.push(healthId);
+    data.tombstones.push(runningId);
     materialiseWeek(WK, data);
 
-    expect(byLabel(data, 'Health')).toBeUndefined();
-    expect(data.nodes.find(n => n.schedId === 's1').parent).toBe('me');
+    expect(byLabel(data, 'Running')).toBeUndefined();
+    expect(data.nodes.find(n => n.schedId === 's1').parent).toBe(byLabel(data, 'Health').id);
   });
 
   it('replants nothing when the week is opened again', () => {
@@ -2152,8 +2153,8 @@ describe('Materialisation — subtree and path', () => {
     expect(data.nodes).toHaveLength(before);
   });
 
-  it('gives two devices the same subtree ids', () => {
-    seed(entry());
+  it('gives two devices the same scaffolding ids', () => {
+    seed(entry(), entry({ id: 's2', label: 'Stretching' }));
     const a = week();
     const b = week();
     materialiseWeek(WK, a);
@@ -2161,49 +2162,19 @@ describe('Materialisation — subtree and path', () => {
     expect(a.nodes.map(n => n.id).sort()).toEqual(b.nodes.map(n => n.id).sort());
   });
 
-  it('rebuilds tick leaves with their index and label', () => {
-    seed(entry({ tree: [
-      { key: '0', label: 'Go for a run' },
-      { key: '0.0', label: '', tick: true },
-      { key: '0.1', label: '', tick: true },
-    ] }));
-    const data = week();
-    materialiseWeek(WK, data);
-
-    const ticks = data.nodes.filter(n => n.tickChild);
-    expect(ticks.map(n => n.tickIndex)).toEqual([1, 2]);
-    expect(ticks.map(n => n.label)).toEqual(['1', '2']);
-    expect(ticks.every(n => n.parent === byLabel(data, 'Go for a run').id)).toBe(true);
-  });
-
-  it('drops a subtree node whose parent did not survive the repair pass', () => {
-    const repaired = validateAndRepairSchedule({ entries: [entry({ tree: [
-      { key: '0', label: 'Kept' },
-      { key: '9.0', label: 'Orphan' },
-      { key: 'nope', label: 'Bad key' },
-    ] })] }, ['me']).entries[0];
-    expect(repaired.tree).toEqual([{ key: '0', label: 'Kept' }]);
-  });
-
-  it('buries the whole planted subtree when one occurrence is deleted', async () => {
-    seed(entry());
+  it('deleting one leaf occurrence leaves its sibling and the scaffolding standing', async () => {
+    seed(entry(), entry({ id: 's2', label: 'Stretching' }));
     const data = week();
     materialiseWeek(WK, data);
     _state.set(data);
 
-    const subtreeIds = [
-      occurrenceNodeId('s1', DATE),
-      occurrenceNodeId('s1', DATE + ':day'),
-      occurrenceTreeNodeId('s1', DATE, '0'),
-      occurrenceTreeNodeId('s1', DATE, '1'),
-    ];
     expect(await deleteOccurrence('s1', DATE)).toBe(true);
 
-    expect(_state.get().tombstones).toEqual(expect.arrayContaining(subtreeIds));
-    expect(_state.get().nodes.filter(n => subtreeIds.includes(n.id))).toEqual([]);
-    // The shared scaffolding stays: other entries and the user's own work hang
-    // off it.
-    expect(_state.get().nodes.find(n => n.label === 'Health')).toBeDefined();
-    expect(materialiseWeek(WK, _state.get())).toBe(false);
+    expect(_state.get().tombstones).toEqual(expect.arrayContaining([
+      occurrenceNodeId('s1', DATE), occurrenceNodeId('s1', DATE + ':day'),
+    ]));
+    expect(_state.get().nodes.find(n => n.schedId === 's1')).toBeUndefined();
+    expect(_state.get().nodes.find(n => n.schedId === 's2')).toBeDefined();
+    expect(_state.get().nodes.find(n => n.label === 'Running')).toBeDefined();
   });
 });

@@ -614,7 +614,6 @@ export const {
   // Schedule store
   canSendToDate,
   sendSubtreeOverCap,
-  occurrenceTreeNodeId,
   sendNodeToDate,
   updateScheduleEntry,
   setEntryPriority,
