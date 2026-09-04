@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-k5Qlnux9D/ae7twUs96Igzu6GD7jcHHsaHIV+M23GoA='
+               'sha256-aqGI3PbO98V7knI98lGPG96JxyM09GLMGzIohmQyFP4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -11354,10 +11354,10 @@ function weekdayOfDayString(str) {
   return new Date(dayNumber(part) * 86400000).getUTCDay();
 }
 
-// Both nodes an occurrence plants carry derived ids, the parent and its day
-// leaf alike. A genId() day leaf would converge badly: two devices opening the
-// same week offline would agree on the activity and then merge two different
-// day children under it.
+// An occurrence used to plant a day leaf beside itself; it now wears its day as
+// a label annotation, the way any single-day activity does. The id survives so
+// a week planted by an older version is still recognised as already holding
+// that occurrence, and so deleting one buries the leaf it left behind.
 function occurrenceDayNodeId(schedId, schedDate) {
   return occurrenceNodeId(schedId, schedDate + ':day');
 }
@@ -11407,24 +11407,19 @@ function plantOccurrence(ctx, entry, date, dayIndex) {
   const host = resolvePathParent(ctx, branchNode, entry.path, stamp);
 
   const node = {
+    // One day is an annotation in the label, never a day child — the rule
+    // setActivityDays has always applied. An occurrence is due on exactly one
+    // day, so it is always that case.
     id, type: 'activity', branch, parent: host.id,
-    label: entry.label, done: false, unplanned: false,
+    label: `${entry.label} (${dayAbbr(dayIndex)})`.trim(),
+    done: false, unplanned: false,
     priority, reusable: false,
-    children: [dayId],
+    children: [],
     schedId: entry.id, schedDate: date,
     _ts: stamp,
   };
-  const dayNode = {
-    id: dayId, type: 'activity', dayChild: true, dayIndex,
-    branch, parent: id,
-    label: dayAbbr(dayIndex),
-    done: false, unplanned: false,
-    priority, reusable: false,
-    children: [], _ts: stamp,
-  };
-  ctx.data.nodes.push(node, dayNode);
+  ctx.data.nodes.push(node);
   ctx.byId.set(id, node);
-  ctx.byId.set(dayId, dayNode);
   host.children = Array.isArray(host.children) ? host.children : [];
   host.children.push(id);
   return true;

@@ -558,15 +558,13 @@ describe('Materialisation on week open', () => {
 
     const node = data.nodes.find(n => n.schedId === 's1');
     expect(node.type).toBe('activity');
-    expect(node.label).toBe('Tax return');
+    // One day is an annotation, never a day child — 2026-05-13 is a Wednesday.
+    expect(node.label).toBe('Tax return (We)');
+    expect(node.children).toEqual([]);
+    expect(data.nodes.filter(n => n.dayChild)).toEqual([]);
     expect(node.parent).toBe('work');
     expect(node.schedDate).toBe('2026-05-13');
     expect(data.nodes.find(n => n.id === 'work').children).toContain(node.id);
-
-    const leaf = data.nodes.find(n => n.dayChild);
-    expect(leaf.parent).toBe(node.id);
-    expect(leaf.dayIndex).toBe(3); // 2026-05-13 is a Wednesday
-    expect(node.children).toEqual([leaf.id]);
   });
 
   it('carries the entry priority onto the occurrence', () => {
@@ -574,7 +572,6 @@ describe('Materialisation on week open', () => {
     const data = week();
     materialiseWeek(WK, data);
     expect(data.nodes.find(n => n.schedId === 's1').priority).toBe('critical');
-    expect(data.nodes.find(n => n.dayChild).priority).toBe('critical');
   });
 
   it('plants nothing when the occurrence falls outside the week', () => {
@@ -614,9 +611,8 @@ describe('Materialisation on week open', () => {
     const data = week();
     materialiseWeek(WK, data);
     const node = data.nodes.find(n => n.schedId === 's1');
-    const leaf = data.nodes.find(n => n.dayChild);
-    data.nodes = data.nodes.filter(n => n.id !== node.id && n.id !== leaf.id);
-    data.tombstones = [node.id, leaf.id];
+    data.nodes = data.nodes.filter(n => n.id !== node.id);
+    data.tombstones = [node.id];
 
     expect(materialiseWeek(WK, data)).toBe(false);
     expect(occurrences(data)).toEqual([]);
@@ -657,9 +653,8 @@ describe('Materialisation on week open', () => {
     const data = week();
     materialiseWeek(WK, data);
     const node = data.nodes.find(n => n.schedId === 's1');
-    expect(node.label).toBe('Pushups 10x');
+    expect(node.label).toBe('Pushups 10x (We)');
     expect(data.nodes.filter(n => n.tickChild)).toEqual([]);
-    expect(data.nodes.filter(n => n.dayChild)).toHaveLength(1);
   });
 
   it('converges on one node when two devices materialise the same week alone', () => {
@@ -673,10 +668,9 @@ describe('Materialisation on week open', () => {
 
     const merged = mergeWeekData(a, b);
     expect(merged.nodes.filter(n => n.schedId === 's1')).toHaveLength(1);
-    expect(merged.nodes.filter(n => n.dayChild)).toHaveLength(1);
     const node = merged.nodes.find(n => n.schedId === 's1');
     expect(node.schedDate).toBe('2026-05-13');
-    expect(node.children).toHaveLength(1);
+    expect(node.children).toEqual([]);
   });
 
   it('carries schedId and schedDate through validateAndRepair', () => {
@@ -687,7 +681,7 @@ describe('Materialisation on week open', () => {
     const node = repaired.nodes.find(n => n.id === data.nodes.find(x => x.schedId).id);
     expect(node.schedId).toBe('s1');
     expect(node.schedDate).toBe('2026-05-13');
-    expect(repaired.nodes.find(n => n.dayChild).dayIndex).toBe(3);
+    expect(node.label).toBe('Tax return (We)');
   });
 
   it('carries schedId and schedDate through a Drive round-trip', () => {
@@ -723,7 +717,7 @@ describe('Materialisation on week open', () => {
     await _state.loadAndRender('2026-19');
     await _state.loadAndRender(WK);
     expect(occurrences(_state.get())).toHaveLength(1);
-    expect(_state.get().nodes.filter(n => n.dayChild)).toHaveLength(1);
+    expect(_state.get().nodes.filter(n => n.dayChild)).toEqual([]);
   });
 
   // R2: withWeekLock is not re-entrant. Materialisation runs under the lock for
@@ -803,7 +797,6 @@ describe('Materialisation on week open', () => {
     await _state.loadAndRender('2026-19');
     await _state.loadAndRender(WK);
     expect(_state.get().nodes.filter(n => n.schedId === 's1')).toHaveLength(1);
-    expect(_state.get().nodes.filter(n => n.dayChild)).toHaveLength(1);
   });
 
   it('leaves a week untouched on open when the schedule is empty', async () => {
@@ -903,7 +896,7 @@ describe('Send to date…', () => {
 
   it('drops the weekday tag from the label it captures', () => {
     // The date is the schedule now; a "(we)" left in the label would ride into
-    // every planted occurrence and fight the day leaf it gets there.
+    // every planted occurrence and fight the day the date gives it there.
     findNode('a1').label = 'Pay tax (we)';
     const entry = sendEntry('a1', { date: '2026-09-21', unit: null });
     expect(entry.label).toBe('Pay tax');
@@ -953,7 +946,7 @@ describe('Send to date…', () => {
     _state.setWeekKey('2026-19');
     await _state.loadAndRender(WK);
     const arrived = _state.get().nodes.find(n => n.schedId === e.id);
-    expect(arrived.label).toBe('Pay tax');
+    expect(arrived.label).toBe('Pay tax (We)');
     expect(arrived.priority).toBe('high');
     expect(arrived.schedDate).toBe('2026-05-13');
   });
@@ -1076,8 +1069,8 @@ describe('Past-due sweep', () => {
 
     const node = data.nodes.find(n => n.schedId === 's1');
     expect(node.schedDate).toBe('2026-04-01');
-    const leaf = data.nodes.find(n => n.dayChild);
-    expect(leaf.dayIndex).toBe(1); // Monday
+    // Swept onto this week's Monday, which the label says and the date does not.
+    expect(node.label).toBe('Pay the bill (Mo)');
   });
 
   it('reads as overdue from Tuesday on, through the existing machinery', () => {
@@ -1087,7 +1080,7 @@ describe('Past-due sweep', () => {
     _state.set(data);
 
     const tuesday = new Date('2026-05-12T09:00:00');
-    expect(getOverdueItems(tuesday).some(n => n.dayChild)).toBe(true);
+    expect(getOverdueItems(tuesday).some(n => n.schedId === 's1')).toBe(true);
     const monday = new Date('2026-05-11T09:00:00');
     expect(getOverdueItems(monday)).toEqual([]);
   });
@@ -1837,8 +1830,7 @@ describe('Pulling an occurrence into the current week', () => {
 
     const node = _state.get().nodes.find(n => n.schedId === 's1');
     expect(node.schedDate).toBe(FUTURE); // the day it was really due
-    const leaf = _state.get().nodes.find(n => n.dayChild);
-    expect(leaf.dayIndex).toBe(3); // Wednesday of this week
+    expect(node.label).toBe('Pay the bill (We)'); // Wednesday of this week
   });
 
   it('buries it in the week that owned it, so it cannot arrive twice', async () => {
@@ -2104,7 +2096,8 @@ describe('Materialisation — path', () => {
     expect(health.parent).toBe('me');
     expect(running.parent).toBe(health.id);
     expect(leaf.parent).toBe(running.id);
-    expect(leaf.children).toEqual([data.nodes.find(n => n.dayChild).id]);
+    expect(leaf.children).toEqual([]);
+    expect(leaf.label).toBe('Go for a run (We)');
     // Scaffolding is not an occurrence — only the leaf carries the stamps.
     expect(health.schedId).toBeUndefined();
     expect(running.schedId).toBeUndefined();
