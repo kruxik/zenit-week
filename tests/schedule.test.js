@@ -1015,6 +1015,26 @@ describe('Send to date…', () => {
     expect(_state.get().nodes.some(n => n.label === 'Big project')).toBe(true);
   });
 
+  it('rebuilds the same scaffolding when the send is repeated after an undo', async () => {
+    sendNodeToDate('a2', { date: '2026-05-20', unit: null });
+    await saveWeek(WK, _state.get());
+    await _state.loadAndRender('2026-21');
+    await _state.loadAndRender(WK);
+    await undo();
+
+    // A second send down the same path derives the same scaffold id. The undo
+    // must not have left a tombstone on it, or the leaves land on the branch.
+    sendNodeToDate('a2', { date: '2026-05-20', unit: null });
+    await saveWeek(WK, _state.get());
+    await _state.loadAndRender('2026-21');
+
+    const again = _state.get();
+    const parent = again.nodes.find(n => n.label === 'Big project');
+    expect(parent).toBeDefined();
+    expect(again.nodes.find(n => n.schedId).parent).toBe(parent.id);
+    expect(parent.parent).toBe('work');
+  });
+
   it('leaves a parent the user made standing when the send is undone', async () => {
     // The target week already has its own 'Big project'; the occurrence lands
     // under it by label match, and it is not this send's to take away.

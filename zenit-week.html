@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-wFGOGpmXZr3kLmh4jIDAZWgYpJtd8lP7i7yiCzUQCwc='
+               'sha256-5cKsw89HQxrJD9bJPspCH5bFEb4QID5fEGqyNmU2HSk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -6133,13 +6133,16 @@ async function _reverseOccurrences(entry, remove) {
         // this occurrence has nothing to remember about it.
         if (touchedWeek) {
           ids.forEach(id => { if (!data.tombstones.includes(id)) data.tombstones.push(id); });
-          pruneOccurrencePath(data, entry).forEach(id => {
-            if (!data.tombstones.includes(id)) data.tombstones.push(id);
-          });
+          // Taken down, never buried. A path id is derived from branch and
+          // labels, so it belongs to the path rather than to this entry — a
+          // tombstone on it would tell every later send down the same path that
+          // the user had deleted that step, and land their leaves on the branch.
+          // The guard in resolvePathParent is for a scaffold the user really
+          // did delete, which deleteNode buries under that same id.
+          pruneOccurrencePath(data, entry);
         }
       } else {
-        const buried = new Set([...ids, ...occurrencePathIds(data, entry)]);
-        const kept = data.tombstones.filter(t => !buried.has(t));
+        const kept = data.tombstones.filter(t => !ids.has(t));
         if (kept.length !== data.tombstones.length) {
           data.tombstones = kept;
           touchedWeek = true;
@@ -6158,20 +6161,6 @@ async function _reverseOccurrences(entry, remove) {
       }
     });
   }
-}
-
-// Every id the entry's path could have been scaffolded under in this week: one
-// per step of the path, per branch, since a re-homed occurrence scaffolds under
-// whichever branch received it. Derived, so an id that is present is one this
-// app built — a node the user made carries a genId() and cannot collide.
-function occurrencePathIds(data, entry) {
-  const labels = Array.isArray(entry.path) ? entry.path : [];
-  if (!labels.length) return [];
-  const out = [];
-  data.nodes.filter(n => n.type === 'branch').forEach(b => {
-    for (let i = 1; i <= labels.length; i++) out.push(occurrencePathNodeId(b.id, labels.slice(0, i)));
-  });
-  return out;
 }
 
 // Takes down the scaffolding an undone send put up, and only that. A step is
