@@ -613,6 +613,8 @@ export const {
   occurrencesBefore,
   // Schedule store
   canSendToDate,
+  sendSubtreeOverCap,
+  occurrenceTreeNodeId,
   sendNodeToDate,
   updateScheduleEntry,
   setEntryPriority,

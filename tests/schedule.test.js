@@ -27,6 +27,8 @@ import {
   deleteOccurrence,
   deleteScheduleSeries,
   deleteNode,
+  sendSubtreeOverCap,
+  occurrenceTreeNodeId,
   getLaterOccurrences,
   formatDayLabel,
   laterMonthKey,
@@ -240,6 +242,7 @@ describe('Occurrence math — dates and robustness', () => {
 describe('Schedule store — validate and repair', () => {
   const good = () => ({
     id: 's1', label: 'Tax return', branch: 'work', priority: 'high',
+    path: ['Admin'], tree: [{ key: '0', label: 'Collect receipts' }],
     anchor: '2026-03-31', repeat: { every: 1, unit: 'year' }, end: { type: 'never' },
     plantedThrough: '2026-03-29', planted: ['2026-03-31'], _ts: 1234,
   });
@@ -371,7 +374,8 @@ describe('Schedule store — validate and repair', () => {
     expect(out.evil).toBeUndefined();
     expect({}.polluted).toBeUndefined();
     expect(Object.keys(out).sort()).toEqual([
-      '_ts', 'anchor', 'branch', 'end', 'id', 'label', 'planted', 'plantedThrough', 'priority', 'repeat',
+      '_ts', 'anchor', 'branch', 'end', 'id', 'label', 'path', 'planted', 'plantedThrough', 'priority',
+      'repeat', 'tree',
     ]);
   });
 });
@@ -444,6 +448,7 @@ describe('Schedule store — persistence', () => {
   it('round-trips entries through IndexedDB', async () => {
     const entry = {
       id: 's1', label: 'Roadworthy check', branch: 'me', priority: 'critical',
+      path: [], tree: [],
       anchor: '2026-09-14', repeat: { every: 2, unit: 'year' }, end: { type: 'count', n: 5 },
       plantedThrough: null, planted: [], _ts: 99,
     };
@@ -832,9 +837,9 @@ describe('Send to date…', () => {
 
   afterEach(() => _state.setSchedule(emptySchedule()));
 
-  it('offers the menu entry only for a childless activity', () => {
+  it('offers the menu entry for any real activity, with or without children', () => {
     expect(canSendToDate(findNode('a1'))).toBe(true);
-    expect(canSendToDate(findNode('a2'))).toBe(false); // has a sub-task
+    expect(canSendToDate(findNode('a2'))).toBe(true); // its sub-task travels too
     expect(canSendToDate(findNode('work'))).toBe(false);
     expect(canSendToDate({ type: 'center' })).toBe(false);
     expect(canSendToDate({ type: 'counter' })).toBe(false);
@@ -928,8 +933,7 @@ describe('Send to date…', () => {
     expect(e.end).toEqual({ type: 'never' });
   });
 
-  it('refuses a node with children and an invalid date', () => {
-    expect(sendNodeToDate('a2', { date: '2026-09-14', unit: null })).toBeNull();
+  it('refuses an invalid date', () => {
     expect(sendNodeToDate('a1', { date: '2026-02-30', unit: null })).toBeNull();
     expect(sendNodeToDate('a1', { date: 'soon', unit: null })).toBeNull();
     expect(findNode('a1')).toBeDefined();
@@ -1882,5 +1886,324 @@ describe('Pulling an occurrence into the current week', () => {
     expect(await pullOccurrenceIntoWeek('nope', FUTURE, 1)).toBe(false);
     expect(await pullOccurrenceIntoWeek('s1', '2026-02-30', 1)).toBe(false);
     expect(occurrences(_state.get())).toEqual([]);
+  });
+});
+
+
+// ─── Subtree and path ─────────────────────────────────────────────────────────
+// A dated task is sent whole: the sub-tasks below it travel as the entry's
+// `tree`, the activities it hung under as its `path`, and the week that owns
+// the date rebuilds both. These cover capture, the caps that refuse an
+// over-large send, and what materialisation makes of the two fields.
+
+describe('Send to date — subtree capture', () => {
+  const WK = '2026-20';
+  freezeToday('2026-05-11');
+
+  // Me → Health → Running → { Go for a run, Stretching }
+  const seedWeek = () => {
+    _state.set({
+      nodes: [
+        { id: 'center', type: 'center', children: ['me'] },
+        { id: 'me', type: 'branch', branch: 'me', parent: 'center', label: 'Me', children: ['h1'] },
+        { id: 'h1', type: 'activity', branch: 'me', parent: 'me', label: 'Health', children: ['r1'] },
+        { id: 'r1', type: 'activity', branch: 'me', parent: 'h1', label: 'Running', children: ['g1', 's1n'] },
+        { id: 'g1', type: 'activity', branch: 'me', parent: 'r1', label: 'Go for a run', priority: 'high', children: [] },
+        { id: 's1n', type: 'activity', branch: 'me', parent: 'r1', label: 'Stretching', children: [] },
+      ],
+      tombstones: [],
+      crdtVersion: 0,
+    });
+  };
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setWeekKey(WK);
+    seedWeek();
+  });
+
+  afterEach(() => _state.setSchedule(emptySchedule()));
+
+  it('carries the subtree and the ancestors it hung under', () => {
+    const entry = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+
+    expect(entry.path).toEqual(['Health']);
+    expect(entry.tree).toEqual([
+      { key: '0', label: 'Go for a run', priority: 'high' },
+      { key: '1', label: 'Stretching' },
+    ]);
+    // The whole subtree leaves the week — a stub left behind would be a task
+    // the user has to close twice.
+    ['r1', 'g1', 's1n'].forEach(id => expect(findNode(id)).toBeUndefined());
+    expect(findNode('h1').children).not.toContain('r1');
+  });
+
+  it('nests deeper sub-tasks by position key', () => {
+    const data = _state.get();
+    data.nodes.push({ id: 'w1', type: 'activity', branch: 'me', parent: 'g1', label: 'Warm up', children: [] });
+    data.nodes.find(n => n.id === 'g1').children.push('w1');
+    _state.set(data);
+    const entry = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+    expect(entry.tree.map(t => t.key)).toEqual(['0', '0.0', '1']);
+    expect(entry.tree[1].label).toBe('Warm up');
+  });
+
+  it('leaves day children and legacy counters behind', () => {
+    const data = _state.get();
+    data.nodes.push(
+      { id: 'd1', type: 'activity', dayChild: true, dayIndex: 3, branch: 'me', parent: 'r1', label: 'we', children: [] },
+      { id: 'c1', type: 'counter', branch: 'me', parent: 'r1', label: '0/5', val: 0, max: 5, children: [] },
+    );
+    data.nodes.find(n => n.id === 'r1').children.push('d1', 'c1');
+    _state.set(data);
+    const entry = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+    expect(entry.tree.map(t => t.label)).toEqual(['Go for a run', 'Stretching']);
+  });
+
+  it('carries tick leaves as a flag rather than a label', () => {
+    const data = _state.get();
+    data.nodes.push(
+      { id: 't1', type: 'activity', tickChild: true, tickIndex: 1, branch: 'me', parent: 'g1', label: '1', children: [] },
+      { id: 't2', type: 'activity', tickChild: true, tickIndex: 2, branch: 'me', parent: 'g1', label: '2', children: [] },
+    );
+    data.nodes.find(n => n.id === 'g1').children.push('t1', 't2');
+    _state.set(data);
+    const entry = sendNodeToDate('r1', { date: '2026-09-15', unit: null });
+    expect(entry.tree.filter(t => t.tick)).toEqual([
+      { key: '0.0', label: '', tick: true },
+      { key: '0.1', label: '', tick: true },
+    ]);
+  });
+
+  it('keeps only the nearest six ancestors', () => {
+    // A chain of eight activities above the sent node.
+    const data = _state.get();
+    let parent = 'me';
+    for (let i = 0; i < 8; i++) {
+      const id = 'p' + i;
+      data.nodes.push({ id, type: 'activity', branch: 'me', parent, label: 'L' + i, children: [] });
+      data.nodes.find(n => n.id === parent).children.push(id);
+      parent = id;
+    }
+    data.nodes.push({ id: 'leaf', type: 'activity', branch: 'me', parent, label: 'Leaf', children: [] });
+    data.nodes.find(n => n.id === parent).children.push('leaf');
+    _state.set(data);
+
+    const entry = sendNodeToDate('leaf', { date: '2026-09-15', unit: null });
+    expect(entry.path).toEqual(['L2', 'L3', 'L4', 'L5', 'L6', 'L7']);
+  });
+
+  it('refuses a subtree deeper than six levels rather than truncating it', () => {
+    const data = _state.get();
+    let parent = 'r1';
+    for (let i = 0; i < 7; i++) {
+      const id = 'deep' + i;
+      data.nodes.push({ id, type: 'activity', branch: 'me', parent, label: 'D' + i, children: [] });
+      data.nodes.find(n => n.id === parent).children.push(id);
+      parent = id;
+    }
+    _state.set(data);
+    expect(sendSubtreeOverCap(findNode('r1'))).toBe(true);
+    expect(sendNodeToDate('r1', { date: '2026-09-15', unit: null })).toBeNull();
+    expect(findNode('r1')).toBeDefined();
+    expect(_state.getSchedule().entries).toEqual([]);
+  });
+
+  it('refuses a subtree of more than 200 nodes', () => {
+    const data = _state.get();
+    for (let i = 0; i < 201; i++) {
+      const id = 'many' + i;
+      data.nodes.push({ id, type: 'activity', branch: 'me', parent: 'g1', label: 'M' + i, children: [] });
+      data.nodes.find(n => n.id === 'g1').children.push(id);
+    }
+    _state.set(data);
+    expect(sendSubtreeOverCap(findNode('r1'))).toBe(true);
+    expect(sendNodeToDate('r1', { date: '2026-09-15', unit: null })).toBeNull();
+    expect(findNode('r1')).toBeDefined();
+  });
+
+  it('holds a subtree that sits exactly on the cap', () => {
+    // 198 more under the root brings the tree to exactly 200 with the two leaves.
+    const data = _state.get();
+    for (let i = 0; i < 198; i++) {
+      const id = 'ok' + i;
+      data.nodes.push({ id, type: 'activity', branch: 'me', parent: 'r1', label: 'K' + i, children: [] });
+      data.nodes.find(n => n.id === 'r1').children.push(id);
+    }
+    _state.set(data);
+    expect(sendSubtreeOverCap(findNode('r1'))).toBe(false);
+    expect(sendNodeToDate('r1', { date: '2026-09-15', unit: null }).tree).toHaveLength(200);
+  });
+});
+
+describe('Materialisation — subtree and path', () => {
+  // 2026-W20 runs Mon 2026-05-11 … Sun 2026-05-17.
+  const WK = '2026-20';
+  const DATE = '2026-05-13';
+
+  const week = () => ({
+    nodes: [
+      { id: 'center', type: 'center', children: ['me'] },
+      { id: 'me', type: 'branch', branch: 'me', parent: 'center', label: 'Me', children: [], side: 'right' },
+    ],
+    tombstones: [],
+    crdtVersion: 0,
+  });
+
+  const entry = (over = {}) => ({
+    id: 's1', label: 'Running', branch: 'me', priority: 'normal',
+    path: ['Health'],
+    tree: [
+      { key: '0', label: 'Go for a run', priority: 'high' },
+      { key: '1', label: 'Stretching' },
+    ],
+    anchor: DATE, repeat: null, end: { type: 'never' },
+    plantedThrough: null, planted: [], _ts: 1,
+    ...over,
+  });
+
+  const seed = (...entries) => _state.setSchedule({ entries, tombstones: [], crdtVersion: 0 });
+  const byLabel = (data, label) => data.nodes.find(n => n.label === label);
+
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setSchedule(emptySchedule());
+    _state.setWeekKey(WK);
+    _state.setTodayWeekKey('2026-10');
+  });
+
+  afterEach(() => {
+    _state.setSchedule(emptySchedule());
+    _state.clearTodayWeekKeyOverride();
+  });
+
+  it('rebuilds the ancestors and the subtree in the week that owns the date', () => {
+    seed(entry());
+    const data = week();
+    expect(materialiseWeek(WK, data)).toBe(true);
+
+    const health = byLabel(data, 'Health');
+    const running = data.nodes.find(n => n.schedId === 's1');
+    const run = byLabel(data, 'Go for a run');
+    const stretch = byLabel(data, 'Stretching');
+
+    expect(health.parent).toBe('me');
+    expect(data.nodes.find(n => n.id === 'me').children).toEqual([health.id]);
+    expect(running.parent).toBe(health.id);
+    expect(health.children).toEqual([running.id]);
+    expect(run.parent).toBe(running.id);
+    expect(stretch.parent).toBe(running.id);
+    // The day leaf still comes first, then the subtree in capture order.
+    const leaf = data.nodes.find(n => n.dayChild);
+    expect(running.children).toEqual([leaf.id, run.id, stretch.id]);
+    expect(run.priority).toBe('high');
+    expect(stretch.priority).toBeNull();
+    // Scaffolding is not an occurrence — only the sent node carries the stamps.
+    expect(health.schedId).toBeUndefined();
+    expect(run.schedId).toBeUndefined();
+  });
+
+  it('reuses the user own ancestor node instead of building a second one', () => {
+    seed(entry());
+    const data = week();
+    data.nodes.push({ id: 'mine', type: 'activity', branch: 'me', parent: 'me', label: '  health ', children: [] });
+    data.nodes.find(n => n.id === 'me').children.push('mine');
+
+    materialiseWeek(WK, data);
+    expect(data.nodes.filter(n => String(n.label || '').trim().toLowerCase() === 'health')).toHaveLength(1);
+    expect(data.nodes.find(n => n.schedId === 's1').parent).toBe('mine');
+  });
+
+  it('lands two entries sharing a path under one scaffold node', () => {
+    seed(entry(), entry({ id: 's2', label: 'Swimming', tree: [] }));
+    const data = week();
+    materialiseWeek(WK, data);
+
+    expect(data.nodes.filter(n => n.label === 'Health')).toHaveLength(1);
+    const health = byLabel(data, 'Health');
+    expect(health.children).toHaveLength(2);
+    expect(data.nodes.filter(n => n.schedId).map(n => n.parent)).toEqual([health.id, health.id]);
+  });
+
+  it('stops at a path step the user has buried and lands one level higher', () => {
+    seed(entry());
+    const first = week();
+    materialiseWeek(WK, first);
+    const healthId = byLabel(first, 'Health').id;
+
+    // A fresh week that has buried that scaffold: the user deleted it there.
+    const data = week();
+    data.tombstones.push(healthId);
+    materialiseWeek(WK, data);
+
+    expect(byLabel(data, 'Health')).toBeUndefined();
+    expect(data.nodes.find(n => n.schedId === 's1').parent).toBe('me');
+  });
+
+  it('replants nothing when the week is opened again', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    const before = data.nodes.length;
+    expect(materialiseWeek(WK, data)).toBe(false);
+    expect(data.nodes).toHaveLength(before);
+  });
+
+  it('gives two devices the same subtree ids', () => {
+    seed(entry());
+    const a = week();
+    const b = week();
+    materialiseWeek(WK, a);
+    materialiseWeek(WK, b);
+    expect(a.nodes.map(n => n.id).sort()).toEqual(b.nodes.map(n => n.id).sort());
+  });
+
+  it('rebuilds tick leaves with their index and label', () => {
+    seed(entry({ tree: [
+      { key: '0', label: 'Go for a run' },
+      { key: '0.0', label: '', tick: true },
+      { key: '0.1', label: '', tick: true },
+    ] }));
+    const data = week();
+    materialiseWeek(WK, data);
+
+    const ticks = data.nodes.filter(n => n.tickChild);
+    expect(ticks.map(n => n.tickIndex)).toEqual([1, 2]);
+    expect(ticks.map(n => n.label)).toEqual(['1', '2']);
+    expect(ticks.every(n => n.parent === byLabel(data, 'Go for a run').id)).toBe(true);
+  });
+
+  it('drops a subtree node whose parent did not survive the repair pass', () => {
+    const repaired = validateAndRepairSchedule({ entries: [entry({ tree: [
+      { key: '0', label: 'Kept' },
+      { key: '9.0', label: 'Orphan' },
+      { key: 'nope', label: 'Bad key' },
+    ] })] }, ['me']).entries[0];
+    expect(repaired.tree).toEqual([{ key: '0', label: 'Kept' }]);
+  });
+
+  it('buries the whole planted subtree when one occurrence is deleted', async () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    _state.set(data);
+
+    const subtreeIds = [
+      occurrenceNodeId('s1', DATE),
+      occurrenceNodeId('s1', DATE + ':day'),
+      occurrenceTreeNodeId('s1', DATE, '0'),
+      occurrenceTreeNodeId('s1', DATE, '1'),
+    ];
+    expect(await deleteOccurrence('s1', DATE)).toBe(true);
+
+    expect(_state.get().tombstones).toEqual(expect.arrayContaining(subtreeIds));
+    expect(_state.get().nodes.filter(n => subtreeIds.includes(n.id))).toEqual([]);
+    // The shared scaffolding stays: other entries and the user's own work hang
+    // off it.
+    expect(_state.get().nodes.find(n => n.label === 'Health')).toBeDefined();
+    expect(materialiseWeek(WK, _state.get())).toBe(false);
   });
 });

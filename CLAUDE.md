@@ -55,6 +55,8 @@ writing a week never touches the schedule.
 schedule = {
   entries: [
     { id, label, branch, priority,
+      path,            // ['Health', …] — ancestor labels, outermost first, nearest 6 kept
+      tree,            // [{ key:'0.1', label, priority?, tick? }, …] — the subtree that travelled
       anchor,          // 'YYYY-MM-DD' — the first occurrence
       repeat,          // { every: N, unit: 'day'|'week'|'month'|'year' } | null
       end,             // { type: 'never' } | { type: 'count', n } | { type: 'until', date }
@@ -72,6 +74,19 @@ on the map. A materialised occurrence is a plain `activity` node with a `dayChil
 fields, `schedId` and `schedDate` (the real date, which for a swept occurrence is not the day its
 leaf sits on). Nothing else marks it — priority, comments, day tags, counters, dropped, transfer,
 stats and drag all work on it untouched, because it is not a special kind of node.
+
+The entry carries the **shape** of what was sent, not just its label. `tree` is the subtree below the
+sent node, flattened depth-first, each item keyed by its position (`'0.1'` hangs under `'0'`), so the
+plant needs no id map. `path` is the ancestor labels it hung under — labels rather than ids, because
+the receiving week is a different record. Day children never travel (the date decides the day) and
+neither do legacy counters; tick leaves travel as `tick: true` and get their index and label back on
+arrival. Subtree nodes get derived ids from `occurrenceTreeNodeId`, so idempotence, two-device
+convergence and burial-on-delete all work exactly as they do for the root. Path nodes are keyed on
+branch + label chain instead (`occurrencePathNodeId`), so two entries under the same `Health`
+converge on one scaffold node; scaffolding is shared and is never buried by a delete. Caps:
+`SCHEDULE_TREE_MAX_NODES` 200, `SCHEDULE_TREE_MAX_DEPTH` 6 — over either the send is **refused with a
+toast**, never truncated; `SCHEDULE_PATH_MAX` 6 clips instead, because a dropped far ancestor loses
+no task, it only re-homes the occurrence one level higher.
 
 ### Rendering
 - Full `render()` on structural changes
@@ -159,7 +174,7 @@ stats and drag all work on it untouched, because it is not a special kind of nod
 - **Dropped status**: A third value on the outcome axis (open / done / dropped) — "this will not happen", without erasing the task. On the map: branch colour at ~45% opacity, a corner-to-corner diagonal slash and a ⊘ badge; never Done's grey or horizontal strike-through, never the dashed stroke reserved for keyboard focus. Dropped tasks stay in the stats denominator in their own grey band, never arrive via `Transfer Unfinished`, never show as overdue, and are revived (flag cleared) by `Transfer Reusable` and `Next week`. `ctx-undone` is the shared way back to open from either closed state — there is no separate un-drop menu item
 - **Daily log**: Not a separate panel — the Agenda's `Done` section is the day log: one row per activity completed or tick recorded that day, ordered by `doneAt`, with branch color dots and `n/total` tick pills. The `daily-log-*` class prefix is legacy naming for the shared agenda-row internals built by `buildAgendaItem()`; it is only ever called from the Agenda
 - **Week statistics**: Live in the Stats view (`S`) — donut, per-branch follow-through, effort baseline and the multi-week cumulative flow, all fed by `computeWeekStats()`. `updateSummary()` does not render a drawer; it rebuilds the Help legend's branch items, refreshes the root node's completion ring via `updateCenterRing()`, and re-renders the Stats panel when it is open
-- **Send to the Future**: *Reschedule → Date* (last entry in the reschedule submenu, between the weekdays and *Any*; childless `activity` nodes only, which also excludes ticks and day-leaves) moves a task out of this week into a schedule entry; the week that owns the date materialises it back on open. One undo reverses both halves — snapshots carry `scheduleRaw`, and an operation reports the entries it created via `_noteScheduleAdditions`, read back per id exactly as `nextWeekAdded` is. Missed occurrences sweep onto the current week's Monday leaf, one item per entry however long the absence
+- **Send to the Future**: *Reschedule → Date* (last entry in the reschedule submenu, between the weekdays and *Any*; `activity` nodes only, which excludes ticks and day-leaves) moves a task out of this week into a schedule entry, subtree and ancestor path included; the week that owns the date materialises it back on open. One undo reverses both halves — snapshots carry `scheduleRaw`, and an operation reports the entries it created via `_noteScheduleAdditions`, read back per id exactly as `nextWeekAdded` is. Missed occurrences sweep onto the current week's Monday leaf, one item per entry however long the absence
 - **Later tab**: last in `AGENDA_TAB_ORDER`, reachable with `L`. A month-grouped reference list of upcoming occurrences, **no badge** — which is also why the agenda strip's staleness key needs nothing added for it. Rows use `buildAgendaItem` in entry mode: no Done, drag, swipe or context menu, because there is no node yet for those to act on. A row opens its entry; deleting from it asks *this occurrence* or *the whole series*
 - **Reusable tasks**: Activity nodes can be marked `reusable`; `Transfer Reusable` copies them (with counters reset) to the next week
 - **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive — Zenit Week runs no servers that hold user data (the sole backend is `/api/token`, an OAuth token-exchange function) and never stores user data itself

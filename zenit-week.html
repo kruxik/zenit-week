@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-XTACu6UOwhYVqRYC3z5LCf0b43yn9daftmU5P6wUyQs='
+               'sha256-A7+eDMvTZ4MGcJhkz7UGYdmDpn+RWA8TSTzTwvnUfIA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4283,7 +4283,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSyncLead">Google Drive sync</strong><span data-i18n="help.featureSyncBody"> — your own Drive only (optional)</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureCommentsLead">Comments</strong><span data-i18n="help.featureCommentsBody"> — attach a note to any activity</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureTransfersLead">Reusable &amp; transfers</strong><span data-i18n="help.featureTransfersBody"> — carry unfinished or repeating work into the next week</span></div>
-        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSendFutureLead">Send to date</strong><span data-i18n="help.featureSendFutureBody"> — hand a task without sub-tasks to a future date, once or repeating; it arrives in the week that owns that date</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSendFutureLead">Send to date</strong><span data-i18n="help.featureSendFutureBody"> — hand a task to a future date, once or repeating; it arrives in the week that owns that date, sub-tasks and all</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureQuickAddLead">Quick add</strong><span data-i18n="help.featureQuickAddBody"> — drop a task on a branch without touching the map</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureUndoLead">Undo / Redo</strong><span data-i18n="help.featureUndoBody"> — made a typo? Revert anytime</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureBackupLead">Export / Import</strong><span data-i18n="help.featureBackupBody"> — full backup of every week as one JSON file</span></div>
@@ -5231,6 +5231,20 @@ async function deleteValueIDB(key) {
 const SCHEDULE_STORAGE_KEY = 'schedule';
 const SCHEDULE_PRIORITIES = new Set(['normal', 'high', 'critical']);
 
+// An entry carries the shape of what was sent, not just its label: `tree` is
+// the subtree below the sent node, `path` the ancestors it hung under. Both are
+// capped, because the schedule is one record that is read, merged and pushed to
+// Drive whole, and a repeating entry replants its subtree once per occurrence.
+// Over the cap the send is refused with a message — never truncated, because a
+// silently halved subtree is exactly the lossy variant this feature refuses.
+const SCHEDULE_TREE_MAX_NODES = 200;
+const SCHEDULE_TREE_MAX_DEPTH = 6;
+// The path is a re-homing hint rather than payload: keeping only the nearest
+// six ancestors drops no task, it just re-homes the occurrence one level higher
+// than it stood. So this one clips instead of refusing.
+const SCHEDULE_PATH_MAX = 6;
+const TREE_KEY_RE = /^\d+(?:\.\d+)*$/;
+
 let scheduleData = emptySchedule(); // in-memory schedule record
 // Set whenever a pass mutates an entry's cursor fields. Materialisation can
 // advance the schedule without planting a single node — a sweep that finds
@@ -5298,6 +5312,8 @@ function validateAndRepairSchedule(raw, branchIds) {
       label: scheduleEntryLabel(e.label),
       branch: repairScheduleBranch(e.branch, branches),
       priority: SCHEDULE_PRIORITIES.has(e.priority) ? e.priority : 'normal',
+      path: repairSchedulePath(e.path),
+      tree: repairScheduleTree(e.tree),
       anchor: e.anchor,
       repeat: repairScheduleRepeat(e.repeat),
       end: repairScheduleEnd(e.end),
@@ -5305,6 +5321,46 @@ function validateAndRepairSchedule(raw, branchIds) {
       planted: repairPlantedList(e.planted),
       _ts: Number.isFinite(e._ts) ? e._ts : 0,
     });
+  });
+  return out;
+}
+
+// Ancestor labels only, trimmed, clipped to the nearest few. A path that
+// arrives malformed costs the occurrence its position, never its existence —
+// an empty path plants under the branch, exactly as entries did before there
+// was a path at all.
+function repairSchedulePath(path) {
+  if (!Array.isArray(path)) return [];
+  return path
+    .filter(l => typeof l === 'string' && l.trim())
+    .map(l => l.trim().slice(0, 200))
+    .slice(-SCHEDULE_PATH_MAX);
+}
+
+// The subtree, checked the way the plant will read it: a position key it can
+// parse, a parent already present, and both caps enforced. A node whose parent
+// did not survive is dropped with it — a re-parented orphan would silently
+// change the shape the user sent, which is the one thing this must not do.
+function repairScheduleTree(tree) {
+  if (!Array.isArray(tree)) return [];
+  const out = [];
+  const keys = new Set(['']);
+  tree.forEach(item => {
+    if (out.length >= SCHEDULE_TREE_MAX_NODES) return;
+    if (!item || typeof item !== 'object') return;
+    if (typeof item.key !== 'string' || !TREE_KEY_RE.test(item.key)) return;
+    if (keys.has(item.key)) return;
+    const depth = item.key.split('.').length;
+    if (depth > SCHEDULE_TREE_MAX_DEPTH) return;
+    const cut = item.key.lastIndexOf('.');
+    if (!keys.has(cut === -1 ? '' : item.key.slice(0, cut))) return;
+
+    const node = { key: item.key, label: typeof item.label === 'string' ? item.label.slice(0, 200) : '' };
+    if (SCHEDULE_PRIORITIES.has(item.priority) && item.priority !== 'normal') node.priority = item.priority;
+    if (item.tick === true) { node.tick = true; node.label = ''; }
+    if (!node.label && !node.tick) return; // nothing left to plant
+    keys.add(item.key);
+    out.push(node);
   });
   return out;
 }
@@ -9836,7 +9892,7 @@ const TRANSLATIONS = {
     'agenda.later':               'Later',
     'help.laterTab':              'Later (upcoming dates)',
     'help.featureSendFutureLead': 'Send to date',
-    'help.featureSendFutureBody': ' — hand a task without sub-tasks to a future date, once or repeating; it arrives in the week that owns that date',
+    'help.featureSendFutureBody': ' — hand a task to a future date, once or repeating; it arrives in the week that owns that date, sub-tasks and all',
     'help.sendToDateHint':        'Right-click a task with no sub-tasks → Reschedule → Date.',
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
     'sendFuture.title':           'Set a date',
@@ -9854,6 +9910,7 @@ const TRANSLATIONS = {
     'sendFuture.ok':              'Set',
     'toast.sentToFuture':         'Set for {date}',
     'toast.pastDate':             'Pick today or later — the schedule only delivers forward',
+    'toast.subtreeTooBig':        'Too big to send — a dated task carries at most 200 sub-tasks, 6 levels deep',
     'sendFuture.pickDate':        'Pick today or later',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
@@ -10186,7 +10243,7 @@ const TRANSLATIONS = {
     'agenda.later':               'Později',
     'help.laterTab':              'Později (nadcházející data)',
     'help.featureSendFutureLead': 'Odeslat na datum',
-    'help.featureSendFutureBody': ' — pošli úkol bez podúkolů na budoucí datum, jednorázově nebo opakovaně; objeví se v týdnu, do kterého datum patří',
+    'help.featureSendFutureBody': ' — pošli úkol na budoucí datum, jednorázově nebo opakovaně; objeví se v týdnu, do kterého datum patří, i s podúkoly',
     'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů → Přeplánovat → Datum.',
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
     'sendFuture.title':           'Nastavit datum',
@@ -10204,6 +10261,7 @@ const TRANSLATIONS = {
     'sendFuture.ok':              'Nastavit',
     'toast.sentToFuture':         'Nastaveno na {date}',
     'toast.pastDate':             'Vyber dnešek nebo pozdější den — plán doručuje jen dopředu',
+    'toast.subtreeTooBig':        'Příliš velké — úkol s datem unese nejvýš 200 podúkolů a 6 úrovní',
     'sendFuture.pickDate':        'Vyber dnešek nebo pozdější den',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
@@ -11330,6 +11388,37 @@ function occurrenceDayNodeId(schedId, schedDate) {
   return occurrenceNodeId(schedId, schedDate + ':day');
 }
 
+// One id per subtree node, salted by the node's position key. Same derivation,
+// same guarantees: two devices planting the same occurrence build the same
+// subtree, and deleting the occurrence can bury it without recording a list.
+function occurrenceTreeNodeId(schedId, schedDate, key) {
+  return occurrenceNodeId(schedId, schedDate + ':t' + key);
+}
+
+// Path scaffolding is shared, so its id is derived from the branch and the
+// label chain and NOT from the entry: two entries filed under the same
+// "Health" converge on one node instead of building a column of duplicates.
+function occurrencePathNodeId(branch, labels) {
+  return occurrenceNodeId('zw-path:' + branch, labels.join('\n'));
+}
+
+// Every id an occurrence of `entry` on `date` can own. deleteOccurrence buries
+// this list; path scaffolding is deliberately absent, because it is shared with
+// other entries and with whatever the user has since put under it.
+function occurrenceNodeIds(entry, date) {
+  const ids = [occurrenceNodeId(entry.id, date), occurrenceDayNodeId(entry.id, date)];
+  (Array.isArray(entry.tree) ? entry.tree : []).forEach(item => {
+    if (item && typeof item.key === 'string') ids.push(occurrenceTreeNodeId(entry.id, date, item.key));
+  });
+  return ids;
+}
+
+// Case- and space-insensitive label match, the rule by which a path step finds
+// the user's own node rather than making a second one beside it.
+function foldLabel(label) {
+  return String(label || '').trim().toLowerCase();
+}
+
 // Plants every occurrence the schedule owes this week into `data`, in place.
 // Returns whether anything was planted, so the caller can skip the write when
 // there is nothing to save — a week with no due occurrences must come out of
@@ -11358,9 +11447,10 @@ function plantOccurrence(ctx, entry, date, dayIndex) {
   const branchNode = ctx.byId.get(branch);
   const stamp = Date.now();
   const priority = entry.priority && entry.priority !== 'normal' ? entry.priority : null;
+  const host = resolvePathParent(ctx, branchNode, entry.path, stamp);
 
   const node = {
-    id, type: 'activity', branch, parent: branch,
+    id, type: 'activity', branch, parent: host.id,
     label: entry.label, done: false, unplanned: false,
     priority, reusable: false,
     children: [dayId],
@@ -11378,9 +11468,94 @@ function plantOccurrence(ctx, entry, date, dayIndex) {
   ctx.data.nodes.push(node, dayNode);
   ctx.byId.set(id, node);
   ctx.byId.set(dayId, dayNode);
-  branchNode.children = Array.isArray(branchNode.children) ? branchNode.children : [];
-  branchNode.children.push(id);
+  host.children = Array.isArray(host.children) ? host.children : [];
+  host.children.push(id);
+  plantSubtree(ctx, entry, date, node, priority, stamp);
   return true;
+}
+
+// Walks the entry's ancestor labels down from the branch, reusing the user's
+// own node whenever one matches by label and creating a derived one when none
+// does. A step the user has buried stops the walk: they deleted that scaffold,
+// so the occurrence lands where the scaffolding still stands rather than
+// resurrecting it. Returns the node the occurrence should hang under.
+function resolvePathParent(ctx, branchNode, path, stamp) {
+  let parent = branchNode;
+  const labels = [];
+  (Array.isArray(path) ? path : []).forEach(raw => {
+    const label = String(raw || '').trim();
+    if (!label || labels.length >= SCHEDULE_PATH_MAX) return;
+    labels.push(label);
+    const fold = foldLabel(label);
+    const existing = (parent.children || [])
+      .map(cid => ctx.byId.get(cid))
+      .find(n => n && n.type === 'activity' && !n.dayChild && !n.tickChild && foldLabel(n.label) === fold);
+    if (existing) { parent = existing; return; }
+
+    const pathId = occurrencePathNodeId(branchNode.id, labels);
+    if (ctx.tombstoned.has(pathId)) { labels.length = SCHEDULE_PATH_MAX; return; }
+    const known = ctx.byId.get(pathId);
+    if (known) { parent = known; return; }
+
+    const node = {
+      id: pathId, type: 'activity', branch: branchNode.id, parent: parent.id,
+      label, done: false, unplanned: false,
+      priority: null, reusable: false,
+      children: [], _ts: stamp,
+    };
+    ctx.data.nodes.push(node);
+    ctx.byId.set(pathId, node);
+    parent.children = Array.isArray(parent.children) ? parent.children : [];
+    parent.children.push(pathId);
+    parent = node;
+  });
+  return parent;
+}
+
+// Rebuilds the subtree the entry carries under the freshly planted occurrence.
+// Position keys give both the parent ('0.1' hangs under '0') and the order, so
+// nothing here depends on the array being walked in any particular sequence
+// beyond parents preceding their children, which capture guarantees.
+//
+// A tick leaf and the day leaf sitting under the same node is the mixed state
+// the agenda already handles; the "day wins" purge belongs to the rename path
+// and fires there, when the user is actually editing that label.
+function plantSubtree(ctx, entry, date, root, rootPriority, stamp) {
+  const items = Array.isArray(entry.tree) ? entry.tree : [];
+  if (!items.length) return;
+  const byKey = new Map([['', root]]);
+  const tickCounts = new Map();
+
+  items.forEach(item => {
+    if (!item || typeof item.key !== 'string') return;
+    const cut = item.key.lastIndexOf('.');
+    const parent = byKey.get(cut === -1 ? '' : item.key.slice(0, cut));
+    if (!parent) return;
+    const id = occurrenceTreeNodeId(entry.id, date, item.key);
+    if (ctx.byId.has(id) || ctx.tombstoned.has(id)) return;
+
+    const priority = item.priority && item.priority !== 'normal'
+      ? item.priority
+      : (parent === root ? rootPriority : (parent.priority || null));
+    const node = {
+      id, type: 'activity', branch: root.branch, parent: parent.id,
+      label: item.label, done: false, unplanned: false,
+      priority, reusable: false,
+      children: [], _ts: stamp,
+    };
+    if (item.tick) {
+      const index = (tickCounts.get(parent.id) || 0) + 1;
+      tickCounts.set(parent.id, index);
+      node.tickChild = true;
+      node.tickIndex = index;
+      node.label = String(index);
+    }
+    ctx.data.nodes.push(node);
+    ctx.byId.set(id, node);
+    parent.children = Array.isArray(parent.children) ? parent.children : [];
+    parent.children.push(id);
+    byKey.set(item.key, node);
+  });
 }
 
 // Shared preamble for both passes: the week's own branches, the ids it already
@@ -16958,8 +17133,12 @@ function attachNodeListeners() {
 // into an ordinary node when it is opened. This is deliberately not a copy —
 // a stub left behind would be a task the user has to close twice.
 //
-// Only a childless activity can be sent: one entry is one activity, and there
-// is no partial or lossy variant that would silently drop a subtree.
+// An activity is sent whole: its subtree travels with it as `tree`, and the
+// ancestors it hung under as `path`, so the occurrence comes back in the shape
+// it left in. Only the mechanical leaves the week owns are refused a seat —
+// day children (the entry's date decides the day) and legacy counters. What
+// cannot travel intact is refused outright: there is still no partial or lossy
+// variant that would silently drop half a subtree.
 // A schedule entry is dated, so a weekday tag in its label has nothing left to
 // say — the date decides the day, and the occurrence gets its own day leaf when
 // it is planted. Strip the day groups on the way in, and keep the raw text when
@@ -16972,8 +17151,60 @@ function scheduleEntryLabel(raw) {
 
 function canSendToDate(node) {
   if (!node || node.type !== 'activity') return false;
-  if (node.dayChild || node.tickChild || node.inbox) return false;
-  return !(node.children || []).length;
+  return !(node.dayChild || node.tickChild || node.inbox);
+}
+
+// The subtree an entry will carry, flattened depth-first. `key` is the node's
+// position ('0', '0.1'), which encodes both its parent and its order, so the
+// planting side needs no id mapping of its own. Day children are dropped — the
+// entry's date decides the day — and legacy counters with them; tick leaves
+// travel as a flag, their index and label being derived on arrival.
+//
+// Returns null when the subtree is over cap, which is the caller's cue to
+// refuse the send rather than send a smaller version of it.
+function captureSendTree(node) {
+  const tree = [];
+  let over = false;
+
+  function walk(parent, prefix, depth) {
+    if (depth > SCHEDULE_TREE_MAX_DEPTH) { over = true; return; }
+    let index = 0;
+    (parent.children || []).forEach(cid => {
+      const child = findNode(cid);
+      if (!child || child.type === 'counter' || child.dayChild) return;
+      if (tree.length >= SCHEDULE_TREE_MAX_NODES) { over = true; return; }
+      const key = prefix === '' ? String(index) : prefix + '.' + index;
+      index++;
+      const item = { key, label: child.tickChild ? '' : String(child.label || '') };
+      if (child.priority && child.priority !== 'normal') item.priority = child.priority;
+      if (child.tickChild) item.tick = true;
+      tree.push(item);
+      if (!child.tickChild) walk(child, key, depth + 1);
+    });
+  }
+
+  walk(node, '', 1);
+  return over ? null : tree;
+}
+
+// The ancestors between the branch and the node, outermost first. Labels rather
+// than ids: the week the occurrence lands in is a different record with
+// different ids, and it may not have these nodes at all yet.
+function captureSendPath(node) {
+  const path = [];
+  let cur = findNode(node.parent);
+  while (cur && cur.type === 'activity') {
+    path.unshift(String(cur.label || '').trim());
+    cur = findNode(cur.parent);
+  }
+  return path.filter(Boolean).slice(-SCHEDULE_PATH_MAX);
+}
+
+// Whether the send would be refused for size. Asked by the dialog's opener so
+// the refusal arrives when the user picks the menu item, not after they have
+// filled in a date.
+function sendSubtreeOverCap(node) {
+  return canSendToDate(node) && captureSendTree(node) === null;
 }
 
 // The node's own state becomes the entry's: label, branch and priority travel,
@@ -16989,6 +17220,12 @@ function sendNodeToDate(nodeId, options) {
   // sets `min` too — this is the guard for every other caller.
   if (anchor < localDateStr()) return null;
 
+  // Over cap the whole send is refused — see SCHEDULE_TREE_MAX_NODES. The
+  // dialog checks the same rule before it opens, so this is the guard for
+  // every other caller.
+  const tree = captureSendTree(node);
+  if (tree === null) return null;
+
   const unit = SCHEDULE_UNITS.includes(options.unit) ? options.unit : null;
   const every = Math.max(1, Math.floor(Number(options.every)) || 1);
   const entry = {
@@ -16996,6 +17233,8 @@ function sendNodeToDate(nodeId, options) {
     label: scheduleEntryLabel(node.label),
     branch: node.branch || '',
     priority: node.priority || 'normal',
+    path: captureSendPath(node),
+    tree,
     anchor,
     repeat: unit ? { every, unit } : null,
     end: { type: 'never' },
@@ -17044,7 +17283,7 @@ async function deleteOccurrence(entryId, date) {
   if (!entry || !parseDayString(date)) return false;
   const wk = weekKeyForDayString(date);
   if (!wk) return false;
-  const ids = [occurrenceNodeId(entryId, date), occurrenceDayNodeId(entryId, date)];
+  const ids = occurrenceNodeIds(entry, date);
 
   await withWeekLock(wk, async () => {
     const data = wk === currentWeekKey ? weekData : await loadWeek(wk);
@@ -17232,6 +17471,9 @@ function updateScheduleEntry(entryId, options) {
     const nodeId = target;
     const node = findNode(nodeId);
     if (!canSendToDate(node)) return;
+    // Refused for size before the dialog opens, so the user is never asked for
+    // a date the send is going to turn down.
+    if (sendSubtreeOverCap(node)) { showToast(t('toast.subtreeTooBig')); return; }
     _targetId = nodeId;
     _entryId = null;
     // A week out is the default because that is the shortest horizon this
@@ -17924,8 +18166,8 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     }
 
     // A date is the same choice as a weekday, one horizon further out: this
-    // week's Monday, or the 31st of March. Only a childless activity can be
-    // sent, which also excludes ticks and day-leaves without a second check.
+    // week's Monday, or the 31st of March. The node's subtree travels with it,
+    // so only the mechanical leaves — ticks and day-children — are excluded.
     if (canSendToDate(findNode(targetId))) {
       const dateSep = document.createElement('div');
       dateSep.className = 'ctx-separator';
