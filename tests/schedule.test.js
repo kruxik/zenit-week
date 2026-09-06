@@ -30,6 +30,8 @@ import {
   loadWeek,
   sendSubtreeOverCap,
   getLaterOccurrences,
+  primeLaterBuried,
+  laterFloorDate,
   formatDayLabel,
   laterMonthKey,
   laterMonthLabel,
@@ -1378,6 +1380,49 @@ describe('Later tab', () => {
     expect(laterRowNode(entry({ priority: 'critical' }), '2026-09-14').priority).toBe('critical');
     expect(laterRowNode(entry(), '2026-09-14').priority).toBeNull();
   });
+
+  it('starts on the Monday after the week today falls in', () => {
+    _state.setTodayWeekKey('2026-36');
+    try {
+      expect(laterFloorDate()).toBe('2026-09-07');
+    } finally {
+      _state.clearTodayWeekKeyOverride();
+    }
+  });
+
+  it('anchors on today, not on the week being viewed', () => {
+    _state.setTodayWeekKey('2026-36');
+    const before = laterFloorDate();
+    _state.setWeekKey('2026-40');
+    try {
+      expect(laterFloorDate()).toBe(before);
+    } finally {
+      _state.setWeekKey('2026-01');
+      _state.clearTodayWeekKeyOverride();
+    }
+  });
+
+  it('keeps listing an occurrence whose week has already been opened', async () => {
+    seed(entry({ anchor: '2026-09-14' }));
+    const week = { nodes: [{ id: 'work', type: 'branch', branch: 'work', label: 'Work', children: [] }] };
+    // Opening week 38 plants the occurrence; the entry still owes that date, so
+    // Later must go on showing it rather than treating delivery as removal.
+    expect(materialiseWeek('2026-38', week)).toBe(true);
+    await primeLaterBuried(['2026-38']);
+    expect(getLaterOccurrences('2026-09-07').map(r => r.date)).toEqual(['2026-09-14']);
+  });
+
+  it('drops an occurrence its week has buried', async () => {
+    seed(entry({ anchor: '2026-09-14', repeat: { every: 1, unit: 'week' } }));
+    saveWeek('2026-38', {
+      nodes: [],
+      tombstones: [occurrenceNodeId('s1', '2026-09-14')],
+    });
+    await primeLaterBuried(['2026-38']);
+    const dates = getLaterOccurrences('2026-09-07').map(r => r.date);
+    expect(dates).not.toContain('2026-09-14');
+    expect(dates[0]).toBe('2026-09-21');
+  });
 });
 
 describe('Editing an entry from the Later tab', () => {
@@ -1956,7 +2001,7 @@ describe('Pulling an occurrence into the current week', () => {
     expect(occurrences(owning)).toEqual([]);
   });
 
-  it('records it as delivered, so the sweep and the Later tab drop it', async () => {
+  it('records it as delivered, and the tombstone drops it from the Later tab', async () => {
     const e = entry();
     _state.setSchedule({ entries: [e], tombstones: [], crdtVersion: 0 });
     expect(getLaterOccurrences('2026-05-11').map(r => r.date)).toEqual([FUTURE]);
@@ -1964,6 +2009,10 @@ describe('Pulling an occurrence into the current week', () => {
     await pullOccurrenceIntoWeek('s1', FUTURE, 1);
 
     expect(e.planted).toContain(FUTURE);
+    // Later reads the owning week's tombstones, which is an async load; a
+    // render that beats it lists the row and re-renders once the answer is in.
+    await primeLaterBuried([weekKeyForDayString(FUTURE)]);
+    console.log('DBG tomb', [...(await _state.sandbox.loadWeekTombstones('2026-22'))], 'rows', JSON.stringify(getLaterOccurrences('2026-05-11').map(r=>r.date)));
     expect(getLaterOccurrences('2026-05-11')).toEqual([]);
   });
 

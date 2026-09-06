@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-r0Qta2zFP8UOYQIDo0kbVSnd0V3IEilm5Bjkj2YpyqU='
+               'sha256-stsCO/9GjQrGVudoicOeTxwpLscGodcuwA6aM/TMisc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5124,12 +5124,17 @@ async function loadWeekIDB(wk) {
 
 async function saveWeekIDB(wk, data) {
   const db = await openDB();
+  // Later filters on this week's tombstones, so its cached copy is now wrong.
+  // Twice: now, so a read already in flight is discarded, and again on commit,
+  // so a read that raced the write does not leave the pre-write answer sitting
+  // in the cache as the current one.
+  invalidateLaterBuried(wk);
   return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction('weeks', 'readwrite');
       const store = tx.objectStore('weeks');
       store.put({ weekKey: wk, data });
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { invalidateLaterBuried(wk); resolve(); };
       tx.onerror = (e) => {
         const error = e.target.error;
         if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
@@ -18771,7 +18776,83 @@ const AGENDA_TAB_ORDER = ['overdue', ...AGENDA_DAY_ORDER, 'later'];
 const LATER_HORIZON_MONTHS = 12;
 const LATER_ROWS_PER_ENTRY = 12;
 
-function getLaterOccurrences(fromDate = localDateStr()) {
+// Where the list starts: the Monday after the week today falls in. Anything
+// inside the current week already has a day tab of its own, and anything before
+// it is not "later" at all. Deliberately anchored on today rather than on the
+// week being viewed, so browsing to week 40 does not silently redefine what
+// "upcoming" means and empty the tab.
+function laterFloorDate() {
+  const week = weekDayStrings(offsetWeek(todayWeekKey(), 1));
+  return week ? week[0] : localDateStr();
+}
+
+// Tombstones of the weeks Later is looking into, keyed by week key. Reading a
+// week record is async and this list is built during a synchronous render, so
+// the cache is what makes the check possible at all: a week that is not in it
+// yet contributes its rows unfiltered, is loaded in the background, and Later
+// re-renders once the answer is in. Dropped whenever that week is written.
+const _laterBuried = new Map();
+const _laterBuriedLoading = new Map();
+// Bumped whenever a week is written. A load that started before the write is
+// answering a question about a record that no longer exists, so it must not
+// put its stale answer in the cache — pullOccurrenceIntoWeek buries an
+// occurrence while exactly such a load is in flight.
+const _laterBuriedGen = new Map();
+
+function invalidateLaterBuried(wk) {
+  _laterBuried.delete(wk);
+  _laterBuriedGen.set(wk, (_laterBuriedGen.get(wk) || 0) + 1);
+}
+
+// Only the tombstone list, so this stays far cheaper than loadWeek() — which
+// would repair, migrate, and for an untouched week go hunting for a branch
+// model to inherit from.
+async function loadWeekTombstones(wk) {
+  let data = null;
+  try {
+    data = await loadWeekIDB(wk);
+  } catch (e) { /* fall through to localStorage */ }
+  if (!data) {
+    const raw = localStorage.getItem(storageKey(wk));
+    if (raw) {
+      try { data = JSON.parse(raw); } catch (e) { /* unreadable — treat as empty */ }
+    }
+  }
+  return new Set(data && Array.isArray(data.tombstones) ? data.tombstones : []);
+}
+
+// One load per week at a time; concurrent askers share it. A load whose week
+// was written while it was in flight answers about a record that is gone, so it
+// is thrown away and the week is read again rather than cached stale.
+function laterBuriedFor(wk) {
+  const pending = _laterBuriedLoading.get(wk);
+  if (pending) return pending;
+  const gen = _laterBuriedGen.get(wk) || 0;
+  const load = loadWeekTombstones(wk).then(buried => {
+    _laterBuriedLoading.delete(wk);
+    if ((_laterBuriedGen.get(wk) || 0) !== gen) return laterBuriedFor(wk);
+    _laterBuried.set(wk, buried);
+    return buried;
+  });
+  _laterBuriedLoading.set(wk, load);
+  return load;
+}
+
+async function primeLaterBuried(keys) {
+  const todo = [...keys].filter(wk => !_laterBuried.has(wk));
+  if (!todo.length) return;
+  const sets = await Promise.all(todo.map(laterBuriedFor));
+  // Only a week that actually buried something can change the list, so a run
+  // that found nothing must not kick off a render — and with it another prime.
+  if (sets.some(b => b.size) && currentView === 'agenda' && agendaActiveTab === 'later') renderAgenda();
+}
+
+// Every occurrence the schedule still owes from next week on, whether or not
+// its week has already been opened. Materialising an occurrence does not remove
+// it from the schedule, so it does not remove it from here either: Later is the
+// one place the standing intentions are listed, and a task appearing both here
+// and on the map is the same task seen from its two ends.
+function getLaterOccurrences(fromDate = laterFloorDate()) {
   const from = parseDayString(fromDate);
   if (!from || !scheduleData || !Array.isArray(scheduleData.entries)) return [];
   const months = from.y * 12 + (from.m - 1) + LATER_HORIZON_MONTHS;
@@ -18780,16 +18861,25 @@ function getLaterOccurrences(fromDate = localDateStr()) {
   const to = formatDayString(ty, tm, Math.min(from.d, daysInMonth(ty, tm)));
 
   const rows = [];
+  const unknown = new Set();
   scheduleData.entries.forEach(entry => {
-    // An occurrence the entry records as planted has already been delivered —
-    // pulled into this week, or met by browsing ahead. It is a task somewhere
-    // now, so listing it as still upcoming would be listing it twice.
-    const delivered = new Set(Array.isArray(entry.planted) ? entry.planted : []);
-    occurrencesInRange(entry, fromDate, to)
-      .filter(date => !delivered.has(date))
-      .slice(0, LATER_ROWS_PER_ENTRY)
-      .forEach(date => rows.push({ entry, date }));
+    let taken = 0;
+    for (const date of occurrencesInRange(entry, fromDate, to)) {
+      if (taken >= LATER_ROWS_PER_ENTRY) break;
+      // An occurrence its week has buried was deleted there on purpose; that
+      // week will never plant it again, so neither may this list offer it.
+      const wk = weekKeyForDayString(date);
+      const buried = wk ? _laterBuried.get(wk) : null;
+      if (buried) {
+        if (buried.has(occurrenceNodeId(entry.id, date))) continue;
+      } else if (wk) {
+        unknown.add(wk);
+      }
+      rows.push({ entry, date });
+      taken++;
+    }
   });
+  if (unknown.size) primeLaterBuried(unknown);
   rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return rows;
 }

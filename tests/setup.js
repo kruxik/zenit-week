@@ -320,6 +320,9 @@ function updateIDBMethods() {
       data.crdtVersion = (data.crdtVersion || 0) + 1;
       if (!Array.isArray(data.tombstones)) data.tombstones = [];
       localStorage.setItem('zenit-week-' + wk, JSON.stringify(data));
+      // The real saveWeekIDB drops the Later tab's cached tombstone view for
+      // this week; this stub bypasses it, so do the same here.
+      invalidateLaterBuried(wk);
     };
   } else {
     openDB = _realOpenDB;
@@ -630,6 +633,8 @@ export const {
   deleteScheduleSeries,
   // Later tab
   getLaterOccurrences,
+  primeLaterBuried,
+  laterFloorDate,
   formatDayLabel,
   laterMonthKey,
   laterMonthLabel,
