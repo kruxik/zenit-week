@@ -26,6 +26,8 @@ import {
   weekKeyForDayString,
   deleteOccurrence,
   deleteScheduleSeries,
+  isSeriesEntry,
+  confirmDeleteOccurrence,
   deleteNode,
   loadWeek,
   sendSubtreeOverCap,
@@ -1637,7 +1639,7 @@ describe('Delete semantics', () => {
   }
 
   it('deleting an occurrence node asks this one or the series', async () => {
-    _state.setSchedule({ entries: [entry({ repeat: null })], tombstones: [], crdtVersion: 0 });
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
     const data = week();
     materialiseWeek(WK, data);
     _state.set(data);
@@ -1664,6 +1666,45 @@ describe('Delete semantics', () => {
     expect(_state.getSchedule().entries).toHaveLength(0);
     expect(_state.get().nodes.find(n => n.schedId === 's1')).toBeUndefined();
     expect(_state.get().tombstones).toContain(id);
+  });
+
+  it('knows a one-off from a series, however the repeat ends', () => {
+    expect(isSeriesEntry(entry())).toBe(true);
+    expect(isSeriesEntry(entry({ repeat: null }))).toBe(false);
+    expect(isSeriesEntry(entry({ end: { type: 'count', n: 1 } }))).toBe(false);
+    expect(isSeriesEntry(entry({ end: { type: 'count', n: 2 } }))).toBe(true);
+    expect(isSeriesEntry(entry({ end: { type: 'until', date: DATE } }))).toBe(false);
+    expect(isSeriesEntry(entry({ end: { type: 'until', date: '2026-05-20' } }))).toBe(true);
+  });
+
+  // Nothing to choose between: the one occurrence and the whole series are the
+  // same task, so the delete just happens.
+  it('deletes a one-off occurrence from the map without asking', async () => {
+    _state.setSchedule({ entries: [entry({ repeat: null })], tombstones: [], crdtVersion: 0 });
+    const data = week();
+    materialiseWeek(WK, data);
+    _state.set(data);
+
+    const id = _state.get().nodes.find(n => n.schedId === 's1').id;
+    const real = sandboxGlobal.showAppConfirm;
+    let asked = false;
+    sandboxGlobal.showAppConfirm = () => { asked = true; };
+    try { await deleteNode(id); } finally { sandboxGlobal.showAppConfirm = real; }
+
+    expect(asked).toBe(false);
+    expect(_state.getSchedule().entries).toHaveLength(0);
+    expect(_state.get().nodes.find(n => n.schedId === 's1')).toBeUndefined();
+  });
+
+  it('deletes a one-off from a Later row without asking', async () => {
+    _state.setSchedule({ entries: [entry({ repeat: null })], tombstones: [], crdtVersion: 0 });
+    const real = sandboxGlobal.showAppConfirm;
+    let asked = false;
+    sandboxGlobal.showAppConfirm = () => { asked = true; };
+    try { await confirmDeleteOccurrence('s1', DATE); } finally { sandboxGlobal.showAppConfirm = real; }
+
+    expect(asked).toBe(false);
+    expect(_state.getSchedule().entries).toHaveLength(0);
   });
 
   it('deletes an ordinary node without asking', () => {

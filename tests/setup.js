@@ -631,6 +631,8 @@ export const {
   weekKeyForDayString,
   deleteOccurrence,
   deleteScheduleSeries,
+  isSeriesEntry,
+  confirmDeleteOccurrence,
   // Later tab
   getLaterOccurrences,
   primeLaterBuried,

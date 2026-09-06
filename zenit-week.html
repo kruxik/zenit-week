@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ajqmpFUb+cXEKhW1MO2bzFKlkrbTS74rIlqvgiurM50='
+               'sha256-TqKgETafDH2bFd6ggEO8fznKMA87UoMDXfFs8U/02fo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -12357,7 +12357,7 @@ function deleteNode(id) {
   const entry = node.schedId && node.schedDate && Array.isArray(scheduleData?.entries)
     ? scheduleData.entries.find(e => e.id === node.schedId)
     : null;
-  if (entry) { confirmDeleteOccurrence(entry.id, node.schedDate, id); return; }
+  if (entry) return confirmDeleteOccurrence(entry.id, node.schedDate, id);
   _performDelete(id);
 }
 
@@ -17470,6 +17470,27 @@ async function pullOccurrenceIntoWeek(entryId, date, dayIndex) {
   return true;
 }
 
+// Whether the entry can ever produce a second occurrence. Asked before the
+// delete dialog, because for a one-off "this occurrence" and "the whole series"
+// are the same act, and a question with one answer is not a question. Read from
+// the calendar rather than from `repeat` alone, so a repeat that ends after its
+// first occurrence — `count: 1`, or an `until` before the second step — counts
+// as the one-off it is.
+function isSeriesEntry(entry) {
+  const anchor = entry && parseDayString(entry.anchor);
+  if (!anchor) return false;
+  return nextOccurrence(entry, dayStringFromNumber(dayNumber(anchor) + 1)) !== null;
+}
+
+// Retire the entry and take the node in front of the user with it. The node is
+// usually one of the occurrences deleteScheduleSeries already cleared; it is
+// still deleted explicitly for the case it is not, a week behind the floor that
+// call keeps off. `snapshot: false` so both halves stay one undo step.
+async function deleteEntryWithNode(entryId, nodeId) {
+  await deleteScheduleSeries(entryId);
+  if (nodeId && findNode(nodeId)) _performDelete(nodeId, { snapshot: false });
+}
+
 // The question a calendar asks: this one, or the series? Asked from both ends of
 // the same task — a Later row, which has no node yet, and an occurrence node on
 // the map or in the agenda, which passes `nodeId` so the copy in front of the
@@ -17479,12 +17500,13 @@ function confirmDeleteOccurrence(entryId, date, nodeId = null) {
   const entry = scheduleData.entries.find(e => e.id === entryId);
   if (!entry) return;
   const done = () => { if (currentView === 'agenda') renderAgenda(); };
+  if (!isSeriesEntry(entry)) return deleteEntryWithNode(entryId, nodeId).then(done);
   showAppConfirm({
     title:           t('confirm.deleteEntryTitle'),
     body:            t('confirm.deleteEntryBody'),
     okLabel:         t('confirm.deleteEntrySeries'),
     danger:          true,
-    onConfirm:       async () => { await deleteScheduleSeries(entryId); done(); },
+    onConfirm:       async () => { await deleteEntryWithNode(entryId, nodeId); done(); },
     secondaryLabel:  t('confirm.deleteEntryOccurrence'),
     onSecondary:     async () => {
       // Both halves. The node is deleted where it stands, because a swept or
