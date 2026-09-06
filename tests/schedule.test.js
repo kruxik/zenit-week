@@ -52,6 +52,7 @@ import {
   loadValueIDB,
   saveValueIDB,
   _state,
+  sandboxGlobal,
 } from './setup.js';
 
 // Both schedule writers refuse a date already past, so every test that calls
@@ -1623,20 +1624,55 @@ describe('Delete semantics', () => {
     expect(weekKeyForDayString('nope')).toBeNull();
   });
 
-  it('deleting an occurrence node in its week is an ordinary delete', () => {
+  // Deleting an occurrence is the one delete that asks, because "this one" and
+  // "the series" are both ordinary readings of the gesture — the same question
+  // the Later tab asks from the other end of the task.
+  function answerDeleteDialog(run, answer) {
+    const real = sandboxGlobal.showAppConfirm;
+    let opts = null;
+    sandboxGlobal.showAppConfirm = o => { opts = o; };
+    try { run(); } finally { sandboxGlobal.showAppConfirm = real; }
+    expect(opts).not.toBeNull();
+    return opts[answer]();
+  }
+
+  it('deleting an occurrence node asks this one or the series', async () => {
     _state.setSchedule({ entries: [entry({ repeat: null })], tombstones: [], crdtVersion: 0 });
     const data = week();
     materialiseWeek(WK, data);
     _state.set(data);
 
     const id = _state.get().nodes.find(n => n.schedId === 's1').id;
-    deleteNode(id);
+    await answerDeleteDialog(() => deleteNode(id), 'onSecondary');
 
     expect(_state.get().nodes.find(n => n.schedId === 's1')).toBeUndefined();
     expect(_state.get().tombstones).toContain(id);
     // The series is untouched, and the week never re-plants it.
     expect(_state.getSchedule().entries).toHaveLength(1);
     expect(materialiseWeek(WK, _state.get())).toBe(false);
+  });
+
+  it('answering the series from the map takes the node with it', async () => {
+    _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
+    const data = week();
+    materialiseWeek(WK, data);
+    _state.set(data);
+
+    const id = _state.get().nodes.find(n => n.schedId === 's1').id;
+    await answerDeleteDialog(() => deleteNode(id), 'onConfirm');
+
+    expect(_state.getSchedule().entries).toHaveLength(0);
+    expect(_state.get().nodes.find(n => n.schedId === 's1')).toBeUndefined();
+    expect(_state.get().tombstones).toContain(id);
+  });
+
+  it('deletes an ordinary node without asking', () => {
+    _state.set(week());
+    const real = sandboxGlobal.showAppConfirm;
+    let asked = false;
+    sandboxGlobal.showAppConfirm = () => { asked = true; };
+    try { deleteNode('work'); } finally { sandboxGlobal.showAppConfirm = real; }
+    expect(asked).toBe(false);
   });
 
   it('deleting one occurrence buries it in the week that owns it', async () => {
@@ -1685,17 +1721,23 @@ describe('Delete semantics', () => {
     expect(await deleteScheduleSeries('s1')).toBe(false);
   });
 
-  it('leaves already-materialised nodes exactly where they are', async () => {
+  it('clears occurrences from this week forward and leaves past weeks alone', async () => {
     _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
-    const data = week();
-    materialiseWeek(WK, data);
-    _state.set(data);
-    const before = JSON.stringify(_state.get());
+    const past = week();
+    materialiseWeek(WK, past);              // 2026-20, behind the new "today"
+    saveWeek(WK, past);
+    const ahead = week();
+    materialiseWeek('2026-22', ahead);      // still to come
+    saveWeek('2026-22', ahead);
+    _state.setTodayWeekKey('2026-21');
 
     await deleteScheduleSeries('s1');
 
-    expect(JSON.stringify(_state.get())).toBe(before);
-    expect(_state.get().nodes.find(n => n.schedId === 's1')).toBeDefined();
+    const back = JSON.parse(_state.getLocalStorage('zenit-week-2026-20'));
+    expect(back.nodes.some(n => n.schedId === 's1')).toBe(true);
+    const later = JSON.parse(_state.getLocalStorage('zenit-week-2026-22'));
+    expect(later.nodes.some(n => n.schedId === 's1')).toBe(false);
+    expect(later.tombstones).toContain(occurrenceNodeId('s1', '2026-05-27'));
   });
 
   it('never revives a tombstoned entry through repair', () => {

@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-stsCO/9GjQrGVudoicOeTxwpLscGodcuwA6aM/TMisc='
+               'sha256-ajqmpFUb+cXEKhW1MO2bzFKlkrbTS74rIlqvgiurM50='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -6099,7 +6099,7 @@ function _noteScheduleAdditions(entryIds) {
 // because nothing re-inserts an occurrence — the entry replants it when its
 // week is next opened, and a buried id would refuse to. The week on screen is
 // replanted here rather than waiting for a reopen it may never get.
-async function _reverseOccurrences(entry, remove) {
+async function _reverseOccurrences(entry, remove, { notBefore = null } = {}) {
   const weeks = new Set([currentWeekKey]);
   try { (await listWeekKeysIDB() || []).forEach(k => weeks.add(k)); } catch { /* IDB unavailable */ }
   // loadWeek falls back to localStorage when IDB has no copy, so the search for
@@ -6115,6 +6115,9 @@ async function _reverseOccurrences(entry, remove) {
   for (const wk of weeks) {
     const days = weekDayStrings(wk);
     if (!days) continue;
+    // A floor spares the weeks that are already history: deleting a series is a
+    // statement about what will happen, not a licence to edit what did.
+    if (notBefore && days[6] < notBefore) continue;
     const dates = occurrencesInRange(entry, days[0], days[6]);
     if (!dates.length) continue;
     const ids = new Set(dates.flatMap(d =>
@@ -9978,7 +9981,7 @@ const TRANSLATIONS = {
     'menu.clearWeek':             'Clear the Week',
     'confirm.clearWeek':          'This will remove all tasks from the current week. This cannot be undone.',
     'confirm.deleteEntryTitle':   'Delete scheduled task?',
-    'confirm.deleteEntryBody':    'Delete only this occurrence, or the whole series? Occurrences already delivered to a week stay exactly where they are.',
+    'confirm.deleteEntryBody':    'Delete only this occurrence, or the whole series? Occurrences in past weeks stay exactly where they are.',
     'confirm.deleteEntryOccurrence': 'This occurrence',
     'confirm.deleteEntrySeries':  'Whole series',
     'menu.done':                  'Done',
@@ -10329,7 +10332,7 @@ const TRANSLATIONS = {
     'menu.clearWeek':             'Vymazat týden',
     'confirm.clearWeek':          'Tímto odstraníte všechny úkoly z aktuálního týdne. Tuto akci nelze vrátit.',
     'confirm.deleteEntryTitle':   'Smazat naplánovaný úkol?',
-    'confirm.deleteEntryBody':    'Smazat jen tento výskyt, nebo celou sérii? Výskyty, které už do nějakého týdne dorazily, zůstanou beze změny.',
+    'confirm.deleteEntryBody':    'Smazat jen tento výskyt, nebo celou sérii? Výskyty v minulých týdnech zůstanou beze změny.',
     'confirm.deleteEntryOccurrence': 'Tento výskyt',
     'confirm.deleteEntrySeries':  'Celou sérii',
     'menu.done':                  'Hotovo',
@@ -12348,6 +12351,13 @@ function deleteNode(id) {
   const node = findNode(id);
   if (!node) return;
   if (node.type === 'branch') { deleteBranch(id); return; }
+  // An occurrence is one date of a standing intention, and deleting it silently
+  // would answer for the user which of the two they meant. Only while the entry
+  // is still live — once the series is gone the node is an ordinary task.
+  const entry = node.schedId && node.schedDate && Array.isArray(scheduleData?.entries)
+    ? scheduleData.entries.find(e => e.id === node.schedId)
+    : null;
+  if (entry) { confirmDeleteOccurrence(entry.id, node.schedDate, id); return; }
   _performDelete(id);
 }
 
@@ -17394,17 +17404,27 @@ async function deleteOccurrence(entryId, date) {
   return true;
 }
 
-// Deleting the series retires the entry and nothing else. Occurrences already
-// delivered are ordinary nodes in weeks the user has already worked in — they
-// are that week's history, not the series', and removing them would rewrite a
-// past the user actually lived.
+// Deleting the series retires the entry and takes its occurrences with it, from
+// the current week forward. Anything it already delivered into a past week is
+// that week's history, not the series', and stays: removing it would rewrite a
+// past the user actually lived, and move the stats of a week already closed.
+//
+// One snapshot covers both halves, exactly as a send's does — undo restores the
+// entry and lifts the tombstones, and the weeks replant from there.
 async function deleteScheduleSeries(entryId) {
   const i = scheduleData.entries.findIndex(e => e.id === entryId);
   if (i === -1) return false;
+  const entry = scheduleData.entries[i];
+
+  takeSnapshot();
+  _noteScheduleAdditions([entryId]);
   scheduleData.entries.splice(i, 1);
   if (!Array.isArray(scheduleData.tombstones)) scheduleData.tombstones = [];
   if (!scheduleData.tombstones.includes(entryId)) scheduleData.tombstones.push(entryId);
   await saveSchedule();
+
+  const thisWeek = weekDayStrings(todayWeekKey());
+  await _reverseOccurrences(entry, true, { notBefore: thisWeek ? thisWeek[0] : null });
   return true;
 }
 
@@ -17450,18 +17470,30 @@ async function pullOccurrenceIntoWeek(entryId, date, dayIndex) {
   return true;
 }
 
-// The Later tab's delete: one occurrence, or the series behind it.
-function confirmDeleteFromLater(entryId, date) {
+// The question a calendar asks: this one, or the series? Asked from both ends of
+// the same task — a Later row, which has no node yet, and an occurrence node on
+// the map or in the agenda, which passes `nodeId` so the copy in front of the
+// user goes too. The series answer needs no `nodeId`: deleteScheduleSeries
+// clears every occurrence from this week on, and that node is one of them.
+function confirmDeleteOccurrence(entryId, date, nodeId = null) {
   const entry = scheduleData.entries.find(e => e.id === entryId);
   if (!entry) return;
+  const done = () => { if (currentView === 'agenda') renderAgenda(); };
   showAppConfirm({
     title:           t('confirm.deleteEntryTitle'),
     body:            t('confirm.deleteEntryBody'),
     okLabel:         t('confirm.deleteEntrySeries'),
     danger:          true,
-    onConfirm:       async () => { await deleteScheduleSeries(entryId); renderAgenda(); },
+    onConfirm:       async () => { await deleteScheduleSeries(entryId); done(); },
     secondaryLabel:  t('confirm.deleteEntryOccurrence'),
-    onSecondary:     async () => { await deleteOccurrence(entryId, date); renderAgenda(); },
+    onSecondary:     async () => {
+      // Both halves. The node is deleted where it stands, because a swept or
+      // pulled occurrence sits in a different week from the date it names, and
+      // the date's own week is buried so no reopen plants it again.
+      if (nodeId && findNode(nodeId)) _performDelete(nodeId);
+      await deleteOccurrence(entryId, date);
+      done();
+    },
   });
 }
 
@@ -18519,7 +18551,7 @@ document.getElementById('ctx-delete').addEventListener('click', () => {
   const entryCtx = agendaEntryCtx;
   if (entryCtx) {
     hideContextMenu();
-    confirmDeleteFromLater(entryCtx.entryId, entryCtx.date);
+    confirmDeleteOccurrence(entryCtx.entryId, entryCtx.date);
     return;
   }
   if (!contextTarget) { hideContextMenu(); return; }
@@ -19295,7 +19327,7 @@ function buildAgendaItem(node, label, opts = {}) {
     del.title = t('menu.delete');
     del.addEventListener('click', e => {
       stopClickKeepingDismiss(e); // the row itself opens the editor
-      confirmDeleteFromLater(entryRow.id, opts.date);
+      confirmDeleteOccurrence(entryRow.id, opts.date);
     });
     item.appendChild(del);
     addAgendaHoverFocus(item, null);
