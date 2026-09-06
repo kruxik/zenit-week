@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-bjTrJ6fMLW+PVAgAyGPZ7g++zuPAtxzp9JEQPwEKiog='
+               'sha256-r0Qta2zFP8UOYQIDo0kbVSnd0V3IEilm5Bjkj2YpyqU='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9941,7 +9941,7 @@ const TRANSLATIONS = {
     'tips.inbox':                 'No place in the plan yet. Drag it onto a task and it files itself underneath, in that task’s colour.',
     'tips.hoverIntro':            'Hover a task, then press:',
     'tips.hoverCaptionTouch':     'Quick gestures',
-    'tips.hoverTouch':            'Double-tap a task to rename it. Long-press opens the menu with everything else.',
+    'tips.hoverTouch':            'Double-tap a task to rename it. Long-press opens the menu with everything else — in the Agenda, swipe left.',
     'tips.counter':               'Each circle is one repetition. Add “3x” to a task and it splits into three steps — done when the last one is ticked.',
     'tips.days':                  'Each circle is one day this task is planned for. Add “(mo, we)” to a task, or “(daily)” for all seven.',
     'tips.unplannedIntro':        'Amber means unplanned. It wasn’t in the plan, and Stats counts it apart from what was.',
@@ -10292,7 +10292,7 @@ const TRANSLATIONS = {
     'tips.inbox':                 'Zatím bez místa v plánu. Přetáhněte ho na úkol a zařadí se pod něj, v jeho barvě.',
     'tips.hoverIntro':            'Najeďte na úkol, pak stiskněte:',
     'tips.hoverCaptionTouch':     'Rychlá gesta',
-    'tips.hoverTouch':            'Dvojitým klepnutím úkol přejmenujete. Podržením otevřete nabídku se vším ostatním.',
+    'tips.hoverTouch':            'Dvojitým klepnutím úkol přejmenujete. Podržením otevřete nabídku se vším ostatním — v Agendě přejetím doleva.',
     'tips.counter':               'Každé kolečko je jedno opakování. Přidejte do úkolu „3x“ a rozdělí se na tři kroky — hotový je posledním odškrtnutím.',
     'tips.days':                  'Každé kolečko je jeden den, na který je úkol naplánovaný. Do úkolu přidejte „(po, st)“ — nebo „(denně)“ pro celý týden.',
     'tips.unplannedIntro':        'Oranžová znamená neplánované. Nebylo to v plánu a Statistika to od plánovaného odděluje.',
@@ -18964,6 +18964,14 @@ function wrapAgendaRowForSwipe(item, rowId, leftIcon, leftClass = '') {
 // mouseenter) is on that row, and a row without it reads as a different kind
 // of surface. `node` is null for rows that stand for no live node, so the
 // hovered-node hotkeys stay off them.
+// A double tap that lands on a control the row already answers — Done, a badge,
+// the grip — must not also fire the row's own gesture.
+function agendaRowChildHandlesTap(e) {
+  return !!(e.target.closest('.agenda-action-btn')
+    || e.target.closest('.daily-log-badge')
+    || e.target.closest('.agenda-drag-handle'));
+}
+
 function addAgendaHoverFocus(item, node) {
   item.addEventListener('mouseenter', () => {
     hoveredAgendaNode = node;
@@ -19045,9 +19053,9 @@ function buildAgendaItem(node, label, opts = {}) {
   mainEl.className = 'daily-log-label-main';
   mainEl.textContent = lbl.main;
   labelEl.appendChild(mainEl);
-  // Reveal full ancestor chain: desktop on click, mobile on long-press.
-  // Short taps on mobile do nothing so users can still interact with the row
-  // (swipe / drag / Done button) without accidentally morphing the label.
+  // Reveal full ancestor chain on a tap — one gesture on both pointer types.
+  // A stationary tap collides with nothing else on the row: swipe needs 10px of
+  // travel and drag starts on the grip, so neither can fire from a still finger.
   labelEl.dataset.expanded = 'false';
   const expandedEl = document.createElement('span');
   expandedEl.className = 'daily-log-label-expanded';
@@ -19059,32 +19067,15 @@ function buildAgendaItem(node, label, opts = {}) {
   const toggleExpanded = () => {
     labelEl.dataset.expanded = labelEl.dataset.expanded === 'true' ? 'false' : 'true';
   };
-  let lpTimer = null;
-  let lpX = 0, lpY = 0;
-  let suppressClick = false;
-  const cancelLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
-  labelEl.addEventListener('touchstart', e => {
-    suppressClick = true;
-    const t = e.touches[0];
-    lpX = t.clientX; lpY = t.clientY;
-    lpTimer = setTimeout(() => { lpTimer = null; toggleExpanded(); }, 500);
-  }, { passive: true });
-  labelEl.addEventListener('touchmove', e => {
-    if (!lpTimer) return;
-    const t = e.touches[0];
-    if (Math.abs(t.clientX - lpX) > 10 || Math.abs(t.clientY - lpY) > 10) cancelLp();
-  }, { passive: true });
-  labelEl.addEventListener('touchend', () => {
-    cancelLp();
-    setTimeout(() => { suppressClick = false; }, 600);
-  }, { passive: true });
-  labelEl.addEventListener('touchcancel', () => {
-    cancelLp();
-    suppressClick = false;
-  }, { passive: true });
   labelEl.addEventListener('click', e => {
     stopClickKeepingDismiss(e);
-    if (suppressClick) { suppressClick = false; return; }
+    // A tap also focuses the row, so every hovered-node hotkey has a touch
+    // path — the same state mouseenter and the arrow keys produce. A Later row
+    // has no node behind it, so it focuses without becoming the hovered node.
+    hoveredAgendaNode = entryRow ? null : node;
+    setAgendaFocus(item);
+    // On a double tap this runs twice and cancels itself, leaving the rename
+    // that dblclick opens on top of an unchanged label.
     toggleExpanded();
   });
   item.appendChild(labelEl);
@@ -19190,6 +19181,13 @@ function buildAgendaItem(node, label, opts = {}) {
     // Mouse only. On touch the row is a swipe target, and a tap that opens a
     // dialog turns every mis-aimed scroll into one.
     if (window.matchMedia('(pointer: fine)').matches) item.addEventListener('click', openEditor);
+    // Touch reaches the editor through a double tap, which no mis-aimed scroll
+    // produces. Single tap stays reserved for focusing the row.
+    item.addEventListener('dblclick', e => {
+      if (agendaRowChildHandlesTap(e)) return;
+      e.preventDefault();
+      openEditor();
+    });
     item._doneAction = openEditor;
     const openEntryMenu = (x, y) => {
       agendaEntryCtx = { entryId: entryRow.id, date: opts.date };
@@ -19267,6 +19265,14 @@ function buildAgendaItem(node, label, opts = {}) {
     showContextMenu(x, y, node.id);
   };
   item._openCtxMenu = openCtxMenu;
+  // Double tap renames, the same meaning the gesture carries on the map and the
+  // one the touch coachmark teaches. A tick row renames its parent, matching the
+  // context menu, where rename is the op agendaTickCtx never redirects.
+  item.addEventListener('dblclick', e => {
+    if (agendaRowChildHandlesTap(e)) return;
+    e.preventDefault();
+    startAgendaRename(node.id);
+  });
   // Track touch start so we can recognise the synthetic contextmenu that
   // mobile fires on long-press. We suppress that one entirely — left-swipe
   // is the mobile path to the menu. Desktop right-click still opens it.
