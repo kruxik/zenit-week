@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-5cKsw89HQxrJD9bJPspCH5bFEb4QID5fEGqyNmU2HSk='
+               'sha256-bjTrJ6fMLW+PVAgAyGPZ7g++zuPAtxzp9JEQPwEKiog='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -17816,6 +17816,14 @@ function hideContextMenu() {
   setAgendaFocus(null);
 }
 
+// A child that stops a click from reaching its row must still let the click act
+// as "outside the context menu", otherwise the menu survives every tap over the
+// wide parts of an agenda row — which on touch is most of the screen.
+function stopClickKeepingDismiss(e) {
+  hideContextMenu();
+  e.stopPropagation();
+}
+
 // ─── Color picker (custom inline SB+hue) ──────────────────────────────────────
 let colorPickerBranch = null;
 const cpPanel     = document.getElementById('color-picker-panel');
@@ -19075,7 +19083,7 @@ function buildAgendaItem(node, label, opts = {}) {
     suppressClick = false;
   }, { passive: true });
   labelEl.addEventListener('click', e => {
-    e.stopPropagation();
+    stopClickKeepingDismiss(e);
     if (suppressClick) { suppressClick = false; return; }
     toggleExpanded();
   });
@@ -19127,7 +19135,7 @@ function buildAgendaItem(node, label, opts = {}) {
     cmt.innerHTML = iconSvg('message');
     cmt.title = t('menu.comment');
     cmt.addEventListener('click', e => {
-      e.stopPropagation();
+      stopClickKeepingDismiss(e);
       openCommentDialog(node.id);
     });
     item.appendChild(cmt);
@@ -19198,7 +19206,7 @@ function buildAgendaItem(node, label, opts = {}) {
     del.innerHTML = `${iconSvg('trash')} ${t('menu.delete')}`;
     del.title = t('menu.delete');
     del.addEventListener('click', e => {
-      e.stopPropagation(); // the row itself opens the editor
+      stopClickKeepingDismiss(e); // the row itself opens the editor
       confirmDeleteFromLater(entryRow.id, opts.date);
     });
     item.appendChild(del);
