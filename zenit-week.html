@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-TqKgETafDH2bFd6ggEO8fznKMA87UoMDXfFs8U/02fo='
+               'sha256-vn60pmH5ALLPvrzNdzJB4tjip/aXHkIdHOXClDI6uMA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -6504,6 +6504,44 @@ function pickBranchColor() {
 
 const COLORS_STORAGE_KEY = 'zenit-week-colors';
 
+// ─── Data records ─────────────────────────────────────────────────────────────
+// Everything the app owns that is the *user's data* beyond the week records. A
+// full backup, an import wipe, a Drive reset and a force-push must each cover
+// all of it — and covering it in four hand-written lists is exactly how the
+// schedule came to be missing from every one of them. One list, four consumers.
+//
+// Device bookkeeping is deliberately absent: the Google session, the Drive file
+// ids, the reset token, the offline upload queue and the import-pending flag
+// identify this browser, not the user. Carried in an export they would let one
+// machine's backup take over another machine's sync identity.
+//
+// Order is the push order, and colors goes last: its appProperties carry the
+// reset token, which is the authoritative "this account was reset" signal, so
+// no other device may see it until everything it vouches for is already up.
+const DATA_RECORDS = [
+  {
+    idbKey: SCHEDULE_STORAGE_KEY,
+    exportKey: 'zenit-week-schedule',
+    // Branch ids come from the loaded week, and during an import no week is
+    // open yet — repairScheduleBranch leaves a well-shaped branch alone when
+    // the list is empty, which is the same thing that happens on boot.
+    sanitize: raw => validateAndRepairSchedule(raw, scheduleBranchIds()),
+    // Written even when the file carries no schedule: the empty record is what
+    // overwrites a stale schedule still sitting in Drive.
+    importDefault: () => emptySchedule(),
+    // Never reports failure, matching syncScheduleToDrive's own policy — a
+    // schedule that will retry must not make a healthy week sync look broken.
+    push: async () => { await syncScheduleToDrive(); return true; },
+  },
+  {
+    idbKey: COLORS_STORAGE_KEY,
+    exportKey: COLORS_STORAGE_KEY,
+    sanitize: raw => sanitizeColorsData(raw),
+    importDefault: null,
+    push: ({ resetToken }) => _uploadColorsToDrive(resetToken),
+  },
+];
+
 function hexToRgb(hex) {
   return {
     r: parseInt(hex.slice(1, 3), 16),
@@ -8944,11 +8982,13 @@ async function forcePushAllToDrive() {
     if (results.some(r => !r)) allOk = false;
   }
 
-  // Upload colors last — resetToken in appProperties is the authoritative reset signal.
-  // Other browsers detect mismatch only after all weeks are already in Drive.
+  // Every non-week record, in manifest order — colors last, because the
+  // resetToken in its appProperties is the authoritative reset signal and other
+  // browsers must not see it until all the data it vouches for is in Drive.
   const resetToken = localStorage.getItem('zenit-week-reset-token') || '';
-  const colorsOk = await _uploadColorsToDrive(resetToken);
-  if (!colorsOk) allOk = false;
+  for (const rec of DATA_RECORDS) {
+    if (!(await rec.push({ resetToken }))) allOk = false;
+  }
 
   if (allOk) {
     await deleteValueIDB('zenit-week-import-pending');
@@ -9580,7 +9620,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   // content back into the data the reset was meant to discard.
   try {
     for (const wk of await listWeekKeysIDB()) await deleteWeekIDB(wk);
-    await deleteValueIDB(COLORS_STORAGE_KEY);
+    for (const rec of DATA_RECORDS) await deleteValueIDB(rec.idbKey);
     await deleteValueIDB('zenit-week-import-pending');
   } catch (e) {
     console.error('[Drive] reset: failed to clear local IndexedDB:', e);
@@ -9604,7 +9644,9 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   setSyncStatus('syncing', 'sync.msg.resyncing');
   await initDriveSync();
   // Re-read the displayed week: it was just deleted and re-fetched underneath us,
-  // so the in-memory copy still holds the discarded data.
+  // so the in-memory copy still holds the discarded data. The schedule was
+  // discarded the same way, and the copy in memory is just as stale.
+  await loadSchedule();
   await loadAndRender(currentWeekKey);
   startDrivePoll(currentWeekKey);
 }
@@ -11049,10 +11091,14 @@ async function exportAllData() {
     const wd = await loadWeekIDB(wk);
     if (wd) data['zenit-week-' + wk] = JSON.stringify(wd);
   }
-  const colors = await loadValueIDB(COLORS_STORAGE_KEY);
-  if (colors) data[COLORS_STORAGE_KEY] = JSON.stringify(colors);
+  for (const rec of DATA_RECORDS) {
+    const value = await loadValueIDB(rec.idbKey);
+    if (value) data[rec.exportKey] = JSON.stringify(value);
+  }
 
-  const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data }, null, 2);
+  // version 2 adds the schedule record. A version 1 file still imports — the
+  // missing record simply reads as an empty schedule.
+  const payload = JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), data }, null, 2);
   const blob = new Blob([payload], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -11149,21 +11195,21 @@ async function importAllData(file) {
     const endWipe = traceSpan('import:wipe');
     const weekKeys = await listWeekKeysIDB();
     for (const wk of weekKeys) await deleteWeekIDB(wk);
-    await deleteValueIDB(COLORS_STORAGE_KEY);
+    for (const rec of DATA_RECORDS) await deleteValueIDB(rec.idbKey);
     endWipe(weekKeys.length + ' weeks');
 
     // Partition weeks: current week vs rest
     const currentWk = todayWeekKey();
     const allWeeks = new Map();
-    let colorsRaw = null;
+    const recordsRaw = new Map();
 
     for (const [key, val] of Object.entries(parsed.data)) {
       const nk = normalizeImportKey(key);
       if (!nk) continue;
       if (nk.startsWith('zenit-week-') && /^\d{4}-\d{2}$/.test(nk.slice(11))) {
         allWeeks.set(nk.slice(11), val);
-      } else if (nk === COLORS_STORAGE_KEY) {
-        colorsRaw = val;
+      } else {
+        recordsRaw.set(nk, val);
       }
     }
 
@@ -11171,10 +11217,14 @@ async function importAllData(file) {
     // one bad entry can't abort the whole import mid-write.
     const safeParse = (raw) => { try { return JSON.parse(raw); } catch { return null; } };
 
-    // Write colors first so loadBranchColors picks them up
-    if (colorsRaw) {
-      const parsedColors = safeParse(colorsRaw);
-      if (parsedColors) await saveValueIDB(COLORS_STORAGE_KEY, sanitizeColorsData(parsedColors));
+    // Write the non-week records before any week: colors has to be in place
+    // before loadBranchColors() reads it, and the schedule before the first
+    // week opens, or that week is the one that never materialises.
+    for (const rec of DATA_RECORDS) {
+      const raw = recordsRaw.get(rec.exportKey);
+      const parsedRec = raw == null ? null : safeParse(raw);
+      if (parsedRec) await saveValueIDB(rec.idbKey, rec.sanitize(parsedRec));
+      else if (rec.importDefault) await saveValueIDB(rec.idbKey, rec.importDefault());
     }
 
     // Write current week first
@@ -11219,6 +11269,9 @@ async function importAllData(file) {
       document.documentElement.dataset.theme = importedTheme === 'dark' ? 'dark' : '';
       await loadBranchColors();
       reloadBranchPalettes();
+      // Same reason as boot: entries must be in memory before the first week
+      // opens, and the ones in memory now are the pre-import ones.
+      await loadSchedule();
       updateSvgFilters();
       updateColorDots();
       applyTranslations();
