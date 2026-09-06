@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.09.06] - 2026-09-06
+
+### Added
+
+- **schedule:** Deleting an occurrence asks this one or the series
+- **agenda:** Tap expands the path, double tap renames
+- **schedule:** Send a task to a date with its subtree and ancestor path
+- **mindmap:** Dash the edge into a dropped node, taper intact
+- **schedule:** Deliver a dated task at once and refuse dates already past
+- **agenda:** Stick section headers while their group scrolls
+- **agenda:** Give Later rows the same swipe gestures as task rows
+- **schedule:** Give Later rows a context menu that acts on the entry
+- **schedule:** Sync the schedule as its own Drive file
+- **schedule:** Delete one occurrence or the whole series
+- **schedule:** Add the Later tab and the L hotkey
+- **schedule:** Sweep missed occurrences into the current week
+- **schedule:** Send a task to a date instead of a week
+- **schedule:** Materialise due occurrences when a week opens
+- **schedule:** Add schedule store with repair and deterministic occurrence ids
+- **schedule:** Add pure occurrence math for repeating entries
+- **delete:** Confirm task deletes and offer Drop as the alternative
+- **agenda:** Add a Dropped group with swipe-right to undrop
+- **stats:** Add a dropped band, headline row and legend entries
+- **status:** Keep dropped tasks out of transfers, overdue and any-day
+- **status:** Render dropped nodes and add X hotkey plus menu entry
+- **status:** Add dropped state to setStatus, cascade and roll-up
+- **quiet-refresh:** Show the update banner when the reload stays blocked
+- **quiet-refresh:** Add the update-ready banner (markup only)
+
+### Changed
+
+- **schedule:** Send a dated task as its leaves, one entry each
+- **delete:** Delete without asking — Drop is already its own choice
+- **dialogs:** Give every dialog one caption, field and button vocabulary
+- **agenda:** Share one inline rename between task rows and entries
+- **schedule:** Show dates in each language's own convention
+- **schedule:** Tighten the Set a date dialog
+- **schedule:** Move Send to date into the reschedule submenu as Date
+
+### Fixed
+
+- **storage:** Cover the schedule in export, import, reset and force-push
+- **schedule:** Skip the delete dialog when the entry has one occurrence
+- **later:** Keep an occurrence listed after its week is opened
+- **agenda:** Close context menu on row clicks that stop propagation
+- **schedule:** Stop burying the shared path id when a send is undone
+- **schedule:** Reverse planted occurrences when a send is undone
+- **schedule:** Treat a date inside this week as the weekday selector
+- **schedule:** Give an occurrence its day as a label tag, not a day child
+- **schedule:** Strip weekday tags from schedule entry paths
+- **agenda:** Give Later rows the same label logic as a day row
+- **mindmap:** Flatten staggered zigzag edges across the near column
+- **mindmap:** Give zigzag blocks the same 12px node gap as every other column
+- **mindmap:** Stop staggered leaf edges grazing the discs they pass
+- **coachmark:** Stop the tip walking 8px at a time after a rotation
+- **schedule:** Stop resetting the end-date field while it is typed into
+- **schedule:** Refuse an end date before the anchor
+- **schedule:** Strip weekday tags from schedule entry labels
+- **agenda:** Match sticky section captions to the row background on mobile
+- **next-week:** Place moved tasks by their previous-week position, not send order
+- **playground:** Relabel untouched seed tasks when the language switches
+- **ui:** Let the toast use the whole viewport width
+- **esc:** Walk one ordered dismiss registry instead of an if-chain
+- **status:** Let done fully clear a drop, on screen and on a counter
+- **settings:** Stop the dev-only block rendering on production
+- **quiet-refresh:** Retry a deferred reload instead of dropping it
+
 ## [v2026.08.21] - 2026-08-21
 
 ### Added
