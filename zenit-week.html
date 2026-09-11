@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-LVN+bOysWfK3jq2ylin3Ej6MhV9VrQ674e/r7YFlwbk='
+               'sha256-vmHs09IaJOas/7zFCrHpSVtho1u1bu2RT0IybsCAD9w='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2672,6 +2672,30 @@
     background: var(--view-separator);
     align-self: center;
     flex-shrink: 0;
+  }
+
+  /* The week chip — only drawn off the current week, where the mindmap's week
+     bar is behind the panel and cannot say which week this is. Same job and the
+     same amber as #week-bar.off-current #week-bar-label, worn by the strip's own
+     tab shape rather than a second button style.
+     Sticky so the way back to today survives scrolling the tabs on a phone; that
+     needs an opaque background (tabs pass underneath), which is why the hover
+     tint is layered over --bg-surface instead of replacing it — --bg-hover is
+     translucent. left matches the strip's 8px padding so the chip does not jump
+     sideways the moment it starts sticking, and the box-shadow paints that same
+     8px of gutter so nothing shows through beside it. */
+  .agenda-tab-week {
+    position: sticky;
+    left: 8px;
+    z-index: 1;
+    color: var(--accent-warning-text);
+    background: var(--bg-surface);
+    box-shadow: -8px 0 0 0 var(--bg-surface);
+  }
+
+  .agenda-tab-week:hover {
+    color: var(--accent-warning-text);
+    background: linear-gradient(var(--bg-hover), var(--bg-hover)), var(--bg-surface);
   }
 
   .agenda-overdue-badge {
@@ -19107,6 +19131,24 @@ function renderAgendaStrip() {
     const sep = document.createElement('div');
     sep.className = 'agenda-tab-separator';
     strip.appendChild(sep);
+  }
+
+  // Week chip — the mirror image of the Overdue tab: shown only when this is
+  // NOT the current week. The mindmap's week bar sits behind this panel (and is
+  // hidden outright on mobile), so without it the Agenda never says which week
+  // it is showing. Clicking it returns to today, exactly as the week bar's own
+  // label does.
+  if (!isCurrentWeekOpen()) {
+    const { year, week } = parseWeekKey(currentWeekKey);
+    const weekBtn = document.createElement('button');
+    weekBtn.type = 'button';
+    weekBtn.className = 'agenda-tab agenda-tab-week';
+    weekBtn.textContent = `${t('week.word')} ${week}`;
+    // The face is the short form; the full wording and what the click does live
+    // on the accessible name, the same split updateWeekBar makes.
+    weekBtn.setAttribute('aria-label', `${formatWeekLabel(year, week)} — ${t('weekbar.today')}`);
+    weekBtn.addEventListener('click', () => goToTodayWeek());
+    strip.appendChild(weekBtn);
   }
 
   // Overdue tab — current week only; see isCurrentWeekOpen.
