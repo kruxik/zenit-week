@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-vmHs09IaJOas/7zFCrHpSVtho1u1bu2RT0IybsCAD9w='
+               'sha256-lUdOR6/ZiT+PSMkvBJpcMQLFr2hoV+TOSUtpc9ir1Aw='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -19178,7 +19178,9 @@ function renderAgendaStrip() {
     addSeparator();
 
     const btn = document.createElement('button');
-    const isToday = dayIdx === new Date().getDay();
+    // Today's dot, like the Overdue tab and the week chip, only means something
+    // in the week today falls in; elsewhere it marked an arbitrary weekday.
+    const isToday = isCurrentWeekOpen() && dayIdx === new Date().getDay();
     btn.className = 'agenda-tab' + (agendaActiveTab === dayIdx ? ' active' : '') + (isToday ? ' agenda-tab-today' : '');
     btn.dataset.tab = String(dayIdx);
     btn.textContent = langLabels[dayIdx];
