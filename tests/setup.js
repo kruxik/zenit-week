@@ -521,6 +521,9 @@ _state.useRealIDB = function(v) {
 _state.getScheduleSyncedHash = function() { return scheduleSyncedHash; };
 _state.wKeyForDriveFileName = function(name) { return _wKeyForDriveFileName(name); };
 _state.getAgendaTabOrder = function() { return AGENDA_TAB_ORDER; };
+_state.getVisibleAgendaTabOrder = function() { return agendaTabOrder(); };
+_state.getVisibleDayFilterOrder = function() { return dayFilterOrder(); };
+_state.setDayFilter = function(d) { activeDayFilter = d; };
 _state.getSchedule = function() { return scheduleData; };
 _state.setSchedule = function(v) { scheduleData = v; };
 _state.resetIDB = function() {

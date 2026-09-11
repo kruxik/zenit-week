@@ -4,6 +4,7 @@ import {
   validateAndRepair, defaultWeekData,
   findNode, rebuildNodeMap, genId,
   isoWeekPos, getAgendaItems, getOverdueItems, getAnyDayItems,
+  dayFilterMatchSet,
   setStatus, localDateStr, tabDateString,
   _state,
 } from './setup.js';
@@ -632,6 +633,74 @@ describe('getOverdueItems', () => {
     // Only the leaf 'mo' is overdue, not the parent 'p1'
     const result = getOverdueItems(d(3));
     expect(result.map(n => n.id)).toEqual(['mo']);
+  });
+});
+
+// ─── Overdue is current-week-only ─────────────────────────────────────────────
+// "Overdue" is measured against today's weekday, which says nothing about a week
+// today does not fall in. Every overdue surface gates on isCurrentWeekOpen().
+
+describe('overdue off the current week', () => {
+  function mkDayLeaf(id, parentId, dayIndex) {
+    return { id, type: 'activity', dayChild: true, dayIndex,
+      branch: 'work', parent: parentId, label: id,
+      done: false, unplanned: false, children: [], _ts: 0 };
+  }
+  function d(dowJS) { return { getDay: () => dowJS }; }
+
+  function seedOverdue() {
+    const branch = mkBranch('work', ['p1']);
+    const p1 = mkActivity('p1', 'work', 'work', { children: ['mo', 'tu'] });
+    setUp([branch, p1, mkDayLeaf('mo', 'p1', 1), mkDayLeaf('tu', 'p1', 2)]);
+  }
+
+  afterEach(() => {
+    _state.clearTodayWeekKeyOverride();
+    _state.setDayFilter(null);
+  });
+
+  test('the same week that reports overdue items reports none once it is not today\'s', () => {
+    seedOverdue();
+    expect(getOverdueItems(d(3)).map(n => n.id).sort()).toEqual(['mo', 'tu']);
+
+    _state.setTodayWeekKey('2025-50');   // open week 2026-01 is now in the future
+    expect(getOverdueItems(d(3))).toEqual([]);
+  });
+
+  test('a past week reports none either', () => {
+    seedOverdue();
+    _state.setTodayWeekKey('2026-30');
+    expect(getOverdueItems(d(3))).toEqual([]);
+  });
+
+  test('the agenda tab strip drops the Overdue tab off-week', () => {
+    seedOverdue();
+    expect(_state.getVisibleAgendaTabOrder()[0]).toBe('overdue');
+
+    _state.setTodayWeekKey('2025-50');
+    const order = _state.getVisibleAgendaTabOrder();
+    expect(order).not.toContain('overdue');
+    expect(order[0]).toBe(1);            // Monday leads instead
+    expect(order[order.length - 1]).toBe('later');
+  });
+
+  test('the mindmap day-filter menu drops Overdue off-week', () => {
+    seedOverdue();
+    expect(_state.getVisibleDayFilterOrder()[0]).toBe('overdue');
+
+    _state.setTodayWeekKey('2025-50');
+    const order = _state.getVisibleDayFilterOrder();
+    expect(order).not.toContain('overdue');
+    expect(order[order.length - 1]).toBe('unscheduled');
+  });
+
+  test('an overdue day filter prunes nothing off-week', () => {
+    seedOverdue();
+    _state.setDayFilter('overdue');
+    expect(dayFilterMatchSet()).not.toBeNull();
+
+    _state.setTodayWeekKey('2025-50');
+    expect(dayFilterMatchSet()).toBeNull();   // no filter, so no pruning
   });
 });
 

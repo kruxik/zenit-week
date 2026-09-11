@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-vn60pmH5ALLPvrzNdzJB4tjip/aXHkIdHOXClDI6uMA='
+               'sha256-LVN+bOysWfK3jq2ylin3Ej6MhV9VrQ674e/r7YFlwbk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7098,7 +7098,7 @@ function hasNowToken(label) {
 function agendaRowsForNode(node) {
   if (!node || node.type !== 'activity') return [];
   const rows = [];
-  const onCurrentWeek = currentWeekKey === todayWeekKey();
+  const onCurrentWeek = isCurrentWeekOpen();
   const todayPos = isoWeekPos(new Date().getDay());
   const pendingOn = (rowId, d) => {
     if (d == null) return;
@@ -10734,6 +10734,14 @@ function todayWeekKey() {
   return weekKey(year, week);
 }
 
+// True while the open week is the real-world current ISO week. "Overdue" is
+// only meaningful there: it is measured against today's weekday, which says
+// nothing about a week today does not fall in. Every overdue surface — the
+// agenda tab, its badge and the mindmap day filter — gates on this.
+function isCurrentWeekOpen() {
+  return currentWeekKey === todayWeekKey();
+}
+
 // ─── Data management ──────────────────────────────────────────────────────────
 function storageKey(wk) { return `zenit-week-${wk}`; }
 
@@ -11750,6 +11758,14 @@ function sweepPastDue(week, ctx) {
 // saveSchedule only queue their sync work, which is why they are safe here.
 // No snapshot is taken — materialisation is delivery, not a user edit.
 async function openWeekIntoView(wk) {
+  // The overdue filter is current-week-only, and both callers set currentWeekKey
+  // before getting here. Clear it rather than leave the bar's "!" lit over a week
+  // it no longer filters. Assigned directly, not via setDayFilter: the callers
+  // render immediately after, and applyFilters() refreshes button and chip there.
+  if (activeDayFilter === 'overdue' && !isCurrentWeekOpen()) {
+    activeDayFilter = null;
+    _dayFilterFresh = new Set();
+  }
   weekData = await loadWeek(wk);
   if (scheduleData.entries.length) {
     await withWeekLock(wk, async () => {
@@ -14324,6 +14340,10 @@ function getAgendaItems(dayIndex) {
 // Undone agenda items whose ISO-week position is before today's.
 // today is optional — defaults to new Date() for production; pass a Date in tests
 function getOverdueItems(today = new Date()) {
+  // Only the current week has a "today" to be late against. In any other week
+  // the comparison reads a weekday out of a week today does not fall in, which
+  // marked future work overdue and past work permanently late.
+  if (!isCurrentWeekOpen()) return [];
   const todayPos = isoWeekPos(today.getDay());
   const result = [];
   weekData.nodes.forEach(n => {
@@ -15134,6 +15154,10 @@ function _hasOwnSchedule(node) {
 
 function dayFilterMatchSet() {
   if (activeDayFilter === null) return null;
+  // Overdue is current-week-only; setDayFilter clears it on a week change, and
+  // this is the belt to that braces — nothing should ever be pruned by a filter
+  // the week cannot answer.
+  if (activeDayFilter === 'overdue' && !isCurrentWeekOpen()) return null;
 
   const d = activeDayFilter;
   const todayPos = isoWeekPos(new Date().getDay());
@@ -16842,8 +16866,10 @@ function _windowKeydownHandler(e) {
     const inputFocused = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
     if (inputFocused || e.metaKey || e.ctrlKey) return;
 
-    // Tab-switching: 0 = Overdue, 1–7 = Mon–Sun
+    // Tab-switching: 0 = Overdue, 1–7 = Mon–Sun. Off the current week there is
+    // no Overdue tab to reach, so 0 does nothing rather than selecting one.
     if (e.key >= '0' && e.key <= '7') {
+      if (e.key === '0' && !isCurrentWeekOpen()) return;
       e.preventDefault();
       const tabMap = { '0': 'overdue', '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 0 };
       agendaActiveTab = tabMap[e.key];
@@ -16903,6 +16929,7 @@ function _windowKeydownHandler(e) {
   if (currentView === 'mindmap' && !hoveredNodeId && !e.metaKey && !e.ctrlKey) {
     const inputFocused = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
     if (!inputFocused && e.key >= '0' && e.key <= '8') {
+      if (e.key === '0' && !isCurrentWeekOpen()) return;   // no overdue off-week
       e.preventDefault();
       const KEY_TO_DAY = { '0':'overdue', '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0, '8':'unscheduled' };
       const newFilter = KEY_TO_DAY[e.key];
@@ -18871,6 +18898,13 @@ const AGENDA_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 const AGENDA_TAB_ORDER = ['overdue', ...AGENDA_DAY_ORDER, 'later'];
 
+// The tabs actually on screen. Overdue is only built on the current week, so
+// arrow navigation has to walk the same list the strip drew — otherwise
+// ArrowLeft off Monday lands on a tab with no button.
+function agendaTabOrder() {
+  return isCurrentWeekOpen() ? AGENDA_TAB_ORDER : AGENDA_TAB_ORDER.filter(k => k !== 'overdue');
+}
+
 // ─── Later tab ────────────────────────────────────────────────────────────────
 // A reference list of what the schedule is holding, not a call to action — that
 // is why the tab carries no badge. The rows show occurrences, but they edit the
@@ -19038,12 +19072,14 @@ function laterRowNode(entry, date) {
 
 
 function navigateAgendaTab(right) {
-  const idx = AGENDA_TAB_ORDER.indexOf(agendaActiveTab);
+  const order = agendaTabOrder();
+  const idx = order.indexOf(agendaActiveTab);
+  if (idx === -1) return;
   const next = right
-    ? Math.min(idx + 1, AGENDA_TAB_ORDER.length - 1)
+    ? Math.min(idx + 1, order.length - 1)
     : Math.max(idx - 1, 0);
   if (next === idx) return;
-  agendaActiveTab = AGENDA_TAB_ORDER[next];
+  agendaActiveTab = order[next];
   renderAgenda();
 }
 
@@ -19063,30 +19099,36 @@ function renderAgendaStrip() {
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
   const overdueCount = _getOverdueItemsForRender().length;
 
+  // A separator sits *between* tabs, so the first tab drawn never gets one —
+  // which is what lets Overdue drop out without leaving a rule hanging off the
+  // left edge of the strip.
   function addSeparator() {
+    if (!strip.firstChild) return;
     const sep = document.createElement('div');
     sep.className = 'agenda-tab-separator';
     strip.appendChild(sep);
   }
 
-  // Overdue tab
-  const overdueBtn = document.createElement('button');
-  overdueBtn.className = 'agenda-tab' + (agendaActiveTab === 'overdue' ? ' active' : '');
-  overdueBtn.dataset.tab = 'overdue';
-  const overdueLabel = document.createTextNode(t('agenda.overdue'));
-  overdueBtn.appendChild(overdueLabel);
-  if (overdueCount > 0) {
-    const badge = document.createElement('span');
-    badge.className = 'agenda-overdue-badge';
-    badge.textContent = String(overdueCount);
-    overdueBtn.appendChild(badge);
-  }
-  overdueBtn.addEventListener('click', () => { agendaActiveTab = 'overdue'; renderAgenda(); });
-  strip.appendChild(overdueBtn);
+  // Overdue tab — current week only; see isCurrentWeekOpen.
+  if (isCurrentWeekOpen()) {
+    const overdueBtn = document.createElement('button');
+    overdueBtn.className = 'agenda-tab' + (agendaActiveTab === 'overdue' ? ' active' : '');
+    overdueBtn.dataset.tab = 'overdue';
+    const overdueLabel = document.createTextNode(t('agenda.overdue'));
+    overdueBtn.appendChild(overdueLabel);
+    if (overdueCount > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'agenda-overdue-badge';
+      badge.textContent = String(overdueCount);
+      overdueBtn.appendChild(badge);
+    }
+    overdueBtn.addEventListener('click', () => { agendaActiveTab = 'overdue'; renderAgenda(); });
+    strip.appendChild(overdueBtn);
 
-  // Scroll overdue tab into view
-  if (agendaActiveTab === 'overdue') {
-    requestAnimationFrame(() => scrollAgendaTabIntoView(strip, overdueBtn));
+    // Scroll overdue tab into view
+    if (agendaActiveTab === 'overdue') {
+      requestAnimationFrame(() => scrollAgendaTabIntoView(strip, overdueBtn));
+    }
   }
 
   // Day tabs in ISO week order
@@ -20111,6 +20153,12 @@ function _getOverdueItemsForRender() {
 function renderAgenda() {
   if (agendaActiveTab === null) {
     agendaActiveTab = new Date().getDay(); // 0=Sun … 6=Sat; matches dayIndex
+  }
+  // Browsing off the current week while sitting on Overdue would leave the view
+  // on a tab the strip no longer draws. Fall back to today's weekday, the same
+  // default a fresh open gets.
+  if (agendaActiveTab === 'overdue' && !isCurrentWeekOpen()) {
+    agendaActiveTab = new Date().getDay();
   }
   if (_agendaRenderScheduled) return;
   _agendaRenderScheduled = true;
@@ -21218,8 +21266,14 @@ function setDayFilter(day) {
 // to announce itself: the bar's day button carries the active day's abbreviation
 // and lights up, and a chip over the canvas names it with one click to clear.
 //
-// Menu order — overdue first, then Mon→Sun, then unscheduled.
+// Menu order — overdue first, then Mon→Sun, then unscheduled. Overdue is
+// dropped off the current week for the reason isCurrentWeekOpen gives: with no
+// today in the week, it would prune the map to a set the user cannot explain.
 const DAY_FILTER_ORDER = ['overdue', ...AGENDA_DAY_ORDER, 'unscheduled'];
+
+function dayFilterOrder() {
+  return isCurrentWeekOpen() ? DAY_FILTER_ORDER : DAY_FILTER_ORDER.filter(d => d !== 'overdue');
+}
 
 function dayFilterName(day) {
   if (day === 'unscheduled') return t('filter.unscheduled');
@@ -21257,7 +21311,7 @@ function openDayFilterMenu() {
     menu.appendChild(row);
   };
 
-  DAY_FILTER_ORDER.forEach(day => addRow(dayFilterName(day), day));
+  dayFilterOrder().forEach(day => addRow(dayFilterName(day), day));
   const sep = document.createElement('div');
   sep.className = 'ctx-separator';
   menu.appendChild(sep);
