@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-lUdOR6/ZiT+PSMkvBJpcMQLFr2hoV+TOSUtpc9ir1Aw='
+               'sha256-7YK8lZEMvkhyaaJNXv8Az2e3WPIsXLD/D/nujQQ8M/w='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -14557,6 +14557,18 @@ function applyAgendaOrder(nodes, savedOrder) {
 // Returns the "YYYY-MM-DD" calendar date for a given JS dayIndex (0=Sun…6=Sat)
 // within the currently loaded week. Returns a local-date string 'YYYY-MM-DD'
 // using local-time date components so it matches donedOn (also local date).
+// The day tab's face when the open week is not the current one. "Mo" is not
+// wrong there, only unanchored — nothing else in the Agenda names the date once
+// the week bar is behind the panel. English borrows the week bar's own wording
+// (MONTH_NAMES.en) rather than introducing a numeric format that a European
+// reader would parse the other way round; Czech uses its day-first convention,
+// with a non-breaking space so "15. 9." never breaks across the two halves.
+function formatTabDate(dayIndex) {
+  const [, m, d] = tabDateString(dayIndex).split('-').map(Number);
+  if (currentLang === 'cs') return `${d}.\u00A0${m}.`;
+  return `${MONTH_NAMES.en[m - 1]} ${d}`;
+}
+
 function tabDateString(dayIndex) {
   const { year, week } = parseWeekKey(currentWeekKey);
   const { monday } = getWeekBounds(year, week);
@@ -19122,6 +19134,9 @@ function renderAgendaStrip() {
 
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
   const overdueCount = _getOverdueItemsForRender().length;
+  // Three things hang off this: the Overdue tab, the week chip and what the day
+  // tabs put on their faces. See isCurrentWeekOpen.
+  const onCurrentWeek = isCurrentWeekOpen();
 
   // A separator sits *between* tabs, so the first tab drawn never gets one —
   // which is what lets Overdue drop out without leaving a rule hanging off the
@@ -19138,7 +19153,7 @@ function renderAgendaStrip() {
   // hidden outright on mobile), so without it the Agenda never says which week
   // it is showing. Clicking it returns to today, exactly as the week bar's own
   // label does.
-  if (!isCurrentWeekOpen()) {
+  if (!onCurrentWeek) {
     const { year, week } = parseWeekKey(currentWeekKey);
     const weekBtn = document.createElement('button');
     weekBtn.type = 'button';
@@ -19152,7 +19167,7 @@ function renderAgendaStrip() {
   }
 
   // Overdue tab — current week only; see isCurrentWeekOpen.
-  if (isCurrentWeekOpen()) {
+  if (onCurrentWeek) {
     const overdueBtn = document.createElement('button');
     overdueBtn.className = 'agenda-tab' + (agendaActiveTab === 'overdue' ? ' active' : '');
     overdueBtn.dataset.tab = 'overdue';
@@ -19180,10 +19195,17 @@ function renderAgendaStrip() {
     const btn = document.createElement('button');
     // Today's dot, like the Overdue tab and the week chip, only means something
     // in the week today falls in; elsewhere it marked an arbitrary weekday.
-    const isToday = isCurrentWeekOpen() && dayIdx === new Date().getDay();
+    const isToday = onCurrentWeek && dayIdx === new Date().getDay();
     btn.className = 'agenda-tab' + (agendaActiveTab === dayIdx ? ' active' : '') + (isToday ? ' agenda-tab-today' : '');
     btn.dataset.tab = String(dayIdx);
-    btn.textContent = langLabels[dayIdx];
+    // Off-week the face carries the date instead of the weekday; the tabs keep
+    // their fixed Mon→Sun order either way, so nothing about the day is lost.
+    btn.textContent = onCurrentWeek ? langLabels[dayIdx] : formatTabDate(dayIdx);
+    // The face drops the weekday off-week, so the accessible name keeps it.
+    if (!onCurrentWeek) {
+      const langFull = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
+      btn.setAttribute('aria-label', `${langFull[dayIdx]} ${formatTabDate(dayIdx)}`);
+    }
     btn.addEventListener('click', () => { agendaActiveTab = dayIdx; renderAgenda(); });
     strip.appendChild(btn);
 
