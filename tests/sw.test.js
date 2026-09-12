@@ -90,7 +90,7 @@ function loadWorker({ onLine, fetchImpl, clients = [], misc = null } = {}) {
       }
     },
     caches: {
-      _names: ['zw-shell-v0', 'zw-shell-v1', 'zw-shell-v2'],
+      _names: ['zw-shell-v1', 'zw-shell-v2', 'zw-shell-v3'],
       async open() { return cache; },
       async keys() { return this._names; },
       async delete(name) { this._names = this._names.filter(n => n !== name); return true; },
@@ -429,7 +429,7 @@ describe('sw.js — activation', () => {
     let work;
     w.listeners.activate({ waitUntil: p => { work = p; } });
     await work;
-    expect(w.ctx.caches._names).toEqual(['zw-shell-v2']);
+    expect(w.ctx.caches._names).toEqual(['zw-shell-v3']);
   });
 });
 
@@ -734,11 +734,11 @@ describe('sw.js — manifest icons', () => {
 
   it('drops the previous shell cache so stale icons cannot linger', async () => {
     const stale = loadWorker({ clients: [] });
-    stale.ctx.caches._names = ['zw-shell-v1', 'zw-shell-v2'];
+    stale.ctx.caches._names = ['zw-shell-v1', 'zw-shell-v2', 'zw-shell-v3'];
     let work;
     stale.listeners.activate({ waitUntil: p => { work = p; } });
     await work;
-    expect(stale.ctx.caches._names).toEqual(['zw-shell-v2']);
+    expect(stale.ctx.caches._names).toEqual(['zw-shell-v3']);
   });
 });
 

@@ -22,7 +22,7 @@
  */
 'use strict';
 
-const CACHE_NAME = 'zw-shell-v2';
+const CACHE_NAME = 'zw-shell-v3';
 
 // The four icons the web app manifest points at. Every other asset the app
 // needs is inline in the document — favicons are canvas-rendered data: URLs and
