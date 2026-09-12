@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-MWA8Mcb0ecUV08HWC0q9cPMZ35NnggnWnKR0v7SaL3c='
+               'sha256-pS8o51XyC+crLHoyFVOdZm0rg8CPDcw8MENiJBMPMIs='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -15397,7 +15397,15 @@ function updateNodeUI(nodeId) {
 
   const rect = g.querySelector('.node-rect');
   if (rect) {
-    rect.setAttribute('fill', bgColor);
+    // Same fill rule makeNodeGroup paints with: an open node is filled by its
+    // branch gradient, and only a closed or unplanned one falls back to a flat
+    // colour. Writing bgColor unconditionally dropped the gradient, so a task
+    // taken done and then undone kept a flat fill until some unrelated change
+    // forced a full render and repainted it.
+    const branch = node.branch || node.id;
+    const open = !node.done && !node.unplanned && !node.dropped;
+    rect.setAttribute('fill',
+      (open && BRANCH_COLORS[branch]) ? `url(#node-grad-${branch})` : bgColor);
     rect.setAttribute('stroke', borderColor);
     rect.setAttribute('stroke-width', sw);
   }
