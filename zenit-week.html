@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-gI3EiljmCC8aQK7MmmqufCFYLTAzAL1Nr30FU7btSUo='
+               'sha256-MWA8Mcb0ecUV08HWC0q9cPMZ35NnggnWnKR0v7SaL3c='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1144,6 +1144,11 @@
     gap: 12px;
   }
 
+  /* No backdrop-filter on small controls. Each one is its own compositor render
+     surface that re-blurs whatever sits behind it, and behind these is the full
+     SVG mindmap. At button size the blur is not legible anyway — --glass-bg
+     carries the look on its own. #sync-dropdown-signout also sits inside
+     #sync-dropdown, which is already blurred, so its own blur was doubled work. */
   #sync-btn,
   #sync-dropdown-signout {
     display: flex;
@@ -1153,8 +1158,6 @@
     height: 36px;
     padding: 0 16px;
     background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
     cursor: pointer;
@@ -1199,8 +1202,6 @@
     padding: 0;
     cursor: pointer;
     background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     flex-shrink: 0;
     box-shadow: 0 2px 8px var(--shadow-md);
     transition: transform 0.15s, box-shadow 0.15s, color 0.3s;
@@ -1424,11 +1425,12 @@
 
   .agenda-item .agenda-action-btn { font-weight: 400; }
 
+  /* Blur-free for the same reason as #sync-btn — and this class is worn by every
+     agenda row action and quick-add pill, so it was the densest cluster of
+     render surfaces in the app. */
   .agenda-action-btn {
     position: relative;
     background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     color: var(--text-subtle);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
@@ -13985,8 +13987,11 @@ function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId
 const inlineInput = document.getElementById('inline-input');
 const inlineSizer = document.getElementById('inline-sizer');
 
-function nodeScreenPos(nodeId) {
-  const positions = computeLayout();
+// `positions` lets a caller that has already run computeLayout() in this same
+// synchronous pass hand it in rather than paying for a second full sizing pass.
+// Only pass it when no node has been mutated in between — computeLayout() is the
+// only thing that reflects such a change.
+function nodeScreenPos(nodeId, positions = computeLayout()) {
   const pos = positions[nodeId];
   if (!pos) return null;
   const rect = container.getBoundingClientRect();
@@ -14009,30 +14014,46 @@ function nodeScreenPos(nodeId) {
 // reflow updates mid-edit is sibling positions shifting to make room — that can
 // wait until the user pauses typing. Fires once typing settles (~130ms idle).
 let _editRenderTimer = null;
+let _editRenderToken = 0;
 const EDIT_RENDER_DEBOUNCE_MS = 130;
 function _scheduleEditRender(immediate = false) {
   clearTimeout(_editRenderTimer);
   _editRenderTimer = null;
-  // Opening the editor (esp. a new node) must reflow now, or the input overlay
-  // visibly overlaps siblings until the debounce fires. Ongoing keystrokes
-  // debounce — the layout slot is already reserved, so reflow can wait for a pause.
-  if (immediate) {
-    if (editState) render();
-    return;
-  }
-  _editRenderTimer = setTimeout(() => {
+  const myToken = ++_editRenderToken;   // supersedes any pending reflow, timer or frame
+  // Opening the editor (esp. a new node) reflows on the next task rather than
+  // waiting out the typing debounce, or the input overlay visibly overlaps its
+  // siblings. Ongoing keystrokes debounce — the layout slot is already reserved,
+  // so that reflow can wait for a pause.
+  //
+  // Never synchronous, even when immediate: this runs inside the "+" tap handler,
+  // and render() rebuilds every node group in the week. Measured on a 228-node
+  // week (Galaxy S22, Chrome 152), that was 135 ms of blocking script inside the
+  // tap; deferred it is 16 ms, which is what keeps the next input responsive.
+  //
+  // What this does NOT buy is INP. Measured against the synchronous version the
+  // total was flat (392 ms -> 400 ms): the browser still cannot present until the
+  // render is done, so the cost only moves from the event's processing time into
+  // its presentation delay. setTimeout(0) was actively worse (464 ms) because a
+  // 0 ms timer is serviced before the frame's rendering opportunity, putting the
+  // render back inside the interaction's own frame; afterNextPaint clears it.
+  // The interaction's real cost is paint, not script — see the glow filters on
+  // .node-rect, worth ~176 ms of the same tap.
+  const run = () => {
+    if (myToken !== _editRenderToken) return;   // a newer keystroke owns the reflow now
     _editRenderTimer = null;
     // Guard: commit/cancel paths run render() themselves. If the user already
     // exited the edit, skip — otherwise we'd render redundantly.
     if (editState) render();
-  }, EDIT_RENDER_DEBOUNCE_MS);
+  };
+  if (immediate) { afterNextPaint(run); return; }
+  _editRenderTimer = setTimeout(run, EDIT_RENDER_DEBOUNCE_MS);
 }
 
 // Last size written by resizeInlineInput(); the input is border-box, so these
 // equal offsetWidth/offsetHeight without touching layout.
 let _inlineInputW = 0, _inlineInputH = 0;
 
-function resizeInlineInput(immediate = false, withRender = true) {
+function resizeInlineInput(immediate = false, withRender = true, positions = null) {
   const nodeId = editState.nodeId;
   const { w, h, fontSize, padX, lineH, totalTextH } = getNodeSize(nodeId);
   const { sw, visualRx } = getNodeVisuals(nodeId);
@@ -14083,7 +14104,7 @@ function resizeInlineInput(immediate = false, withRender = true) {
   inlineInput.style.paddingRight  = (padX * zoom) + 'px';
 
   if (editState) {
-    const sp = nodeScreenPos(nodeId);
+    const sp = positions ? nodeScreenPos(nodeId, positions) : nodeScreenPos(nodeId);
     if (sp) {
       inlineInput.style.left = (sp.x - totalW / 2) + 'px';
       inlineInput.style.top  = (sp.y - totalH / 2) + 'px';
@@ -14114,7 +14135,10 @@ function revealNewlyEditedNode(nodeId) {
 // Eased animation from current panX/panY to a target. Cancels any in-flight
 // animation; restarts smoothly from current values so repeated calls (e.g.
 // debounced vv.resize during a keyboard opening) compose without snapping.
-function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
+// `positions` as in nodeScreenPos: both callers have just run computeLayout() to
+// work out where they are panning to, and re-running it here sized all 200+ nodes
+// a second time for a single position lookup.
+function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350, positions = null) {
   // Three independent triggers ask for this pan (optimistic, keyboard-settled,
   // 500 ms fallback) and they usually agree. Restarting the tween for a target
   // it is already flying to reads as a stutter: the running ease decelerates,
@@ -14149,8 +14173,7 @@ function animatePanTo(targetPanX, targetPanY, nodeId, duration = 350) {
   // a tip must never be stranded in the queue by a pan that never finished.
   setTimeout(() => { if (myToken === _panAnimToken) endPanAnimation(); }, duration + 80);
   const rect = container.getBoundingClientRect();
-  const positions = computeLayout();
-  const pos = nodeId ? positions[nodeId] : null;
+  const pos = nodeId ? (positions || computeLayout())[nodeId] : null;
 
   function ease(t) {
     if (continuing) return t * (2 - t);                  // ease-out, no second ramp
@@ -14203,7 +14226,7 @@ function smoothPanToRevealNode(nodeId) {
   if (nodeScreenX > margin && nodeScreenX < cW - margin &&
       nodeScreenY > margin && nodeScreenY < cH - margin) return;
 
-  animatePanTo(cW / 2 - pos.x * zoom, cH / 2 - pos.y * zoom, nodeId);
+  animatePanTo(cW / 2 - pos.x * zoom, cH / 2 - pos.y * zoom, nodeId, 350, positions);
 }
 
 function createDayChild(parentId, dayIndex) {
@@ -14991,7 +15014,10 @@ function _openInlineInput(nodeId, isNew) {
   inlineInput.maxLength = node.dayChild ? 2 : (node.tickChild ? 4 : 524288);
   inlineInput.value = isNew ? '' : node.label;
 
-  const sp = nodeScreenPos(nodeId);
+  // One sizing pass for the whole open: the guard below and resizeInlineInput's
+  // positioning both read it, and nothing between them touches a node.
+  const editPositions = computeLayout();
+  const sp = nodeScreenPos(nodeId, editPositions);
   if (!sp) { cancelEdit(); return; }
 
   // Match node border exactly
@@ -15012,7 +15038,7 @@ function _openInlineInput(nodeId, isNew) {
   }
   inlineInput.style.display      = 'block';
 
-  resizeInlineInput(true);
+  resizeInlineInput(true, true, editPositions);
   probeMark('edit:sized');
 
   // preventScroll keeps the browser from auto-scrolling the body to bring the
@@ -15271,7 +15297,7 @@ function _panEditNodeToVisibleArea(opts) {
   const targetPanY = targetScreenY - rect.top  - pos.y * zoom;
   probeMark('pan:request', (optimistic ? 'optimistic' : 'settled') +
     ' kbOpen=' + kbOpen + ' inset=' + Math.round(effectiveInset));
-  animatePanTo(targetPanX, targetPanY, editState.nodeId, 300);
+  animatePanTo(targetPanX, targetPanY, editState.nodeId, 300, positions);
 }
 
 if (window.visualViewport) {
@@ -21568,6 +21594,21 @@ function repackLayout() {
 // stays inside the same input-driven pipeline and only delays the start.
 function deferFromInput(fn) {
   setTimeout(fn, 0);
+}
+
+// Run `fn` only once the browser has painted the frame the current interaction is
+// waiting for. deferFromInput is not enough on its own for work this heavy: a 0 ms
+// timer is serviced *before* the frame's rendering opportunity, so a full render()
+// handed to it still lands in the interaction's own frame and simply moves the
+// cost from the event's processing time into its presentation delay — measured on
+// a 228-node week as 336 ms synchronous vs 464 ms via setTimeout(0).
+//
+// The rAF callback runs just before that paint; the timer it arms is therefore the
+// first task after it. Use this for work the user is not waiting to see. Falls
+// back to a plain task where rAF is unavailable (hidden tab, no rAF).
+function afterNextPaint(fn) {
+  if (typeof requestAnimationFrame !== 'function') { setTimeout(fn, 0); return; }
+  requestAnimationFrame(() => setTimeout(fn, 0));
 }
 
 function repackWithSlide(mutate) {
