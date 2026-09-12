@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-GhlAf0T74mzoRiekDFoWGqmhGvcN7ggFFgGSlcFKEIE='
+               'sha256-gI3EiljmCC8aQK7MmmqufCFYLTAzAL1Nr30FU7btSUo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5137,6 +5137,15 @@ function _fireQuietReload() {
   }
   _hideUpdateBanner();
   _writePendingReload({ v: APP_VERSION, n: attempts + 1 });
+  stashViewStateForReload();
+  console.debug('[quiet-refresh] reload-fired');
+  location.reload();
+}
+
+// Volatile view state, parked where boot will find it. Every deliberate reload
+// goes through here — the quiet auto-reload and the pull-to-refresh gesture —
+// so both land back on the map the person was looking at.
+function stashViewStateForReload() {
   const payload = buildRestorePayload({
     panX, panY, zoom,
     currentView, currentWeekKey,
@@ -5144,8 +5153,6 @@ function _fireQuietReload() {
     now: Date.now(),
   });
   localStorage.setItem(RESTORE_KEY, JSON.stringify(payload));
-  console.debug('[quiet-refresh] reload-fired');
-  location.reload();
 }
 
 document.addEventListener('mouseup',   tryQuietReload);
@@ -22163,10 +22170,18 @@ function _ptrPark() {
   el.style.setProperty('--ptr-rot', '0deg');
 }
 
-// What "refresh" means here, in order: take a waiting app update if one is owed,
-// otherwise re-pull this week from Drive and re-open it. The quiescence gate is
-// skipped exactly as the update banner's own button skips it — the person
-// pulling is the reason that gate exists.
+// A pull is the browser's own reload gesture, so it does what the browser's
+// reload does: refetch the document and boot the app from scratch. Anything
+// less is a different act wearing the same gesture — a data re-pull leaves the
+// running build, the service worker registration and every module's in-memory
+// state exactly as they were, which is precisely what someone reaching for
+// reload is trying to get rid of. The one thing added on top is the view state,
+// so the pull lands back on the map the menu's reload would have thrown away.
+//
+// The exception is a tab that is offline with no worker answering for it: there
+// a reload reaches the browser's error page and takes the app with it. That tab
+// gets its week re-opened in place instead — the most a refresh can honestly
+// mean with no document to fetch.
 async function performPullRefresh() {
   if (_ptrBusy) return;
   _ptrBusy = true;
@@ -22174,14 +22189,25 @@ async function performPullRefresh() {
   el.classList.add('settling', 'spinning');
   el.style.opacity = '1';
   el.style.transform = `translateY(${PTR_REST_Y}px)`;
+
+  // An update already owed keeps its own bookkeeping (attempt count, banner),
+  // so hand the reload to the path that owns it.
+  if (_pendingReload) { _fireQuietReload(); return; }
+
+  const swControlled = typeof navigator !== 'undefined'
+    && navigator.serviceWorker
+    && !!navigator.serviceWorker.controller;
+  if (!isDefinitelyOffline() || swControlled) {
+    stashViewStateForReload();
+    // The spinner stays up: the document is on its way out. If navigation is
+    // somehow refused, release the gesture rather than spin forever.
+    setTimeout(() => { _ptrPark(); _ptrBusy = false; }, 5000);
+    location.reload();
+    return;
+  }
+
   const startedAt = Date.now();
   try {
-    if (_pendingReload) { _fireQuietReload(); return; }
-    if (googleAccessToken && !isDefinitelyOffline()) {
-      await syncWeekFromDrive(currentWeekKey, { force: true });
-      await syncScheduleFromDrive();
-      await syncColorsFromDrive();
-    }
     // Re-open rather than just re-render: the pull is also how someone asks for
     // occurrences that came due while the tab sat open.
     await openWeekIntoView(currentWeekKey);
@@ -22193,7 +22219,7 @@ async function performPullRefresh() {
     console.error('[ptr] refresh failed:', err);
   } finally {
     // Hold the spinner long enough to read as an answer; a refresh that resolves
-    // from cache in 20ms otherwise looks like a gesture that did nothing.
+    // from IDB in 20ms otherwise looks like a gesture that did nothing.
     const linger = Math.max(0, 450 - (Date.now() - startedAt));
     setTimeout(() => { _ptrPark(); _ptrBusy = false; }, linger);
   }
