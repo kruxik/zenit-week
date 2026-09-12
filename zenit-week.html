@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Lh76jvMOly2n3brb7ZrXDV/m5qnAwL+EjWvHmtIBC0Y='
+               'sha256-GhlAf0T74mzoRiekDFoWGqmhGvcN7ggFFgGSlcFKEIE='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2254,8 +2254,9 @@
   }
 
   /* Empty / positive states */
-  /* The empty week is one centred block, not two flex columns of the donut row. */
-  .stats-empty {
+  /* One centred block for every "nothing here yet" surface — the empty week in
+     Stats and each empty Agenda tab. Built by buildEmptyState(). */
+  .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2265,14 +2266,14 @@
     min-height: 46vh;
     text-align: center;
   }
-  .stats-empty .daily-log-empty { padding: 0; }
-  .stats-empty-icon {
+  .empty-state .daily-log-empty { padding: 0; }
+  .empty-state-icon {
     font-size: 44px;
     color: var(--text-placeholder);
     opacity: 0.5;
     margin-bottom: 4px;
   }
-  .stats-empty-hint {
+  .empty-state-hint {
     text-align: center;
     color: var(--text-placeholder);
     font-size: 12.5px;
@@ -6196,6 +6197,27 @@ async function runMigrationIfNeeded() {
 // ─── Icon helper ──────────────────────────────────────────────────────────────
 function iconSvg(name) {
   return `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"/></svg>`;
+}
+
+// The one "nothing here yet" block: a muted view icon, the state in a sentence,
+// and a hint naming the move that fills it. Stats and every Agenda tab share it,
+// so an empty surface reads the same wherever it is met.
+function buildEmptyState(iconName, msgKey, hintKey) {
+  const wrap = document.createElement('div');
+  wrap.className = 'empty-state';
+  const icon = document.createElement('span');
+  icon.className = 'empty-state-icon';
+  icon.innerHTML = iconSvg(iconName); // static, constant markup
+  wrap.appendChild(icon);
+  const msg = document.createElement('div');
+  msg.className = 'daily-log-empty';
+  msg.textContent = t(msgKey);
+  wrap.appendChild(msg);
+  const hint = document.createElement('div');
+  hint.className = 'empty-state-hint';
+  hint.textContent = t(hintKey);
+  wrap.appendChild(hint);
+  return wrap;
 }
 
 // ─── Undo/Redo ────────────────────────────────────────────────────────────────
@@ -10261,7 +10283,9 @@ const TRANSLATIONS = {
     'view.stats':                 'Stats',
     'agenda.overdue':             'Overdue',
     'agenda.emptyDay':            'No tasks for this day.',
+    'agenda.emptyDayHint':        'Give a task this day on the mindmap and it lands here.',
     'agenda.emptyOverdue':        'No overdue tasks.',
+    'agenda.emptyOverdueHint':    'Nothing from earlier this week is still open.',
     'agenda.anyDay':              'Any day',
     'agenda.dropped':             'Dropped',
     'agenda.scheduled':           'Scheduled',
@@ -10296,6 +10320,7 @@ const TRANSLATIONS = {
     'help.featureSendFutureBody': ' — hand a task to a future date, once or repeating; it arrives in the week that owns that date, under the same parents it left',
     'help.sendToDateHint':        'Right-click a task with no sub-tasks → Reschedule → Date.',
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
+    'agenda.emptyLaterHint':      'Send a task to a date to plan past this week.',
     'sendFuture.title':           'Set a date',
     'sendFuture.date':            'Date',
     'sendFuture.repeat':          'Repeat',
@@ -10615,7 +10640,9 @@ const TRANSLATIONS = {
     'view.stats':                 'Statistika',
     'agenda.overdue':             'Zpožděné',
     'agenda.emptyDay':            'Pro tento den žádné úkoly.',
+    'agenda.emptyDayHint':        'Přiřaďte úkolu tento den v myšlenkové mapě a objeví se tady.',
     'agenda.emptyOverdue':        'Žádné zpožděné úkoly.',
+    'agenda.emptyOverdueHint':    'Z dřívějška nezůstalo nic otevřeného.',
     'agenda.anyDay':              'Kdykoli',
     'agenda.dropped':             'Vyřazeno',
     'agenda.scheduled':           'Naplánováno',
@@ -10650,6 +10677,7 @@ const TRANSLATIONS = {
     'help.featureSendFutureBody': ' — pošli úkol na budoucí datum, jednorázově nebo opakovaně; objeví se v týdnu, do kterého datum patří, pod stejnými rodiči',
     'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů → Přeplánovat → Datum.',
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
+    'agenda.emptyLaterHint':      'Pošlete úkol na datum a naplánujete ho za tento týden.',
     'sendFuture.title':           'Nastavit datum',
     'sendFuture.date':            'Datum',
     'sendFuture.repeat':          'Opakování',
@@ -16061,21 +16089,7 @@ function _renderStatsEmpty() {
   const sec = document.getElementById('stats-section-donut');
   if (!sec) return;
   sec.textContent = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'stats-empty';
-  const icon = document.createElement('span');
-  icon.className = 'stats-empty-icon';
-  icon.innerHTML = iconSvg('chart-donut'); // static, constant markup
-  wrap.appendChild(icon);
-  const msg = document.createElement('div');
-  msg.className = 'daily-log-empty';
-  msg.textContent = t('stats.emptyWeek');
-  wrap.appendChild(msg);
-  const hint = document.createElement('div');
-  hint.className = 'stats-empty-hint';
-  hint.textContent = t('stats.emptyWeekHint');
-  wrap.appendChild(hint);
-  sec.appendChild(wrap);
+  sec.appendChild(buildEmptyState('chart-donut', 'stats.emptyWeek', 'stats.emptyWeekHint'));
 }
 
 // ④ The Week — when work got done (doneAt / counter ticks) and when unplanned tasks
@@ -19921,10 +19935,9 @@ function renderAgendaTabContent() {
 
   if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0
       && scheduledTickRows.length === 0 && droppedItems.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'daily-log-empty';
-    empty.textContent = isOverdue ? t('agenda.emptyOverdue') : t('agenda.emptyDay');
-    content.appendChild(empty);
+    content.appendChild(isOverdue
+      ? buildEmptyState('circle-check', 'agenda.emptyOverdue', 'agenda.emptyOverdueHint')
+      : buildEmptyState('list-details', 'agenda.emptyDay', 'agenda.emptyDayHint'));
     return;
   }
 
@@ -20424,10 +20437,7 @@ function renderAgendaTabContent() {
 function renderLaterTab(content) {
   const rows = getLaterOccurrences();
   if (!rows.length) {
-    const empty = document.createElement('div');
-    empty.className = 'daily-log-empty';
-    empty.textContent = t('agenda.emptyLater');
-    content.appendChild(empty);
+    content.appendChild(buildEmptyState('calendar-week', 'agenda.emptyLater', 'agenda.emptyLaterHint'));
     return;
   }
 
