@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-E7nWOLQ7YMzWrhjRnRyChSxOSwvytuVFVCiDnepYOnU='
+               'sha256-7zBraczdJsARHlY2HJrIGTI/ZhT4v4bvK8ijIs5DT9c='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2254,11 +2254,29 @@
   }
 
   /* Empty / positive states */
+  /* The empty week is one centred block, not two flex columns of the donut row. */
+  .stats-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 46vh;
+    text-align: center;
+  }
+  .stats-empty .daily-log-empty { padding: 0; }
+  .stats-empty-icon {
+    font-size: 44px;
+    color: var(--text-placeholder);
+    opacity: 0.5;
+    margin-bottom: 4px;
+  }
   .stats-empty-hint {
     text-align: center;
     color: var(--text-placeholder);
     font-size: 12.5px;
-    margin-top: -20px;
+    max-width: 34ch;
   }
   .stats-positive {
     display: inline-flex;
@@ -15993,14 +16011,21 @@ function _renderStatsEmpty() {
   const sec = document.getElementById('stats-section-donut');
   if (!sec) return;
   sec.textContent = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'stats-empty';
+  const icon = document.createElement('span');
+  icon.className = 'stats-empty-icon';
+  icon.innerHTML = iconSvg('chart-donut'); // static, constant markup
+  wrap.appendChild(icon);
   const msg = document.createElement('div');
   msg.className = 'daily-log-empty';
   msg.textContent = t('stats.emptyWeek');
-  sec.appendChild(msg);
+  wrap.appendChild(msg);
   const hint = document.createElement('div');
   hint.className = 'stats-empty-hint';
   hint.textContent = t('stats.emptyWeekHint');
-  sec.appendChild(hint);
+  wrap.appendChild(hint);
+  sec.appendChild(wrap);
 }
 
 // ④ The Week — when work got done (doneAt / counter ticks) and when unplanned tasks
