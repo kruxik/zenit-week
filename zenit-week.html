@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-pS8o51XyC+crLHoyFVOdZm0rg8CPDcw8MENiJBMPMIs='
+               'sha256-YCfbzt3Te+5w6JiNL4Gj/cXAWTIKIf1jkbiAj6qzRQE='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -15408,6 +15408,17 @@ function updateNodeUI(nodeId) {
       (open && BRANCH_COLORS[branch]) ? `url(#node-grad-${branch})` : bgColor);
     rect.setAttribute('stroke', borderColor);
     rect.setAttribute('stroke-width', sw);
+  }
+
+  // The "+" disc is branch-coloured while the node is open and grey once it is
+  // done — makeNodeGroup's rule. Left out here, a task taken done kept a
+  // branch-coloured "+" (and a grey one after undone) until an unrelated change
+  // forced a full render.
+  const addDisc = g.querySelector('.add-btn .add-btn-inner > path, .add-btn .add-btn-inner > circle');
+  if (addDisc) {
+    const bcMain = (BRANCH_COLORS[node.branch] || {}).main
+      || (document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666');
+    addDisc.setAttribute('fill', node.done ? getThemeColors().DONE_BORDER : bcMain);
   }
 
   const texts = g.querySelectorAll('text');
