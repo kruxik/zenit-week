@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-7YK8lZEMvkhyaaJNXv8Az2e3WPIsXLD/D/nujQQ8M/w='
+               'sha256-E7nWOLQ7YMzWrhjRnRyChSxOSwvytuVFVCiDnepYOnU='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -887,44 +887,38 @@
     text-transform: none;
   }
 
-  /* ─── Week bar ───────────────────────────────────────────────────────────── */
-  /* Absolute inside #canvas-container rather than fixed to the body, so the
-     agenda panel covers it exactly the way it covers the mindmap it belongs to.
-     Styled as a peer of the other button bars (#undo-redo-bar, #view-toggle-bar)
-     because that is what it is; its buttons and the 1px rules between them
-     reuse .undo-redo-btn / .undo-redo-separator unchanged. */
-  #week-bar {
+  /* ─── Week picker ────────────────────────────────────────────────────────── */
+  /* One week control for all three views, and it lives in the toolbar rather
+     than over the canvas: Agenda and Stats cover the canvas, so a bar down
+     there could only ever name the week for the Mindmap. The toolbar already
+     paints above every panel, so nothing per-view keeps this visible.
+     Absolutely centred instead of a flex child, so neither the logo's two
+     widths nor the sync button's changing label can shove it sideways. Its
+     buttons and the 1px rules between them reuse .undo-redo-btn /
+     .undo-redo-separator unchanged. */
+  #week-picker {
     position: absolute;
-    /* Clears the 56px toolbar, which overlays the canvas from the top. */
-    top: 68px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     align-items: center;
     gap: 0;
-    max-width: calc(100vw - 24px);
-    box-sizing: border-box;
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px var(--shadow-md);
-    padding: 3px;
-    z-index: 20;
-    user-select: none;
+    /* Leaves the logo one side and the sync button the other; the label
+       ellipsises inside this rather than pushing either away. */
+    max-width: calc(100vw - 260px);
   }
 
-  #week-bar-label {
+  #week-picker-label {
     display: flex;
     /* Not baseline: a baseline-aligned flex group is placed at the cross-start
        edge, which pins the text to the top of the 36px button instead of
-       centring it. Both spans share one font-size, so their baselines line up
+       centring it. The spans share one font-size, so their baselines line up
        under center anyway — keep it that way if either size ever changes. */
     align-items: center;
     gap: 5px;
     height: 36px;
-    padding: 0 10px;
+    max-width: 100%;
+    padding: 0 6px 0 10px;
     border: none;
     background: none;
     border-radius: 5px;
@@ -935,30 +929,186 @@
     font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
+    overflow: hidden;
     transition: background 0.15s, color 0.15s;
   }
-  #week-bar-label:hover { background: var(--bg-hover); }
-  #week-bar-range { font-weight: 500; color: var(--text-subtle); }
+  #week-picker-label:hover { background: var(--bg-hover); }
+  #week-picker-range { font-weight: 500; color: var(--text-subtle); }
+  #week-picker-week,
+  #week-picker-range { overflow: hidden; text-overflow: ellipsis; }
 
-  /* The glyphs carry generous padding inside their 24-unit viewBox, so at the
-     inherited size they read as a fraction of the label beside them. .icon is
-     1em, so the button's own font-size is the dial — and it has to be set on all
-     three, or the odd one out falls back to the UA button default of 13.33px. */
-  #week-bar-prev, #week-bar-actions, #week-bar-next { font-size: 22px; }
+  /* The chevron is the whole promise that this opens, so it is the one part of
+     the label that never shrinks away — and it turns over while the fold is up. */
+  #week-picker-chevron {
+    flex-shrink: 0;
+    font-size: 18px;
+    transition: transform 0.15s ease;
+  }
+  #week-picker-label[aria-expanded="true"] #week-picker-chevron { transform: rotate(180deg); }
+
+  /* The short face — one letter and the number — is what survives on the
+     narrowest phones, where the full wording would crowd the logo. */
+  #week-picker-week-short { display: none; }
+
+  #week-picker-prev, #week-picker-next { font-size: 22px; }
 
   /* Away from the present, the label and the arrow that leads back to it share
      one accent, so "this is not the current week" reads as a single cue rather
      than two unrelated highlights. */
-  #week-bar.off-current #week-bar-label { color: var(--accent-warning-text); }
+  #week-picker.off-current #week-picker-label { color: var(--accent-warning-text); }
   .undo-redo-btn.today-direction {
     color: var(--accent-warning-text);
     background: var(--accent-warning-bg);
   }
 
-  /* Phones: the date range gives way first. The week number carries navigation,
-     and the full wording stays in the label's title and aria-label. */
+  /* ── The fold ───────────────────────────────────────────────────────────── */
+  /* Same glass surface as the toolbar's other dropdowns (#sync-dropdown,
+     #settings-dropdown) because it drops out of the same bar. Centred on the
+     label; on phones it spans the viewport instead (see the 520px query), which
+     is what keeps a 300px card from hanging off a 360px screen. */
+  #week-picker-fold {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    background: var(--settings-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
+    padding: 8px 0;
+    /* Above the toolbar's own 2600 so no panel header clips it, below
+       #settings-dropdown's 2700, which can open over it. */
+    z-index: 2650;
+    display: none;
+    /* Opacity only, not the shared fadeIn: that keyframe animates transform,
+       which would spend the translateX(-50%) this card is centred with and slide
+       it half its width off the label while it opened. */
+    animation: wpFoldIn 0.12s ease-out;
+  }
+  @keyframes wpFoldIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  #week-picker-fold.visible { display: block; }
+
+  #week-picker-month {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 0 8px 6px;
+  }
+  #week-picker-month-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  #week-picker-month .undo-redo-btn { width: 30px; height: 30px; font-size: 20px; }
+
+  #week-picker-grid { padding: 0 8px; }
+
+  .wp-head, .wp-week-row {
+    display: grid;
+    grid-template-columns: 30px repeat(7, 1fr);
+    align-items: center;
+  }
+  .wp-head {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding-bottom: 2px;
+  }
+  .wp-head span { text-align: center; }
+
+  /* The row is the target, not the day: a week is what this app opens, so a
+     click anywhere along the row means the one thing. */
+  .wp-week-row {
+    width: 100%;
+    border: none;
+    background: none;
+    font-family: inherit;
+    color: var(--text-dim);
+    padding: 2px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+    transition: background 0.15s, color 0.15s;
+  }
+  .wp-week-row:hover,
+  .wp-week-row:focus-visible { background: var(--ctx-hover-bg); color: var(--accent-primary); }
+  .wp-week-row.open { background: var(--accent-primary); color: #fff; }
+  .wp-week-row.open .wp-weekno,
+  .wp-week-row.open .wp-day.outside { color: rgba(255,255,255,0.78); opacity: 1; }
+
+  .wp-weekno {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: center;
+  }
+  .wp-day {
+    font-size: 12px;
+    text-align: center;
+    padding: 3px 0;
+  }
+  .wp-day.outside { color: var(--text-muted); opacity: 0.5; }
+  .wp-day.today { font-weight: 700; color: var(--accent-primary); }
+  .wp-week-row.open .wp-day.today { color: #fff; text-decoration: underline; }
+
+  /* The actions the Mindmap's week-bar gear used to hold, wearing the context menu's
+     own row so there is one vocabulary for "do something to this week". */
+  #week-picker-actions { margin-top: 4px; }
+  /* Real buttons, so Tab and Enter work without a roving-tabindex of our own;
+     these four lines are only what it takes to make a <button> wear .ctx-item. */
+  #week-picker-actions .ctx-item {
+    font-size: 13px;
+    padding: 9px 16px;
+    width: 100%;
+    border: none;
+    background: none;
+    font-family: inherit;
+    text-align: left;
+  }
+  .wp-today-item { color: var(--accent-warning-text); }
+  .wp-today-item:hover { background: var(--accent-warning-bg); color: var(--accent-warning-text); }
+
+  @media (max-width: 520px) {
+    /* The fold carries navigation here, so the arrows and their rules step
+       aside and the logo keeps its full wordmark. The control stops being
+       centred on the viewport and becomes a flex child between the logo and the
+       sync button, because at this width a viewport-centred label sits on top
+       of the logo. */
+    #week-picker {
+      position: relative;
+      left: auto;
+      transform: none;
+      margin: 0 4px;
+      min-width: 0;
+      max-width: none;
+    }
+    #week-picker-prev,
+    #week-picker-next,
+    #week-picker .undo-redo-separator { display: none; }
+    #week-picker-range { display: none; }
+    /* Viewport-wide instead of label-wide: a 300px card cannot hang off a
+       360px screen if it is pinned to both gutters. */
+    #week-picker-fold {
+      position: fixed;
+      top: calc(var(--toolbar-h) + 4px);
+      left: 8px;
+      right: 8px;
+      width: auto;
+      transform: none;
+    }
+  }
+
   @media (max-width: 360px) {
-    #week-bar-range { display: none; }
+    #week-picker-week { display: none; }
+    #week-picker-week-short { display: inline; }
   }
 
   /* View levels and the day filter hide by pruning nodes out of the layout, but
@@ -2674,30 +2824,6 @@
     flex-shrink: 0;
   }
 
-  /* The week chip — only drawn off the current week, where the mindmap's week
-     bar is behind the panel and cannot say which week this is. Same job and the
-     same amber as #week-bar.off-current #week-bar-label, worn by the strip's own
-     tab shape rather than a second button style.
-     Sticky so the way back to today survives scrolling the tabs on a phone; that
-     needs an opaque background (tabs pass underneath), which is why the hover
-     tint is layered over --bg-surface instead of replacing it — --bg-hover is
-     translucent. left matches the strip's 8px padding so the chip does not jump
-     sideways the moment it starts sticking, and the box-shadow paints that same
-     8px of gutter so nothing shows through beside it. */
-  .agenda-tab-week {
-    position: sticky;
-    left: 8px;
-    z-index: 1;
-    color: var(--accent-warning-text);
-    background: var(--bg-surface);
-    box-shadow: -8px 0 0 0 var(--bg-surface);
-  }
-
-  .agenda-tab-week:hover {
-    color: var(--accent-warning-text);
-    background: linear-gradient(var(--bg-hover), var(--bg-hover)), var(--bg-surface);
-  }
-
   .agenda-overdue-badge {
     display: inline-flex;
     align-items: center;
@@ -3734,6 +3860,59 @@
         <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="currentColor"> Week</text>
       </svg>
     </div>
+    <!-- Week picker. The one week control every view shares. The Mindmap's old
+         #week-bar sat over the canvas, which Agenda and Stats cover — so from
+         either of those views nothing said which week was on screen. The toolbar
+         paints above every panel, so one control here serves all three.
+         Every face is written by updateWeekPicker (week- and language-dependent),
+         so only the static aria labels are declared here. -->
+    <div id="week-picker">
+      <button type="button" class="undo-redo-btn" id="week-picker-prev"
+              data-i18n-aria="nav.prev" aria-label="Previous">
+        <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-up"/></svg>
+      </button>
+      <div class="undo-redo-separator"></div>
+      <!-- aria-label is a placeholder for the empty-until-rendered spans;
+           updateWeekPicker replaces it with the full week wording. -->
+      <button type="button" id="week-picker-label" aria-label="Week"
+              aria-haspopup="dialog" aria-expanded="false" aria-controls="week-picker-fold">
+        <span id="week-picker-week"></span>
+        <span id="week-picker-week-short"></span>
+        <span id="week-picker-range"></span>
+        <svg class="icon" id="week-picker-chevron" aria-hidden="true"><use href="#icon-caret-down"/></svg>
+      </button>
+      <div class="undo-redo-separator"></div>
+      <button type="button" class="undo-redo-btn" id="week-picker-next"
+              data-i18n-aria="nav.next" aria-label="Next">
+        <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-down"/></svg>
+      </button>
+      <!-- The fold. Month paging never changes the open week — only a week row
+           does — so browsing to September does not drag the app along with it. -->
+      <div id="week-picker-fold" role="dialog" data-i18n-aria="weekpicker.title" aria-label="Choose week">
+        <div id="week-picker-month">
+          <button type="button" class="undo-redo-btn" id="week-picker-month-prev"
+                  data-i18n-aria="weekpicker.prevMonth" aria-label="Previous month">
+            <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-up"/></svg>
+          </button>
+          <div id="week-picker-month-label"></div>
+          <button type="button" class="undo-redo-btn" id="week-picker-month-next"
+                  data-i18n-aria="weekpicker.nextMonth" aria-label="Next month">
+            <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-down"/></svg>
+          </button>
+        </div>
+        <div id="week-picker-grid"></div>
+        <div id="week-picker-actions">
+          <button type="button" class="ctx-item wp-today-item" id="wp-this-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="weekpicker.thisWeek">This week</span></button>
+          <div class="ctx-separator"></div>
+          <button type="button" class="ctx-item" id="wp-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.transferUnfinished">Transfer Unfinished</span></button>
+          <button type="button" class="ctx-item" id="wp-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> <span data-i18n="menu.transferReusable">Transfer Reusable</span></button>
+          <button type="button" class="ctx-item" id="wp-set-baseline"><svg class="icon" aria-hidden="true"><use href="#icon-battery-2"/></svg> <span data-i18n="menu.setBaseline">Set Effort Baseline</span></button>
+          <button type="button" class="ctx-item" id="wp-clear-day-filter"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed"/></svg> <span data-i18n="menu.clearDayFilter">Clear Day Filter</span></button>
+          <div class="ctx-separator"></div>
+          <button type="button" class="ctx-item danger" id="wp-clear-week"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.clearWeek">Clear the Week</span></button>
+        </div>
+      </div>
+    </div>
     <div id="toolbar-right">
       <div id="sync-container">
         <button type="button" id="sync-btn">
@@ -3860,33 +4039,6 @@
         </div>
         <span data-i18n="view.rocks">Rocks</span>
       </div>
-    </div>
-    <!-- Week navigation. Global chrome, so it lives in the DOM instead of inside
-         the pannable SVG root node, where reaching it meant zooming to the
-         center of the map. Titles are set in updateWeekBar (they name the
-         target week), so only the aria labels are declared here. -->
-    <div id="week-bar">
-      <button type="button" class="undo-redo-btn" id="week-bar-prev"
-              data-i18n-aria="nav.prev" aria-label="Previous">
-        <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-up"/></svg>
-      </button>
-      <div class="undo-redo-separator"></div>
-      <!-- aria-label is a placeholder for the empty-until-rendered spans;
-           updateWeekBar replaces it with the full week wording. -->
-      <button type="button" id="week-bar-label" aria-label="Week">
-        <span id="week-bar-week"></span>
-        <span id="week-bar-range"></span>
-      </button>
-      <div class="undo-redo-separator"></div>
-      <button type="button" class="undo-redo-btn" id="week-bar-actions"
-              data-i18n-aria="weekbar.actions" aria-label="Week actions" aria-haspopup="true">
-        <svg class="icon" aria-hidden="true"><use href="#icon-menu-2"/></svg>
-      </button>
-      <div class="undo-redo-separator"></div>
-      <button type="button" class="undo-redo-btn" id="week-bar-next"
-              data-i18n-aria="nav.next" aria-label="Next">
-        <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-down"/></svg>
-      </button>
     </div>
     <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -9967,7 +10119,10 @@ const TRANSLATIONS = {
     'week.word':                  'Week',
     'center.me':                  'Me',
     'weekbar.today':              'Jump to current week',
-    'weekbar.actions':            'Week actions',
+    'weekpicker.title':           'Choose week',
+    'weekpicker.prevMonth':       'Previous month',
+    'weekpicker.nextMonth':       'Next month',
+    'weekpicker.thisWeek':        'This week',
     'settings.appearance':        'Theme',
     'settings.light':             'Light',
     'settings.dark':              'Dark',
@@ -10318,7 +10473,10 @@ const TRANSLATIONS = {
     'week.word':                  'Týden',
     'center.me':                  'Já',
     'weekbar.today':              'Přejít na aktuální týden',
-    'weekbar.actions':            'Akce týdne',
+    'weekpicker.title':           'Vybrat týden',
+    'weekpicker.prevMonth':       'Předchozí měsíc',
+    'weekpicker.nextMonth':       'Další měsíc',
+    'weekpicker.thisWeek':        'Tento týden',
     'settings.appearance':        'Téma',
     'settings.light':             'Světlý',
     'settings.dark':              'Tmavý',
@@ -10682,7 +10840,7 @@ function applyTranslations() {
   });
   refreshSyncUiText();
   refreshDayFilterUI(); // day names in the rail and chip are language-dependent
-  updateWeekBar();      // as is every string in the week bar
+  updateWeekPicker();   // as is every string in the week picker
   const sel = document.getElementById('lang-select');
   if (sel) sel.value = currentLang;
   // Show only the day-indicator rows matching the current language
@@ -10703,7 +10861,7 @@ function setLanguage(lang) {
   saveBranchColors(); // propagate lang change to Drive via colors file
 }
 
-// The week's name and its date range, kept apart so the week bar can render
+// The week's name and its date range, kept apart so the week picker can render
 // them as two elements and drop the range on narrow viewports without
 // re-deriving the wording. Callers that want one string use formatWeekLabel.
 function formatWeekParts(year, week) {
@@ -13207,7 +13365,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   }
 
   // "+ Branch" buttons on the center node's left and right edges. Week label,
-  // navigation and the week-actions gear all moved to #week-bar — they were
+  // navigation and the week actions all moved to #week-picker — they were
   // global chrome sitting in a pannable coordinate space.
   if (isCenter) {
     const centerBtnColor = document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666';
@@ -14558,8 +14716,8 @@ function applyAgendaOrder(nodes, savedOrder) {
 // within the currently loaded week. Returns a local-date string 'YYYY-MM-DD'
 // using local-time date components so it matches donedOn (also local date).
 // The day tab's face when the open week is not the current one. "Mo" is not
-// wrong there, only unanchored — nothing else in the Agenda names the date once
-// the week bar is behind the panel. English borrows the week bar's own wording
+// wrong there, only unanchored — the week picker names the week, but nothing in
+// the Agenda names the date. English borrows the week picker's own wording
 // (MONTH_NAMES.en) rather than introducing a numeric format that a European
 // reader would parse the other way round; Czech uses its day-first convention,
 // with a non-breaking space so "15. 9." never breaks across the two halves.
@@ -16485,7 +16643,7 @@ function render() {
   });
 
   // Draw center node. Its label is the user, not the week — the week and its
-  // navigation live in #week-bar.
+  // navigation live in #week-picker.
   const centerG = makeNodeGroup('center', 0, 0, centerDisplayName(), 'center', null, null, null);
   nodesG.appendChild(centerG);
 
@@ -16742,6 +16900,8 @@ const ESC_DISMISSALS = [
     dismiss: () => { closeHelp(); } },
   { isOpen: () => isCommentDialogOpen(),
     dismiss: () => { closeCommentDialog(); } },
+  { isOpen: () => isWeekPickerOpen(),
+    dismiss: () => { closeWeekPicker(); } },
   { isOpen: () => isSettingsDropdownOpen(),
     dismiss: () => { closeSettingsDropdown(); } },
   // Mindmap-only from here down, and gated on it: the ring and the level row
@@ -16786,6 +16946,14 @@ function closeSettingsDropdown() {
 // Global keyboard shortcuts for hovered node
 function _windowKeydownHandler(e) {
   if (editState) return; // Don't interfere with inline editing
+
+  // The week picker's fold owns the keyboard while it is open: its rows take
+  // the arrows, and a bare letter must not switch view out from under it. Esc
+  // still runs the normal walk, which closes the fold first.
+  if (isWeekPickerOpen()) {
+    if (e.key === 'Escape') { e.preventDefault(); runEscDismiss(); }
+    return;
+  }
 
   // View toggle shortcuts — active unless typing in an input
   if (!e.metaKey && !e.ctrlKey && !e.shiftKey) {
@@ -18173,28 +18341,49 @@ document.addEventListener('pointerdown', (e) => {
   if (bpPanel.classList.contains('visible') && !bpPanel.contains(e.target)) closeBaselinePanel();
 });
 
-document.getElementById('ctx-clear-day-filter').addEventListener('click', () => {
-  // Menu closes now, the repack starts on the next task — see deferFromInput.
-  hideContextMenu();
+// ─── Week actions ─────────────────────────────────────────────────────────────
+// The things that act on the whole week, named once because two doors open onto
+// them: the week picker's fold and the center node's context menu. Each caller
+// closes its own surface first, so nothing here touches a menu.
+
+function weekActionClearDayFilter() {
+  // The repack starts on the next task — see deferFromInput.
   deferFromInput(() => setDayFilter(null));
+}
+
+function weekActionSetBaseline(x, y) {
+  openBaselinePanel(x, y);
+}
+
+async function weekActionTransferUnfinished() {
+  await transferUnfinished();
+  if (currentView === 'agenda') renderAgenda();
+}
+
+async function weekActionTransferReusable() {
+  await transferReusable();
+  if (currentView === 'agenda') renderAgenda();
+}
+
+document.getElementById('ctx-clear-day-filter').addEventListener('click', () => {
+  hideContextMenu();
+  weekActionClearDayFilter();
 });
 
 document.getElementById('ctx-set-baseline').addEventListener('click', () => {
   const rect = ctxMenu.getBoundingClientRect();
   hideContextMenu();
-  openBaselinePanel(rect.right + 4, rect.top);
+  weekActionSetBaseline(rect.right + 4, rect.top);
 });
 
-document.getElementById('ctx-transfer-unfinished').addEventListener('click', async () => {
-  await transferUnfinished();
-  if (currentView === 'agenda') renderAgenda();
+document.getElementById('ctx-transfer-unfinished').addEventListener('click', () => {
   hideContextMenu();
+  weekActionTransferUnfinished();
 });
 
-document.getElementById('ctx-transfer-reusable').addEventListener('click', async () => {
-  await transferReusable();
-  if (currentView === 'agenda') renderAgenda();
+document.getElementById('ctx-transfer-reusable').addEventListener('click', () => {
   hideContextMenu();
+  weekActionTransferReusable();
 });
 
 document.getElementById('ctx-move-next-week').addEventListener('click', async () => {
@@ -18494,8 +18683,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   });
 })();
 
-document.getElementById('ctx-clear-week').addEventListener('click', async () => {
-  hideContextMenu();
+async function weekActionClearWeek() {
   takeSnapshot();
   const clearIds = weekData.nodes
     .filter(n => n.type !== 'branch' && n.type !== 'center')
@@ -18508,6 +18696,11 @@ document.getElementById('ctx-clear-week').addEventListener('click', async () => 
   syncBranchConfig();
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
+}
+
+document.getElementById('ctx-clear-week').addEventListener('click', () => {
+  hideContextMenu();
+  weekActionClearWeek();
 });
 
 document.getElementById('ctx-done').addEventListener('click', () => {
@@ -19134,8 +19327,9 @@ function renderAgendaStrip() {
 
   const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
   const overdueCount = _getOverdueItemsForRender().length;
-  // Three things hang off this: the Overdue tab, the week chip and what the day
-  // tabs put on their faces. See isCurrentWeekOpen.
+  // Two things hang off this: the Overdue tab and what the day tabs put on
+  // their faces. The week itself is named by #week-picker, which every view
+  // shares. See isCurrentWeekOpen.
   const onCurrentWeek = isCurrentWeekOpen();
 
   // A separator sits *between* tabs, so the first tab drawn never gets one —
@@ -19146,24 +19340,6 @@ function renderAgendaStrip() {
     const sep = document.createElement('div');
     sep.className = 'agenda-tab-separator';
     strip.appendChild(sep);
-  }
-
-  // Week chip — the mirror image of the Overdue tab: shown only when this is
-  // NOT the current week. The mindmap's week bar sits behind this panel (and is
-  // hidden outright on mobile), so without it the Agenda never says which week
-  // it is showing. Clicking it returns to today, exactly as the week bar's own
-  // label does.
-  if (!onCurrentWeek) {
-    const { year, week } = parseWeekKey(currentWeekKey);
-    const weekBtn = document.createElement('button');
-    weekBtn.type = 'button';
-    weekBtn.className = 'agenda-tab agenda-tab-week';
-    weekBtn.textContent = `${t('week.word')} ${week}`;
-    // The face is the short form; the full wording and what the click does live
-    // on the accessible name, the same split updateWeekBar makes.
-    weekBtn.setAttribute('aria-label', `${formatWeekLabel(year, week)} — ${t('weekbar.today')}`);
-    weekBtn.addEventListener('click', () => goToTodayWeek());
-    strip.appendChild(weekBtn);
   }
 
   // Overdue tab — current week only; see isCurrentWeekOpen.
@@ -21427,37 +21603,45 @@ function refreshDayFilterUI() {
 
 }
 
-// ─── Week bar ─────────────────────────────────────────────────────────────────
-// Single refresh for the whole bar. Called from the two places currentWeekKey
-// changes (loadAndRender and the hashchange handler) and from applyTranslations,
-// since every string here is language-dependent.
-function updateWeekBar() {
-  const bar = document.getElementById('week-bar');
-  if (!bar || !currentWeekKey) return;   // pre-init: no week to describe yet
+// ─── Week picker ──────────────────────────────────────────────────────────────
+// The one week control, shared by all three views because it lives in the
+// toolbar rather than over the canvas. updateWeekPicker writes its face; the
+// fold underneath it is built by renderWeekPickerFold.
+//
+// Called from the two places currentWeekKey changes (loadAndRender and the
+// hashchange handler) and from applyTranslations, since every string here is
+// language-dependent.
+function updateWeekPicker() {
+  const picker = document.getElementById('week-picker');
+  if (!picker || !currentWeekKey) return;   // pre-init: no week to describe yet
 
   const { year, week } = parseWeekKey(currentWeekKey);
   const { weekPart, rangePart } = formatWeekParts(year, week);
-  document.getElementById('week-bar-week').textContent  = weekPart;
-  document.getElementById('week-bar-range').textContent = `(${rangePart})`;
+  document.getElementById('week-picker-week').textContent  = weekPart;
+  // The narrow face: the week word's initial and the number. That is as small
+  // as this gets and still reads as a week rather than a bare integer.
+  document.getElementById('week-picker-week-short').textContent =
+    `${t('week.word').charAt(0).toUpperCase()}${week}`;
+  document.getElementById('week-picker-range').textContent = `(${rangePart})`;
 
   const twk = todayWeekKey();
   const onCurrentWeek = currentWeekKey === twk;
-  bar.classList.toggle('off-current', !onCurrentWeek);
+  picker.classList.toggle('off-current', !onCurrentWeek);
 
   // Accent whichever arrow leads back to the present — neither, when this is it.
-  document.getElementById('week-bar-prev').classList.toggle('today-direction', currentWeekKey > twk);
-  document.getElementById('week-bar-next').classList.toggle('today-direction', currentWeekKey < twk);
+  document.getElementById('week-picker-prev').classList.toggle('today-direction', currentWeekKey > twk);
+  document.getElementById('week-picker-next').classList.toggle('today-direction', currentWeekKey < twk);
 
   // The visible label drops its date range on narrow viewports, so the full
-  // wording lives on the button's accessible name. No title — the week bar is
-  // the weeknav coachmark's anchor, and a native tooltip fights it on hover.
-  const label = document.getElementById('week-bar-label');
-  const full = formatWeekLabel(year, week);
-  const text = onCurrentWeek ? full : `${full} — ${t('weekbar.today')}`;
-  label.setAttribute('aria-label', text);
+  // wording lives on the button's accessible name. No title — the label is the
+  // weeknav coachmark's anchor, and a native tooltip fights it on hover.
+  document.getElementById('week-picker-label')
+    .setAttribute('aria-label', formatWeekLabel(year, week));
+
+  if (isWeekPickerOpen()) renderWeekPickerFold();
 }
 
-// Week navigation, shared by the bar's arrows and the [ / ] hotkeys.
+// Week navigation, shared by the picker's arrows and the [ / ] hotkeys.
 function stepWeek(delta) {
   return loadAndRender(offsetWeek(currentWeekKey, delta));
 }
@@ -21467,24 +21651,185 @@ function goToTodayWeek() {
   if (twk !== currentWeekKey) return loadAndRender(twk);
 }
 
-(function wireWeekBar() {
-  document.getElementById('week-bar-prev').addEventListener('click', () => stepWeek(-1));
-  document.getElementById('week-bar-next').addEventListener('click', () => stepWeek(+1));
+// ─── The fold ─────────────────────────────────────────────────────────────────
+// The month the grid is showing, as { y, m } with a 0-based month. Null means
+// "follow the open week", which every fresh open resets it to — so paging
+// months inside the fold never outlives the fold itself.
+let _wpMonth = null;
 
-  document.getElementById('week-bar-label').addEventListener('click', () => goToTodayWeek());
+function isWeekPickerOpen() {
+  return !!document.getElementById('week-picker-fold')?.classList.contains('visible');
+}
 
-  const actions = document.getElementById('week-bar-actions');
-  actions.addEventListener('click', (e) => {
+function openWeekPicker() {
+  _wpMonth = null;
+  renderWeekPickerFold();
+  document.getElementById('week-picker-fold').classList.add('visible');
+  document.getElementById('week-picker-label').setAttribute('aria-expanded', 'true');
+  // Land the keyboard where the eye already is.
+  document.querySelector('#week-picker-fold .wp-week-row.open')?.focus();
+}
+
+function closeWeekPicker() {
+  document.getElementById('week-picker-fold')?.classList.remove('visible');
+  document.getElementById('week-picker-label')?.setAttribute('aria-expanded', 'false');
+}
+
+// The month grid. A row is one button covering the whole ISO week, because a
+// week is what this app opens — the seven day numbers on it are a label, not
+// seven targets. Dates here are built as local midnights so getISOWeek, which
+// reads local components, agrees with what is drawn.
+function renderWeekPickerFold() {
+  const grid = document.getElementById('week-picker-grid');
+  if (!grid || !currentWeekKey) return;
+
+  const open = parseWeekKey(currentWeekKey);
+  if (!_wpMonth) {
+    const { monday } = getWeekBounds(open.year, open.week);
+    // A week belongs to the month holding its Thursday — the same rule ISO uses
+    // to decide which year it belongs to, so a week never opens the fold on a
+    // month it barely touches.
+    const thu = new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 3);
+    _wpMonth = { y: thu.getFullYear(), m: thu.getMonth() };
+  }
+
+  const months = MONTH_NAMES[currentLang] ?? MONTH_NAMES.en;
+  const name = months[_wpMonth.m];
+  document.getElementById('week-picker-month-label').textContent =
+    `${name.charAt(0).toUpperCase()}${name.slice(1)} ${_wpMonth.y}`;
+
+  grid.textContent = '';
+
+  const dayLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+  const head = document.createElement('div');
+  head.className = 'wp-head';
+  head.appendChild(document.createElement('span'));   // the week-number gutter
+  for (let i = 1; i <= 7; i++) {
+    const cell = document.createElement('span');
+    cell.textContent = dayLabels[i % 7];              // Monday-first, ISO
+    head.appendChild(cell);
+  }
+  grid.appendChild(head);
+
+  const now = new Date();
+  const todayStamp = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  const first  = new Date(_wpMonth.y, _wpMonth.m, 1);
+  const last   = new Date(_wpMonth.y, _wpMonth.m + 1, 0);
+  // Back up to the Monday of the week the 1st falls in, then walk whole weeks
+  // until one starts after the month has ended.
+  const cursor = new Date(first);
+  cursor.setDate(first.getDate() - ((first.getDay() || 7) - 1));
+
+  while (cursor <= last) {
+    const monday = new Date(cursor);
+    const iso = getISOWeek(monday);
+    const wk  = weekKey(iso.year, iso.week);
+    const isOpen = wk === currentWeekKey;
+
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'wp-week-row' + (isOpen ? ' open' : '');
+    row.setAttribute('aria-label', formatWeekLabel(iso.year, iso.week));
+    if (isOpen) row.setAttribute('aria-current', 'true');
+
+    const no = document.createElement('span');
+    no.className = 'wp-weekno';
+    no.textContent = String(iso.week);
+    row.appendChild(no);
+
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const cell = document.createElement('span');
+      cell.className = 'wp-day'
+        + (day.getMonth() === _wpMonth.m ? '' : ' outside')
+        + (`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}` === todayStamp ? ' today' : '');
+      cell.textContent = String(day.getDate());
+      row.appendChild(cell);
+    }
+
+    row.addEventListener('click', () => {
+      closeWeekPicker();
+      if (wk !== currentWeekKey) loadAndRender(wk);
+    });
+    grid.appendChild(row);
+    cursor.setDate(cursor.getDate() + 7);
+  }
+
+  // The way back only means something away from the present; the day filter
+  // only has something to clear while one is on.
+  document.getElementById('wp-this-week').style.display =
+    currentWeekKey === todayWeekKey() ? 'none' : '';
+  document.getElementById('wp-clear-day-filter').style.display =
+    activeDayFilter !== null ? '' : 'none';
+}
+
+(function wireWeekPicker() {
+  const label = document.getElementById('week-picker-label');
+  const fold  = document.getElementById('week-picker-fold');
+
+  document.getElementById('week-picker-prev').addEventListener('click', () => stepWeek(-1));
+  document.getElementById('week-picker-next').addEventListener('click', () => stepWeek(+1));
+
+  label.addEventListener('click', (e) => {
     e.stopPropagation();   // the document-level dismissal would close it again
     // …which also means the second click can't reach that dismissal, so the
-    // button has to close its own menu.
-    if (ctxMenu.classList.contains('visible') && contextTarget === 'center') {
-      hideContextMenu();
-      return;
-    }
-    const r = actions.getBoundingClientRect();
-    showContextMenu(r.left, r.bottom + 4, 'center');
+    // button has to close its own fold.
+    if (isWeekPickerOpen()) closeWeekPicker();
+    else openWeekPicker();
   });
+
+  // Everything inside the fold acts for itself; none of it is an outside click.
+  fold.addEventListener('click', (e) => e.stopPropagation());
+
+  function stepMonth(delta) {
+    const d = new Date(_wpMonth.y, _wpMonth.m + delta, 1);
+    _wpMonth = { y: d.getFullYear(), m: d.getMonth() };
+    renderWeekPickerFold();
+  }
+  document.getElementById('week-picker-month-prev').addEventListener('click', () => stepMonth(-1));
+  document.getElementById('week-picker-month-next').addEventListener('click', () => stepMonth(+1));
+
+  document.getElementById('wp-this-week').addEventListener('click', () => {
+    closeWeekPicker();
+    goToTodayWeek();
+  });
+  document.getElementById('wp-transfer-unfinished').addEventListener('click', () => {
+    closeWeekPicker();
+    weekActionTransferUnfinished();
+  });
+  document.getElementById('wp-transfer-reusable').addEventListener('click', () => {
+    closeWeekPicker();
+    weekActionTransferReusable();
+  });
+  document.getElementById('wp-set-baseline').addEventListener('click', () => {
+    const r = fold.getBoundingClientRect();
+    closeWeekPicker();
+    weekActionSetBaseline(r.left, r.bottom + 4);
+  });
+  document.getElementById('wp-clear-day-filter').addEventListener('click', () => {
+    closeWeekPicker();
+    weekActionClearDayFilter();
+  });
+  document.getElementById('wp-clear-week').addEventListener('click', () => {
+    closeWeekPicker();
+    weekActionClearWeek();
+  });
+
+  // Up and down walk the week rows. The global hotkey handler steps aside while
+  // the fold is open (see _windowKeydownHandler), so these are the only arrows
+  // in play — nothing here moves the map's focus ring.
+  fold.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const rows = Array.from(fold.querySelectorAll('.wp-week-row'));
+    if (!rows.length) return;
+    e.preventDefault();
+    const i = rows.indexOf(document.activeElement);
+    if (i === -1) { rows[0].focus(); return; }
+    rows[i + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
+  });
+
+  // One outside-click dismissal, the same one #sync-dropdown uses.
+  document.addEventListener('click', () => closeWeekPicker());
 })();
 
 // Slide each surviving node from its previous position to the freshly rendered
@@ -21630,10 +21975,6 @@ document.addEventListener('pointerdown', (e) => {
   if (menu.classList.contains('visible') && !menu.contains(e.target)) closeDayFilterMenu();
 });
 
-// The chip floats over the canvas, so swallow pointerdown or clicking it starts a pan.
-// Both float over the canvas as container descendants, so their pointerdowns
-// would otherwise bubble to the pan handler and drag the map behind them.
-document.getElementById('week-bar').addEventListener('pointerdown', e => e.stopPropagation());
 
 // ─── Branch swipe → cycle view level (mobile) ─────────────────────────────────
 const VIEW_LEVELS = ['full', 'pebbles', 'rocks'];
@@ -21706,7 +22047,7 @@ async function loadAndRender(wk) {
   } else {
     location.hash = wk;
   }
-  updateWeekBar();
+  updateWeekPicker();
   renderIfVisible();
   if (refit) fitMindmapView();
   if (currentView === 'agenda') renderAgenda();
@@ -21730,7 +22071,7 @@ window.addEventListener('hashchange', async () => {
       hideImportSpinner();
     }
     await openWeekIntoView(currentWeekKey);
-    updateWeekBar();
+    updateWeekPicker();
     renderIfVisible();
     fitMindmapView();   // new week, new extent — see loadAndRender's refit note
     if (currentView === 'agenda') renderAgenda();
@@ -23065,10 +23406,10 @@ window.addEventListener('load', async () => {
     _syncBtn.addEventListener('mouseenter', () => maybeShowHint('signin', _syncBtn));
     armTouchHintGate(_syncBtn, 'signin');
   }
-  const _weekBar = document.getElementById('week-bar');
-  if (_weekBar) {
-    _weekBar.addEventListener('mouseenter', () => maybeShowHint('weeknav', _weekBar));
-    armTouchHintGate(_weekBar, 'weeknav');
+  const _weekPicker = document.getElementById('week-picker-label');
+  if (_weekPicker) {
+    _weekPicker.addEventListener('mouseenter', () => maybeShowHint('weeknav', _weekPicker));
+    armTouchHintGate(_weekPicker, 'weeknav');
   }
   const _fabAdd = document.getElementById('fab-add');
   if (_fabAdd) {

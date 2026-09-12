@@ -172,7 +172,7 @@ async function captureMindmap(variant) {
     if (cc) { cc.style.background = 'transparent'; cc.style.backgroundImage = 'none'; }
     const overlays = [
       '#toolbar', '#fab-pill', '#view-level-bar', '#view-level-toast',
-      '#week-bar', '#zoom-label', '#help-fab', '#help-panel', '#sync-container',
+      '#week-picker', '#zoom-label', '#help-fab', '#help-panel', '#sync-container',
       '#placeholder-panel', '#agenda-view', '#context-menu',
       '#app-confirm-overlay',
     ];
