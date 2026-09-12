@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-cE8Qf8wTGfRs3hEXzE7qgq4HIQCj/rwOZ8coLs2411k='
+               'sha256-3XSQjyPgKwXuInjExVcy19Ne7ASRheDC4uqy83RGEZg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -17290,7 +17290,11 @@ function _windowKeydownHandler(e) {
       e.preventDefault();
       const KEY_TO_DAY = { '0':'overdue', '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':0, '8':'unscheduled' };
       const newFilter = KEY_TO_DAY[e.key];
-      setDayFilter(activeDayFilter === newFilter ? null : newFilter);
+      // Deferred for the reason deferFromInput documents, and to match the two
+      // menu call sites: setDayFilter repacks every node and then slides them,
+      // and an animation started inside a discrete input handler is serialised
+      // input-to-paint rather than running in ordinary frames.
+      deferFromInput(() => setDayFilter(activeDayFilter === newFilter ? null : newFilter));
       openViewLevels(); // the row carries the day button — it shows what is set
       return;
     }
