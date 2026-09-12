@@ -1284,6 +1284,12 @@
 
 
   /* ── Logo variants ── */
+  /* Same drawing at the same scale as .logo-full; the viewBox is cropped to
+     where the wordmark actually ends. The full variant carries ~30px of empty
+     box after "Week", which is invisible on the desktop toolbar (the week
+     picker is centred on the viewport there) but not on a phone, where the
+     picker is a flex child: space-between then measures from the empty tail and
+     parks the week label closer to the sync button than to the logo. */
   .logo-compact { display: none; }
   .logo-full    { display: block; }
 
@@ -3849,7 +3855,7 @@
         <text x="108" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="currentColor"> Week</text>
       </svg>
       <!-- Compact logotype: mobile (Zenit Week) -->
-      <svg class="logo-compact" xmlns="http://www.w3.org/2000/svg" viewBox="0 3 216 46" width="156" height="34" aria-label="Zenit Week" role="img">
+      <svg class="logo-compact" xmlns="http://www.w3.org/2000/svg" viewBox="0 3 178 46" width="129" height="34" aria-label="Zenit Week" role="img">
         <text x="2" y="36" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="currentColor">Zen</text>
         <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
         <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
