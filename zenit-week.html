@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-7zBraczdJsARHlY2HJrIGTI/ZhT4v4bvK8ijIs5DT9c='
+               'sha256-Lh76jvMOly2n3brb7ZrXDV/m5qnAwL+EjWvHmtIBC0Y='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2557,6 +2557,56 @@
   }
   @keyframes import-spin {
     to { transform: rotate(360deg); }
+  }
+
+  /* ─── Pull to refresh ────────────────────────────────────────────────────
+     One layer for the whole app, pinned under the toolbar and clipping its own
+     content, so the puck slides out from beneath the toolbar in every view and
+     is hidden the rest of the time. It lives in the toolbar's z-band (2600) so
+     it is drawn over the panels the same way the toolbar is. */
+  #ptr-layer {
+    position: fixed;
+    top: var(--toolbar-h);
+    left: 0;
+    right: 0;
+    height: 160px;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 2600;
+  }
+  #ptr-indicator {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    margin-left: -16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 2px 8px var(--shadow-md);
+    opacity: 0;
+    transform: translateY(-60px);
+  }
+  /* Only the release animates; while the finger drives the pull, transform
+     follows it frame by frame and a transition would lag behind it. */
+  #ptr-indicator.settling {
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+  #ptr-indicator::after {
+    content: '';
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-subtle);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    transform: rotate(var(--ptr-rot, 0deg));
+  }
+  #ptr-indicator.spinning::after {
+    animation: import-spin 0.7s linear infinite;
   }
 
   /* ─── View Toggle Bar ────────────────────────────────────────────────────── */
@@ -22054,6 +22104,147 @@ window.addEventListener('pointerup', (e) => {
     : VIEW_LEVELS[Math.max(idx - 1, 0)];
   if (next !== currentViewLevel) deferFromInput(() => _setViewLevel(next));
 });
+
+// ─── Pull to refresh ─────────────────────────────────────────────────────────
+// The platform-standard overscroll gesture. Two places start it:
+//   · the toolbar — the one strip that is present in every view, which is what
+//     lets the gesture reach the mindmap at all. A downward drag on the canvas
+//     is a pan (touch-action: none there), and no heuristic can serve both, so
+//     the top bar is the handle instead.
+//   · the Agenda and Stats lists, at scroll top, where the gesture is expected.
+//
+// Nothing native is being duplicated: <body> is overflow:hidden, so the
+// browser's own pull-to-refresh never arms in this app and cannot double-fire.
+const PTR_TRIGGER_PX = 64;   // pulled distance (after resistance) that commits
+const PTR_MAX_PX     = 96;   // travel cap, so the indicator can't be dragged away
+const PTR_RESISTANCE = 0.5;  // finger travel → indicator travel
+const PTR_REST_Y     = 56;   // resting offset under the toolbar, clear of a panel header
+const PTR_PARK_Y     = -60;  // hidden behind the toolbar, inside the layer's clip
+let _ptrBusy = false;
+
+function _ptrIndicator() {
+  let el = document.getElementById('ptr-indicator');
+  if (!el) {
+    const layer = document.createElement('div');
+    layer.id = 'ptr-layer';
+    el = document.createElement('div');
+    el.id = 'ptr-indicator';
+    layer.appendChild(el);
+    document.getElementById('app').appendChild(layer);
+  }
+  return el;
+}
+
+function _ptrTrack(dist) {
+  const el = _ptrIndicator();
+  const progress = Math.min(1, dist / PTR_TRIGGER_PX);
+  el.classList.remove('settling');
+  el.style.opacity = String(progress);
+  el.style.transform = `translateY(${Math.round(Math.min(PTR_REST_Y, dist - 40))}px)`;
+  el.style.setProperty('--ptr-rot', `${Math.round(progress * 270)}deg`);
+}
+
+function _ptrPark() {
+  const el = _ptrIndicator();
+  el.classList.add('settling');
+  el.classList.remove('spinning');
+  el.style.opacity = '0';
+  el.style.transform = `translateY(${PTR_PARK_Y}px)`;
+  el.style.setProperty('--ptr-rot', '0deg');
+}
+
+// What "refresh" means here, in order: take a waiting app update if one is owed,
+// otherwise re-pull this week from Drive and re-open it. The quiescence gate is
+// skipped exactly as the update banner's own button skips it — the person
+// pulling is the reason that gate exists.
+async function performPullRefresh() {
+  if (_ptrBusy) return;
+  _ptrBusy = true;
+  const el = _ptrIndicator();
+  el.classList.add('settling', 'spinning');
+  el.style.opacity = '1';
+  el.style.transform = `translateY(${PTR_REST_Y}px)`;
+  const startedAt = Date.now();
+  try {
+    if (_pendingReload) { _fireQuietReload(); return; }
+    if (googleAccessToken && !isDefinitelyOffline()) {
+      await syncWeekFromDrive(currentWeekKey, { force: true });
+      await syncScheduleFromDrive();
+      await syncColorsFromDrive();
+    }
+    // Re-open rather than just re-render: the pull is also how someone asks for
+    // occurrences that came due while the tab sat open.
+    await openWeekIntoView(currentWeekKey);
+    renderIfVisible();
+    updateSummary();
+    if (currentView === 'agenda') renderAgenda();
+    if (currentView === 'stats')  renderStatsPanel();
+  } catch (err) {
+    console.error('[ptr] refresh failed:', err);
+  } finally {
+    // Hold the spinner long enough to read as an answer; a refresh that resolves
+    // from cache in 20ms otherwise looks like a gesture that did nothing.
+    const linger = Math.max(0, 450 - (Date.now() - startedAt));
+    setTimeout(() => { _ptrPark(); _ptrBusy = false; }, linger);
+  }
+}
+
+// atTop: a scrolling source only owns the gesture while its list is at the top.
+// The toolbar passes null — it never scrolls, so it is always at the top.
+function initPullToRefresh(source, atTop = null) {
+  let startY = 0, startX = 0, dist = 0;
+  let armed = false, pulling = false;
+  const isAtTop = () => (atTop ? atTop() : true);
+
+  source.addEventListener('touchstart', e => {
+    armed = false; pulling = false; dist = 0;
+    if (_ptrBusy || e.touches.length !== 1 || !isAtTop()) return;
+    // An in-flight edit or write owns the record; re-opening the week under it
+    // would read a half-written state back over the screen.
+    if (_atomicOpsDepth > 0) return;
+    startY = e.touches[0].clientY;
+    startX = e.touches[0].clientX;
+    armed = true;
+  }, { passive: true });
+
+  source.addEventListener('touchmove', e => {
+    if (!armed || e.touches.length !== 1) return;
+    const dy = e.touches[0].clientY - startY;
+    const dx = Math.abs(e.touches[0].clientX - startX);
+    if (!pulling) {
+      // Anything but a downward drag from the top belongs to someone else: the
+      // list scrolling up, or an agenda row's horizontal swipe.
+      if (dy <= 0 || !isAtTop()) { armed = false; return; }
+      if (dx > Math.abs(dy)) { armed = false; return; }
+      if (dy < 8) return;
+      pulling = true;
+    }
+    e.preventDefault(); // suppress the scroll container's own rubber-band
+    dist = Math.min(PTR_MAX_PX, dy * PTR_RESISTANCE);
+    _ptrTrack(dist);
+  }, { passive: false });
+
+  const endPull = () => {
+    if (!pulling) { armed = false; return; }
+    const committed = dist >= PTR_TRIGGER_PX;
+    pulling = false; armed = false; dist = 0;
+    if (committed) performPullRefresh();
+    else _ptrPark();
+  };
+  source.addEventListener('touchend', endPull);
+  source.addEventListener('touchcancel', endPull);
+}
+
+// Touch input only. A mouse has no overscroll to read, and desktop already has
+// the sync menu for the same job.
+if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+  const toolbar = document.getElementById('toolbar');
+  if (toolbar) initPullToRefresh(toolbar);
+  ['agenda-tab-content', 'stats-content'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) initPullToRefresh(el, () => el.scrollTop <= 0);
+  });
+}
 
 // ─── Week navigation ──────────────────────────────────────────────────────────
 async function loadAndRender(wk) {
