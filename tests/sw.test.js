@@ -9,12 +9,13 @@ const swCode = readFileSync(resolve(__dirname, '../sw.js'), 'utf8');
 
 const ORIGIN = 'https://zenitweek.com';
 
-function makeResponse({ ok = true, status = 200, etag = null, lastModified = null, tag = 'body' } = {}) {
+function makeResponse({ ok = true, status = 200, etag = null, lastModified = null, tag = 'body', extraHeaders = null } = {}) {
   const headers = {
     get(name) {
       const lc = name.toLowerCase();
       if (lc === 'etag') return etag;
       if (lc === 'last-modified') return lastModified;
+      if (extraHeaders && lc in extraHeaders) return extraHeaders[lc];
       return null;
     },
   };
@@ -293,6 +294,46 @@ describe('sw.js — serving the shell', () => {
     expect(resp.tag).toBe('cached');
     await Promise.all(ev.waits);
     expect(w.fetches).toHaveLength(0);
+  });
+});
+
+describe('sw.js — foreign documents', () => {
+  // A tunnel's own page is a 200 text/html document. Cached under the shell key
+  // it becomes the app on that device, which is how one ngrok browser warning
+  // turned into a permanently blank screen that survived every reload.
+  const interstitial = () => makeResponse({
+    tag: 'ngrok-warning',
+    extraHeaders: { 'ngrok-error-code': 'ERR_NGROK_6024', 'content-type': 'text/html' },
+  });
+
+  it('serves a tunnel interstitial but never caches it as the shell', async () => {
+    const w = loadWorker({ fetchImpl: () => Promise.resolve(interstitial()) });
+    const ev = navEvent(`${ORIGIN}/app`);
+    const resp = await w.ctx.shellResponse(ev);
+    expect(resp.tag).toBe('ngrok-warning');
+    await Promise.all(ev.waits);
+    expect(await w.cache.match('/__zw-shell__')).toBeUndefined();
+  });
+
+  it('never lets a tunnel interstitial replace a cached shell', async () => {
+    const w = loadWorker({ fetchImpl: () => Promise.resolve(interstitial()) });
+    const cached = makeResponse({ etag: '"v1"', tag: 'cached' });
+    await w.cache.put('/__zw-shell__', cached);
+
+    await w.ctx.revalidateShell(w.cache, cached, '/app');
+
+    expect((await w.cache.match('/__zw-shell__')).tag).toBe('cached');
+    expect(w.posted).toHaveLength(0);
+  });
+
+  it('never caches a document that is not html', async () => {
+    const w = loadWorker({
+      fetchImpl: () => Promise.resolve(makeResponse({ tag: 'json', extraHeaders: { 'content-type': 'application/json' } })),
+    });
+    const ev = navEvent(`${ORIGIN}/app`);
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(await w.cache.match('/__zw-shell__')).toBeUndefined();
   });
 });
 

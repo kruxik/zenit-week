@@ -355,7 +355,7 @@ async function warmShell() {
   const path = new URL(client.url).pathname;
   try {
     const resp = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
-    if (resp && resp.ok) await cache.put(SHELL_KEY, resp);
+    if (resp && resp.ok && !isForeignDocument(resp)) await cache.put(SHELL_KEY, resp);
   } catch (err) {
     console.debug('[sw] warm-failed', err && err.message);
   }
@@ -387,6 +387,25 @@ self.addEventListener('fetch', event => {
   const key = marketingKey(url);
   if (key) event.respondWith(cachedDocument(event, key, false));
 });
+
+// A tunnel, proxy or captive portal can answer a navigation with a page of its
+// own: ngrok's free-tier browser warning is a 200 text/html document carrying an
+// `ngrok-error-code` header. Stored under the shell key it *becomes* the app on
+// that device — every later navigation is served the warning from cache, which
+// reads as a blank screen and survives reloads, because the worker never gets to
+// ask the network again. So a document is stored only when nothing about it says
+// it came from somewhere else. Silence is consent: the app's own response
+// carries none of these marks, and neither do the test doubles.
+function isForeignDocument(res) {
+  if (!res) return true;
+  const headers = res.headers;
+  if (headers && typeof headers.get === 'function') {
+    if (headers.get('ngrok-error-code')) return true;
+    const ct = headers.get('content-type');
+    if (ct && !ct.includes('text/html')) return true;
+  }
+  return res.type === 'opaque' || res.type === 'opaqueredirect' || res.type === 'cors';
+}
 
 function shellResponse(event) {
   return cachedDocument(event, SHELL_KEY, true);
@@ -566,7 +585,9 @@ async function cachedDocument(event, cacheKey, notify) {
   }
   try {
     const fresh = (preload && await preload) || await fetch(event.request);
-    if (fresh && fresh.ok) await cache.put(cacheKey, fresh.clone());
+    // Hand the page on either way — a tunnel warning is exactly what the user
+    // has to see and click through — but never keep it.
+    if (fresh && fresh.ok && !isForeignDocument(fresh)) await cache.put(cacheKey, fresh.clone());
     return fresh;
   } catch (err) {
     return offlineResponse(event.request, cacheKey);
@@ -598,7 +619,7 @@ async function revalidateDocument(cache, cacheKey, cached, path, notify, preload
       return; // Offline or the link died — the cached copy stays authoritative.
     }
   }
-  if (!fresh || !fresh.ok) return;
+  if (!fresh || !fresh.ok || isForeignDocument(fresh)) return;
   const newToken = versionToken(fresh);
   const oldToken = versionToken(cached);
   await cache.put(cacheKey, fresh.clone());
