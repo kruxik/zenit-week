@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-YCfbzt3Te+5w6JiNL4Gj/cXAWTIKIf1jkbiAj6qzRQE='
+               'sha256-cE8Qf8wTGfRs3hEXzE7qgq4HIQCj/rwOZ8coLs2411k='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -16819,16 +16819,22 @@ function render() {
   updateSummary();
 
   markMapGeometryChanged();
+  _mapDirty = false;
   document.body.classList.remove('app-loading');
   probeMark('render:end', document.querySelectorAll('.node-group').length + ' groups');
   endRender(document.querySelectorAll('.node-group').length + ' groups');
   return positions;
 }
 
+// Set when a render was asked for and skipped, so the map on screen no longer
+// matches weekData. Only the mobile agenda skips (it hides the canvas), and only
+// switchView reads this — see the mindmap branch there.
+let _mapDirty = false;
+
 // Skip mindmap render when canvas is display:none (mobile + agenda view).
 // Caller must invoke renderAgenda() separately when the agenda needs refreshing.
 function renderIfVisible() {
-  if (currentView === 'agenda' && window.innerWidth < 768) return;
+  if (currentView === 'agenda' && window.innerWidth < 768) { _mapDirty = true; return; }
   render();
 }
 
@@ -20662,7 +20668,16 @@ function switchView(view) {
     renderStatsPanel();
     if (isDesktop) render();
   } else {
-    render();
+    // Only rebuild if the map actually fell behind while it was away. It is torn
+    // down and rebuilt whole — 229 node groups on a full week — and measured on a
+    // Galaxy S22 that is ~100 ms of script, which put every return to Mindmap at
+    // just over 300 ms INP however little had changed.
+    //
+    // Nothing renders behind the mobile agenda (renderIfVisible skips, and flags
+    // it), so that is the one case where the DOM can be stale. Coming back from
+    // Stats, or from either view on desktop, the map on screen is already current
+    // and only needs unhiding.
+    if (_mapDirty) render();
   }
 }
 
