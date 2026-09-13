@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-pbij9c04HLNjjDGnU4pX2ReqUe52XZDqq1jQSLOfu2A='
+               'sha256-amoha84q7HZixklhXKfdXovwnis8zpAp+ouiKQGSeFg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -20817,9 +20817,19 @@ async function resetView() {
     return;
   }
 
-  // From Stats the logo is "home": leave to the mindmap, then reset it to the
-  // current week at the default zoom (falls through to the mindmap reset below).
-  if (currentView === 'stats') switchView('mindmap');
+  if (currentView === 'stats') {
+    // Home for Stats is Stats, on the current week, with the CFD lens back at
+    // its defaults — the view as a fresh open draws it.
+    _cfdBranch = null;
+    _cfdRange = _CFD_RANGES[0];
+    if (currentWeekKey !== todayWeekKey()) {
+      await loadAndRender(todayWeekKey());
+    }
+    renderStatsPanel();
+    const content = document.getElementById('stats-content');
+    if (content) content.scrollTop = 0;
+    return;
+  }
 
   // "Show me the whole week" — so every filter that is hiding part of it goes:
   // the day filter and the view level both prune the map, and a fit to a pruned
