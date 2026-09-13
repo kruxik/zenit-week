@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.09.13] - 2026-09-13
+
+### Added
+
+- **mobile:** Pull to refresh from the toolbar, in every view
+- **week-picker:** One toolbar week control with a calendar fold for every view
+- **agenda:** Date the day tabs when the week is not the current one
+- **agenda:** Name the week and offer the way back when off the current one
+
+### Changed
+
+- **mindmap:** Defer the day-filter hotkey like its two menu call sites
+- **mindmap:** Only rebuild the map on return if it fell behind
+- **mindmap:** Cut redundant layout passes and defer the editor-open reflow
+- **empty-states:** One shared empty block for Stats and every Agenda tab
+
+### Fixed
+
+- **mindmap:** Recolour the "+" button when a task changes done state
+- **mindmap:** Restore the branch gradient when a task is taken out of done
+- **ptr:** Make pull to refresh a real document reload, not a data re-pull
+- **stats:** Centre the empty-week state instead of splitting it across the donut row
+- **sw:** Never cache a document that came from somewhere else
+- **sw:** Bump the shell cache to zw-shell-v3
+- **week-picker:** Balance the phone toolbar by cropping the compact logo
+- **agenda:** Drop the today dot outside the current week
+- **agenda:** Hide Overdue outside the current week
+
 ## [v2026.09.06] - 2026-09-06
 
 ### Added
