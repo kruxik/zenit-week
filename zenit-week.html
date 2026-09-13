@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-3XSQjyPgKwXuInjExVcy19Ne7ASRheDC4uqy83RGEZg='
+               'sha256-aUyTakkQczuWzeU1Urx1rAGAsl1zxFT/rItDRE69wy8='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -20817,12 +20817,17 @@ async function resetView() {
   // current week at the default zoom (falls through to the mindmap reset below).
   if (currentView === 'stats') switchView('mindmap');
 
-  const hadDayFilter = activeDayFilter !== null;
+  // "Show me the whole week" — so every filter that is hiding part of it goes:
+  // the day filter and the view level both prune the map, and a fit to a pruned
+  // map is a fit to the wrong thing.
+  const hadFilter = activeDayFilter !== null || currentViewLevel !== 'full';
   activeDayFilter = null;
+  applyViewLevel('full');
+  closeViewLevels({ force: true }); // nothing left to name, so the row goes too
   if (currentWeekKey !== todayWeekKey()) {
     await loadAndRender(todayWeekKey());
-  } else if (hadDayFilter) {
-    renderIfVisible(); // un-prune what the day filter was hiding
+  } else if (hadFilter) {
+    renderIfVisible(); // un-prune what the filters were hiding
   }
 
   fitMindmapView();
@@ -21660,14 +21665,19 @@ function repackWithSlide(mutate) {
   animateViewSlide(fromPos);
 }
 
+// The state half of a level switch: the variable and the lit button, with no
+// repack of its own. resetView uses it directly because it re-renders and refits
+// the map itself; switchViewLevel wraps it in the slide.
+function applyViewLevel(level) {
+  currentViewLevel = level;
+  document.querySelectorAll('.view-level-btn[data-level]').forEach(b =>
+    b.classList.toggle('active', b.dataset.level === level));
+}
+
 // Switch Rocks/Pebbles/Sand.
 function switchViewLevel(level) {
   if (level === currentViewLevel) return;
-  repackWithSlide(() => {
-    currentViewLevel = level;
-    document.querySelectorAll('.view-level-btn[data-level]').forEach(b =>
-      b.classList.toggle('active', b.dataset.level === level));
-  });
+  repackWithSlide(() => applyViewLevel(level));
 }
 
 // Single entry point for the day filter — hotkeys 0–8, the day-filter menu and
