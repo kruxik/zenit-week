@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-T6grOy7a9Boi+9aEtdrQW1p8x3Ajto9WxDMiRw6BH7w='
+               'sha256-MaJIlLd7EGm5HiOq7YfTawOxvdqpCG0p2fECcBafogg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9965,6 +9965,19 @@ let panX    = 0;
 let panY    = 0;
 let isPanning = false;
 let panningFromCenter = false;
+
+// Abandon a press on the root without acting on it: the map goes back where it
+// was and pointerup finds nothing pending. The long-press context menu uses it —
+// one gesture cannot both open the menu and open Stats behind it.
+function cancelCenterPress() {
+  if (!panningFromCenter) return;
+  panningFromCenter = false;
+  isPanning = false;
+  panX = panStartPanX;
+  panY = panStartPanY;
+  applyTransform();
+  container.classList.remove('panning');
+}
 let panStartX = 0;
 let panStartY = 0;
 let panStartPanX = 0;
@@ -17621,6 +17634,10 @@ function attachNodeListeners() {
       e.stopPropagation();
       // Long-press on drag-handle is for drag, not menu
       if (e.target.closest('.drag-handle')) return;
+      // The press that opened this menu is spent. On the root it would otherwise
+      // still be a pending click, and the pointerup behind the menu would open
+      // Stats on top of it.
+      if (id === 'center') cancelCenterPress();
       showContextMenu(e.clientX, e.clientY, id);
     });
   });
