@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-amoha84q7HZixklhXKfdXovwnis8zpAp+ouiKQGSeFg='
+               'sha256-T6grOy7a9Boi+9aEtdrQW1p8x3Ajto9WxDMiRw6BH7w='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -20804,6 +20804,10 @@ function fitMindmapView() {
 }
 
 async function resetView() {
+  // Help is a modal over whichever view is underneath; "put this view back the
+  // way it was" has to get it out of the way first.
+  if (isHelpOpen()) closeHelp();
+
   if (currentView === 'agenda') {
     agendaActiveTab = null;
     if (currentWeekKey !== todayWeekKey()) {
