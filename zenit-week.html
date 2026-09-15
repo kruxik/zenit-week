@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-UX2Dzew0yC6CevJSterh9Cy8lAqAy7lXtW46JpFBWdQ='
+               'sha256-10iW3f/KHx6rEe7/pHxVjFshCRoypJNEhrp1JOE1mQ4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -6303,6 +6303,38 @@ function _preserveRemoteNodes(data, liveNodes, protectedIds) {
   }
 }
 
+// Not part of a node's content: the two bookkeeping stamps, the transient
+// editor flag, the position triple (which travels on _posTs) and children order
+// (which merges by document savedAt, never by a stamp).
+const _RESTAMP_SKIP = new Set(['_ts', '_posTs', '_editing', 'offX', 'offY', 'side', 'children']);
+
+function _nodeContentSig(n) {
+  const out = {};
+  for (const k of Object.keys(n).sort()) {
+    if (_RESTAMP_SKIP.has(k)) continue;
+    out[k] = n[k];
+  }
+  return JSON.stringify(out);
+}
+
+// An undo is not "everything in this snapshot is new". Stamping the whole
+// restored week promoted every node in it to newest, so the next Drive merge
+// handed the undoing device's copy of nodes it never touched to every other
+// device. Stamp only what the restore actually changes, on the axis it changes:
+// content on _ts, position on _posTs, a re-created node on both. A node the
+// restore leaves exactly as it stands keeps the live stamps, so it cannot roll
+// back to the older ones the snapshot happens to carry.
+function _restampRestoredNodes(nodes, liveNodes, tsNow) {
+  const liveById = new Map((liveNodes || []).map(n => [n.id, n]));
+  for (const n of nodes) {
+    const live = liveById.get(n.id);
+    if (!live) { n._ts = tsNow; n._posTs = tsNow; continue; }
+    n._ts = (_nodeContentSig(n) === _nodeContentSig(live)) ? (live._ts || 0) : tsNow;
+    const samePosition = n.offX === live.offX && n.offY === live.offY && n.side === live.side;
+    n._posTs = samePosition ? (live._posTs || 0) : tsNow;
+  }
+}
+
 let nodeMap = new Map();
 
 function rebuildNodeMap() {
@@ -6516,15 +6548,17 @@ async function _applySnapshot(raw) {
   }
 
   // ── Primary week (where the action happened) ──────────────────────────────
-  // Bump _ts so the next Drive merge (LWW by _ts) keeps the restored values,
-  // tombstone nodes the restore drops, and force-push (block pull-before-push).
+  // Stamp the nodes the restore changes so the next Drive merge keeps the
+  // restored values, tombstone nodes the restore drops, and force-push (block
+  // pull-before-push).
   await withWeekLock(primaryKey, async () => {
     const livePrimaryNodes = (primaryKey === viewWeek && weekData?.nodes)
       ? weekData.nodes.slice()
       : (((await loadWeekIDB(primaryKey)) || {}).nodes || []);
-    // Bump _ts first so only the snapshot's own nodes win the next LWW merge —
-    // preserved remote nodes keep the timestamp their originating device gave them.
-    for (const n of restoredPrimary.nodes) n._ts = tsNow;
+    // Restamp first so only the nodes the restore actually changes win the next
+    // LWW merge — preserved remote nodes keep the timestamp their originating
+    // device gave them, and so does every node the undo leaves alone.
+    _restampRestoredNodes(restoredPrimary.nodes, livePrimaryNodes, tsNow);
     _preserveRemoteNodes(restoredPrimary, livePrimaryNodes, _remoteOriginIds.get(primaryKey));
     _tombstoneRemovedNodes(restoredPrimary, livePrimaryNodes);
     _undoRedoForcePush.add(primaryKey);

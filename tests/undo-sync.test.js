@@ -113,8 +113,14 @@ describe('Undo/redo vs Drive sync', () => {
     expect(_state.getUndoRedoForcePush().has(WK)).toBe(true);
   });
 
-  test('undo bumps _ts on all restored nodes', async () => {
-    _state.set(buildLocalData([{ id: 'a1', label: 'Task', ts: 100 }]));
+  // Was: "undo bumps _ts on all restored nodes". Stamping the whole week is the
+  // incident this spec closes — a stale device promoted every node it had never
+  // touched and then won the next merge. Only what the undo reverts is stamped.
+  test('undo bumps _ts on the node it reverts, and only that node', async () => {
+    _state.set(buildLocalData([
+      { id: 'a1', label: 'Task', ts: 100 },
+      { id: 'a2', label: 'Other', ts: 100 },
+    ]));
     takeSnapshot();
 
     const data = _state.get();
@@ -125,9 +131,8 @@ describe('Undo/redo vs Drive sync', () => {
     await undo();
 
     const restored = _state.get();
-    for (const n of restored.nodes) {
-      expect(n._ts).toBeGreaterThanOrEqual(before);
-    }
+    expect(restored.nodes.find(n => n.id === 'a1')._ts).toBeGreaterThanOrEqual(before);
+    expect(restored.nodes.find(n => n.id === 'a2')._ts).toBe(100);
   });
 
   test('syncWeekFromDrive skips pull when force-push flag is set', async () => {
