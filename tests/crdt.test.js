@@ -1,4 +1,4 @@
-import { mergeWeekData, validateAndRepair } from './setup.js';
+import { mergeWeekData, validateAndRepair, _weekContentSig } from './setup.js';
 
 describe('CRDT - mergeWeekData', () => {
   const mkNode = (id, parent, ts = 100) => ({ 
@@ -125,6 +125,92 @@ describe('CRDT - mergeWeekData', () => {
     const remote = mkWeek([], [], 2000);
     remote.agendaOrder = { 'k': { ids: ['fresh'], ts: 1 } };        // any ts>0 beats legacy
     expect(mergeWeekData(local, remote).agendaOrder['k'].ids).toEqual(['fresh']);
+  });
+
+  // I2 — content follows _ts, position follows _posTs, both tie to remote.
+  describe('position LWW by _posTs (I2)', () => {
+    const mkPos = (id, { ts, posTs, label, offX, offY }) => ({
+      id, parent: 'work', branch: 'work', type: 'activity',
+      label, children: [], _ts: ts, _posTs: posTs, offX, offY,
+    });
+
+    test('local newer content + remote newer position', () => {
+      const local  = mkWeek([mkPos('a1', { ts: 300, posTs: 100, label: 'local',  offX: 10, offY: 10 })], [], 1000);
+      const remote = mkWeek([mkPos('a1', { ts: 100, posTs: 300, label: 'remote', offX: 99, offY: 99 })], [], 2000);
+      const n = mergeWeekData(local, remote).nodes.find(x => x.id === 'a1');
+      expect(n.label).toBe('local');
+      expect(n.offX).toBe(99);
+      expect(n.offY).toBe(99);
+    });
+
+    test('remote newer content + local newer position', () => {
+      const local  = mkWeek([mkPos('a1', { ts: 100, posTs: 300, label: 'local',  offX: 10, offY: 10 })], [], 1000);
+      const remote = mkWeek([mkPos('a1', { ts: 300, posTs: 100, label: 'remote', offX: 99, offY: 99 })], [], 2000);
+      const n = mergeWeekData(local, remote).nodes.find(x => x.id === 'a1');
+      expect(n.label).toBe('remote');
+      expect(n.offX).toBe(10);
+      expect(n.offY).toBe(10);
+    });
+
+    test('both stamps newer on the same side — that side wins outright', () => {
+      const local  = mkWeek([mkPos('a1', { ts: 300, posTs: 300, label: 'local',  offX: 10, offY: 10 })], [], 1000);
+      const remote = mkWeek([mkPos('a1', { ts: 100, posTs: 100, label: 'remote', offX: 99, offY: 99 })], [], 2000);
+      const n = mergeWeekData(local, remote).nodes.find(x => x.id === 'a1');
+      expect(n.label).toBe('local');
+      expect(n.offX).toBe(10);
+      expect(n.offY).toBe(10);
+    });
+
+    test('equal _posTs ties to remote, like _ts', () => {
+      const local  = mkWeek([mkPos('a1', { ts: 300, posTs: 200, label: 'local',  offX: 10, offY: 10 })], [], 1000);
+      const remote = mkWeek([mkPos('a1', { ts: 100, posTs: 200, label: 'remote', offX: 99, offY: 99 })], [], 2000);
+      const n = mergeWeekData(local, remote).nodes.find(x => x.id === 'a1');
+      expect(n.label).toBe('local');
+      expect(n.offX).toBe(99);
+    });
+
+    test('legacy side without _posTs reads as 0 and loses the position', () => {
+      const legacy = { id: 'a1', parent: 'work', branch: 'work', type: 'activity',
+                       label: 'local', children: [], _ts: 500, offX: 10, offY: 10 };
+      const local  = mkWeek([legacy], [], 1000);
+      const remote = mkWeek([mkPos('a1', { ts: 1, posTs: 1, label: 'remote', offX: 99, offY: 99 })], [], 2000);
+      const n = mergeWeekData(local, remote).nodes.find(x => x.id === 'a1');
+      expect(n.label).toBe('local');   // content still local's, by _ts
+      expect(n.offX).toBe(99);         // position remote's, 1 > 0
+    });
+
+    test('branch side follows _posTs too', () => {
+      const mkBr = (posTs, side) => ({ id: 'work', type: 'branch', branch: 'work',
+                                       label: 'Work', children: [], side, _ts: 100, _posTs: posTs });
+      const merged = mergeWeekData(mkWeek([mkBr(900, 'left')], [], 1000),
+                                   mkWeek([mkBr(100, 'right')], [], 2000));
+      expect(merged.nodes.find(n => n.id === 'work').side).toBe('left');
+    });
+
+    test('a node present on one side only keeps its own position', () => {
+      const local  = mkWeek([mkPos('only', { ts: 5, posTs: 5, label: 'only', offX: 42, offY: 7 })], [], 1000);
+      const remote = mkWeek([], [], 2000);
+      const n = mergeWeekData(local, remote).nodes.find(x => x.id === 'only');
+      expect(n.offX).toBe(42);
+      expect(n.offY).toBe(7);
+    });
+  });
+
+  // I3 — bookkeeping stamps are not content.
+  test('_weekContentSig ignores _ts and _posTs (I3)', () => {
+    const a = mkWeek([{ id: 'a1', parent: 'work', branch: 'work', type: 'activity',
+                        label: 'x', children: [], _ts: 1, _posTs: 2 }], [], 1000);
+    const b = mkWeek([{ id: 'a1', parent: 'work', branch: 'work', type: 'activity',
+                        label: 'x', children: [], _ts: 999, _posTs: 12345 }], [], 1000);
+    expect(_weekContentSig(a)).toBe(_weekContentSig(b));
+  });
+
+  test('_weekContentSig still sees a position change', () => {
+    const a = mkWeek([{ id: 'a1', parent: 'work', branch: 'work', type: 'activity',
+                        label: 'x', children: [], _ts: 1, _posTs: 2, offX: 0 }], [], 1000);
+    const b = mkWeek([{ id: 'a1', parent: 'work', branch: 'work', type: 'activity',
+                        label: 'x', children: [], _ts: 1, _posTs: 2, offX: 50 }], [], 1000);
+    expect(_weekContentSig(a)).not.toBe(_weekContentSig(b));
   });
 
   test('handles complete missing branches by delegating to validateAndRepair', () => {

@@ -28,7 +28,8 @@ weekData = {
       doneAt,                // set when marked done
       unplannedAt,           // set when marked unplanned
       droppedAt,             // set when marked dropped
-      _ts }                  // epoch ms — Drive merge conflict resolution
+      _ts,                   // epoch ms — Drive merge conflict resolution, content only
+      _posTs }               // epoch ms — same role for `offX`/`offY`/`side` alone
   ]
 }
 ```
@@ -102,6 +103,7 @@ re-homes the occurrence one level higher.
 - `findNode(id)` — O(1) lookup via `nodeMap` (a `Map<id, node>`, rebuilt on every structural change)
 - `genId()` — generates a node ID using `crypto.randomUUID()` with a `crypto.getRandomValues` fallback for plain-HTTP contexts; always call this, never `crypto.randomUUID()` directly
 - `getDescendantIds(id)` — recursively collects subtree
+- `touchNode(id)` / `touchLayout(id)` — the two merge stamps, and the line between them. `touchNode` says *content* changed (`_ts`, and it drops `_demo`); `touchLayout` says only *where the node sits* changed (`_posTs`, `_demo` untouched). A move — recenter-all, a drop, a branch side flip, a children reorder — calls `touchLayout` and never `touchNode`, because a device holding a stale week must not promote its copy of every node it dragged past. `mergeWeekData` reads the two independently: the node body from the higher `_ts`, `offX`/`offY`/`side` from the higher `_posTs`, both tying to remote
 - `validateAndRepair()` — garbage collection and orphan cleanup
 - `transferUnfinished()` — copies incomplete activity nodes from previous ISO week to current
 - `transferReusable()` — copies nodes marked `reusable: true` (with counters reset) to current week

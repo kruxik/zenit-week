@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-MaJIlLd7EGm5HiOq7YfTawOxvdqpCG0p2fECcBafogg='
+               'sha256-l93EDF3HMUKLZFNeeuSDv4+UIWaRZ9x8WcTLB5pSNRs='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8340,8 +8340,8 @@ async function startDriveSession() {
   }
 }
 
-// Stable content signature for merge no-op detection. Strips _ts (LWW
-// bookkeeping) and _editing (transient UI flag), sorts top-level nodes and
+// Stable content signature for merge no-op detection. Strips _ts and _posTs
+// (LWW bookkeeping) and _editing (transient UI flag), sorts top-level nodes and
 // object keys so two orderings of the same data serialize identically.
 // Children arrays keep insertion order — that order is visually meaningful.
 function _weekContentSig(d) {
@@ -8349,7 +8349,7 @@ function _weekContentSig(d) {
   const stripNode = n => {
     const out = {};
     for (const k of Object.keys(n).sort()) {
-      if (k === '_ts' || k === '_editing') continue;
+      if (k === '_ts' || k === '_posTs' || k === '_editing') continue;
       out[k] = n[k];
     }
     return out;
@@ -8443,6 +8443,27 @@ function mergeWeekData(local, remote) {
     for (const n of (remote.nodes||[])) {
       const existing = byId.get(n.id);
       if (!existing || (n._ts||0) >= (existing._ts||0)) byId.set(n.id, { ...n });
+    }
+
+    // 2b. Position LWW: offX / offY / side are stamped by _posTs, not _ts, so a
+    //     device that only moved a node cannot promote its stale content — and a
+    //     device that only edited content cannot drag the node back. Same tie
+    //     convention as above (remote wins). Ids on one side only keep theirs.
+    const localById = new Map((local.nodes||[]).map(n => [n.id, n]));
+    for (const n of (remote.nodes||[])) {
+      const localNode = localById.get(n.id);
+      if (!localNode) continue;
+      const merged = byId.get(n.id);
+      if (!merged) continue;
+      const winner = (n._posTs||0) >= (localNode._posTs||0) ? n : localNode;
+      merged.offX   = winner.offX;
+      merged.offY   = winner.offY;
+      merged.side   = winner.side;
+      merged._posTs = winner._posTs;
+      if (merged.offX === undefined) delete merged.offX;
+      if (merged.offY === undefined) delete merged.offY;
+      if (merged.side === undefined) delete merged.side;
+      if (merged._posTs === undefined) delete merged._posTs;
     }
 
     // 3. Remove tombstoned nodes
@@ -11194,6 +11215,9 @@ function migrateCrdt(data) {
     // Use fallbackTs + index so migrated nodes have unique, deterministic _ts values.
     // This makes mergeWeekData's sort stable and preserves original insertion order.
     if (typeof n._ts !== 'number') n._ts = fallbackTs + i;
+    // Layout stamp: legacy records have none, and 0 makes them lose the
+    // position overlay against any freshly-stamped move.
+    if (typeof n._posTs !== 'number') n._posTs = 0;
   });
   // agendaOrder shape: bare arrays → { ids, ts: 0 }. ts=0 makes legacy entries
   // lose per-key LWW against any freshly-stamped reorder.
@@ -12558,14 +12582,27 @@ function findNode(id) {
 
 // Marks a node as user-modified: bumps _ts for Drive LWW merge and, for
 // onboarding seed nodes, drops the _demo flag so the node is now the user's own
-// (and survives "Clear example tasks"). Pass { keepDemo: true } for bulk layout
-// operations (e.g. recenter-all) that touch every node without the user
-// actually claiming each one. See docs/specs/onboarding-part-a-playground.md.
+// (and survives "Clear example tasks"). Pass { keepDemo: true } for a bulk
+// operation that touches every node without the user actually claiming each
+// one. See docs/specs/onboarding-part-a-playground.md.
+// Content only: a move stamps touchLayout instead, so layout never promotes a
+// stale copy of a node's content in mergeWeekData.
 function touchNode(id, opts) {
   const node = findNode(id);
   if (!node) return;
   node._ts = Date.now();
   if (node._demo && !(opts && opts.keepDemo)) delete node._demo;
+}
+
+// Marks a node's *position* as changed: bumps _posTs, the layout twin of _ts.
+// Layout moves (recenter-all, drag offsets, branch side flips) must never
+// promote a stale copy of a node's content to "newest" in mergeWeekData, so
+// they stamp this instead of _ts. Deliberately leaves _demo alone — moving a
+// seed node around is not the user claiming it.
+function touchLayout(id) {
+  const node = findNode(id);
+  if (!node) return;
+  node._posTs = Date.now();
 }
 
 function tombstoneNodes(ids) {
@@ -21114,14 +21151,14 @@ function maybeFlipDraggedBranch(clientX, clientY) {
   // Clear subtree offsets so children re-splay naturally on the new side.
   getDescendantIds(id).forEach(cid => {
     const c = findNode(cid);
-    if (c) { c.offX = 0; c.offY = 0; touchNode(cid); }
+    if (c) { c.offX = 0; c.offY = 0; touchLayout(cid); }
   });
 
   // Pin the branch to its current world position after the mirrored layout.
   node.offX = 0; node.offY = 0;
   const nat = computeLayout()[id];
   if (nat) { node.offX = curWorldX - nat.x; node.offY = curWorldY - nat.y; }
-  touchNode(id);
+  touchLayout(id);
 
   render();
   // Re-establish drag caches against the freshly mirrored DOM, anchored at the
@@ -21309,32 +21346,36 @@ window.addEventListener('pointerup', (e) => {
   if (isPanning) {
     isPanning = false;
     container.classList.remove('panning');
-    if (panningFromCenter) {
-      panningFromCenter = false;
-      // A press that never left the slop circle is a click, however jittery the
-      // hand or trackpad: an exact-equality test on panX/panY made one stray
-      // pixel commit a "pan", which does not just skip Stats — it flattens every
-      // node's manual offset. Below the threshold, undo the stray pixels first.
-      const movedPx = Math.hypot(e.clientX - panStartX, e.clientY - panStartY);
-      if (movedPx > CENTER_CLICK_SLOP_PX) {
-        takeSnapshot();
-        weekData.nodes.forEach(n => {
-          if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchNode(n.id, { keepDemo: true }); }
-        });
-        saveWeek(currentWeekKey, weekData);
-        render();
-      } else {
-        // The root wears the week's completion ring, so a click on it — anywhere
-        // on the disc, ring or avatar alike — opens the panel that explains the
-        // number. Roll back the sub-threshold drift so the map does not creep.
-        panX = panStartPanX;
-        panY = panStartPanY;
-        applyTransform();
-        switchView('stats');
-      }
-    }
+    if (panningFromCenter) endCenterPan(e);
   }
 });
+
+// Resolves a press that began on the root node.
+//
+// A press that never left the slop circle is a click, however jittery the hand
+// or trackpad: an exact-equality test on panX/panY made one stray pixel commit a
+// "pan", which does not just skip Stats — it flattens every node's manual
+// offset. Below the threshold, undo the stray pixels first.
+function endCenterPan(e) {
+  panningFromCenter = false;
+  const movedPx = Math.hypot(e.clientX - panStartX, e.clientY - panStartY);
+  if (movedPx > CENTER_CLICK_SLOP_PX) {
+    takeSnapshot();
+    weekData.nodes.forEach(n => {
+      if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchLayout(n.id); }
+    });
+    saveWeek(currentWeekKey, weekData);
+    render();
+  } else {
+    // The root wears the week's completion ring, so a click on it — anywhere
+    // on the disc, ring or avatar alike — opens the panel that explains the
+    // number. Roll back the sub-threshold drift so the map does not creep.
+    panX = panStartPanX;
+    panY = panStartPanY;
+    applyTransform();
+    switchView('stats');
+  }
+}
 
 window.addEventListener('pointercancel', (e) => {
   endPointer(e);
@@ -21431,7 +21472,9 @@ function handleNodeDrop(mouseX, mouseY) {
           }
         }
         parent.children.splice(insertIdx, 0, nodeId);
-        touchNode(node.parent);
+        // Layout, not content: children order merges by document savedAt
+        // (step 4 of mergeWeekData), never by the parent's _ts.
+        touchLayout(node.parent);
       }
     } else if (node.type === 'branch') {
       const newSide = svgX < 0 ? 'left' : 'right';
@@ -21452,7 +21495,7 @@ function handleNodeDrop(mouseX, mouseY) {
       otherBranches.splice(insertIdx, 0, node);
       weekData.nodes = [...otherBranches, ...nonBranches];
       rebuildNodeMap();
-      touchNode(nodeId);
+      touchLayout(nodeId);
     }
 
     // Clear offsets for descendants
@@ -21464,7 +21507,7 @@ function handleNodeDrop(mouseX, mouseY) {
           if (child) {
             child.offX = 0;
             child.offY = 0;
-            touchNode(cid);
+            touchLayout(cid);
             clearDescendantOffsets(cid);
           }
         });
@@ -21480,7 +21523,7 @@ function handleNodeDrop(mouseX, mouseY) {
       node.offX = svgX - nat.x;
       node.offY = svgY - nat.y;
     }
-    touchNode(nodeId);
+    touchLayout(nodeId);
   }
 
   saveWeek(currentWeekKey, weekData);

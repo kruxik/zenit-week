@@ -70,6 +70,7 @@ function elementStub() {
 // window.addEventListener is stubbed so the 'load' callback never fires.
 const sandbox = {
   crypto: globalThis.crypto,
+  structuredClone: globalThis.structuredClone,
   URL: globalThis.URL,
   URLSearchParams: globalThis.URLSearchParams,
   // netFetch() attaches AbortSignal.timeout() to every request; exposing the
@@ -557,11 +558,51 @@ _state.resolveDriveFileId = function(wk) { return getDriveFileId(wk); };
 _state.setLastSyncedHash = function(wk, hash) {
   lastSyncedHash.set(wk, hash);
 };
+_state.getLastSeenRemoteHash = function(wk) {
+  return lastSeenRemoteHash.has(wk) ? lastSeenRemoteHash.get(wk) : null;
+};
+_state.getPendingRemoteMerge = function() { return pendingRemoteMerge; };
+_state.clearPendingRemoteMerge = function() { pendingRemoteMerge = null; };
+_state.setPendingRemoteMerge = function(wKey, remoteData) {
+  pendingRemoteMerge = { wKey, remoteData };
+};
+
+// Atomic-op depth and the upload keys it parks are module-level \`let\`s; the
+// visibility teardown has to be able to prove it drained both.
+_state.getAtomicOpsDepth = function() { return _atomicOpsDepth; };
+_state.setAtomicOpsDepth = function(v) { _atomicOpsDepth = v; };
+_state.getPendingUploadKeys = function() { return [..._pendingUploadKeys]; };
+_state.addPendingUploadKey = function(wk) { _pendingUploadKeys.add(wk); };
+// isAtomicOpActive is stubbed to false above so existing tests stay simple;
+// restore the real one where the depth is what is under test.
+_state.useRealAtomicOpGuard = function(v) {
+  isAtomicOpActive = v ? (() => _atomicOpsDepth > 0) : (() => false);
+};
+_state.fireVisibilityChange = function(state) {
+  document.visibilityState = state;
+  return _syncVisibilityHandler();
+};
+_state.flushOnTeardown = function() { return _flushOnTeardown(); };
+_state.getOfflineUploadQueue = function() { return [..._offlineUploadQueue]; };
+_state.offlineQueueSettled = function() { return _offlineQueueWrite; };
+_state.clearOfflineUploadQueue = function() { _offlineUploadQueue.clear(); };
+_state.abortActiveDrag = function() { return abortActiveDrag(); };
+_state.getDragState = function() { return dragState; };
 // Viewport vars are module-level \`let\`s; tests that convert client → world
 // coordinates need to pin them (zoom defaults to 0.6).
 _state.setViewport = function({ panX: px = 0, panY: py = 0, zoom: z = 1 } = {}) {
   panX = px; panY = py; zoom = z;
 };
+// Stages a press that began on the root node, then resolves it exactly as the
+// pointerup handler does. panStart* are module-level \`let\`s, so the pan origin
+// has to be pinned from in here.
+_state.endCenterPan = function({ startX = 0, startY = 0, clientX = 0, clientY = 0, pointerType = 'mouse' } = {}) {
+  panningFromCenter = true;
+  panStartX = startX; panStartY = startY;
+  panStartPanX = panX; panStartPanY = panY;
+  endCenterPan({ clientX, clientY, pointerType });
+};
+
 // dragState is a module-level \`let\`, so it is invisible on the sandbox object.
 // Expose a setter so drag/drop tests can stage a drag without real pointer events.
 _state.setDragState = function(patch) {
@@ -739,6 +780,8 @@ export const {
   orderedInsertIndex,
   // Onboarding _demo drop-on-touch
   touchNode,
+  // Layout stamp (_posTs) — position changes, never content
+  touchLayout,
   // Onboarding cleanup
   clearExampleTasks,
   hasDemoActivityNodes,
@@ -816,6 +859,9 @@ export const {
   shouldShowUpdateBanner,
   // Google Drive Sync
   attemptSilentRestore,
+  // Duplicate-file resolution
+  pickDriveSurvivor,
+  listAllDriveWeekFiles,
   authFetch,
   driveApiRequest,
   syncWeekFromDrive,
