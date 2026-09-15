@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-iBeeV8k6p4nI70rFWybSN+5Az2QUb4aFX/Di18okBJA='
+               'sha256-5w/AWMRH6r1TqFAaRt4nOWx2L0Ze7lF4VZLdXncsK00='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9185,6 +9185,12 @@ async function initDriveSync(onShownWeekReady = () => {}) {
     endRest();
     if (restAll.length > 0) setSyncStatus('connected', 'sync.msg.synced');
 
+    // Every week has just been reconciled, so anything the worker is still
+    // holding is stale. Chromium would drain it behind our back on the next
+    // Background Sync event; Safari and Firefox have no such event, so an entry
+    // parked at teardown would otherwise sit in IDB forever.
+    await _clearOfflineUploadQueue();
+
   } catch (err) {
     console.error('[Drive] initDriveSync error:', err);
     setSyncStatus('error', 'sync.msg.driveInitFailed');
@@ -9483,7 +9489,7 @@ async function _buildOfflineUploadEntry(wKey) {
   };
 }
 
-async function _persistOfflineUpload(wKey) {
+async function _writeOfflineUpload(wKey) {
   try {
     const entry = await _buildOfflineUploadEntry(wKey);
     if (!entry) return;
@@ -9495,6 +9501,16 @@ async function _persistOfflineUpload(wKey) {
   } catch (err) {
     console.debug('[sync] park-failed', err && err.message);
   }
+}
+
+// Read-modify-write of one stored array, so parking several weeks in the same
+// tick has to be serialised: run in parallel they all read the queue before any
+// of them writes it, and the last write drops every other week.
+let _offlineQueueWrite = Promise.resolve();
+function _persistOfflineUpload(wKey) {
+  const run = () => _writeOfflineUpload(wKey);
+  _offlineQueueWrite = _offlineQueueWrite.then(run, run);
+  return _offlineQueueWrite;
 }
 
 async function _clearOfflineUploadQueue() {
@@ -21488,8 +21504,11 @@ function endCenterPan(e) {
   }
 }
 
-window.addEventListener('pointercancel', (e) => {
-  endPointer(e);
+// Drop a drag in flight without committing it: undo the drag visuals, close the
+// atomic op it opened, and leave the node where the layout puts it. The gesture
+// is over either way — the pointer was cancelled, or the page is being hidden
+// with a finger still down. An atomic op left open blocks every remote merge.
+function abortActiveDrag() {
   pendingDrag = null;
   if (dragState.activeNodeId) {
     stopDragAutoScroll();
@@ -21511,6 +21530,11 @@ window.addEventListener('pointercancel', (e) => {
   dragState.activeNodeId = null;
   isPanning = false;
   container.classList.remove('panning');
+}
+
+window.addEventListener('pointercancel', (e) => {
+  endPointer(e);
+  abortActiveDrag();
 });
 
 function handleNodeDrop(mouseX, mouseY) {
@@ -22654,16 +22678,31 @@ document.getElementById('sync-btn').addEventListener('click', () => { startSignI
 // Upload every week with a pending debounce, not just the displayed one. A
 // transfer queues the *next* week too, and nothing else ever uploads a week the
 // user isn't looking at — dropping it here strands that week on this device.
-function flushAllPendingSyncToDrive() {
-  if (!googleAccessToken) return;
+// Every week owing an upload, plus the one on screen. Reading it clears the
+// debounce timers, so call it once per flush.
+function _takePendingSyncWeeks() {
   const pendingWeeks = new Set([...syncDebounceTimers.keys(), currentWeekKey]);
   clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
   if (scheduleSyncDebounceTimer) { clearTimeout(scheduleSyncDebounceTimer); scheduleSyncDebounceTimer = null; }
+  return pendingWeeks;
+}
+
+// Hand every pending week to the service worker instead of pushing it from here.
+// canPushEntry keeps that conflict-safe: it only pushes while Drive still holds
+// a revision this device reconciled.
+function _parkPendingUploads(pendingWeeks) {
+  pendingWeeks.forEach(wk => { _offlineUploadQueue.add(wk); _persistOfflineUpload(wk); });
+  _registerUploadSync();
+}
+
+function flushAllPendingSyncToDrive() {
+  if (!googleAccessToken) return;
+  const pendingWeeks = _takePendingSyncWeeks();
   // Offline this is the last moment the page gets: an upload attempt would only
   // fail and be forgotten, so hand the weeks to the worker instead.
   if (isDefinitelyOffline()) {
-    pendingWeeks.forEach(wk => { _offlineUploadQueue.add(wk); _persistOfflineUpload(wk); });
+    _parkPendingUploads(pendingWeeks);
     return;
   }
   pendingWeeks.forEach(wk => syncWeekToDrive(wk));
@@ -22672,25 +22711,41 @@ function flushAllPendingSyncToDrive() {
 }
 
 // Flush pending sync when tab hides; pull + restart poll on tab restore
-document.addEventListener('visibilitychange', () => {
+function _syncVisibilityHandler() {
   if (!googleAccessToken) return;
   if (document.visibilityState === 'hidden') {
     stopDrivePoll();
+    // Nothing the user started can survive the page being hidden, and anything
+    // still open here blocks sync silently: an inline editor parks every remote
+    // merge, and an atomic op left above zero parks merges and uploads both.
+    // Close them all before the flush so the week that goes up is complete and
+    // the next pull is not refused by a gesture nobody is making any more.
+    if (editState) commitEdit();
+    abortActiveDrag();
+    _atomicOpsDepth = 0;
+    _flushPendingSync();
     flushAllPendingSyncToDrive();
   } else {
     syncWeekFromDrive(currentWeekKey); // pull before next edit
     syncColorsFromDrive();
     startDrivePoll(currentWeekKey);   // restart 10s poll
   }
-});
+}
+document.addEventListener('visibilitychange', _syncVisibilityHandler);
 
-// Secondary best-effort flush on tab close. Both events are wired because
-// neither is universally reliable: beforeunload is skipped on mobile, pagehide
-// is the one iOS actually fires when the app is backgrounded or swiped away.
-// Re-running the flush is harmless — syncWeekToDrive no-ops on an unchanged hash.
+// Last chance on tab close. Both events are wired because neither is
+// universally reliable: beforeunload is skipped on mobile, pagehide is the one
+// iOS actually fires when the app is backgrounded or swiped away.
+//
+// Nothing is uploaded from here. syncWeekToDrive pulls, merges, then pushes,
+// and navigation kills every request in flight — the push usually never
+// happened, and when it did it was a blind one. The weeks are parked for the
+// worker instead. (visibilitychange → hidden still uploads directly: the page
+// is alive there, and this handler has not run.)
 function _flushOnTeardown() {
   stopDrivePoll();
-  flushAllPendingSyncToDrive();
+  if (!googleAccessToken) return;
+  _parkPendingUploads(_takePendingSyncWeeks());
 }
 window.addEventListener('beforeunload', _flushOnTeardown);
 window.addEventListener('pagehide', _flushOnTeardown);
