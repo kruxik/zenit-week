@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-l93EDF3HMUKLZFNeeuSDv4+UIWaRZ9x8WcTLB5pSNRs='
+               'sha256-UX2Dzew0yC6CevJSterh9Cy8lAqAy7lXtW46JpFBWdQ='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -21360,6 +21360,12 @@ function endCenterPan(e) {
   panningFromCenter = false;
   const movedPx = Math.hypot(e.clientX - panStartX, e.clientY - panStartY);
   if (movedPx > CENTER_CLICK_SLOP_PX) {
+    // On touch a pan that began on the root is a pan and nothing else. The root
+    // fills the middle of the map, so scrolling the week with a finger starts
+    // there constantly — and "recenter all" from that gesture silently flattens
+    // every manual offset and stamps the whole week. Mouse and pen keep it:
+    // there the press is a deliberate grab of the root, not a scroll.
+    if (e.pointerType === 'touch') return;
     takeSnapshot();
     weekData.nodes.forEach(n => {
       if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchLayout(n.id); }
