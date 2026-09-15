@@ -6,7 +6,7 @@
 import { describe, test, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import { _state, syncWeekFromDrive } from './setup.js';
+import { _state, syncWeekFromDrive, pickDriveSurvivor, listAllDriveWeekFiles } from './setup.js';
 
 const IDS_KEY = 'zenit-week-drive-file-ids';
 
@@ -120,5 +120,135 @@ describe('a stale persisted id', () => {
 
     expect(seen.filter(s => s.kind === 'download')).toHaveLength(2);
     expect(seen.filter(s => s.kind === 'search')).toHaveLength(1);
+  });
+});
+
+// I5 — two devices resolving the same file name from the same listing must pick
+// the same file id. Drive lets two devices create the same name in the same
+// second; nothing here repairs an existing split, it only stops the two copies
+// from being used alternately.
+describe('duplicate file names (I5)', () => {
+  test('the newest modifiedTime survives', () => {
+    const files = [
+      { id: 'zzz', modifiedTime: '2026-09-15T10:00:00.000Z' },
+      { id: 'aaa', modifiedTime: '2026-09-14T10:00:00.000Z' },
+    ];
+    expect(pickDriveSurvivor(files).id).toBe('zzz');
+    expect(pickDriveSurvivor([...files].reverse()).id).toBe('zzz');
+  });
+
+  test('an identical modifiedTime ties to the lexically smallest id', () => {
+    const files = [
+      { id: 'zzz', modifiedTime: '2026-09-15T10:00:00.000Z' },
+      { id: 'aaa', modifiedTime: '2026-09-15T10:00:00.000Z' },
+    ];
+    expect(pickDriveSurvivor(files).id).toBe('aaa');
+    expect(pickDriveSurvivor([...files].reverse()).id).toBe('aaa');
+  });
+
+  test('a missing modifiedTime reads as the oldest possible', () => {
+    expect(pickDriveSurvivor([
+      { id: 'b' },
+      { id: 'a', modifiedTime: '2020-01-01T00:00:00.000Z' },
+    ]).id).toBe('a');
+  });
+
+  test('handles zero and one file', () => {
+    expect(pickDriveSurvivor([])).toBeNull();
+    expect(pickDriveSurvivor(undefined)).toBeNull();
+    expect(pickDriveSurvivor([{ id: 'only' }]).id).toBe('only');
+  });
+});
+
+describe('listAllDriveWeekFiles with a duplicated week', () => {
+  const server = setupServer(
+    http.get('https://www.googleapis.com/drive/v3/files', () =>
+      HttpResponse.json({
+        files: [
+          { id: 'old', name: 'zenit-week-2026-16.json', modifiedTime: '2026-04-01T00:00:00.000Z',
+            appProperties: { savedAt: '100', contentHash: 'h-old' } },
+          { id: 'new', name: 'zenit-week-2026-16.json', modifiedTime: '2026-04-09T00:00:00.000Z',
+            appProperties: { savedAt: '900', contentHash: 'h-new' } },
+          { id: 'w17', name: 'zenit-week-2026-17.json', modifiedTime: '2026-04-20T00:00:00.000Z',
+            appProperties: { savedAt: '50', contentHash: 'h17' } },
+        ],
+      })),
+  );
+  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  afterAll(() => server.close());
+  beforeEach(() => {
+    _state.clearLocalStorage();
+    _state.resetSyncState();
+    _state.setAccessToken('test-token');
+  });
+  afterEach(() => _state.setAccessToken(null));
+
+  test('emits one entry per week key, and it is the survivor', async () => {
+    const found = await listAllDriveWeekFiles();
+    const w16 = found.filter(f => f.wKey === '2026-16');
+    expect(w16).toHaveLength(1);
+    expect(w16[0].contentHash).toBe('h-new');
+    expect(found.map(f => f.wKey).sort()).toEqual(['2026-16', '2026-17']);
+    expect(_state.getDriveFileId('2026-16')).toBe('new');
+  });
+});
+
+describe('creating a week file that another device just created', () => {
+  const calls = [];
+  // The search before the POST sees nothing; the re-check afterwards sees the
+  // peer's copy, which is newer and therefore the survivor.
+  let searchCount = 0;
+  const server = setupServer(
+    http.get('https://www.googleapis.com/drive/v3/files', () => {
+      searchCount += 1;
+      calls.push('search');
+      if (searchCount === 1) return HttpResponse.json({ files: [] });
+      return HttpResponse.json({
+        files: [
+          { id: 'mine',  name: 'zenit-week-2026-30.json', modifiedTime: '2026-07-20T10:00:00.000Z' },
+          { id: 'peers', name: 'zenit-week-2026-30.json', modifiedTime: '2026-07-20T10:00:05.000Z' },
+        ],
+      });
+    }),
+    http.post('https://www.googleapis.com/drive/v3/files', () => {
+      calls.push('create');
+      return HttpResponse.json({ id: 'mine' });
+    }),
+    http.delete('https://www.googleapis.com/drive/v3/files/:id', ({ params }) => {
+      calls.push('delete:' + params.id);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  afterAll(() => server.close());
+  beforeEach(() => {
+    calls.length = 0;
+    searchCount = 0;
+    _state.clearLocalStorage();
+    _state.resetSyncState();
+    _state.setAccessToken('test-token');
+  });
+  afterEach(() => _state.setAccessToken(null));
+
+  test('deletes its own placeholder and adopts the survivor', async () => {
+    const id = await _state.resolveDriveFileId('2026-30');
+    expect(id).toBe('peers');
+    expect(calls).toContain('delete:mine');
+    expect(_state.getDriveFileId('2026-30')).toBe('peers');
+  });
+
+  test('keeps its own file when the re-check shows no duplicate', async () => {
+    server.use(
+      http.get('https://www.googleapis.com/drive/v3/files', () => {
+        searchCount += 1;
+        if (searchCount === 1) return HttpResponse.json({ files: [] });
+        return HttpResponse.json({
+          files: [{ id: 'mine', name: 'zenit-week-2026-31.json', modifiedTime: '2026-07-27T10:00:00.000Z' }],
+        });
+      }),
+    );
+    const id = await _state.resolveDriveFileId('2026-31');
+    expect(id).toBe('mine');
+    expect(calls.some(c => c.startsWith('delete:'))).toBe(false);
   });
 });

@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-10iW3f/KHx6rEe7/pHxVjFshCRoypJNEhrp1JOE1mQ4='
+               'sha256-XMadeDYdolm2ggxKmwwKRaUYF9b3WDqF9Y3ZTHUJEpA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8862,6 +8862,23 @@ function clearDriveFileIds() {
   try { localStorage.removeItem(DRIVE_FILE_IDS_KEY); } catch { /* nothing to drop */ }
 }
 
+// Two devices can create the same week file in the same second — Drive allows
+// duplicate names in appDataFolder, and nothing in the API prevents the race.
+// One rule everywhere makes every device pick the same copy, so the duplicate
+// goes inert instead of making the two devices ping-pong between files:
+//   survivor = newest modifiedTime; tie → lexically smallest id.
+// This only prevents new splits; existing duplicates are left where they are.
+function pickDriveSurvivor(files) {
+  const list = (files || []).filter(f => f && f.id);
+  if (list.length <= 1) return list[0] ?? null;
+  return list.reduce((best, f) => {
+    const bt = Date.parse(best.modifiedTime || '') || 0;
+    const ft = Date.parse(f.modifiedTime || '') || 0;
+    if (ft !== bt) return ft > bt ? f : best;
+    return f.id < best.id ? f : best;
+  });
+}
+
 async function findDriveFileId(wKey) {
   if (driveFileIdCache.has(wKey)) return driveFileIdCache.get(wKey);
   const lastMiss = _driveFileMissSince.get(wKey);
@@ -8873,10 +8890,10 @@ async function findDriveFileId(wKey) {
       params: {
         spaces: 'appDataFolder',
         q: `name = 'zenit-week-${wKey}.json'`,
-        fields: 'files(id)',
+        fields: 'files(id,name,modifiedTime,appProperties)',
       },
     });
-    const id = resp.result?.files?.[0]?.id ?? null;
+    const id = pickDriveSurvivor(resp.result?.files)?.id ?? null;
     if (id) {
       driveFileIdCache.set(wKey, id);
       _driveFileMissSince.delete(wKey);
@@ -8896,22 +8913,24 @@ async function getDriveFileId(wKey) {
 
   const filename = `zenit-week-${wKey}.json`;
 
+  const searchParams = {
+    spaces: 'appDataFolder',
+    q: `name = '${filename}'`,
+    fields: 'files(id,name,modifiedTime,appProperties)',
+  };
+
   // Search for existing file in appDataFolder
   const searchResp = await driveApiRequest({
     path: 'https://www.googleapis.com/drive/v3/files',
     method: 'GET',
-    params: {
-      spaces: 'appDataFolder',
-      q: `name = '${filename}'`,
-      fields: 'files(id)',
-    },
+    params: searchParams,
   });
 
-  const files = searchResp.result?.files ?? [];
-  if (files.length > 0) {
-    driveFileIdCache.set(wKey, files[0].id);
+  const survivor = pickDriveSurvivor(searchResp.result?.files);
+  if (survivor) {
+    driveFileIdCache.set(wKey, survivor.id);
     persistDriveFileIds();
-    return files[0].id;
+    return survivor.id;
   }
 
   // File not found — create empty placeholder
@@ -8923,7 +8942,36 @@ async function getDriveFileId(wKey) {
     body: JSON.stringify({ name: filename, parents: ['appDataFolder'] }),
   });
 
-  const fileId = createResp.result?.id;
+  let fileId = createResp.result?.id;
+
+  // Another device may have created the same name between the search and the
+  // POST. Ask once more: if someone else's copy is the survivor, throw away the
+  // placeholder this device just made — it is seconds old and empty, so nothing
+  // can be lost — and adopt theirs. A failed delete is harmless: no device will
+  // ever resolve to the loser again.
+  try {
+    const recheck = await driveApiRequest({
+      path: 'https://www.googleapis.com/drive/v3/files',
+      method: 'GET',
+      params: searchParams,
+    });
+    const winner = pickDriveSurvivor(recheck.result?.files);
+    if (winner && fileId && winner.id !== fileId && (recheck.result?.files?.length ?? 0) > 1) {
+      const doomed = fileId;
+      fileId = winner.id;
+      try {
+        await driveApiRequest({
+          path: `https://www.googleapis.com/drive/v3/files/${doomed}`,
+          method: 'DELETE',
+        });
+      } catch (err) {
+        console.warn(`[Drive] could not delete duplicate placeholder ${doomed}:`, err);
+      }
+    }
+  } catch (err) {
+    console.warn(`[Drive] duplicate re-check for ${filename} failed:`, err);
+  }
+
   driveFileIdCache.set(wKey, fileId);
   persistDriveFileIds();
   return fileId;
@@ -8939,13 +8987,17 @@ function weekProximity(wKey, refKey) {
 // Lists all zenit-week-*.json files in appDataFolder; returns [{wKey, savedAt, contentHash}]
 // Also populates driveFileIdCache. Uses appProperties to avoid content downloads.
 async function listAllDriveWeekFiles() {
-  const found = [];
+  // Collected per week key, not per file: a duplicated name must yield exactly
+  // one entry, or driveMap and driveFileIdCache flip between the two copies from
+  // one sign-in to the next. pickDriveSurvivor decides which copy that is, and
+  // decides it the same way on every device.
+  const byWeek = new Map();
   let pageToken = null;
   do {
     const params = {
       spaces: 'appDataFolder',
       q: "name contains 'zenit-week-' and name contains '.json'",
-      fields: 'nextPageToken,files(id,name,appProperties)',
+      fields: 'nextPageToken,files(id,name,modifiedTime,appProperties)',
       pageSize: 100,
     };
     if (pageToken) params.pageToken = pageToken;
@@ -8956,18 +9008,23 @@ async function listAllDriveWeekFiles() {
     });
     for (const f of resp.result?.files ?? []) {
       const m = f.name.match(/^zenit-week-(\d{4}-\d{2})\.json$/);
-      if (m) {
-        const wKey = m[1];
-        driveFileIdCache.set(wKey, f.id);
-        found.push({
-          wKey,
-          savedAt:     parseInt(f.appProperties?.savedAt ?? '0', 10),
-          contentHash: f.appProperties?.contentHash ?? null,
-        });
-      }
+      if (!m) continue;
+      const wKey = m[1];
+      const prev = byWeek.get(wKey);
+      byWeek.set(wKey, prev ? pickDriveSurvivor([prev, f]) : f);
     }
     pageToken = resp.result?.nextPageToken ?? null;
   } while (pageToken);
+
+  const found = [];
+  for (const [wKey, f] of byWeek) {
+    driveFileIdCache.set(wKey, f.id);
+    found.push({
+      wKey,
+      savedAt:     parseInt(f.appProperties?.savedAt ?? '0', 10),
+      contentHash: f.appProperties?.contentHash ?? null,
+    });
+  }
   persistDriveFileIds();
   return found;
 }
