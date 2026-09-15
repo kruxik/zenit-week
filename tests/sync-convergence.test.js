@@ -496,3 +496,107 @@ describe('Drive sync E2E — Changes API poll (flagged)', () => {
     expect(mediaFetchCount).toBe(0);     // recognised as our own content — no re-download
   });
 });
+
+// ── I6: lastSeenRemoteHash is only ever set to a hash that was actually merged ──
+//
+// The poll used to record "seen" at the call site, right after awaiting the
+// pull — whether or not the pull did anything. A 401, an exhausted retry or the
+// undo force-push guard therefore left the device convinced it had reconciled a
+// revision it never downloaded, and no later poll would go back for it: a
+// silent stall that only a sign-out could clear.
+describe('Drive sync — "seen" only when applied (I6)', () => {
+  const WK = '2026-01';
+  const FILE_ID = 'file_seen';
+  const remoteMedia = sampleWeek();
+  const REMOTE_HASH = 'remote-hash-1';
+
+  let mediaStatus = 200;
+
+  const server = setupServer(
+    http.post('http://localhost/api/token', () =>
+      HttpResponse.json({ access_token: 'new_access_token', expires_in: 3600 })
+    ),
+    http.get('https://www.googleapis.com/drive/v3/files', () =>
+      HttpResponse.json({ files: [{ id: FILE_ID, name: `zenit-week-${WK}.json` }] })
+    ),
+    http.get('https://www.googleapis.com/drive/v3/files/:fileId', ({ params, request }) => {
+      if (params.fileId !== FILE_ID) return new HttpResponse(null, { status: 404 });
+      const url = new URL(request.url);
+      if (url.searchParams.get('alt') === 'media') {
+        if (mediaStatus !== 200) return new HttpResponse(null, { status: mediaStatus });
+        return HttpResponse.json(remoteMedia);
+      }
+      return HttpResponse.json({ id: FILE_ID, appProperties: { contentHash: REMOTE_HASH } });
+    }),
+    http.patch('https://www.googleapis.com/upload/drive/v3/files/:fileId', () =>
+      HttpResponse.json({ id: FILE_ID })
+    ),
+  );
+
+  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  afterAll(() => server.close());
+
+  beforeEach(async () => {
+    server.resetHandlers();
+    _state.resetSyncState();
+    _state.clearLocalStorage();
+    _state.clearIDBStore();
+    _state.clearPendingRemoteMerge();
+    mediaStatus = 200;
+    _state.setWeekKey(WK);
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+    await attemptSilentRestore();
+    _state.setDriveFileId(WK, FILE_ID);
+    await _state.saveWeekIDB(WK, clone(defaultWeekData()));
+  });
+  afterEach(() => { _state.resetSyncState(); _state.clearPendingRemoteMerge(); });
+
+  test('a merge that lands returns "applied" and records the hash', async () => {
+    const outcome = await syncWeekFromDrive(WK, { seenHash: REMOTE_HASH });
+    expect(outcome).toBe('applied');
+    expect(_state.getLastSeenRemoteHash(WK)).toBe(REMOTE_HASH);
+  });
+
+  test('a merge parked behind an open editor returns "deferred" and still counts as seen', async () => {
+    const live = clone(defaultWeekData());
+    live.nodes.find(n => n.id === 'work')._editing = true;
+    _state.set(live);
+
+    const outcome = await syncWeekFromDrive(WK, { seenHash: REMOTE_HASH });
+    expect(outcome).toBe('deferred');
+    expect(_state.getPendingRemoteMerge()).not.toBeNull();
+    expect(_state.getLastSeenRemoteHash(WK)).toBe(REMOTE_HASH);
+  });
+
+  test('a 401 returns "failed" and leaves the hash unset', async () => {
+    mediaStatus = 401;
+    const outcome = await syncWeekFromDrive(WK, { seenHash: REMOTE_HASH });
+    expect(outcome).toBe('failed');
+    expect(_state.getLastSeenRemoteHash(WK)).toBeNull();
+  });
+
+  test('the undo force-push guard returns "failed" and leaves the hash unset', async () => {
+    _state.setUndoRedoForcePush(WK);
+    const outcome = await syncWeekFromDrive(WK, { seenHash: REMOTE_HASH });
+    expect(outcome).toBe('failed');
+    expect(_state.getLastSeenRemoteHash(WK)).toBeNull();
+    _state.setUndoRedoForcePush(null);
+  });
+
+  test('a 304 returns "unchanged" — nothing was merged, so nothing is marked seen', async () => {
+    mediaStatus = 304;
+    const outcome = await syncWeekFromDrive(WK, { seenHash: REMOTE_HASH });
+    expect(outcome).toBe('unchanged');
+    expect(_state.getLastSeenRemoteHash(WK)).toBeNull();
+  });
+
+  test('a failed poll pull is re-attempted on the next poll instead of stalling', async () => {
+    mediaStatus = 401;
+    await pollDriveMeta(WK);
+    expect(_state.getLastSeenRemoteHash(WK)).toBeNull();
+
+    mediaStatus = 200;
+    await pollDriveMeta(WK);
+    expect(_state.getLastSeenRemoteHash(WK)).toBe(REMOTE_HASH);
+  });
+});

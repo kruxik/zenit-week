@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-XMadeDYdolm2ggxKmwwKRaUYF9b3WDqF9Y3ZTHUJEpA='
+               'sha256-iBeeV8k6p4nI70rFWybSN+5Az2QUb4aFX/Di18okBJA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8585,12 +8585,16 @@ function hasEditingNode() {
 // invariant "never re-render over an open editor" holds even if a future edit
 // path forgets to wrap beginAtomicOp. Deferral is re-merged by _flushPendingMerge
 // when the op ends (commitEdit/cancelEdit → endAtomicOp).
+// Returns 'deferred' when the merge is parked behind an open editor or an
+// atomic op, 'applied' when it is committed — syncWeekFromDrive reports the
+// difference upward, and both count as "seen".
 async function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData) {
   if (wKey === currentWeekKey && (isAtomicOpActive() || hasEditingNode())) {
     pendingRemoteMerge = { wKey, remoteData };
-    return;
+    return 'deferred';
   }
   await _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+  return 'applied';
 }
 
 async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload) {
@@ -8699,9 +8703,9 @@ function _flushPendingSync() {
 // wrong answer immediately before an upload: that pull exists to guarantee we
 // merge the true current remote before overwriting it, and a conditional request
 // answers from what we last saw rather than from what is there now.
-async function syncWeekFromDrive(wKey, { force = false } = {}) {
-  if (!googleAccessToken) return;
-  if (_undoRedoForcePush.has(wKey)) return;
+async function syncWeekFromDrive(wKey, { force = false, seenHash = null } = {}) {
+  if (!googleAccessToken) return 'failed';
+  if (_undoRedoForcePush.has(wKey)) return 'failed';
 
   let fileId;
   try {
@@ -8709,7 +8713,7 @@ async function syncWeekFromDrive(wKey, { force = false } = {}) {
   } catch (err) {
     console.error('[Drive] syncWeekFromDrive: getDriveFileId error:', err);
     setSyncStatus('error', 'sync.msg.failedNoFile');
-    return;
+    return 'failed';
   }
 
   const MAX_RETRIES = 5;
@@ -8726,15 +8730,15 @@ async function syncWeekFromDrive(wKey, { force = false } = {}) {
         { method: 'GET', headers: fetchHeaders }
       );
 
-      if (resp.status === 401) return; // auth expired — _handleAuthExpiry already called
-      if (resp.status === 304) return; // not modified — skip merge
+      if (resp.status === 401) return 'failed'; // auth expired — _handleAuthExpiry already called
+      if (resp.status === 304) return 'unchanged'; // not modified — skip merge
 
       // The id came from a cache that outlived the file. Drop it and resolve the
       // name once more; a second miss means there is genuinely nothing to pull.
       if (resp.status === 404) {
         forgetDriveFileId(wKey);
         etagCache.delete(wKey);
-        if (idRetried) return;
+        if (idRetried) return 'failed';
         idRetried = true;
         fileId = await getDriveFileId(wKey);
         continue;
@@ -8752,39 +8756,46 @@ async function syncWeekFromDrive(wKey, { force = false } = {}) {
       if (newEtag) etagCache.set(wKey, newEtag);
 
       const remoteJson = (await resp.text()).trim();
-      if (!remoteJson) return; // empty file — nothing to merge
+      if (!remoteJson) return 'unchanged'; // empty file — nothing to merge
       traceMark('week:downloaded ' + wKey, remoteJson.length + ' chars');
 
       const endMerge = traceSpan('week:merge ' + wKey);
       const parsedRemote = migrateCrdt(JSON.parse(remoteJson));
       // Skip merge on a malformed remote rather than letting validateAndRepair
       // substitute defaultWeekData() (which would inject fresh default branches).
-      if (!parsedRemote || !Array.isArray(parsedRemote.nodes)) return;
+      if (!parsedRemote || !Array.isArray(parsedRemote.nodes)) return 'unchanged';
       const remoteData = validateAndRepair(parsedRemote);
 
       // CRDT merge: per-node LWW by _ts, union tombstones. Read-merge-write is
       // one critical section — a transfer or peer merge committing between the
       // read and the write would be silently overwritten by the merge result.
-      await withWeekLock(wKey, async () => {
+      const outcome = await withWeekLock(wKey, async () => {
         const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
         const mergedData = mergeWeekData(localData, remoteData);
         _recordRemoteArrivals(wKey, localData, mergedData);
         const mergedJson = JSON.stringify(mergedData);
         const mergedHash = weekContentHash(mergedData);
         const scheduleUpload = mergedHash !== weekContentHash(remoteData);
-        await applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
+        return applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
       });
       endMerge();
-      return;
+      // Only now is this revision reconciled. Marking it seen at the call site
+      // marked it seen even when the pull never happened — a 401 or an
+      // exhausted retry left the device sitting on stale data believing it was
+      // current, with no poll that would ever go back for it. A deferred merge
+      // counts: pendingRemoteMerge owns it until _flushPendingMerge runs.
+      if (seenHash) lastSeenRemoteHash.set(wKey, seenHash);
+      return outcome === 'deferred' ? 'deferred' : 'applied';
 
     } catch (err) {
       if (attempt >= MAX_RETRIES) {
         console.error('[Drive] syncWeekFromDrive error:', err);
         setSyncStatus('error', 'sync.msg.failedUsingLocal');
-        return;
+        return 'failed';
       }
     }
   }
+  return 'failed';
 }
 
 // ─── TASK-09: Find or create per-week Drive file ──────────────────────────────
@@ -9105,16 +9116,18 @@ async function initDriveSync(onShownWeekReady = () => {}) {
     for (const wKey of new Set([...driveMap.keys(), ...localMap.keys()])) {
       const driveEntry  = driveMap.get(wKey);
       const localHash   = localMap.get(wKey) ?? null;
-      // Record the remote hash init reconciles so the background poll treats it as
-      // already-seen (prevents a needless re-download on the first poll, and stops
-      // legacy-scheme appProperties from re-downloading every cycle thereafter).
-      if (driveEntry?.contentHash) lastSeenRemoteHash.set(wKey, driveEntry.contentHash);
       if (!localHash) {
         toMerge.push(wKey);  // Drive-only — download into local
       } else if (!driveEntry) {
         toUpload.push(wKey); // local-only — push to Drive
       } else if (driveEntry.contentHash && String(localHash) === driveEntry.contentHash) {
         lastSyncedHash.set(wKey, localHash); // identical — mark synced, skip transfer
+        // Nothing to download, so nothing to reconcile: the poll may treat this
+        // revision as seen straight away. Every other class marks itself seen
+        // inside syncWeekFromDrive, and only if the merge really landed — this
+        // used to be recorded for every week up front, which told the poll a
+        // failed pull had been reconciled and left the device silently stale.
+        lastSeenRemoteHash.set(wKey, driveEntry.contentHash);
       } else {
         toMerge.push(wKey);  // hash mismatch — CRDT merge resolves it
       }
@@ -9131,7 +9144,7 @@ async function initDriveSync(onShownWeekReady = () => {}) {
       if (k === shownKey && shownPulled && !toUpload.includes(k)) continue;
       const endWeek = traceSpan('drive:priority-week ' + k,
         toMerge.includes(k) ? 'merge' : toUpload.includes(k) ? 'upload' : 'skip');
-      if (toMerge.includes(k))  await syncWeekFromDrive(k);
+      if (toMerge.includes(k))  await syncWeekFromDrive(k, { seenHash: driveMap.get(k)?.contentHash || null });
       else if (toUpload.includes(k)) await syncWeekToDrive(k);
       endWeek();
     }
@@ -9163,7 +9176,9 @@ async function initDriveSync(onShownWeekReady = () => {}) {
     for (let i = 0; i < restAll.length; i += CONCURRENCY) {
       await Promise.all(
         restAll.slice(i, i + CONCURRENCY).map(({ k, isDownload }) =>
-          isDownload ? syncWeekFromDrive(k) : syncWeekToDrive(k)
+          isDownload
+            ? syncWeekFromDrive(k, { seenHash: driveMap.get(k)?.contentHash || null })
+            : syncWeekToDrive(k)
         )
       );
     }
@@ -9892,8 +9907,8 @@ async function pollDriveMeta(wKey) {
       if (remoteHash &&
           remoteHash !== String(lastSyncedHash.get(k)) &&
           remoteHash !== lastSeenRemoteHash.get(k)) {
-        await syncWeekFromDrive(k); // hash changed — download + CRDT merge
-        lastSeenRemoteHash.set(k, remoteHash);
+        // seenHash is recorded inside, and only if the merge actually landed.
+        await syncWeekFromDrive(k, { seenHash: remoteHash }); // hash changed — download + CRDT merge
       }
     }
   } catch { /* silent — next poll will retry */ }
@@ -9973,8 +9988,7 @@ async function pollDriveChanges(_wKey) {
           // syncWeekFromDrive skips a getDriveFileId lookup (and can't create a
           // placeholder for a week the feed just told us exists).
           if (ch.fileId) driveFileIdCache.set(k, ch.fileId);
-          await syncWeekFromDrive(k);
-          lastSeenRemoteHash.set(k, remoteHash);
+          await syncWeekFromDrive(k, { seenHash: remoteHash });
         }
       }
 
