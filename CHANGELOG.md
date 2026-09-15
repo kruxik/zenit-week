@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.09.15] - 2026-09-15
+
+### Added
+
+- **help:** Close Help when the logo resets the view
+- **agenda:** Scroll the list back to the top when the logo resets the view
+- **mindmap:** Reset filters and close the level row when the logo refits the map
+
+### Fixed
+
+- **sync:** Release editor, drag and atomic-op holds on hide, and park uploads at teardown
+- **sync:** Mark a remote revision seen only when its merge actually landed
+- **sync:** Resolve duplicate Drive week files to one deterministic survivor
+- **sync:** Restamp only the nodes an undo actually changes
+- **mindmap:** Stop a touch pan from the root flattening every node offset
+- **sync:** Stamp layout changes with _posTs so a drag cannot promote stale content
+- **mindmap:** Stop a long-press on the root from opening Stats behind its menu
+- **stats:** Keep the logo on Stats and reset it instead of leaving to the mindmap
+
 ## [v2026.09.13] - 2026-09-13
 
 ### Added
