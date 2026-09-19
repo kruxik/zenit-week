@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-5w/AWMRH6r1TqFAaRt4nOWx2L0Ze7lF4VZLdXncsK00='
+               'sha256-L5HzxiEzpO0oPRcK85Bjf5EDqWxO0361izoyFUvLwXM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -14467,20 +14467,36 @@ function applyDayReschedule(targetId, mode, action) {
   const result = computeDayReschedule(mode, action);
   if (!result) return false;
   takeSnapshot();
-  setActivityDays(targetId, result.newDays, result.keepAsChildren);
+  // A leaf move (Fr → Sa) keeps that day's own outcome: re-key the preserved
+  // state so done/dropped travel with the day the user dragged.
+  const remap = (mode === 'leaf' && action.currentDayIndex !== action.newDayIndex)
+    ? { from: action.currentDayIndex, to: action.newDayIndex }
+    : null;
+  setActivityDays(targetId, result.newDays, result.keepAsChildren, remap);
   return true;
 }
 
-function setActivityDays(nodeId, newDays, keepAsChildren = false) {
+function setActivityDays(nodeId, newDays, keepAsChildren = false, remap = null) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity' || node.dayChild) return;
 
   const dayChildIds = (node.children || []).filter(id => findNode(id)?.dayChild);
+  // Day-children are torn down and rebuilt, so their outcome (done *and*
+  // dropped — two values on one axis) is carried across by dayIndex. Losing
+  // `dropped` here silently revived every dropped sibling, because the parent
+  // is then recomputed from all-open children.
   const prevState = new Map();
   dayChildIds.forEach(id => {
     const c = findNode(id);
-    if (c) prevState.set(c.dayIndex, { done: c.done, doneAt: c.doneAt });
+    if (c) prevState.set(c.dayIndex, {
+      done: c.done, doneAt: c.doneAt,
+      dropped: c.dropped, droppedAt: c.droppedAt,
+    });
   });
+  if (remap && prevState.has(remap.from)) {
+    prevState.set(remap.to, prevState.get(remap.from));
+    prevState.delete(remap.from);
+  }
   tombstoneNodes(dayChildIds);
   weekData.nodes = weekData.nodes.filter(n => !dayChildIds.includes(n.id));
   node.children = node.children.filter(id => !dayChildIds.includes(id));
@@ -14495,10 +14511,16 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false) {
     sortedDays.forEach(d => {
       const id = createDayChild(nodeId, d);
       const prev = prevState.get(d);
-      if (prev?.done) {
+      if (prev?.done || prev?.dropped) {
         const child = findNode(id);
-        child.done = true;
-        child.doneAt = prev.doneAt;
+        if (prev.dropped) {
+          child.dropped = true;
+          if (prev.droppedAt) child.droppedAt = prev.droppedAt;
+        } else {
+          child.done = true;
+          child.doneAt = prev.doneAt;
+        }
+        syncStatusUp(id, 'done');
       }
     });
   } else {

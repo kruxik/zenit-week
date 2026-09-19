@@ -3,7 +3,7 @@ import {
   transferUnfinished, transferReusable, moveNodeToNextWeek,
   getOverdueItems, getAnyDayItems, getDroppedItems, localDateStr,
   computeWeekStats, _computeSummarySignature, deleteNode, sandboxGlobal,
-  subtreeHasDropped, updateCounter,
+  subtreeHasDropped, updateCounter, setActivityDays,
   _state,
 } from './setup.js';
 
@@ -1086,5 +1086,83 @@ describe('done wins over dropped, everywhere it is set', () => {
     expect(p.done).toBe(true);
     expect(p.dropped).toBe(false);
     expect(p.droppedAt).toBeUndefined();
+  });
+});
+
+// ─── T9 — rescheduling a day-child keeps every sibling's outcome ──────────────
+
+describe('T9 – setActivityDays preserves dropped day-children', () => {
+  // "Running (mo, th, fr, su)" with Th and Fr dropped. Moving Fr to Sa used to
+  // rebuild every day-child from scratch, losing `dropped` on all of them.
+  function runningWithDroppedDays() {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { label: 'Running', children: ['d1', 'd2', 'd3', 'd4'] }),
+      mkActivity('d1', 'a1', 'work', { label: 'mo', dayChild: true, dayIndex: 1 }),
+      mkActivity('d2', 'a1', 'work', { label: 'th', dayChild: true, dayIndex: 4,
+        dropped: true, droppedAt: '2026-01-01T10:00:00.000Z' }),
+      mkActivity('d3', 'a1', 'work', { label: 'fr', dayChild: true, dayIndex: 5,
+        dropped: true, droppedAt: '2026-01-02T10:00:00.000Z' }),
+      mkActivity('d4', 'a1', 'work', { label: 'su', dayChild: true, dayIndex: 0 }),
+    ]);
+  }
+
+  function dayChildren() {
+    return findNode('a1').children.map(findNode);
+  }
+
+  test('a sibling stays dropped when another day moves', () => {
+    runningWithDroppedDays();
+
+    setActivityDays('a1', new Set([1, 4, 6, 0]), true, { from: 5, to: 6 });
+
+    const byDay = new Map(dayChildren().map(c => [c.dayIndex, c]));
+    expect(byDay.get(4).dropped).toBe(true);
+    expect(byDay.get(4).droppedAt).toBe('2026-01-01T10:00:00.000Z');
+    expect(byDay.get(1).dropped).toBeFalsy();
+    expect(byDay.get(0).dropped).toBeFalsy();
+  });
+
+  test('the moved day carries its dropped state to the new day', () => {
+    runningWithDroppedDays();
+
+    setActivityDays('a1', new Set([1, 4, 6, 0]), true, { from: 5, to: 6 });
+
+    const byDay = new Map(dayChildren().map(c => [c.dayIndex, c]));
+    expect(byDay.get(6).dropped).toBe(true);
+    expect(byDay.get(6).droppedAt).toBe('2026-01-02T10:00:00.000Z');
+    expect(byDay.has(5)).toBe(false);
+  });
+
+  test('done day-children still survive alongside dropped ones', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { label: 'Running', children: ['d1', 'd2'] }),
+      mkActivity('d1', 'a1', 'work', { label: 'mo', dayChild: true, dayIndex: 1,
+        done: true, doneAt: '2026-01-05T08:00:00.000Z' }),
+      mkActivity('d2', 'a1', 'work', { label: 'th', dayChild: true, dayIndex: 4, dropped: true }),
+    ]);
+
+    setActivityDays('a1', new Set([1, 4, 3]), true);
+
+    const byDay = new Map(dayChildren().map(c => [c.dayIndex, c]));
+    expect(byDay.get(1).done).toBe(true);
+    expect(byDay.get(1).doneAt).toBe('2026-01-05T08:00:00.000Z');
+    expect(byDay.get(4).dropped).toBe(true);
+    expect(byDay.get(3).done).toBeFalsy();
+    expect(byDay.get(3).dropped).toBeFalsy();
+  });
+
+  test('the parent rolls up to dropped when every remaining day is dropped', () => {
+    setUp([
+      mkBranch('work', ['a1']),
+      mkActivity('a1', 'work', 'work', { label: 'Running', children: ['d1', 'd2'] }),
+      mkActivity('d1', 'a1', 'work', { label: 'th', dayChild: true, dayIndex: 4, dropped: true }),
+      mkActivity('d2', 'a1', 'work', { label: 'fr', dayChild: true, dayIndex: 5, dropped: true }),
+    ]);
+
+    setActivityDays('a1', new Set([4, 6]), true, { from: 5, to: 6 });
+
+    expect(findNode('a1').dropped).toBe(true);
   });
 });
