@@ -943,13 +943,41 @@ describe('sw.js — navigation preload', () => {
     expect(w.posted[0].msg).toEqual({ type: 'zw-shell-updated', token: '"v2"' });
   });
 
-  it('ignores a preload that came back broken', async () => {
+  // A preload the worker cannot use means "ask again properly", never "give up":
+  // the preload is the browser's own navigation request and carries none of the
+  // worker's headers, so a tunnel interstitial arrives on exactly this path.
+  // Abandoning the revalidation is what pins a cache to one build for good.
+  it('falls back to its own fetch when the preload came back broken', async () => {
     const w = loadWorker();
     await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'cached' }));
     const ev = navEvent(`${ORIGIN}/app`, Promise.resolve(makeResponse({ ok: false, status: 500 })));
     await w.ctx.shellResponse(ev);
     await Promise.all(ev.waits);
-    expect(w.cache.store.get('/__zw-shell__').tag).toBe('cached');
+    expect(w.fetches.length).toBe(1);
+    expect(w.cache.store.get('/__zw-shell__').headers.get('etag')).toBe('"fresh"');
+  });
+
+  it('falls back to its own fetch when the preload is a tunnel interstitial', async () => {
+    const w = loadWorker();
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'cached' }));
+    const interstitial = makeResponse({ etag: null, extraHeaders: { 'ngrok-error-code': 'ERR_NGROK_6024' } });
+    const ev = navEvent(`${ORIGIN}/app`, Promise.resolve(interstitial));
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(w.fetches[0].input).toBe('/app');
+    expect(w.cache.store.get('/__zw-shell__').headers.get('etag')).toBe('"fresh"');
+  });
+
+  it('cancels the body of a preload it decided against', async () => {
+    const w = loadWorker();
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"' }));
+    let cancelled = false;
+    const unusable = makeResponse({ ok: false, status: 502 });
+    unusable.body = { cancel: () => { cancelled = true; } };
+    const ev = navEvent(`${ORIGIN}/app`, Promise.resolve(unusable));
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(cancelled).toBe(true);
   });
 
   it('does not reach for the network at all when the browser says it is offline', async () => {
@@ -1132,5 +1160,49 @@ describe('sw.js — avatar photo', () => {
     w.listeners.message({ data: { type: 'zw-clear-avatar' }, waitUntil: p => waits.push(p) });
     await Promise.all(waits);
     expect(w.cache.store.has(PHOTO)).toBe(false);
+  });
+});
+
+// ─── Tunnel interstitial ──────────────────────────────────────────────────────
+//
+// A free-tier ngrok domain answers a browser-shaped request with its own warning
+// page instead of the app. The worker must not cache it (covered under foreign
+// documents) *and* must not be stopped by it — before the opt-out header, a shell
+// cached once behind such a tunnel could never be refreshed again.
+
+describe('sw.js — tunnel interstitial', () => {
+  it('sends the opt-out header on the revalidation fetch', async () => {
+    const w = loadWorker();
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"' }));
+    const ev = navEvent(`${ORIGIN}/app`);
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(w.fetches[0].init.headers).toEqual({ 'ngrok-skip-browser-warning': '1' });
+    expect(w.fetches[0].init.cache).toBe('no-cache');
+  });
+
+  it('sends it when warming a cold shell on activation too', async () => {
+    const w = loadWorker({ clients: [`${ORIGIN}/app`] });
+    await w.ctx.warmShell();
+    expect(w.fetches[0].init.headers).toEqual({ 'ngrok-skip-browser-warning': '1' });
+  });
+
+  it('sends it when precaching the manifest icons', async () => {
+    const w = loadWorker();
+    await w.ctx.precacheIcons();
+    expect(w.fetches.length).toBe(4);
+    for (const f of w.fetches) {
+      expect(f.init.headers).toEqual({ 'ngrok-skip-browser-warning': '1' });
+    }
+  });
+
+  it('still refuses to cache an interstitial that answers its own fetch', async () => {
+    const interstitial = makeResponse({ etag: null, extraHeaders: { 'ngrok-error-code': 'ERR_NGROK_6024' } });
+    const w = loadWorker({ fetchImpl: () => Promise.resolve(interstitial) });
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'cached' }));
+    const ev = navEvent(`${ORIGIN}/app`, Promise.resolve(makeResponse({ ok: false, status: 502 })));
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(w.cache.store.get('/__zw-shell__').tag).toBe('cached');
   });
 });

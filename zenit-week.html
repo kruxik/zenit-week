@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-L5HzxiEzpO0oPRcK85Bjf5EDqWxO0361izoyFUvLwXM='
+               'sha256-8T1ukDAHDTplrTAxxlCPk8/PAJVOdOZpEFawd4io00Q='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4814,6 +4814,11 @@ async function checkForAssetUpdate() {
     resp = await netFetch(_assetProbeUrl(), {
       method:    'HEAD',
       cache:     'no-store',
+      // A free-tier tunnel answers a browser-shaped request with its own
+      // interstitial, which carries neither ETag nor Last-Modified — the probe
+      // would report `probe-no-token` forever and never see a new build. Same
+      // opt-out header the service worker sends; every other host ignores it.
+      headers:   { 'ngrok-skip-browser-warning': '1' },
       timeoutMs: NET_PROBE_TIMEOUT_MS,
     });
   } catch (err) {

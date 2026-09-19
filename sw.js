@@ -58,6 +58,28 @@ function timeoutSignal(ms) {
     : undefined;
 }
 
+// A free-tier tunnel (ngrok) answers a browser-shaped request with an
+// interstitial of its own rather than the app: 200, text/html, and an
+// `ngrok-error-code` header. isForeignDocument() refuses to store that, which is
+// right — but on its own it leaves the shell unrefreshable behind such a tunnel,
+// because every revalidation is thrown away and the cache stays pinned to
+// whatever build it caught first, with no way out but clearing it by hand. This
+// header is the documented opt-out. Every other host ignores an unknown request
+// header, so it rides along on all of the worker's own fetches rather than being
+// switched on for development.
+const OWN_FETCH_HEADERS = { 'ngrok-skip-browser-warning': '1' };
+
+// Every fetch the worker issues on its own behalf — never the navigation, which
+// belongs to the browser. `no-cache` sends a conditional request, so an
+// unchanged document costs a 304 rather than another full download.
+function ownFetch(path) {
+  return fetch(path, {
+    cache: 'no-cache',
+    headers: OWN_FETCH_HEADERS,
+    signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS),
+  });
+}
+
 function isAppDocument(url) {
   return url.origin === self.location.origin && APP_PATH.test(url.pathname);
 }
@@ -308,7 +330,7 @@ async function precacheIcons() {
   await Promise.all(ICON_PATHS.map(async path => {
     try {
       if (await cache.match(path)) return;
-      const resp = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
+      const resp = await ownFetch(path);
       if (resp && resp.ok) await cache.put(path, resp);
     } catch (err) {
       console.debug('[sw] icon-precache-failed', path, err && err.message);
@@ -354,7 +376,7 @@ async function warmShell() {
   // Path only: never store a response keyed to an OAuth `?code=` callback.
   const path = new URL(client.url).pathname;
   try {
-    const resp = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
+    const resp = await ownFetch(path);
     if (resp && resp.ok && !isForeignDocument(resp)) await cache.put(SHELL_KEY, resp);
   } catch (err) {
     console.debug('[sw] warm-failed', err && err.message);
@@ -409,6 +431,14 @@ function isForeignDocument(res) {
 
 function shellResponse(event) {
   return cachedDocument(event, SHELL_KEY, true);
+}
+
+// Drop a response nothing will read, so a preload the worker decided against
+// does not sit with an unconsumed body. Always returns null, to read as an
+// assignment at the call site.
+function discardResponse(res) {
+  try { if (res && res.body && typeof res.body.cancel === 'function') res.body.cancel(); } catch (_) {}
+  return null;
 }
 
 // Cache-first with no revalidation, unlike the documents. An icon is content-
@@ -608,13 +638,19 @@ async function revalidateDocument(cache, cacheKey, cached, path, notify, preload
   // Only trusted in the negative — see isDefinitelyOffline() in the app.
   if (self.navigator && self.navigator.onLine === false) return;
   let fresh = preload ? await preload : null;
+  // The preload is the browser's own navigation request, so it carries none of
+  // the worker's headers and a tunnel answers it with an interstitial. An
+  // unusable preload therefore means "ask again properly", never "give up" —
+  // abandoning the revalidation here is what pins a cache to a stale build for
+  // good, since the next navigation is served from that same cache and the
+  // network is never consulted again.
+  if (fresh && (!fresh.ok || isForeignDocument(fresh))) fresh = discardResponse(fresh);
   if (!fresh) {
     try {
-      // `no-cache` sends a conditional request, so an unchanged document costs a
-      // 304 and not another full download. The preload above is the browser's own
-      // navigation request, which the app document's must-revalidate makes
-      // conditional too — so either route costs the same on an unchanged deploy.
-      fresh = await fetch(path, { cache: 'no-cache', signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS) });
+      // The preload above is the browser's own navigation request, which the app
+      // document's must-revalidate makes conditional too — so either route costs
+      // the same on an unchanged deploy.
+      fresh = await ownFetch(path);
     } catch (err) {
       return; // Offline or the link died — the cached copy stays authoritative.
     }
