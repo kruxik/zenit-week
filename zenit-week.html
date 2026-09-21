@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-pZWul98h3AZ/oC9Aj538UXV+Vlc8i7k8UtwFZ3kRNXU='
+               'sha256-jMrcF7Vwj9bQ+graSsre4ctd2obZ5fgsg2u/IuNl9HQ='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1147,12 +1147,8 @@
   /* No backdrop-filter on small controls. Each one is its own compositor render
      surface that re-blurs whatever sits behind it, and behind these is the full
      SVG mindmap. At button size the blur is not legible anyway — --glass-bg
-     carries the look on its own. #sync-dropdown-signout and
-     #sync-dropdown-signout-all also sit inside
-     #sync-dropdown, which is already blurred, so its own blur was doubled work. */
-  #sync-btn,
-  #sync-dropdown-signout,
-  #sync-dropdown-signout-all {
+     carries the look on its own. */
+  #sync-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1175,16 +1171,12 @@
 
   #sync-btn { display: none; }
 
-  #sync-btn:hover,
-  #sync-dropdown-signout:hover,
-  #sync-dropdown-signout-all:hover {
+  #sync-btn:hover {
     color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
 
-  #sync-btn:hover::before,
-  #sync-dropdown-signout:hover::before,
-  #sync-dropdown-signout-all:hover::before {
+  #sync-btn:hover::before {
     content: '';
     position: absolute;
     top: 3px; left: 3px; right: 3px; bottom: 3px;
@@ -1256,6 +1248,7 @@
     padding: 12px 14px;
     z-index: 1001;
     min-width: 264px;
+    max-width: 320px;
     display: none;
     flex-direction: column;
     gap: 6px;
@@ -1264,18 +1257,65 @@
 
   #sync-dropdown.visible { display: flex; }
 
+  /* An account menu, read top to bottom: who you are, when it last synced,
+     then what you can do. Everything is left-aligned against one edge — the
+     centred text and the two full-size glass buttons this replaced gave four
+     competing alignments in a 264px box. */
+  #sync-dropdown-account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 0 4px;
+    min-width: 0;
+  }
+
+  #sync-dropdown-avatar {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #fff;
+    background: var(--text-muted);
+  }
+
+  /* min-width:0 on both, or the ellipsis below never triggers: a flex item's
+     default min-width is its content, so a long address widens the menu. */
+  #sync-dropdown-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  #sync-dropdown-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #sync-dropdown-name:empty { display: none; }
+
   #sync-dropdown-email {
     font-size: 12px;
     color: var(--text-muted);
-    font-weight: 500;
-    word-break: break-all;
-    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   #sync-dropdown-last-sync {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-secondary);
-    text-align: center;
+    padding: 0 0 2px;
   }
 
   /* Settings & Toolbar Right */
@@ -1285,8 +1325,6 @@
     gap: 12px;
     justify-content: flex-end;
   }
-
-
 
   /* ── Logo variants ── */
   /* Same drawing at the same scale as .logo-full; the viewBox is cropped to
@@ -3373,7 +3411,8 @@
     transform: translateY(0);
   }
   .dialog-actions .agenda-action-btn,
-  #settings-dropdown .agenda-action-btn {
+  #settings-dropdown .agenda-action-btn,
+  #sync-dropdown .agenda-action-btn {
     white-space: nowrap;
     height: 36px;
     padding: 0 16px;
@@ -4055,12 +4094,17 @@
           </svg>
         </button>
         <div id="sync-dropdown" role="menu">
-          <div id="sync-dropdown-email"></div>
-          <div class="settings-separator"></div>
+          <div id="sync-dropdown-account">
+            <div id="sync-dropdown-avatar" aria-hidden="true"></div>
+            <div id="sync-dropdown-identity">
+              <div id="sync-dropdown-name"></div>
+              <div id="sync-dropdown-email"></div>
+            </div>
+          </div>
           <div id="sync-dropdown-last-sync">Last sync: —</div>
           <div class="settings-separator"></div>
-          <button type="button" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out</button>
-          <button type="button" id="sync-dropdown-signout-all" data-i18n="sync.signOutAll">Sign out of all devices</button>
+          <button type="button" role="menuitem" class="agenda-action-btn" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out</button>
+          <button type="button" role="menuitem" class="agenda-action-btn danger" id="sync-dropdown-signout-all" data-i18n="sync.signOutAll">Sign out of all devices</button>
         </div>
       </div>
     </div>
@@ -4273,8 +4317,6 @@ Or remove them later in Settings → Help.</div>
     </div>
   </div>
 </div>
-
-
 
 
 <div id="app-confirm-overlay">
@@ -7957,6 +7999,17 @@ function showSignedInState(user) {
   _avatarPhotoDeferred = canShowAvatarPhoto() ? false : !!googleUserPhoto;
 
   if (emailEl) emailEl.textContent = googleUserEmail;
+
+  // Initials, never the photo: the disc needs no network and no widening of
+  // connect-src, and it is the same identity mark the root node already wears.
+  const nameEl   = document.getElementById('sync-dropdown-name');
+  const avatarEl = document.getElementById('sync-dropdown-avatar');
+  if (nameEl) nameEl.textContent = googleUserName || '';
+  if (avatarEl) {
+    avatarEl.textContent = googleUserInitials || getInitials(googleUserEmail || '?');
+    avatarEl.style.background = googleUserInitialsColor || '';
+  }
+
   if (stateBtn) stateBtn.style.display = 'flex';
   updateDropdownSyncTime();
 }
@@ -8367,9 +8420,11 @@ async function signOut({ revoke = false } = {}) {
 
 // Sign out of every device. Signs this one out the ordinary way and also
 // revokes the grant, which ends the session everywhere else and makes the next
-// sign-in ask for permission again. Local data is kept — this is about access.
-async function signOutAllDevices() {
-  await signOut({ revoke: true });
+// sign-in ask for permission again. What happens to the local copy is the same
+// question a plain sign-out asks, and gets the same two answers.
+async function signOutAllDevices({ clearLocal = false } = {}) {
+  if (clearLocal) await signOutAndClear({ revoke: true });
+  else            await signOut({ revoke: true });
 }
 
 // Sign out AND wipe all local USER data (weeks, colors, sync caches, undo/redo).
@@ -8387,8 +8442,8 @@ const SIGNOUT_PRESERVE_KEYS = new Set([
   // has already seen the tour.
   ...ONBOARDING_DEVICE_KEYS,
 ]);
-async function signOutAndClear() {
-  await signOut();
+async function signOutAndClear({ revoke = false } = {}) {
+  await signOut({ revoke });
 
   // Close open IDB handle so deleteDatabase doesn't get onblocked
   if (_db) { try { _db.close(); } catch {} _db = null; }
@@ -10903,8 +10958,9 @@ const TRANSLATIONS = {
     'sync.signOutConfirm.body':       'Your data stays in your Google Drive, and your other devices stay signed in.\nWhat to do with the local copy on this device?\nAny pending changes will sync before signing out.',
     'sync.signOutAll':                'Sign out of all devices',
     'sync.signOutAllConfirm.title':   'Sign out of all devices?',
-    'sync.signOutAllConfirm.body':    'Zenit Week loses access to your Google Drive everywhere you are signed in, not just on this device.\nYour data stays in Drive and on this device.\nSigning in again will ask for your permission once more.',
-    'sync.signOutAllConfirm.ok':      'Sign out everywhere',
+    'sync.signOutAllConfirm.body':    'Your data stays in your Google Drive, but every device signs out, not just this one.\nWhat to do with the local copy on this device?\nSigning in again will ask for your permission once more.',
+    'sync.signOutAllConfirm.keepLocal':  'Keep data',
+    'sync.signOutAllConfirm.clearLocal': 'Clear & sign out',
     'sync.signOutConfirm.keepLocal':  'Keep data',
     'sync.signOutConfirm.clearLocal': 'Clear & sign out',
     'app-confirm.cancel':         'Cancel',
@@ -11264,8 +11320,9 @@ const TRANSLATIONS = {
     'sync.signOutConfirm.body':       'Vaše data zůstávají na vašem Disku Google a ostatní zařízení zůstanou přihlášená.\nVyberte, co udělat s lokální kopií na tomto zařízení?\nNesynchronizované změny se před odhlášením nahrají.',
     'sync.signOutAll':                'Odhlásit se na všech zařízeních',
     'sync.signOutAllConfirm.title':   'Odhlásit se na všech zařízeních?',
-    'sync.signOutAllConfirm.body':    'Zenit Week ztratí přístup k vašemu Disku Google všude, kde jste přihlášeni, nejen na tomto zařízení.\nVaše data zůstanou na Disku i v tomto zařízení.\nPři dalším přihlášení budete znovu požádáni o udělení oprávnění.',
-    'sync.signOutAllConfirm.ok':      'Odhlásit všude',
+    'sync.signOutAllConfirm.body':    'Vaše data zůstávají na vašem Disku Google, ale odhlásí se všechna zařízení, nejen toto.\nVyberte, co udělat s lokální kopií na tomto zařízení?\nPři dalším přihlášení budete znovu požádáni o udělení oprávnění.',
+    'sync.signOutAllConfirm.keepLocal':  'Ponechat data',
+    'sync.signOutAllConfirm.clearLocal': 'Smazat a odhlásit',
     'sync.signOutConfirm.keepLocal':  'Ponechat data',
     'sync.signOutConfirm.clearLocal': 'Smazat a odhlásit',
     'app-confirm.cancel':         'Zrušit',
@@ -22946,11 +23003,13 @@ document.getElementById('sync-btn').addEventListener('click', () => { startSignI
   signoutAllBtn.addEventListener('click', () => {
     dropdown.classList.remove('visible');
     showAppConfirm({
-      title:     t('sync.signOutAllConfirm.title'),
-      body:      t('sync.signOutAllConfirm.body'),
-      okLabel:   t('sync.signOutAllConfirm.ok'),
-      danger:    true,
-      onConfirm: signOutAllDevices,
+      title:           t('sync.signOutAllConfirm.title'),
+      body:            t('sync.signOutAllConfirm.body'),
+      okLabel:         t('sync.signOutAllConfirm.keepLocal'),
+      onConfirm:       () => signOutAllDevices(),
+      secondaryLabel:  t('sync.signOutAllConfirm.clearLocal'),
+      secondaryDanger: true,
+      onSecondary:     () => signOutAllDevices({ clearLocal: true }),
     });
   });
 

@@ -54,4 +54,13 @@ describe('sign out vs sign out of all devices', () => {
     expect(revokeCalls).toEqual(['access_token_of_this_device']);
     expect(_state.getAccessToken()).toBe(null);
   });
+
+  // The confirm hands the handler no argument, and a stray event object must
+  // not read as { clearLocal: true } and wipe the device.
+  test('keeps local data unless the wipe answer was chosen', async () => {
+    await signOutAllDevices({});
+    await flush();
+
+    expect(tokenBodies).toEqual([{ grant_type: 'revoke' }]);
+  });
 });
