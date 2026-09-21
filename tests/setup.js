@@ -877,6 +877,9 @@ export const {
   _state,
 } = sandbox;
 
+export const triggerKeydown = (e) => sandbox._state.triggerKeydown(e);
+export const setHoveredNode = (id) => sandbox._state.setHoveredNode(id);
+export const getHoveredNode = () => sandbox._state.getHoveredNode();
 export const panState = () => sandbox._state.getPanState();
 export const endPan = () => sandbox._state.endPan();
 export const sandboxGlobal = sandbox;

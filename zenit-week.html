@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-TsHMPw3d3laixfJE+VMq40UEW9rCvgKVg+bdvFHNe7I='
+               'sha256-9kVoNCcAwyK2lxlHtAF+Y6jKt4YmfxIqTB03C9OYe58='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -17679,6 +17679,14 @@ function _windowKeydownHandler(e) {
     moveKbFocus(ARROW_DIRS[e.key][0], ARROW_DIRS[e.key][1]);
     return;
   }
+
+  // Every hotkey below acts on the hovered node, so none of them may fire while
+  // the user is typing. The quick-add panel deliberately keeps focus in its
+  // field between entries so the mobile keyboard never dismisses, and the last
+  // drag leaves a node hovered — which turned a Backspace meant for the text
+  // into a delete of that node. Guarded once for the whole block, because every
+  // key in it shares the precondition; the branches above guard themselves.
+  if (isTypingTarget(e.target)) return;
 
   if (!hoveredNodeId) return;
 
