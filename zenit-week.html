@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-mXZ8wmznp2jTMqswOvqFd6M55U14xkrYsZArKpWn/dY='
+               'sha256-QvTg0O3BHZvu9UtGrNXdHp9O8KDtiiukkmPBHUKqmcU='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4983,10 +4983,11 @@ async function requestPersistentStorage() {
 
 requestPersistentStorage();
 
-// ─── Quiet refresh: restore payload helpers (Slice 3) ────────────────────────
+// ─── Quiet refresh: restore payload helpers ──────────────────────────────────
 // Volatile view-state survives location.reload() via this serializable payload.
-// Slice 3 wires only the manual debug trigger (window.__quietRefreshReloadNow);
-// Slice 4 will connect it to auto-reload.
+// Every deliberate reload goes through stashViewStateForReload(), so both the
+// auto-reload and the pull-to-refresh gesture land back where the person was.
+// `window.__quietRefreshReloadNow` remains as a manual trigger for debugging.
 const RESTORE_KEY        = 'zenit-week-pending-restore';
 const RESTORE_TTL_MS     = 5 * 60 * 1000;
 const RESTORE_SCHEMA_V   = 1;
