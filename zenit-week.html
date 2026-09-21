@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-8T1ukDAHDTplrTAxxlCPk8/PAJVOdOZpEFawd4io00Q='
+               'sha256-p03ZZgsIB+gjp74KbiUXlWfF+ojn9JSDG20cvvEFCuM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5324,7 +5324,7 @@ async function onPeerWeekSaved(msg) {
     const remoteData = await loadWeekIDB(wk);
     if (!remoteData) return null;
     const localData = structuredClone(weekData);
-    const mergedData = mergeWeekData(localData, remoteData);
+    const mergedData = mergeWeekData(localData, remoteData, wk);
     _recordRemoteArrivals(wk, localData, mergedData);
     const mergedJson = JSON.stringify(mergedData);
     const mergedHash = weekContentHash(mergedData);
@@ -5481,6 +5481,73 @@ async function saveValueIDB(key, value) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+// ─── Audit log (diagnostics) ──────────────────────────────────────────────────
+// A per-device ring buffer of the structural events that can make a node vanish:
+// deletes, tombstone writes, undo/redo restores and the two merge cases where a
+// tombstone on one side removes content the other side still holds. Local only —
+// it is not in DATA_RECORDS, so it never reaches Drive and never leaves the
+// device that wrote it. Every entry also goes to the console, so a live session
+// can be watched without opening IndexedDB. Diagnostics must never break the
+// app: every function here swallows its own errors.
+const AUDIT_KEY = 'zenit-week-audit-log';
+const AUDIT_MAX = 500;
+let auditBuffer = [];
+let auditFlushTimer = null;
+let auditDeviceTag = null;
+
+function auditDevice() {
+  if (auditDeviceTag) return auditDeviceTag;
+  const ua = navigator.userAgent || '';
+  const kind = /Android/i.test(ua) ? 'android'
+    : /iPhone|iPad/i.test(ua) ? 'ios'
+    : /Macintosh/i.test(ua) ? 'mac'
+    : /Windows/i.test(ua) ? 'win' : 'other';
+  auditDeviceTag = `${kind}:${TAB_ID.slice(0, 6)}`;
+  return auditDeviceTag;
+}
+
+// The two or three frames above the audit() call, names only — enough to tell a
+// user delete from an undo restore without carrying whole stacks around.
+function auditCallers() {
+  try {
+    return (new Error().stack || '')
+      .split('\n')
+      .slice(3, 6)
+      .map(line => line.trim().replace(/^at\s+/, '').replace(/\s*\(.*$/, ''))
+      .filter(Boolean)
+      .join(' < ');
+  } catch {
+    return '';
+  }
+}
+
+function audit(event, detail) {
+  try {
+    const entry = { t: new Date().toISOString(), dev: auditDevice(), ev: event, ...detail, at: auditCallers() };
+    auditBuffer.push(entry);
+    console.log('[zw-audit]', JSON.stringify(entry));
+    if (auditBuffer.length > AUDIT_MAX) auditBuffer = auditBuffer.slice(-AUDIT_MAX);
+    if (!auditFlushTimer) auditFlushTimer = setTimeout(auditFlush, 1500);
+  } catch { /* diagnostics never throw into their caller */ }
+}
+
+async function auditFlush() {
+  auditFlushTimer = null;
+  if (!auditBuffer.length) return;
+  const pending = auditBuffer;
+  auditBuffer = [];
+  try {
+    const previous = (await loadValueIDB(AUDIT_KEY)) || [];
+    await saveValueIDB(AUDIT_KEY, previous.concat(pending).slice(-AUDIT_MAX));
+  } catch { /* a lost diagnostic entry is not worth a failed write path */ }
+}
+
+// Read and clear the log from the console on any device.
+window.zwAudit = {
+  dump:  async () => { await auditFlush(); return (await loadValueIDB(AUDIT_KEY)) || []; },
+  clear: async () => { auditBuffer = []; await saveValueIDB(AUDIT_KEY, []); },
+};
 
 async function deleteValueIDB(key) {
   const db = await openDB();
@@ -6253,10 +6320,15 @@ function _tombstoneRemovedNodes(data, liveNodes) {
   if (!data) return;
   if (!Array.isArray(data.tombstones)) data.tombstones = [];
   const present = new Set((data.nodes || []).map(n => n.id));
+  const buried = [];
   for (const n of liveNodes) {
     if (n.type === 'branch') continue;
-    if (!present.has(n.id) && !data.tombstones.includes(n.id)) data.tombstones.push(n.id);
+    if (!present.has(n.id) && !data.tombstones.includes(n.id)) {
+      data.tombstones.push(n.id);
+      buried.push({ id: n.id, label: n.label });
+    }
   }
+  if (buried.length) audit('undoBuried', { buried });
 }
 
 // weekKey → ids that a merge pulled in from elsewhere (Drive or a peer tab) and
@@ -6766,6 +6838,7 @@ async function _currentSnapshot(wk = currentWeekKey) {
 
 async function undo() {
   if (undoStack.length === 0) return;
+  audit('undo', { wk: currentWeekKey, depth: undoStack.length });
   const raw = undoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
@@ -6776,6 +6849,7 @@ async function undo() {
 
 async function redo() {
   if (redoStack.length === 0) return;
+  audit('redo', { wk: currentWeekKey, depth: redoStack.length });
   const raw = redoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
@@ -8467,7 +8541,7 @@ function stripDemoScaffolding(data, other) {
 // merge: locally, when an existing account signs in on a fresh device; remotely,
 // once such a device has pushed it to Drive. Either way it must not graft itself
 // onto a week of real work — strip it from both sides before merging.
-function mergeWeekData(local, remote) {
+function mergeWeekData(local, remote, wk = null) {
   try {
     const localBefore = local;
     local = stripDemoScaffolding(local, remote);
@@ -8475,6 +8549,21 @@ function mergeWeekData(local, remote) {
 
     // 1. Union tombstones
     const tombstones = new Set([...(local.tombstones||[]), ...(remote.tombstones||[])]);
+
+    // A tombstone always wins, so the merge is the last point at which the node
+    // it removes is still visible. Record both directions: content this device
+    // loses because the other side buried it, and content the other side loses
+    // because this device did.
+    const localTombstones = new Set(local.tombstones || []);
+    const remoteTombstones = new Set(remote.tombstones || []);
+    const lostHere = (local.nodes || [])
+      .filter(n => remoteTombstones.has(n.id) && !localTombstones.has(n.id))
+      .map(n => ({ id: n.id, label: n.label }));
+    const lostThere = (remote.nodes || [])
+      .filter(n => localTombstones.has(n.id) && !remoteTombstones.has(n.id))
+      .map(n => ({ id: n.id, label: n.label }));
+    if (lostHere.length)  audit('mergeRemoteTombstone', { wk, lost: lostHere });
+    if (lostThere.length) audit('mergeLocalTombstone',  { wk, lost: lostThere });
 
     // 2. LWW per node: keep node with higher _ts; remote wins on tie (remote is newer signal)
     const byId = new Map();
@@ -8668,7 +8757,7 @@ async function _flushPendingMerge() {
     const localData = (wKey === currentWeekKey)
       ? structuredClone(weekData)
       : (await loadWeekIDB(wKey)) || { nodes: [] };
-    const mergedData = mergeWeekData(localData, remoteData);
+    const mergedData = mergeWeekData(localData, remoteData, wKey);
     _recordRemoteArrivals(wKey, localData, mergedData);
     const mergedJson = JSON.stringify(mergedData);
     const mergedHash = weekContentHash(mergedData);
@@ -8776,7 +8865,7 @@ async function syncWeekFromDrive(wKey, { force = false, seenHash = null } = {}) 
       // read and the write would be silently overwritten by the merge result.
       const outcome = await withWeekLock(wKey, async () => {
         const localData = (await loadWeekIDB(wKey)) || { nodes: [] };
-        const mergedData = mergeWeekData(localData, remoteData);
+        const mergedData = mergeWeekData(localData, remoteData, wKey);
         _recordRemoteArrivals(wKey, localData, mergedData);
         const mergedJson = JSON.stringify(mergedData);
         const mergedHash = weekContentHash(mergedData);
@@ -11529,6 +11618,7 @@ async function saveWeek(wk, data) {
   // node into weekData before the IDB write actually runs.
   const persisted = { ...data, nodes: data.nodes.filter(n => !n._editing) };
 
+  audit('saveWeek', { wk, v: persisted.crdtVersion, nodes: persisted.nodes.length, tombs: persisted.tombstones.length });
   await saveWeekIDB(wk, persisted);
 
   // Signal peer tabs that this week's record changed, so any tab showing it can
@@ -12732,6 +12822,7 @@ function touchLayout(id) {
 }
 
 function tombstoneNodes(ids) {
+  audit('tombstoneNodes', { wk: currentWeekKey, ids: Array.from(ids) });
   if (!Array.isArray(weekData.tombstones)) weekData.tombstones = [];
   for (const id of ids) {
     if (!weekData.tombstones.includes(id)) weekData.tombstones.push(id);
@@ -12886,6 +12977,7 @@ function deleteBranch(id) {
 // Delete means delete. Drop is its own menu item and its own hotkey, so a user
 // who chose Delete has already passed the fork and is not asked to pick again.
 function deleteNode(id) {
+  audit('deleteNode', { wk: currentWeekKey, id, label: findNode(id)?.label ?? null });
   const node = findNode(id);
   if (!node) return;
   if (node.type === 'branch') { deleteBranch(id); return; }
