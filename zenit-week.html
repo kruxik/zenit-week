@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-fzL5V4AOJ3+j0c9ygv3bAdAkG2EwEbsY0nBQcSpwHVU='
+               'sha256-hbAGHfn8c6AQR9VDwPf28LQgBAoxQBsmk38A+xYcKIA='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7831,7 +7831,12 @@ let _changesPageToken = null;   // Drive Changes API cursor (null = needs re-bas
 // Experimental: drain the Drive Changes API once per cycle instead of GETting
 // appProperties per file. Off by default; flip in console with
 // localStorage.setItem('zenit-week-sync-changes-feed','1') to A/B in the browser.
-function _useChangeFeed() { return localStorage.getItem('zenit-week-sync-changes-feed') === '1'; }
+// One changes.list call per cycle instead of one appProperties GET per watched
+// file. The old path cost five requests an idle cycle — colors, schedule and
+// the current week ±1 — and grew with every file worth watching; the feed's
+// cost does not depend on how many files exist. Opt back out with
+// localStorage['zenit-week-sync-changes-feed'] = '0'.
+function _useChangeFeed() { return localStorage.getItem('zenit-week-sync-changes-feed') !== '0'; }
 let pendingRemoteMerge = null;  // { wKey, mergedData, mergedJson, mergedHash, scheduleUpload }
 let googleUserEmail = '';
 let googleUserName = '';
@@ -10226,6 +10231,18 @@ async function pollDriveChanges(_wKey) {
         if (ch.removed) continue; // local deletion handling is out of scope (matches pollDriveMeta)
         const k = _wKeyForDriveFileName(ch.file?.name);
         if (!k) continue;
+        // The reset token rides on the colors file and means the whole local
+        // copy is obsolete. It is checked before the content guards and before
+        // the hash test, because a reset is exactly the case where the hashes
+        // this device holds describe data that no longer exists.
+        if (k === 'colors') {
+          const remoteResetToken = ch.file?.appProperties?.resetToken;
+          const localResetToken = localStorage.getItem('zenit-week-reset-token') || '';
+          if (remoteResetToken && remoteResetToken !== localResetToken) {
+            await _handleResetTokenMismatch(remoteResetToken);
+            return; // initDriveSync takes over; this cursor is meaningless now
+          }
+        }
         const remoteHash = ch.file?.appProperties?.contentHash;
         if (!remoteHash) continue;
         if (k === 'colors') {

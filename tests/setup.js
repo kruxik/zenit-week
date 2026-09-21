@@ -477,6 +477,8 @@ _state.resetSyncState = function() {
   _cancelRefreshRetry();
   syncStatus = 'disconnected';
 };
+_state.getChangesPageToken = function() { return _changesPageToken; };
+_state.setChangesPageToken = function(t) { _changesPageToken = t; };
 _state.getSyncStatus = function() { return syncStatus; };
 _state.hasRefreshRetryPending = function() { return _refreshRetryTimer !== null; };
 _state.getUndoRedoForcePush = function() { return _undoRedoForcePush; };
