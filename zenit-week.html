@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Sc29/5O5wIXd4a4vMAXtAYwTZqk6ViOKa+lj5u4B9ek='
+               'sha256-TsHMPw3d3laixfJE+VMq40UEW9rCvgKVg+bdvFHNe7I='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9485,6 +9485,37 @@ async function isImportPending() {
   catch { return false; }
 }
 
+// The flag used to be the string '1', which said that an import was waiting but
+// not when it happened — so it stayed authoritative for ever, and a sign-in days
+// later overwrote Drive with whatever that device happened to hold. A record
+// written by an older build still reads, and reads as age zero: unknown age is
+// never allowed to win. A build that predates this change sees an object where
+// it expected '1' and still treats it as truthy, so downgrading is safe too.
+function normalizeImportPending(raw) {
+  if (!raw) return null;
+  if (typeof raw === 'object' && Number.isFinite(raw.importedAt)) {
+    return { importedAt: raw.importedAt };
+  }
+  return { importedAt: 0 };
+}
+
+async function readImportPending() {
+  try { return normalizeImportPending(await loadValueIDB('zenit-week-import-pending')); }
+  catch { return null; }
+}
+
+// Per week, not once for the whole push: an import is authoritative only over
+// the weeks it is actually newer than. A week Drive does not hold has nothing to
+// lose, so it uploads; a week whose age Drive cannot state is never overwritten,
+// because the import cannot be shown to be the newer of the two. Everything else
+// is decided by the two timestamps, which is what the CRDT does everywhere else.
+function importPushDecision(importedAt, driveEntry) {
+  if (!driveEntry) return 'push';
+  const driveSavedAt = Number(driveEntry.savedAt) || 0;
+  if (!driveSavedAt) return 'merge';
+  return (Number(importedAt) || 0) >= driveSavedAt ? 'push' : 'merge';
+}
+
 // Force-push all local weeks to Drive without pulling first.
 // Used after import to make local data the unconditional source of truth.
 // The import-pending flag is cleared only when every upload succeeds.
@@ -9507,14 +9538,32 @@ async function forcePushAllToDrive() {
   // Collect all local week keys from IDB
   const weekKeys = await listWeekKeysIDB();
 
+  // What Drive holds, and how old each week there is. The listing costs one
+  // round of metadata and no content downloads, and it repopulates the file-id
+  // cache that clearDriveFileIds() just emptied.
+  const { importedAt } = (await readImportPending()) || { importedAt: 0 };
+  let driveMap = new Map();
+  try {
+    driveMap = new Map((await listAllDriveWeekFiles()).map(f => [f.wKey, f]));
+  } catch (err) {
+    // Without the listing nothing can be shown to be older, so no week is
+    // overwritten: every one of them goes through the merge instead.
+    console.warn('[Drive] import push: week listing failed, merging every week:', err);
+  }
+
   // Upload all weeks (5 concurrent) and track failures
   let allOk = true;
   const CONCURRENCY = 5;
   for (let i = 0; i < weekKeys.length; i += CONCURRENCY) {
     const batch = weekKeys.slice(i, i + CONCURRENCY);
     const results = await Promise.all(batch.map(async (wKey) => {
+      const decision = importPushDecision(importedAt, driveMap.get(wKey));
+      if (decision === 'merge') {
+        audit('importMergedNotPushed', { wk: wKey, importedAt, driveSavedAt: driveMap.get(wKey)?.savedAt ?? null });
+        try { await syncWeekFromDrive(wKey); return true; } catch { return false; }
+      }
       const data = await loadWeekIDB(wKey);
-      return data ? _uploadWeekToDrive(wKey, JSON.stringify(data)) : Promise.resolve(true);
+      return data ? _uploadWeekToDrive(wKey, JSON.stringify(data)) : true;
     }));
     if (results.some(r => !r)) allOk = false;
   }
@@ -11841,7 +11890,7 @@ async function importAllData(file) {
 
     // Reset token + import-pending flag
     localStorage.setItem('zenit-week-reset-token', genId());
-    await saveValueIDB('zenit-week-import-pending', '1');
+    await saveValueIDB('zenit-week-import-pending', { v: 1, importedAt: Date.now() });
     stopDrivePoll();
 
     // Re-initialize and render current week immediately
