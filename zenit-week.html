@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-asYj0tW2qxMvzPuUJsLNOtwCVPBx/HEgoOQ29sMRkFg='
+               'sha256-N6zGAi7nTH6V2kIPz6tw9mQzGUD5yEVpKn09hMGhBaE='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -12371,8 +12371,8 @@ function sweepPastDue(week, ctx) {
 // saveSchedule only queue their sync work, which is why they are safe here.
 // No snapshot is taken — materialisation is delivery, not a user edit.
 async function openWeekIntoView(wk) {
-  // The overdue filter is current-week-only, and both callers set currentWeekKey
-  // before getting here. Clear it rather than leave the bar's "!" lit over a week
+  // The overdue filter is current-week-only, and every caller sets currentWeekKey
+  // before getting here — this does not set it itself. Clear it rather than leave the bar's "!" lit over a week
   // it no longer filters. Assigned directly, not via setDayFilter: the callers
   // render immediately after, and applyFilters() refreshes button and chip there.
   if (activeDayFilter === 'overdue' && !isCurrentWeekOpen()) {
