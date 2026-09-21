@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-QvTg0O3BHZvu9UtGrNXdHp9O8KDtiiukkmPBHUKqmcU='
+               'sha256-c0G8S1Hhm/d4ysh9xVwu9mKgl5EGUZPW6a+sE4nblHM='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2685,6 +2685,14 @@
     will-change: transform;
     transform-origin: 0 0;
   }
+
+  /* The group carries no transform until applyTransform() writes one, so until
+     then it paints at scale 1 from the origin — the whole map hugely magnified
+     and cropped. A render queued by scheduleRender() runs in its own frame, so
+     the browser gets to paint that state before the first fit lands, which
+     reads as a flash of maximum zoom on every load. Stay invisible until
+     positioned; nothing about the map is worth showing before it. */
+  #map-root:not(.map-ready) { visibility: hidden; }
 
   .view-toggle-btn {
     display: flex;
@@ -21103,6 +21111,16 @@ function recomputeZoomBounds(fitZoom) {
   }
 }
 
+// Positioned at least once, so it may be seen. Reached only from
+// applyTransform: revealing anywhere else means revealing before the map has
+// been placed, which is the flash this guards against. The class outlives
+// render(), which empties the group rather than replacing it, so a later week
+// that opens without a refit stays visible. Idempotent — this runs on every pan
+// and zoom frame.
+function revealMap() {
+  mapRoot.classList.add('map-ready');
+}
+
 function applyTransform() {
   // On weak devices: drive pan/zoom via CSS transform + will-change so the
   // SVG group is promoted to its own compositor layer. The browser then
@@ -21113,6 +21131,7 @@ function applyTransform() {
   // Capable hardware keeps the SVG `transform` attribute path so high zoom
   // stays crisp. The two paths are mutually exclusive — keep only one
   // active to avoid doubled translations.
+  revealMap();
   if (document.documentElement.classList.contains('reduce-effects')) {
     mapRoot.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
     if (mapRoot.hasAttribute('transform')) mapRoot.removeAttribute('transform');
