@@ -21,6 +21,13 @@ function mkDayChild(id, parentId, branchId, dayIndex) {
     dayChild: true, dayIndex, done: false, unplanned: false, children: [], _ts: 0 };
 }
 
+function mkTickChild(id, parentId, branchId, tickIndex, dayIndex) {
+  const n = { id, type: 'activity', branch: branchId, parent: parentId, label: String(tickIndex),
+    tickChild: true, tickIndex, done: false, unplanned: false, children: [], _ts: 0 };
+  if (dayIndex != null) n.dayIndex = dayIndex;
+  return n;
+}
+
 function mkCounter(id, parentId, branchId, val = 0, max = 5) {
   return { id, type: 'counter', branch: branchId, parent: parentId, label: String(val),
     val, max, done: val >= max, children: [], ticks: [], _ts: 0 };
@@ -251,6 +258,63 @@ describe('dayFilterMatches — unscheduled filter', () => {
 });
 
 // ─── Ancestor / branch visibility ────────────────────────────────────────────
+
+describe('dayFilterMatches — tick children', () => {
+  function pushups(tickDays) {
+    const b = mkBranch('b1');
+    const a = mkActivity('a1', 'b1', 'b1', { label: 'Pushups 3x' });
+    const ticks = tickDays.map((day, i) => mkTickChild('t' + (i + 1), 'a1', 'b1', i + 1, day));
+    a.children = ticks.map(t => t.id);
+    b.children = ['a1'];
+    setUp([b, a, ...ticks]);
+    return { a, ticks };
+  }
+
+  test('tick pinned to Monday matches the Monday filter', () => {
+    pushups([1, null, null]);
+    _state.setActiveDayFilter(1);
+    expect(dayFilterMatches('t1')).toBe(true);
+  });
+
+  test('its parent rides along on the Monday filter', () => {
+    pushups([1, null, null]);
+    _state.setActiveDayFilter(1);
+    expect(dayFilterMatches('a1')).toBe(true);
+    expect(dayFilterMatches('b1')).toBe(true);
+  });
+
+  test('a tick pinned elsewhere does not match', () => {
+    pushups([1, 3, null]);
+    _state.setActiveDayFilter(1);
+    expect(dayFilterMatches('t2')).toBe(false);
+  });
+
+  test('an unpinned tick does not match a weekday', () => {
+    pushups([1, null, null]);
+    _state.setActiveDayFilter(1);
+    expect(dayFilterMatches('t2')).toBe(false);
+  });
+
+  test('no tick pinned → parent hidden on the Monday filter', () => {
+    pushups([null, null, null]);
+    _state.setActiveDayFilter(1);
+    expect(dayFilterMatches('a1')).toBe(false);
+  });
+
+  test('unscheduled: unpinned ticks and their parent match', () => {
+    pushups([1, null, null]);
+    _state.setActiveDayFilter('unscheduled');
+    expect(dayFilterMatches('t2')).toBe(true);
+    expect(dayFilterMatches('a1')).toBe(true);
+  });
+
+  test('unscheduled: every tick pinned → parent drops out', () => {
+    pushups([1, 2, 3]);
+    _state.setActiveDayFilter('unscheduled');
+    expect(dayFilterMatches('t1')).toBe(false);
+    expect(dayFilterMatches('a1')).toBe(false);
+  });
+});
 
 describe('dayFilterMatches — ancestor visibility', () => {
   test('Activity should be visible if its grandchild matches the day filter', () => {

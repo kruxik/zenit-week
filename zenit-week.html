@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-c0G8S1Hhm/d4ysh9xVwu9mKgl5EGUZPW6a+sE4nblHM='
+               'sha256-19+m0nAxCxTvZ2K4FM6i+omdGsbYo3E/PF1y2sV1dGU='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -15868,7 +15868,10 @@ let _dayFilterFresh = new Set();
 function _hasOwnSchedule(node) {
   if (!node) return false;
   if (parseTodoDays(node.label || '').size > 0) return true;
-  return (node.children || []).some(id => findNode(id)?.dayChild);
+  return (node.children || []).some(id => {
+    const c = findNode(id);
+    return c?.dayChild || (c?.tickChild && c.dayIndex != null);
+  });
 }
 
 function dayFilterMatchSet() {
@@ -15884,6 +15887,9 @@ function dayFilterMatchSet() {
 
   function isOverdueMatch(n) {
     if (n.type !== 'activity' || n.done) return false;
+    if (n.tickChild) {
+      return n.dayIndex != null && isoWeekPos(n.dayIndex) < todayPos;
+    }
     if (n.dayChild) {
       return n.dayIndex !== null && isoWeekPos(n.dayIndex) < todayPos;
     }
@@ -15916,13 +15922,22 @@ function dayFilterMatchSet() {
       const own = d !== 'unscheduled' && n.dayIndex === d;
       memo.set(id, own);
       return own;
+    } else if (n.tickChild) {
+      // A tick pinned to a weekday is that day's item, exactly as the agenda
+      // reads it (getScheduledTickRows); an unpinned one is still Any day.
+      const own = n.dayIndex != null ? (n.dayIndex === d) : (d === 'unscheduled');
+      memo.set(id, own);
+      return own;
     } else if (n.type === 'activity') {
       if (d === 'unscheduled') {
         const children = (n.children || []).map(cid => findNode(cid));
         const hasDayChild = children.some(c => c?.dayChild);
         const hasCounter = children.some(c => c?.type === 'counter');
         const hasLabelDays = parseTodoDays(n.label || '').size > 0;
-        hit = !hasDayChild && !hasCounter && !hasLabelDays;
+        const ticks = children.filter(c => c?.tickChild);
+        hit = ticks.length > 0
+          ? (!hasLabelDays && ticks.some(c => c.dayIndex == null))
+          : (!hasDayChild && !hasCounter && !hasLabelDays);
       } else {
         const dayChildren = (n.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild);
         if (dayChildren.length > 0) {
@@ -15979,9 +15994,12 @@ function isVirtuallyDone(nodeId) {
     const n = findNode(id);
     if (!n) return [];
     if (n.dayChild) return n.dayIndex === d ? [n] : [];
+    if (n.tickChild) return n.dayIndex === d ? [n] : [];
     if (n.type === 'activity') {
       const dayChildren = (n.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild);
       if (dayChildren.length > 0) return dayChildren.filter(c => c.dayIndex === d);
+      const dayTicks = (n.children || []).map(cid => findNode(cid)).filter(c => c?.tickChild && c.dayIndex != null);
+      if (dayTicks.length > 0) return dayTicks.filter(c => c.dayIndex === d);
       if (parseTodoDays(n.label || '').has(d)) return [n];
     }
     return (n.children || []).flatMap(cid => {
