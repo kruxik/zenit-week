@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-kPpAX1JX8knp66kObfRYcFP9MXpw8xG+GIOQwlK+v0E='
+               'sha256-tprZLi+RuYF+Bm7WGkQS5qNgQnmktmfiEs0Z8CSZHHc='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8167,7 +8167,16 @@ async function _doSilentRefresh() {
     return REFRESH_SOFT; // never reached the proxy — says nothing about the session
   }
   if (tokens.error || !tokens.access_token) {
-    return HARD_REFRESH_ERRORS.has(tokens.error) ? REFRESH_HARD : REFRESH_SOFT;
+    // Name the reason. The session ends the same way whatever it is, but the
+    // causes are unrelated and the console otherwise shows only "400": Google
+    // rejecting the grant (invalid_grant — revoked or expired) looks exactly
+    // like the proxy finding no zw_rt cookie on the request (missing_params —
+    // cleared site data, a private window, blocked cookies). Without this the
+    // next report of a device signing itself out is unattributable again.
+    const hard = HARD_REFRESH_ERRORS.has(tokens.error);
+    console.warn('[Drive] Silent refresh rejected:', tokens.error || 'no access_token',
+                 hard ? '(session dropped)' : '(will retry)');
+    return hard ? REFRESH_HARD : REFRESH_SOFT;
   }
   try {
     await onTokensReceived(tokens.access_token);
