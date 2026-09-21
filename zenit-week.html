@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-9kVoNCcAwyK2lxlHtAF+Y6jKt4YmfxIqTB03C9OYe58='
+               'sha256-asYj0tW2qxMvzPuUJsLNOtwCVPBx/HEgoOQ29sMRkFg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8594,35 +8594,6 @@ function mergeWeekData(local, remote, wk = null) {
       if (merged._posTs === undefined) delete merged._posTs;
     }
 
-    // A node can also leave without a tombstone: LWW takes each parent whole,
-    // children list included, so a device that edits a parent while stale wins
-    // with a list that never had the child the other device just added. The
-    // child survives step 2 and is then unreachable, and validateAndRepair drops
-    // it silently. Catch it here, where the parent that won is still known.
-    const linked = new Set();
-    for (const n of byId.values()) {
-      if (Array.isArray(n.children)) n.children.forEach(cid => linked.add(cid));
-    }
-    const orphaned = [];
-    for (const n of byId.values()) {
-      if (n.type === 'branch' || n.type === 'center') continue;
-      if (linked.has(n.id) || tombstones.has(n.id)) continue;
-      const parent = byId.get(n.parent);
-      const localParent = localById.get(n.parent);
-      const remoteParent = (remote.nodes || []).find(r => r.id === n.parent);
-      orphaned.push({
-        id: n.id,
-        label: n.label,
-        parent: n.parent,
-        parentLabel: parent ? parent.label : null,
-        parentFrom: (!parent || !remoteParent) ? 'local-only'
-          : (remoteParent._ts || 0) >= (localParent?._ts || 0) ? 'remote' : 'local',
-        inLocalParent: !!localParent?.children?.includes(n.id),
-        inRemoteParent: !!remoteParent?.children?.includes(n.id),
-      });
-    }
-    if (orphaned.length) audit('mergeOrphaned', { wk, orphaned });
-
     // 3. Remove tombstoned nodes
     for (const id of tombstones) byId.delete(id);
 
@@ -8655,6 +8626,21 @@ function mergeWeekData(local, remote, wk = null) {
         n.children = sorted.filter(c => c.parent === n.id).map(c => c.id);
       }
     });
+
+    // Anything still unlinked is a node validateAndRepair will drop in its
+    // garbage collection step, with no tombstone and no trace. Measured here and
+    // not before the repair above: LWW takes each parent whole, children list
+    // included, so until `extra` re-links a node by its own parent pointer every
+    // child the winning parent did not list looks lost and almost none are.
+    const linkedIds = new Set();
+    sorted.forEach(n => {
+      if (Array.isArray(n.children)) n.children.forEach(cid => linkedIds.add(cid));
+    });
+    const orphaned = sorted
+      .filter(n => n.type !== 'branch' && n.type !== 'center' && !linkedIds.has(n.id))
+      .map(n => ({ id: n.id, label: n.label, parent: n.parent,
+        parentPresent: sorted.some(p => p.id === n.parent) }));
+    if (orphaned.length) audit('mergeOrphaned', { wk, orphaned });
 
     // 5. validateAndRepair handles orphan GC and missing default branches
     // baseline: winner (higher savedAt) wins.
