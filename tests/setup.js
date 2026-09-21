@@ -875,6 +875,8 @@ export const {
   exchangeToken,
   purgeLegacyRefreshToken,
   signOut,
+  shouldRefitForExtentChange,
+  mindmapContentExtent,
   _state,
 } = sandbox;
 

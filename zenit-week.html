@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-yJNGY8/RXDNXmNllgXLc9IpHIfQC9v19+6IDs/Nnerg='
+               'sha256-fzL5V4AOJ3+j0c9ygv3bAdAkG2EwEbsY0nBQcSpwHVU='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8821,6 +8821,7 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
     if (changed) {
       renderIfVisible();
       if (currentView === 'agenda') renderAgenda();
+      maybeRefitAfterRemoteChange();
       traceMilestone('current week repainted from Drive');
     } else {
       traceMark('week:commit-no-visual-change ' + wKey);
@@ -21246,6 +21247,63 @@ function applyTransform() {
   }
 }
 
+// How far the laid-out map may change size before a sync is allowed to move
+// the viewport under the user. 1.2 is "a fifth bigger or a fifth smaller",
+// measured on the longer axis rather than on area: the fit zoom is chosen from
+// linear extents, so that is the number the user actually sees change.
+const REFIT_EXTENT_RATIO = 1.2;
+
+// Size of the laid-out map, independent of zoom, pan and the DOM — the same
+// bounding box fitMindmapView fits to. null when there is nothing to measure.
+function mindmapContentExtent(positions = computeLayout()) {
+  const nodes = Object.values(positions);
+  if (nodes.length <= 1) return null;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  nodes.forEach(p => {
+    const hw = (p.w || 80) / 2;
+    const hh = (p.h || 36) / 2;
+    minX = Math.min(minX, p.x - hw);
+    maxX = Math.max(maxX, p.x + hw);
+    minY = Math.min(minY, p.y - hh);
+    maxY = Math.max(maxY, p.y + hh);
+  });
+  return { w: maxX - minX, h: maxY - minY };
+}
+
+// Whether the map changed size enough to be worth re-fitting. Symmetric: a map
+// that grew by a fifth and one that shrank to five sixths both cross it, which
+// is what makes a first sync after sign-in (small → large) and a week emptying
+// out (large → small) behave the same. A growth from nothing, or to nothing,
+// always counts; a change under the ratio never does, so ordinary edits
+// arriving from another device leave the viewport where the user put it.
+function shouldRefitForExtentChange(before, after, ratio = REFIT_EXTENT_RATIO) {
+  if (!after) return false;
+  if (!before) return true;
+  const grew = Math.max(after.w / (before.w || 1), after.h / (before.h || 1));
+  const shrank = Math.max(before.w / (after.w || 1), before.h / (after.h || 1));
+  return Math.max(grew, shrank) > ratio;
+}
+
+// The extent the viewport was last fitted to. Compared against, not recomputed
+// from the current view: zoom and pan the user chose since are theirs to keep.
+let _lastFitExtent = null;
+
+// A sync must not yank the viewport out from under a hand that is on it.
+function _viewportIsBusy() {
+  return isPanning || dragState.activeNodeId !== null ||
+         isAtomicOpActive() || hasEditingNode();
+}
+
+// Re-fit after a remote merge, but only when the map changed size enough to
+// leave the user looking at the wrong part of it — a first sync after sign-in
+// filling an empty week, or a week that just lost most of its content.
+function maybeRefitAfterRemoteChange() {
+  if (currentView !== 'mindmap' || _viewportIsBusy()) return;
+  const after = mindmapContentExtent();
+  if (!shouldRefitForExtentChange(_lastFitExtent, after)) return;
+  fitMindmapView();
+}
+
 function fitMindmapView() {
   const svg = document.getElementById('main-svg');
   // Canvas may be display:none (mobile, agenda view) → svg has zero size.
@@ -21269,6 +21327,7 @@ function fitMindmapView() {
       minY = Math.min(minY, p.y - hh);
       maxY = Math.max(maxY, p.y + hh);
     });
+    _lastFitExtent = { w: maxX - minX, h: maxY - minY };
     const zoomCap = isMobile ? ZOOM_MAX_BASE : 0.6;
     const fitZoom = Math.min(
       (w - pad * 2) / (maxX - minX),
@@ -21280,6 +21339,7 @@ function fitMindmapView() {
     panX = w / 2 - ((minX + maxX) / 2) * zoom;
     panY = h / 2 - ((minY + maxY) / 2) * zoom;
   } else {
+    _lastFitExtent = null;
     recomputeZoomBounds(0.6);
     zoom = ZOOM_DEFAULT;
     panX = w / 2;
