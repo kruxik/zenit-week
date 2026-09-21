@@ -2,7 +2,8 @@
 // Holds GOOGLE_CLIENT_SECRET server-side so it never appears in browser code.
 // The Google refresh token is kept in an HttpOnly cookie (never exposed to JS)
 // rather than returned to the client. Handles authorization_code and
-// refresh_token grants, a revoke action for sign-out, and revoke_legacy for
+// refresh_token grants, a logout action that ends this browser's session, a
+// revoke action for signing out of all devices, and revoke_legacy for
 // retiring plaintext tokens left in localStorage before the cookie change.
 
 const GOOGLE_CLIENT_ID = '458902252486-kh8ptv2b2b2q1echn99soes191smr56p.apps.googleusercontent.com';
@@ -88,7 +89,20 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // Sign-out: revoke the refresh token held in the cookie and clear it.
+  // Sign-out: drop this browser's session and nothing else. Google is not
+  // told, because its revoke endpoint works on the grant, not on the token
+  // handed to it — revoking one device's refresh token deauthorizes the app
+  // for the whole account, so every other device loses its access token (401
+  // on Drive) and its refresh (invalid_grant). Clearing the cookie is the
+  // entire session here; the access token dies with the page that holds it.
+  if (grant_type === 'logout') {
+    clearRefreshCookie(req, res);
+    return res.status(204).end();
+  }
+
+  // Disconnect: the deliberate account-wide act. Revokes the refresh token in
+  // the cookie, which withdraws the app's authorization for this Google
+  // account on every device, and clears the cookie too.
   if (grant_type === 'revoke') {
     const cookieToken = readCookie(req, REFRESH_COOKIE);
     clearRefreshCookie(req, res);

@@ -874,6 +874,8 @@ export const {
   silentRefresh,
   exchangeToken,
   purgeLegacyRefreshToken,
+  signOut,
+  signOutAllDevices,
   _state,
 } = sandbox;
 
