@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.09.21.1] - 2026-09-21
+
+### Added
+
+- **debug:** Audit merge orphaning and tombstone-less repair drops
+
+### Fixed
+
+- **filter:** Let the day filter see ticks pinned to a weekday
+- **map:** Keep the mindmap hidden until it has been positioned once
+- **render:** Give weekData a valid shape before the first week loads
+- **debug:** Report merge orphans only after the children repair
+- **hotkeys:** Don't act on the hovered node while the user is typing
+- **sync:** Expire the import-pending flag per week against Drive's savedAt
+
 ## [v2026.09.21] - 2026-09-21
 
 ### Added
