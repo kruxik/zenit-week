@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-tprZLi+RuYF+Bm7WGkQS5qNgQnmktmfiEs0Z8CSZHHc='
+               'sha256-yJNGY8/RXDNXmNllgXLc9IpHIfQC9v19+6IDs/Nnerg='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4104,7 +4104,6 @@
           <div id="sync-dropdown-last-sync">Last sync: —</div>
           <div class="settings-separator"></div>
           <button type="button" role="menuitem" class="agenda-action-btn" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out</button>
-          <button type="button" role="menuitem" class="agenda-action-btn danger" id="sync-dropdown-signout-all" data-i18n="sync.signOutAll">Sign out of all devices</button>
         </div>
       </div>
     </div>
@@ -8359,17 +8358,12 @@ async function handleAuthCode(callback) {
   }
 }
 
-// Ends the Drive session on this device. `revoke` is the separate, deliberate
-// act of signing out of all devices: Google's revoke endpoint works on
-// the grant rather than on the one token given to it, so revoking here signs
-// every other device out too. A plain sign-out therefore tells Google nothing
-// — it drops the access token this page holds and asks the proxy to clear the
-// refresh cookie, which is the whole of this browser's session.
-async function signOut({ revoke = false } = {}) {
-  // Taken before the pre-sign-out flush: a 401 during that flush clears
-  // googleAccessToken, and a sign-out of all devices must still revoke the
-  // token this session was holding.
-  const token = googleAccessToken;
+// Ends the Drive session on this device, and only on this device. Nothing is
+// revoked: Google's revoke endpoint acts on the grant behind the token it is
+// given, which is this browser's own, so revoking bought nothing here except a
+// fresh consent screen on the next sign-in. Dropping the access token this
+// page holds and clearing the refresh cookie is the whole of the session.
+async function signOut() {
   stopDrivePoll();
   if (tokenRenewalTimer)        { clearInterval(tokenRenewalTimer);        tokenRenewalTimer = null; }
   clearAllSyncDebounceTimers();
@@ -8410,30 +8404,9 @@ async function signOut({ revoke = false } = {}) {
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
   showSignedOutButton('sync.btnLabel');
   setSyncStatus('disconnected');
-  if (revoke) {
-    // Account-wide: withdraw the app's authorization, then let the proxy
-    // revoke the refresh token in the cookie and clear it.
-    if (token) {
-      netFetch(
-        `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`,
-        { method: 'POST' }
-      ).catch(() => {});
-    }
-    exchangeToken({ grant_type: 'revoke' }).catch(() => {});
-  } else {
-    // Clear the HttpOnly refresh cookie server-side (JS can't read it). Google
-    // keeps the grant, so the other devices stay signed in.
-    exchangeToken({ grant_type: 'logout' }).catch(() => {});
-  }
-}
-
-// Sign out of every device. Signs this one out the ordinary way and also
-// revokes the grant, which ends the session everywhere else and makes the next
-// sign-in ask for permission again. What happens to the local copy is the same
-// question a plain sign-out asks, and gets the same two answers.
-async function signOutAllDevices({ clearLocal = false } = {}) {
-  if (clearLocal) await signOutAndClear({ revoke: true });
-  else            await signOut({ revoke: true });
+  // Clear the HttpOnly refresh cookie server-side (JS can't read it). Google
+  // keeps the grant, so the other devices stay signed in.
+  exchangeToken({ grant_type: 'logout' }).catch(() => {});
 }
 
 // Sign out AND wipe all local USER data (weeks, colors, sync caches, undo/redo).
@@ -8451,8 +8424,8 @@ const SIGNOUT_PRESERVE_KEYS = new Set([
   // has already seen the tour.
   ...ONBOARDING_DEVICE_KEYS,
 ]);
-async function signOutAndClear({ revoke = false } = {}) {
-  await signOut({ revoke });
+async function signOutAndClear() {
+  await signOut();
 
   // Close open IDB handle so deleteDatabase doesn't get onblocked
   if (_db) { try { _db.close(); } catch {} _db = null; }
@@ -10972,11 +10945,6 @@ const TRANSLATIONS = {
     'sync.signOut':               'Sign out',
     'sync.signOutConfirm.title':      'Sign out?',
     'sync.signOutConfirm.body':       'Your data stays in your Google Drive, and your other devices stay signed in.\nWhat to do with the local copy on this device?\nAny pending changes will sync before signing out.',
-    'sync.signOutAll':                'Sign out of all devices',
-    'sync.signOutAllConfirm.title':   'Sign out of all devices?',
-    'sync.signOutAllConfirm.body':    'Your data stays in your Google Drive, but every device signs out, not just this one.\nWhat to do with the local copy on this device?\nSigning in again will ask for your permission once more.',
-    'sync.signOutAllConfirm.keepLocal':  'Keep data',
-    'sync.signOutAllConfirm.clearLocal': 'Clear & sign out',
     'sync.signOutConfirm.keepLocal':  'Keep data',
     'sync.signOutConfirm.clearLocal': 'Clear & sign out',
     'app-confirm.cancel':         'Cancel',
@@ -11334,11 +11302,6 @@ const TRANSLATIONS = {
     'sync.signOut':               'Odhlásit se',
     'sync.signOutConfirm.title':      'Odhlásit se?',
     'sync.signOutConfirm.body':       'Vaše data zůstávají na vašem Disku Google a ostatní zařízení zůstanou přihlášená.\nVyberte, co udělat s lokální kopií na tomto zařízení?\nNesynchronizované změny se před odhlášením nahrají.',
-    'sync.signOutAll':                'Odhlásit se na všech zařízeních',
-    'sync.signOutAllConfirm.title':   'Odhlásit se na všech zařízeních?',
-    'sync.signOutAllConfirm.body':    'Vaše data zůstávají na vašem Disku Google, ale odhlásí se všechna zařízení, nejen toto.\nVyberte, co udělat s lokální kopií na tomto zařízení?\nPři dalším přihlášení budete znovu požádáni o udělení oprávnění.',
-    'sync.signOutAllConfirm.keepLocal':  'Ponechat data',
-    'sync.signOutAllConfirm.clearLocal': 'Smazat a odhlásit',
     'sync.signOutConfirm.keepLocal':  'Ponechat data',
     'sync.signOutConfirm.clearLocal': 'Smazat a odhlásit',
     'app-confirm.cancel':         'Zrušit',
@@ -22995,7 +22958,6 @@ document.getElementById('sync-btn').addEventListener('click', () => { startSignI
   const stateBtn   = document.getElementById('sync-state-btn');
   const dropdown   = document.getElementById('sync-dropdown');
   const signoutBtn = document.getElementById('sync-dropdown-signout');
-  const signoutAllBtn = document.getElementById('sync-dropdown-signout-all');
 
   stateBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -23013,19 +22975,6 @@ document.getElementById('sync-btn').addEventListener('click', () => { startSignI
       secondaryLabel:  t('sync.signOutConfirm.clearLocal'),
       secondaryDanger: true,
       onSecondary:     signOutAndClear,
-    });
-  });
-
-  signoutAllBtn.addEventListener('click', () => {
-    dropdown.classList.remove('visible');
-    showAppConfirm({
-      title:           t('sync.signOutAllConfirm.title'),
-      body:            t('sync.signOutAllConfirm.body'),
-      okLabel:         t('sync.signOutAllConfirm.keepLocal'),
-      onConfirm:       () => signOutAllDevices(),
-      secondaryLabel:  t('sync.signOutAllConfirm.clearLocal'),
-      secondaryDanger: true,
-      onSecondary:     () => signOutAllDevices({ clearLocal: true }),
     });
   });
 

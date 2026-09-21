@@ -875,7 +875,6 @@ export const {
   exchangeToken,
   purgeLegacyRefreshToken,
   signOut,
-  signOutAllDevices,
   _state,
 } = sandbox;
 

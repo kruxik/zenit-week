@@ -1,19 +1,18 @@
 import { describe, test, expect, beforeEach, afterAll, afterEach } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import { signOut, signOutAllDevices, _state } from './setup.js';
+import { signOut, _state } from './setup.js';
 
-// Signing out of one device must not sign the account out of the others.
-// Google's revoke endpoint works on the grant, not on the token handed to it:
-// revoking one device's refresh token withdraws the app's authorization for
-// the whole account, so every other device gets 401 on Drive and invalid_grant
-// on refresh. Sign-out therefore clears the cookie and stops; signing out of
-// all devices is the separate, deliberate act that revokes.
+// Signing out ends this browser's session and nothing else. Revoking was
+// tried and removed: Google's revoke endpoint acts on the grant behind the
+// token it is given, which is this browser's own, so it cannot reach another
+// device — measured twice on real devices — and all it bought was a fresh
+// consent screen on the next sign-in.
 const server = setupServer();
 server.listen({ onUnhandledRequest: 'bypass' });
 afterAll(() => server.close());
 
-describe('sign out vs sign out of all devices', () => {
+describe('sign-out scope', () => {
   let tokenBodies;
   let revokeCalls;
 
@@ -46,21 +45,4 @@ describe('sign out vs sign out of all devices', () => {
     expect(_state.getAccessToken()).toBe(null);
   });
 
-  test('signing out of all devices revokes the grant as well', async () => {
-    await signOutAllDevices();
-    await flush();
-
-    expect(tokenBodies).toEqual([{ grant_type: 'revoke' }]);
-    expect(revokeCalls).toEqual(['access_token_of_this_device']);
-    expect(_state.getAccessToken()).toBe(null);
-  });
-
-  // The confirm hands the handler no argument, and a stray event object must
-  // not read as { clearLocal: true } and wipe the device.
-  test('keeps local data unless the wipe answer was chosen', async () => {
-    await signOutAllDevices({});
-    await flush();
-
-    expect(tokenBodies).toEqual([{ grant_type: 'revoke' }]);
-  });
 });

@@ -2,9 +2,9 @@
 // Holds GOOGLE_CLIENT_SECRET server-side so it never appears in browser code.
 // The Google refresh token is kept in an HttpOnly cookie (never exposed to JS)
 // rather than returned to the client. Handles authorization_code and
-// refresh_token grants, a logout action that ends this browser's session, a
-// revoke action for signing out of all devices, and revoke_legacy for
-// retiring plaintext tokens left in localStorage before the cookie change.
+// refresh_token grants, a logout action that ends this browser's session, and
+// revoke_legacy for retiring plaintext tokens left in localStorage before the
+// cookie change.
 
 const GOOGLE_CLIENT_ID = '458902252486-kh8ptv2b2b2q1echn99soes191smr56p.apps.googleusercontent.com';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -90,31 +90,17 @@ export default async function handler(req, res) {
   }
 
   // Sign-out: drop this browser's session and nothing else. Google is not
-  // told, because its revoke endpoint works on the grant, not on the token
-  // handed to it — revoking one device's refresh token deauthorizes the app
-  // for the whole account, so every other device loses its access token (401
-  // on Drive) and its refresh (invalid_grant). Clearing the cookie is the
-  // entire session here; the access token dies with the page that holds it.
-  if (grant_type === 'logout') {
+  // told. Its revoke endpoint acts on the grant behind the token it is given,
+  // which is this browser's own — it cannot reach another device's session,
+  // and all it bought here was a fresh consent screen on the next sign-in.
+  // Clearing the cookie is the entire session; the access token dies with the
+  // page that holds it.
+  //
+  // 'revoke' is the old name for this action, still sent by clients running a
+  // build from before the split. It now does exactly what 'logout' does: the
+  // name is kept only so those clients' cookies still get cleared.
+  if (grant_type === 'logout' || grant_type === 'revoke') {
     clearRefreshCookie(req, res);
-    return res.status(204).end();
-  }
-
-  // Disconnect: the deliberate account-wide act. Revokes the refresh token in
-  // the cookie, which withdraws the app's authorization for this Google
-  // account on every device, and clears the cookie too.
-  if (grant_type === 'revoke') {
-    const cookieToken = readCookie(req, REFRESH_COOKIE);
-    clearRefreshCookie(req, res);
-    if (cookieToken) {
-      try {
-        await fetch(GOOGLE_REVOKE_URL, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body:    new URLSearchParams({ token: cookieToken }),
-        });
-      } catch { /* best-effort */ }
-    }
     return res.status(204).end();
   }
 
