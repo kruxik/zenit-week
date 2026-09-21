@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.09.21.2] - 2026-09-21
+
+### Added
+
+- **map:** Re-fit the mindmap when a sync changes how big the week is
+- **sync:** Rebuild the signed-in Drive menu and ask the data question in both sign-outs
+
+### Changed
+
+- **sync:** Poll Drive's change feed instead of one request per watched file
+- **auth:** Drop "Sign out of all devices" — revoke cannot reach another device
+- **sync:** Stop each edit costing two pull-merge round trips
+
+### Fixed
+
+- **sync:** Name the reason a silent refresh dropped the session
+- **sync:** Stop the cloud badge claiming a session nothing has checked
+- **auth:** Sign out this device only, add sign out of all devices
+
 ## [v2026.09.21.1] - 2026-09-21
 
 ### Added
