@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-jMrcF7Vwj9bQ+graSsre4ctd2obZ5fgsg2u/IuNl9HQ='
+               'sha256-dF6zDQ3Q8P/VF9tP1IgZtlJwkkOXGmVLoO0EOM7+T90='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -23071,8 +23071,23 @@ function _syncVisibilityHandler() {
     _flushPendingSync();
     flushAllPendingSyncToDrive();
   } else {
-    syncWeekFromDrive(currentWeekKey); // pull before next edit
-    syncColorsFromDrive();
+    // The badge is only ever as fresh as the last poll, and the poll has been
+    // stopped for as long as the page was hidden — on a phone that can be
+    // hours. A connected cloud on wake is a claim about a session nothing has
+    // checked since, which is how a revoked or expired session reads as green.
+    // Say "syncing" until the pull below answers; it sets connected or error.
+    if (syncStatus === 'connected') setSyncStatus('syncing', 'sync.msg.syncing');
+    // A pull that finds nothing new returns 'unchanged' and sets no status of
+    // its own, so the badge has to be closed out here or it sits amber until
+    // the next real sync. Only a badge still saying 'syncing' is ours to
+    // close: a 401 has already put it on disconnected by the time we land.
+    Promise.all([syncWeekFromDrive(currentWeekKey), syncColorsFromDrive()])
+      .then(([weekResult]) => {
+        if (syncStatus !== 'syncing') return;
+        if (weekResult === 'failed') setSyncStatus('error', 'sync.msg.failedUsingLocal');
+        else setSyncStatus('connected');
+      })
+      .catch(() => { if (syncStatus === 'syncing') setSyncStatus('error', 'sync.msg.failedUsingLocal'); });
     startDrivePoll(currentWeekKey);   // restart 10s poll
   }
 }
