@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-dF6zDQ3Q8P/VF9tP1IgZtlJwkkOXGmVLoO0EOM7+T90='
+               'sha256-kPpAX1JX8knp66kObfRYcFP9MXpw8xG+GIOQwlK+v0E='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8790,16 +8790,18 @@ function hasEditingNode() {
 // Returns 'deferred' when the merge is parked behind an open editor or an
 // atomic op, 'applied' when it is committed — syncWeekFromDrive reports the
 // difference upward, and both count as "seen".
-async function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData) {
+async function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData, callerWillPush = false) {
   if (wKey === currentWeekKey && (isAtomicOpActive() || hasEditingNode())) {
     pendingRemoteMerge = { wKey, remoteData };
+    // Nothing was committed, so the caller's upload cannot carry this merge —
+    // the flush that eventually commits it schedules its own push.
     return 'deferred';
   }
-  await _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload);
+  await _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, callerWillPush);
   return 'applied';
 }
 
-async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload) {
+async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, callerWillPush = false) {
   const endCommit = traceSpan('week:commit ' + wKey);
   try {
     await saveWeekIDB(wKey, mergedData);
@@ -8849,7 +8851,12 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
   if (!scheduleUpload) lastSyncedHash.set(wKey, mergedHash);
   lastSyncedAt = Date.now();
   updateDropdownSyncTime();
-  if (scheduleUpload) scheduleDriveSync(wKey);
+  // A merge that produced content Drive lacks has to be pushed — but when the
+  // pull was syncWeekToDrive's own (callerWillPush), that push is the next
+  // thing to happen, and arming the debounce here only buys a second, empty
+  // pull-merge round trip ten seconds later: it finds hash === lastSyncedHash
+  // and returns without uploading. One edit used to cost two cycles.
+  if (scheduleUpload && !callerWillPush) scheduleDriveSync(wKey);
 }
 
 async function _flushPendingMerge() {
@@ -8905,7 +8912,7 @@ function _flushPendingSync() {
 // wrong answer immediately before an upload: that pull exists to guarantee we
 // merge the true current remote before overwriting it, and a conditional request
 // answers from what we last saw rather than from what is there now.
-async function syncWeekFromDrive(wKey, { force = false, seenHash = null } = {}) {
+async function syncWeekFromDrive(wKey, { force = false, seenHash = null, callerWillPush = false } = {}) {
   if (!googleAccessToken) return 'failed';
   if (_undoRedoForcePush.has(wKey)) return 'failed';
 
@@ -8978,7 +8985,7 @@ async function syncWeekFromDrive(wKey, { force = false, seenHash = null } = {}) 
         const mergedJson = JSON.stringify(mergedData);
         const mergedHash = weekContentHash(mergedData);
         const scheduleUpload = mergedHash !== weekContentHash(remoteData);
-        return applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData);
+        return applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData, callerWillPush);
       });
       endMerge();
       // Only now is this revision reconciled. Marking it seen at the call site
@@ -9491,7 +9498,7 @@ async function syncWeekToDrive(wKey) {
     // Pull-merge-push: fetch Drive content first, CRDT-merge, then upload.
     // This ensures we never overwrite concurrent changes from another device —
     // which only holds if the pull is unconditional (see syncWeekFromDrive).
-    await syncWeekFromDrive(wKey, { force: true });
+    await syncWeekFromDrive(wKey, { force: true, callerWillPush: true });
   }
 
   // Re-read local after merge (syncWeekFromDrive may have updated it)
