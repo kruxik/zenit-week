@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-hbAGHfn8c6AQR9VDwPf28LQgBAoxQBsmk38A+xYcKIA='
+               'sha256-omRudDjNtZudT8y51OBv6Dw0FY/CF4tNDBX8z4wuqw4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -19457,9 +19457,15 @@ document.getElementById('ctx-comment').addEventListener('click', () => {
   if (id) openCommentDialog(id);
 });
 
-// ─── Comment dialog (shell — auto-save wired in T3) ───────────────────────────
+// ─── Comment dialog ───────────────────────────────────────────────────────────
+// The draft persists while the dialog is still open — debounced on input, and
+// at once when the page is hidden — because a mobile OS kills a background tab
+// without warning, and a comment that only saved on close was lost with it.
 const COMMENT_SOFT_LIMIT = 1000;
+const COMMENT_AUTOSAVE_MS = 800;
 let commentTargetId = null;
+let commentSnapshotTaken = false; // one undo step per dialog session, not per keystroke
+let commentSaveTimer = null;
 
 function updateCommentCounter() {
   const ta = document.getElementById('comment-textarea');
@@ -19473,6 +19479,7 @@ function openCommentDialog(nodeId) {
   const node = findNode(nodeId);
   if (!node) return;
   commentTargetId = nodeId;
+  commentSnapshotTaken = false;
   document.getElementById('comment-title').textContent = nodeDisplayLabel(node);
   const ta = document.getElementById('comment-textarea');
   ta.value = node.comments || '';
@@ -19494,20 +19501,24 @@ function planCommentWrite(node, rawValue) {
   return rawValue;
 }
 
-function closeCommentDialog() {
+// Writes the open dialog's text to its node. Safe to call any number of times:
+// an unchanged draft is a no-op, and only the first real write of a dialog
+// session takes the undo snapshot.
+function persistCommentDraft() {
+  clearTimeout(commentSaveTimer);
+  commentSaveTimer = null;
   const id = commentTargetId;
-  document.getElementById('comment-overlay').classList.remove('visible');
-  document.getElementById('comment-panel').classList.remove('visible');
-  commentTargetId = null;
   if (!id) return;
-
   const node = findNode(id);
   if (!node) return;
   const write = planCommentWrite(node, document.getElementById('comment-textarea').value);
   if (write === null) return; // unchanged — no snapshot, no _ts bump, no save
 
   const hadComment = !!node.comments;
-  takeSnapshot();             // capture pre-edit state for undo
+  if (!commentSnapshotTaken) {
+    takeSnapshot();           // capture pre-edit state for undo
+    commentSnapshotTaken = true;
+  }
   if (write) node.comments = write;
   else delete node.comments;  // empty clears the field
   touchNode(id);              // bump _ts for Drive LWW merge
@@ -19519,7 +19530,26 @@ function closeCommentDialog() {
   else if (hadComment !== !!write) render();
   else updateNodeUI(id);
 }
+
+function scheduleCommentAutosave() {
+  clearTimeout(commentSaveTimer);
+  commentSaveTimer = setTimeout(persistCommentDraft, COMMENT_AUTOSAVE_MS);
+}
+
+function closeCommentDialog() {
+  document.getElementById('comment-overlay').classList.remove('visible');
+  document.getElementById('comment-panel').classList.remove('visible');
+  persistCommentDraft();
+  commentTargetId = null;
+}
 window.closeCommentDialog = closeCommentDialog;
+
+// Registered before the Drive sync's own hidden-page flush, so the draft is in
+// weekData by the time that upload runs.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') persistCommentDraft();
+});
+window.addEventListener('pagehide', persistCommentDraft);
 
 document.getElementById('ctx-add-child').addEventListener('click', () => {
   const id = contextTarget;
@@ -24577,7 +24607,10 @@ window.addEventListener('load', async () => {
   document.getElementById('comment-overlay').addEventListener('click', () => closeCommentDialog());
   const commentCloseMobile = document.getElementById('comment-close-mobile');
   if (commentCloseMobile) commentCloseMobile.addEventListener('click', () => closeCommentDialog());
-  document.getElementById('comment-textarea').addEventListener('input', updateCommentCounter);
+  document.getElementById('comment-textarea').addEventListener('input', () => {
+    updateCommentCounter();
+    scheduleCommentAutosave();
+  });
 
   // Agenda overlay click to close
   const agendaOverlay = document.getElementById('agenda-overlay');
