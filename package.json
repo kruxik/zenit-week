@@ -18,17 +18,28 @@
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "build": "node scripts/inject-playground-seed.mjs && node scripts/inject-version.js && node scripts/csp-hashes.mjs",
     "csp": "node scripts/csp-hashes.mjs",
+    "editor:build": "node scripts/build-editor.mjs",
     "release": "node scripts/release.mjs",
     "release:notes": "node scripts/extract-release-notes.mjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.5",
     "dotenv-cli": "^11.0.0",
+    "esbuild": "0.28.2",
     "fake-indexeddb": "^6.2.5",
     "git-cliff": "^2.13.1",
     "html-validate": "^9.0.0",
     "msw": "^2.14.2",
     "playwright": "^1.59.1",
+    "prosemirror-commands": "1.7.2",
+    "prosemirror-history": "1.5.1",
+    "prosemirror-inputrules": "1.5.1",
+    "prosemirror-keymap": "1.2.3",
+    "prosemirror-model": "1.25.12",
+    "prosemirror-schema-list": "1.5.1",
+    "prosemirror-state": "1.4.4",
+    "prosemirror-transform": "1.12.2",
+    "prosemirror-view": "1.42.6",
     "vitest": "^4.1.5"
   }
 }

@@ -8,13 +8,13 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ## S1 — Vendor pipeline
 
-- [ ] T1.1 — Add pinned (exact-version) `prosemirror-model`, `-state`, `-view`, `-transform`, `-history`, `-keymap`, `-inputrules`, `-commands`, `-schema-list` and `esbuild` as devDependencies.
-- [ ] T1.2 — `vendor/editor-entry.js`: re-exports only — no application logic. Header comment states that rule.
-- [ ] T1.3 — `scripts/build-editor.mjs` (`npm run editor:build`): esbuild IIFE, minified, `--legal-comments=eof`; writes `vendor/editor.<contenthash>.js`; deletes the previous hashed file; writes the file name and SRI `sha384` into a marked constant in `zenit-week.html` in the same step.
-- [ ] T1.4 — Licence check in the build script: walk the bundled packages; fail on any licence outside MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0.
-- [ ] T1.5 — `vercel.json`: `/vendor/(.*)` gets `Cache-Control: public, max-age=31536000, immutable`.
-- [ ] T1.6 — Tests: filename hash matches content; SRI in the page matches the file; bundle contains the MIT notices; the licence check rejects a fake GPL entry.
-- [ ] T1.7 — `npm test` + `npm run validate` green.
+- [x] T1.1 — Add pinned (exact-version) `prosemirror-model`, `-state`, `-view`, `-transform`, `-history`, `-keymap`, `-inputrules`, `-commands`, `-schema-list` and `esbuild` as devDependencies.
+- [x] T1.2 — `vendor/editor-entry.js`: re-exports only — no application logic. Header comment states that rule.
+- [x] T1.3 — `scripts/build-editor.mjs` (`npm run editor:build`): esbuild IIFE, minified, `--legal-comments=eof`; writes `vendor/editor.<contenthash>.js`; deletes the previous hashed file; writes the file name and SRI `sha384` into a marked constant in `zenit-week.html` in the same step.
+- [x] T1.4 — Licence check in the build script: walk the bundled packages; fail on any licence outside MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0.
+- [x] T1.5 — `vercel.json`: `/vendor/(.*)` gets `Cache-Control: public, max-age=31536000, immutable`.
+- [x] T1.6 — Tests: filename hash matches content; SRI in the page matches the file; bundle contains the MIT notices; the licence check rejects a fake GPL entry.
+- [x] T1.7 — `npm test` + `npm run validate` green.
 
 **AC:** one command produces a hashed bundle with licence notices, and the page's constant names it with a matching SRI; a disallowed licence stops the build.
 **Verify:** `npm run editor:build` twice with no change → identical file name; `npm test`.

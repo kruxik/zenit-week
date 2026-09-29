@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-omRudDjNtZudT8y51OBv6Dw0FY/CF4tNDBX8z4wuqw4='
+               'sha256-R3+fDK80RyxTGTkDv/1JFwutCOefLnTS6bOYd4CKm4o='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4748,6 +4748,13 @@ const _displayVersion = APP_VERSION.startsWith('__') ? 'dev' : APP_VERSION;
   const _verEl = document.getElementById('app-version');
   if (_verEl) _verEl.textContent = _displayVersion;
 }
+
+// ─── Comment editor bundle ────────────────────────────────────────────────────
+// The rich comment editor (ProseMirror) is third-party code too heavy to
+// inline, so it ships as one lazy-loaded, content-hashed vendor file. The
+// object between the markers is written by scripts/build-editor.mjs from the
+// same bytes as the file name — never edit it by hand; run `npm run editor:build`.
+const COMMENT_EDITOR_BUNDLE = /* editor-bundle:start */ { src: '/vendor/editor.02f6e0d06d47a6cf.js', integrity: 'sha384-snb81k9maG9vaXItkHg6jO2p/IaV3xZ77m2oyfIbFat8ieqTDC93On8qYU1ePaqd' } /* editor-bundle:end */;
 
 // ─── Network: every request carries a deadline ───────────────────────────────
 // Nothing this app does over the wire is worth waiting on forever. A request
