@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ugU9rnKjvE1zpunEWJl4WK0bnA8z2vY56UCll6Hx1DI='
+               'sha256-pM2Z1pG0v6oxB5pypGlto1HwbchyD7lfRoEWA1tvVo0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3314,6 +3314,43 @@
     font-feature-settings: "liga" 0;
   }
   #comment-editor p { margin: 0; }
+  #comment-editor .cm-heading {
+    margin: 6px 0 2px;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  #comment-editor .cm-bullet {
+    position: relative;
+    padding-left: 22px;
+  }
+  #comment-editor .cm-bullet::before {
+    content: '•';
+    position: absolute;
+    left: 6px;
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+  #comment-editor .cm-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  #comment-editor .cm-check input {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin: 4px 0 0 3px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+  }
+  /* A native checkbox paints light unless told otherwise. */
+  [data-theme="dark"] #comment-editor .cm-check input { color-scheme: dark; }
+  #comment-editor .cm-check-text { flex: 1; min-width: 0; }
+  #comment-editor .cm-check.checked .cm-check-text {
+    color: var(--text-secondary);
+    text-decoration: line-through;
+  }
   #comment-editor.ProseMirror-hideselection *::selection { background: transparent; }
   #comment-editor.ProseMirror-hideselection { caret-color: transparent; }
   #comment-editor img.ProseMirror-separator {
@@ -10829,6 +10866,7 @@ const TRANSLATIONS = {
     'menu.prioCritical':          'Priority Critical',
     'menu.rename':                'Rename',
     'menu.comment':               'Comment',
+    'comment.toggleItem':         'Toggle checklist item',
     'menu.addActivity':           'Add Activity',
     'menu.changeColor':           'Change color',
     'menu.setBaseline':           'Set Effort Baseline',
@@ -11186,6 +11224,7 @@ const TRANSLATIONS = {
     'menu.prioCritical':          'Priorita Kritická',
     'menu.rename':                'Přejmenovat',
     'menu.comment':               'Komentář',
+    'comment.toggleItem':         'Přepnout položku seznamu',
     'menu.addActivity':           'Přidat aktivitu',
     'menu.changeColor':           'Změnit barvu',
     'menu.setBaseline':           'Nastavit základní zátěž',
@@ -19715,28 +19754,55 @@ function loadCommentEditor() {
   return commentEditorLoad;
 }
 
-// Plain text only for now: one paragraph per line, no marks. Takes the
+// One node per line of the comment grammar: paragraph, heading, bullet and
+// check are all flat textblocks, exactly as tokenizeComment() reads the string —
+// the document is the grammar's block list, never a nested list tree. Takes the
 // namespace as a parameter so tests can hand in the real packages.
 function buildCommentSchema(pm) {
+  const text = { content: 'text*', group: 'block', marks: '' };
   return new pm.model.Schema({
     nodes: {
-      doc: { content: 'paragraph+' },
-      paragraph: { content: 'text*', parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
+      doc: { content: 'block+' },
+      paragraph: { ...text, parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
+      heading: { ...text, parseDOM: [{ tag: 'h3.cm-heading' }], toDOM: () => ['h3', { class: 'cm-heading' }, 0] },
+      bullet: { ...text, parseDOM: [{ tag: 'div.cm-bullet' }], toDOM: () => ['div', { class: 'cm-bullet' }, 0] },
+      check: {
+        ...text,
+        attrs: { checked: { default: false } },
+        parseDOM: [{
+          tag: 'div.cm-check',
+          contentElement: 'span.cm-check-text',
+          getAttrs: dom => ({ checked: dom.getAttribute('data-checked') === 'true' }),
+        }],
+        toDOM: node => ['div', { class: 'cm-check', 'data-checked': String(node.attrs.checked) },
+          ['span', { class: 'cm-check-text' }, 0]],
+      },
       text: {},
     },
   });
 }
 
-// String → doc and back must be byte-identical for any string: every '\n'
-// is a paragraph boundary, and nothing else is touched — no trimming, no
-// collapsing of blank lines.
+function commentNodeMarker(node) {
+  return commentBlockMarker({ type: node.type.name, checked: node.attrs.checked });
+}
+
+// String → doc through the grammar's own tokenizer. A block's text is its raw
+// source after the marker, so inline syntax the schema cannot show yet stays
+// literal text and the string round-trips byte-identically.
 function commentTextToDoc(schema, text) {
-  return schema.node('doc', null, (text || '').split('\n').map(line =>
-    schema.node('paragraph', null, line ? [schema.text(line)] : [])));
+  const src = text || '';
+  return schema.node('doc', null, tokenizeComment(src).map(block => {
+    const body = src.slice(block.start + commentBlockMarker(block).length, block.end);
+    return schema.node(block.type, block.type === 'check' ? { checked: block.checked } : null,
+      body ? [schema.text(body)] : []);
+  }));
 }
 
 function commentFragmentToText(fragment) {
-  return fragment.textBetween(0, fragment.size, '\n');
+  if (fragment.firstChild && fragment.firstChild.isInline) return fragment.textBetween(0, fragment.size);
+  const lines = [];
+  fragment.forEach(node => lines.push(commentNodeMarker(node) + node.textContent));
+  return lines.join('\n');
 }
 
 function commentDocToText(doc) {
@@ -19759,21 +19825,123 @@ function isCommentEditorTarget(el) {
   return !!commentEditor && !!el && commentEditor.view.dom.contains(el);
 }
 
-function commentEditorPlugins(pm) {
+const isCommentListItem = node => node.type.name === 'bullet' || node.type.name === 'check';
+
+// A tick is one transaction and its own undo step — closeHistory keeps it from
+// merging into the typing just before it.
+function toggleCommentCheck(pm, state, pos) {
+  const node = state.doc.nodeAt(pos);
+  if (!node || node.type.name !== 'check') return null;
+  return pm.history.closeHistory(state.tr.setNodeMarkup(pos, null, { checked: !node.attrs.checked }));
+}
+
+// Enter continues a list with a fresh item; Enter on an empty item ends the list.
+function commentEnterCommand(pm) {
+  const split = pm.commands.splitBlockAs(node => (isCommentListItem(node)
+    ? { type: node.type, attrs: node.type.name === 'check' ? { checked: false } : null }
+    : null));
+  return (state, dispatch) => {
+    const { $from, empty } = state.selection;
+    if (!isCommentListItem($from.parent)) return false;
+    if (empty && $from.parent.content.size === 0) {
+      if (dispatch) dispatch(state.tr.setBlockType($from.pos, $from.pos, state.schema.nodes.paragraph));
+      return true;
+    }
+    return split(state, dispatch);
+  };
+}
+
+// Backspace at the very start of an item or heading lifts it to a paragraph,
+// keeping its text; a second Backspace then joins lines as usual.
+function commentLiftAtStart(state, dispatch) {
+  const { $from, empty } = state.selection;
+  if (!empty || $from.parentOffset !== 0 || $from.parent.type.name === 'paragraph') return false;
+  if (dispatch) dispatch(state.tr.setBlockType($from.pos, $from.pos, state.schema.nodes.paragraph));
+  return true;
+}
+
+function commentToggleAtCaret(pm) {
+  return (state, dispatch) => {
+    const { $from } = state.selection;
+    if ($from.parent.type.name !== 'check') return false;
+    if (dispatch) dispatch(toggleCommentCheck(pm, state, $from.before()));
+    return true;
+  };
+}
+
+// Docs-style shortcuts typed at the start of a line. `\s` rather than a space
+// so a phone keyboard's non-breaking space still counts.
+function commentInputRuleList(pm, schema) {
+  const { textblockTypeInputRule } = pm.inputrules;
+  const n = schema.nodes;
+  return [
+    textblockTypeInputRule(/^-\s$/, n.bullet),
+    textblockTypeInputRule(/^(?:-\s)?\[(\s?|x)\]\s$/, n.check, m => ({ checked: m[1] === 'x' })),
+    textblockTypeInputRule(/^#\s$/, n.heading),
+  ];
+}
+
+function commentEditorPlugins(pm, schema) {
   const { undo, redo } = pm.history;
+  const { chainCommands } = pm.commands;
   return [
     // Also answers beforeinput historyUndo / historyRedo (phone undo keys,
     // shake and three-finger gestures), not just the key bindings below.
     pm.history.history(),
+    pm.inputrules.inputRules({ rules: commentInputRuleList(pm, schema) }),
     pm.keymap.keymap({
       'Mod-z': undo,
       'Shift-Mod-z': redo,
       'Mod-y': redo,
+      'Enter': commentEnterCommand(pm),
       'Shift-Enter': pm.commands.splitBlock,
+      // Right after an input rule, Backspace gives the typed `- ` back.
+      'Backspace': chainCommands(pm.inputrules.undoInputRule, commentLiftAtStart),
+      'Mod-Enter': commentToggleAtCaret(pm),
     }),
     // Esc belongs to the app (it closes the dialog), not to node selection.
     pm.keymap.keymap(Object.fromEntries(Object.entries(pm.commands.baseKeymap).filter(([k]) => k !== 'Escape'))),
   ];
+}
+
+// The checkbox is a real control outside the editable text. Tapping it never
+// moves the caret or raises a phone keyboard; the editor state stays the only
+// truth, and the box just mirrors it. Keyboard: Mod-Enter on the item.
+function commentCheckView(pm, node, view, getPos) {
+  const dom = document.createElement('div');
+  dom.className = 'cm-check';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.contentEditable = 'false';
+  box.tabIndex = -1;
+  box.setAttribute('aria-label', t('comment.toggleItem'));
+  const content = document.createElement('span');
+  content.className = 'cm-check-text';
+  dom.appendChild(box);
+  dom.appendChild(content);
+  const sync = n => {
+    box.checked = n.attrs.checked;
+    dom.classList.toggle('checked', n.attrs.checked);
+  };
+  sync(node);
+  box.addEventListener('mousedown', e => e.preventDefault());
+  // No preventDefault on click: a cancelled click makes the browser restore
+  // the box's old state after sync() has set the new one.
+  box.addEventListener('click', () => {
+    const tr = toggleCommentCheck(pm, view.state, getPos());
+    if (tr) view.dispatch(tr);
+  });
+  return {
+    dom,
+    contentDOM: content,
+    update(next) {
+      if (next.type !== node.type) return false;
+      sync(next);
+      return true;
+    },
+    stopEvent: e => e.target === box,
+    ignoreMutation: m => m.target === box || (m.type === 'attributes' && m.target === dom),
+  };
 }
 
 function mountCommentEditor(pm) {
@@ -19788,8 +19956,9 @@ function mountCommentEditor(pm) {
       state: pm.state.EditorState.create({
         doc,
         selection: pm.state.Selection.atEnd(doc),
-        plugins: commentEditorPlugins(pm),
+        plugins: commentEditorPlugins(pm, schema),
       }),
+      nodeViews: { check: (n, v, getPos) => commentCheckView(pm, n, v, getPos) },
       attributes: { spellcheck: 'true', role: 'textbox', 'aria-multiline': 'true', 'aria-labelledby': 'comment-title' },
       dispatchTransaction(tr) {
         view.updateState(view.state.apply(tr));
@@ -19799,8 +19968,8 @@ function mountCommentEditor(pm) {
         }
       },
       clipboardTextSerializer: slice => commentFragmentToText(slice.content),
-      // Plain text only, exactly like the textarea; rich paste arrives with the
-      // rich schema.
+      // Plain text only, read through the comment grammar; HTML paste arrives
+      // with the inline marks.
       handlePaste(v, event) {
         const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
         if (!text) return true;

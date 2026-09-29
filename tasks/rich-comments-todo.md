@@ -38,10 +38,11 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ### ⛔ CHECKPOINT 1 — phone go/no-go on ProseMirror
 
-- [ ] Android (Gboard): autocorrect replacing words, swipe typing, Czech diacritics (`ěščřžýáíé`), keyboard undo key.
+- [x] Android (Gboard): autocorrect replacing words, swipe typing, Czech diacritics (`ěščřžýáíé`), keyboard undo key.
 - [ ] iOS Safari: dictation, autocorrect, shake-to-undo, three-finger undo swipe.
 - [ ] No caret jumps, no dropped or doubled characters in a 2-minute typing session on each.
-- [ ] Decision recorded here: continue with ProseMirror, or switch to the hand-built fallback.
+- [x] Decision recorded here: continue with ProseMirror, or switch to the hand-built fallback.
+  - 2026-09-29: **continue with ProseMirror.** Android passed on a real phone. iOS Safari not yet tested — carried to Checkpoint 2.
 
 ---
 
@@ -62,12 +63,12 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ## S4 — Rich blocks
 
-- [ ] T4.1 — Schema gains heading (one level), bullet list, checkbox list; Markdown bridge = S3 tokenizer in, serializer out, both in the main file.
-- [ ] T4.2 — Checkbox node view: tap/click toggles as one editor transaction (one undo step); keyboard-accessible.
-- [ ] T4.3 — Input rules: `- ` → bullet, `[] ` and `- [ ] ` → checkbox, `# ` → heading.
-- [ ] T4.4 — Keymap: Enter continues a list item; Enter on an empty item ends the list; Backspace at item start lifts to paragraph.
-- [ ] T4.5 — Tests: doc ↔ Markdown for every block type; tick → serialized `[x]`; untouched rich comment round-trips byte-identical.
-- [ ] T4.6 — `npm test` + `npm run validate` + **`npm run csp`** green.
+- [x] T4.1 — Schema gains heading (one level), bullet list, checkbox list; Markdown bridge = S3 tokenizer in, serializer out, both in the main file.
+- [x] T4.2 — Checkbox node view: tap/click toggles as one editor transaction (one undo step); keyboard-accessible.
+- [x] T4.3 — Input rules: `- ` → bullet, `[] ` and `- [ ] ` → checkbox, `# ` → heading.
+- [x] T4.4 — Keymap: Enter continues a list item; Enter on an empty item ends the list; Backspace at item start lifts to paragraph.
+- [x] T4.5 — Tests: doc ↔ Markdown for every block type; tick → serialized `[x]`; untouched rich comment round-trips byte-identical.
+- [x] T4.6 — `npm test` + `npm run validate` + **`npm run csp`** green.
 
 **AC:** a user can build a checklist by typing `[] ` and ticking items; undo reverses a tick; the stored string is plain Markdown readable on an old client.
 **Verify:** browser desktop + Android + iOS; the Agenda pill updates after ticks.
