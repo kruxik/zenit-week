@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-vuuNW4FmVjgVm6gujFrSHnv9MV7gw6ZyzSxJTrAADN4='
+               'sha256-ugU9rnKjvE1zpunEWJl4WK0bnA8z2vY56UCll6Hx1DI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1778,6 +1778,31 @@
     color: var(--stats-dropped);
   }
   .agenda-item .daily-log-badge.comment { cursor: pointer; }
+  /* The comment badge carries the comment's first line and checklist count.
+     Unlike the other badges it may shrink, and the preview gives way first so
+     the task label stays readable. */
+  .agenda-item .daily-log-badge.comment {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 40%;
+    gap: 6px;
+    font-weight: 500;
+  }
+  .agenda-item .daily-log-badge.comment .icon { flex-shrink: 0; }
+  .comment-preview {
+    min-width: 0;
+    max-width: 180px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .comment-preview strong { font-weight: 700; }
+  .comment-preview a { color: inherit; text-decoration: underline; }
+  .comment-checks {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
   .agenda-item .daily-log-badge.comment:hover { filter: brightness(1.08); }
 
   .daily-log-label {
@@ -19497,6 +19522,148 @@ document.getElementById('ctx-comment').addEventListener('click', () => {
   if (id) openCommentDialog(id);
 });
 
+// ─── Comment grammar ──────────────────────────────────────────────────────────
+// A comment is one plain string, read as Markdown in a small fixed grammar:
+//   blocks  — paragraph, `# ` heading, `- ` bullet, `- [ ] ` / `- [x] ` checkbox
+//   inline  — `**bold**`, `*italic*`, `[text](url)`, bare http(s) URL
+// Anything else is literal text. There is no escape syntax and no nesting, and
+// every construct is recognised only in the exact spelling its serializer
+// writes back — so an untouched comment always re-serializes byte-identically.
+// Every token keeps its source range [start, end) into the original string.
+const COMMENT_BLOCK_RULES = [
+  { type: 'check', marker: '- [ ] ', checked: false },
+  { type: 'check', marker: '- [x] ', checked: true },
+  { type: 'bullet', marker: '- ' },
+  { type: 'heading', marker: '# ' },
+];
+// Order matters: bold before italic, so `**` is never read as two italics.
+const COMMENT_INLINE_RE = new RegExp([
+  /\*\*(?<bold>[^\s*](?:[^*\n]*[^\s*])?)\*\*/.source,
+  /(?<![*])\*(?<italic>[^\s*](?:[^*\n]*[^\s*])?)\*(?![*])/.source,
+  /\[(?<linkText>[^\]\n]+)\]\((?<linkHref>[^\s)]+)\)/.source,
+  /(?<autolink>https?:\/\/[^\s<>()\[\]]*[^\s<>()\[\].,;:!?'"*])/.source,
+].join('|'), 'g');
+
+function tokenizeCommentInline(text, offset = 0) {
+  const tokens = [];
+  let last = 0;
+  const pushText = (from, to) => {
+    if (to > from) tokens.push({ type: 'text', text: text.slice(from, to), start: offset + from, end: offset + to });
+  };
+  for (const m of text.matchAll(COMMENT_INLINE_RE)) {
+    const g = m.groups;
+    const start = m.index;
+    const end = start + m[0].length;
+    let token;
+    if (g.bold !== undefined) token = { type: 'bold', text: g.bold };
+    else if (g.italic !== undefined) token = { type: 'italic', text: g.italic };
+    else if (g.linkText !== undefined) {
+      // An unsafe target is not a link at all — it stays the literal text it was.
+      if (!isSafeCommentUrl(g.linkHref)) continue;
+      token = { type: 'link', text: g.linkText, href: g.linkHref };
+    } else {
+      if (!isSafeCommentUrl(g.autolink)) continue;
+      token = { type: 'autolink', text: g.autolink, href: g.autolink };
+    }
+    pushText(last, start);
+    tokens.push({ ...token, start: offset + start, end: offset + end });
+    last = end;
+  }
+  pushText(last, text.length);
+  return tokens;
+}
+
+// String → blocks, one per '\n'-separated line.
+function tokenizeComment(str) {
+  const blocks = [];
+  let pos = 0;
+  for (const line of (str || '').split('\n')) {
+    const rule = COMMENT_BLOCK_RULES.find(r => line.startsWith(r.marker));
+    const marker = rule ? rule.marker : '';
+    const block = { type: rule ? rule.type : 'paragraph', start: pos, end: pos + line.length };
+    if (rule && rule.type === 'check') block.checked = rule.checked;
+    block.inline = tokenizeCommentInline(line.slice(marker.length), pos + marker.length);
+    blocks.push(block);
+    pos += line.length + 1;
+  }
+  return blocks;
+}
+
+function serializeCommentInline(tokens) {
+  return tokens.map(tk => {
+    switch (tk.type) {
+      case 'bold': return `**${tk.text}**`;
+      case 'italic': return `*${tk.text}*`;
+      case 'link': return `[${tk.text}](${tk.href})`;
+      default: return tk.text; // text, autolink
+    }
+  }).join('');
+}
+
+function commentBlockMarker(block) {
+  if (block.type === 'check') return block.checked ? '- [x] ' : '- [ ] ';
+  if (block.type === 'bullet') return '- ';
+  if (block.type === 'heading') return '# ';
+  return '';
+}
+
+function serializeComment(blocks) {
+  return blocks.map(b => commentBlockMarker(b) + serializeCommentInline(b.inline)).join('\n');
+}
+
+// Link targets are an allow-list, never a deny-list: http(s) and mailto only.
+// The raw string must already be clean — no whitespace or control characters
+// anywhere, so a leading space or an embedded tab cannot smuggle a scheme past
+// the check — and the URL parser has to agree on the scheme.
+function isSafeCommentUrl(url) {
+  if (typeof url !== 'string' || /[\u0000-\u0020\u007f]/.test(url)) return false;
+  if (!/^(https?:\/\/[^/]|mailto:[^/])/i.test(url)) return false;
+  try {
+    return ['http:', 'https:', 'mailto:'].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
+// Inline tokens → DOM, appended to `parent`. textContent only, never markup.
+function buildCommentInline(tokens, parent) {
+  for (const tk of tokens) {
+    if (tk.type === 'text') {
+      parent.appendChild(document.createTextNode(tk.text));
+      continue;
+    }
+    const el = document.createElement(tk.type === 'bold' ? 'strong' : tk.type === 'italic' ? 'em' : 'a');
+    el.textContent = tk.text;
+    if (tk.type === 'link' || tk.type === 'autolink') {
+      el.href = tk.href;
+      el.rel = 'noopener noreferrer';
+      el.target = '_blank';
+    }
+    parent.appendChild(el);
+  }
+  return parent;
+}
+
+function commentInlineText(tokens) {
+  return tokens.map(tk => tk.text).join('');
+}
+
+// What the reader sees: markers and inline syntax do not count, line breaks do.
+function commentVisibleLength(str) {
+  return tokenizeComment(str).map(b => commentInlineText(b.inline)).join('\n').length;
+}
+
+// Agenda preview: the first line with visible text, and checklist progress.
+function commentPreview(str) {
+  const blocks = tokenizeComment(str);
+  const first = blocks.find(b => commentInlineText(b.inline).trim() !== '');
+  const checks = blocks.filter(b => b.type === 'check');
+  return {
+    inline: first ? first.inline : [],
+    checks: checks.length ? { done: checks.filter(b => b.checked).length, total: checks.length } : null,
+  };
+}
+
 // ─── Comment dialog ───────────────────────────────────────────────────────────
 // The draft persists while the dialog is still open — debounced on input, and
 // at once when the page is hidden — because a mobile OS kills a background tab
@@ -19666,7 +19833,7 @@ function unmountCommentEditor() {
 
 function updateCommentCounter() {
   const counter = document.getElementById('comment-counter');
-  const len = getCommentText().length;
+  const len = commentVisibleLength(getCommentText());
   counter.textContent = `${len} / ${COMMENT_SOFT_LIMIT}`;
   counter.classList.toggle('over', len > COMMENT_SOFT_LIMIT);
 }
@@ -20490,9 +20657,24 @@ function buildAgendaItem(node, label, opts = {}) {
   if (node.comments) {
     const cmt = document.createElement('span');
     cmt.className = 'daily-log-badge comment';
-    cmt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;';
+    cmt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;';
     cmt.innerHTML = iconSvg('message');
     cmt.title = t('menu.comment');
+    const preview = commentPreview(node.comments);
+    if (preview.inline.length) {
+      const text = document.createElement('span');
+      text.className = 'comment-preview';
+      buildCommentInline(preview.inline, text);
+      // A link in the preview opens itself, not the comment dialog.
+      text.addEventListener('click', e => { if (e.target.closest('a')) stopClickKeepingDismiss(e); });
+      cmt.appendChild(text);
+    }
+    if (preview.checks) {
+      const count = document.createElement('span');
+      count.className = 'comment-checks';
+      count.textContent = `${preview.checks.done}/${preview.checks.total}`;
+      cmt.appendChild(count);
+    }
     cmt.addEventListener('click', e => {
       stopClickKeepingDismiss(e);
       openCommentDialog(node.id);

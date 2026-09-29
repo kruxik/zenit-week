@@ -47,13 +47,13 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ## S3 — Grammar, tokenizer, Agenda preview
 
-- [ ] T3.1 — `tokenizeComment(str)` — pure; blocks: paragraph, `#` heading, `- ` bullet, `- [ ] ` / `- [x] ` checkbox; inline: `**bold**`, `*italic*`, `[text](url)`, bare-URL autolink. Everything else literal. Every token keeps its source range.
-- [ ] T3.2 — `isSafeCommentUrl(url)` — only `http:`, `https:`, `mailto:`; unsafe links render as literal text.
-- [ ] T3.3 — `buildCommentInline(tokens)` — DOM via `createElement` + `textContent` only; links get `rel="noopener noreferrer"` and `target="_blank"`.
-- [ ] T3.4 — `commentVisibleLength(str)` — visible characters only; `updateCommentCounter()` (`:19470`) uses it.
-- [ ] T3.5 — Agenda row (`buildAgendaItem()` `:20146`, comment badge `:20284`): first non-empty line rendered inline, single-line ellipsis; `n/m` pill when checklist items exist. Reuses existing badge classes.
-- [ ] T3.6 — Tests: grammar table; unsafe schemes (`javascript:`, `data:`, `vbscript:`, mixed case, leading whitespace, entity tricks); corpus of real comments → tokens → re-serialized string is byte-identical; visible length; preview first line and pill count.
-- [ ] T3.7 — `npm test` + `npm run validate` + **`npm run csp`** green.
+- [x] T3.1 — `tokenizeComment(str)` — pure; blocks: paragraph, `#` heading, `- ` bullet, `- [ ] ` / `- [x] ` checkbox; inline: `**bold**`, `*italic*`, `[text](url)`, bare-URL autolink. Everything else literal. Every token keeps its source range.
+- [x] T3.2 — `isSafeCommentUrl(url)` — only `http:`, `https:`, `mailto:`; unsafe links render as literal text.
+- [x] T3.3 — `buildCommentInline(tokens)` — DOM via `createElement` + `textContent` only; links get `rel="noopener noreferrer"` and `target="_blank"`.
+- [x] T3.4 — `commentVisibleLength(str)` — visible characters only; `updateCommentCounter()` (`:19470`) uses it.
+- [x] T3.5 — Agenda row (`buildAgendaItem()` `:20146`, comment badge `:20284`): first non-empty line rendered inline, single-line ellipsis; `n/m` pill when checklist items exist. Reuses existing badge classes.
+- [x] T3.6 — Tests: grammar table; unsafe schemes (`javascript:`, `data:`, `vbscript:`, mixed case, leading whitespace, entity tricks); corpus of real comments → tokens → re-serialized string is byte-identical; visible length; preview first line and pill count.
+- [x] T3.7 — `npm test` + `npm run validate` + **`npm run csp`** green.
 
 **AC:** Markdown comments show formatted first lines and checklist progress in the Agenda; no unsafe link ever becomes clickable; every existing comment round-trips unchanged.
 **Verify:** browser Agenda, light + dark, EN + CS; a comment with `- [x] a` / `- [ ] b` shows `1/2`.

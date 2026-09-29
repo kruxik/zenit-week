@@ -818,6 +818,12 @@ export const {
   commentDocToText,
   commentTextSlice,
   isTypingTarget,
+  tokenizeComment,
+  serializeComment,
+  isSafeCommentUrl,
+  buildCommentInline,
+  commentVisibleLength,
+  commentPreview,
   // UI & Action Logic
   showContextMenu,
   hideContextMenu,
