@@ -23,14 +23,15 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ## S2 — Lazy editor, plain text
 
-- [ ] T2.1 — Loader in `zenit-week.html`: `loadCommentEditor()` injects one `<script src integrity crossorigin>` for the hashed bundle; memoised promise; deadline; resolves to the ProseMirror namespace or rejects.
-- [ ] T2.2 — Minimal schema (doc → paragraphs → text) built by a function that takes the ProseMirror namespace as a parameter (testable in `tests/setup.js`).
-- [ ] T2.3 — `openCommentDialog()` (`:19478`): show the textarea at once; when the editor resolves and the textarea has no unsaved keystrokes, swap in the editor with the same text and caret at end. On load failure keep the textarea silently.
-- [ ] T2.4 — Autosave: editor changes feed the same `scheduleCommentAutosave()` / `persistCommentDraft()` (`:19507`) path; `planCommentWrite` dirty-check, one `takeSnapshot()` per session, `visibilitychange` flush and `closeCommentDialog()` (`:19539`) flush all unchanged in behaviour.
-- [ ] T2.5 — `prosemirror-history` + keymap: Cmd/Ctrl+Z, Cmd+Shift+Z, Ctrl+Y, and `beforeinput` `historyUndo` / `historyRedo`. Global app hotkeys stay suppressed while the editor has focus (`isTypingTarget()` `:17367` recognises the editor).
-- [ ] T2.6 — Editor styles from dialog tokens; light + dark; fills `#comment-body` like the textarea did.
-- [ ] T2.7 — Tests: plain text round trip is byte-identical (including `*`, `#`, blank lines, trailing spaces); no write when the text is unchanged; loader rejects → textarea path.
-- [ ] T2.8 — `npm test` + `npm run validate` + **`npm run csp`** green.
+- [x] T2.1 — Loader in `zenit-week.html`: `loadCommentEditor()` injects one `<script src integrity crossorigin>` for the hashed bundle; memoised promise; deadline; resolves to the ProseMirror namespace or rejects.
+- [x] T2.2 — Minimal schema (doc → paragraphs → text) built by a function that takes the ProseMirror namespace as a parameter (testable in `tests/setup.js`).
+- [x] T2.3 — `openCommentDialog()` (`:19478`): show the textarea at once; when the editor resolves and the textarea has no unsaved keystrokes, swap in the editor with the same text and caret at end. On load failure keep the textarea silently.
+- [x] T2.4 — Autosave: editor changes feed the same `scheduleCommentAutosave()` / `persistCommentDraft()` (`:19507`) path; `planCommentWrite` dirty-check, one `takeSnapshot()` per session, `visibilitychange` flush and `closeCommentDialog()` (`:19539`) flush all unchanged in behaviour.
+- [x] T2.5 — `prosemirror-history` + keymap: Cmd/Ctrl+Z, Cmd+Shift+Z, Ctrl+Y, and `beforeinput` `historyUndo` / `historyRedo`. Global app hotkeys stay suppressed while the editor has focus (`isTypingTarget()` `:17367` recognises the editor).
+- [x] T2.6 — Editor styles from dialog tokens; light + dark; fills `#comment-body` like the textarea did.
+- [x] T2.7 — Tests: plain text round trip is byte-identical (including `*`, `#`, blank lines, trailing spaces); no write when the text is unchanged; loader rejects → textarea path.
+- [x] T2.8 — `npm test` + `npm run validate` + **`npm run csp`** green.
+- [x] T2.9 — `sw.js` serves `/vendor/editor.<hash>.js` by refetching with `OWN_FETCH_HEADERS` — a `<script>` cannot send `ngrok-skip-browser-warning`, so behind the dev tunnel the interstitial failed SRI. S6 adds caching to this same route.
 
 **AC:** the comment panel edits through ProseMirror with exactly today's behaviour (plain text, autosave, one app-undo step per session); in-editor undo/redo works from every entry point; a blocked or missing bundle leaves today's textarea fully working.
 **Verify:** browser desktop Chrome + Safari; DevTools block `/vendor/*` → textarea still works; open and close a comment without typing → no `_ts` bump, no undo entry.

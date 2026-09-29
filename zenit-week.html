@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-R3+fDK80RyxTGTkDv/1JFwutCOefLnTS6bOYd4CKm4o='
+               'sha256-vuuNW4FmVjgVm6gujFrSHnv9MV7gw6ZyzSxJTrAADN4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3268,6 +3268,33 @@
     font-size: 15px;
     line-height: 1.6;
     padding: 0;
+  }
+  /* Rich editor (ProseMirror) — takes the textarea's place and its look. The
+     white-space / ligature rules are ProseMirror's own required base styles. */
+  #comment-editor {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    position: relative;
+    outline: none;
+    color: var(--text-primary);
+    caret-color: var(--text-primary);
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0;
+  }
+  #comment-editor p { margin: 0; }
+  #comment-editor.ProseMirror-hideselection *::selection { background: transparent; }
+  #comment-editor.ProseMirror-hideselection { caret-color: transparent; }
+  #comment-editor img.ProseMirror-separator {
+    display: inline;
+    border: none;
+    margin: 0;
   }
   #comment-counter {
     margin-top: 8px;
@@ -17371,8 +17398,10 @@ function scheduleRender() {
 // existing hotkey set to the keyboard without duplicating any of it.
 let kbFocusId = null;
 
+// The rich comment editor is a contenteditable <div>, not a form field, so the
+// tag alone would hand every letter typed into it to the view hotkeys.
 function isTypingTarget(el) {
-  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable === true);
 }
 
 // Repaints the ring from kbFocusId. Also called after every render, since
@@ -17599,7 +17628,7 @@ function _windowKeydownHandler(e) {
   if (!e.metaKey && !e.ctrlKey && !e.shiftKey) {
     const key = e.key.toLowerCase();
     if (key === 'a' || key === 'm') {
-      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      if (!isTypingTarget(e.target)) {
         const targetView = key === 'a' ? 'agenda' : 'mindmap';
         if (_statsPanelOpen || currentView !== targetView) {
           e.preventDefault();
@@ -17612,7 +17641,7 @@ function _windowKeydownHandler(e) {
     // it. Free: X is dropped and 9 belongs to the numeric day strip. The
     // editState guard at the top of this handler keeps it off inline renames.
     if (key === 'l') {
-      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      if (!isTypingTarget(e.target)) {
         e.preventDefault();
         agendaActiveTab = 'later';
         if (currentView !== 'agenda') switchView('agenda');
@@ -17621,7 +17650,7 @@ function _windowKeydownHandler(e) {
       }
     }
     if (key === 's') {
-      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      if (!isTypingTarget(e.target)) {
         e.preventDefault();
         // Toggle Stats; leaving lands on the default (mindmap). With Help open
         // the press spends itself on dismissing Help, so Stats stays put.
@@ -17634,7 +17663,7 @@ function _windowKeydownHandler(e) {
   // Quick add — the keyboard twin of the "+" FAB. Shift is allowed so both q
   // and Q work; the panel's own input is excluded so typing "q" still types.
   if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'q') {
-    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && window.toggleQuickAdd) {
+    if (!isTypingTarget(e.target) && window.toggleQuickAdd) {
       e.preventDefault();
       window.toggleQuickAdd();
       return;
@@ -17693,7 +17722,11 @@ function _windowKeydownHandler(e) {
   const isZ = e.key.toLowerCase() === 'z';
   const isY = e.key.toLowerCase() === 'y';
   const isMod = e.metaKey || e.ctrlKey;
-  
+
+  // The rich comment editor keeps its own history and has already acted on this
+  // press; the app's undo would rewind the week under the user's caret.
+  if (isMod && (isZ || isY) && isCommentEditorTarget(e.target)) return;
+
   if (isMod && isZ) {
     e.preventDefault();
     if (e.shiftKey) redo();
@@ -17707,7 +17740,7 @@ function _windowKeydownHandler(e) {
   }
 
   if (currentView === 'agenda') {
-    const inputFocused = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+    const inputFocused = isTypingTarget(e.target);
     if (inputFocused || e.metaKey || e.ctrlKey) return;
 
     // Tab-switching: 0 = Overdue, 1–7 = Mon–Sun. Off the current week there is
@@ -17771,7 +17804,7 @@ function _windowKeydownHandler(e) {
 
   // Mindmap canvas hotkeys 1–8: toggle day filter
   if (currentView === 'mindmap' && !hoveredNodeId && !e.metaKey && !e.ctrlKey) {
-    const inputFocused = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+    const inputFocused = isTypingTarget(e.target);
     if (!inputFocused && e.key >= '0' && e.key <= '8') {
       if (e.key === '0' && !isCurrentWeekOpen()) return;   // no overdue off-week
       e.preventDefault();
@@ -19473,11 +19506,167 @@ const COMMENT_AUTOSAVE_MS = 800;
 let commentTargetId = null;
 let commentSnapshotTaken = false; // one undo step per dialog session, not per keystroke
 let commentSaveTimer = null;
+let commentSession = 0;      // bumped per open/close, so a late bundle never mounts into a stale dialog
+let commentTyped = false;    // a keystroke landed in the textarea this session — no swap after that
+let commentEditor = null;    // { pm, schema, view } while the rich editor is mounted
+
+// ─── Comment editor: lazy ProseMirror ─────────────────────────────────────────
+// ProseMirror is third-party code shipped as the one vendor bundle named by
+// COMMENT_EDITOR_BUNDLE. Everything that is ours — schema, text bridge, mount,
+// autosave hook — lives here; the bundle only re-exports the packages.
+const COMMENT_EDITOR_LOAD_MS = 10000;
+let commentEditorLoad = null; // memoised; cleared on failure so a later open retries
+
+// Resolves to the ProseMirror namespace ({ model, state, view, ... }) or
+// rejects. Same origin, SRI-pinned, and bounded by a deadline like every other
+// request the app makes.
+function loadCommentEditor() {
+  if (commentEditorLoad) return commentEditorLoad;
+  commentEditorLoad = new Promise((resolve, reject) => {
+    if (window.ZenitProseMirror) { resolve(window.ZenitProseMirror); return; }
+    const { src, integrity } = COMMENT_EDITOR_BUNDLE;
+    if (!src) { reject(new Error('comment editor bundle not built')); return; }
+    const script = document.createElement('script');
+    let timer = null;
+    const settle = (err) => {
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      if (!err && window.ZenitProseMirror) { resolve(window.ZenitProseMirror); return; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+      commentEditorLoad = null;
+      reject(err || new Error('comment editor bundle defined no namespace'));
+    };
+    script.onload = () => settle(null);
+    script.onerror = () => settle(new Error('comment editor bundle failed to load'));
+    timer = setTimeout(() => settle(new Error('comment editor bundle timed out')), COMMENT_EDITOR_LOAD_MS);
+    script.src = src;
+    script.integrity = integrity;
+    script.crossOrigin = 'anonymous';
+    script.async = true;
+    document.head.appendChild(script);
+  });
+  return commentEditorLoad;
+}
+
+// Plain text only for now: one paragraph per line, no marks. Takes the
+// namespace as a parameter so tests can hand in the real packages.
+function buildCommentSchema(pm) {
+  return new pm.model.Schema({
+    nodes: {
+      doc: { content: 'paragraph+' },
+      paragraph: { content: 'text*', parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
+      text: {},
+    },
+  });
+}
+
+// String → doc and back must be byte-identical for any string: every '\n'
+// is a paragraph boundary, and nothing else is touched — no trimming, no
+// collapsing of blank lines.
+function commentTextToDoc(schema, text) {
+  return schema.node('doc', null, (text || '').split('\n').map(line =>
+    schema.node('paragraph', null, line ? [schema.text(line)] : [])));
+}
+
+function commentFragmentToText(fragment) {
+  return fragment.textBetween(0, fragment.size, '\n');
+}
+
+function commentDocToText(doc) {
+  return commentFragmentToText(doc.content);
+}
+
+// Pasted plain text, open on both sides so its first and last lines join the
+// paragraphs around the caret — what a textarea paste does.
+function commentTextSlice(pm, schema, text) {
+  return new pm.model.Slice(commentTextToDoc(schema, text.replace(/\r\n?/g, '\n')).content, 1, 1);
+}
+
+function getCommentText() {
+  return commentEditor
+    ? commentDocToText(commentEditor.view.state.doc)
+    : document.getElementById('comment-textarea').value;
+}
+
+function isCommentEditorTarget(el) {
+  return !!commentEditor && !!el && commentEditor.view.dom.contains(el);
+}
+
+function commentEditorPlugins(pm) {
+  const { undo, redo } = pm.history;
+  return [
+    // Also answers beforeinput historyUndo / historyRedo (phone undo keys,
+    // shake and three-finger gestures), not just the key bindings below.
+    pm.history.history(),
+    pm.keymap.keymap({
+      'Mod-z': undo,
+      'Shift-Mod-z': redo,
+      'Mod-y': redo,
+      'Shift-Enter': pm.commands.splitBlock,
+    }),
+    // Esc belongs to the app (it closes the dialog), not to node selection.
+    pm.keymap.keymap(Object.fromEntries(Object.entries(pm.commands.baseKeymap).filter(([k]) => k !== 'Escape'))),
+  ];
+}
+
+function mountCommentEditor(pm) {
+  const ta = document.getElementById('comment-textarea');
+  let view;
+  try {
+    const schema = buildCommentSchema(pm);
+    const doc = commentTextToDoc(schema, ta.value);
+    const host = document.createElement('div');
+    host.id = 'comment-editor';
+    view = new pm.view.EditorView({ mount: host }, {
+      state: pm.state.EditorState.create({
+        doc,
+        selection: pm.state.Selection.atEnd(doc),
+        plugins: commentEditorPlugins(pm),
+      }),
+      attributes: { spellcheck: 'true', role: 'textbox', 'aria-multiline': 'true', 'aria-labelledby': 'comment-title' },
+      dispatchTransaction(tr) {
+        view.updateState(view.state.apply(tr));
+        if (tr.docChanged) {
+          updateCommentCounter();
+          scheduleCommentAutosave();
+        }
+      },
+      clipboardTextSerializer: slice => commentFragmentToText(slice.content),
+      // Plain text only, exactly like the textarea; rich paste arrives with the
+      // rich schema.
+      handlePaste(v, event) {
+        const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+        if (!text) return true;
+        v.dispatch(v.state.tr.replaceSelection(commentTextSlice(pm, schema, text)).scrollIntoView());
+        return true;
+      },
+    });
+    const hadFocus = document.activeElement === ta;
+    ta.parentNode.insertBefore(host, ta);
+    ta.hidden = true;
+    commentEditor = { pm, schema, view };
+    if (hadFocus) view.focus();
+  } catch (err) {
+    // Never block a comment: whatever went wrong, the textarea stays.
+    if (view) { view.destroy(); view.dom.remove(); }
+    ta.hidden = false;
+    commentEditor = null;
+    console.warn('[comments] rich editor unavailable:', err);
+  }
+}
+
+function unmountCommentEditor() {
+  if (!commentEditor) return;
+  const { view } = commentEditor;
+  commentEditor = null;
+  view.destroy();
+  view.dom.remove();
+  document.getElementById('comment-textarea').hidden = false;
+}
 
 function updateCommentCounter() {
-  const ta = document.getElementById('comment-textarea');
   const counter = document.getElementById('comment-counter');
-  const len = ta.value.length;
+  const len = getCommentText().length;
   counter.textContent = `${len} / ${COMMENT_SOFT_LIMIT}`;
   counter.classList.toggle('over', len > COMMENT_SOFT_LIMIT);
 }
@@ -19488,12 +19677,22 @@ function openCommentDialog(nodeId) {
   commentTargetId = nodeId;
   commentSnapshotTaken = false;
   document.getElementById('comment-title').textContent = nodeDisplayLabel(node);
+  unmountCommentEditor();
+  const session = ++commentSession;
+  commentTyped = false;
   const ta = document.getElementById('comment-textarea');
   ta.value = node.comments || '';
   updateCommentCounter();
   document.getElementById('comment-overlay').classList.add('visible');
   document.getElementById('comment-panel').classList.add('visible');
   ta.focus();
+  // The textarea is usable at once; the rich editor replaces it only once its
+  // bundle is ready and nothing has been typed, so no keystroke is ever lost to
+  // the swap. A bundle that never arrives simply leaves the textarea in place.
+  return loadCommentEditor().then(pm => {
+    if (session !== commentSession || !commentTargetId || commentTyped) return;
+    mountCommentEditor(pm);
+  }, () => {});
 }
 
 // Decide what a Comment-dialog close should persist.
@@ -19518,7 +19717,7 @@ function persistCommentDraft() {
   if (!id) return;
   const node = findNode(id);
   if (!node) return;
-  const write = planCommentWrite(node, document.getElementById('comment-textarea').value);
+  const write = planCommentWrite(node, getCommentText());
   if (write === null) return; // unchanged — no snapshot, no _ts bump, no save
 
   const hadComment = !!node.comments;
@@ -19547,6 +19746,8 @@ function closeCommentDialog() {
   document.getElementById('comment-overlay').classList.remove('visible');
   document.getElementById('comment-panel').classList.remove('visible');
   persistCommentDraft();
+  unmountCommentEditor();
+  commentSession++;
   commentTargetId = null;
 }
 window.closeCommentDialog = closeCommentDialog;
@@ -24614,10 +24815,14 @@ window.addEventListener('load', async () => {
   document.getElementById('comment-overlay').addEventListener('click', () => closeCommentDialog());
   const commentCloseMobile = document.getElementById('comment-close-mobile');
   if (commentCloseMobile) commentCloseMobile.addEventListener('click', () => closeCommentDialog());
-  document.getElementById('comment-textarea').addEventListener('input', () => {
+  const commentTextarea = document.getElementById('comment-textarea');
+  commentTextarea.addEventListener('input', () => {
+    commentTyped = true;
     updateCommentCounter();
     scheduleCommentAutosave();
   });
+  // An IME can hold a composition before any input event fires.
+  commentTextarea.addEventListener('compositionstart', () => { commentTyped = true; });
 
   // Agenda overlay click to close
   const agendaOverlay = document.getElementById('agenda-overlay');

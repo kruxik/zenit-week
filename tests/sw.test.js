@@ -1196,6 +1196,26 @@ describe('sw.js — tunnel interstitial', () => {
     }
   });
 
+  it('refetches the editor bundle with the opt-out, since a <script> cannot send it', async () => {
+    const w = loadWorker();
+    const ev = navEvent(`${ORIGIN}/vendor/editor.0123456789abcdef.js`);
+    ev.request.mode = 'cors';
+    w.listeners.fetch(ev);
+    expect(ev.responses).toHaveLength(1);
+    await ev.responses[0];
+    expect(w.fetches[0].input).toBe('/vendor/editor.0123456789abcdef.js');
+    expect(w.fetches[0].init.headers).toEqual({ 'ngrok-skip-browser-warning': '1' });
+  });
+
+  it('claims only the hashed bundle shape on its own origin', () => {
+    const w = loadWorker();
+    for (const path of ['/vendor/editor-entry.js', '/vendor/editor.js', '/vendor/editor.XYZ.js', '/vendor/other.0123456789abcdef.js']) {
+      expect(w.ctx.isVendorBundle(new URL(path, ORIGIN))).toBe(false);
+    }
+    expect(w.ctx.isVendorBundle(new URL('https://evil.example/vendor/editor.0123456789abcdef.js'))).toBe(false);
+    expect(w.ctx.isVendorBundle(new URL('/vendor/editor.0123456789abcdef.js', ORIGIN))).toBe(true);
+  });
+
   it('still refuses to cache an interstitial that answers its own fetch', async () => {
     const interstitial = makeResponse({ etag: null, extraHeaders: { 'ngrok-error-code': 'ERR_NGROK_6024' } });
     const w = loadWorker({ fetchImpl: () => Promise.resolve(interstitial) });

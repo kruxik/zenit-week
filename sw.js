@@ -84,6 +84,26 @@ function isAppDocument(url) {
   return url.origin === self.location.origin && APP_PATH.test(url.pathname);
 }
 
+// The comment editor's vendor bundle — content-hashed, so the name is the
+// identity. Matched on the exact shape scripts/build-editor.mjs writes, never on
+// the directory alone.
+const VENDOR_BUNDLE_PATH = /^\/vendor\/editor\.[0-9a-f]{16}\.js$/;
+
+function isVendorBundle(url) {
+  return url.origin === self.location.origin && VENDOR_BUNDLE_PATH.test(url.pathname);
+}
+
+// A <script> tag cannot carry OWN_FETCH_HEADERS, so behind a free-tier tunnel the
+// browser's own request for the bundle is answered with the interstitial and
+// the page's SRI check blocks it. Refetching it here adds the opt-out. Nothing
+// is trusted on the worker's word: the page still checks SRI on these bytes.
+function vendorResponse(url) {
+  return fetch(url.pathname, {
+    headers: OWN_FETCH_HEADERS,
+    signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS),
+  });
+}
+
 function isManifestIcon(url) {
   return url.origin === self.location.origin && ICON_PATHS.includes(url.pathname);
 }
@@ -395,6 +415,10 @@ self.addEventListener('fetch', event => {
   }
   if (isAvatarPhoto(url)) {
     event.respondWith(cachedAvatar(event, url.href));
+    return;
+  }
+  if (isVendorBundle(url)) {
+    event.respondWith(vendorResponse(url));
     return;
   }
   if (req.mode !== 'navigate') return;

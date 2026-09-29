@@ -418,6 +418,8 @@ _state.setTipsSeen = function(seen) {
 };
 _state.getDocument = function() { return document; };
 _state.getCurrentView = function() { return currentView; };
+_state.resetCommentEditorLoad = function() { commentEditorLoad = null; };
+_state.getCommentEditor = function() { return commentEditor; };
 _state.setCurrentView = function(v) { currentView = v; };
 _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
@@ -807,6 +809,15 @@ export const {
   redo,
   // Node comments
   planCommentWrite,
+  openCommentDialog,
+  closeCommentDialog,
+  persistCommentDraft,
+  loadCommentEditor,
+  buildCommentSchema,
+  commentTextToDoc,
+  commentDocToText,
+  commentTextSlice,
+  isTypingTarget,
   // UI & Action Logic
   showContextMenu,
   hideContextMenu,
