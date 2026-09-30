@@ -3284,10 +3284,13 @@
   /* Not a scroll region — the textarea fills the panel, so the top offset clears
      the floating header and the toolbar above it instead of scrolling under. */
   #comment-body {
+    /* The bottom inset, named once: the body's own padding and the floating
+       footer's offset must stay equal, per breakpoint and keyboard state. */
+    --comment-pad-bottom: 24px;
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: calc(var(--toolbar-h) + var(--panel-header-h) + 16px) 24px 24px;
+    padding: calc(var(--toolbar-h) + var(--panel-header-h) + 16px) 24px var(--comment-pad-bottom);
     min-height: 0;
   }
   #comment-textarea {
@@ -3375,16 +3378,29 @@
   #comment-editor strong { font-weight: 700; }
   #comment-editor a { color: var(--accent-primary); text-decoration: underline; }
   #comment-body { position: relative; }
-  /* Formatting bar: the bottom-right corner of the comment footer, under the
-     counter. Always there on desktop; on a phone only while the keyboard is up
-     (see the phone rules), when there is text being written to format. */
+  /* The footer — counter, and the formatting bar under it — floats over the
+     text in the bottom-right corner instead of taking a row of its own, so
+     the text keeps the whole height. The text ends with room to spare
+     (COMMENT_FOOTER_ROOM below), so its last lines always scroll up clear of
+     the footer. Only the controls take taps; the gaps between them reach the
+     text. The formatting bar is always there on desktop; on a phone only while
+     the keyboard is up (see the phone rules). */
   #comment-footer {
+    position: absolute;
+    right: 24px;
+    bottom: var(--comment-pad-bottom);
+    z-index: 1;
     display: flex;
     flex-direction: column; /* counter on top, formatting bar under it */
     align-items: flex-end;
     gap: 6px;
-    margin-top: 8px;
-    flex-shrink: 0;
+    pointer-events: none;
+  }
+  #comment-footer > #comment-toolbar { pointer-events: auto; }
+  #comment-editor,
+  #comment-textarea {
+    padding-bottom: 88px; /* COMMENT_FOOTER_ROOM: counter + gap + a toolbar row, with air */
+    scroll-padding-bottom: 88px;
   }
   #comment-toolbar {
     display: flex;
@@ -3421,7 +3437,7 @@
   /* Desktop: the app's bottom bars float over the panel's lower edge, so the
      footer clears them — as .app-panel-content does for the other panels. */
   @media (min-width: 768px) {
-    #comment-body { padding-bottom: var(--stack-l1); }
+    #comment-body { --comment-pad-bottom: var(--stack-l1); }
   }
   #comment-toolbar .agenda-action-btn {
     min-width: 38px;
@@ -3449,11 +3465,17 @@
     border: none;
     margin: 0;
   }
+  /* Floats over text, so it wears the glass the buttons wear to stay legible. */
   #comment-counter {
     text-align: right;
     font-size: 11px;
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
   #comment-counter.over { color: var(--accent-danger); }
 
@@ -3471,7 +3493,7 @@
     #comment-toolbar { display: none; }
     #comment-panel.keyboard-open #comment-toolbar { display: flex; }
     #comment-panel.keyboard-open { transition: opacity 0.3s ease; }
-    #comment-panel.keyboard-open #comment-body { padding-bottom: 8px; }
+    #comment-panel.keyboard-open #comment-body { --comment-pad-bottom: 8px; }
     #comment-panel.keyboard-open #comment-editor,
     #comment-panel.keyboard-open #comment-textarea {
       overscroll-behavior: contain;
