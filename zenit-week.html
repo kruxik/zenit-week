@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-IgRRtK25cyhW6Kte8Ine/hbdmToY97phd0lvKVH4sQk='
+               'sha256-Yw1uhjQwlnnLsxYs/amuRn7RQVQi/jbvuzq9BsKfcCY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -20083,6 +20083,33 @@ function pastedListItemContent(li) {
   return li.querySelector(':scope > p') || li;
 }
 
+// Pasted text at or above this size reads as a heading: Google Docs' Title is
+// 26pt and Heading 1 20pt, while body text is 11pt and Subtitle 15pt.
+const PASTED_HEADING_MIN_PT = 16;
+
+function cssFontSizeInPt(value) {
+  const m = /^([\d.]+)(pt|px)$/.exec((value || '').trim());
+  if (!m) return null;
+  return m[2] === 'pt' ? parseFloat(m[1]) : parseFloat(m[1]) * 0.75;
+}
+
+// True when every visible character of the paragraph sits in an inline style
+// of a large font size. Inline styles only — that is all a clipboard carries.
+function isLargeTextParagraph(p) {
+  const walker = p.ownerDocument.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+  let seen = false;
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    if (!t.nodeValue.trim()) continue;
+    seen = true;
+    let size = null;
+    for (let el = t.parentElement; el && !size; el = el === p ? null : el.parentElement) {
+      size = cssFontSizeInPt(el.style && el.style.fontSize);
+    }
+    if (!size || size < PASTED_HEADING_MIN_PT) return false;
+  }
+  return seen;
+}
+
 // An <ol> item's number: the list's start plus its place among its siblings.
 function pastedListItemNumber(li) {
   const list = li.parentElement;
@@ -20111,10 +20138,15 @@ function buildCommentSchema(pm) {
     nodes: {
       doc: { content: 'block+' },
       paragraph: { ...text, parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
-      // Pasted headings of any level (Google Docs, Word, web pages) are ours.
+      // Pasted headings of any level (Google Docs, Word, web pages) are ours —
+      // and so is a paragraph set wholly in a large font, which is how Google
+      // Docs copies its Title style (no heading tag at all).
       heading: {
         ...text,
-        parseDOM: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].map(tag => ({ tag })),
+        parseDOM: [
+          ...['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].map(tag => ({ tag })),
+          { tag: 'p', priority: 60, getAttrs: dom => (isLargeTextParagraph(dom) ? null : false) },
+        ],
         toDOM: () => ['h3', { class: 'cm-heading' }, 0],
       },
       bullet: {
@@ -20738,7 +20770,12 @@ function mountCommentEditor(pm) {
           const end = $from.before() + slice.content.size - 1;
           tr.setSelection(pm.state.TextSelection.create(tr.doc, end));
         } else {
-          tr = v.state.tr.replaceSelection(slice);
+          // Mid-line, a paste that starts with a heading, a list item or a
+          // checkbox arrives as that block, not merged into the line — the
+          // line is split around it. Pasted plain text still joins the line.
+          const first = slice.content.firstChild;
+          const keepFirst = first && first.isBlock && first.type.name !== 'paragraph';
+          tr = v.state.tr.replaceSelection(keepFirst ? new pm.model.Slice(slice.content, 0, slice.openEnd) : slice);
         }
         v.dispatch(tr.scrollIntoView());
         return true;

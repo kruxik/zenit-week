@@ -836,6 +836,7 @@ export const {
   reloadApp,
   reloadAppFresh,
   refreshOpenComment,
+  cssFontSizeInPt,
   commentToolbarState,
   isTypingTarget,
   tokenizeComment,

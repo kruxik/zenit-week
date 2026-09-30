@@ -10,7 +10,7 @@ import {
   buildCommentSchema, commentTextToDoc, commentDocToText, commentTextSlice, isTypingTarget,
   toggleCommentCheck, commentEnterCommand, commentLiftAtStart, commentToggleAtCaret, commentInputRuleList,
   commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor, commentEditorText, commentViewportBox, shouldPinPanelCaption,
-  takeSnapshot, refreshOpenComment,
+  takeSnapshot, refreshOpenComment, cssFontSizeInPt,
 } from './setup.js';
 
 // The real packages, injected exactly as the page injects the bundle's namespace.
@@ -641,5 +641,16 @@ describe('comment open on two devices', () => {
     ta().value = 'old';
     closeCommentDialog();
     expect(findNode('a1')._ts).toBe(5);
+  });
+});
+
+describe('pasted large text reads as a heading', () => {
+  it('reads inline font sizes in pt and px', () => {
+    expect(cssFontSizeInPt('26pt')).toBe(26);
+    expect(cssFontSizeInPt(' 20pt ')).toBe(20);
+    expect(cssFontSizeInPt('32px')).toBe(24);
+    expect(cssFontSizeInPt('1.5em')).toBe(null);
+    expect(cssFontSizeInPt('')).toBe(null);
+    expect(cssFontSizeInPt(undefined)).toBe(null);
   });
 });
