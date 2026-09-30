@@ -322,7 +322,9 @@ describe('rich inline — paste allow-list', () => {
 
   it('parse rules name only the grammar\'s own elements', () => {
     const tags = allRules().filter(r => r.tag).map(r => r.tag.split(/[.[]/)[0]);
-    expect([...new Set(tags)].sort()).toEqual(['a', 'b', 'div', 'em', 'h3', 'i', 'p', 'strong']);
+    expect([...new Set(tags)].sort()).toEqual([
+      'a', 'b', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'i', 'li', 'ol > li', 'p', 'strong', 'ul > li',
+    ]);
     for (const bad of ['script', 'img', 'iframe', 'style', 'object', 'svg', 'form', 'input']) {
       expect(tags).not.toContain(bad);
     }

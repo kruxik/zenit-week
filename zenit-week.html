@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-tunYp7GzBBlse30vJYRsNSg1iN+Uu6XgOjsZsGROL20='
+               'sha256-zkxut4FWN7vupEcfxq+nUj5xrG4JnhWgCnANC5oCLF8='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -20000,6 +20000,25 @@ function scheduleCommentEditorPrefetch() {
   else setTimeout(run, 3000);
 }
 
+// Pasted list items. Most word processors wrap the item's text in a <p>
+// inside the <li>; our items are single textblocks, so the text is read from
+// that paragraph when there is one. Nested lists come out flat — the grammar
+// has one level.
+function pastedListItemContent(li) {
+  return li.querySelector(':scope > p') || li;
+}
+
+// An <ol> item's number: the list's start plus its place among its siblings.
+function pastedListItemNumber(li) {
+  const list = li.parentElement;
+  const start = parseInt(list && list.getAttribute('start'), 10) || 1;
+  let index = 0;
+  for (let el = li.previousElementSibling; el; el = el.previousElementSibling) {
+    if (el.tagName === 'LI') index++;
+  }
+  return String(start + index);
+}
+
 // One node per line of the comment grammar: paragraph, heading, bullet and
 // check are all flat textblocks, exactly as tokenizeComment() reads the string —
 // the document is the grammar's block list, never a nested list tree. Takes the
@@ -20017,12 +20036,17 @@ function buildCommentSchema(pm) {
     nodes: {
       doc: { content: 'block+' },
       paragraph: { ...text, parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
-      heading: { ...text, parseDOM: [{ tag: 'h3.cm-heading' }], toDOM: () => ['h3', { class: 'cm-heading' }, 0] },
+      // Pasted headings of any level (Google Docs, Word, web pages) are ours.
+      heading: {
+        ...text,
+        parseDOM: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].map(tag => ({ tag })),
+        toDOM: () => ['h3', { class: 'cm-heading' }, 0],
+      },
       bullet: {
         ...text,
         // `-` or `*` — both are bullets; the attribute only keeps the spelling.
         attrs: { bullet: { default: '-' } },
-        parseDOM: [{ tag: 'div.cm-bullet' }],
+        parseDOM: [{ tag: 'div.cm-bullet' }, { tag: 'ul > li', contentElement: pastedListItemContent }],
         toDOM: () => ['div', { class: 'cm-bullet' }, 0],
       },
       // Shows the number of its place in the run, counted from the first item's
@@ -20030,7 +20054,10 @@ function buildCommentSchema(pm) {
       ordered: {
         ...text,
         attrs: { number: { default: '1' } },
-        parseDOM: [{ tag: 'div.cm-ordered', getAttrs: dom => ({ number: dom.getAttribute('data-number') || '1' }) }],
+        parseDOM: [
+          { tag: 'div.cm-ordered', getAttrs: dom => ({ number: dom.getAttribute('data-number') || '1' }) },
+          { tag: 'ol > li', contentElement: pastedListItemContent, getAttrs: dom => ({ number: pastedListItemNumber(dom) }) },
+        ],
         toDOM: node => ['div', {
           class: 'cm-ordered',
           'data-number': node.attrs.number,
@@ -20040,11 +20067,31 @@ function buildCommentSchema(pm) {
       check: {
         ...text,
         attrs: { checked: { default: false } },
-        parseDOM: [{
-          tag: 'div.cm-check',
-          contentElement: 'span.cm-check-text',
-          getAttrs: dom => ({ checked: dom.getAttribute('data-checked') === 'true' }),
-        }],
+        parseDOM: [
+          {
+            tag: 'div.cm-check',
+            contentElement: 'span.cm-check-text',
+            getAttrs: dom => ({ checked: dom.getAttribute('data-checked') === 'true' }),
+          },
+          // Google Docs marks a checklist item with the ARIA checkbox role; GitHub,
+          // Notion and most HTML task lists put a real checkbox in the item. Both
+          // outrank the plain `ul > li` bullet rule.
+          {
+            tag: 'li[role="checkbox"]',
+            priority: 60,
+            contentElement: pastedListItemContent,
+            getAttrs: dom => ({ checked: dom.getAttribute('aria-checked') === 'true' }),
+          },
+          {
+            tag: 'li',
+            priority: 60,
+            contentElement: pastedListItemContent,
+            getAttrs: dom => {
+              const box = dom.querySelector('input[type="checkbox"]');
+              return box && box.closest('li') === dom ? { checked: box.checked || box.hasAttribute('checked') } : false;
+            },
+          },
+        ],
         toDOM: node => ['div', { class: 'cm-check', 'data-checked': String(node.attrs.checked) },
           ['span', { class: 'cm-check-text' }, 0]],
       },
@@ -20188,6 +20235,24 @@ function commentTextSlice(pm, schema, text) {
 // _ts bump that wins the Drive merge, and a save nobody asked for.
 function commentEditorText(editor) {
   return editor.dirty ? commentDocToText(editor.view.state.doc) : editor.source;
+}
+
+// Pasted HTML → a slice, through the schema's parse rules only. The markup is
+// parsed into an inert document — no script runs and no image loads there —
+// and anything the rules do not name is dropped.
+function commentHtmlSlice(pm, schema, html) {
+  const doc = new window.DOMParser().parseFromString(html, 'text/html');
+  // Google Docs wraps the whole paste in one inline <b>, so the line breaks
+  // between its blocks read as inline text — a blank-looking paragraph of one
+  // space after every heading and list. Source-formatting whitespace (it holds
+  // a line break) is dropped; a real space between two words never does.
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const layout = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (/^\s*\n\s*$/.test(n.nodeValue) && !n.parentElement.closest('pre')) layout.push(n);
+  }
+  layout.forEach(n => n.remove());
+  return pm.model.DOMParser.fromSchema(schema).parseSlice(doc.body);
 }
 
 function getCommentText() {
@@ -20579,20 +20644,21 @@ function mountCommentEditor(pm) {
         }
       },
       clipboardTextSerializer: slice => commentFragmentToText(slice.content),
-      // HTML goes through the schema's parse rules (the allow-list) — ProseMirror's
-      // own paste path. Plain text goes through the comment grammar, so pasted
-      // Markdown arrives formatted.
+      // HTML goes through the schema's parse rules (the allow-list); plain text
+      // goes through the comment grammar, so pasted Markdown arrives formatted.
+      // Both land the same way.
       handlePaste(v, event) {
         const data = event.clipboardData;
-        if (!data || data.getData('text/html')) return false;
+        if (!data) return false;
+        const html = data.getData('text/html');
         const text = data.getData('text/plain');
-        if (!text) return true;
-        const slice = commentTextSlice(pm, schema, text);
+        if (!html && !text) return true;
+        const slice = html ? commentHtmlSlice(pm, schema, html) : commentTextSlice(pm, schema, text);
         const { $from, empty } = v.state.selection;
         let tr;
         if (empty && $from.parent.type.name === 'paragraph' && $from.parent.content.size === 0) {
           // On an empty line the pasted lines keep their own block types — a
-          // pasted checklist stays a checklist instead of joining the paragraph.
+          // pasted heading or checklist stays one instead of joining the line.
           tr = v.state.tr.replaceWith($from.before(), $from.after(), slice.content);
           const end = $from.before() + slice.content.size - 1;
           tr.setSelection(pm.state.TextSelection.create(tr.doc, end));
