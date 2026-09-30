@@ -39,7 +39,7 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 ### ⛔ CHECKPOINT 1 — phone go/no-go on ProseMirror
 
 - [x] Android (Gboard): autocorrect replacing words, swipe typing, Czech diacritics (`ěščřžýáíé`), keyboard undo key.
-- [ ] iOS Safari: dictation, autocorrect, shake-to-undo, three-finger undo swipe.
+- [x] iOS Safari: dictation, autocorrect, shake-to-undo, three-finger undo swipe. (2026-09-30, on the final build)
 - [ ] No caret jumps, no dropped or doubled characters in a 2-minute typing session on each.
 - [x] Decision recorded here: continue with ProseMirror, or switch to the hand-built fallback.
   - 2026-09-29: **continue with ProseMirror.** Android passed on a real phone. iOS Safari not yet tested — carried to Checkpoint 2.
@@ -131,5 +131,5 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ### ⛔ CHECKPOINT 3 — ship
 
-- [ ] All AC met; phone pass repeated on the final build.
+- [x] All AC met; phone pass repeated on the final build. (Android + iOS, 2026-09-30)
 - [ ] Review with human before the release.
