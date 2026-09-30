@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-hmDM/IpKvbcpLRietED473oNyJiukEXDht/Oc9Vf0Gs='
+               'sha256-IgRRtK25cyhW6Kte8Ine/hbdmToY97phd0lvKVH4sQk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9207,6 +9207,7 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
     const changed = _weekContentSig(weekData) !== _weekContentSig(mergedData);
     weekData = mergedData;
     rebuildNodeMap();
+    refreshOpenComment();
     // Refresh BRANCH_CONFIG from the merged node.side — computeLayout reads a
     // branch's left/right side from BRANCH_CONFIG, not the node, so a remote
     // side change (branch dragged across the centerline on another device)
@@ -20013,6 +20014,7 @@ let commentSnapshotTaken = false; // one undo step per dialog session, not per k
 let commentSaveTimer = null;
 let commentSession = 0;      // bumped per open/close, so a late bundle never mounts into a stale dialog
 let commentTyped = false;    // a keystroke landed in the textarea this session — no swap after that
+let commentBaseline = '';    // the stored text this dialog last agreed with (at open, after a save, after a sync)
 let commentEditor = null;    // { pm, schema, view } while the rich editor is mounted
 
 // ─── Comment editor: lazy ProseMirror ─────────────────────────────────────────
@@ -20785,8 +20787,9 @@ function openCommentDialog(nodeId) {
   unmountCommentEditor();
   const session = ++commentSession;
   commentTyped = false;
+  commentBaseline = node.comments || '';
   const ta = document.getElementById('comment-textarea');
-  ta.value = node.comments || '';
+  ta.value = commentBaseline;
   updateCommentCounter();
   document.getElementById('comment-overlay').classList.add('visible');
   document.getElementById('comment-panel').classList.add('visible');
@@ -20828,8 +20831,15 @@ function persistCommentDraft() {
   if (!id) return;
   const node = findNode(id);
   if (!node) return;
-  const write = planCommentWrite(node, getCommentText());
+  // Only the user's own edits are written. A dialog nobody typed in must never
+  // write — sync may have stored a newer version since it opened, and writing
+  // the text on screen back would stamp the stale copy newer and win the merge.
+  if (!isCommentSessionDirty()) return;
+  const text = getCommentText();
+  if (text === commentBaseline) return; // edited, then back to what was stored
+  const write = planCommentWrite(node, text);
   if (write === null) return; // unchanged — no snapshot, no _ts bump, no save
+  commentBaseline = text;
 
   const hadComment = !!node.comments;
   const hadBadge = hadComment ? mapCommentBadgeText(node.comments) : null;
@@ -20964,6 +20974,34 @@ function setCommentViewportFit(on) {
   panel.classList.remove('keyboard-open');
   resetPanelCaption(panel);
   panel.style.top = panel.style.height = panel.style.bottom = '';
+}
+
+function isCommentSessionDirty() {
+  return commentTyped || !!(commentEditor && commentEditor.dirty);
+}
+
+// An open comment nobody has typed in follows the stored one: when a newer
+// version arrives — synced from another device or another tab — the text on
+// screen becomes it. Once the user has changed anything in this session,
+// their text stands, and the newer save wins as for any other edit.
+function refreshOpenComment() {
+  if (!commentTargetId || isCommentSessionDirty()) return;
+  const node = findNode(commentTargetId);
+  if (!node) return;
+  const stored = node.comments || '';
+  if (stored === commentBaseline) return;
+  commentBaseline = stored;
+  if (commentEditor) {
+    const { pm, schema, view } = commentEditor;
+    const doc = commentTextToDoc(schema, stored);
+    // A fresh state, not a transaction: not an edit, not an undo step.
+    view.updateState(pm.state.EditorState.create({ doc, plugins: view.state.plugins }));
+    commentEditor.source = stored;
+    commentEditor.toolbar.sync(view.state);
+  } else {
+    document.getElementById('comment-textarea').value = stored;
+  }
+  updateCommentCounter();
 }
 
 function scheduleCommentAutosave() {

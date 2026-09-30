@@ -10,7 +10,7 @@ import {
   buildCommentSchema, commentTextToDoc, commentDocToText, commentTextSlice, isTypingTarget,
   toggleCommentCheck, commentEnterCommand, commentLiftAtStart, commentToggleAtCaret, commentInputRuleList,
   commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor, commentEditorText, commentViewportBox, shouldPinPanelCaption,
-  takeSnapshot,
+  takeSnapshot, refreshOpenComment,
 } from './setup.js';
 
 // The real packages, injected exactly as the page injects the bundle's namespace.
@@ -150,6 +150,7 @@ describe('loadCommentEditor', () => {
     expect(ta.hidden).not.toBe(true);
     expect(ta.value).toBe('note');
     ta.value = 'note edited';
+    _state.setCommentTyped(true); // what the textarea's input event does
     persistCommentDraft();
     expect(findNode('a1').comments).toBe('note edited');
     closeCommentDialog();
@@ -590,5 +591,55 @@ describe('numbered lists', () => {
     const on = run(at('milk', 2), commentBlockToggle(schema, 'ordered'));
     expect(commentDocToText(on.doc)).toBe('1. milk');
     expect(commentDocToText(run(on, commentBlockToggle(schema, 'ordered')).doc)).toBe('milk');
+  });
+});
+
+describe('comment open on two devices', () => {
+  const tree = (comments, ts) => _state.set({ nodes: [
+    { id: 'work', type: 'branch', branch: 'work', label: 'Work', children: ['a1'], side: 'left', _ts: 0 },
+    { id: 'a1', type: 'activity', branch: 'work', parent: 'work', label: 'Task', children: [], comments, _ts: ts },
+  ] });
+  const ta = () => sandboxGlobal.document.getElementById('comment-textarea');
+
+  it('an untouched dialog never writes its stale text over a newer synced one', () => {
+    tree('old', 5);
+    openCommentDialog('a1').catch(() => {});
+    findNode('a1').comments = 'new from desktop'; // sync lands while the dialog is open
+    findNode('a1')._ts = 9;
+    persistCommentDraft();                          // autosave / page hidden
+    closeCommentDialog();
+    expect(findNode('a1').comments).toBe('new from desktop');
+    expect(findNode('a1')._ts).toBe(9);
+  });
+
+  it('an untouched dialog shows the newer version when it syncs in', () => {
+    tree('old', 5);
+    openCommentDialog('a1').catch(() => {});
+    findNode('a1').comments = 'new from desktop';
+    refreshOpenComment();
+    expect(ta().value).toBe('new from desktop');
+    closeCommentDialog();
+    expect(findNode('a1').comments).toBe('new from desktop');
+  });
+
+  it('once the user has typed, their text stands and is saved', () => {
+    tree('old', 5);
+    openCommentDialog('a1').catch(() => {});
+    _state.setCommentTyped(true);
+    ta().value = 'mine';
+    findNode('a1').comments = 'new from desktop';
+    refreshOpenComment();
+    expect(ta().value).toBe('mine');
+    closeCommentDialog();
+    expect(findNode('a1').comments).toBe('mine');
+  });
+
+  it('typing and then restoring the original text writes nothing', () => {
+    tree('old', 5);
+    openCommentDialog('a1').catch(() => {});
+    _state.setCommentTyped(true);
+    ta().value = 'old';
+    closeCommentDialog();
+    expect(findNode('a1')._ts).toBe(5);
   });
 });

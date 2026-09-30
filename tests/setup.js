@@ -420,6 +420,7 @@ _state.getDocument = function() { return document; };
 _state.getCurrentView = function() { return currentView; };
 _state.resetCommentEditorLoad = function() { commentEditorLoad = null; };
 _state.setReloadFresh = function(v) { _reloadFresh = v; };
+_state.setCommentTyped = function(v) { commentTyped = v; };
 _state.getRestoreKey = function() { return RESTORE_KEY; };
 _state.getCommentEditor = function() { return commentEditor; };
 _state.setCurrentView = function(v) { currentView = v; };
@@ -834,6 +835,7 @@ export const {
   saveViewStateOnLeave,
   reloadApp,
   reloadAppFresh,
+  refreshOpenComment,
   commentToolbarState,
   isTypingTarget,
   tokenizeComment,
