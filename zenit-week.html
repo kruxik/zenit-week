@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-BoBGTNAcgPVi11+CxWiqeJYdM6PrsCYDo5sPM/7U5Po='
+               'sha256-9ruAV47T4FAxXuH76Yr1mPBJjFjop5BwZUBGrwMduZo='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3781,8 +3781,26 @@
   .comment-badge {
     cursor: pointer;
   }
-  .comment-badge:hover {
-    opacity: 0.7;
+  /* The ring in the canvas colour lifts the pill off the node's border. */
+  /* Solid, not the Agenda's pale tint: on the canvas it has to read at the
+     fitted zoom, where a pastel pill disappears into a white node. */
+  .comment-badge-pill {
+    fill: var(--badge-comment-text);
+    stroke: var(--bg-canvas);
+    stroke-width: 2.5;
+  }
+  .comment-badge-icon {
+    color: var(--bg-canvas);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+  }
+  .comment-badge-text {
+    fill: var(--bg-canvas);
+    font-variant-numeric: tabular-nums;
+  }
+  .comment-badge:hover .comment-badge-pill {
+    filter: brightness(1.06);
   }
 
   /* Completion ring on the root node. The root's fill is dark in both themes, so
@@ -7460,6 +7478,58 @@ const CENTER_CLICK_SLOP_PX = 5;
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 
+// Comment badge on a map node: a solid pill pinned to the node's top-right
+// corner, in the Agenda badge's comment hue, with the checklist count when the
+// comment has one. It is drawn over the node rather than inside its box, so
+// it never widens the node or moves its label — the layout is the same with
+// or without a comment.
+const MAP_COMMENT_BADGE = { h: 36, icon: 22, pad: 9, gap: 4, font: 19 };
+
+function mapCommentBadgeText(comments) {
+  const checks = commentPreview(comments).checks;
+  return checks ? `${checks.done}/${checks.total}` : '';
+}
+
+function buildMapCommentBadge(node, boxW, boxH) {
+  const B = MAP_COMMENT_BADGE;
+  const label = mapCommentBadgeText(node.comments);
+  const textW = label ? measureText(label, B.font, '700') : 0;
+  const w = B.pad * 2 + B.icon + (label ? B.gap + textW : 0);
+  // Centred on the node's top-right corner: half the pill inside the node,
+  // half outside, so it reads as attached without hiding much of the label.
+  const x = boxW / 2 - w / 2;
+  const y = -boxH / 2 - B.h / 2;
+  const g = svgEl('g', { class: 'comment-badge', 'data-id': node.id });
+  const title = svgEl('title');
+  title.textContent = t('menu.comment');
+  g.appendChild(title);
+  // Generous transparent hit area: the pill alone is a small finger target.
+  g.appendChild(svgEl('rect', { x: x - 6, y: y - 6, width: w + 12, height: B.h + 12, fill: 'transparent' }));
+  g.appendChild(svgEl('rect', {
+    class: 'comment-badge-pill',
+    x, y, width: w, height: B.h, rx: B.h / 2,
+  }));
+  g.appendChild(svgEl('use', {
+    href: '#icon-message',
+    width: B.icon, height: B.icon,
+    x: x + B.pad, y: y + (B.h - B.icon) / 2,
+    class: 'comment-badge-icon',
+    'pointer-events': 'none',
+  }));
+  if (label) {
+    const text = svgEl('text', {
+      x: x + B.pad + B.icon + B.gap, y: y + B.h / 2,
+      'dominant-baseline': 'central',
+      'font-size': B.font, 'font-weight': '700',
+      class: 'comment-badge-text',
+      'pointer-events': 'none',
+    });
+    text.textContent = label;
+    g.appendChild(text);
+  }
+  return g;
+}
+
 // Per-process cache for canvas text measurements. getNodeSize / makeNodeGroup
 // call measureText many times per render (once per label line, sometimes
 // repeatedly for the same label as layout traverses), and ctx.measureText is
@@ -7870,7 +7940,6 @@ function _computeNodeSize(nodeId) {
         if (node.priority === 'high' || node.priority === 'critical') lineW += nodeBadgeSize + nodeBadgeGap;
         if (node.unplanned) lineW += nodeBadgeSize + nodeBadgeGap;
         if (node.reusable) lineW += nodeBadgeSize + nodeBadgeGap;
-        if (node.comments) lineW += nodeBadgeSize + nodeBadgeGap;
         if (node.dropped) lineW += nodeBadgeSize + nodeBadgeGap;
       }
       return Math.max(max, lineW);
@@ -14087,7 +14156,6 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   // Text
   // Captured before the loop: `t` is shadowed by the <text> element inside it.
-  const commentIconTitle = t('menu.comment');
   // The root paints its own interior above (avatar over initials, or the
   // signed-out wording), layered so a failed photo reveals what is under it.
   // Running the generic label pass too would put text on top of the photo.
@@ -14108,17 +14176,15 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       && (node.priority === 'high' || node.priority === 'critical');
     const hasUnplannedIcon = node && (isActivity || isBranch) && i === 0 && node.unplanned;
     const hasReusableIcon  = node && isActivity && i === 0 && node.reusable;
-    const hasCommentIcon   = node && isActivity && i === 0 && !!node.comments;
     const hasDroppedIcon   = node && (isActivity || isBranch) && i === 0 && node.dropped;
 
-    if (hasPriorityIcon || hasUnplannedIcon || hasReusableIcon || hasCommentIcon || hasDroppedIcon) {
+    if (hasPriorityIcon || hasUnplannedIcon || hasReusableIcon || hasDroppedIcon) {
       const textOnlyW = measureText(line, fontSize, fontWeight);
       const leftW  = hasPriorityIcon ? badgeSize + badgeGap : 0;
       const rightW = (hasUnplannedIcon ? badgeGap + badgeSize : 0)
                    + (hasReusableIcon  ? badgeGap + badgeSize : 0)
-                   + (hasCommentIcon   ? badgeGap + badgeSize : 0)
                    + (hasDroppedIcon   ? badgeGap + badgeSize : 0);
-      // Center [priorityIcon?][text][boltIcon?][repeatIcon?][commentIcon?][banIcon?] around x=0
+      // Center [priorityIcon?][text][boltIcon?][repeatIcon?][banIcon?] around x=0
       const textX = (leftW - rightW) / 2;
       t.setAttribute('x', textX);
 
@@ -14156,32 +14222,6 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
         rightCursor += badgeSize + badgeGap;
       }
 
-      if (hasCommentIcon) {
-        // Clickable presence indicator — opens the comment dialog (same as agenda).
-        const iconY = textY - badgeSize / 2 - fontSize * 0.35;
-        const pad = 5;
-        const cmtG = svgEl('g', { class: 'comment-badge', 'data-id': id });
-        const cmtTitle = svgEl('title');
-        cmtTitle.textContent = commentIconTitle;
-        cmtG.appendChild(cmtTitle);
-        // Transparent hit area — the icon itself is stroke-only and hard to hit.
-        cmtG.appendChild(svgEl('rect', {
-          x: rightCursor - pad, y: iconY - pad,
-          width: badgeSize + pad * 2, height: badgeSize + pad * 2,
-          rx: 4, fill: 'transparent',
-        }));
-        cmtG.appendChild(svgEl('use', {
-          href: '#icon-message',
-          width: badgeSize, height: badgeSize,
-          x: rightCursor,
-          y: iconY,
-          style: `color:${textColor};fill:none;stroke:currentColor`,
-          'pointer-events': 'none',
-        }));
-        g.appendChild(cmtG);
-        rightCursor += badgeSize + badgeGap;
-      }
-
       if (hasDroppedIcon) {
         // Survives greyscale, colour-blindness and the zoomed-out Rocks view,
         // where the diagonal alone gets thin.
@@ -14200,6 +14240,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     }
     g.appendChild(t);
   });
+
+  if (node && isActivity && node.comments) g.appendChild(buildMapCommentBadge(node, boxW, boxH));
 
   // Counter buttons
   if (type === 'counter') {
@@ -20404,6 +20446,7 @@ function persistCommentDraft() {
   if (write === null) return; // unchanged — no snapshot, no _ts bump, no save
 
   const hadComment = !!node.comments;
+  const hadBadge = hadComment ? mapCommentBadgeText(node.comments) : null;
   if (!commentSnapshotTaken) {
     takeSnapshot();           // capture pre-edit state for undo
     commentSnapshotTaken = true;
@@ -20413,10 +20456,11 @@ function persistCommentDraft() {
   touchNode(id);              // bump _ts for Drive LWW merge
   saveWeek(currentWeekKey, weekData);
 
-  // Presence toggle adds/removes the indicator icon (and shifts text centering),
-  // which updateNodeUI can't do surgically — a full render is required then.
+  // The map badge appears, disappears or changes its checklist count — none of
+  // which updateNodeUI can do surgically, so those take a full render.
+  const badge = write ? mapCommentBadgeText(write) : null;
   if (currentView === 'agenda') renderAgenda();
-  else if (hadComment !== !!write) render();
+  else if (hadBadge !== badge) render();
   else updateNodeUI(id);
 }
 
