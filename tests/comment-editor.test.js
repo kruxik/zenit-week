@@ -9,7 +9,8 @@ import {
   openCommentDialog, closeCommentDialog, persistCommentDraft, loadCommentEditor,
   buildCommentSchema, commentTextToDoc, commentDocToText, commentTextSlice, isTypingTarget,
   toggleCommentCheck, commentEnterCommand, commentLiftAtStart, commentToggleAtCaret, commentInputRuleList,
-  commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor,
+  commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor, commentEditorText,
+  takeSnapshot,
 } from './setup.js';
 
 // The real packages, injected exactly as the page injects the bundle's namespace.
@@ -436,5 +437,76 @@ describe('idle prefetch of the editor', () => {
     } finally {
       sandboxGlobal.navigator = nav;
     }
+  });
+});
+
+describe('pre-release review fixes', () => {
+  const { strong, em, link } = schema.marks;
+  const para = (...nodes) => schema.node('doc', null, [schema.node('paragraph', null, nodes)]);
+  const txt = (t, ...marks) => schema.text(t, marks);
+  const reread = (doc) => commentTextToDoc(schema, commentDocToText(doc));
+
+  it.each(['[ a ](https://x.cz)', '[ ](https://x.cz)', '[a ](https://x.cz)'])(
+    '%j — brackets with edge spaces are literal, and round-trip', (text) => {
+      const doc = commentTextToDoc(schema, text);
+      // No bracket link — only the bare URL inside may autolink, showing itself.
+      doc.firstChild.forEach(n => n.marks.forEach(m => expect(n.text).toBe(m.attrs.href)));
+      expect(commentDocToText(doc)).toBe(text);
+    });
+
+  it('ProseMirror merges touching same-mark runs — why an untouched dialog keeps its source', () => {
+    expect(commentDocToText(commentTextToDoc(schema, '**a****b**'))).toBe('**ab**');
+    const editor = { dirty: false, source: '**a****b**', view: { state: { doc: commentTextToDoc(schema, '**a****b**') } } };
+    expect(commentEditorText(editor)).toBe('**a****b**');
+    editor.dirty = true;
+    expect(commentEditorText(editor)).toBe('**ab**');
+  });
+
+  it('a URL with parentheses keeps its full target', () => {
+    const href = 'https://en.wikipedia.org/wiki/Foo_(bar)';
+    const md = commentDocToText(para(txt('x', link.create({ href }))));
+    expect(md).toBe('[x](https://en.wikipedia.org/wiki/Foo_%28bar%29)');
+    const back = reread(para(txt('x', link.create({ href })))).firstChild.firstChild;
+    expect(back.text).toBe('x');
+    expect(back.marks[0].attrs.href).toBe('https://en.wikipedia.org/wiki/Foo_%28bar%29');
+  });
+
+  it('link text holding "](" can never redirect the link', () => {
+    const doc = para(txt('x](https://evil.cz)', link.create({ href: 'https://a.cz' })));
+    const back = reread(doc).firstChild;
+    // Degraded to plain text: at most the bare URL autolinks, and then the
+    // link's visible text is its own destination — nothing hides a target.
+    back.forEach(n => n.marks.forEach(m => expect(n.text).toBe(m.attrs.href)));
+    expect(back.textContent).toBe('x](https://evil.cz)');
+  });
+
+  it.each([
+    ['bold then italic', [['a', strong], ['b', em]]],
+    ['italic then bold', [['a', em], ['b', strong]]],
+    ['bold then bold-less star text', [['a', strong], ['*x', null]]],
+    ['star text then italic', [['x*', null], ['b', em]]],
+  ])('%s: what is stored reads back as exactly the stored text', (_name, parts) => {
+    const doc = para(...parts.map(([t, m]) => (m ? txt(t, m.create()) : txt(t))));
+    const md = commentDocToText(doc);
+    const back = commentTextToDoc(schema, md);
+    expect(commentDocToText(back)).toBe(md);
+    expect(back.textContent).toBe(doc.textContent);
+  });
+
+  it('Cmd+Z in the plain textarea fallback leaves the app undo stack alone', () => {
+    _state.set({ nodes: [
+      { id: 'work', type: 'branch', branch: 'work', label: 'Work', children: ['a1'], side: 'left', _ts: 0 },
+      { id: 'a1', type: 'activity', branch: 'work', parent: 'work', label: 'Task', children: [], _ts: 5 },
+    ] });
+    takeSnapshot();
+    const before = _state.getUndoStack().length;
+    openCommentDialog('a1').catch(() => {});
+    triggerKeydown({ key: 'z', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false,
+      target: { tagName: 'TEXTAREA' }, preventDefault() {}, stopPropagation() {} });
+    expect(_state.getUndoStack().length).toBe(before);
+    closeCommentDialog();
+    triggerKeydown({ key: 'z', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false,
+      target: { tagName: 'BODY' }, preventDefault() {}, stopPropagation() {} });
+    expect(_state.getUndoStack().length).toBe(before - 1);
   });
 });

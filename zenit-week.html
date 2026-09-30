@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-2MeYwntvwpG87FT/YslvmtcqWAH534K6QiAJHC7lDGQ='
+               'sha256-BoBGTNAcgPVi11+CxWiqeJYdM6PrsCYDo5sPM/7U5Po='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -17829,7 +17829,10 @@ function _windowKeydownHandler(e) {
 
   // The rich comment editor keeps its own history and has already acted on this
   // press; the app's undo would rewind the week under the user's caret.
-  if (isMod && (isZ || isY) && isCommentEditorTarget(e.target)) return;
+  // The same holds for the plain textarea fallback: its native undo is the one
+  // the user means, and the app's would rewind weekData under the open draft.
+  if (isMod && (isZ || isY)
+      && (isCommentEditorTarget(e.target) || (commentTargetId && isTypingTarget(e.target)))) return;
 
   if (isMod && isZ) {
     e.preventDefault();
@@ -19619,7 +19622,7 @@ const COMMENT_BLOCK_RULES = [
 const COMMENT_INLINE_RE = new RegExp([
   /\*\*(?<bold>[^\s*](?:[^*\n]*[^\s*])?)\*\*/.source,
   /(?<![*])\*(?<italic>[^\s*](?:[^*\n]*[^\s*])?)\*(?![*])/.source,
-  /\[(?<linkText>[^\]\n]+)\]\((?<linkHref>[^\s)]+)\)/.source,
+  /\[(?<linkText>[^\s\]](?:[^\]\n]*[^\s\]])?)\]\((?<linkHref>[^\s)]+)\)/.source,
   /(?<autolink>https?:\/\/[^\s<>()\[\]]*[^\s<>()\[\].,;:!?'"*])/.source,
 ].join('|'), 'g');
 
@@ -19890,21 +19893,41 @@ function commentMarkFor(schema, token) {
 }
 
 // A block's inline content → Markdown, in exactly the spellings the tokenizer
-// reads back. Whitespace at a mark's edge moves outside it, because `** a **`
-// is not bold in the grammar; an auto link whose text still is its URL stays a
-// bare URL.
+// reads back. The grammar has no escapes, so anything it could not read back
+// as written is degraded to plain text rather than stored as something else:
+//   - whitespace at a mark's edge moves outside it (`** a **` is not bold);
+//   - a link whose text holds `]` loses the link, never its destination;
+//   - `(` and `)` in a URL are percent-encoded, so `Foo_(bar)` survives;
+//   - a bold or italic run touching another `*` delimiter is written plain —
+//     `**a***b*` would read back as something else.
 function serializeCommentInlineNodes(content) {
-  let out = '';
+  const runs = [];
   content.forEach(child => {
     const text = child.text || '';
     const mark = child.marks[0];
-    if (!mark) { out += text; return; }
     const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
-    if (!core) { out += text; return; }
-    if (mark.type.name === 'strong') out += `${lead}**${core}**${trail}`;
-    else if (mark.type.name === 'em') out += `${lead}*${core}*${trail}`;
-    else if (mark.attrs.auto && text === mark.attrs.href) out += text;
-    else out += `${lead}[${core}](${mark.attrs.href})${trail}`;
+    let run = { plain: text };
+    if (mark && core) {
+      const name = mark.type.name;
+      if (name === 'strong') run = { lead, core, trail, open: '**', close: '**' };
+      else if (name === 'em') run = { lead, core, trail, open: '*', close: '*' };
+      else if (mark.attrs.auto && text === mark.attrs.href) run = { plain: text };
+      else if (!core.includes(']')) {
+        const href = mark.attrs.href.replace(/\(/g, '%28').replace(/\)/g, '%29');
+        run = { plain: `${lead}[${core}](${href})${trail}` };
+      }
+    }
+    runs.push(run);
+  });
+  const starEdge = (run, side) => !!run && !run.plain && !(side === 'start' ? run.lead : run.trail);
+  let out = '';
+  runs.forEach((run, i) => {
+    if (run.plain !== undefined) { out += run.plain; return; }
+    const touches = (starEdge(runs[i - 1], 'end') && !run.lead) || out.endsWith('*')
+      || (starEdge(runs[i + 1], 'start') && !run.trail)
+      || (!run.trail && runs[i + 1] && runs[i + 1].plain !== undefined && runs[i + 1].plain.startsWith('*'));
+    out += touches ? run.lead + run.core + run.trail : run.lead + run.open + run.core + run.close + run.trail;
+    if (touches) run.plain = run.lead + run.core + run.trail;
   });
   return out;
 }
@@ -19939,9 +19962,18 @@ function commentTextSlice(pm, schema, text) {
   return new pm.model.Slice(commentTextToDoc(schema, text.replace(/\r\n?/g, '\n')).content, 1, 1);
 }
 
+// Until the user actually changes the document, the dialog's text is the
+// string it opened with — byte for byte. Rebuilding it from the doc is not
+// always exact (ProseMirror merges `**a****b**` into one bold run), and a
+// rebuilt string that differed would write an untouched comment: a snapshot, a
+// _ts bump that wins the Drive merge, and a save nobody asked for.
+function commentEditorText(editor) {
+  return editor.dirty ? commentDocToText(editor.view.state.doc) : editor.source;
+}
+
 function getCommentText() {
   return commentEditor
-    ? commentDocToText(commentEditor.view.state.doc)
+    ? commentEditorText(commentEditor)
     : document.getElementById('comment-textarea').value;
 }
 
@@ -20253,6 +20285,7 @@ function mountCommentEditor(pm) {
         view.updateState(view.state.apply(tr));
         toolbar.sync(view.state);
         if (tr.docChanged) {
+          if (commentEditor) commentEditor.dirty = true;
           updateCommentCounter();
           scheduleCommentAutosave();
         }
@@ -20287,7 +20320,7 @@ function mountCommentEditor(pm) {
     ta.parentNode.insertBefore(toolbar, ta);
     ta.parentNode.insertBefore(host, ta);
     ta.hidden = true;
-    commentEditor = { pm, schema, view, toolbar };
+    commentEditor = { pm, schema, view, toolbar, source: ta.value, dirty: false };
     if (hadFocus) view.focus();
   } catch (err) {
     // Never block a comment: whatever went wrong, the textarea stays.
@@ -23877,6 +23910,9 @@ async function loadAndRender(wk) {
   // week) is excluded: init owns the first fit, and its quiet-refresh restore
   // must not be overwritten.
   const refit = currentWeekKey && currentWeekKey !== wk;
+  // The draft belongs to the week on screen — save it there before the key
+  // moves, or its node is gone from the week the autosave then looks in.
+  if (commentTargetId && currentWeekKey !== wk) closeCommentDialog();
   currentWeekKey = wk;
   if (_importInProgress && _pendingImportData && _pendingImportData.has(wk)) {
     showImportSpinner();
@@ -23909,6 +23945,7 @@ window.addEventListener('hashchange', async () => {
   const hashWeek = location.hash.slice(1);
   const target = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
   if (target !== currentWeekKey) {
+    if (commentTargetId) closeCommentDialog();
     currentWeekKey = target;
     if (_importInProgress && _pendingImportData && _pendingImportData.has(target)) {
       showImportSpinner();

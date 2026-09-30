@@ -133,3 +133,4 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 - [x] All AC met; phone pass repeated on the final build. (Android + iOS, 2026-09-30)
 - [ ] Review with human before the release.
+  - 2026-09-30 pre-release code review: four defects fixed (untouched comment rewritten on close; `)` in URLs and `](` in link text; touching bold/italic runs; Cmd+Z in the textarea fallback ran app undo) plus draft saved before a week switch. Not changed: a device serving a cached old page after a release falls back to the textarea until reload, because the previous bundle is no longer deployed.
