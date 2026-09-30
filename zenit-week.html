@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Yw1uhjQwlnnLsxYs/amuRn7RQVQi/jbvuzq9BsKfcCY='
+               'sha256-s7GZvB9fXvQNDsJ+o2V5eeH2IMJle7xD23pcs1IV5/4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3460,10 +3460,6 @@
   #comment-toolbar .agenda-action-btn[aria-pressed="true"] {
     color: var(--accent-primary);
     border-color: var(--accent-primary);
-  }
-  .comment-link-chip {
-    position: absolute;
-    z-index: 1;
   }
   #comment-editor .cm-check.checked .cm-check-text {
     color: var(--text-secondary);
@@ -20479,7 +20475,7 @@ function commentEditorPlugins(pm, schema) {
       'Mod-b': pm.commands.toggleMark(schema.marks.strong),
       'Mod-i': pm.commands.toggleMark(schema.marks.em),
     }),
-    commentLinkChipPlugin(pm),
+    commentLinkPlugin(pm),
     // Esc belongs to the app (it closes the dialog), not to node selection.
     pm.keymap.keymap(Object.fromEntries(Object.entries(pm.commands.baseKeymap).filter(([k]) => k !== 'Escape'))),
   ];
@@ -20500,11 +20496,10 @@ function openCommentLink(href) {
   window.open(href, '_blank', 'noopener,noreferrer');
 }
 
-// Inside an editor a tap only places the caret, so a phone has no way to follow
-// a link. On touch, a tap anywhere on a link is taken for the link: no caret,
-// no keyboard, just the question whether to open it. On desktop Cmd/Ctrl-click
-// opens it directly, and while the caret sits in a link a small Open chip
-// appears under it.
+// Opening a comment link has one way in, wherever the link is: this dialog,
+// which shows the full address before anything opens. The editor reaches it
+// by a tap on touch (a plain tap would only place the caret) and by
+// Cmd/Ctrl-click on desktop (a plain click edits); the Agenda preview by a click.
 function askOpenCommentLink(href) {
   showAppConfirm({
     title: t('comment.openLinkTitle'),
@@ -20543,44 +20538,19 @@ function guardCommentLinkTaps(dom) {
   };
 }
 
-function commentLinkChipPlugin(pm) {
+function commentLinkPlugin(pm) {
   return new pm.state.Plugin({
     props: {
       handleClick(view, pos, event) {
         if (!(event.metaKey || event.ctrlKey)) return false;
         const href = commentLinkAt(view.state, pos);
         if (!href) return false;
-        openCommentLink(href);
+        askOpenCommentLink(href);
         return true;
       },
     },
     view(editorView) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'agenda-action-btn comment-link-chip';
-      chip.hidden = true;
-      chip.textContent = t('comment.openLink');
-      let href = null;
-      chip.addEventListener('mousedown', e => e.preventDefault()); // keep the caret
-      chip.addEventListener('click', () => openCommentLink(href));
-      const body = document.getElementById('comment-body');
-      body.appendChild(chip);
-      const place = view => {
-        const { empty, from } = view.state.selection;
-        href = empty && view.hasFocus() ? commentLinkAt(view.state, from) : null;
-        chip.hidden = !href;
-        if (!href) return;
-        const caret = view.coordsAtPos(from);
-        const box = body.getBoundingClientRect();
-        chip.style.top = `${caret.bottom - box.top + 6}px`;
-        chip.style.left = `${Math.max(8, Math.min(caret.left - box.left, box.width - chip.offsetWidth - 8))}px`;
-      };
-      place(editorView);
-      const unguard = guardCommentLinkTaps(editorView.dom);
-      return {
-        update: place,
-        destroy: () => { chip.remove(); unguard(); },
-      };
+      return { destroy: guardCommentLinkTaps(editorView.dom) };
     },
   });
 }
@@ -21803,8 +21773,15 @@ function buildAgendaItem(node, label, opts = {}) {
       const text = document.createElement('span');
       text.className = 'comment-preview';
       buildCommentInline(preview.inline, text);
-      // A link in the preview opens itself, not the comment dialog.
-      text.addEventListener('click', e => { if (e.target.closest('a')) stopClickKeepingDismiss(e); });
+      // A link in the preview asks to open itself, as every comment link does,
+      // instead of opening the comment.
+      text.addEventListener('click', e => {
+        const a = e.target.closest('a[href]');
+        if (!a) return;
+        stopClickKeepingDismiss(e);
+        e.preventDefault();
+        askOpenCommentLink(a.getAttribute('href'));
+      });
       cmt.appendChild(text);
     }
     if (preview.checks) {

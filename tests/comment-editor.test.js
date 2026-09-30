@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as model from 'prosemirror-model';
 import * as state from 'prosemirror-state';
@@ -652,5 +655,19 @@ describe('pasted large text reads as a heading', () => {
     expect(cssFontSizeInPt('1.5em')).toBe(null);
     expect(cssFontSizeInPt('')).toBe(null);
     expect(cssFontSizeInPt(undefined)).toBe(null);
+  });
+});
+
+describe('opening a comment link has one way in', () => {
+  const html = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'zenit-week.html'), 'utf8');
+  const code = html.match(/<script\s+id="app-script">([\s\S]*?)<\/script>/)[1].replace(/^\s*\/\/.*$/gm, '');
+
+  it('only the confirm dialog opens a link, and every entry point asks it', () => {
+    // openCommentLink: its definition, and the dialog's OK — nothing else.
+    expect(code.match(/openCommentLink\(/g)).toHaveLength(2);
+    expect(code).toMatch(/onConfirm: \(\) => openCommentLink\(href\)/);
+    // Editor tap (touch), editor Cmd/Ctrl-click, Agenda preview click.
+    expect(code.match(/askOpenCommentLink\(/g)).toHaveLength(4);
+    expect(code).not.toMatch(/comment-link-chip/);
   });
 });
