@@ -3375,14 +3375,14 @@
   #comment-editor strong { font-weight: 700; }
   #comment-editor a { color: var(--accent-primary); text-decoration: underline; }
   #comment-body { position: relative; }
-  /* Formatting bar: the bottom-right corner of the comment footer, next to the
+  /* Formatting bar: the bottom-right corner of the comment footer, under the
      counter. Always there on desktop; on a phone only while the keyboard is up
      (see the phone rules), when there is text being written to format. */
   #comment-footer {
     display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
+    flex-direction: column; /* counter on top, formatting bar under it */
+    align-items: flex-end;
+    gap: 6px;
     margin-top: 8px;
     flex-shrink: 0;
   }
@@ -3392,9 +3392,9 @@
     gap: 6px;
   }
   /* Folded: no width, no hit area. Opening slides the row out to the left of
-     the Aa toggle — the view-level row's fade-and-shift, plus the width it
-     needs so the counter moves aside instead of being covered. The padding
-     keeps the buttons' shadows from being clipped. */
+     the Aa toggle — the view-level row's fade-and-shift, with the width
+     animated so the row grows out of the toggle. The padding keeps the
+     buttons' shadows from being clipped. */
   #comment-fmt-buttons {
     display: flex;
     gap: 6px;
