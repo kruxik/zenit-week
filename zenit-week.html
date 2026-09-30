@@ -1223,8 +1223,11 @@
   #sync-state-btn[data-status="error"]        .sync-glyph-error        { display: block; }
   #sync-state-btn[data-status="disconnected"] .sync-glyph-disconnected { display: block; }
 
-  #sync-state-btn[data-status="connected"] { color: var(--accent-success-text); }
-  #sync-state-btn[data-status="syncing"]   { color: var(--accent-warning-text); }
+  /* Syncing is a healthy state, so it wears the OK green; the glyph and its
+     animation say "in progress". Warning and danger colours stay reserved for
+     states that want attention. */
+  #sync-state-btn[data-status="connected"],
+  #sync-state-btn[data-status="syncing"]   { color: var(--accent-success-text); }
   #sync-state-btn[data-status="error"]     { color: var(--accent-danger); }
 
   #sync-state-btn[data-status="syncing"] .sync-glyph-syncing {
