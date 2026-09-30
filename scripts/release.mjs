@@ -87,7 +87,7 @@ function readOutdated(names) {
 }
 
 function editorBundleStatus() {
-  return sh('git status --porcelain -- vendor zenit-week.html');
+  return sh('git status --porcelain -- vendor zenit-week.html LICENSE');
 }
 
 function runEditorChecks() {

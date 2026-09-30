@@ -7,6 +7,7 @@ import {
   BUNDLE_FILE_REGEX, GLOBAL_NAME, bundle, bundleFileName, sriHash, contentHash,
   checkLicenses, isLicenseAllowed, packageDirOf, buildNotices,
   applyEditorConstant, readEditorConstant,
+  buildLicenseSection, applyLicenseSection, readLicenseSection,
 } from '../scripts/build-editor.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,6 +44,17 @@ describe('committed editor bundle', () => {
     // Fails when a dependency bump or entry edit lands without `npm run editor:build`.
     const { bytes } = await bundle({ root });
     expect(bundleFileName(bytes)).toBe(bundleName);
+  }, 30000);
+
+  it('LICENSE lists exactly the packages the bundle is built from', async () => {
+    // Fails when a dependency is added, dropped or relicensed without a rebuild.
+    const { packages } = await bundle({ root });
+    const license = readFileSync(resolve(root, 'LICENSE'), 'utf8');
+    expect(readLicenseSection(license)).toBe(buildLicenseSection(packages));
+    for (const name of EDITOR_PACKAGES) expect(readLicenseSection(license)).toContain(`- ${name} (MIT)`);
+    // The app's own licence and the Tabler notice are left untouched.
+    expect(license.startsWith('MIT License\n\nCopyright (c) 2026 Petr Burian')).toBe(true);
+    expect(license).toContain('Tabler Icons');
   }, 30000);
 
   it('carries the licence notice of every bundled package', () => {
@@ -116,6 +128,32 @@ describe('build helpers', () => {
 
   it('fails loudly when the marker is missing', () => {
     expect(() => applyEditorConstant('no marker here', { src: 'x', integrity: 'y' })).toThrow(/marker not found/);
+  });
+});
+
+describe('LICENSE notice section', () => {
+  const pkgs = [
+    { name: 'b-pkg', version: '1.0.0', license: 'MIT', licenseText: 'Copyright (c) 2020 B\n\nMIT terms here' },
+    { name: 'a-pkg', version: '1.0.0', license: 'MIT', licenseText: 'Copyright (c) 2019 A\n\nMIT terms here' },
+    { name: 'c-pkg', version: '1.0.0', license: 'ISC', licenseText: 'Copyright (c) 2021 C\n\nISC terms here' },
+  ];
+
+  it('keeps every copyright line and prints shared terms once', () => {
+    const section = buildLicenseSection(pkgs);
+    expect(section).toContain('- b-pkg (MIT) — Copyright (c) 2020 B');
+    expect(section).toContain('- a-pkg (MIT) — Copyright (c) 2019 A');
+    expect(section.match(/MIT terms here/g)).toHaveLength(1);
+    expect(section).toContain('ISC terms here');
+  });
+
+  it('appends once, then replaces in place — idempotent', () => {
+    const base = 'MIT License\n\nOwn terms\n';
+    const once = applyLicenseSection(base, buildLicenseSection(pkgs));
+    expect(once.startsWith(base.trimEnd())).toBe(true);
+    expect(applyLicenseSection(once, buildLicenseSection(pkgs))).toBe(once);
+    const fewer = applyLicenseSection(once, buildLicenseSection(pkgs.slice(0, 1)));
+    expect(fewer).not.toContain('c-pkg');
+    expect(fewer.startsWith(base.trimEnd())).toBe(true);
   });
 });
 

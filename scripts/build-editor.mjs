@@ -105,6 +105,61 @@ export function buildNotices(packages) {
   return `/*! Third-party software bundled in this file and its licences:\n *\n${escaped}\n */\n`;
 }
 
+// LICENSE carries the notices for everything the app ships, so the editor's
+// packages are listed there too — generated from the same package walk as the
+// bundle, between two marker lines, so a dependency added or dropped by an
+// update can never leave LICENSE behind. Packages sharing identical licence
+// terms (all of ProseMirror is MIT) are grouped: each copyright line is kept,
+// the terms are printed once per group. `npm run editor:build` owns the
+// section; never edit it by hand.
+const LICENSE_START = '--- BEGIN editor bundle notices (generated) ---';
+const LICENSE_END = '--- END editor bundle notices ---';
+
+function splitLicense(text) {
+  const lines = text.split('\n');
+  const copyright = lines.filter(l => /^\s*copyright\b/i.test(l)).map(l => l.trim());
+  const terms = lines.filter(l => !/^\s*copyright\b/i.test(l)).join('\n').trim();
+  return { copyright, terms };
+}
+
+export function buildLicenseSection(packages) {
+  const groups = new Map();
+  for (const p of packages) {
+    const { copyright, terms } = splitLicense(p.licenseText);
+    if (!groups.has(terms)) groups.set(terms, []);
+    groups.get(terms).push({ ...p, copyright });
+  }
+  const parts = [...groups.entries()].map(([terms, pkgs]) => {
+    const list = pkgs.map(p => `- ${p.name} (${p.license})${p.copyright.length ? ` — ${p.copyright.join('; ')}` : ''}`);
+    return `${list.join('\n')}\n\n${terms}`;
+  });
+  return [
+    LICENSE_START,
+    '',
+    'The lazy-loaded comment editor bundle (vendor/editor.<hash>.js) includes the',
+    'following packages, used under the licence terms that follow each list:',
+    '',
+    parts.join('\n\n'),
+    '',
+    LICENSE_END,
+  ].join('\n');
+}
+
+export function applyLicenseSection(license, section) {
+  const start = license.indexOf(LICENSE_START);
+  const end = license.indexOf(LICENSE_END);
+  if (start !== -1 && end > start) {
+    return license.slice(0, start) + section + license.slice(end + LICENSE_END.length);
+  }
+  return `${license.replace(/\s*$/, '')}\n\n${section}\n`;
+}
+
+export function readLicenseSection(license) {
+  const start = license.indexOf(LICENSE_START);
+  const end = license.indexOf(LICENSE_END);
+  return start !== -1 && end > start ? license.slice(start, end + LICENSE_END.length) : null;
+}
+
 export function applyEditorConstant(html, { src, integrity }) {
   if (!CONSTANT_REGEX.test(html)) throw new Error('[editor-build] editor-bundle marker not found in zenit-week.html');
   const literal = `{ src: '${src}', integrity: '${integrity}' }`;
@@ -157,8 +212,14 @@ export async function main() {
   const out = applyCsp(applyEditorConstant(html, { src: `/${VENDOR_DIR}/${fileName}`, integrity: sriHash(bytes) }));
   if (out !== html) writeFileSync(htmlPath, out);
 
+  const licensePath = resolve(ROOT, 'LICENSE');
+  const license = readFileSync(licensePath, 'utf8');
+  const licenseOut = applyLicenseSection(license, buildLicenseSection(packages));
+  if (licenseOut !== license) writeFileSync(licensePath, licenseOut);
+
   console.log(`[editor-build] ${VENDOR_DIR}/${fileName} — ${bytes.length} bytes, ${packages.length} packages`
-    + (out === html ? ', page already up to date' : ', page constant + CSP updated'));
+    + (out === html ? ', page already up to date' : ', page constant + CSP updated')
+    + (licenseOut === license ? '' : ', LICENSE notices updated'));
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
