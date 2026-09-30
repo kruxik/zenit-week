@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-UHfdWUtNfwY4dgV7BjXjkPnfBSry/j1I4ZmaxVF8lek='
+               'sha256-H0qCb5nWnd0ZXoj6RUA7IexzC3W9mo+F9h9QE3aFYd0='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3477,7 +3477,12 @@
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
-  #comment-counter.over { color: var(--accent-danger); }
+  /* The limit is a recommendation, not a cap — nothing is cut or refused —
+     so going over is a yellow heads-up, never an error red. */
+  #comment-counter.over {
+    color: var(--accent-warning-text);
+    background: var(--accent-warning-bg);
+  }
 
   /* Phone, comment specifics on top of the shared modal-panel rules. With the
      caption pinned, the text starts right under it. With a keyboard up the
@@ -19912,7 +19917,7 @@ function commentPreview(str) {
 // The draft persists while the dialog is still open — debounced on input, and
 // at once when the page is hidden — because a mobile OS kills a background tab
 // without warning, and a comment that only saved on close was lost with it.
-const COMMENT_SOFT_LIMIT = 1000;
+const COMMENT_SOFT_LIMIT = 1000; // recommended length only: longer comments are stored whole
 const COMMENT_AUTOSAVE_MS = 800;
 let commentTargetId = null;
 let commentSnapshotTaken = false; // one undo step per dialog session, not per keystroke
