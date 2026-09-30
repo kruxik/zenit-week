@@ -1226,3 +1226,48 @@ describe('sw.js — tunnel interstitial', () => {
     expect(w.cache.store.get('/__zw-shell__').tag).toBe('cached');
   });
 });
+
+describe('sw.js — editor vendor bundle', () => {
+  const NEW = '/vendor/editor.0123456789abcdef.js';
+  const OLD = '/vendor/editor.fedcba9876543210.js';
+  const script = (tag = 'bundle') => makeResponse({ tag, extraHeaders: { 'content-type': 'application/javascript; charset=utf-8' } });
+  const bundleEvent = (path) => {
+    const ev = navEvent(`${ORIGIN}${path}`);
+    ev.request.mode = 'cors';
+    return ev;
+  };
+  const serve = async (w, path) => {
+    const ev = bundleEvent(path);
+    w.listeners.fetch(ev);
+    const res = await ev.responses[0];
+    await Promise.all(ev.waits);
+    return res;
+  };
+
+  it('stores a fetched bundle and drops every other bundle', async () => {
+    const w = loadWorker({ fetchImpl: () => Promise.resolve(script('new')) });
+    await w.cache.put(OLD, script('old'));
+    await w.cache.put('/assets/icon-192.png', makeResponse({ tag: 'icon' }));
+    await serve(w, NEW);
+    expect([...w.cache.store.keys()].sort()).toEqual(['/assets/icon-192.png', NEW]);
+    expect(w.cache.store.get(NEW).tag).toBe('new');
+  });
+
+  it('answers from the cache without touching the network', async () => {
+    const w = loadWorker();
+    await w.cache.put(NEW, script('cached'));
+    const res = await serve(w, NEW);
+    expect(res.tag).toBe('cached');
+    expect(w.fetches).toHaveLength(0);
+  });
+
+  it('never stores a tunnel interstitial or an error in place of the script', async () => {
+    const interstitial = makeResponse({ extraHeaders: { 'content-type': 'text/html', 'ngrok-error-code': 'ERR_NGROK_6024' } });
+    for (const res of [interstitial, makeResponse({ extraHeaders: { 'content-type': 'text/html' } }), makeResponse({ ok: false, status: 404 })]) {
+      const w = loadWorker({ fetchImpl: () => Promise.resolve(res) });
+      await w.cache.put(OLD, script('old'));
+      await serve(w, NEW);
+      expect([...w.cache.store.keys()]).toEqual([OLD]);
+    }
+  });
+});

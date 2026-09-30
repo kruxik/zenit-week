@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-3GsNTHVxCnLn4oAagAxoR+D6oxBVni+Uz58XkQ8xLBk='
+               'sha256-J+oPVOUBDzcAAfHr4CmxDtE0tPMUuqk/LnJw5Gcg6Lw='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -19794,6 +19794,26 @@ function loadCommentEditor() {
   return commentEditorLoad;
 }
 
+// Warm the editor once the app is idle after boot, so the first comment opens
+// straight into it — no textarea-to-editor swap, which on a phone can drop the
+// keyboard. Never on the startup path, and never when the bytes are not worth
+// it: offline, Data Saver or a 2G link, the same rules as the quiet refresh.
+function shouldPrefetchCommentEditor(conn) {
+  if (isDefinitelyOffline()) return false;
+  if (conn && (conn.saveData === true || SLOW_EFFECTIVE_TYPES.has(conn.effectiveType))) return false;
+  return true;
+}
+
+function scheduleCommentEditorPrefetch() {
+  const run = () => {
+    const conn = (typeof navigator !== 'undefined' && navigator.connection) || null;
+    if (shouldPrefetchCommentEditor(conn)) loadCommentEditor().catch(() => {});
+  };
+  // Safari has no requestIdleCallback; a few seconds after boot is idle enough.
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(run);
+  else setTimeout(run, 3000);
+}
+
 // One node per line of the comment grammar: paragraph, heading, bullet and
 // check are all flat textblocks, exactly as tokenizeComment() reads the string —
 // the document is the grammar's block list, never a nested list tree. Takes the
@@ -25242,6 +25262,7 @@ window.addEventListener('load', async () => {
   endFirstPaint();
   traceMilestone('local week painted');
   endBoot();
+  scheduleCommentEditorPrefetch();
 
   if (_quietRestore && _quietRestore.hoveredNodeId && findNode(_quietRestore.hoveredNodeId)) {
     hoveredNodeId = _quietRestore.hoveredNodeId;

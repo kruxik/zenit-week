@@ -108,10 +108,10 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ## S6 — Offline + prefetch
 
-- [ ] T6.1 — `sw.js`: precache the current hashed bundle (name passed from the page, not hard-coded in the worker); delete other `/vendor/editor.*` entries; bump `CACHE_NAME` only if needed.
-- [ ] T6.2 — Idle prefetch after boot via `requestIdleCallback`, gated by `isDefinitelyOffline()` (`:4768`), slow connection and `saveData`; never on the startup path.
-- [ ] T6.3 — Tests: prefetch skipped when offline / `saveData`; worker cleanup keeps only the current bundle.
-- [ ] T6.4 — `npm test` + `npm run validate` + **`npm run csp`** green.
+- [x] T6.1 — `sw.js`: precache the current hashed bundle (name passed from the page, not hard-coded in the worker); delete other `/vendor/editor.*` entries; bump `CACHE_NAME` only if needed.
+- [x] T6.2 — Idle prefetch after boot via `requestIdleCallback`, gated by `isDefinitelyOffline()` (`:4768`), slow connection and `saveData`; never on the startup path.
+- [x] T6.3 — Tests: prefetch skipped when offline / `saveData`; worker cleanup keeps only the current bundle.
+- [x] T6.4 — `npm test` + `npm run validate` + **`npm run csp`** green.
 
 **AC:** after one online visit, the rich editor opens offline; the cache holds exactly one editor bundle.
 **Verify:** DevTools offline → open comment → rich editor; Application → Cache Storage shows one bundle.

@@ -9,7 +9,7 @@ import {
   openCommentDialog, closeCommentDialog, persistCommentDraft, loadCommentEditor,
   buildCommentSchema, commentTextToDoc, commentDocToText, commentTextSlice, isTypingTarget,
   toggleCommentCheck, commentEnterCommand, commentLiftAtStart, commentToggleAtCaret, commentInputRuleList,
-  commentBlockToggle, commentToolbarState,
+  commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor,
 } from './setup.js';
 
 // The real packages, injected exactly as the page injects the bundle's namespace.
@@ -413,5 +413,28 @@ describe('phone formatting toolbar', () => {
   it('reports which marks and block are active at the caret', () => {
     const st = at('- [ ] **bold** x', 3);
     expect(commentToolbarState(st)).toEqual({ strong: true, em: false, heading: false, bullet: false, check: true });
+  });
+});
+
+describe('idle prefetch of the editor', () => {
+  it('runs on an ordinary link', () => {
+    expect(shouldPrefetchCommentEditor(null)).toBe(true);
+    expect(shouldPrefetchCommentEditor({ effectiveType: '4g', saveData: false })).toBe(true);
+  });
+
+  it('skips Data Saver and 2G links', () => {
+    expect(shouldPrefetchCommentEditor({ effectiveType: '4g', saveData: true })).toBe(false);
+    expect(shouldPrefetchCommentEditor({ effectiveType: '2g' })).toBe(false);
+    expect(shouldPrefetchCommentEditor({ effectiveType: 'slow-2g' })).toBe(false);
+  });
+
+  it('skips when the device is definitely offline', () => {
+    const nav = sandboxGlobal.navigator;
+    sandboxGlobal.navigator = { ...nav, onLine: false };
+    try {
+      expect(shouldPrefetchCommentEditor(null)).toBe(false);
+    } finally {
+      sandboxGlobal.navigator = nav;
+    }
   });
 });

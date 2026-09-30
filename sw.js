@@ -93,15 +93,49 @@ function isVendorBundle(url) {
   return url.origin === self.location.origin && VENDOR_BUNDLE_PATH.test(url.pathname);
 }
 
-// A <script> tag cannot carry OWN_FETCH_HEADERS, so behind a free-tier tunnel the
-// browser's own request for the bundle is answered with the interstitial and
-// the page's SRI check blocks it. Refetching it here adds the opt-out. Nothing
-// is trusted on the worker's word: the page still checks SRI on these bytes.
-function vendorResponse(url) {
-  return fetch(url.pathname, {
+// Cache-first, never revalidated: the name is the content hash, so a new
+// build is a new URL, never new bytes at an old one. That makes the rich
+// comment editor open offline after one online visit — the page's idle
+// prefetch is what first requests it, so the worker learns the current name
+// from the page rather than carrying one of its own.
+//
+// A miss is refetched with OWN_FETCH_HEADERS: a <script> tag cannot send them,
+// and behind a free-tier tunnel the browser's own request is answered with the
+// interstitial. Nothing is trusted on the worker's word — the page still
+// checks SRI on whatever this returns — but only a real script is stored, so a
+// foreign page can never pin itself into the cache and fail SRI forever.
+async function vendorResponse(event, url) {
+  const path = url.pathname;
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(path);
+  if (cached) return cached;
+  const fresh = await fetch(path, {
     headers: OWN_FETCH_HEADERS,
     signal: timeoutSignal(SHELL_FETCH_TIMEOUT_MS),
   });
+  if (isVendorScript(fresh)) event.waitUntil(storeVendorBundle(cache, path, fresh.clone()));
+  return fresh;
+}
+
+function isVendorScript(res) {
+  if (!res || !res.ok) return false;
+  const headers = res.headers;
+  if (!headers || typeof headers.get !== 'function') return false;
+  if (headers.get('ngrok-error-code')) return false;
+  return /javascript/i.test(headers.get('content-type') || '');
+}
+
+// Exactly one bundle is kept: every release ships a new hash, and without this
+// the cache would grow by one editor per release.
+async function storeVendorBundle(cache, path, response) {
+  await cache.put(path, response);
+  const keys = await cache.keys();
+  await Promise.all(keys.map(async request => {
+    const raw = typeof request === 'string' ? request : request.url;
+    let pathname;
+    try { pathname = new URL(raw, self.location.origin).pathname; } catch (_) { return; }
+    if (pathname !== path && VENDOR_BUNDLE_PATH.test(pathname)) await cache.delete(request);
+  }));
 }
 
 function isManifestIcon(url) {
@@ -418,7 +452,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (isVendorBundle(url)) {
-    event.respondWith(vendorResponse(url));
+    event.respondWith(vendorResponse(event, url));
     return;
   }
   if (req.mode !== 'navigate') return;

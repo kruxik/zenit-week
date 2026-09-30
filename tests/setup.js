@@ -823,6 +823,7 @@ export const {
   commentToggleAtCaret,
   commentInputRuleList,
   commentBlockToggle,
+  shouldPrefetchCommentEditor,
   commentToolbarState,
   isTypingTarget,
   tokenizeComment,
