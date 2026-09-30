@@ -7,7 +7,7 @@ import {
   BUNDLE_FILE_REGEX, GLOBAL_NAME, bundle, bundleFileName, sriHash, contentHash,
   checkLicenses, isLicenseAllowed, packageDirOf, buildNotices,
   applyEditorConstant, readEditorConstant,
-  buildLicenseSection, applyLicenseSection, readLicenseSection,
+  buildLicenseSection, applyLicenseSection, readLicenseSection, NOTICES_FILE,
 } from '../scripts/build-editor.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -46,16 +46,22 @@ describe('committed editor bundle', () => {
     expect(bundleFileName(bytes)).toBe(bundleName);
   }, 30000);
 
-  it('LICENSE lists exactly the packages the bundle is built from', async () => {
+  it('THIRD_PARTY_NOTICES.md lists exactly the packages the bundle is built from', async () => {
     // Fails when a dependency is added, dropped or relicensed without a rebuild.
     const { packages } = await bundle({ root });
-    const license = readFileSync(resolve(root, 'LICENSE'), 'utf8');
-    expect(readLicenseSection(license)).toBe(buildLicenseSection(packages));
-    for (const name of EDITOR_PACKAGES) expect(readLicenseSection(license)).toContain(`- ${name} (MIT)`);
-    // The app's own licence and the Tabler notice are left untouched.
-    expect(license.startsWith('MIT License\n\nCopyright (c) 2026 Petr Burian')).toBe(true);
-    expect(license).toContain('Tabler Icons');
+    const notices = readFileSync(resolve(root, NOTICES_FILE), 'utf8');
+    expect(readLicenseSection(notices)).toBe(buildLicenseSection(packages));
+    for (const name of EDITOR_PACKAGES) expect(readLicenseSection(notices)).toContain(`- \`${name}\` (MIT)`);
+    expect(notices).toContain('Copyright (c) 2020-2026 Paweł Kuna');
   }, 30000);
+
+  it('LICENSE is the app\'s own MIT text alone, so GitHub detects it', () => {
+    const license = readFileSync(resolve(root, 'LICENSE'), 'utf8');
+    expect(license.startsWith('MIT License\n\nCopyright (c) 2026 Petr Burian\n')).toBe(true);
+    expect(license.trimEnd().endsWith('SOFTWARE.')).toBe(true);
+    expect(license.match(/Permission is hereby granted/g)).toHaveLength(1);
+    expect(license).not.toMatch(/Tabler|ProseMirror|Third-Party/i);
+  });
 
   it('carries the licence notice of every bundled package', () => {
     for (const name of EDITOR_PACKAGES) {
@@ -131,7 +137,7 @@ describe('build helpers', () => {
   });
 });
 
-describe('LICENSE notice section', () => {
+describe('third-party notice section', () => {
   const pkgs = [
     { name: 'b-pkg', version: '1.0.0', license: 'MIT', licenseText: 'Copyright (c) 2020 B\n\nMIT terms here' },
     { name: 'a-pkg', version: '1.0.0', license: 'MIT', licenseText: 'Copyright (c) 2019 A\n\nMIT terms here' },
@@ -140,8 +146,8 @@ describe('LICENSE notice section', () => {
 
   it('keeps every copyright line and prints shared terms once', () => {
     const section = buildLicenseSection(pkgs);
-    expect(section).toContain('- b-pkg (MIT) — Copyright (c) 2020 B');
-    expect(section).toContain('- a-pkg (MIT) — Copyright (c) 2019 A');
+    expect(section).toContain('- `b-pkg` (MIT) — Copyright (c) 2020 B');
+    expect(section).toContain('- `a-pkg` (MIT) — Copyright (c) 2019 A');
     expect(section.match(/MIT terms here/g)).toHaveLength(1);
     expect(section).toContain('ISC terms here');
   });

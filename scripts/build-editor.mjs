@@ -105,15 +105,17 @@ export function buildNotices(packages) {
   return `/*! Third-party software bundled in this file and its licences:\n *\n${escaped}\n */\n`;
 }
 
-// LICENSE carries the notices for everything the app ships, so the editor's
+// THIRD_PARTY_NOTICES.md lists everything the app ships, so the editor's
 // packages are listed there too — generated from the same package walk as the
-// bundle, between two marker lines, so a dependency added or dropped by an
-// update can never leave LICENSE behind. Packages sharing identical licence
-// terms (all of ProseMirror is MIT) are grouped: each copyright line is kept,
-// the terms are printed once per group. `npm run editor:build` owns the
-// section; never edit it by hand.
-const LICENSE_START = '--- BEGIN editor bundle notices (generated) ---';
-const LICENSE_END = '--- END editor bundle notices ---';
+// bundle, between two marker comments, so a dependency added or dropped by an
+// update can never leave the notices behind. LICENSE stays the app's own MIT
+// text alone, which is what lets GitHub detect it. Packages sharing identical
+// licence terms (all of ProseMirror is MIT) are grouped: each copyright line
+// is kept, the terms are printed once per group. `npm run editor:build` owns
+// the section; never edit it by hand.
+export const NOTICES_FILE = 'THIRD_PARTY_NOTICES.md';
+const NOTICES_START = '<!-- BEGIN editor bundle notices (generated) -->';
+const NOTICES_END = '<!-- END editor bundle notices -->';
 
 function splitLicense(text) {
   const lines = text.split('\n');
@@ -130,34 +132,34 @@ export function buildLicenseSection(packages) {
     groups.get(terms).push({ ...p, copyright });
   }
   const parts = [...groups.entries()].map(([terms, pkgs]) => {
-    const list = pkgs.map(p => `- ${p.name} (${p.license})${p.copyright.length ? ` — ${p.copyright.join('; ')}` : ''}`);
-    return `${list.join('\n')}\n\n${terms}`;
+    const list = pkgs.map(p => `- \`${p.name}\` (${p.license})${p.copyright.length ? ` — ${p.copyright.join('; ')}` : ''}`);
+    return `${list.join('\n')}\n\n\`\`\`text\n${terms}\n\`\`\``;
   });
   return [
-    LICENSE_START,
+    NOTICES_START,
+    '## Comment editor bundle',
     '',
-    'The lazy-loaded comment editor bundle (vendor/editor.<hash>.js) includes the',
-    'following packages, used under the licence terms that follow each list:',
+    'The lazy-loaded comment editor (`vendor/editor.<hash>.js`) bundles the',
+    'following packages, each used under the licence terms that follow its list.',
     '',
     parts.join('\n\n'),
-    '',
-    LICENSE_END,
+    NOTICES_END,
   ].join('\n');
 }
 
-export function applyLicenseSection(license, section) {
-  const start = license.indexOf(LICENSE_START);
-  const end = license.indexOf(LICENSE_END);
+export function applyLicenseSection(notices, section) {
+  const start = notices.indexOf(NOTICES_START);
+  const end = notices.indexOf(NOTICES_END);
   if (start !== -1 && end > start) {
-    return license.slice(0, start) + section + license.slice(end + LICENSE_END.length);
+    return notices.slice(0, start) + section + notices.slice(end + NOTICES_END.length);
   }
-  return `${license.replace(/\s*$/, '')}\n\n${section}\n`;
+  return `${notices.replace(/\s*$/, '')}\n\n${section}\n`;
 }
 
-export function readLicenseSection(license) {
-  const start = license.indexOf(LICENSE_START);
-  const end = license.indexOf(LICENSE_END);
-  return start !== -1 && end > start ? license.slice(start, end + LICENSE_END.length) : null;
+export function readLicenseSection(notices) {
+  const start = notices.indexOf(NOTICES_START);
+  const end = notices.indexOf(NOTICES_END);
+  return start !== -1 && end > start ? notices.slice(start, end + NOTICES_END.length) : null;
 }
 
 export function applyEditorConstant(html, { src, integrity }) {
@@ -212,14 +214,14 @@ export async function main() {
   const out = applyCsp(applyEditorConstant(html, { src: `/${VENDOR_DIR}/${fileName}`, integrity: sriHash(bytes) }));
   if (out !== html) writeFileSync(htmlPath, out);
 
-  const licensePath = resolve(ROOT, 'LICENSE');
+  const licensePath = resolve(ROOT, NOTICES_FILE);
   const license = readFileSync(licensePath, 'utf8');
   const licenseOut = applyLicenseSection(license, buildLicenseSection(packages));
   if (licenseOut !== license) writeFileSync(licensePath, licenseOut);
 
   console.log(`[editor-build] ${VENDOR_DIR}/${fileName} — ${bytes.length} bytes, ${packages.length} packages`
     + (out === html ? ', page already up to date' : ', page constant + CSP updated')
-    + (licenseOut === license ? '' : ', LICENSE notices updated'));
+    + (licenseOut === license ? '' : ', notices updated'));
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);

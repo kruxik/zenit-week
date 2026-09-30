@@ -116,4 +116,11 @@ If Zenit Week saves you time and headspace, you can support the project. *(Ko-fi
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Includes [Tabler Icons](https://tabler.io/icons) under MIT.
+MIT — see [LICENSE](LICENSE).
+
+Zenit Week ships two third-party libraries, both MIT-licensed:
+
+- [Tabler Icons](https://tabler.io/icons) — UI icons
+- [ProseMirror](https://prosemirror.net) — the rich comment editor
+
+Full copyright and licence texts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
