@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-4fJ0iH6ViiD1EvtHbsI3BOi91JcnT60v01n7CgOiUVw='
+               'sha256-PnEnuEKsTIWXE2+6PQg1VjXr7GWg9kmwt/DMCIAer5g='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3290,7 +3290,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: calc(var(--toolbar-h) + var(--panel-header-h) + 16px) 24px var(--comment-pad-bottom);
+    padding: 0 24px var(--comment-pad-bottom);
     min-height: 0;
   }
   #comment-textarea {
@@ -3397,11 +3397,22 @@
     pointer-events: none;
   }
   #comment-footer > #comment-toolbar { pointer-events: auto; }
+  /* The text scrolls the panel's full height, under the app bar and the
+     caption, the way .app-panel-content does — its top inset is padding inside
+     the scroller, not space above it. So pinning the caption (which only moves
+     the bars) never resizes the scroller: a resize at the bottom of the text
+     would clamp scrollTop and flip the pin straight back, every frame. */
   #comment-editor,
   #comment-textarea {
+    --comment-pad-top: calc(var(--toolbar-h) + var(--panel-header-h) + 16px);
+    padding-top: var(--comment-pad-top);
+    scroll-padding-top: var(--comment-pad-top);
     padding-bottom: 88px; /* COMMENT_FOOTER_ROOM: counter + gap + a toolbar row, with air */
     scroll-padding-bottom: 88px;
+    scrollbar-width: none;
   }
+  #comment-editor::-webkit-scrollbar,
+  #comment-textarea::-webkit-scrollbar { display: none; }
   #comment-toolbar {
     display: flex;
     align-items: center;
@@ -3491,8 +3502,11 @@
      because the page panning is what would move the caption. The bottom Close
      pill would sit behind the keyboard; the caption's X serves. */
   @media (max-width: 767px) {
-    #comment-panel.caption-top #comment-body {
-      padding-top: calc(var(--panel-header-h) + 12px);
+    /* With the keyboard up the app bar is gone for good, so the text starts
+       right under the caption. A keyboard change, never a scroll one. */
+    #comment-panel.keyboard-open #comment-editor,
+    #comment-panel.keyboard-open #comment-textarea {
+      --comment-pad-top: calc(var(--panel-header-h) + 12px);
     }
     body:has(#comment-panel.keyboard-open) #comment-close-bar { display: none; }
     #comment-toolbar { display: none; }
@@ -20657,9 +20671,14 @@ function persistCommentDraft() {
 // takes the top of the screen (.caption-top, CSS). One state, one rule set,
 // for both panels.
 const PANEL_CAPTION_SCROLL_PX = 56; // the app bar's height
+const PANEL_CAPTION_UNPIN_PX = 4;   // unpin only back at the top
 
-function shouldPinPanelCaption({ narrow, keyboard, scrollTop }) {
-  return !!narrow && (!!keyboard || scrollTop > PANEL_CAPTION_SCROLL_PX);
+// Hysteresis: pins past the app bar's height, unpins only back at the top, so
+// no small scroll — nor iOS's bounce at either end — can flip it to and fro.
+function shouldPinPanelCaption({ narrow, keyboard, scrollTop, pinned = false }) {
+  if (!narrow) return false;
+  if (keyboard) return true;
+  return scrollTop > (pinned ? PANEL_CAPTION_UNPIN_PX : PANEL_CAPTION_SCROLL_PX);
 }
 
 function updatePanelCaption(panel) {
@@ -20668,6 +20687,7 @@ function updatePanelCaption(panel) {
     narrow: window.matchMedia('(max-width: 767px)').matches,
     keyboard: panel.classList.contains('keyboard-open'),
     scrollTop: scroller && scroller.isConnected ? scroller.scrollTop : 0,
+    pinned: panel.classList.contains('caption-top'),
   }));
 }
 

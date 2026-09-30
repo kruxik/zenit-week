@@ -549,6 +549,12 @@ describe('phone panels pin their caption (Help, Comment)', () => {
     expect(shouldPinPanelCaption({ narrow: true, keyboard: true, scrollTop: 0 })).toBe(true);
   });
 
+  it('once pinned, stays pinned until back at the top — no flip-flop', () => {
+    expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 30, pinned: true })).toBe(true);
+    expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 30, pinned: false })).toBe(false);
+    expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 0, pinned: true })).toBe(false);
+  });
+
   it('never on desktop', () => {
     expect(shouldPinPanelCaption({ narrow: false, keyboard: true, scrollTop: 500 })).toBe(false);
   });
