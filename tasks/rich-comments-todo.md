@@ -120,11 +120,11 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ## S7 — Release gate + docs
 
-- [ ] T7.1 — `scripts/release.mjs`: before the version commit, run `npm outdated` for the editor packages (fail if behind), `npm run editor:build`, the licence check, and `npm test`; any failure aborts with no commit.
-- [ ] T7.2 — CLAUDE.md: narrow single-file exception for `vendor/editor.<hash>.js` next to the `sw.js` exception; data model note that `comments` is Markdown in the fixed grammar.
-- [ ] T7.3 — Help panel: comments feature line mentions formatting (EN + CS).
-- [ ] T7.4 — CHANGELOG entry; update `docs/ideas/rich-comments.md` status.
-- [ ] T7.5 — `npm test` + `npm run validate` + **`npm run csp`** green.
+- [x] T7.1 — `scripts/release.mjs`: before the version commit, run `npm outdated` for the editor packages (fail if behind), `npm run editor:build`, the licence check, and `npm test`; any failure aborts with no commit.
+- [x] T7.2 — CLAUDE.md: narrow single-file exception for `vendor/editor.<hash>.js` next to the `sw.js` exception; data model note that `comments` is Markdown in the fixed grammar.
+- [x] T7.3 — Help panel: comments feature line mentions formatting (EN + CS).
+- [x] T7.4 — CHANGELOG entry; update `docs/ideas/rich-comments.md` status. (CHANGELOG entries come from the `feat(comments)` commits via git-cliff at release — no hand-written entry.)
+- [x] T7.5 — `npm test` + `npm run validate` + **`npm run csp`** green.
 
 **AC:** a release cannot ship an outdated or disallowed-licence editor bundle; the policy exception is written down.
 **Verify:** dry-run the release checks with an intentionally outdated package → abort, no commit.

@@ -3,6 +3,10 @@
 //
 // Flow:
 //   1. Verify the working tree is clean and we're on main.
+//   1b. Editor bundle gate (see runEditorChecks): the ProseMirror packages are
+//      current, the committed bundle is exactly what they build (licence
+//      allow-list included), and the test suite passes. Any failure aborts
+//      before a single file is touched. `--checks-only` runs just this gate.
 //   2. Compute next CalVer tag (vYYYY.MM.DD, with .N suffix if today's
 //      tag already exists).
 //   3. Run git-cliff to prepend a new version section into CHANGELOG.md
@@ -46,6 +50,80 @@ function assertCleanTree() {
 function assertOnMain() {
   const branch = sh('git rev-parse --abbrev-ref HEAD');
   if (branch !== 'main') die(`Releases must be cut from main (currently on ${branch}).`);
+}
+
+// The packages bundled into vendor/editor.<hash>.js — every exact-pinned
+// prosemirror-* devDependency.
+export function editorPackages(pkgJson) {
+  return Object.keys(pkgJson.devDependencies || {}).filter(name => name.startsWith('prosemirror-')).sort();
+}
+
+// `npm outdated --json` output → the editor packages behind their latest
+// release. A package installed at an older version than `latest` counts, even
+// when the pin itself asks for exactly that version.
+// npm reports one object per package, or an array of them when several
+// packages depend on it (every ProseMirror package depends on -model, -state…).
+export function outdatedEditorPackages(outdatedJson, names) {
+  const out = [];
+  for (const name of names) {
+    const entries = [].concat(outdatedJson[name] || []);
+    const behind = entries.find(e => e.current !== e.latest);
+    if (behind) out.push(`${name} ${behind.current} → ${behind.latest}`);
+  }
+  return out;
+}
+
+function readOutdated(names) {
+  // npm outdated exits 1 whenever anything is outdated; its JSON is on stdout
+  // either way.
+  const res = spawnSync('npm', ['outdated', '--json', ...names], { cwd: REPO_ROOT, encoding: 'utf8' });
+  if (res.error) throw res.error;
+  const out = (res.stdout || '').trim();
+  if (!out) {
+    if (res.status !== 0) throw new Error(`npm outdated failed: ${res.stderr}`);
+    return {};
+  }
+  return JSON.parse(out);
+}
+
+function editorBundleStatus() {
+  return sh('git status --porcelain -- vendor zenit-week.html');
+}
+
+function runEditorChecks() {
+  const pkgJson = JSON.parse(readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8'));
+  const names = editorPackages(pkgJson);
+  console.log(`\n🔎 Editor gate: ${names.length} ProseMirror packages`);
+
+  let outdated;
+  try {
+    outdated = outdatedEditorPackages(readOutdated(names), names);
+  } catch (err) {
+    die(`Could not check editor packages for updates: ${err.message}`);
+  }
+  if (outdated.length) {
+    die(`Editor packages are behind — bump them deliberately, rebuild and run the editor checklist:\n  ${outdated.join('\n  ')}`);
+  }
+  console.log('✅ Editor packages are current');
+
+  // Builds and runs the licence allow-list; a disallowed licence exits non-zero.
+  const before = editorBundleStatus();
+  try {
+    shInherit('npm run editor:build');
+  } catch {
+    die('Editor bundle build failed (see output above — a disallowed licence stops it).');
+  }
+  if (editorBundleStatus() !== before) {
+    die('The committed editor bundle is stale — `npm run editor:build` changed it. Commit the rebuilt bundle and page, then release.');
+  }
+  console.log('✅ Editor bundle matches its sources, licences allowed');
+
+  try {
+    shInherit('npm test');
+  } catch {
+    die('Tests failed.');
+  }
+  console.log('✅ Tests pass');
 }
 
 function computeNextVersion() {
@@ -129,9 +207,15 @@ async function confirm(rl, prompt) {
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
+  const checksOnly = process.argv.includes('--checks-only');
 
-  if (!dryRun) assertCleanTree();
+  if (!dryRun && !checksOnly) assertCleanTree();
   assertOnMain();
+  runEditorChecks();
+  if (checksOnly) {
+    console.log('\n🧪 Checks only — no changelog, no commit, no tag.\n');
+    return;
+  }
 
   const version = computeNextVersion();
   if (!VERSION_REGEX.test(version)) die(`Computed version "${version}" is malformed.`);
@@ -183,4 +267,5 @@ async function main() {
   console.log(`   Tag push will trigger .github/workflows/deploy-production.yml.\n`);
 }
 
-main().catch(err => die(err.stack || err.message));
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) main().catch(err => die(err.stack || err.message));

@@ -1,5 +1,7 @@
 # Rich Comments
 
+**Status:** Implemented 2026-09-30 (slices S1–S7, plus a phone formatting toolbar from Checkpoint 2) — see `tasks/rich-comments-todo.md`. Open: iOS Safari phone pass before release.
+
 ## Problem Statement
 How might we let a comment carry checklists, links and emphasis — edited the way Google Docs feels, with real undo/redo on phone and desktop — without changing the plain-string data model, the Drive merge, or the app's size and security rules?
 
