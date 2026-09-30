@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-JpVX49jgxKXii1X/GZNupoKdeACt3h3n1O5bg1OEfDI='
+               'sha256-Ap080o6z793ICOrQfk9rENTZsH5+GfnKcjPH/ulX55g='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3232,21 +3232,30 @@
     color: var(--text-dim);
   }
 
-  /* Mobile: hide bottom pill bars while help is open; swap top-X for bottom Close pill */
+  /* ─── Phone: modal panels (Help, Comment) ───────────────────────────────────
+     One rule set for both. The bottom chrome steps aside for the panel's own
+     Close pill, and the caption keeps its X. Once the panel pins its caption
+     (.caption-top — content scrolled past the app bar, or a keyboard up; see
+     updatePanelCaption), the app bar slides away and the caption takes the top
+     of the screen. Stats and Agenda keep the full bottom chrome: they are
+     views, not modals. */
   @media (max-width: 767px) {
     body:has(#help-panel.visible) #fab-pill,
     body:has(#help-panel.visible) #undo-redo-bar,
-    body:has(#help-panel.visible) #view-toggle-bar {
+    body:has(#help-panel.visible) #view-toggle-bar,
+    body:has(#comment-panel.visible) #fab-pill,
+    body:has(#comment-panel.visible) #undo-redo-bar,
+    body:has(#comment-panel.visible) #view-toggle-bar {
       display: none;
     }
-    body:has(#help-panel.visible) #help-close {
-      display: none;
-    }
-    body:has(#help-panel.visible) #help-close-bar {
+    body:has(#help-panel.visible) #help-close-bar,
+    body:has(#comment-panel.visible) #comment-close-bar {
       display: flex;
     }
-    /* Stats panel keeps the full bottom chrome (FAB, undo/redo, view pill)
-       visible, like Agenda — it's a transient view, not a modal. */
+    #toolbar { transition: transform 0.2s ease; }
+    body:has(.app-panel.visible.caption-top) #toolbar { transform: translateY(-100%); }
+    .app-panel-header { transition: top 0.2s ease; }
+    .app-panel.caption-top { --panel-header-top: 0px; }
   }
 
   /* Comment dialog — mirrors the Help dialog layout (desktop centered panel,
@@ -3395,31 +3404,19 @@
   }
   #comment-counter.over { color: var(--accent-danger); }
 
-  /* Mobile: hide bottom pill bars while comment dialog open; show bottom pill alongside top-X */
+  /* Phone, comment specifics on top of the shared modal-panel rules. With the
+     caption pinned, the text starts right under it. With a keyboard up the
+     panel is exactly the visible area (JS sets top and height) and the text
+     scrolls inside it; reaching its end must not hand the drag on to the page,
+     because the page panning is what would move the caption. The bottom Close
+     pill would sit behind the keyboard; the caption's X serves. */
   @media (max-width: 767px) {
-    body:has(#comment-panel.visible) #fab-pill,
-    body:has(#comment-panel.visible) #undo-redo-bar,
-    body:has(#comment-panel.visible) #view-toggle-bar {
-      display: none;
-    }
-    body:has(#comment-panel.visible) #comment-close-bar {
-      display: flex;
-    }
-    /* Keyboard up: the panel is exactly the visible area (JS sets top and
-       height), the caption sits at its top in place of the app bar, and the
-       text scrolls inside the panel. Reaching its end must not hand the drag on
-       to the page — the page panning is what would move the caption. The
-       bottom Close pill would sit behind the keyboard; the caption's X serves. */
-    body:has(#comment-panel.keyboard-open) #toolbar { visibility: hidden; }
-    body:has(#comment-panel.keyboard-open) #comment-close-bar { display: none; }
-    #comment-panel.keyboard-open {
-      --panel-header-top: 0px;
-      transition: opacity 0.3s ease;
-    }
-    #comment-panel.keyboard-open #comment-body {
+    #comment-panel.caption-top #comment-body {
       padding-top: calc(var(--panel-header-h) + 12px);
-      padding-bottom: 8px;
     }
+    body:has(#comment-panel.keyboard-open) #comment-close-bar { display: none; }
+    #comment-panel.keyboard-open { transition: opacity 0.3s ease; }
+    #comment-panel.keyboard-open #comment-body { padding-bottom: 8px; }
     #comment-panel.keyboard-open #comment-editor,
     #comment-panel.keyboard-open #comment-textarea {
       overscroll-behavior: contain;
@@ -20429,6 +20426,7 @@ function openCommentDialog(nodeId) {
   updateCommentCounter();
   document.getElementById('comment-overlay').classList.add('visible');
   document.getElementById('comment-panel').classList.add('visible');
+  resetPanelCaption(document.getElementById('comment-panel'));
   setCommentViewportFit(true);
   ta.focus();
   // The textarea is usable at once; the rich editor replaces it only once its
@@ -20484,6 +20482,42 @@ function persistCommentDraft() {
   else updateNodeUI(id);
 }
 
+// ─── Phone: pinned panel caption (Help, Comment) ──────────────────────────────
+// On a phone the modal panels start with their caption (title + X) under the
+// app bar. Once the user needs the room — the content scrolled past the bar's
+// height, or a keyboard up in Comment — the bar slides away and the caption
+// takes the top of the screen (.caption-top, CSS). One state, one rule set,
+// for both panels.
+const PANEL_CAPTION_SCROLL_PX = 56; // the app bar's height
+
+function shouldPinPanelCaption({ narrow, keyboard, scrollTop }) {
+  return !!narrow && (!!keyboard || scrollTop > PANEL_CAPTION_SCROLL_PX);
+}
+
+function updatePanelCaption(panel) {
+  const scroller = panel._captionScroller;
+  panel.classList.toggle('caption-top', shouldPinPanelCaption({
+    narrow: window.matchMedia('(max-width: 767px)').matches,
+    keyboard: panel.classList.contains('keyboard-open'),
+    scrollTop: scroller && scroller.isConnected ? scroller.scrollTop : 0,
+  }));
+}
+
+// `scroller` is the panel's scroll region at open. Scroll does not bubble, so
+// a capturing listener also hears the comment editor or textarea that
+// replaces it, whichever one is scrolling.
+function watchPanelCaption(panel) {
+  panel.addEventListener('scroll', e => {
+    panel._captionScroller = e.target;
+    updatePanelCaption(panel);
+  }, true);
+}
+
+function resetPanelCaption(panel, scroller = null) {
+  panel._captionScroller = scroller;
+  updatePanelCaption(panel);
+}
+
 // A phone keyboard does not shrink the page: the browser pans the visible area
 // over it, and everything position:fixed at the top — the app bar and the
 // comment caption with it — slides off. Chasing that pan with the caption
@@ -20516,6 +20550,7 @@ function fitCommentPanelToViewport() {
   commentViewportLast = key;
   commentViewportStill = 0;
   panel.classList.toggle('keyboard-open', !!box);
+  updatePanelCaption(panel);
   panel.style.top = box ? `${box.top}px` : '';
   panel.style.height = box ? `${box.height}px` : '';
   panel.style.bottom = box ? 'auto' : '';
@@ -20545,6 +20580,7 @@ function setCommentViewportFit(on) {
   if (on) { wakeCommentViewport(); return; }
   const panel = document.getElementById('comment-panel');
   panel.classList.remove('keyboard-open');
+  resetPanelCaption(panel);
   panel.style.top = panel.style.height = panel.style.bottom = '';
 }
 
@@ -22152,11 +22188,13 @@ function openHelp() {
   if (onboardingSection) onboardingSection.hidden = !hasDemoActivityNodes();
   document.getElementById('help-overlay').classList.add('visible');
   document.getElementById('help-panel').classList.add('visible');
+  resetPanelCaption(document.getElementById('help-panel'), document.getElementById('help-content'));
 }
 
 function closeHelp() {
   document.getElementById('help-overlay').classList.remove('visible');
   document.getElementById('help-panel').classList.remove('visible');
+  resetPanelCaption(document.getElementById('help-panel'));
 }
 // Kept as a window property: the Esc chain and switchView have called it through
 // window since Help was wired inside init.
@@ -25641,6 +25679,9 @@ window.addEventListener('load', async () => {
   document.getElementById('help-overlay').addEventListener('click', closeHelp);
   const helpCloseMobile = document.getElementById('help-close-mobile');
   if (helpCloseMobile) helpCloseMobile.addEventListener('click', closeHelp);
+
+  watchPanelCaption(document.getElementById('help-panel'));
+  watchPanelCaption(document.getElementById('comment-panel'));
 
   // Comment dialog close wiring
   document.getElementById('comment-close').addEventListener('click', () => closeCommentDialog());

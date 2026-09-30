@@ -9,7 +9,7 @@ import {
   openCommentDialog, closeCommentDialog, persistCommentDraft, loadCommentEditor,
   buildCommentSchema, commentTextToDoc, commentDocToText, commentTextSlice, isTypingTarget,
   toggleCommentCheck, commentEnterCommand, commentLiftAtStart, commentToggleAtCaret, commentInputRuleList,
-  commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor, commentEditorText, commentViewportBox,
+  commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor, commentEditorText, commentViewportBox, shouldPinPanelCaption,
   takeSnapshot,
 } from './setup.js';
 
@@ -528,5 +528,21 @@ describe('comment panel takes the visible area above a phone keyboard', () => {
     expect(commentViewportBox(800, vv(450), false)).toBe(null);
     expect(commentViewportBox(800, vv(400, 0, 2), true)).toBe(null);
     expect(commentViewportBox(800, null, true)).toBe(null);
+  });
+});
+
+describe('phone panels pin their caption (Help, Comment)', () => {
+  it('pins once the content has scrolled past the app bar', () => {
+    expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 0 })).toBe(false);
+    expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 56 })).toBe(false);
+    expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 57 })).toBe(true);
+  });
+
+  it('pins while a keyboard is up, wherever the text is scrolled', () => {
+    expect(shouldPinPanelCaption({ narrow: true, keyboard: true, scrollTop: 0 })).toBe(true);
+  });
+
+  it('never on desktop', () => {
+    expect(shouldPinPanelCaption({ narrow: false, keyboard: true, scrollTop: 500 })).toBe(false);
   });
 });

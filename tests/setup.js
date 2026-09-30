@@ -826,6 +826,7 @@ export const {
   shouldPrefetchCommentEditor,
   commentEditorText,
   commentViewportBox,
+  shouldPinPanelCaption,
   commentToolbarState,
   isTypingTarget,
   tokenizeComment,
