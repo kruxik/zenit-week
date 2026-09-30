@@ -36,7 +36,17 @@ describe('buildRestorePayload', () => {
       currentView:    'mindmap',
       currentWeekKey: '2026-19',
       hoveredNodeId:  'node-abc',
+      commentNodeId:  null,
     });
+  });
+
+  it('carries the open comment, and reads an old payload without it as none', () => {
+    expect(buildRestorePayload(validState({ commentNodeId: 'n1' })).commentNodeId).toBe('n1');
+    const old = buildRestorePayload(validState());
+    delete old.commentNodeId;
+    expect(validateRestorePayload(old, { currentWeekKey: old.currentWeekKey, now: old.ts }).commentNodeId).toBeNull();
+    const bad = { ...buildRestorePayload(validState()), commentNodeId: 7 };
+    expect(validateRestorePayload(bad, { currentWeekKey: bad.currentWeekKey, now: bad.ts })).toBeNull();
   });
 
   it('normalizes undefined hoveredNodeId to null', () => {

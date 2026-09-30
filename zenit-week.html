@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-PnEnuEKsTIWXE2+6PQg1VjXr7GWg9kmwt/DMCIAer5g='
+               'sha256-hId8Jf8c/4ELY/fmooBvsALePubSszcl/TRiWEGBYcI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5322,6 +5322,7 @@ function buildRestorePayload(state) {
     currentView:    state.currentView,
     currentWeekKey: state.currentWeekKey,
     hoveredNodeId:  state.hoveredNodeId || null,
+    commentNodeId:  state.commentNodeId || null,
   };
 }
 
@@ -5336,6 +5337,8 @@ function validateRestorePayload(payload, ctx) {
   if (typeof payload.zoom !== 'number' || !isFinite(payload.zoom) || payload.zoom <= 0) return null;
   if (typeof payload.currentView !== 'string') return null;
   if (payload.hoveredNodeId !== null && typeof payload.hoveredNodeId !== 'string') return null;
+  // Absent in payloads written before comments reopened; that reads as none.
+  if (payload.commentNodeId != null && typeof payload.commentNodeId !== 'string') return null;
   return {
     v:              RESTORE_SCHEMA_V,
     ts:             payload.ts,
@@ -5345,19 +5348,14 @@ function validateRestorePayload(payload, ctx) {
     currentView:    payload.currentView,
     currentWeekKey: payload.currentWeekKey,
     hoveredNodeId:  payload.hoveredNodeId || null,
+    commentNodeId:  payload.commentNodeId || null,
   };
 }
 
 // Debug surface — intentionally retained in production for diagnosability.
 // Invoke from DevTools to verify the round-trip survives a real reload.
 window.__quietRefreshReloadNow = function() {
-  const payload = buildRestorePayload({
-    panX, panY, zoom,
-    currentView, currentWeekKey,
-    hoveredNodeId,
-    now: Date.now(),
-  });
-  localStorage.setItem(RESTORE_KEY, JSON.stringify(payload));
+  const payload = stashViewStateForReload();
   console.debug('[quiet-refresh] manual reload-fired', payload);
   location.reload();
 };
@@ -5478,9 +5476,11 @@ function stashViewStateForReload() {
     panX, panY, zoom,
     currentView, currentWeekKey,
     hoveredNodeId,
+    commentNodeId: commentTargetId,
     now: Date.now(),
   });
   localStorage.setItem(RESTORE_KEY, JSON.stringify(payload));
+  return payload;
 }
 
 document.addEventListener('mouseup',   tryQuietReload);
@@ -20610,7 +20610,11 @@ function openCommentDialog(nodeId) {
   document.getElementById('comment-panel').classList.add('visible');
   resetPanelCaption(document.getElementById('comment-panel'));
   setCommentViewportFit(true);
-  ta.focus();
+  // An empty comment is opened to be written, so it opens with the caret (and
+  // a phone's keyboard) ready. An existing one is opened to be read first: no
+  // keyboard over it until the user taps the text, which then places the caret
+  // where they tapped.
+  if (!node.comments) ta.focus();
   // The textarea is usable at once; the rich editor replaces it only once its
   // bundle is ready and nothing has been typed, so no keystroke is ever lost to
   // the swap. A bundle that never arrives simply leaves the textarea in place.
@@ -24264,6 +24268,11 @@ function initPullToRefresh(source, atTop = null) {
 if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
   const toolbar = document.getElementById('toolbar');
   if (toolbar) initPullToRefresh(toolbar);
+  // A pinned caption has taken the app bar's place, so it takes its gesture too.
+  ['comment-header', 'help-header'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) initPullToRefresh(el);
+  });
   ['agenda-tab-content', 'stats-content'].forEach(id => {
     const el = document.getElementById(id);
     if (el) initPullToRefresh(el, () => el.scrollTop <= 0);
@@ -25671,6 +25680,11 @@ window.addEventListener('load', async () => {
 
   if (_quietRestore && _quietRestore.hoveredNodeId && findNode(_quietRestore.hoveredNodeId)) {
     hoveredNodeId = _quietRestore.hoveredNodeId;
+  }
+  // A comment open at the reload opens again — fresh, exactly as a tap on its
+  // task would open it; nothing else about the dialog is carried over.
+  if (_quietRestore && _quietRestore.commentNodeId && findNode(_quietRestore.commentNodeId)) {
+    openCommentDialog(_quietRestore.commentNodeId);
   }
 
   applyTranslations();
