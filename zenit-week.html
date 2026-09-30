@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-zstrn85CNKTZpgK3IrWAXF8gQ1qP4FKFxBnrNKmjKD4='
+               'sha256-ftI6rzwgDRFhc2BpdQL2O6DrCXMri5bC6GuL/BG5s5g='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3397,7 +3397,7 @@
     transform: translateX(0);
     pointer-events: auto;
   }
-  #comment-toolbar .comment-fmt-toggle .icon { width: 18px; height: 18px; }
+  #comment-toolbar .icon { width: 18px; height: 18px; }
   #comment-toolbar .comment-fmt-toggle[aria-expanded="true"] {
     color: var(--accent-primary);
     border-color: var(--accent-primary);
@@ -4142,6 +4142,7 @@
   <symbol id="icon-flame" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.294 -2.333 5.588c0 3.704 3.134 6.706 7 6.706c3.866 0 7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235"/></symbol>
   <symbol id="icon-pencil" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></symbol>
   <symbol id="icon-letter-case" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 15.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0"/><path d="M3 19v-10.5a3.5 3.5 0 0 1 7 0v10.5"/><path d="M3 13h7"/><path d="M21 12v7"/></symbol>
+  <symbol id="icon-text-caption" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 15h16"/><path d="M4 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M4 20h12"/></symbol>
   <symbol id="icon-message" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9h8"/><path d="M8 13h6"/><path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12z"/></symbol>
   <symbol id="icon-plus" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14"/><path d="M5 12l14 0"/></symbol>
   <symbol id="icon-trash" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></symbol>
@@ -20264,9 +20265,9 @@ function commentLinkChipPlugin(pm) {
 // buttons switch the caret's lines to that type, or back to a paragraph when
 // they already are one.
 const COMMENT_TOOLBAR = [
+  { id: 'heading', icon: 'text-caption', title: 'comment.fmtHeading', block: 'heading' },
   { id: 'strong', label: 'B', title: 'comment.fmtBold', mark: 'strong' },
   { id: 'em', label: 'I', title: 'comment.fmtItalic', mark: 'em' },
-  { id: 'heading', label: 'H', title: 'comment.fmtHeading', block: 'heading' },
   { id: 'bullet', label: '•', title: 'comment.fmtBullet', block: 'bullet' },
   { id: 'check', label: '☐', title: 'comment.fmtCheck', block: 'check' },
 ];
@@ -20312,7 +20313,8 @@ function buildCommentToolbar(pm, schema, getView) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `agenda-action-btn comment-fmt-${item.id}`;
-    btn.textContent = item.label;
+    if (item.icon) btn.innerHTML = iconSvg(item.icon); // static markup only
+    else btn.textContent = item.label;
     btn.title = t(item.title);
     btn.setAttribute('aria-label', t(item.title));
     btn.setAttribute('aria-pressed', 'false');
