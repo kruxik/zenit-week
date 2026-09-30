@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-zkxut4FWN7vupEcfxq+nUj5xrG4JnhWgCnANC5oCLF8='
+               'sha256-hmDM/IpKvbcpLRietED473oNyJiukEXDht/Oc9Vf0Gs='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5304,10 +5304,8 @@ async function requestPersistentStorage() {
 requestPersistentStorage();
 
 // ─── Quiet refresh: restore payload helpers ──────────────────────────────────
-// Volatile view-state survives location.reload() via this serializable payload.
-// Every deliberate reload goes through stashViewStateForReload(), so both the
-// auto-reload and the pull-to-refresh gesture land back where the person was.
-// `window.__quietRefreshReloadNow` remains as a manual trigger for debugging.
+// Volatile view state survives a reload via this serializable payload. See
+// "Reload: one path" below for who writes it and when boot reads it back.
 const RESTORE_KEY        = 'zenit-week-pending-restore';
 const RESTORE_TTL_MS     = 5 * 60 * 1000;
 const RESTORE_SCHEMA_V   = 1;
@@ -5323,6 +5321,7 @@ function buildRestorePayload(state) {
     currentWeekKey: state.currentWeekKey,
     hoveredNodeId:  state.hoveredNodeId || null,
     commentNodeId:  state.commentNodeId || null,
+    helpOpen:       !!state.helpOpen,
   };
 }
 
@@ -5339,6 +5338,7 @@ function validateRestorePayload(payload, ctx) {
   if (payload.hoveredNodeId !== null && typeof payload.hoveredNodeId !== 'string') return null;
   // Absent in payloads written before comments reopened; that reads as none.
   if (payload.commentNodeId != null && typeof payload.commentNodeId !== 'string') return null;
+  if (payload.helpOpen != null && typeof payload.helpOpen !== 'boolean') return null;
   return {
     v:              RESTORE_SCHEMA_V,
     ts:             payload.ts,
@@ -5349,19 +5349,19 @@ function validateRestorePayload(payload, ctx) {
     currentWeekKey: payload.currentWeekKey,
     hoveredNodeId:  payload.hoveredNodeId || null,
     commentNodeId:  payload.commentNodeId || null,
+    helpOpen:       payload.helpOpen === true,
   };
 }
 
 // Debug surface — intentionally retained in production for diagnosability.
 // Invoke from DevTools to verify the round-trip survives a real reload.
 window.__quietRefreshReloadNow = function() {
-  const payload = stashViewStateForReload();
-  console.debug('[quiet-refresh] manual reload-fired', payload);
-  location.reload();
+  console.debug('[quiet-refresh] manual reload-fired');
+  reloadApp();
 };
 
 // ─── Quiet refresh: quiescence gate + auto-reload (Slice 4) ──────────────────
-// Defers `location.reload()` until the app is idle: no inline edit, no pan,
+// Defers the reload (reloadApp) until the app is idle: no inline edit, no pan,
 // no in-flight atomic op or Drive upload, no open panel/menu/dialog.
 // Wired to mouseup/touchend/keyup, endAtomicOp, visibilitychange, and the
 // asset probe itself — any of these may transition the app into quiescence.
@@ -5463,24 +5463,97 @@ function _fireQuietReload() {
   }
   _hideUpdateBanner();
   _writePendingReload({ v: APP_VERSION, n: attempts + 1 });
-  stashViewStateForReload();
   console.debug('[quiet-refresh] reload-fired');
-  location.reload();
+  reloadApp();
 }
 
-// Volatile view state, parked where boot will find it. Every deliberate reload
-// goes through here — the quiet auto-reload and the pull-to-refresh gesture —
-// so both land back on the map the person was looking at.
+// ─── Reload: one path ─────────────────────────────────────────────────────────
+// Every reload — the browser's own (F5, Cmd/Ctrl+R, its reload button), the
+// logo, the pull-down gesture and the quiet update reload — lands back where
+// the person was: same view, same week, same open comment or Help. There is one
+// way in and one way out, and nothing else:
+//   · out — the page's end. `pagehide` fires for every one of those reloads,
+//     including the browser's, which the app never gets to see coming, so the
+//     view is saved there and only there (saveViewStateOnLeave).
+//   · in  — boot reads it back only when the browser reports this start as a
+//     reload (readReloadRestore). Closing the tab also saves, but a fresh
+//     open — new tab, reopened app, a link — is not a reload and starts clean.
+// The app's own reloads therefore just reload (reloadApp). Sign-out and reset
+// are the deliberate exceptions: reloadAppFresh skips the save.
+let _reloadFresh = false;
+
 function stashViewStateForReload() {
   const payload = buildRestorePayload({
     panX, panY, zoom,
     currentView, currentWeekKey,
     hoveredNodeId,
     commentNodeId: commentTargetId,
+    helpOpen: isHelpOpen(),
     now: Date.now(),
   });
   localStorage.setItem(RESTORE_KEY, JSON.stringify(payload));
   return payload;
+}
+
+function saveViewStateOnLeave() {
+  if (_reloadFresh) return;
+  try { stashViewStateForReload(); } catch (err) { console.debug('[reload] save-failed', err && err.message); }
+}
+window.addEventListener('pagehide', saveViewStateOnLeave);
+
+function isReloadNavigation(perf = (typeof performance !== 'undefined' ? performance : null)) {
+  const entry = perf && typeof perf.getEntriesByType === 'function' ? perf.getEntriesByType('navigation')[0] : null;
+  if (entry) return entry.type === 'reload';
+  return !!(perf && perf.navigation && perf.navigation.type === 1); // TYPE_RELOAD, older Safari
+}
+
+// The saved view, if this start is a reload and it is still valid for the week
+// being opened; null otherwise. Always consumes it, valid or not.
+function readReloadRestore({ storage, perf, currentWeekKey: wk, now }) {
+  let raw = null;
+  try { raw = storage.getItem(RESTORE_KEY); } catch (_) { return null; }
+  if (!raw) return null;
+  storage.removeItem(RESTORE_KEY);
+  if (!isReloadNavigation(perf)) return null;
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (_) { return null; }
+  return validateRestorePayload(parsed, { currentWeekKey: wk, now });
+}
+
+// A reload needs a document to come back to. Offline with no service worker
+// answering, the browser would show its error page and take the app with it,
+// so there the week is re-opened in place instead — the most a refresh can
+// honestly mean with no document to fetch.
+function canReloadDocument() {
+  const swControlled = typeof navigator !== 'undefined'
+    && navigator.serviceWorker && !!navigator.serviceWorker.controller;
+  return !isDefinitelyOffline() || !!swControlled;
+}
+
+async function reloadApp() {
+  if (canReloadDocument()) {
+    location.reload();
+    return 'reloading';
+  }
+  try {
+    // Re-open rather than just re-render: a refresh is also how someone asks
+    // for occurrences that came due while the tab sat open.
+    await openWeekIntoView(currentWeekKey);
+    renderIfVisible();
+    updateSummary();
+    if (currentView === 'agenda') renderAgenda();
+    if (currentView === 'stats')  renderStatsPanel();
+  } catch (err) {
+    console.error('[reload] reopen failed:', err);
+  }
+  return 'reopened';
+}
+
+// Sign-out and reset: a clean start, not a return to where the person was.
+function reloadAppFresh() {
+  _reloadFresh = true;
+  try { localStorage.removeItem(RESTORE_KEY); } catch (_) { /* storage unavailable */ }
+  location.reload();
 }
 
 document.addEventListener('mouseup',   tryQuietReload);
@@ -6543,7 +6616,7 @@ async function devResetApp() {
     } catch { /* no worker registered */ }
   }
 
-  location.reload();
+  reloadAppFresh();
 }
 
 // TODO: remove after 2026-07-28 — localStorage→IDB migration code
@@ -8769,7 +8842,7 @@ async function signOutAndClear() {
   }
   keysToWipe.forEach(k => localStorage.removeItem(k));
 
-  location.reload();
+  reloadAppFresh();
 }
 
 // ─── TASK-12: Sync status helper ──────────────────────────────────────────────
@@ -23513,7 +23586,7 @@ zoomTrack.addEventListener('pointercancel', () => {
 });
 
 document.getElementById('zoom-label').addEventListener('click', resetView);
-document.getElementById('logo').addEventListener('click', resetView);
+document.getElementById('logo').addEventListener('click', () => reloadApp());
 
 // ─── View Level Bar ────────────────────────────────────────────────────────────
 document.getElementById('view-level-bar').addEventListener('pointerdown', e => e.stopPropagation());
@@ -24271,18 +24344,8 @@ function _ptrPark() {
   el.style.setProperty('--ptr-rot', '0deg');
 }
 
-// A pull is the browser's own reload gesture, so it does what the browser's
-// reload does: refetch the document and boot the app from scratch. Anything
-// less is a different act wearing the same gesture — a data re-pull leaves the
-// running build, the service worker registration and every module's in-memory
-// state exactly as they were, which is precisely what someone reaching for
-// reload is trying to get rid of. The one thing added on top is the view state,
-// so the pull lands back on the map the menu's reload would have thrown away.
-//
-// The exception is a tab that is offline with no worker answering for it: there
-// a reload reaches the browser's error page and takes the app with it. That tab
-// gets its week re-opened in place instead — the most a refresh can honestly
-// mean with no document to fetch.
+// A pull is the browser's own reload gesture, so it is the app's reload
+// (reloadApp) — nothing of its own. The only thing it adds is the spinner.
 async function performPullRefresh() {
   if (_ptrBusy) return;
   _ptrBusy = true;
@@ -24295,35 +24358,17 @@ async function performPullRefresh() {
   // so hand the reload to the path that owns it.
   if (_pendingReload) { _fireQuietReload(); return; }
 
-  const swControlled = typeof navigator !== 'undefined'
-    && navigator.serviceWorker
-    && !!navigator.serviceWorker.controller;
-  if (!isDefinitelyOffline() || swControlled) {
-    stashViewStateForReload();
+  const startedAt = Date.now();
+  if (await reloadApp() === 'reloading') {
     // The spinner stays up: the document is on its way out. If navigation is
     // somehow refused, release the gesture rather than spin forever.
     setTimeout(() => { _ptrPark(); _ptrBusy = false; }, 5000);
-    location.reload();
     return;
   }
-
-  const startedAt = Date.now();
-  try {
-    // Re-open rather than just re-render: the pull is also how someone asks for
-    // occurrences that came due while the tab sat open.
-    await openWeekIntoView(currentWeekKey);
-    renderIfVisible();
-    updateSummary();
-    if (currentView === 'agenda') renderAgenda();
-    if (currentView === 'stats')  renderStatsPanel();
-  } catch (err) {
-    console.error('[ptr] refresh failed:', err);
-  } finally {
-    // Hold the spinner long enough to read as an answer; a refresh that resolves
-    // from IDB in 20ms otherwise looks like a gesture that did nothing.
-    const linger = Math.max(0, 450 - (Date.now() - startedAt));
-    setTimeout(() => { _ptrPark(); _ptrBusy = false; }, linger);
-  }
+  // Re-opened in place. Hold the spinner long enough to read as an answer; a
+  // refresh that resolves from IDB in 20ms otherwise looks like it did nothing.
+  const linger = Math.max(0, 450 - (Date.now() - startedAt));
+  setTimeout(() => { _ptrPark(); _ptrBusy = false; }, linger);
 }
 
 // atTop: a scrolling source only owns the gesture while its list is at the top.
@@ -25763,15 +25808,9 @@ window.addEventListener('load', async () => {
   // Quiet-refresh restore: apply persisted view-state before first paint.
   // Returns the cleaned payload so hoveredNodeId can be applied once weekData
   // is loaded (findNode is meaningless before that).
-  const _quietRestore = (() => {
-    let raw = null;
-    try { raw = localStorage.getItem(RESTORE_KEY); } catch (_) { return null; }
-    if (!raw) return null;
-    localStorage.removeItem(RESTORE_KEY); // always consume — even on invalid
-    let parsed;
-    try { parsed = JSON.parse(raw); } catch (_) { return null; }
-    return validateRestorePayload(parsed, { currentWeekKey: initialWeek, now: Date.now() });
-  })();
+  const _quietRestore = readReloadRestore({
+    storage: localStorage, currentWeekKey: initialWeek, now: Date.now(),
+  });
   if (_quietRestore) {
     panX        = _quietRestore.panX;
     panY        = _quietRestore.panY;
@@ -25789,11 +25828,6 @@ window.addEventListener('load', async () => {
 
   if (_quietRestore && _quietRestore.hoveredNodeId && findNode(_quietRestore.hoveredNodeId)) {
     hoveredNodeId = _quietRestore.hoveredNodeId;
-  }
-  // A comment open at the reload opens again — fresh, exactly as a tap on its
-  // task would open it; nothing else about the dialog is carried over.
-  if (_quietRestore && _quietRestore.commentNodeId && findNode(_quietRestore.commentNodeId)) {
-    openCommentDialog(_quietRestore.commentNodeId);
   }
 
   applyTranslations();
@@ -26039,6 +26073,13 @@ window.addEventListener('load', async () => {
     else               fitMindmapView();
   });
 
+  // Last, once every view is applied and every control wired: whatever was open
+  // at the reload opens again — fresh, exactly as a tap would open it. Earlier,
+  // applying the saved view (switchView) would close it straight back.
+  if (_quietRestore && _quietRestore.commentNodeId && findNode(_quietRestore.commentNodeId)) {
+    openCommentDialog(_quietRestore.commentNodeId);
+  }
+  if (_quietRestore && _quietRestore.helpOpen) openHelp();
 });
 
 let _resizeRefitTimer = null;

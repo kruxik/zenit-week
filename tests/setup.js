@@ -419,6 +419,8 @@ _state.setTipsSeen = function(seen) {
 _state.getDocument = function() { return document; };
 _state.getCurrentView = function() { return currentView; };
 _state.resetCommentEditorLoad = function() { commentEditorLoad = null; };
+_state.setReloadFresh = function(v) { _reloadFresh = v; };
+_state.getRestoreKey = function() { return RESTORE_KEY; };
 _state.getCommentEditor = function() { return commentEditor; };
 _state.setCurrentView = function(v) { currentView = v; };
 _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
@@ -827,6 +829,11 @@ export const {
   commentEditorText,
   commentViewportBox,
   shouldPinPanelCaption,
+  isReloadNavigation,
+  readReloadRestore,
+  saveViewStateOnLeave,
+  reloadApp,
+  reloadAppFresh,
   commentToolbarState,
   isTypingTarget,
   tokenizeComment,

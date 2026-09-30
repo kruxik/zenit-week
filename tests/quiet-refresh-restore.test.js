@@ -37,6 +37,7 @@ describe('buildRestorePayload', () => {
       currentWeekKey: '2026-19',
       hoveredNodeId:  'node-abc',
       commentNodeId:  null,
+      helpOpen:       false,
     });
   });
 
