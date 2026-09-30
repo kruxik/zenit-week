@@ -822,6 +822,8 @@ export const {
   commentLiftAtStart,
   commentToggleAtCaret,
   commentInputRuleList,
+  commentBlockToggle,
+  commentToolbarState,
   isTypingTarget,
   tokenizeComment,
   serializeComment,

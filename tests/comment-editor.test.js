@@ -9,6 +9,7 @@ import {
   openCommentDialog, closeCommentDialog, persistCommentDraft, loadCommentEditor,
   buildCommentSchema, commentTextToDoc, commentDocToText, commentTextSlice, isTypingTarget,
   toggleCommentCheck, commentEnterCommand, commentLiftAtStart, commentToggleAtCaret, commentInputRuleList,
+  commentBlockToggle, commentToolbarState,
 } from './setup.js';
 
 // The real packages, injected exactly as the page injects the bundle's namespace.
@@ -383,5 +384,34 @@ describe('rich inline — input rules', () => {
   it('an unsafe scheme is never auto-linked', () => {
     const st = typeInto('javascript://x', ' ');
     expect(st.doc.firstChild.content.content.every(n => !n.marks.length)).toBe(true);
+  });
+});
+
+describe('phone formatting toolbar', () => {
+  const at = (text, from, to = from) => {
+    const doc = commentTextToDoc(schema, text);
+    return state.EditorState.create({ doc, selection: state.TextSelection.create(doc, from, to) });
+  };
+  const run = (st, cmd) => { let next = st; cmd(st, tr => { next = st.apply(tr); }); return next; };
+
+  it.each([
+    ['bullet', 'milk', '- milk'],
+    ['check', 'milk', '- [ ] milk'],
+    ['heading', 'Trip', '# Trip'],
+  ])('%s turns a paragraph into that block, and back', (type, text, md) => {
+    const on = run(at(text, 2), commentBlockToggle(schema, type));
+    expect(commentDocToText(on.doc)).toBe(md);
+    const off = run(on, commentBlockToggle(schema, type));
+    expect(commentDocToText(off.doc)).toBe(text);
+  });
+
+  it('switches every line in the selection', () => {
+    const st = run(at('a\nb', 1, 4), commentBlockToggle(schema, 'bullet'));
+    expect(commentDocToText(st.doc)).toBe('- a\n- b');
+  });
+
+  it('reports which marks and block are active at the caret', () => {
+    const st = at('- [ ] **bold** x', 3);
+    expect(commentToolbarState(st)).toEqual({ strong: true, em: false, heading: false, bullet: false, check: true });
   });
 });

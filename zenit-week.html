@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-d42qKLsPoLLnikTfJOdpUqv7vrq9K4rMUCTr6giAs3k='
+               'sha256-3GsNTHVxCnLn4oAagAxoR+D6oxBVni+Uz58XkQ8xLBk='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3350,6 +3350,27 @@
   #comment-editor strong { font-weight: 700; }
   #comment-editor a { color: var(--accent-primary); text-decoration: underline; }
   #comment-body { position: relative; }
+  /* Phone-only formatting bar: a touch screen has no Cmd+B. */
+  #comment-toolbar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  #comment-toolbar .agenda-action-btn {
+    min-width: 38px;
+    height: 34px;
+    font-size: 14px;
+  }
+  #comment-toolbar .comment-fmt-strong { font-weight: 800; }
+  #comment-toolbar .comment-fmt-em { font-style: italic; font-family: Georgia, serif; }
+  #comment-toolbar .agenda-action-btn[aria-pressed="true"] {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    #comment-toolbar { display: none; }
+  }
   .comment-link-chip {
     position: absolute;
     z-index: 1;
@@ -10875,6 +10896,11 @@ const TRANSLATIONS = {
     'menu.comment':               'Comment',
     'comment.toggleItem':         'Toggle checklist item',
     'comment.openLink':           'Open link',
+    'comment.fmtBold':            'Bold',
+    'comment.fmtItalic':          'Italic',
+    'comment.fmtHeading':         'Heading',
+    'comment.fmtBullet':          'Bulleted list',
+    'comment.fmtCheck':           'Checklist',
     'menu.addActivity':           'Add Activity',
     'menu.changeColor':           'Change color',
     'menu.setBaseline':           'Set Effort Baseline',
@@ -11234,6 +11260,11 @@ const TRANSLATIONS = {
     'menu.comment':               'Komentář',
     'comment.toggleItem':         'Přepnout položku seznamu',
     'comment.openLink':           'Otevřít odkaz',
+    'comment.fmtBold':            'Tučně',
+    'comment.fmtItalic':          'Kurzíva',
+    'comment.fmtHeading':         'Nadpis',
+    'comment.fmtBullet':          'Odrážky',
+    'comment.fmtCheck':           'Zaškrtávací seznam',
     'menu.addActivity':           'Přidat aktivitu',
     'menu.changeColor':           'Změnit barvu',
     'menu.setBaseline':           'Nastavit základní zátěž',
@@ -20069,6 +20100,78 @@ function commentLinkChipPlugin(pm) {
   });
 }
 
+// Phone formatting bar. Typed shortcuts cover everything, but a phone user
+// should not have to know them. Bold and italic toggle marks; the three block
+// buttons switch the caret's lines to that type, or back to a paragraph when
+// they already are one.
+const COMMENT_TOOLBAR = [
+  { id: 'strong', label: 'B', title: 'comment.fmtBold', mark: 'strong' },
+  { id: 'em', label: 'I', title: 'comment.fmtItalic', mark: 'em' },
+  { id: 'heading', label: 'H', title: 'comment.fmtHeading', block: 'heading' },
+  { id: 'bullet', label: '•', title: 'comment.fmtBullet', block: 'bullet' },
+  { id: 'check', label: '☐', title: 'comment.fmtCheck', block: 'check' },
+];
+
+function commentBlockToggle(schema, typeName) {
+  return (state, dispatch) => {
+    const { $from, $to } = state.selection;
+    const active = $from.parent.type.name === typeName;
+    if (dispatch) {
+      dispatch(state.tr.setBlockType($from.pos, $to.pos, active ? schema.nodes.paragraph : schema.nodes[typeName]));
+    }
+    return true;
+  };
+}
+
+function isCommentMarkActive(state, markType) {
+  const { from, to, empty, $from } = state.selection;
+  if (empty) return !!markType.isInSet(state.storedMarks || $from.marks());
+  return state.doc.rangeHasMark(from, to, markType);
+}
+
+function commentToolbarState(state) {
+  const active = {};
+  for (const item of COMMENT_TOOLBAR) {
+    active[item.id] = item.mark
+      ? isCommentMarkActive(state, state.schema.marks[item.mark])
+      : state.selection.$from.parent.type.name === item.block;
+  }
+  return active;
+}
+
+function buildCommentToolbar(pm, schema, getView) {
+  const bar = document.createElement('div');
+  bar.id = 'comment-toolbar';
+  bar.setAttribute('role', 'toolbar');
+  const buttons = COMMENT_TOOLBAR.map(item => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `agenda-action-btn comment-fmt-${item.id}`;
+    btn.textContent = item.label;
+    btn.title = t(item.title);
+    btn.setAttribute('aria-label', t(item.title));
+    btn.setAttribute('aria-pressed', 'false');
+    // Keep the caret, the selection and the phone keyboard where they are.
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const view = getView();
+      if (!view) return;
+      const command = item.mark
+        ? pm.commands.toggleMark(schema.marks[item.mark])
+        : commentBlockToggle(schema, item.block);
+      command(view.state, view.dispatch);
+      view.focus();
+    });
+    bar.appendChild(btn);
+    return { item, btn };
+  });
+  bar.sync = state => {
+    const active = commentToolbarState(state);
+    for (const { item, btn } of buttons) btn.setAttribute('aria-pressed', String(active[item.id]));
+  };
+  return bar;
+}
+
 // The checkbox is a real control outside the editable text. Tapping it never
 // moves the caret or raises a phone keyboard; the editor state stays the only
 // truth, and the box just mirrors it. Keyboard: Mod-Enter on the item.
@@ -20117,6 +20220,7 @@ function mountCommentEditor(pm) {
     const doc = commentTextToDoc(schema, ta.value);
     const host = document.createElement('div');
     host.id = 'comment-editor';
+    const toolbar = buildCommentToolbar(pm, schema, () => (commentEditor ? commentEditor.view : null));
     view = new pm.view.EditorView({ mount: host }, {
       state: pm.state.EditorState.create({
         doc,
@@ -20127,6 +20231,7 @@ function mountCommentEditor(pm) {
       attributes: { spellcheck: 'true', role: 'textbox', 'aria-multiline': 'true', 'aria-labelledby': 'comment-title' },
       dispatchTransaction(tr) {
         view.updateState(view.state.apply(tr));
+        toolbar.sync(view.state);
         if (tr.docChanged) {
           updateCommentCounter();
           scheduleCommentAutosave();
@@ -20158,13 +20263,16 @@ function mountCommentEditor(pm) {
       },
     });
     const hadFocus = document.activeElement === ta;
+    toolbar.sync(view.state);
+    ta.parentNode.insertBefore(toolbar, ta);
     ta.parentNode.insertBefore(host, ta);
     ta.hidden = true;
-    commentEditor = { pm, schema, view };
+    commentEditor = { pm, schema, view, toolbar };
     if (hadFocus) view.focus();
   } catch (err) {
     // Never block a comment: whatever went wrong, the textarea stays.
     if (view) { view.destroy(); view.dom.remove(); }
+    document.getElementById('comment-toolbar')?.remove();
     ta.hidden = false;
     commentEditor = null;
     console.warn('[comments] rich editor unavailable:', err);
@@ -20173,10 +20281,11 @@ function mountCommentEditor(pm) {
 
 function unmountCommentEditor() {
   if (!commentEditor) return;
-  const { view } = commentEditor;
+  const { view, toolbar } = commentEditor;
   commentEditor = null;
   view.destroy();
   view.dom.remove();
+  toolbar.remove();
   document.getElementById('comment-textarea').hidden = false;
 }
 

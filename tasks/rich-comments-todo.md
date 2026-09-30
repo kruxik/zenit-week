@@ -90,8 +90,19 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ### ⛔ CHECKPOINT 2 — editor feel review
 
-- [ ] Use for a day on desktop and phone.
-- [ ] Decide: phone formatting toolbar yes/no; phone link-open affordance.
+- [x] Use for a day on desktop and phone.
+- [x] Decide: phone formatting toolbar yes/no; phone link-open affordance.
+  - 2026-09-30: **phone toolbar — yes** (added as S5b below). **Link open — keep the Open-link chip** under the caret.
+
+---
+
+## S5b — Phone formatting toolbar (from Checkpoint 2)
+
+- [x] T5b.1 — `#comment-toolbar` above the editor: Bold, Italic, Heading, Bullet, Checkbox; built from `.agenda-action-btn`; hidden on fine-pointer (desktop) devices.
+- [x] T5b.2 — Buttons keep caret and keyboard (`mousedown` prevented); marks toggle, block buttons switch the selected lines and switch back when already that type; `aria-pressed` mirrors the caret's state.
+- [x] T5b.3 — EN + CS labels.
+- [x] T5b.4 — Tests: block toggle on/off, multi-line selection, active-state report.
+- [x] T5b.5 — `npm test` + `npm run validate` + **`npm run csp`** green.
 
 ---
 
