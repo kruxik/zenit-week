@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.09.30] - 2026-09-30
+
+### Added
+
+- **comments:** Keep headings, lists and checklists when pasting from Docs and other apps
+- **comments:** On touch, a tap on a link asks to open it instead of raising the keyboard
+- **comments:** Reopen the comment after a pull refresh; open for writing only when empty
+- **comments:** Float the counter and formatting bar over the text
+- **comments:** Place the character counter above the formatting bar
+- **comments:** Checkbox icon for the checklist button
+- **comments:** Add numbered lists with a list-numbers button
+- **comments:** List icon for bullets and accept "* " as a bullet marker
+- **comments:** Heading button uses the text-caption icon and leads the formatting bar
+- **comments:** Fold the formatting bar behind an Aa toggle with a slide-out animation
+- **comments:** Move formatting bar to the bottom-right corner, phone shows it only with the keyboard up
+- **map:** Show comments as a corner badge with checklist count on map nodes
+- **comments:** Cache the editor bundle offline and prefetch it when idle
+- **comments:** Add phone formatting toolbar to the comment editor
+- **comments:** Add bold, italic and safe links with filtered paste to the comment editor
+- **comments:** Add headings, bullets and tickable checklists to the comment editor
+- **comments:** Add comment grammar tokenizer and Agenda preview with checklist count
+- **comments:** Lazy-load ProseMirror plain-text editor with textarea fallback
+
+### Changed
+
+- **comments:** One way to open a comment link — the confirm dialog, from every entry point
+- **reload:** One reload path for the browser, logo, pull-down and update reload
+- **panels:** Share one pinned-caption behaviour for Help and Comment on phones
+
+### Fixed
+
+- **sync:** Show syncing in the OK green, not the warning yellow
+- **comments:** Paste Google Docs Title as a heading and keep a pasted heading's type mid-line
+- **comments:** An untouched open comment never overwrites a newer synced one, and follows it
+- **panels:** Stop the caption pin flickering at the bottom of a comment
+- **comments:** Drop the caret when the phone keyboard is dismissed
+- **comments:** Show over-length as a yellow heads-up, the limit is only a recommendation
+- **comments:** Fit the comment panel to the area above the phone keyboard
+- **license:** Generate third-party notices for the editor bundle into LICENSE
+- **comments:** Keep untouched comments byte-identical and harden the Markdown bridge from review
+
 ## [v2026.09.29] - 2026-09-29
 
 ### Fixed
