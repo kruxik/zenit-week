@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Mj1V/X70MWCln3uzC5tmWQPi8R+rKyI1EMSxoPcI09o='
+               'sha256-zstrn85CNKTZpgK3IrWAXF8gQ1qP4FKFxBnrNKmjKD4='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3372,7 +3372,35 @@
   }
   #comment-toolbar {
     display: flex;
+    align-items: center;
     gap: 6px;
+  }
+  /* Folded: no width, no hit area. Opening slides the row out to the left of
+     the Aa toggle — the view-level row's fade-and-shift, plus the width it
+     needs so the counter moves aside instead of being covered. The padding
+     keeps the buttons' shadows from being clipped. */
+  #comment-fmt-buttons {
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    margin: -6px;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(8px);
+    pointer-events: none;
+    transition: max-width 0.2s ease, opacity 0.15s ease, transform 0.15s ease;
+  }
+  #comment-toolbar.open #comment-fmt-buttons {
+    max-width: 280px;
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+  #comment-toolbar .comment-fmt-toggle .icon { width: 18px; height: 18px; }
+  #comment-toolbar .comment-fmt-toggle[aria-expanded="true"] {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
   }
   /* Desktop: the app's bottom bars float over the panel's lower edge, so the
      footer clears them — as .app-panel-content does for the other panels. */
@@ -4113,6 +4141,7 @@
   <symbol id="icon-caret-down" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 10l6 6l6 -6h-12"/></symbol>
   <symbol id="icon-flame" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.294 -2.333 5.588c0 3.704 3.134 6.706 7 6.706c3.866 0 7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235"/></symbol>
   <symbol id="icon-pencil" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></symbol>
+  <symbol id="icon-letter-case" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 15.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0"/><path d="M3 19v-10.5a3.5 3.5 0 0 1 7 0v10.5"/><path d="M3 13h7"/><path d="M21 12v7"/></symbol>
   <symbol id="icon-message" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9h8"/><path d="M8 13h6"/><path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12z"/></symbol>
   <symbol id="icon-plus" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14"/><path d="M5 12l14 0"/></symbol>
   <symbol id="icon-trash" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></symbol>
@@ -10999,6 +11028,7 @@ const TRANSLATIONS = {
     'menu.comment':               'Comment',
     'comment.toggleItem':         'Toggle checklist item',
     'comment.openLink':           'Open link',
+    'comment.fmtToggle':          'Formatting',
     'comment.fmtBold':            'Bold',
     'comment.fmtItalic':          'Italic',
     'comment.fmtHeading':         'Heading',
@@ -11363,6 +11393,7 @@ const TRANSLATIONS = {
     'menu.comment':               'Komentář',
     'comment.toggleItem':         'Přepnout položku seznamu',
     'comment.openLink':           'Otevřít odkaz',
+    'comment.fmtToggle':          'Formátování',
     'comment.fmtBold':            'Tučně',
     'comment.fmtItalic':          'Kurzíva',
     'comment.fmtHeading':         'Nadpis',
@@ -20267,10 +20298,16 @@ function commentToolbarState(state) {
   return active;
 }
 
+// Folded by default behind one "Aa" toggle, like the Mindmap tab's view-level
+// row: the same button opens and closes it, and it stays open while the user
+// formats. Every comment opens with it folded.
 function buildCommentToolbar(pm, schema, getView) {
   const bar = document.createElement('div');
   bar.id = 'comment-toolbar';
-  bar.setAttribute('role', 'toolbar');
+  const buttonsEl = document.createElement('div');
+  buttonsEl.id = 'comment-fmt-buttons';
+  buttonsEl.setAttribute('role', 'toolbar');
+  buttonsEl.inert = true;
   const buttons = COMMENT_TOOLBAR.map(item => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -20290,9 +20327,28 @@ function buildCommentToolbar(pm, schema, getView) {
       command(view.state, view.dispatch);
       view.focus();
     });
-    bar.appendChild(btn);
+    buttonsEl.appendChild(btn);
     return { item, btn };
   });
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'agenda-action-btn comment-fmt-toggle';
+  toggle.innerHTML = iconSvg('letter-case'); // static markup only
+  toggle.title = t('comment.fmtToggle');
+  toggle.setAttribute('aria-label', t('comment.fmtToggle'));
+  toggle.setAttribute('aria-controls', 'comment-fmt-buttons');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.addEventListener('mousedown', e => e.preventDefault());
+  toggle.addEventListener('click', () => {
+    const open = !bar.classList.contains('open');
+    bar.classList.toggle('open', open);
+    buttonsEl.inert = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+
+  bar.appendChild(buttonsEl);
+  bar.appendChild(toggle);
   bar.sync = state => {
     const active = commentToolbarState(state);
     for (const { item, btn } of buttons) btn.setAttribute('aria-pressed', String(active[item.id]));
