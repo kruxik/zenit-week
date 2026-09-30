@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-hId8Jf8c/4ELY/fmooBvsALePubSszcl/TRiWEGBYcI='
+               'sha256-tunYp7GzBBlse30vJYRsNSg1iN+Uu6XgOjsZsGROL20='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -11089,6 +11089,7 @@ const TRANSLATIONS = {
     'menu.comment':               'Comment',
     'comment.toggleItem':         'Toggle checklist item',
     'comment.openLink':           'Open link',
+    'comment.openLinkTitle':      'Open this link?',
     'comment.fmtToggle':          'Formatting',
     'comment.fmtBold':            'Bold',
     'comment.fmtItalic':          'Italic',
@@ -11455,6 +11456,7 @@ const TRANSLATIONS = {
     'menu.comment':               'Komentář',
     'comment.toggleItem':         'Přepnout položku seznamu',
     'comment.openLink':           'Otevřít odkaz',
+    'comment.openLinkTitle':      'Otevřít tento odkaz?',
     'comment.fmtToggle':          'Formátování',
     'comment.fmtBold':            'Tučně',
     'comment.fmtItalic':          'Kurzíva',
@@ -20327,8 +20329,48 @@ function openCommentLink(href) {
 }
 
 // Inside an editor a tap only places the caret, so a phone has no way to follow
-// a link. While the caret sits in one, a small Open chip appears under it; on
-// desktop Cmd/Ctrl-click opens the link directly.
+// a link. On touch, a tap anywhere on a link is taken for the link: no caret,
+// no keyboard, just the question whether to open it. On desktop Cmd/Ctrl-click
+// opens it directly, and while the caret sits in a link a small Open chip
+// appears under it.
+function askOpenCommentLink(href) {
+  showAppConfirm({
+    title: t('comment.openLinkTitle'),
+    body: href,
+    okLabel: t('comment.openLink'),
+    onConfirm: () => openCommentLink(href),
+  });
+}
+
+// A still tap on a link (a drag that starts on one is a scroll, left alone).
+// Cancelling touchend suppresses the click, which is what would focus the
+// editor and raise the keyboard.
+function guardCommentLinkTaps(dom) {
+  let tap = null;
+  const onStart = e => {
+    const a = e.touches.length === 1 && e.target.closest ? e.target.closest('a[href]') : null;
+    tap = a && dom.contains(a) ? { a, x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+  };
+  const onEnd = e => {
+    if (!tap) return;
+    const { a, x, y } = tap;
+    tap = null;
+    const end = e.changedTouches[0];
+    if (!end || Math.hypot(end.clientX - x, end.clientY - y) > 10) return;
+    e.preventDefault();
+    askOpenCommentLink(a.getAttribute('href'));
+  };
+  const onCancel = () => { tap = null; };
+  dom.addEventListener('touchstart', onStart, { passive: true });
+  dom.addEventListener('touchend', onEnd, { passive: false });
+  dom.addEventListener('touchcancel', onCancel);
+  return () => {
+    dom.removeEventListener('touchstart', onStart);
+    dom.removeEventListener('touchend', onEnd);
+    dom.removeEventListener('touchcancel', onCancel);
+  };
+}
+
 function commentLinkChipPlugin(pm) {
   return new pm.state.Plugin({
     props: {
@@ -20362,9 +20404,10 @@ function commentLinkChipPlugin(pm) {
         chip.style.left = `${Math.max(8, Math.min(caret.left - box.left, box.width - chip.offsetWidth - 8))}px`;
       };
       place(editorView);
+      const unguard = guardCommentLinkTaps(editorView.dom);
       return {
         update: place,
-        destroy: () => chip.remove(),
+        destroy: () => { chip.remove(); unguard(); },
       };
     },
   });
