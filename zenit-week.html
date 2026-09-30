@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-H0qCb5nWnd0ZXoj6RUA7IexzC3W9mo+F9h9QE3aFYd0='
+               'sha256-4fJ0iH6ViiD1EvtHbsI3BOi91JcnT60v01n7CgOiUVw='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -20717,11 +20717,19 @@ function fitCommentPanelToViewport() {
   if (key === commentViewportLast) { commentViewportStill++; return; }
   commentViewportLast = key;
   commentViewportStill = 0;
+  const wasOpen = panel.classList.contains('keyboard-open');
   panel.classList.toggle('keyboard-open', !!box);
   updatePanelCaption(panel);
   panel.style.top = box ? `${box.top}px` : '';
   panel.style.height = box ? `${box.height}px` : '';
   panel.style.bottom = box ? 'auto' : '';
+  // Dismissing the keyboard (Android's back gesture, the keyboard's own hide
+  // key) leaves the text focused, with a caret blinking at nothing. Put
+  // closing the keyboard and leaving the text together, as iOS's Done does.
+  if (wasOpen && !box) {
+    const active = document.activeElement;
+    if (active && panel.contains(active)) active.blur();
+  }
 }
 
 // Runs every frame while the visible area moves, and stops once it has been
