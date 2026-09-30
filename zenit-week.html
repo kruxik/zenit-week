@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-weYU/9S2h13zB3IKBZ+9XnV5wKxGBfwerQIn4hMSo/M='
+               'sha256-97iwqotou3oInSRbWXYffPmWFxtYjF1Dd+FlPkStovI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3340,6 +3340,22 @@
     font-weight: 700;
     color: var(--text-secondary);
   }
+  #comment-editor .cm-ordered {
+    position: relative;
+    padding-left: 26px;
+    counter-increment: cm-ol;
+  }
+  #comment-editor .cm-ordered:first-child,
+  #comment-editor :not(.cm-ordered) + .cm-ordered {
+    counter-reset: cm-ol var(--ol-start);
+  }
+  #comment-editor .cm-ordered::before {
+    content: counter(cm-ol) ".";
+    position: absolute;
+    left: 2px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
   #comment-editor .cm-check {
     display: flex;
     align-items: flex-start;
@@ -4144,6 +4160,7 @@
   <symbol id="icon-letter-case" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 15.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0"/><path d="M3 19v-10.5a3.5 3.5 0 0 1 7 0v10.5"/><path d="M3 13h7"/><path d="M21 12v7"/></symbol>
   <symbol id="icon-text-caption" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 15h16"/><path d="M4 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M4 20h12"/></symbol>
   <symbol id="icon-list" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></symbol>
+  <symbol id="icon-list-numbers" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11 6h9"/><path d="M11 12h9"/><path d="M12 18h8"/><path d="M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4"/><path d="M6 10v-6l-2 2"/></symbol>
   <symbol id="icon-message" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9h8"/><path d="M8 13h6"/><path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12z"/></symbol>
   <symbol id="icon-plus" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14"/><path d="M5 12l14 0"/></symbol>
   <symbol id="icon-trash" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></symbol>
@@ -11035,6 +11052,7 @@ const TRANSLATIONS = {
     'comment.fmtItalic':          'Italic',
     'comment.fmtHeading':         'Heading',
     'comment.fmtBullet':          'Bulleted list',
+    'comment.fmtOrdered':         'Numbered list',
     'comment.fmtCheck':           'Checklist',
     'menu.addActivity':           'Add Activity',
     'menu.changeColor':           'Change color',
@@ -11400,6 +11418,7 @@ const TRANSLATIONS = {
     'comment.fmtItalic':          'Kurzíva',
     'comment.fmtHeading':         'Nadpis',
     'comment.fmtBullet':          'Odrážky',
+    'comment.fmtOrdered':         'Číslovaný seznam',
     'comment.fmtCheck':           'Zaškrtávací seznam',
     'menu.addActivity':           'Přidat aktivitu',
     'menu.changeColor':           'Změnit barvu',
@@ -19715,7 +19734,8 @@ document.getElementById('ctx-comment').addEventListener('click', () => {
 
 // ─── Comment grammar ──────────────────────────────────────────────────────────
 // A comment is one plain string, read as Markdown in a small fixed grammar:
-//   blocks  — paragraph, `# ` heading, `- ` or `* ` bullet, `- [ ] ` / `- [x] ` checkbox
+//   blocks  — paragraph, `# ` heading, `- ` or `* ` bullet, `1. ` numbered item,
+//             `- [ ] ` / `- [x] ` checkbox
 //   inline  — `**bold**`, `*italic*`, `[text](url)`, bare http(s) URL
 // Anything else is literal text. There is no escape syntax and no nesting, and
 // every construct is recognised only in the exact spelling its serializer
@@ -19728,6 +19748,9 @@ const COMMENT_BLOCK_RULES = [
   { type: 'bullet', marker: '* ', bullet: '*' },
   { type: 'heading', marker: '# ' },
 ];
+// A numbered item: up to nine digits, a dot, a space. The digits are kept as
+// written, so `01. ` survives an untouched round trip.
+const COMMENT_ORDERED_RE = /^(\d{1,9})\. /;
 // Order matters: bold before italic, so `**` is never read as two italics.
 const COMMENT_INLINE_RE = new RegExp([
   /\*\*(?<bold>[^\s*](?:[^*\n]*[^\s*])?)\*\*/.source,
@@ -19771,11 +19794,14 @@ function tokenizeComment(str) {
   let pos = 0;
   for (const line of (str || '').split('\n')) {
     const rule = COMMENT_BLOCK_RULES.find(r => line.startsWith(r.marker));
-    const marker = rule ? rule.marker : '';
-    const block = { type: rule ? rule.type : 'paragraph', start: pos, end: pos + line.length };
+    const ordered = rule ? null : COMMENT_ORDERED_RE.exec(line);
+    const marker = rule ? rule.marker : ordered ? ordered[0] : '';
+    const type = rule ? rule.type : ordered ? 'ordered' : 'paragraph';
+    const block = { type, start: pos, end: pos + line.length };
     if (rule && rule.type === 'check') block.checked = rule.checked;
     // Which bullet character it was written with, so it is written back the same.
     if (rule && rule.type === 'bullet') block.bullet = rule.bullet;
+    if (ordered) block.number = ordered[1];
     block.inline = tokenizeCommentInline(line.slice(marker.length), pos + marker.length);
     blocks.push(block);
     pos += line.length + 1;
@@ -19797,6 +19823,7 @@ function serializeCommentInline(tokens) {
 function commentBlockMarker(block) {
   if (block.type === 'check') return block.checked ? '- [x] ' : '- [ ] ';
   if (block.type === 'bullet') return block.bullet === '*' ? '* ' : '- ';
+  if (block.type === 'ordered') return `${block.number}. `;
   if (block.type === 'heading') return '# ';
   return '';
 }
@@ -19954,6 +19981,18 @@ function buildCommentSchema(pm) {
         parseDOM: [{ tag: 'div.cm-bullet' }],
         toDOM: () => ['div', { class: 'cm-bullet' }, 0],
       },
+      // Shows the number of its place in the run, counted from the first item's
+      // own number (CSS counters), exactly as Markdown numbers a list.
+      ordered: {
+        ...text,
+        attrs: { number: { default: '1' } },
+        parseDOM: [{ tag: 'div.cm-ordered', getAttrs: dom => ({ number: dom.getAttribute('data-number') || '1' }) }],
+        toDOM: node => ['div', {
+          class: 'cm-ordered',
+          'data-number': node.attrs.number,
+          style: `--ol-start: ${(parseInt(node.attrs.number, 10) || 1) - 1}`,
+        }, 0],
+      },
       check: {
         ...text,
         attrs: { checked: { default: false } },
@@ -20051,7 +20090,9 @@ function serializeCommentInlineNodes(content) {
 }
 
 function commentNodeMarker(node) {
-  return commentBlockMarker({ type: node.type.name, checked: node.attrs.checked, bullet: node.attrs.bullet });
+  return commentBlockMarker({
+    type: node.type.name, checked: node.attrs.checked, bullet: node.attrs.bullet, number: node.attrs.number,
+  });
 }
 
 // String → doc through the grammar's own tokenizer, so the editor, the Agenda
@@ -20060,14 +20101,29 @@ function commentNodeMarker(node) {
 function commentTextToDoc(schema, text) {
   return schema.node('doc', null, tokenizeComment(text || '').map(block =>
     schema.node(block.type,
-      block.type === 'check' ? { checked: block.checked } : block.type === 'bullet' ? { bullet: block.bullet } : null,
+      block.type === 'check' ? { checked: block.checked }
+        : block.type === 'bullet' ? { bullet: block.bullet }
+        : block.type === 'ordered' ? { number: block.number } : null,
       block.inline.map(tk => schema.text(tk.text, commentMarkFor(schema, tk))))));
 }
 
 function commentFragmentToText(fragment) {
   if (fragment.firstChild && fragment.firstChild.isInline) return serializeCommentInlineNodes(fragment);
+  // A numbered run is written the way it shows: the first item keeps the
+  // number it was written with, the rest count on from it. Only reached after
+  // a real edit — an untouched comment keeps its source (commentEditorText).
   const lines = [];
-  fragment.forEach(node => lines.push(commentNodeMarker(node) + serializeCommentInlineNodes(node.content)));
+  let next = null;
+  fragment.forEach(node => {
+    let marker = commentNodeMarker(node);
+    if (node.type.name === 'ordered') {
+      if (next !== null) marker = `${next}. `;
+      next = (next !== null ? next : (parseInt(node.attrs.number, 10) || 1)) + 1;
+    } else {
+      next = null;
+    }
+    lines.push(marker + serializeCommentInlineNodes(node.content));
+  });
   return lines.join('\n');
 }
 
@@ -20100,7 +20156,7 @@ function isCommentEditorTarget(el) {
   return !!commentEditor && !!el && commentEditor.view.dom.contains(el);
 }
 
-const isCommentListItem = node => node.type.name === 'bullet' || node.type.name === 'check';
+const isCommentListItem = node => ['bullet', 'ordered', 'check'].includes(node.type.name);
 
 // A tick is one transaction and its own undo step — closeHistory keeps it from
 // merging into the typing just before it.
@@ -20178,6 +20234,7 @@ function commentInputRuleList(pm, schema) {
   const inner = '([^\\s*](?:[^*\\n]*[^\\s*])?)';
   return [
     textblockTypeInputRule(/^([-*])\s$/, n.bullet, m => ({ bullet: m[1] })),
+    textblockTypeInputRule(/^(\d{1,9})\.\s$/, n.ordered, m => ({ number: m[1] })),
     textblockTypeInputRule(/^(?:-\s)?\[(\s?|x)\]\s$/, n.check, m => ({ checked: m[1] === 'x' })),
     textblockTypeInputRule(/^#\s$/, n.heading),
     commentMarkInputRule(pm, new RegExp(`(?:^|[^*])(\\*\\*${inner}\\*\\*)$`), schema.marks.strong),
@@ -20280,6 +20337,7 @@ const COMMENT_TOOLBAR = [
   { id: 'strong', label: 'B', title: 'comment.fmtBold', mark: 'strong' },
   { id: 'em', label: 'I', title: 'comment.fmtItalic', mark: 'em' },
   { id: 'bullet', icon: 'list', title: 'comment.fmtBullet', block: 'bullet' },
+  { id: 'ordered', icon: 'list-numbers', title: 'comment.fmtOrdered', block: 'ordered' },
   { id: 'check', label: '☐', title: 'comment.fmtCheck', block: 'check' },
 ];
 

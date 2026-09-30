@@ -41,13 +41,14 @@ describe('comment text ↔ ProseMirror doc', () => {
     ['# Heading', 'heading'],
     ['- bullet', 'bullet'],
     ['* bullet', 'bullet'],
+    ['3. third', 'ordered'],
     ['- [ ] open', 'check'],
     ['- [x] done', 'check'],
     ['plain', 'paragraph'],
   ])('%j becomes a %s node without its marker', (text, type) => {
     const node = commentTextToDoc(schema, text).firstChild;
     expect(node.type.name).toBe(type);
-    expect(node.textContent).toBe(text.replace(/^(- \[[ x]\] |[-*] |# )/, ''));
+    expect(node.textContent).toBe(text.replace(/^(- \[[ x]\] |[-*] |\d+\. |# )/, ''));
   });
 
   it('reads inline syntax into marks', () => {
@@ -267,7 +268,7 @@ describe('rich blocks — editing commands', () => {
   it('input rules cover - , [] , [ ] , [x] , - [ ]  and # ', () => {
     const rules = commentInputRuleList(pm, schema);
     const matches = (s) => rules.filter(r => r.match.test(s)).length;
-    for (const typed of ['- ', '* ', '[] ', '[ ] ', '[x] ', '- [ ] ', '- [x] ', '# ', '-\u00a0']) {
+    for (const typed of ['- ', '* ', '1. ', '12. ', '[] ', '[ ] ', '[x] ', '- [ ] ', '- [x] ', '# ', '-\u00a0']) {
       expect(matches(typed)).toBeGreaterThan(0);
     }
     for (const typed of ['-- ', '## ', '[X] ', 'a- ']) expect(matches(typed)).toBe(0);
@@ -419,7 +420,7 @@ describe('phone formatting toolbar', () => {
 
   it('reports which marks and block are active at the caret', () => {
     const st = at('- [ ] **bold** x', 3);
-    expect(commentToolbarState(st)).toEqual({ strong: true, em: false, heading: false, bullet: false, check: true });
+    expect(commentToolbarState(st)).toEqual({ strong: true, em: false, heading: false, bullet: false, ordered: false, check: true });
   });
 });
 
@@ -550,5 +551,36 @@ describe('phone panels pin their caption (Help, Comment)', () => {
 
   it('never on desktop', () => {
     expect(shouldPinPanelCaption({ narrow: false, keyboard: true, scrollTop: 500 })).toBe(false);
+  });
+});
+
+describe('numbered lists', () => {
+  const at = (text, pos) => {
+    const doc = commentTextToDoc(schema, text);
+    return state.EditorState.create({ doc, selection: state.TextSelection.create(doc, pos) });
+  };
+  const run = (st, cmd) => { let next = st; cmd(st, tr => { next = st.apply(tr); }); return next; };
+
+  it('keeps the written numbers on an untouched read', () => {
+    const doc = commentTextToDoc(schema, '1. a\n1. b');
+    expect(doc.child(0).attrs.number).toBe('1');
+    expect(doc.child(1).attrs.number).toBe('1');
+  });
+
+  it('once edited, a run is written the way it shows — counting on from its first item', () => {
+    expect(commentDocToText(commentTextToDoc(schema, '1. a\n1. b\n1. c'))).toBe('1. a\n2. b\n3. c');
+    expect(commentDocToText(commentTextToDoc(schema, '3. a\n9. b'))).toBe('3. a\n4. b');
+    expect(commentDocToText(commentTextToDoc(schema, '1. a\ntext\n5. b\n5. c'))).toBe('1. a\ntext\n5. b\n6. c');
+  });
+
+  it('Enter continues a numbered list, and the next number follows on save', () => {
+    const st = run(at('1. milk', 5), commentEnterCommand(pm));
+    expect(commentDocToText(st.doc)).toBe('1. milk\n2. ');
+  });
+
+  it('the toolbar button turns a line into a numbered item and back', () => {
+    const on = run(at('milk', 2), commentBlockToggle(schema, 'ordered'));
+    expect(commentDocToText(on.doc)).toBe('1. milk');
+    expect(commentDocToText(run(on, commentBlockToggle(schema, 'ordered')).doc)).toBe('milk');
   });
 });

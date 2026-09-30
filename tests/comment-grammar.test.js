@@ -13,6 +13,8 @@ describe('comment grammar — blocks', () => {
     ['# Heading', 'heading', undefined],
     ['- bullet', 'bullet', undefined],
     ['* star bullet', 'bullet', undefined],
+    ['1. numbered', 'ordered', undefined],
+    ['12. twelfth', 'ordered', undefined],
     ['- [ ] open item', 'check', false],
     ['- [x] done item', 'check', true],
   ])('%j is a %s', (line, type, checked) => {
@@ -23,7 +25,7 @@ describe('comment grammar — blocks', () => {
 
   it.each([
     '#no space', '## two levels', '-no space', '*no space', '  - indented',
-    '- [X] capital X', '- [ ]no space', '1. numbered', '> quote',
+    '- [X] capital X', '- [ ]no space', '> quote',
   ])('%j stays literal (paragraph or bullet text), never a new construct', (line) => {
     const [block] = tokenizeComment(line);
     expect(['paragraph', 'bullet']).toContain(block.type);
@@ -101,6 +103,7 @@ describe('comment round trip — tokens re-serialize byte-identically', () => {
     '\n\n\n',
     '- [X] capital\n- [ ]no space\n-  two spaces',
     '* star\n- dash\n* mixed *italic* inside\n*not a bullet*',
+    '1. a\n1. b\n01. c\n2026. year\n1.no space\n1) paren',
     'CRLF line\r\nsecond',
   ];
 
