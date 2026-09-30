@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-9ruAV47T4FAxXuH76Yr1mPBJjFjop5BwZUBGrwMduZo='
+               'sha256-JpVX49jgxKXii1X/GZNupoKdeACt3h3n1O5bg1OEfDI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3404,6 +3404,25 @@
     }
     body:has(#comment-panel.visible) #comment-close-bar {
       display: flex;
+    }
+    /* Keyboard up: the panel is exactly the visible area (JS sets top and
+       height), the caption sits at its top in place of the app bar, and the
+       text scrolls inside the panel. Reaching its end must not hand the drag on
+       to the page — the page panning is what would move the caption. The
+       bottom Close pill would sit behind the keyboard; the caption's X serves. */
+    body:has(#comment-panel.keyboard-open) #toolbar { visibility: hidden; }
+    body:has(#comment-panel.keyboard-open) #comment-close-bar { display: none; }
+    #comment-panel.keyboard-open {
+      --panel-header-top: 0px;
+      transition: opacity 0.3s ease;
+    }
+    #comment-panel.keyboard-open #comment-body {
+      padding-top: calc(var(--panel-header-h) + 12px);
+      padding-bottom: 8px;
+    }
+    #comment-panel.keyboard-open #comment-editor,
+    #comment-panel.keyboard-open #comment-textarea {
+      overscroll-behavior: contain;
     }
   }
 
@@ -20410,6 +20429,7 @@ function openCommentDialog(nodeId) {
   updateCommentCounter();
   document.getElementById('comment-overlay').classList.add('visible');
   document.getElementById('comment-panel').classList.add('visible');
+  setCommentViewportFit(true);
   ta.focus();
   // The textarea is usable at once; the rich editor replaces it only once its
   // bundle is ready and nothing has been typed, so no keystroke is ever lost to
@@ -20464,6 +20484,70 @@ function persistCommentDraft() {
   else updateNodeUI(id);
 }
 
+// A phone keyboard does not shrink the page: the browser pans the visible area
+// over it, and everything position:fixed at the top — the app bar and the
+// comment caption with it — slides off. Chasing that pan with the caption
+// always lags a frame and jiggles, because the browser pans on its compositor
+// and the page hears of it late. So nothing is chased while scrolling: with
+// the keyboard up, the panel takes exactly the visible area — its top and its
+// height — and the text scrolls inside it. Every line is reachable without
+// panning the page, so the page stays still and the caption with it. The
+// visible area itself is never forced back; the panel only follows it, frame
+// by frame, while the keyboard opens or closes.
+// Phones only; pinch-zoom is left alone — there the user is inspecting.
+const COMMENT_KEYBOARD_MIN_PX = 120;
+
+function commentViewportBox(innerHeight, vv, narrow) {
+  if (!vv || !narrow || vv.scale > 1.01) return null;
+  if (innerHeight - vv.height <= COMMENT_KEYBOARD_MIN_PX) return null;
+  return { top: Math.round(vv.offsetTop), height: Math.round(vv.height) };
+}
+
+let commentViewportFrame = 0;
+let commentViewportLast = '';
+let commentViewportStill = 0;
+
+function fitCommentPanelToViewport() {
+  const panel = document.getElementById('comment-panel');
+  const narrow = window.matchMedia('(max-width: 767px)').matches;
+  const box = commentViewportBox(window.innerHeight, window.visualViewport, narrow);
+  const key = box ? `${box.top}:${box.height}` : '';
+  if (key === commentViewportLast) { commentViewportStill++; return; }
+  commentViewportLast = key;
+  commentViewportStill = 0;
+  panel.classList.toggle('keyboard-open', !!box);
+  panel.style.top = box ? `${box.top}px` : '';
+  panel.style.height = box ? `${box.height}px` : '';
+  panel.style.bottom = box ? 'auto' : '';
+}
+
+// Runs every frame while the visible area moves, and stops once it has been
+// still for a few frames; the next viewport event restarts it.
+function followCommentViewport() {
+  fitCommentPanelToViewport();
+  commentViewportFrame = commentViewportStill < 10 ? requestAnimationFrame(followCommentViewport) : 0;
+}
+
+function wakeCommentViewport() {
+  commentViewportStill = 0;
+  if (!commentViewportFrame) commentViewportFrame = requestAnimationFrame(followCommentViewport);
+}
+
+function setCommentViewportFit(on) {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const method = on ? 'addEventListener' : 'removeEventListener';
+  vv[method]('scroll', wakeCommentViewport);
+  vv[method]('resize', wakeCommentViewport);
+  cancelAnimationFrame(commentViewportFrame);
+  commentViewportFrame = 0;
+  commentViewportLast = '';
+  if (on) { wakeCommentViewport(); return; }
+  const panel = document.getElementById('comment-panel');
+  panel.classList.remove('keyboard-open');
+  panel.style.top = panel.style.height = panel.style.bottom = '';
+}
+
 function scheduleCommentAutosave() {
   clearTimeout(commentSaveTimer);
   commentSaveTimer = setTimeout(persistCommentDraft, COMMENT_AUTOSAVE_MS);
@@ -20472,6 +20556,7 @@ function scheduleCommentAutosave() {
 function closeCommentDialog() {
   document.getElementById('comment-overlay').classList.remove('visible');
   document.getElementById('comment-panel').classList.remove('visible');
+  setCommentViewportFit(false);
   persistCommentDraft();
   unmountCommentEditor();
   commentSession++;

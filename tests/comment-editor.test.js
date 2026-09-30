@@ -9,7 +9,7 @@ import {
   openCommentDialog, closeCommentDialog, persistCommentDraft, loadCommentEditor,
   buildCommentSchema, commentTextToDoc, commentDocToText, commentTextSlice, isTypingTarget,
   toggleCommentCheck, commentEnterCommand, commentLiftAtStart, commentToggleAtCaret, commentInputRuleList,
-  commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor, commentEditorText,
+  commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor, commentEditorText, commentViewportBox,
   takeSnapshot,
 } from './setup.js';
 
@@ -508,5 +508,25 @@ describe('pre-release review fixes', () => {
     triggerKeydown({ key: 'z', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false,
       target: { tagName: 'BODY' }, preventDefault() {}, stopPropagation() {} });
     expect(_state.getUndoStack().length).toBe(before - 1);
+  });
+});
+
+describe('comment panel takes the visible area above a phone keyboard', () => {
+  const vv = (height, offsetTop = 0, scale = 1) => ({ height, offsetTop, scale });
+
+  it('matches the visible area exactly — top and height', () => {
+    expect(commentViewportBox(800, vv(450, 0), true)).toEqual({ top: 0, height: 450 });
+    expect(commentViewportBox(800, vv(450.6, 212.3), true)).toEqual({ top: 212, height: 451 });
+  });
+
+  it('leaves the normal layout alone without a keyboard', () => {
+    expect(commentViewportBox(800, vv(800), true)).toBe(null);
+    expect(commentViewportBox(800, vv(720), true)).toBe(null); // URL bar, not a keyboard
+  });
+
+  it('ignores desktop widths, pinch-zoom and browsers without the API', () => {
+    expect(commentViewportBox(800, vv(450), false)).toBe(null);
+    expect(commentViewportBox(800, vv(400, 0, 2), true)).toBe(null);
+    expect(commentViewportBox(800, null, true)).toBe(null);
   });
 });
