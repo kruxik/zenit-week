@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Ap080o6z793ICOrQfk9rENTZsH5+GfnKcjPH/ulX55g='
+               'sha256-Mj1V/X70MWCln3uzC5tmWQPi8R+rKyI1EMSxoPcI09o='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3359,12 +3359,25 @@
   #comment-editor strong { font-weight: 700; }
   #comment-editor a { color: var(--accent-primary); text-decoration: underline; }
   #comment-body { position: relative; }
-  /* Phone-only formatting bar: a touch screen has no Cmd+B. */
+  /* Formatting bar: the bottom-right corner of the comment footer, next to the
+     counter. Always there on desktop; on a phone only while the keyboard is up
+     (see the phone rules), when there is text being written to format. */
+  #comment-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
   #comment-toolbar {
     display: flex;
     gap: 6px;
-    margin-bottom: 12px;
-    flex-shrink: 0;
+  }
+  /* Desktop: the app's bottom bars float over the panel's lower edge, so the
+     footer clears them — as .app-panel-content does for the other panels. */
+  @media (min-width: 768px) {
+    #comment-body { padding-bottom: var(--stack-l1); }
   }
   #comment-toolbar .agenda-action-btn {
     min-width: 38px;
@@ -3376,9 +3389,6 @@
   #comment-toolbar .agenda-action-btn[aria-pressed="true"] {
     color: var(--accent-primary);
     border-color: var(--accent-primary);
-  }
-  @media (hover: hover) and (pointer: fine) {
-    #comment-toolbar { display: none; }
   }
   .comment-link-chip {
     position: absolute;
@@ -3396,7 +3406,6 @@
     margin: 0;
   }
   #comment-counter {
-    margin-top: 8px;
     text-align: right;
     font-size: 11px;
     color: var(--text-placeholder);
@@ -3415,6 +3424,8 @@
       padding-top: calc(var(--panel-header-h) + 12px);
     }
     body:has(#comment-panel.keyboard-open) #comment-close-bar { display: none; }
+    #comment-toolbar { display: none; }
+    #comment-panel.keyboard-open #comment-toolbar { display: flex; }
     #comment-panel.keyboard-open { transition: opacity 0.3s ease; }
     #comment-panel.keyboard-open #comment-body { padding-bottom: 8px; }
     #comment-panel.keyboard-open #comment-editor,
@@ -4881,7 +4892,9 @@ Or remove them later in Settings → Help.</div>
   </div>
   <div id="comment-body">
     <textarea id="comment-textarea" spellcheck="true"></textarea>
-    <div id="comment-counter"></div>
+    <div id="comment-footer">
+      <div id="comment-counter"></div>
+    </div>
   </div>
 </div>
 <div id="comment-close-bar">
@@ -20215,8 +20228,8 @@ function commentLinkChipPlugin(pm) {
   });
 }
 
-// Phone formatting bar. Typed shortcuts cover everything, but a phone user
-// should not have to know them. Bold and italic toggle marks; the three block
+// Formatting bar, in the footer's bottom-right corner. Typed shortcuts cover
+// everything, but nobody should have to know them. Bold and italic toggle marks; the three block
 // buttons switch the caret's lines to that type, or back to a paragraph when
 // they already are one.
 const COMMENT_TOOLBAR = [
@@ -20380,7 +20393,7 @@ function mountCommentEditor(pm) {
     });
     const hadFocus = document.activeElement === ta;
     toolbar.sync(view.state);
-    ta.parentNode.insertBefore(toolbar, ta);
+    document.getElementById('comment-footer').appendChild(toolbar);
     ta.parentNode.insertBefore(host, ta);
     ta.hidden = true;
     commentEditor = { pm, schema, view, toolbar, source: ta.value, dirty: false };
