@@ -47,11 +47,14 @@ describe('comment text ↔ ProseMirror doc', () => {
     expect(node.textContent).toBe(text.replace(/^(- \[[ x]\] |- |# )/, ''));
   });
 
-  it('keeps inline syntax as literal text until marks exist', () => {
+  it('reads inline syntax into marks', () => {
     const text = '- [x] **bold** [doc](https://a.cz)';
     const doc = commentTextToDoc(schema, text);
     expect(doc.firstChild.attrs.checked).toBe(true);
-    expect(doc.firstChild.textContent).toBe('**bold** [doc](https://a.cz)');
+    expect(doc.firstChild.textContent).toBe('bold doc');
+    const [bold, , link] = doc.firstChild.content.content;
+    expect(bold.marks.map(m => m.type.name)).toEqual(['strong']);
+    expect(link.marks[0].attrs).toEqual({ href: 'https://a.cz', auto: false });
     expect(commentDocToText(doc)).toBe(text);
   });
 
@@ -260,5 +263,125 @@ describe('rich blocks — editing commands', () => {
       expect(matches(typed)).toBeGreaterThan(0);
     }
     for (const typed of ['-- ', '## ', '[X] ', 'a- ']) expect(matches(typed)).toBe(0);
+  });
+});
+
+describe('rich inline — marks', () => {
+  const para = (...nodes) => schema.node('doc', null, [schema.node('paragraph', null, nodes)]);
+  const txt = (t, ...marks) => schema.text(t, marks);
+  const { strong, em, link } = schema.marks;
+
+  it.each([
+    'plain **bold** and *italic* text',
+    'see [the doc](https://docs.example.com/x) or https://example.com/a?b=1.',
+    '**a** *b* **c**',
+    'mail [me](mailto:me@example.com)',
+    'literal: 2 * 3, a**b, ** x **, [x](javascript:alert(1))',
+    '# **Heading** with https://a.cz\n- [x] *done* [l](https://b.cz)\n- item',
+  ])('round-trips %j byte-identically through marks', (text) => {
+    expect(commentDocToText(commentTextToDoc(schema, text))).toBe(text);
+  });
+
+  it('moves whitespace at a mark edge outside the delimiters', () => {
+    expect(commentDocToText(para(txt('a'), txt(' b ', strong.create()), txt('c')))).toBe('a **b** c');
+    expect(commentDocToText(para(txt(' i', em.create())))).toBe(' *i*');
+  });
+
+  it('a whitespace-only marked run is written as plain text', () => {
+    expect(commentDocToText(para(txt('a'), txt('  ', strong.create()), txt('b')))).toBe('a  b');
+  });
+
+  it('an auto link stays a bare URL until its text is edited', () => {
+    const href = 'https://a.cz';
+    expect(commentDocToText(para(txt(href, link.create({ href, auto: true }))))).toBe(href);
+    expect(commentDocToText(para(txt('site', link.create({ href, auto: true }))))).toBe(`[site](${href})`);
+  });
+
+  it('marks exclude one another — the grammar has no nesting', () => {
+    const doc = para(txt('word', em.create()));
+    let st = state.EditorState.create({ doc, selection: state.TextSelection.create(doc, 1, 5) });
+    commands.toggleMark(strong)(st, tr => { st = st.apply(tr); });
+    expect(commentDocToText(st.doc)).toBe('**word**');
+  });
+});
+
+describe('rich inline — paste allow-list', () => {
+  const allRules = () => [
+    ...Object.values(schema.nodes).flatMap(t => t.spec.parseDOM || []),
+    ...Object.values(schema.marks).flatMap(t => t.spec.parseDOM || []),
+  ];
+
+  it('parse rules name only the grammar\'s own elements', () => {
+    const tags = allRules().filter(r => r.tag).map(r => r.tag.split(/[.[]/)[0]);
+    expect([...new Set(tags)].sort()).toEqual(['a', 'b', 'div', 'em', 'h3', 'i', 'p', 'strong']);
+    for (const bad of ['script', 'img', 'iframe', 'style', 'object', 'svg', 'form', 'input']) {
+      expect(tags).not.toContain(bad);
+    }
+  });
+
+  it('a pasted link with an unsafe scheme becomes plain text', () => {
+    const rule = schema.marks.link.spec.parseDOM[0];
+    const a = (href) => ({ getAttribute: () => href });
+    expect(rule.getAttrs(a('javascript:alert(1)'))).toBe(false);
+    expect(rule.getAttrs(a('JAVASCRIPT:alert(1)'))).toBe(false);
+    expect(rule.getAttrs(a('data:text/html,x'))).toBe(false);
+    expect(rule.getAttrs(a(' https://a.cz'))).toBe(false);
+    expect(rule.getAttrs(a('https://a.cz'))).toEqual({ href: 'https://a.cz' });
+  });
+
+  it('Google Docs\' normal-weight <b> wrapper is not bold', () => {
+    const rule = schema.marks.strong.spec.parseDOM.find(r => r.tag === 'b');
+    expect(rule.getAttrs({ style: { fontWeight: 'normal' } })).toBe(false);
+    expect(rule.getAttrs({ style: { fontWeight: '' } })).toBe(null);
+  });
+});
+
+describe('rich inline — input rules', () => {
+  const rules = commentInputRuleList(pm, schema);
+  // Mirrors prosemirror-inputrules: the typed character is part of the match
+  // but not yet part of the document.
+  const typeInto = (before, typed) => {
+    // Raw text, not through the tokenizer — which would already link a URL.
+    const doc = schema.node('doc', null, [schema.node('paragraph', null, [schema.text(before)])]);
+    const cursor = doc.content.size - 1;
+    const st = state.EditorState.create({ doc, selection: state.TextSelection.create(doc, cursor) });
+    const textBefore = before + typed;
+    for (const rule of rules) {
+      const match = rule.match.exec(textBefore);
+      if (!match) continue;
+      const tr = rule.handler(st, match, cursor - (match[0].length - typed.length), cursor);
+      if (tr) return st.apply(tr);
+    }
+    return st.apply(st.tr.insertText(typed));
+  };
+
+  it('closing ** makes bold and drops the delimiters', () => {
+    const st = typeInto('say **hi*', '*');
+    expect(st.doc.textContent).toBe('say hi');
+    expect(commentDocToText(st.doc)).toBe('say **hi**');
+  });
+
+  it('closing * makes italic, but not inside a bold run being typed', () => {
+    expect(commentDocToText(typeInto('an *idea', '*').doc)).toBe('an *idea*');
+    expect(typeInto('an *idea', '*').doc.textContent).toBe('an idea');
+    expect(typeInto('**bold', '*').doc.textContent).toBe('**bold*');
+  });
+
+  it('spaces around the content keep asterisks literal', () => {
+    expect(typeInto('2 * 3 ', '*').doc.textContent).toBe('2 * 3 *');
+  });
+
+  it('a space after a bare URL makes it a link', () => {
+    const st = typeInto('go https://example.com/x.', ' ');
+    expect(st.doc.textContent).toBe('go https://example.com/x. ');
+    expect(commentDocToText(st.doc)).toBe('go https://example.com/x. ');
+    const linked = st.doc.firstChild.child(1);
+    expect(linked.text).toBe('https://example.com/x');
+    expect(linked.marks[0].attrs).toEqual({ href: 'https://example.com/x', auto: true });
+  });
+
+  it('an unsafe scheme is never auto-linked', () => {
+    const st = typeInto('javascript://x', ' ');
+    expect(st.doc.firstChild.content.content.every(n => !n.marks.length)).toBe(true);
   });
 });

@@ -77,13 +77,13 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ## S5 — Rich inline
 
-- [ ] T5.1 — Marks: bold, italic, link. Cmd/Ctrl+B / I (check the keydown handler for collisions first).
-- [ ] T5.2 — Input rules: closing `**x**` → bold, `*x*` → italic; typed or pasted bare URL → link.
-- [ ] T5.3 — Link mark parse rule enforces `isSafeCommentUrl`; Cmd/Ctrl-click opens with `noopener`; resolve the phone "open link" affordance per the plan's Open Questions.
-- [ ] T5.4 — Paste: HTML passes only through the schema; unknown marks and nodes dropped; plain-text paste goes through the tokenizer.
-- [ ] T5.5 — i18n for any new strings (EN + CS).
-- [ ] T5.6 — Tests: marks round trip; unsafe link pasted as HTML becomes plain text; pasted `<script>` / `<img onerror>` produce no element.
-- [ ] T5.7 — `npm test` + `npm run validate` + **`npm run csp`** green.
+- [x] T5.1 — Marks: bold, italic, link. Cmd/Ctrl+B / I (check the keydown handler for collisions first).
+- [x] T5.2 — Input rules: closing `**x**` → bold, `*x*` → italic; typed or pasted bare URL → link.
+- [x] T5.3 — Link mark parse rule enforces `isSafeCommentUrl`; Cmd/Ctrl-click opens with `noopener`; resolve the phone "open link" affordance per the plan's Open Questions.
+- [x] T5.4 — Paste: HTML passes only through the schema; unknown marks and nodes dropped; plain-text paste goes through the tokenizer.
+- [x] T5.5 — i18n for any new strings (EN + CS).
+- [x] T5.6 — Tests: marks round trip; unsafe link pasted as HTML becomes plain text; pasted `<script>` / `<img onerror>` produce no element.
+- [x] T5.7 — `npm test` + `npm run validate` + **`npm run csp`** green.
 
 **AC:** bold, italic and links work by shortcut and by typing Markdown; no pasted or synced content can create an unsafe link or element.
 **Verify:** browser; paste from a web page and from Google Docs; dark mode.

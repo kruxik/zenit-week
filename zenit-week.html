@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-pM2Z1pG0v6oxB5pypGlto1HwbchyD7lfRoEWA1tvVo0='
+               'sha256-d42qKLsPoLLnikTfJOdpUqv7vrq9K4rMUCTr6giAs3k='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3347,6 +3347,13 @@
   /* A native checkbox paints light unless told otherwise. */
   [data-theme="dark"] #comment-editor .cm-check input { color-scheme: dark; }
   #comment-editor .cm-check-text { flex: 1; min-width: 0; }
+  #comment-editor strong { font-weight: 700; }
+  #comment-editor a { color: var(--accent-primary); text-decoration: underline; }
+  #comment-body { position: relative; }
+  .comment-link-chip {
+    position: absolute;
+    z-index: 1;
+  }
   #comment-editor .cm-check.checked .cm-check-text {
     color: var(--text-secondary);
     text-decoration: line-through;
@@ -10867,6 +10874,7 @@ const TRANSLATIONS = {
     'menu.rename':                'Rename',
     'menu.comment':               'Comment',
     'comment.toggleItem':         'Toggle checklist item',
+    'comment.openLink':           'Open link',
     'menu.addActivity':           'Add Activity',
     'menu.changeColor':           'Change color',
     'menu.setBaseline':           'Set Effort Baseline',
@@ -11225,6 +11233,7 @@ const TRANSLATIONS = {
     'menu.rename':                'Přejmenovat',
     'menu.comment':               'Komentář',
     'comment.toggleItem':         'Přepnout položku seznamu',
+    'comment.openLink':           'Otevřít odkaz',
     'menu.addActivity':           'Přidat aktivitu',
     'menu.changeColor':           'Změnit barvu',
     'menu.setBaseline':           'Nastavit základní zátěž',
@@ -19758,8 +19767,15 @@ function loadCommentEditor() {
 // check are all flat textblocks, exactly as tokenizeComment() reads the string —
 // the document is the grammar's block list, never a nested list tree. Takes the
 // namespace as a parameter so tests can hand in the real packages.
+//
+// The grammar has no nesting, so every mark excludes every other: bolding a
+// link or italic text replaces its mark rather than stacking one the string
+// could not express. The mark set is also the paste allow-list — HTML only
+// ever enters through these parse rules, and anything they do not name is
+// dropped.
+const COMMENT_BOLD_WEIGHT = /^(bold(er)?|[6-9]\d{2})$/;
 function buildCommentSchema(pm) {
-  const text = { content: 'text*', group: 'block', marks: '' };
+  const text = { content: 'text*', group: 'block', marks: '_' };
   return new pm.model.Schema({
     nodes: {
       doc: { content: 'block+' },
@@ -19779,29 +19795,86 @@ function buildCommentSchema(pm) {
       },
       text: {},
     },
+    marks: {
+      link: {
+        attrs: { href: {}, auto: { default: false } },
+        inclusive: false,
+        excludes: '_',
+        parseDOM: [{
+          tag: 'a[href]',
+          // An unsafe target is no link: the text survives, the href does not.
+          getAttrs: dom => (isSafeCommentUrl(dom.getAttribute('href'))
+            ? { href: dom.getAttribute('href') } : false),
+        }],
+        toDOM: mark => ['a', { href: mark.attrs.href, rel: 'noopener noreferrer', target: '_blank' }, 0],
+      },
+      strong: {
+        excludes: '_',
+        parseDOM: [
+          { tag: 'strong' },
+          // Google Docs wraps a whole paste in <b style="font-weight:normal">.
+          { tag: 'b', getAttrs: dom => dom.style.fontWeight !== 'normal' && null },
+          { style: 'font-weight', getAttrs: value => COMMENT_BOLD_WEIGHT.test(value) && null },
+        ],
+        toDOM: () => ['strong', 0],
+      },
+      em: {
+        excludes: '_',
+        parseDOM: [{ tag: 'em' }, { tag: 'i' }, { style: 'font-style=italic' }],
+        toDOM: () => ['em', 0],
+      },
+    },
   });
+}
+
+function commentMarkFor(schema, token) {
+  const m = schema.marks;
+  switch (token.type) {
+    case 'bold': return [m.strong.create()];
+    case 'italic': return [m.em.create()];
+    case 'link': return [m.link.create({ href: token.href })];
+    case 'autolink': return [m.link.create({ href: token.href, auto: true })];
+    default: return null;
+  }
+}
+
+// A block's inline content → Markdown, in exactly the spellings the tokenizer
+// reads back. Whitespace at a mark's edge moves outside it, because `** a **`
+// is not bold in the grammar; an auto link whose text still is its URL stays a
+// bare URL.
+function serializeCommentInlineNodes(content) {
+  let out = '';
+  content.forEach(child => {
+    const text = child.text || '';
+    const mark = child.marks[0];
+    if (!mark) { out += text; return; }
+    const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
+    if (!core) { out += text; return; }
+    if (mark.type.name === 'strong') out += `${lead}**${core}**${trail}`;
+    else if (mark.type.name === 'em') out += `${lead}*${core}*${trail}`;
+    else if (mark.attrs.auto && text === mark.attrs.href) out += text;
+    else out += `${lead}[${core}](${mark.attrs.href})${trail}`;
+  });
+  return out;
 }
 
 function commentNodeMarker(node) {
   return commentBlockMarker({ type: node.type.name, checked: node.attrs.checked });
 }
 
-// String → doc through the grammar's own tokenizer. A block's text is its raw
-// source after the marker, so inline syntax the schema cannot show yet stays
-// literal text and the string round-trips byte-identically.
+// String → doc through the grammar's own tokenizer, so the editor, the Agenda
+// preview and the stored string can never disagree about what is bold or a
+// link. Round trip is byte-identical for every string.
 function commentTextToDoc(schema, text) {
-  const src = text || '';
-  return schema.node('doc', null, tokenizeComment(src).map(block => {
-    const body = src.slice(block.start + commentBlockMarker(block).length, block.end);
-    return schema.node(block.type, block.type === 'check' ? { checked: block.checked } : null,
-      body ? [schema.text(body)] : []);
-  }));
+  return schema.node('doc', null, tokenizeComment(text || '').map(block =>
+    schema.node(block.type, block.type === 'check' ? { checked: block.checked } : null,
+      block.inline.map(tk => schema.text(tk.text, commentMarkFor(schema, tk))))));
 }
 
 function commentFragmentToText(fragment) {
-  if (fragment.firstChild && fragment.firstChild.isInline) return fragment.textBetween(0, fragment.size);
+  if (fragment.firstChild && fragment.firstChild.isInline) return serializeCommentInlineNodes(fragment);
   const lines = [];
-  fragment.forEach(node => lines.push(commentNodeMarker(node) + node.textContent));
+  fragment.forEach(node => lines.push(commentNodeMarker(node) + serializeCommentInlineNodes(node.content)));
   return lines.join('\n');
 }
 
@@ -19871,13 +19944,43 @@ function commentToggleAtCaret(pm) {
 
 // Docs-style shortcuts typed at the start of a line. `\s` rather than a space
 // so a phone keyboard's non-breaking space still counts.
+// Closing delimiter typed → the run becomes marked and the delimiters vanish.
+// match[1] is the whole `**x**`, match[2] its content. The last typed
+// character is in the match but not yet in the document.
+function commentMarkInputRule(pm, regexp, markType) {
+  return new pm.inputrules.InputRule(regexp, (state, match, start, end) => {
+    const markStart = start + match[0].length - match[1].length;
+    return state.tr
+      .replaceWith(markStart, end, state.schema.text(match[2], [markType.create()]))
+      .removeStoredMark(markType);
+  });
+}
+
+// A bare URL becomes a link when the space after it is typed. Text already
+// inside a link is left alone.
+function commentAutolinkInputRule(pm, schema) {
+  return new pm.inputrules.InputRule(/(?:^|\s)(https?:\/\/\S+)(\s)$/, (state, match, start, end) => {
+    const token = tokenizeCommentInline(match[1]).find(tk => tk.type === 'autolink' && tk.start === 0);
+    if (!token) return null;
+    const from = start + match[0].length - match[1].length - match[2].length;
+    if (state.doc.rangeHasMark(from, from + token.text.length, schema.marks.link)) return null;
+    return state.tr
+      .insertText(match[2], end)
+      .addMark(from, from + token.text.length, schema.marks.link.create({ href: token.href, auto: true }));
+  });
+}
+
 function commentInputRuleList(pm, schema) {
   const { textblockTypeInputRule } = pm.inputrules;
   const n = schema.nodes;
+  const inner = '([^\\s*](?:[^*\\n]*[^\\s*])?)';
   return [
     textblockTypeInputRule(/^-\s$/, n.bullet),
     textblockTypeInputRule(/^(?:-\s)?\[(\s?|x)\]\s$/, n.check, m => ({ checked: m[1] === 'x' })),
     textblockTypeInputRule(/^#\s$/, n.heading),
+    commentMarkInputRule(pm, new RegExp(`(?:^|[^*])(\\*\\*${inner}\\*\\*)$`), schema.marks.strong),
+    commentMarkInputRule(pm, new RegExp(`(?:^|[^*])(\\*${inner}\\*)$`), schema.marks.em),
+    commentAutolinkInputRule(pm, schema),
   ];
 }
 
@@ -19898,10 +20001,72 @@ function commentEditorPlugins(pm, schema) {
       // Right after an input rule, Backspace gives the typed `- ` back.
       'Backspace': chainCommands(pm.inputrules.undoInputRule, commentLiftAtStart),
       'Mod-Enter': commentToggleAtCaret(pm),
+      'Mod-b': pm.commands.toggleMark(schema.marks.strong),
+      'Mod-i': pm.commands.toggleMark(schema.marks.em),
     }),
+    commentLinkChipPlugin(pm),
     // Esc belongs to the app (it closes the dialog), not to node selection.
     pm.keymap.keymap(Object.fromEntries(Object.entries(pm.commands.baseKeymap).filter(([k]) => k !== 'Escape'))),
   ];
+}
+
+// The link under the caret, if any — the href of the link mark at `pos`.
+function commentLinkAt(state, pos) {
+  const $pos = state.doc.resolve(pos);
+  const marks = [...$pos.marks(), ...($pos.nodeAfter ? $pos.nodeAfter.marks : [])];
+  const link = marks.find(mk => mk.type.name === 'link');
+  return link ? link.attrs.href : null;
+}
+
+// Every way out of the editor to a link passes the allow-list again, whatever
+// the document holds.
+function openCommentLink(href) {
+  if (!isSafeCommentUrl(href)) return;
+  window.open(href, '_blank', 'noopener,noreferrer');
+}
+
+// Inside an editor a tap only places the caret, so a phone has no way to follow
+// a link. While the caret sits in one, a small Open chip appears under it; on
+// desktop Cmd/Ctrl-click opens the link directly.
+function commentLinkChipPlugin(pm) {
+  return new pm.state.Plugin({
+    props: {
+      handleClick(view, pos, event) {
+        if (!(event.metaKey || event.ctrlKey)) return false;
+        const href = commentLinkAt(view.state, pos);
+        if (!href) return false;
+        openCommentLink(href);
+        return true;
+      },
+    },
+    view(editorView) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'agenda-action-btn comment-link-chip';
+      chip.hidden = true;
+      chip.textContent = t('comment.openLink');
+      let href = null;
+      chip.addEventListener('mousedown', e => e.preventDefault()); // keep the caret
+      chip.addEventListener('click', () => openCommentLink(href));
+      const body = document.getElementById('comment-body');
+      body.appendChild(chip);
+      const place = view => {
+        const { empty, from } = view.state.selection;
+        href = empty && view.hasFocus() ? commentLinkAt(view.state, from) : null;
+        chip.hidden = !href;
+        if (!href) return;
+        const caret = view.coordsAtPos(from);
+        const box = body.getBoundingClientRect();
+        chip.style.top = `${caret.bottom - box.top + 6}px`;
+        chip.style.left = `${Math.max(8, Math.min(caret.left - box.left, box.width - chip.offsetWidth - 8))}px`;
+      };
+      place(editorView);
+      return {
+        update: place,
+        destroy: () => chip.remove(),
+      };
+    },
+  });
 }
 
 // The checkbox is a real control outside the editable text. Tapping it never
@@ -19968,12 +20133,27 @@ function mountCommentEditor(pm) {
         }
       },
       clipboardTextSerializer: slice => commentFragmentToText(slice.content),
-      // Plain text only, read through the comment grammar; HTML paste arrives
-      // with the inline marks.
+      // HTML goes through the schema's parse rules (the allow-list) — ProseMirror's
+      // own paste path. Plain text goes through the comment grammar, so pasted
+      // Markdown arrives formatted.
       handlePaste(v, event) {
-        const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+        const data = event.clipboardData;
+        if (!data || data.getData('text/html')) return false;
+        const text = data.getData('text/plain');
         if (!text) return true;
-        v.dispatch(v.state.tr.replaceSelection(commentTextSlice(pm, schema, text)).scrollIntoView());
+        const slice = commentTextSlice(pm, schema, text);
+        const { $from, empty } = v.state.selection;
+        let tr;
+        if (empty && $from.parent.type.name === 'paragraph' && $from.parent.content.size === 0) {
+          // On an empty line the pasted lines keep their own block types — a
+          // pasted checklist stays a checklist instead of joining the paragraph.
+          tr = v.state.tr.replaceWith($from.before(), $from.after(), slice.content);
+          const end = $from.before() + slice.content.size - 1;
+          tr.setSelection(pm.state.TextSelection.create(tr.doc, end));
+        } else {
+          tr = v.state.tr.replaceSelection(slice);
+        }
+        v.dispatch(tr.scrollIntoView());
         return true;
       },
     });
