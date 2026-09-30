@@ -40,13 +40,14 @@ describe('comment text ↔ ProseMirror doc', () => {
   it.each([
     ['# Heading', 'heading'],
     ['- bullet', 'bullet'],
+    ['* bullet', 'bullet'],
     ['- [ ] open', 'check'],
     ['- [x] done', 'check'],
     ['plain', 'paragraph'],
   ])('%j becomes a %s node without its marker', (text, type) => {
     const node = commentTextToDoc(schema, text).firstChild;
     expect(node.type.name).toBe(type);
-    expect(node.textContent).toBe(text.replace(/^(- \[[ x]\] |- |# )/, ''));
+    expect(node.textContent).toBe(text.replace(/^(- \[[ x]\] |[-*] |# )/, ''));
   });
 
   it('reads inline syntax into marks', () => {
@@ -223,6 +224,11 @@ describe('rich blocks — editing commands', () => {
     expect(text(st)).toBe('- [x] a');
   });
 
+  it('Enter continues a * list with *', () => {
+    const { st } = run(at('* milk', 5), commentEnterCommand(pm));
+    expect(text(st)).toBe('* milk\n* ');
+  });
+
   it('Enter continues a bullet list', () => {
     const { st } = run(at('- milk', 5), commentEnterCommand(pm));
     expect(text(st)).toBe('- milk\n- ');
@@ -261,7 +267,7 @@ describe('rich blocks — editing commands', () => {
   it('input rules cover - , [] , [ ] , [x] , - [ ]  and # ', () => {
     const rules = commentInputRuleList(pm, schema);
     const matches = (s) => rules.filter(r => r.match.test(s)).length;
-    for (const typed of ['- ', '[] ', '[ ] ', '[x] ', '- [ ] ', '- [x] ', '# ', '-\u00a0']) {
+    for (const typed of ['- ', '* ', '[] ', '[ ] ', '[x] ', '- [ ] ', '- [x] ', '# ', '-\u00a0']) {
       expect(matches(typed)).toBeGreaterThan(0);
     }
     for (const typed of ['-- ', '## ', '[X] ', 'a- ']) expect(matches(typed)).toBe(0);
