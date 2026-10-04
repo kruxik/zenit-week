@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-jFlRHXc+Lj69wCjk/n6ymNzpIYNRx58L+SuA98+Ux5U='
+               'sha256-ric3u9THsLs5KKPKD7y7EcCvKDR2BKAbHlox33DfawQ='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1807,15 +1807,25 @@
     font-variant-numeric: tabular-nums;
   }
   .agenda-item .daily-log-badge.comment:hover { filter: brightness(1.08); }
+  /* A phone row has no room for the preview: the bubble is the icon, plus the
+     checklist count when there is one. The comment itself is a tap away. */
+  @media (max-width: 767px) {
+    .agenda-item .daily-log-badge.comment { max-width: none; flex-shrink: 0; }
+    .agenda-item .comment-preview { display: none; }
+  }
 
+  /* Clipped, so a label can never paint under the badges beside it. */
   .daily-log-label {
     flex: 1;
     display: flex;
     min-width: 0;
+    overflow: hidden;
     align-items: baseline;
   }
+  /* The prefix gives way first — its shrink factor dwarfs the name's — and
+     only once it is gone does the name itself end in an ellipsis. */
   .daily-log-label-prefix {
-    flex: 0 1 auto;
+    flex: 0 1000 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1828,7 +1838,10 @@
     opacity: 0.6;
   }
   .daily-log-label-main {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
   .daily-log-label-expanded { display: none; }
@@ -21701,7 +21714,7 @@ function buildAgendaItem(node, label, opts = {}) {
     item.appendChild(prioEl);
   }
 
-  // Label — prefix shrinks with ellipsis, main always fully visible
+  // Label — prefix shrinks with ellipsis first, then the main part
   const lbl = (label && typeof label === 'object')
     ? label
     : { prefix: '', main: label || nodeDisplayLabel(node) || t('todo.noLabel') };
