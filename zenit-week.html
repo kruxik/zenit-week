@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-IYgS5xX1Oe+OLGo5N7CH2Wv9PtAD6N6XWRCMihi0u5o='
+               'sha256-LcJ0Xhqh/FSlX7TdcXPyfKw/Mocw+WkuiLGk7R54RLQ='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2455,16 +2455,17 @@
   /* Receipt strip — the panel stays open after a submit, so each stored item
      is echoed here instead of firing a toast (the toast is a single slot and
      sits at bottom:68px, right on top of this panel). */
-  /* The card's left inset — 1px border + 8px padding, inside the body's 10px —
-     puts the dot exactly where the input's text starts, so the strip and the
-     field share one left edge. */
+  /* The row's left inset — the card's 1px border + the row's 8px padding,
+     inside the body's 10px — puts the dot exactly where the input's text
+     starts, so the strip and the field share one left edge. The row carries
+     the padding so its node colour reaches the card's edges. */
   #quick-add-recent {
     display: flex;
     flex-direction: column;
     background: var(--bg-surface);
     border: 1px solid var(--border-soft);
     border-radius: 6px;
-    padding: 0 8px;
+    overflow: hidden;
   }
   #quick-add-recent:empty { display: none; }
   /* Each row sits in the agenda's swipe shell, which draws the divider; the
@@ -2476,20 +2477,22 @@
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     min-width: 0;
     height: 36px;
+    padding: 0 8px;
     background: var(--bg-surface);
     font-size: 13px;
     color: var(--text-primary);
     cursor: default;
   }
-  .qab-recent-closed > * { opacity: 0.5; }
-  /* Age ramp — the newest item is the last child, directly above the input, so
-     the strip fades upwards into the older ones. */
-  #quick-add-recent > :nth-last-child(2) { opacity: 0.85; }
-  #quick-add-recent > :nth-last-child(3) { opacity: 0.7; }
-  #quick-add-recent > :nth-last-child(4) { opacity: 0.55; }
+  .qab-recent-item > .qab-pill-dot { margin-right: 4px; }
+  .qab-recent-icon { display: inline-flex; flex-shrink: 0; }
+  .qab-recent-count {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
   .qab-recent-label {
     flex: 1;
     min-width: 0;
@@ -24835,20 +24838,54 @@ document.addEventListener('click', (e) => {
   // row is only a receipt.
   function buildRecentRow(entry) {
     const node = entry.movedToNextWeek ? null : findNode(entry.id);
-    const bc = BRANCH_COLORS[node ? node.branch : entry.branch] || { main: '#888' };
+    // The map's own colour rules, so a row reads as its node does. Font size
+    // stays put: priority scales a node on the map, never a row here.
+    const vis = node ? getNodeVisuals(node.id) : null;
     const item = document.createElement('div');
     item.className = 'qab-recent-item';
-    if (node && (node.done || node.dropped)) item.classList.add('qab-recent-closed');
+    if (vis) {
+      item.style.background = vis.bgColor;
+      item.style.color = vis.textColor;
+    }
 
     const dot = document.createElement('span');
     dot.className = 'qab-pill-dot';
-    dot.style.background = bc.main;
+    dot.style.background = vis ? vis.borderColor : (BRANCH_COLORS[entry.branch] || { main: '#888' }).main;
     item.appendChild(dot);
+
+    // Icons in the map's order: priority before the label; unplanned,
+    // reusable and dropped after it. Dropped gets the ⊘ but not the map's
+    // diagonal slash, which does not translate to a list row.
+    const icon = (name) => {
+      const el = document.createElement('span');
+      el.className = 'qab-recent-icon';
+      el.innerHTML = iconSvg(name);
+      item.appendChild(el);
+    };
+    if (node && (node.priority === 'high' || node.priority === 'critical')) {
+      icon(node.priority === 'high' ? 'alert-circle' : 'flame');
+    }
 
     const text = document.createElement('span');
     text.className = 'qab-recent-label';
     text.textContent = node ? node.label : entry.label;
+    if (node && node.done) text.style.textDecoration = 'line-through';
     item.appendChild(text);
+
+    if (node) {
+      if (node.unplanned) icon('bolt');
+      if (node.reusable) icon('repeat');
+      if (node.dropped) icon('ban');
+      if (node.comments) icon('message');
+      const cc = getCounterChild(node);
+      const ticks = getTickInfo(node);
+      if (cc || ticks) {
+        const count = document.createElement('span');
+        count.className = 'qab-recent-count';
+        count.textContent = cc ? `${cc.val || 0}/${cc.max}` : `${ticks.done}/${ticks.total}`;
+        item.appendChild(count);
+      }
+    }
 
     if (entry.movedToNextWeek) {
       const note = document.createElement('span');
