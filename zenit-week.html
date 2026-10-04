@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-s7GZvB9fXvQNDsJ+o2V5eeH2IMJle7xD23pcs1IV5/4='
+               'sha256-IYgS5xX1Oe+OLGo5N7CH2Wv9PtAD6N6XWRCMihi0u5o='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2467,24 +2467,32 @@
     padding: 0 8px;
   }
   #quick-add-recent:empty { display: none; }
+  /* Each row sits in the agenda's swipe shell, which draws the divider; the
+     item covers the shell's action icons until it slides. */
+  #quick-add-recent .agenda-swipe-wrapper { contain-intrinsic-size: 0 36px; }
+  .qab-recent-new { animation: qab-recent-in 0.25s ease; }
   .qab-recent-item {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: 10px;
     min-width: 0;
     height: 36px;
-    border-bottom: 1px solid var(--border-faint);
+    background: var(--bg-surface);
     font-size: 13px;
     color: var(--text-primary);
-    animation: qab-recent-in 0.25s ease;
+    cursor: default;
   }
-  .qab-recent-item:last-child { border-bottom: none; }
+  .qab-recent-closed > * { opacity: 0.5; }
   /* Age ramp — the newest item is the last child, directly above the input, so
      the strip fades upwards into the older ones. */
-  .qab-recent-item:nth-last-child(2) { opacity: 0.85; }
-  .qab-recent-item:nth-last-child(3) { opacity: 0.7; }
-  .qab-recent-item:nth-last-child(4) { opacity: 0.55; }
-  .qab-recent-item > span:nth-child(2) {
+  #quick-add-recent > :nth-last-child(2) { opacity: 0.85; }
+  #quick-add-recent > :nth-last-child(3) { opacity: 0.7; }
+  #quick-add-recent > :nth-last-child(4) { opacity: 0.55; }
+  .qab-recent-label {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -12201,6 +12209,9 @@ async function saveWeek(wk, data) {
   const persisted = { ...data, nodes: data.nodes.filter(n => !n._editing) };
 
   audit('saveWeek', { wk, v: persisted.crdtVersion, nodes: persisted.nodes.length, tombs: persisted.tombstones.length });
+  // Every edit of the open week lands here, whichever path made it (menu,
+  // swipe, rename, undo), so the quick-add receipt rows follow from one place.
+  if (wk === currentWeekKey && window.refreshQuickAddRecent) window.refreshQuickAddRecent();
   await saveWeekIDB(wk, persisted);
 
   // Signal peer tabs that this week's record changed, so any tab showing it can
@@ -15751,14 +15762,17 @@ function startRenameNode(nodeId) {
   _openInlineInput(nodeId, false);
 }
 
-// The inline rename an agenda row uses: the row's label becomes an input in
-// place, Enter and blur commit, Escape reverts. Extracted so a Later row
-// renames by exactly this gesture rather than by one that merely resembles it —
-// only what a commit means differs, and that is the caller's business.
-function openAgendaRowRename(rowId, originalLabel, onCommit, onCancel) {
+function agendaRowLabelEl(rowId) {
   const itemEl = document.querySelector(`#agenda-tab-content .agenda-item[data-node-id="${CSS.escape(rowId)}"]`);
-  if (!itemEl) return false;
-  const labelEl = itemEl.querySelector('.daily-log-label');
+  return itemEl ? itemEl.querySelector('.daily-log-label') : null;
+}
+
+// The inline rename a list row uses: the row's label becomes an input in
+// place, Enter and blur commit, Escape reverts. Extracted so a Later row and a
+// quick-add receipt row rename by exactly this gesture rather than by one that
+// merely resembles it — only what a commit means differs, and that is the
+// caller's business.
+function openRowRename(labelEl, originalLabel, onCommit, onCancel) {
   if (!labelEl) return false;
 
   const input = document.createElement('input');
@@ -15796,7 +15810,9 @@ function openAgendaRowRename(rowId, originalLabel, onCommit, onCancel) {
   return true;
 }
 
-function startAgendaRename(nodeId) {
+// Renames the node a list row stands for, through commitEdit like the map.
+// labelEl defaults to the row's label in the Agenda.
+function startRowRename(nodeId, labelEl = agendaRowLabelEl(nodeId)) {
   const node = findNode(nodeId);
   if (!node) return;
   const targetId = (node.dayChild || node.tickChild) ? node.parent : nodeId;
@@ -15809,8 +15825,8 @@ function startAgendaRename(nodeId) {
   editState = { nodeId: targetId, isNew: false, originalLabel, initialNodeW: 0 };
   beginAtomicOp();
 
-  const opened = openAgendaRowRename(
-    nodeId,
+  const opened = openRowRename(
+    labelEl,
     originalLabel,
     value => { inlineInput.value = value; commitEdit(); },
     () => { delete target._editing; cancelEdit(); },
@@ -15836,8 +15852,8 @@ function renameScheduleEntry(entryId, label) {
 function startEntryRename(entryId, rowId) {
   const entry = scheduleData.entries.find(e => e.id === entryId);
   if (!entry) return;
-  openAgendaRowRename(
-    rowId,
+  openRowRename(
+    agendaRowLabelEl(rowId),
     entry.label || '',
     value => { renameScheduleEntry(entryId, value); },
     () => {},
@@ -18149,7 +18165,7 @@ function _windowKeydownHandler(e) {
       deleteNode(rowId);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      startAgendaRename(node.id);
+      startRowRename(node.id);
     }
     return;
   }
@@ -19839,13 +19855,18 @@ document.getElementById('ctx-rename').addEventListener('click', () => {
   hideContextMenu();
   if (entryCtx) { startEntryRename(entryCtx.entryId, occurrenceNodeId(entryCtx.entryId, entryCtx.date)); return; }
   if (!id) return;
-  if (currentView === 'agenda') startAgendaRename(id);
+  // The quick-add backdrop covers the map and the Agenda, so a menu opened
+  // while the panel is up came from one of its receipt rows.
+  if (window.isQuickAddOpen() && window.renameQuickAddRow(id)) return;
+  if (currentView === 'agenda') startRowRename(id);
   else startRenameNode(id);
 });
 
 document.getElementById('ctx-comment').addEventListener('click', () => {
   const id = contextTarget;
   hideContextMenu();
+  // The comment dialog sits below the quick-add panel, so the panel yields.
+  if (window.isQuickAddOpen()) window.closeQuickAdd();
   if (id) openCommentDialog(id);
 });
 
@@ -21939,7 +21960,7 @@ function buildAgendaItem(node, label, opts = {}) {
   item.addEventListener('dblclick', e => {
     if (agendaRowChildHandlesTap(e)) return;
     e.preventDefault();
-    startAgendaRename(node.id);
+    startRowRename(node.id);
   });
   // Track touch start so we can recognise the synthetic contextmenu that
   // mobile fires on long-press. We suppress that one entirely — left-swipe
@@ -24803,13 +24824,21 @@ document.addEventListener('click', (e) => {
     });
   }
 
-  // Echo a stored item back into the panel. The label is the *resolved* one —
-  // read after applyMagicLabel — so the user sees the frozen day token and the
-  // counter split, not just what they typed.
-  function addRecent(label, branchId, movedToNextWeek) {
-    const bc = BRANCH_COLORS[branchId] || { main: '#888' };
+  // Items stored this session, oldest first: { id, label, movedToNextWeek }.
+  // The rows are rebuilt from the live nodes, so a menu action, a rename or an
+  // undo shows up here without each path having to know about the strip.
+  let recent = [];
+
+  // A row is the agenda's swipe shell around a slim item: swipe left for the
+  // context menu, swipe right for done, right-click and double-click as on any
+  // agenda row. A task sent on to next week is no longer in this week, so its
+  // row is only a receipt.
+  function buildRecentRow(entry) {
+    const node = entry.movedToNextWeek ? null : findNode(entry.id);
+    const bc = BRANCH_COLORS[node ? node.branch : entry.branch] || { main: '#888' };
     const item = document.createElement('div');
     item.className = 'qab-recent-item';
+    if (node && (node.done || node.dropped)) item.classList.add('qab-recent-closed');
 
     const dot = document.createElement('span');
     dot.className = 'qab-pill-dot';
@@ -24817,20 +24846,74 @@ document.addEventListener('click', (e) => {
     item.appendChild(dot);
 
     const text = document.createElement('span');
-    text.textContent = label;
+    text.className = 'qab-recent-label';
+    text.textContent = node ? node.label : entry.label;
     item.appendChild(text);
 
-    if (movedToNextWeek) {
+    if (entry.movedToNextWeek) {
       const note = document.createElement('span');
       note.className = 'qab-recent-note';
       note.textContent = '→ ' + t('menu.nextWeek');
       item.appendChild(note);
     }
 
+    const wrapper = wrapAgendaRowForSwipe(item, entry.id, iconSvg('circle-check'));
+    if (!node) return wrapper;
+
+    item._doneAction = () => {
+      setStatus(node.id, node.dropped ? 'undropped' : node.done ? 'undone' : 'done');
+    };
+    item._openCtxMenu = (x, y) => showContextMenu(x, y, node.id);
+    addSwipeGesture(item, node);
+    item.addEventListener('dblclick', e => {
+      if (e.target.closest('.agenda-rename-input')) return; // selecting a word mid-rename
+      e.preventDefault();
+      startRowRename(node.id, text);
+    });
+    // Touch fires a synthetic contextmenu on long-press; as in the Agenda,
+    // swipe left is the touch path to the menu, so only a real right-click opens it.
+    let lastTouchAt = 0;
+    item.addEventListener('touchstart', () => { lastTouchAt = Date.now(); }, { passive: true });
+    item.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (Date.now() - lastTouchAt < 1000) return;
+      item._openCtxMenu(e.clientX, e.clientY);
+    });
+    return wrapper;
+  }
+
+  function refreshRecent() {
+    // A rename in progress owns its row until it commits.
+    if (recentRow.querySelector('.agenda-rename-input')) return;
+    // A deleted task drops out of the strip; nothing is left to act on.
+    recent = recent.filter(e => e.movedToNextWeek || findNode(e.id));
+    recentRow.replaceChildren(...recent.map(buildRecentRow));
+  }
+  window.refreshQuickAddRecent = () => {
+    if (panel.classList.contains('is-open') && recent.length) refreshRecent();
+  };
+
+  // Called by the menu's Rename: renames in the strip when the task has a row.
+  window.renameQuickAddRow = (id) => {
+    const wrapper = [...recentRow.children].find(w => w.dataset.nodeId === id);
+    const labelEl = wrapper && wrapper.querySelector('.qab-recent-label');
+    if (!labelEl) return false;
+    startRowRename(id, labelEl);
+    return true;
+  };
+
+  // Echo a stored item back into the panel. The label is the *resolved* one —
+  // read after applyMagicLabel — so the user sees the frozen day token and the
+  // counter split, not just what they typed.
+  function addRecent(id, label, branchId, movedToNextWeek) {
     // FIFO — oldest first, newest lands directly above the input, so the strip
     // reads in the order the items were typed.
-    recentRow.append(item);
-    while (recentRow.children.length > RECENT_MAX) recentRow.firstElementChild.remove();
+    recent.push({ id, label, branch: branchId, movedToNextWeek });
+    if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
+    refreshRecent();
+    // Only the arrival animates; a rebuild after an edit must not replay it.
+    recentRow.lastElementChild?.classList.add('qab-recent-new');
   }
 
   function openQuickAdd() {
@@ -24865,7 +24948,8 @@ document.addEventListener('click', (e) => {
     input.value = '';
     // The receipt is session-scoped — a fresh open starts a fresh strip, so the
     // panel never grows into a history log.
-    recentRow.innerHTML = '';
+    recent = [];
+    recentRow.replaceChildren();
     requestAnimationFrame(() => input.focus());
   }
 
@@ -24927,7 +25011,7 @@ document.addEventListener('click', (e) => {
 
     // Stay open for the next item: the receipt strip confirms the store, and
     // keeping focus means the mobile keyboard never dismisses between entries.
-    addRecent(storedLabel, selectedBranchId, crossesNextWeek);
+    addRecent(node.id, storedLabel, selectedBranchId, crossesNextWeek);
     input.value = '';
     if (panel.classList.contains('is-open')) input.focus();
   }
