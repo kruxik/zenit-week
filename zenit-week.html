@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-LcJ0Xhqh/FSlX7TdcXPyfKw/Mocw+WkuiLGk7R54RLQ='
+               'sha256-8euedrrXXLZOaclTMbqDHsJkRYaY/NKecqjrC4LNqwE='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -24850,7 +24850,9 @@ document.addEventListener('click', (e) => {
 
     const dot = document.createElement('span');
     dot.className = 'qab-pill-dot';
-    dot.style.background = vis ? vis.borderColor : (BRANCH_COLORS[entry.branch] || { main: '#888' }).main;
+    // Always the branch colour, whatever the status: the dot says where the
+    // task lives, the row's colours say what state it is in.
+    dot.style.background = (BRANCH_COLORS[node ? node.branch : entry.branch] || { main: '#888' }).main;
     item.appendChild(dot);
 
     // Icons in the map's order: priority before the label; unplanned,
