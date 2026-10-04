@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-8euedrrXXLZOaclTMbqDHsJkRYaY/NKecqjrC4LNqwE='
+               'sha256-jFlRHXc+Lj69wCjk/n6ymNzpIYNRx58L+SuA98+Ux5U='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -24827,7 +24827,8 @@ document.addEventListener('click', (e) => {
     });
   }
 
-  // Items stored this session, oldest first: { id, label, movedToNextWeek }.
+  // Items stored this session, oldest first: { id, label, branch,
+  // movedToNextWeek }. The strip shows the last RECENT_MAX still in the week.
   // The rows are rebuilt from the live nodes, so a menu action, a rename or an
   // undo shows up here without each path having to know about the strip.
   let recent = [];
@@ -24925,13 +24926,17 @@ document.addEventListener('click', (e) => {
   function refreshRecent() {
     // A rename in progress owns its row until it commits.
     if (recentRow.querySelector('.agenda-rename-input')) return;
-    // A deleted task drops out of the strip; nothing is left to act on.
-    recent = recent.filter(e => e.movedToNextWeek || findNode(e.id));
-    recentRow.replaceChildren(...recent.map(buildRecentRow));
+    // A deleted task is hidden, not forgotten: an undo brings its node back,
+    // and with it the row.
+    const shown = recent.filter(e => e.movedToNextWeek || findNode(e.id)).slice(-RECENT_MAX);
+    recentRow.replaceChildren(...shown.map(buildRecentRow));
   }
   window.refreshQuickAddRecent = () => {
     if (panel.classList.contains('is-open') && recent.length) refreshRecent();
   };
+  // An undo saves the restored week before it swaps it into weekData, so the
+  // saveWeek refresh still sees the old nodes; this one runs after the swap.
+  window.addEventListener('snapshotApplied', window.refreshQuickAddRecent);
 
   // Called by the menu's Rename: renames in the strip when the task has a row.
   window.renameQuickAddRow = (id) => {
@@ -24949,7 +24954,6 @@ document.addEventListener('click', (e) => {
     // FIFO — oldest first, newest lands directly above the input, so the strip
     // reads in the order the items were typed.
     recent.push({ id, label, branch: branchId, movedToNextWeek });
-    if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
     refreshRecent();
     // Only the arrival animates; a rebuild after an edit must not replay it.
     recentRow.lastElementChild?.classList.add('qab-recent-new');
