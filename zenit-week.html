@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ric3u9THsLs5KKPKD7y7EcCvKDR2BKAbHlox33DfawQ='
+               'sha256-jznsLXV1FlZUjoOtSV6tx4IrftKr1IiSoZ8KyhPWgrw='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -12551,6 +12551,23 @@ function insertChildInSourceOrder(destParent, newId, srcOrd, ordOf, destLookup) 
   children.splice(idx, 0, newId);
 }
 
+// A transfer wires children in the source week's order, which is the user's
+// own arrangement — kept 1:1 when Auto layout is off. With Auto layout on the
+// layout is the app's to decide, so day selectors arrive Mon–Sun and
+// quantifiers 1..N, whatever order they were dragged into last week.
+// Call after rebuildNodeMap(): both sorts resolve ids through findNode.
+function orderTransferredDayAndTicks(parentIds) {
+  if (!autoLayout) return;
+  parentIds.forEach(id => {
+    const parent = findNode(id);
+    if (!parent || !Array.isArray(parent.children) || parent.children.length < 2) return;
+    const before = parent.children.join('\n');
+    sortDayChildren(parent);
+    sortTickChildren(parent);
+    if (parent.children.join('\n') !== before) touchLayout(id);
+  });
+}
+
 function findReuseTarget(source, destNodes, destParentId, lookup) {
   let hit = destNodes.find(n => n.id === source.id || n.prevId === source.id);
   if (hit) return hit;
@@ -12633,6 +12650,7 @@ async function transferUnfinished() {
   newNodes.forEach(newNode => weekData.nodes.push(newNode));
 
   // 3. Wire hierarchy by iterating old parent.children arrays to preserve visual order
+  const wiredParentIds = new Set();
   prevData.nodes.forEach(oldParent => {
     if (!oldParent.children?.length) return;
 
@@ -12652,6 +12670,7 @@ async function transferUnfinished() {
       }
     });
 
+    wiredParentIds.add(targetParent.id);
     const oldPos = new Map();
     oldParent.children.forEach((cid, i) => oldPos.set(cid, i));
     targetParent.children.sort((a, b) => {
@@ -12667,6 +12686,7 @@ async function transferUnfinished() {
     });
   });
   rebuildNodeMap();
+  orderTransferredDayAndTicks(wiredParentIds);
 
   // Merging not-done nodes into an existing (possibly done) parent can flip the
   // parent's done/unplanned status — resync up from each transferred node.
@@ -13065,6 +13085,7 @@ async function transferReusable() {
   newNodes.forEach(newNode => weekData.nodes.push(newNode));
 
   // 6. Wire hierarchy by iterating old parent.children arrays to preserve visual order
+  const wiredParentIds = new Set();
   prevData.nodes.forEach(oldParent => {
     if (!oldParent.children?.length) return;
 
@@ -13084,6 +13105,7 @@ async function transferReusable() {
       }
     });
 
+    wiredParentIds.add(targetParent.id);
     const oldPos = new Map();
     oldParent.children.forEach((cid, i) => oldPos.set(cid, i));
     targetParent.children.sort((a, b) => {
@@ -13099,6 +13121,7 @@ async function transferReusable() {
     });
   });
   rebuildNodeMap();
+  orderTransferredDayAndTicks(wiredParentIds);
 
   // Merging into an existing parent can flip its done/unplanned status.
   newNodes.forEach(n => { syncStatusUp(n.id, 'done'); syncStatusUp(n.id, 'unplanned'); });

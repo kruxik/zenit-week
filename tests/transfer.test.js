@@ -156,4 +156,52 @@ describe('Transfers - Week to Week', () => {
       expect(newA1.reusable).toBe(true);
     });
   });
+
+  describe('day selectors and quantifiers on transfer', () => {
+    const DAYS = [3, 1, 0, 5]; // We, Mo, Su, Fr — dragged out of week order
+    const seedPrev = (extra = {}) => {
+      const dayIds = DAYS.map(d => 'd' + d);
+      const b = mkBranch('me', ['r1', 'p1']);
+      const r1 = mkActivity('r1', 'me', 'me', { children: dayIds, ...extra });
+      const days = DAYS.map(d => mkActivity('d' + d, 'r1', 'me', { dayChild: true, dayIndex: d, ...extra }));
+      const p1 = mkActivity('p1', 'me', 'me', { children: ['t1', 't2', 't3'], ...extra });
+      const ticks = [1, 2, 3].map(i => mkActivity('t' + i, 'p1', 'me', { tickChild: true, tickIndex: i, label: String(i), ...extra }));
+      _state.setLocalStorage('zenit-week-2026-01', { nodes: [b, r1, ...days, p1, ...ticks] });
+      _state.setWeekKey('2026-02');
+      _state.set({ nodes: [mkBranch('me')] });
+    };
+    const dayOrder = () => {
+      const r = _state.get().nodes.find(n => n.prevId === 'r1');
+      return r.children.map(id => findNode(id).dayIndex);
+    };
+    const tickOrder = () => {
+      const p = _state.get().nodes.find(n => n.prevId === 'p1');
+      return p.children.map(id => findNode(id).tickIndex);
+    };
+
+    afterEach(() => _state.setAutoLayout(true));
+
+    test.each([
+      ['transferUnfinished', () => transferUnfinished(), {}],
+      ['transferReusable', () => transferReusable(), { reusable: true }],
+    ])('%s orders days Mon–Sun and ticks 1..N with Auto layout on', async (_n, run, extra) => {
+      _state.setAutoLayout(true);
+      seedPrev(extra);
+      await run();
+      expect(dayOrder()).toEqual([1, 3, 5, 0]);
+      expect(tickOrder()).toEqual([1, 2, 3]);
+    });
+
+    test.each([
+      ['transferUnfinished', () => transferUnfinished(), {}],
+      ['transferReusable', () => transferReusable(), { reusable: true }],
+    ])('%s keeps the source order and offsets 1:1 with Auto layout off', async (_n, run, extra) => {
+      _state.setAutoLayout(false);
+      seedPrev({ offX: 12, offY: -7, ...extra });
+      await run();
+      expect(dayOrder()).toEqual(DAYS);
+      const moved = _state.get().nodes.find(n => n.prevId === 'd3');
+      expect([moved.offX, moved.offY]).toEqual([12, -7]);
+    });
+  });
 });
