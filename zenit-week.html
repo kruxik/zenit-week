@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-jznsLXV1FlZUjoOtSV6tx4IrftKr1IiSoZ8KyhPWgrw='
+               'sha256-Wjsv14oLo7XjALLZWQF+S68U+FQxPAvbAunQ2YiiItY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2501,11 +2501,6 @@
   }
   .qab-recent-item > .qab-pill-dot { margin-right: 4px; }
   .qab-recent-icon { display: inline-flex; flex-shrink: 0; }
-  .qab-recent-count {
-    flex-shrink: 0;
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-  }
   .qab-recent-label {
     flex: 1;
     min-width: 0;
@@ -24863,8 +24858,9 @@ document.addEventListener('click', (e) => {
     });
   }
 
-  // Items stored this session, oldest first: { id, label, branch,
-  // movedToNextWeek }. The strip shows the last RECENT_MAX still in the week.
+  // Items stored this session, oldest first: { id, label, typed, branch,
+  // movedToNextWeek }. `label` is what the node was stored as, `typed` what the
+  // user wrote. The strip shows the last RECENT_MAX still in the week.
   // The rows are rebuilt from the live nodes, so a menu action, a rename or an
   // undo shows up here without each path having to know about the strip.
   let recent = [];
@@ -24907,7 +24903,10 @@ document.addEventListener('click', (e) => {
 
     const text = document.createElement('span');
     text.className = 'qab-recent-label';
-    text.textContent = node ? node.label : entry.label;
+    // The row echoes the entry as typed — "Pushups 3x" stays "Pushups 3x" even
+    // though the node itself is "Pushups" with three ticks. Once the node is
+    // renamed, the row follows the node.
+    text.textContent = node && node.label !== entry.label ? node.label : entry.typed;
     if (node && node.done) text.style.textDecoration = 'line-through';
     item.appendChild(text);
 
@@ -24916,14 +24915,8 @@ document.addEventListener('click', (e) => {
       if (node.reusable) icon('repeat');
       if (node.dropped) icon('ban');
       if (node.comments) icon('message');
-      const cc = getCounterChild(node);
-      const ticks = getTickInfo(node);
-      if (cc || ticks) {
-        const count = document.createElement('span');
-        count.className = 'qab-recent-count';
-        count.textContent = cc ? `${cc.val || 0}/${cc.max}` : `${ticks.done}/${ticks.total}`;
-        item.appendChild(count);
-      }
+      // No n/total pill: the typed "3x" already says it, and progress is the
+      // Agenda's to show, not a just-added receipt's.
     }
 
     if (entry.movedToNextWeek) {
@@ -24983,13 +24976,14 @@ document.addEventListener('click', (e) => {
     return true;
   };
 
-  // Echo a stored item back into the panel. The label is the *resolved* one —
-  // read after applyMagicLabel — so the user sees the frozen day token and the
-  // counter split, not just what they typed.
-  function addRecent(id, label, branchId, movedToNextWeek) {
+  // Echo a stored item back into the panel. `typed` keeps the Nx quantifier and
+  // the day selectors as written; only relative-day words are frozen, so a
+  // "tomorrow" reads as the day it was stored on. `label` is the node's label
+  // after applyMagicLabel, the baseline that tells a later rename apart.
+  function addRecent(id, label, typed, branchId, movedToNextWeek) {
     // FIFO — oldest first, newest lands directly above the input, so the strip
     // reads in the order the items were typed.
-    recent.push({ id, label, branch: branchId, movedToNextWeek });
+    recent.push({ id, label, typed, branch: branchId, movedToNextWeek });
     refreshRecent();
     // Only the arrival animates; a rebuild after an edit must not replay it.
     recentRow.lastElementChild?.classList.add('qab-recent-new');
@@ -25090,7 +25084,7 @@ document.addEventListener('click', (e) => {
 
     // Stay open for the next item: the receipt strip confirms the store, and
     // keeping focus means the mobile keyboard never dismisses between entries.
-    addRecent(node.id, storedLabel, selectedBranchId, crossesNextWeek);
+    addRecent(node.id, storedLabel, resolveMagicDayTokens(label.slice(0, 200)), selectedBranchId, crossesNextWeek);
     input.value = '';
     if (panel.classList.contains('is-open')) input.focus();
   }
