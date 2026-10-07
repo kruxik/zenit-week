@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.10.07] - 2026-10-07
+
+### Added
+
+- **seo:** Put "weekly planner" / "plánovač týdne" in page titles, add app meta description
+- **quick-add:** Receipt rows echo the entry as typed — Nx and day selectors kept, no n/total pill
+- **transfer:** With Auto layout on, transferred day selectors arrive Mo–Su and quantifiers 1..N
+- **quick-add:** Added entry rows show their node's colours, status icons and counter
+- **quick-add:** Context menu, swipe and double-click rename on added entry rows
+
+### Fixed
+
+- **agenda:** Long labels truncate instead of running under badges; comment bubble is icon-only on mobile
+- **quick-add:** Undo brings a deleted row back and repaints undone statuses
+- **quick-add:** Row dot keeps the branch colour whatever the status
+
 ## [v2026.09.30] - 2026-09-30
 
 ### Added
