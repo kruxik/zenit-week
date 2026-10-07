@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Wjsv14oLo7XjALLZWQF+S68U+FQxPAvbAunQ2YiiItY='
+               'sha256-DKiAFmLdg7habd1C/kfxP+a37Pg131Uqi2WXu7mhnAI='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -23697,7 +23697,7 @@ zoomTrack.addEventListener('pointercancel', () => {
 });
 
 document.getElementById('zoom-label').addEventListener('click', resetView);
-document.getElementById('logo').addEventListener('click', () => reloadApp());
+document.getElementById('logo').addEventListener('click', resetView);
 
 // ─── View Level Bar ────────────────────────────────────────────────────────────
 document.getElementById('view-level-bar').addEventListener('pointerdown', e => e.stopPropagation());

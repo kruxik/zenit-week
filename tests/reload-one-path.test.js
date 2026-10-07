@@ -7,7 +7,7 @@ import {
   isReloadNavigation, readReloadRestore, saveViewStateOnLeave, reloadApp, reloadAppFresh,
 } from './setup.js';
 
-// Every reload — browser F5 / Cmd+R / its button, the logo, the pull-down
+// Every reload — browser F5 / Cmd+R / its button, the pull-down
 // gesture, the quiet update reload — goes one way: saved on `pagehide`,
 // restored at boot only when the browser reports a reload. These tests pin
 // both halves, and the source guards below keep a second path from creeping
@@ -160,8 +160,7 @@ describe('one path — source guards', () => {
     expect(code.indexOf('if (_quietRestore && _quietRestore.helpOpen) openHelp()')).toBeGreaterThan(applyView);
   });
 
-  it('the logo, the pull-down gesture and the quiet update reload all use reloadApp', () => {
-    expect(code).toMatch(/getElementById\('logo'\)\.addEventListener\('click', \(\) => reloadApp\(\)\)/);
+  it('the pull-down gesture and the quiet update reload use reloadApp', () => {
     expect(body('performPullRefresh')).toContain('reloadApp()');
     expect(body('_fireQuietReload')).toContain('reloadApp()');
     for (const name of ['performPullRefresh', '_fireQuietReload']) {

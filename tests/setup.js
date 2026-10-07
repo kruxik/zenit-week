@@ -17,8 +17,11 @@ const scriptCode = match[1];
 // Reusable stub for DOM elements returned by getElementById / createElement
 function elementStub() {
   const classes = new Set();
+  const listeners = {};
   return {
-    addEventListener: () => {},
+    // Recorded so a test can fire what a control is wired to (see listenersOf).
+    addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn); },
+    _listeners: listeners,
     removeEventListener: () => {},
     classList: {
       add: (c) => classes.add(c),
