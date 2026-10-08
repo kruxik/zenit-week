@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.10.08.1] - 2026-10-08
+
+### Added
+
+- **analytics:** Add cookieless Umami Cloud analytics via first-party proxy with three derived app events
+
+### Changed
+
+- **privacy:** Say we count anonymous visits instead of "nothing tracks you"
+
 ## [v2026.10.08] - 2026-10-08
 
 ### Added
