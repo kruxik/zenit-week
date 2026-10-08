@@ -10,8 +10,8 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-puprNN14alpM+tSIsvjR5UdULd0EwP6VobNuNFZM0M8='
-               'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
+               'sha256-zOcDWzvdNfv6rIklxaHubvR9nepcXrGQR2WtcSKb40U='
+               'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://*.googleusercontent.com;
@@ -12253,11 +12253,11 @@ async function loadWeek(wk) {
           crdtVersion: 0,
         };
         if (prevData.baseline) newWeek.baseline = prevData.baseline;
-        return newWeek;
+        return markFreshWeek(newWeek);
       }
     } catch(e) { /* fall through to plain defaults */ }
   }
-  return defaultWeekData();
+  return markFreshWeek(defaultWeekData());
 }
 
 // Reload _nextWeekRawCache from IDB for the current week's next week. Call
@@ -12269,7 +12269,103 @@ async function refreshNextWeekCache() {
   _nextWeekRawCache = nextWeekData ? JSON.stringify(nextWeekData) : null;
 }
 
+// ─── Analytics (Umami) ───────────────────────────────────────────────────────
+// Three product events ride alongside the page view: app_opened,
+// first_node_created and returned_new_week. Each is read off a state change the
+// app already makes, never off a marker of its own. Storing or reading anything
+// on the device purely for analytics would need consent (ePrivacy, CZ
+// 127/2005 §89(3)), so nothing here touches localStorage, IndexedDB or a
+// cookie: the only memory is in-page and dies with the page. Payloads carry the
+// UI language at most, never a label. The tracker is optional - blocked,
+// offline or still loading, every call is a silent no-op that never throws and
+// never waits, so analytics can never slow down or break an edit.
+const ANALYTICS_QUEUE_MAX = 10;
+const _analyticsQueue = [];
+let _appOpenedTracked = false;
+// Week objects loadWeek built in memory because no record existed yet. A
+// WeakSet, not a flag on the object, so the marker can never reach a record.
+const _freshWeeks = new WeakSet();
+
+function analyticsReady() {
+  const u = window.umami;
+  return !!(u && typeof u.track === 'function');
+}
+
+function trackEvent(name) {
+  try {
+    if (!analyticsReady()) {
+      // Something can happen before the deferred tracker arrives (a delivery
+      // saved at boot); hold it in memory until then, or drop it.
+      if (_analyticsQueue.length < ANALYTICS_QUEUE_MAX) _analyticsQueue.push(name);
+      return;
+    }
+    const sent = window.umami.track(name, { lang: currentLang });
+    if (sent && typeof sent.catch === 'function') sent.catch(() => {});
+  } catch (_) { /* analytics never breaks the app */ }
+}
+
+// The tracker loader calls this once the script has run.
+function onAnalyticsLoaded() {
+  if (!analyticsReady()) return;
+  if (!_appOpenedTracked) {
+    _appOpenedTracked = true;
+    trackEvent('app_opened');
+  }
+  _analyticsQueue.splice(0).forEach(trackEvent);
+}
+
+// A task the user wrote: not playground scaffolding (untouched or claimed - a
+// seed id stays a seed id), not a day or tick leaf the app manages, not an
+// input still open.
+function isOwnTask(n) {
+  return !!n && n.type === 'activity' && !n._demo && !n._editing
+    && !n.dayChild && !n.tickChild && !seedNodeById(n.id);
+}
+
+// Called when a new task is committed into the open week. Fires only while that
+// task is the week's only one, so it fires once per week and device without
+// remembering anything: after it the week is no longer empty.
+function noteTaskCreated(nodeId) {
+  try {
+    const node = findNode(nodeId);
+    if (!isOwnTask(node)) return;
+    if (weekData.nodes.some(n => n.id !== nodeId && isOwnTask(n))) return;
+    trackEvent('first_node_created');
+  } catch (_) { /* analytics never breaks the app */ }
+}
+
+function markFreshWeek(data) {
+  _freshWeeks.add(data);
+  return data;
+}
+
+function isEarlierWeekKey(a, b) {
+  const x = parseWeekKey(a);
+  const y = parseWeekKey(b);
+  return x.year < y.year || (x.year === y.year && x.week < y.week);
+}
+
+// The first save of this week's record, on a device that already holds an
+// earlier week, is someone coming back for a new week. Revisiting the week
+// later finds the record on disk, so it never fires twice. Not awaited: the
+// save never waits on analytics.
+function noteWeekSaved(wk, data) {
+  try {
+    if (!_freshWeeks.has(data)) return;
+    _freshWeeks.delete(data);
+    if (wk !== todayWeekKey()) return;
+    Promise.resolve(listWeekKeysIDB())
+      .then(keys => {
+        if ((keys || []).some(k => k !== wk && isEarlierWeekKey(k, wk))) trackEvent('returned_new_week');
+      })
+      .catch(() => {});
+  } catch (_) { /* analytics never breaks the app */ }
+}
+
 async function saveWeek(wk, data) {
+  // Before anything else touches the record: the first save of a week built in
+  // memory is the moment that week starts to exist on this device.
+  noteWeekSaved(wk, data);
   data.savedAt = Date.now();
   data.crdtVersion = (data.crdtVersion || 0) + 1;
   if (!Array.isArray(data.tombstones)) data.tombstones = [];
@@ -16101,6 +16197,7 @@ function commitEdit(followUp = 'auto') {
     if (isNew && node.type !== 'branch' && node.parent && node.parent !== 'center') {
       syncStatusUp(nodeId, 'done');
     }
+    if (isNew) noteTaskCreated(nodeId);
 
     saveWeek(currentWeekKey, weekData);
     // Deferred: this commit is usually triggered by a blur from a pointerdown
@@ -25164,6 +25261,7 @@ document.addEventListener('click', (e) => {
       // reverses the add+move). move() saves both weeks and re-renders.
       await moveNodeToNextWeek(node.id, { takeSnap: false });
     } else {
+      noteTaskCreated(node.id);
       saveWeek(currentWeekKey, weekData);
     }
     renderIfVisible();
@@ -26415,6 +26513,32 @@ window.addEventListener('resize', () => {
     s.defer = true;
     s.src = '/_vercel/insights/script.js';
     document.head.appendChild(s);
+
+    // Umami, served first-party through the /u/ rewrites in vercel.json, so CSP
+    // stays at 'self'. It waits until the app has loaded and the main thread is
+    // idle: counting a visit is never worth a millisecond of the first paint.
+    // Search and hash are left out of every URL it reports - the app's query
+    // can carry an OAuth code and its hash a week key.
+    function loadUmami() {
+      if (navigator.onLine === false) return;
+      var u = document.createElement('script');
+      u.defer = true;
+      u.src = '/u/script.js';
+      u.setAttribute('data-website-id', '77360782-8018-480d-8567-4f0a7e5d0000');
+      u.setAttribute('data-host-url', location.origin + '/u');
+      u.setAttribute('data-exclude-search', 'true');
+      u.setAttribute('data-exclude-hash', 'true');
+      u.addEventListener('load', function () {
+        try { if (typeof onAnalyticsLoaded === 'function') onAnalyticsLoaded(); } catch (e) {}
+      });
+      document.head.appendChild(u);
+    }
+    function whenIdle() {
+      if ('requestIdleCallback' in window) requestIdleCallback(loadUmami, { timeout: 5000 });
+      else setTimeout(loadUmami, 2000);
+    }
+    if (document.readyState === 'complete') whenIdle();
+    else window.addEventListener('load', whenIdle, { once: true });
   })();
 </script>
 </body>

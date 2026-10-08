@@ -1031,6 +1031,24 @@
     s.defer = true;
     s.src = '/_vercel/insights/script.js';
     document.head.appendChild(s);
+
+    // Umami, served first-party through the /u/ rewrites in vercel.json, once
+    // the page has loaded and the main thread is idle.
+    function loadUmami() {
+      if (navigator.onLine === false) return;
+      var u = document.createElement('script');
+      u.defer = true;
+      u.src = '/u/script.js';
+      u.setAttribute('data-website-id', '77360782-8018-480d-8567-4f0a7e5d0000');
+      u.setAttribute('data-host-url', location.origin + '/u');
+      document.head.appendChild(u);
+    }
+    function whenIdle() {
+      if ('requestIdleCallback' in window) requestIdleCallback(loadUmami, { timeout: 5000 });
+      else setTimeout(loadUmami, 2000);
+    }
+    if (document.readyState === 'complete') whenIdle();
+    else window.addEventListener('load', whenIdle, { once: true });
   })();
 </script>
 

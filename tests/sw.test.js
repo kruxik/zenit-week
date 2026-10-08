@@ -209,6 +209,20 @@ describe('sw.js — request routing', () => {
     expect(ev.responses).toHaveLength(0);
   });
 
+  it('leaves the analytics proxy to the network, so it is never cached and its failure never becomes the worker\'s', () => {
+    const script = navEvent(`${ORIGIN}/u/script.js`);
+    script.request.mode = 'no-cors';
+    w.listeners.fetch(script);
+    const collect = navEvent(`${ORIGIN}/u/api/send`);
+    collect.request.method = 'POST';
+    collect.request.mode = 'cors';
+    w.listeners.fetch(collect);
+    expect(script.responses).toHaveLength(0);
+    expect(collect.responses).toHaveLength(0);
+    expect(script.waits).toHaveLength(0);
+    expect(collect.waits).toHaveLength(0);
+  });
+
   it('takes over a navigation to the app document', () => {
     const ev = navEvent(`${ORIGIN}/app`);
     w.listeners.fetch(ev);
