@@ -1,9 +1,19 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { _state, computeLayout, rebuildNodeMap } from './setup.js';
+import { _state, computeLayout, rebuildNodeMap, stepPebbles, cycleViewLevel } from './setup.js';
 
 // Rocks/Pebbles/Sand hide deep nodes by pruning them from the layout entirely
 // (no position → render() skips them), which also lets the surviving parents
 // pack together. These tests pin that pruning + repack behavior.
+// Remove a leaf from the current tree so Pebbles has nothing left to hide.
+function removeLeaf(id) {
+  const data = _state.get();
+  const node = data.nodes.find(n => n.id === id);
+  const parent = data.nodes.find(n => n.id === node.parent);
+  parent.children = parent.children.filter(c => c !== id);
+  data.nodes = data.nodes.filter(n => n.id !== id);
+  rebuildNodeMap();
+}
+
 describe('view-level layout pruning', () => {
   beforeEach(() => _state.reset());
   afterEach(() => _state.setViewLevel('full'));
@@ -41,6 +51,44 @@ describe('view-level layout pruning', () => {
     expect(pos['a1']).toBeDefined();
     expect(pos['s1']).toBeDefined();
     expect(pos['s2']).toBeUndefined();
+  });
+
+  test('pressing Pebbles again reveals one more level; the step that would show everything is Sand', () => {
+    // add depth 5 so Pebbles has one real step deeper
+    const tree = buildTree();
+    tree.nodes.find(n => n.id === 's2').children = ['s3'];
+    tree.nodes.push({ id: 's3', type: 'activity', parent: 's2', branch: 'b1', label: 'Deep', children: [] });
+    _state.set(tree);
+    rebuildNodeMap();
+    _state.setViewLevel('full');
+    stepPebbles(); // Sand → Pebbles: base depth
+    expect(computeLayout()['s2']).toBeUndefined();
+    stepPebbles(); // one level deeper, s3 still hidden
+    expect(_state.getViewLevel()).toBe('pebbles');
+    expect(computeLayout()['s2']).toBeDefined();
+    expect(computeLayout()['s3']).toBeUndefined();
+    stepPebbles(); // next step would hide nothing → Sand
+    expect(_state.getViewLevel()).toBe('full');
+  });
+
+  test('V walks Sand → Rocks → Pebbles → Sand, never a Pebbles step equal to Sand', () => {
+    layoutAt('full');
+    cycleViewLevel();
+    expect(_state.getViewLevel()).toBe('rocks');
+    cycleViewLevel();
+    expect(_state.getViewLevel()).toBe('pebbles');
+    expect(computeLayout()['s2']).toBeUndefined();
+    cycleViewLevel(); // one level deeper would show all → Sand
+    expect(_state.getViewLevel()).toBe('full');
+  });
+
+  test('Rocks → Pebbles goes straight to Sand when Pebbles would hide nothing', () => {
+    _state.set(buildTree());
+    rebuildNodeMap();
+    _state.setViewLevel('rocks');
+    removeLeaf('s2');
+    stepPebbles();
+    expect(_state.getViewLevel()).toBe('full');
   });
 
   test('Rocks prunes everything below the branch activities', () => {

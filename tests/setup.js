@@ -442,7 +442,7 @@ _state.getHoveredNode = function() { return hoveredNodeId; };
 _state.getKbFocus = function() { return kbFocusId; };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
-_state.setViewLevel = function(v) { currentViewLevel = v; };
+_state.setViewLevel = function(v) { currentViewLevel = v; pebblesExtraDepth = 0; };
 _state.closeViewLevels = function() { closeViewLevels(); };
 _state.getViewLevel = function() { return currentViewLevel; };
 _state.getZoom = function() { return zoom; };
@@ -753,6 +753,8 @@ export const {
   migrateDayCounters,
   transferReusable,
   computeLayout,
+  stepPebbles,
+  cycleViewLevel,
   getNodeSize,
   updateCounter,
   addBranch,

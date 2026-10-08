@@ -188,9 +188,9 @@ describe('Global hotkeys', () => {
   test('V cycles the view level', () => {
     _state.setViewLevel('full');
     press('v');
-    expect(_state.getViewLevel()).toBe('pebbles');
-    press('v');
     expect(_state.getViewLevel()).toBe('rocks');
+    press('v');
+    expect(_state.getViewLevel()).toBe('pebbles');
     press('v');
     expect(_state.getViewLevel()).toBe('full');
   });

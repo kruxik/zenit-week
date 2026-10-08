@@ -10,7 +10,7 @@ const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8')
 // one macrotask. It cost a full day to find, because it is invisible to any
 // scripted benchmark — calling switchViewLevel() from a script never enters the
 // input path at all.
-const SLIDE_TRIGGERS = ['switchViewLevel', 'setDayFilter', '_setViewLevel', 'repackWithSlide'];
+const SLIDE_TRIGGERS = ['switchViewLevel', 'pressViewLevel', 'stepPebbles', 'setDayFilter', '_setViewLevel', 'repackWithSlide'];
 
 // Handlers that legitimately mention a trigger without starting a slide. Keyed
 // by a stable snippet so an unrelated edit cannot silently widen the exemption.
@@ -62,7 +62,7 @@ describe('pointer handlers never start the view slide inline', () => {
 
   test('the three known entry points are still deferred', () => {
     // the view-level buttons
-    expect(SRC).toMatch(/addEventListener\('click', \(\) => deferFromInput\(\(\) => switchViewLevel\(btn\.dataset\.level\)\)\)/);
+    expect(SRC).toMatch(/addEventListener\('click', \(\) => deferFromInput\(\(\) => pressViewLevel\(btn\.dataset\.level\)\)\)/);
     // the branch swipe
     expect(SRC).toMatch(/deferFromInput\(\(\) => _setViewLevel\(next\)\)/);
     // the day-filter menu rows

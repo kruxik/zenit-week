@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-fKwBkKvt1S1N3HkDhEvDE2O7qwgGv4eorZWI9ZeC2MY='
+               'sha256-puprNN14alpM+tSIsvjR5UdULd0EwP6VobNuNFZM0M8='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -10872,6 +10872,9 @@ let editState = null;           // { nodeId, isNew, originalLabel }
 let _editJustCommitted = false; // true for 600ms after commit, guards resize handler
 let hoveredNodeId = null;  // Track currently hovered node
 let currentViewLevel = 'full'; // 'full' | 'pebbles' | 'rocks'
+// Levels Pebbles reveals beyond its base depth. Each repeat of Pebbles (button
+// or V) steps one level deeper; any level change starts it again at 0.
+let pebblesExtraDepth = 0;
 let activeDayFilter = null;   // null | 0–6 | 'unscheduled'
 
 let _atomicOpsDepth = 0;    // nesting counter; Drive sync deferred while > 0
@@ -11164,7 +11167,7 @@ const TRANSLATIONS = {
     'tips.priorityIntro':         'A flame marks critical, an exclamation high. Priority sizes the task on the map and passes down to everything beneath it.',
     'tips.undoIntro':             'Every change can be taken back. Experiment freely — nothing gets lost.',
     'tips.dayFilter':             'Narrows the map to one day. Pick a day here and the rest of the week steps aside.',
-    'tips.levels':                'How much detail the map draws. Rocks shows what matters, Pebbles adds sub-tasks, Sand shows everything. Nothing is lost — it just steps into the background.',
+    'tips.levels':                'How much detail the map draws. Rocks shows what matters, Pebbles adds sub-tasks — tap it again to go one level deeper — Sand shows everything. Nothing is lost — it just steps into the background.',
     'tips.views':                 'Three views of your week: Mindmap to plan, Agenda day by day, Stats for how it went.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
@@ -11531,7 +11534,7 @@ const TRANSLATIONS = {
     'tips.priorityIntro':         'Plamínek značí kritickou prioritu, vykřičník vysokou. Priorita zvětšuje úkol na mapě a propíše se na vše pod ním.',
     'tips.undoIntro':             'Každou změnu lze vzít zpět. Klidně zkoušejte — nic se neztratí.',
     'tips.dayFilter':             'Zúží mapu na jeden den. Vyberte den a zbytek týdne ustoupí.',
-    'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to klíčové, Oblázky přidají podúkoly, Písek ukáže vše. Nic se neztratí — jen ustoupí do pozadí.',
+    'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to klíčové, Oblázky přidají podúkoly — dalším klepnutím jdou o úroveň hlouběji — Písek ukáže vše. Nic se neztratí — jen ustoupí do pozadí.',
     'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
@@ -13925,7 +13928,7 @@ function setStatus(id, status) {
 // parents pack tightly together. Shared with applyFilters so both agree.
 // Depths: center=0, branch=1, activity=2, sub-task/counter=3, …
 function viewLevelHideDepth(level = currentViewLevel) {
-  if (level === 'pebbles') return 4; // hide sub-tasks below the first level
+  if (level === 'pebbles') return 4 + pebblesExtraDepth; // keep 4 in step with pebblesHidesAt // first sub-task level, plus any steps deeper
   if (level === 'rocks')   return 3; // show branches and their activities
   return Infinity;                   // 'full' (Sand) — show everything
 }
@@ -13935,6 +13938,15 @@ function viewLevelHideDepth(level = currentViewLevel) {
 // the user cannot see, so every entry point to adding one asks here first.
 function canAddChildAt(id) {
   return getNodeDepth(id) + 1 < viewLevelHideDepth();
+}
+
+// Whether Pebbles, `extra` levels past its base depth, still prunes something
+// the day filter would show. When it does not, that Pebbles step is just Sand.
+function pebblesHidesAt(extra) {
+  const hideDepth = 4 + extra; // viewLevelHideDepth('pebbles') at that step
+  const dayMatch = dayFilterMatchSet();
+  return weekData.nodes.some(n =>
+    getNodeDepth(n.id) >= hideDepth && dayFilterMatches(n.id, dayMatch));
 }
 
 function computeLayout() {
@@ -23919,6 +23931,7 @@ function repackWithSlide(mutate) {
 // the map itself; switchViewLevel wraps it in the slide.
 function applyViewLevel(level) {
   currentViewLevel = level;
+  pebblesExtraDepth = 0;
   document.querySelectorAll('.view-level-btn[data-level]').forEach(b =>
     b.classList.toggle('active', b.dataset.level === level));
 }
@@ -23927,6 +23940,22 @@ function applyViewLevel(level) {
 function switchViewLevel(level) {
   if (level === currentViewLevel) return;
   repackWithSlide(() => applyViewLevel(level));
+}
+
+// A level button press. Pebbles steps deeper on repeat; the others just switch.
+function pressViewLevel(level) {
+  if (level === 'pebbles') stepPebbles();
+  else switchViewLevel(level);
+}
+
+// Pebbles pressed again: reveal one more level of sub-tasks. A step that would
+// hide nothing is Sand, so the walk lands on Sand, the default view, instead.
+function stepPebbles() {
+  const onPebbles = currentViewLevel === 'pebbles';
+  const extra = onPebbles ? pebblesExtraDepth + 1 : 0;
+  if (!pebblesHidesAt(extra)) switchViewLevel('full');
+  else if (!onPebbles) switchViewLevel('pebbles');
+  else repackWithSlide(() => { pebblesExtraDepth = extra; });
 }
 
 // Single entry point for the day filter — hotkeys 0–8, the day-filter menu and
@@ -24395,7 +24424,7 @@ function animateViewSlide(fromPos) {
 }
 
 document.querySelectorAll('.view-level-btn[data-level]').forEach(btn => {
-  btn.addEventListener('click', () => deferFromInput(() => switchViewLevel(btn.dataset.level)));
+  btn.addEventListener('click', () => deferFromInput(() => pressViewLevel(btn.dataset.level)));
 });
 
 document.getElementById('day-filter-btn').addEventListener('click', () => {
@@ -24426,11 +24455,12 @@ function _setViewLevel(level) {
   openViewLevels();
 }
 
-// Sand → Pebbles → Rocks → Sand. The swipe walks the same list one step at a
-// time; the V hotkey wraps, so one key still reaches all three.
+// The V hotkey goes from coarse to fine: Sand → Rocks → Pebbles, then Pebbles
+// one level deeper per press until nothing is hidden, and back to Sand.
 function cycleViewLevel() {
-  const idx = VIEW_LEVELS.indexOf(currentViewLevel);
-  _setViewLevel(VIEW_LEVELS[(idx + 1) % VIEW_LEVELS.length]);
+  if (currentViewLevel === 'full') _setViewLevel('rocks');
+  else if (currentViewLevel === 'rocks') _setViewLevel('pebbles');
+  else { stepPebbles(); openViewLevels(); }
 }
 
 function showToast(msg, duration = 2000) {
