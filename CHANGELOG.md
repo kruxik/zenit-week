@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.10.08] - 2026-10-08
+
+### Added
+
+- **view-levels:** V walks Sand → Rocks → Pebbles, one level deeper per repeat, ending on Sand
+
+### Fixed
+
+- **view-levels:** Switch the lit level button instantly; the cross-fade blanked its label mid-way
+- **update:** Never ignore a stale-shell report, refresh SW cache before reload, check while app is in foreground
+
 ## [v2026.10.07.1] - 2026-10-07
 
 ### Fixed
