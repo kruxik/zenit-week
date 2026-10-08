@@ -827,7 +827,6 @@
     padding: 6px 4px;
     border-radius: 5px;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
     color: var(--text-subtle);
     font-size: 6px;
     font-weight: 600;
@@ -835,9 +834,13 @@
     text-transform: uppercase;
   }
 
-  .view-level-btn:hover {
+  /* Only the hover fades in. A level switch must be instant: fading the old
+     button's fill out while its label fades to grey crosses the two over, and
+     for a frame or two the button is a blank grey box (traced in Chrome). */
+  .view-level-btn:not(.active):hover {
     background: var(--bg-hover);
     color: var(--text-dim);
+    transition: background 0.15s, color 0.15s;
   }
 
   .view-level-btn.active {
