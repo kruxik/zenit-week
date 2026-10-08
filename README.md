@@ -20,7 +20,7 @@ The "rocks first" idea: fill the jar with sand first and the big rocks won't fit
 - **Online:** open [zenitweek.com](https://zenitweek.com/) and start in seconds.
 - **Offline:** download `zenit-week.html` and open it in any modern browser. Your data is saved to the browser's IndexedDB. Optionally sign in with Google to sync to your own Drive.
 
-No account is required. No tracking. Your data never touches Zenit Week's infrastructure.
+No account is required. No cookies, only anonymous visit counts. Your data never touches Zenit Week's infrastructure.
 
 ## Features
 
