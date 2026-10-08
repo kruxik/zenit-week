@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-DKiAFmLdg7habd1C/kfxP+a37Pg131Uqi2WXu7mhnAI='
+               'sha256-fKwBkKvt1S1N3HkDhEvDE2O7qwgGv4eorZWI9ZeC2MY='
                'sha256-CfAP9jDc6KL9/zlzFWG8Mkm2zvmkF5fMtVTqia8xaak=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5076,9 +5076,8 @@ function netFetch(input, options = {}) {
 
 // ─── Quiet refresh: asset version probe ──────────────────────────────────────
 // Probes the deployed asset's ETag on foreground/focus. Loop guard: the new
-// ETag is persisted to localStorage *before* `_pendingReload` is flagged, so a
-// deploy is only ever chased once — and the attempt count below caps how many
-// reloads that one chase may spend.
+// ETag is persisted to localStorage *before* `_pendingReload` is flagged, and
+// the attempt count below caps how many reloads one build may spend.
 let _pendingReload = false;
 let _newAssetEtag  = null;
 const ASSET_ETAG_KEY = 'zenit-week-asset-etag';
@@ -5173,30 +5172,76 @@ async function checkForAssetUpdate() {
     console.debug('[quiet-refresh] probe-no-token');
     return;
   }
-  _noteAssetVersion(token);
+  await _noteProbedVersion(token);
 }
 
-// Records the version token seen for the deployed shell. Shared by the HTTP
-// probe above and the service worker's postMessage, which report the same fact
-// through different channels. The token is persisted *before* `_pendingReload`
-// is flagged, so a broken deploy can only ever reload once.
-function _noteAssetVersion(token) {
-  if (!token) return;
+// The token saved here is the last deployed version this device has *seen* —
+// not the one this page is *running*, which the page cannot know. Treating the
+// two as the same once left a phone a build behind with no reload and no
+// banner: the probe recorded the new token, its reload was answered from the
+// worker's still-stale cache, and the worker's own "shell updated" report was
+// then dropped as old news. So the token only decides whether a probe has news;
+// the worker's report is acted on regardless (_noteStaleShell).
+// Returns 'seeded', 'same' or 'changed'.
+function _recordAssetToken(token) {
   const prev = localStorage.getItem(ASSET_ETAG_KEY);
-  if (prev === null) {
-    localStorage.setItem(ASSET_ETAG_KEY, token);
-    console.debug('[quiet-refresh] baseline-seeded', token);
-    return;
-  }
-  if (prev === token) return;
+  if (prev === token) return 'same';
   localStorage.setItem(ASSET_ETAG_KEY, token);
-  _newAssetEtag  = token;
+  if (prev === null) {
+    console.debug('[quiet-refresh] baseline-seeded', token);
+    return 'seeded';
+  }
+  _newAssetEtag = token;
   console.debug('[quiet-refresh] update-detected', { etag: token, prevEtag: prev });
-  // A new token starts the count over: attempts spent chasing an earlier one
-  // say nothing about this build.
-  _writePendingReload({ v: APP_VERSION, n: 0 });
+  return 'changed';
+}
+
+// The HTTP probe. A first token is only a baseline — a page loaded from the
+// network is the build it saw. A changed one is news, but under a worker the
+// reload is answered from its cache, so the cache is refreshed first; otherwise
+// that reload just lands on the same stale build again.
+async function _noteProbedVersion(token) {
+  if (!token || _recordAssetToken(token) !== 'changed') return;
+  await _refreshWorkerShell();
+  _oweReload(true);
+}
+
+// The worker found its cached shell older than the deployed one. Every page it
+// controls was served from that cache, so this page is stale whatever the
+// saved token says.
+function _noteStaleShell(token) {
+  if (!token) return;
+  _oweReload(_recordAssetToken(token) === 'changed');
+}
+
+// Arms the reload. Only a new build starts the attempt count over — a repeated
+// report for the same one must not, or a reload that keeps missing would never
+// give up.
+function _oweReload(newBuild) {
+  const rec = _readPendingReload();
+  if (newBuild || !rec || rec.v !== APP_VERSION) _writePendingReload({ v: APP_VERSION, n: 0 });
   _armPendingReload();
   tryQuietReload();
+}
+
+// Asks the worker to revalidate its cached shell now, and waits until it has
+// (or a deadline passes — the reload then just retries off a stale copy).
+const SHELL_REFRESH_TIMEOUT_MS = 25000;
+
+function _refreshWorkerShell() {
+  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (!sw || typeof MessageChannel === 'undefined') return Promise.resolve();
+  return new Promise(resolve => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(resolve, SHELL_REFRESH_TIMEOUT_MS);
+    channel.port1.onmessage = () => { clearTimeout(timer); resolve(); };
+    try {
+      sw.postMessage({ type: 'zw-refresh-shell' }, [channel.port2]);
+    } catch (err) {
+      clearTimeout(timer);
+      resolve();
+    }
+  });
 }
 
 // `visibilitychange` and `focus` both fire when a desktop tab is switched back
@@ -5218,6 +5263,14 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') requestAssetUpdateCheck();
 });
 window.addEventListener('focus', requestAssetUpdateCheck);
+
+// Returning to the app is not the only way to be on it: someone can sit in the
+// Agenda for an hour without the tab ever losing focus. A slow foreground check
+// covers that. It spends nothing while hidden, and the probe skips offline.
+const FOREGROUND_PROBE_INTERVAL_MS = 15 * 60 * 1000;
+setInterval(() => {
+  if (document.visibilityState === 'visible') requestAssetUpdateCheck();
+}, FOREGROUND_PROBE_INTERVAL_MS);
 
 // Boot probe. A page the service worker controls has just had its shell
 // revalidated by the worker as part of this very navigation, and a new version
@@ -5273,7 +5326,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     if (!data) return;
     if (data.type === 'zw-shell-updated') {
       console.debug('[sw] shell-updated', data.token);
-      _noteAssetVersion(data.token);
+      _noteStaleShell(data.token);
       return;
     }
     // A week the worker pushed while the tab was backgrounded or closed.

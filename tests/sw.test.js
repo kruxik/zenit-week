@@ -67,7 +67,7 @@ function makeIndexedDb(misc, { stores = ['weeks', 'misc'] } = {}) {
 
 // Boots sw.js in an isolated context with the worker globals it expects, and
 // hands back both the context and the recorded event listeners.
-function loadWorker({ onLine, fetchImpl, clients = [], misc = null } = {}) {
+function loadWorker({ onLine, fetchImpl, clients = [], misc = null, served = {} } = {}) {
   const listeners = {};
   const cache = makeCache();
   const posted = [];
@@ -77,6 +77,11 @@ function loadWorker({ onLine, fetchImpl, clients = [], misc = null } = {}) {
     url,
     postMessage: msg => posted.push({ url, msg }),
   }));
+  const servedClients = Object.fromEntries(Object.entries(served).map(([id, url]) => [id, {
+    id,
+    url,
+    postMessage: msg => posted.push({ url, msg, id }),
+  }]));
 
   const ctx = {
     console: { debug() {}, warn() {}, error() {} },
@@ -109,6 +114,7 @@ function loadWorker({ onLine, fetchImpl, clients = [], misc = null } = {}) {
     clients: {
       claim: async () => {},
       matchAll: async () => clientStubs,
+      get: async id => servedClients[id],
     },
     addEventListener: (type, fn) => { listeners[type] = fn; },
   };
@@ -349,6 +355,22 @@ describe('sw.js — revalidation', () => {
     await w.ctx.revalidateShell(w.cache, cached, '/app');
 
     expect(w.posted).toHaveLength(2);
+    expect(w.posted[0].msg).toEqual({ type: 'zw-shell-updated', token: '"v2"' });
+  });
+
+  it('tells the page this navigation created, even before matchAll lists it', async () => {
+    const w = loadWorker({
+      clients: [],
+      served: { 'new-tab': `${ORIGIN}/app` },
+      fetchImpl: () => Promise.resolve(makeResponse({ etag: '"v2"' })),
+    });
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"' }));
+    const ev = navEvent(`${ORIGIN}/app`);
+    ev.resultingClientId = 'new-tab';
+    await w.ctx.shellResponse(ev);
+    await Promise.all(ev.waits);
+    expect(w.posted).toHaveLength(1);
+    expect(w.posted[0].id).toBe('new-tab');
     expect(w.posted[0].msg).toEqual({ type: 'zw-shell-updated', token: '"v2"' });
   });
 
@@ -1269,5 +1291,44 @@ describe('sw.js — editor vendor bundle', () => {
       await serve(w, NEW);
       expect([...w.cache.store.keys()]).toEqual([OLD]);
     }
+  });
+});
+
+describe('sw.js — refresh on request', () => {
+  function refreshEvent(sourceUrl) {
+    const replies = [];
+    const waits = [];
+    return {
+      data: { type: 'zw-refresh-shell' },
+      source: { url: sourceUrl },
+      ports: [{ postMessage: msg => replies.push(msg) }],
+      waitUntil: p => { waits.push(p); },
+      replies,
+      waits,
+    };
+  }
+
+  it('refreshes the cached shell before the page reloads, then answers', async () => {
+    const w = loadWorker({
+      clients: [`${ORIGIN}/app`],
+      fetchImpl: () => Promise.resolve(makeResponse({ etag: '"v2"', tag: 'fresh' })),
+    });
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'stale' }));
+    const ev = refreshEvent(`${ORIGIN}/app`);
+    w.listeners.message(ev);
+    await Promise.all(ev.waits);
+    expect((await w.cache.match('/__zw-shell__')).tag).toBe('fresh');
+    expect(ev.replies).toEqual([{ type: 'zw-shell-refreshed' }]);
+    expect(w.posted).toHaveLength(0);  // the page arms its own reload
+  });
+
+  it('still answers when the network is gone, so the page never waits out its deadline', async () => {
+    const w = loadWorker({ fetchImpl: () => Promise.reject(new Error('offline')) });
+    await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"', tag: 'stale' }));
+    const ev = refreshEvent(`${ORIGIN}/app`);
+    w.listeners.message(ev);
+    await Promise.all(ev.waits);
+    expect((await w.cache.match('/__zw-shell__')).tag).toBe('stale');
+    expect(ev.replies).toHaveLength(1);
   });
 });

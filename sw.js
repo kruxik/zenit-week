@@ -566,9 +566,35 @@ async function clearAvatars() {
 
 self.addEventListener('message', event => {
   const data = event.data;
-  if (!data || data.type !== 'zw-clear-avatar') return;
-  event.waitUntil(clearAvatars());
+  if (!data) return;
+  if (data.type === 'zw-clear-avatar') {
+    event.waitUntil(clearAvatars());
+    return;
+  }
+  if (data.type === 'zw-refresh-shell') event.waitUntil(refreshShellFor(event));
 });
+
+// The page's probe found a new deploy and is about to reload. The reload is
+// answered from this cache, so bring it up to date first and say when done —
+// otherwise the reload lands on the same stale build. The page arms its own
+// reload, so this does not notify. The reply is sent whatever happens: the
+// page is waiting on it.
+async function refreshShellFor(event) {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(SHELL_KEY);
+    let path = '/app';
+    try {
+      const url = new URL(event.source.url);
+      if (isAppDocument(url)) path = url.pathname;
+    } catch (_) { /* no usable source URL — '/app' serves the same document */ }
+    if (cached) await revalidateDocument(cache, SHELL_KEY, cached, path, false);
+  } catch (err) {
+    console.debug('[sw] refresh-shell-failed', err && err.message);
+  }
+  const port = event.ports && event.ports[0];
+  if (port) port.postMessage({ type: 'zw-shell-refreshed' });
+}
 
 // ─── Offline fallback ─────────────────────────────────────────────────────────
 //
@@ -668,7 +694,7 @@ async function cachedDocument(event, cacheKey, notify) {
   const preload = preloadResponse(event);
   if (cached) {
     // Stale-while-revalidate: paint from cache, check for a new deploy after.
-    event.waitUntil(revalidateDocument(cache, cacheKey, cached, path, notify, preload));
+    event.waitUntil(revalidateDocument(cache, cacheKey, cached, path, notify, preload, event.resultingClientId));
     return cached;
   }
   try {
@@ -692,7 +718,7 @@ function revalidateShell(cache, cached, path) {
   return revalidateDocument(cache, SHELL_KEY, cached, path, true);
 }
 
-async function revalidateDocument(cache, cacheKey, cached, path, notify, preload = null) {
+async function revalidateDocument(cache, cacheKey, cached, path, notify, preload = null, servedClientId = null) {
   // Only trusted in the negative — see isDefinitelyOffline() in the app.
   if (self.navigator && self.navigator.onLine === false) return;
   let fresh = preload ? await preload : null;
@@ -719,8 +745,19 @@ async function revalidateDocument(cache, cacheKey, cached, path, notify, preload
   await cache.put(cacheKey, fresh.clone());
   if (!notify) return;
   if (!newToken || !oldToken || newToken === oldToken) return;
-  const windows = await self.clients.matchAll({ type: 'window' });
-  for (const client of windows) {
+  for (const client of await shellUpdateRecipients(servedClientId)) {
     client.postMessage({ type: 'zw-shell-updated', token: newToken });
   }
+}
+
+// Every open tab, plus the page this very navigation is creating. That page is
+// the one most certainly stale — it was just handed the old copy — yet it may
+// not be listed by matchAll() until it is ready, which a fast revalidation can
+// beat. clients.get() waits for it.
+async function shellUpdateRecipients(servedClientId) {
+  const windows = await self.clients.matchAll({ type: 'window' });
+  if (!servedClientId || windows.some(c => c.id === servedClientId)) return windows;
+  let served = null;
+  try { served = await self.clients.get(servedClientId); } catch (_) { served = null; }
+  return served ? windows.concat(served) : windows;
 }

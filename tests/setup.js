@@ -172,6 +172,10 @@ const sandbox = {
   requestAnimationFrame: () => {},
   setTimeout,
   clearTimeout,
+  // Unref'd so a top-level interval in the app (the foreground update check)
+  // never keeps the test worker alive.
+  setInterval: (fn, ms) => { const t = setInterval(fn, ms); if (t.unref) t.unref(); return t; },
+  clearInterval,
   // Date getter — re-reads host global on each access so withFrozenDate()
   // overrides propagate into the VM sandbox.
   get Date() { return globalThis.Date; },
@@ -376,6 +380,8 @@ _state.getNetTimeouts = function() {
 };
 _state.getLastProbeAt = function() { return _lastProbeAt; };
 _state.setLastProbeAt = function(v) { _lastProbeAt = v; };
+_state.getPendingReload = function() { return _pendingReload; };
+_state.resetPendingReload = function() { _pendingReload = false; _pendingReloadSince = 0; _disarmPendingReload(); };
 
 // Reveal-pan guard: the tween's target and in-flight flag are module-level.
 _state.getPanState = function() {
@@ -901,6 +907,8 @@ export const {
   validateRestorePayload,
   isAppQuiescent,
   isPendingReloadOwed,
+  _noteStaleShell,
+  _noteProbedVersion,
   shouldShowUpdateBanner,
   // Google Drive Sync
   attemptSilentRestore,
