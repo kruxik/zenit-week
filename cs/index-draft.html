@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Vizuální plánovač týdne ve stylu myšlenkové mapy. Soustřeďte se na to, co je důležité — ne jen na to, co je naléhavé. Bez registrace. Zdarma.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1a2e'/%3E%3Cpath d='M18,32 C32,32 32,14 42,14' fill='none' stroke='%23A259FF' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M18,32 C32,32 32,50 42,50' fill='none' stroke='%231ABCFE' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='32' r='7' fill='%23f0f0f0'/%3E%3Ccircle cx='48' cy='14' r='5' fill='%23A259FF'/%3E%3Ccircle cx='48' cy='50' r='5' fill='%231ABCFE'/%3E%3C/svg%3E">
+  <title>Zenit Week - Vizuální plánovač týdne ve stylu myšlenkové mapy</title>
+
+  <!-- SEO -->
+  <link rel="canonical" href="https://zenitweek.com/cs/">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="author" content="Petr Burian">
+
+  <!-- Language alternates -->
+  <link rel="alternate" hreflang="en" href="https://zenitweek.com/">
+  <link rel="alternate" hreflang="cs" href="https://zenitweek.com/cs/">
+  <link rel="alternate" hreflang="x-default" href="https://zenitweek.com/">
+
+  <!-- Open Graph -->
+  <meta property="og:site_name" content="Zenit Week">
+  <meta property="og:title" content="Zenit Week - Vizuální plánovač týdne ve stylu myšlenkové mapy">
+  <meta property="og:description" content="Přestaňte sypat do týdne písek. Velké kameny napřed.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://zenitweek.com/cs/">
+  <meta property="og:locale" content="cs_CZ">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:image" content="https://zenitweek.com/og-image-cs.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Zenit Week — vizuální plánovač týdne ve stylu myšlenkové mapy. Plánujte to, na čem záleží.">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Zenit Week - Vizuální plánovač týdne ve stylu myšlenkové mapy">
+  <meta name="twitter:description" content="Přestaňte sypat do týdne písek. Velké kameny napřed.">
+  <meta name="twitter:image" content="https://zenitweek.com/og-image-cs.png">
+  <meta name="twitter:image:alt" content="Zenit Week — vizuální plánovač týdne ve stylu myšlenkové mapy. Plánujte to, na čem záleží.">
+
+  <!-- Structured data (schema.org SoftwareApplication) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Zenit Week",
+    "description": "Vizuální plánovač týdne ve stylu myšlenkové mapy. Důsledné soukromí, vaše plány se na naše servery nedostanou, zdarma.",
+    "url": "https://zenitweek.com/cs/",
+    "inLanguage": "cs",
+    "applicationCategory": "ProductivityApplication",
+    "operatingSystem": "Web",
+    "browserRequirements": "Vyžaduje moderní prohlížeč s podporou ES6+",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "CZK"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Petr Burian"
+    },
+    "license": "https://opensource.org/licenses/MIT"
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:       #1a1a2e;
+      --cloud:     #f9f9f9;
+      --surface:   #ffffff;
+      --muted:     #6b6b80;
+      --border:    #e8e8ee;
+      --work:      #F24E1E;
+      --family:    #A259FF;
+      --me:        #1ABCFE;
+      --work-lt:   #FFF0ED;
+      --family-lt: #F3EBFF;
+      --me-lt:     #E8F8FF;
+      --radius:    14px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body { overflow-x: clip; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--cloud);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Nav ──────────────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(249,249,249,0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+      color: var(--ink);
+    }
+
+    .nav-cta {
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+    .nav-cta:hover { opacity: 0.82; }
+    .nav-cta .nav-cta-short { display: none; }
+    @media (max-width: 540px) {
+      .nav-cta .nav-cta-full { display: none; }
+      .nav-cta .nav-cta-short { display: inline; }
+    }
+
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .lang-switcher {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .lang-link {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .lang-link:hover { color: var(--ink); }
+    .lang-link.active { color: var(--ink); background: var(--surface); border: 1px solid var(--border); }
+    .lang-sep { color: var(--border); font-weight: 300; }
+
+    /* ── Lang banner ──────────────────────────────────────────────── */
+    .lang-banner[hidden] { display: none; }
+    .lang-banner {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--ink);
+    }
+    .lang-banner-text { color: var(--muted); }
+    .lang-banner-cta {
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      transition: opacity 0.15s;
+    }
+    .lang-banner-cta:hover { opacity: 0.82; }
+    .lang-banner-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .lang-banner-close:hover { color: var(--ink); background: var(--cloud); }
+    @media (max-width: 540px) {
+      .lang-banner { font-size: 13px; padding: 8px 12px; gap: 8px; }
+    }
+
+    /* ── Hero ─────────────────────────────────────────────────────── */
+    .hero {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 56px 24px 72px;
+      text-align: center;
+    }
+
+    .hero-eyebrow {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 14px 6px 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+      text-decoration: none;
+      margin-bottom: 28px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .hero-badge:hover {
+      border-color: #8F37FF;
+      box-shadow: 0 0 0 3px rgba(143,55,255,0.12);
+    }
+    .hero-badge svg { flex-shrink: 0; }
+
+    .hero-title {
+      font-size: clamp(34px, 6.5vw, 60px);
+      font-weight: 300;
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 20px;
+    }
+
+    .hero-title strong { font-weight: 700; }
+
+    .hero-lead {
+      font-size: clamp(20px, 3vw, 26px);
+      font-weight: 300;
+      line-height: 1.35;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+    .hero-lead strong { font-weight: 700; }
+
+    .hero-shot {
+      margin: 48px 0 0;
+    }
+
+    /* Questions moved from the hero into the Problem section: beat `.why p` */
+    .why .why-inner p.hero-hook {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 300;
+      line-height: 1.18;
+      color: var(--ink);
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .why .why-inner p.hero-answer {
+      font-size: clamp(26px, 4vw, 36px);
+      font-weight: 700;
+      color: var(--ink);
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .why .why-inner p.hero-sub {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .hero-hook {
+      font-size: clamp(32px, 6vw, 56px);
+      font-weight: 300;
+      line-height: 1.18;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 12px;
+    }
+
+    .hero-hook strong {
+      font-weight: 700;
+    }
+
+    .hero-questions {
+      list-style: none;
+      margin: 44px auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 560px;
+      align-items: center;
+    }
+
+    .hero-questions li {
+      font-size: clamp(14px, 2vw, 16px);
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 11px;
+      border: 1.5px solid;
+      line-height: 1.3;
+      white-space: nowrap;
+      position: relative;
+      overflow: visible;
+    }
+
+    .branch-svg {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      overflow: visible;
+      pointer-events: none;
+    }
+    .branch-left  { right: calc(100% - 1px); }
+    .branch-right { left:  calc(100% - 1px); }
+
+    .hero-questions li:nth-child(1) {
+      background: linear-gradient(to bottom, #ffffff, #ede0ff);
+      border-color: #8F37FF;
+      color: #6010c8;
+      box-shadow: 0 0 18px rgba(143,55,255,0.32);
+      margin-left: -60px;
+    }
+    .hero-questions li:nth-child(2) {
+      background: linear-gradient(to bottom, #ffffff, #e0ffe2);
+      border-color: #19C82A;
+      color: #0a7a14;
+      box-shadow: 0 0 18px rgba(25,200,42,0.32);
+      margin-left: 60px;
+    }
+    .hero-questions li:nth-child(3) {
+      background: linear-gradient(to bottom, #ffffff, #e0f6ff);
+      border-color: #1ABCFE;
+      color: #0070a0;
+      box-shadow: 0 0 18px rgba(26,188,254,0.32);
+      margin-left: 20px;
+    }
+    .hero-questions li:nth-child(4) {
+      background: linear-gradient(to bottom, #ffffff, #ffe8e0);
+      border-color: #F83800;
+      color: #b82000;
+      box-shadow: 0 0 18px rgba(248,56,0,0.32);
+      margin-left: -30px;
+    }
+
+    .hero-answer {
+      font-size: clamp(29px, 4.55vw, 42px);
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 44px;
+    }
+
+    .hero-sub {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 44px;
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      padding: 16px 36px;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      transition: transform 0.15s, opacity 0.15s;
+      box-shadow: 0 4px 20px rgba(26,26,46,0.18);
+    }
+    .cta-btn:hover { transform: translateY(-2px); opacity: 0.9; }
+
+    .cta-note {
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ── Divider ──────────────────────────────────────────────────── */
+    .section-divider {
+      width: 48px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--family), var(--me));
+      border-radius: 2px;
+      margin: 0 auto 24px;
+    }
+
+    /* ── Why section ──────────────────────────────────────────────── */
+    .why {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .why-inner {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .why h2,
+    .preview h2,
+    .features h2 {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 700;
+      line-height: 1.25;
+      margin: 0 0 24px;
+    }
+
+    .why p:not(.section-label) {
+      font-size: 17px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    /* Jar SVG */
+    .jar-wrap {
+      margin: 44px auto 0;
+      max-width: 440px;
+    }
+
+    /* ── App preview ──────────────────────────────────────────────── */
+    .preview {
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .preview-inner {
+      max-width: 840px;
+      margin: 0 auto;
+    }
+
+    .preview > .preview-inner > p:not(.section-label),
+    .features > .features-inner > p:not(.section-label) {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 52px;
+    }
+
+    /* Mind map SVG card */
+    .mindmap-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 8px 40px rgba(26,26,46,0.08);
+      padding: 40px 24px 36px;
+      margin-bottom: 52px;
+      overflow: hidden;
+    }
+
+    /* Benefits */
+    .benefits {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      text-align: left;
+    }
+
+    .benefit {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .benefit-icon {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--ico, currentColor);
+      filter: drop-shadow(0 0 6px var(--ico, currentColor));
+    }
+    .benefit-icon svg {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .benefit-body { flex: 1; }
+
+    .benefit h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .benefit p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── Features section ─────────────────────────────────────────── */
+    .features {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .features-inner {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      text-align: left;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 540px) {
+      .features-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Ritual section ───────────────────────────────────────────── */
+    .ritual {
+      background: var(--ink);
+      color: #fff;
+      padding: 88px 24px;
+      text-align: center;
+    }
+
+    .ritual-inner {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .ritual h2 {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 300;
+      line-height: 1.22;
+      margin-bottom: 20px;
+    }
+
+    .ritual h2 strong { font-weight: 700; display: block; margin-bottom: 20px; }
+
+    .ritual p:not(.ritual-note) {
+      font-size: 17px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 40px;
+      line-height: 1.7;
+    }
+
+    .cta-btn-light {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      color: var(--ink);
+      text-decoration: none;
+      padding: 16px 36px;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 700;
+      transition: transform 0.15s, opacity 0.15s;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    }
+    .cta-btn-light:hover { transform: translateY(-2px); opacity: 0.92; }
+
+    .ritual-note {
+      margin-top: 16px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    footer p {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    footer a {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    footer a:hover { color: var(--ink); }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 540px) {
+      .hero { padding: 28px 20px 56px; }
+      .why, .preview, .features, .ritual { padding: 60px 20px; }
+      .mindmap-card { padding: 24px 12px; }
+      .hero-questions { max-width: 100%; gap: 8px; }
+      .hero-questions li {
+        font-size: 13px;
+        padding: 8px 14px;
+        white-space: normal;
+      }
+      .hero-questions li:nth-child(1) { margin-left: -24px; }
+      .hero-questions li:nth-child(2) { margin-left:  24px; }
+      .hero-questions li:nth-child(3) { margin-left:   8px; }
+      .hero-questions li:nth-child(4) { margin-left: -12px; }
+      .branch-svg { width: 36px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Lang suggestion banner ─────────────────────────────────────── -->
+<aside id="lang-banner" class="lang-banner" hidden aria-label="Language suggestion">
+  <span class="lang-banner-text">This page is available in English.</span>
+  <a href="/" class="lang-banner-cta" id="lang-banner-cta">Switch</a>
+  <button type="button" class="lang-banner-close" id="lang-banner-close" aria-label="Close">×</button>
+</aside>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────── -->
+<nav>
+  <a href="/cs/" class="nav-logo" aria-label="Zenit Week — domovská stránka">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 3 216 46" width="156" height="34" aria-hidden="true">
+      <text x="2" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+      <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+      <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+      <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+      <text x="84" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+      <text x="108" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+    </svg>
+  </a>
+  <div class="nav-right">
+    <div class="lang-switcher">
+      <a href="/" class="lang-link" hreflang="en">EN</a>
+      <span class="lang-sep" aria-hidden="true">|</span>
+      <a href="/cs/" class="lang-link active" aria-current="page">CS</a>
+    </div>
+    <a href="/app" class="nav-cta"><span class="nav-cta-full">Otevřít aplikaci →</span><span class="nav-cta-short">apka</span></a>
+  </div>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <a class="hero-badge" href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 012-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="currentColor"/>
+    </svg>
+    ⭐ Open source · Sledujte na GitHubu →
+  </a>
+
+  <h1 class="hero-title"><strong>Vizuální</strong> týdenní plánovač</h1>
+  <p class="hero-lead">Týden vám zavalí maily a meetingy. <strong>Na to důležité nezbude čas.</strong></p>
+  <p class="hero-sub">V myšlenkové mapě si nejdřív naplánujte hodnotnou práci, rodinu a koníčky.<br>Zbytek se vejde kolem.</p>
+
+  <a href="/app" class="cta-btn">
+    <span style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <span style="font-size:17px;font-weight:700;line-height:1.2;">Vyzkoušet ukázkový týden</span>
+    </span>
+  </a>
+  <p class="cta-note">Bez registrace. Bez instalace. Data zůstávají u vás.</p>
+
+  <div class="mindmap-card hero-shot">
+    <img src="../assets/hero.svg" alt="Vizuální týdenní plánovač Zenit Week: myšlenková mapa na notebooku, agenda na telefonu" fetchpriority="high" style="display:block; width:100%; height:auto;">
+  </div>
+</section>
+
+<!-- ── Why ──────────────────────────────────────────────────────────── -->
+<section class="why">
+  <div class="why-inner">
+    <p class="section-label">Problém</p>
+    <div class="section-divider"></div>
+    <p class="hero-hook">
+      Máte dost času na to,<br>co je opravdu <strong>důležité</strong>?
+    </p>
+
+    <ul class="hero-questions">
+      <li>
+        <svg class="branch-svg branch-left" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
+          <defs>
+            <linearGradient id="bl1" x1="70" y1="20" x2="0" y2="20" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#8F37FF" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#8F37FF" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 70 20 C 48 20 28 14 0 22" fill="none" stroke="url(#bl1)" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        Učit se AI — i kdyby jen 10 minut denně?
+      </li>
+      <li>
+        <svg class="branch-svg branch-right" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
+          <defs>
+            <linearGradient id="bl2" x1="0" y1="20" x2="70" y2="20" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#19C82A" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#19C82A" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 0 20 C 22 20 48 14 70 22" fill="none" stroke="url(#bl2)" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        Být plně přítomný se svou rodinou?
+      </li>
+      <li>
+        <svg class="branch-svg branch-right" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
+          <defs>
+            <linearGradient id="bl3" x1="0" y1="20" x2="70" y2="20" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#1ABCFE" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#1ABCFE" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 0 20 C 22 20 48 14 70 22" fill="none" stroke="url(#bl3)" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        Pečovat o svou mysl a tělo?
+      </li>
+      <li>
+        <svg class="branch-svg branch-left" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
+          <defs>
+            <linearGradient id="bl4" x1="70" y1="20" x2="0" y2="20" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#F83800" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#F83800" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 70 20 C 48 20 28 26 0 18" fill="none" stroke="url(#bl4)" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        Budovat něco, co vás posouvá vpřed?
+      </li>
+    </ul>
+
+    <p class="hero-answer">Pravděpodobně ne.</p>
+    <p class="hero-sub">Ne proto, že byste byli líní nebo nechtěli.<br>Protože váš týden se zaplní dřív, než stihnete rozhodnout, co je v něm důležité.</p>
+
+
+    <h2>Sypete do nádoby nejdřív písek</h2>
+    <p>
+      Existuje ukázka: nádobu nejprve naplníte pískem a pak se snažíte vměstnat dovnitř velké kameny — rodinu, zdraví, růst, smysluplnou práci.
+    </p>
+    <p>
+      <strong>Nevejdou se.</strong>
+    </p>
+    <p>
+      Když to ale obrátíte — dáte kameny napřed — písek se kolem nich přirozeně usadí.
+    </p>
+    <p>
+      Většina z nás plánuje týden jako první nádobu. Maily, schůzky a drobné úkoly ji zaplní. Do čtvrtka už není místo na to, na čem doopravdy záleží.
+    </p>
+
+    <!-- Jar illustration -->
+    <div class="jar-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 340" width="100%" role="img" aria-label="Dvě skleněné nádoby — jedna naplněná pískem napřed, kam se velké kameny už nevejdou; druhá s velkými kameny vloženými první a pískem zaplňujícím mezery">
+        <defs>
+          <linearGradient id="glass-body" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#fafbfc" stop-opacity="0.92"/>
+            <stop offset="55%"  stop-color="#eaecef" stop-opacity="0.78"/>
+            <stop offset="100%" stop-color="#d7dadf" stop-opacity="0.85"/>
+          </linearGradient>
+          <linearGradient id="sand-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#f4dfa6"/>
+            <stop offset="100%" stop-color="#d6ad62"/>
+          </linearGradient>
+          <linearGradient id="sand-top" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#fff3d0"/>
+            <stop offset="100%" stop-color="#f4dfa6"/>
+          </linearGradient>
+          <radialGradient id="rock-work" cx="32%" cy="28%" r="80%">
+            <stop offset="0%" stop-color="#ff7a52"/><stop offset="60%" stop-color="#ee4f20"/><stop offset="100%" stop-color="#b03000"/>
+          </radialGradient>
+          <radialGradient id="rock-family" cx="32%" cy="28%" r="80%">
+            <stop offset="0%" stop-color="#c389ff"/><stop offset="60%" stop-color="#9d4cff"/><stop offset="100%" stop-color="#6f1ed9"/>
+          </radialGradient>
+          <radialGradient id="rock-me" cx="32%" cy="28%" r="80%">
+            <stop offset="0%" stop-color="#65d4ff"/><stop offset="60%" stop-color="#23b8f7"/><stop offset="100%" stop-color="#0285b8"/>
+          </radialGradient>
+          <filter id="rock-shadow" x="-30%" y="-30%" width="160%" height="180%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0a0a14" flood-opacity="0.32"/>
+          </filter>
+          <filter id="jar-shadow" x="-15%" y="-10%" width="130%" height="125%">
+            <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#1a1a2e" flood-opacity="0.15"/>
+          </filter>
+          <filter id="ground-shadow" x="-20%" y="-50%" width="140%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
+          </filter>
+          <clipPath id="clip-left"> <path d="M 60 90 C 60 82 66 78 82 78 L 158 78 C 174 78 180 82 180 90 L 180 246 Q 180 260 166 260 L 74 260 Q 60 260 60 246 Z"/></clipPath>
+          <clipPath id="clip-right"><path d="M 270 90 C 270 82 276 78 292 78 L 368 78 C 384 78 390 82 390 90 L 390 246 Q 390 260 376 260 L 284 260 Q 270 260 270 246 Z"/></clipPath>
+        </defs>
+
+        <!-- ══ LEFT JAR — sand first (bad) ══ -->
+        <ellipse cx="120" cy="272" rx="58" ry="6" fill="#000" opacity="0.32" filter="url(#ground-shadow)"/>
+        <g filter="url(#jar-shadow)">
+          <path d="M 60 246 Q 60 260 74 260 L 166 260 Q 180 260 180 246 L 180 90 C 180 82 174 78 158 78 L 158 64 L 168 64 Q 172 64 172 60 L 172 46 Q 172 40 166 40 L 74 40 Q 68 40 68 46 L 68 60 Q 68 64 72 64 L 82 64 L 82 78 C 66 78 60 82 60 90 Z"
+                fill="url(#glass-body)" stroke="#c8ccd2" stroke-width="1"/>
+        </g>
+        <line x1="72" y1="50" x2="168" y2="50" stroke="#c8ccd2" stroke-width="0.8" opacity="0.55"/>
+        <g clip-path="url(#clip-left)">
+          <rect x="60" y="105" width="120" height="155" fill="url(#sand-grad)"/>
+          <rect x="60" y="103" width="120" height="6" fill="url(#sand-top)"/>
+          <circle cx="80"  cy="140" r="1.4" fill="#a87f3a" opacity="0.45"/>
+          <circle cx="105" cy="125" r="1"   fill="#a87f3a" opacity="0.4"/>
+          <circle cx="130" cy="138" r="1.6" fill="#a87f3a" opacity="0.45"/>
+          <circle cx="92"  cy="160" r="1.2" fill="#a87f3a" opacity="0.4"/>
+          <circle cx="148" cy="155" r="1"   fill="#a87f3a" opacity="0.4"/>
+          <circle cx="73"  cy="180" r="1.4" fill="#a87f3a" opacity="0.4"/>
+          <circle cx="120" cy="185" r="1.2" fill="#a87f3a" opacity="0.4"/>
+          <circle cx="155" cy="195" r="1"   fill="#a87f3a" opacity="0.35"/>
+          <circle cx="98"  cy="210" r="1.5" fill="#a87f3a" opacity="0.45"/>
+          <circle cx="140" cy="225" r="1.2" fill="#a87f3a" opacity="0.4"/>
+          <g filter="url(#rock-shadow)"><ellipse cx="86"  cy="95" rx="13" ry="7.5" fill="url(#rock-work)"/></g>
+          <g filter="url(#rock-shadow)"><ellipse cx="120" cy="87" rx="14" ry="8"   fill="url(#rock-me)"/></g>
+          <g filter="url(#rock-shadow)"><ellipse cx="153" cy="96" rx="13" ry="7.5" fill="url(#rock-family)"/></g>
+        </g>
+        <text x="120" y="308" text-anchor="middle" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" fill="#1a1a2e">Nejdřív písek</text>
+        <text x="120" y="326" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif"                                                font-size="11" font-weight="400" fill="#888">To důležité se nevejde</text>
+
+        <!-- ══ ARROW ══ -->
+        <text x="225" y="102" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="500" fill="#888">Obráceně</text>
+        <path d="M 187 145 C 200 110, 250 110, 263 145" fill="none" stroke="#b8bcc4" stroke-width="2" stroke-linecap="round"/>
+        <path d="M 264 136 L 263 145 L 256 138"          fill="none" stroke="#b8bcc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- ══ RIGHT JAR — rocks first (good) ══ -->
+        <ellipse cx="330" cy="272" rx="58" ry="6" fill="#000" opacity="0.32" filter="url(#ground-shadow)"/>
+        <g filter="url(#jar-shadow)">
+          <path d="M 270 246 Q 270 260 284 260 L 376 260 Q 390 260 390 246 L 390 90 C 390 82 384 78 368 78 L 368 64 L 378 64 Q 382 64 382 60 L 382 46 Q 382 40 376 40 L 284 40 Q 278 40 278 46 L 278 60 Q 278 64 282 64 L 292 64 L 292 78 C 276 78 270 82 270 90 Z"
+                fill="url(#glass-body)" stroke="#c8ccd2" stroke-width="1"/>
+        </g>
+        <line x1="282" y1="50" x2="378" y2="50" stroke="#c8ccd2" stroke-width="0.8" opacity="0.55"/>
+        <g clip-path="url(#clip-right)">
+          <g filter="url(#rock-shadow)"><ellipse cx="300" cy="200" rx="30" ry="20" fill="url(#rock-work)"/></g>
+          <g filter="url(#rock-shadow)"><ellipse cx="357" cy="195" rx="28" ry="22" fill="url(#rock-family)"/></g>
+          <g filter="url(#rock-shadow)"><ellipse cx="325" cy="160" rx="30" ry="20" fill="url(#rock-me)"/></g>
+          <rect x="270" y="217" width="120" height="43" fill="url(#sand-grad)"/>
+          <rect x="270" y="215" width="120" height="5"  fill="url(#sand-top)"/>
+          <circle cx="288" cy="232" r="1.3" fill="#a87f3a" opacity="0.45"/>
+          <circle cx="310" cy="240" r="1"   fill="#a87f3a" opacity="0.4"/>
+          <circle cx="335" cy="235" r="1.5" fill="#a87f3a" opacity="0.45"/>
+          <circle cx="358" cy="246" r="1.2" fill="#a87f3a" opacity="0.4"/>
+          <circle cx="378" cy="232" r="1"   fill="#a87f3a" opacity="0.35"/>
+        </g>
+        <g transform="translate(400, 60)">
+          <circle r="13" fill="#e8f8e8" stroke="#2d9e4f" stroke-width="0.8"/>
+          <path d="M -5.5 0 L -1 4 L 6 -4" stroke="#2d9e4f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </g>
+        <text x="330" y="308" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#1a1a2e">Nejdřív kameny</text>
+        <text x="330" y="326" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="400" fill="#888">Všechno důležité se vejde</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ── App Preview ────────────────────────────────────────────────────── -->
+<section class="preview">
+  <div class="preview-inner">
+    <p class="section-label">Řešení</p>
+    <div class="section-divider"></div>
+    <h2>Váš týden jako myšlenková mapa</h2>
+    <p>Plánujte vizuálně. Začněte největšími kameny. Rovnováhu — nebo její absenci — vidíte na první pohled.</p>
+
+
+    <!-- Benefits -->
+    <div class="benefits">
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#1a1a2e;"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="18" rx="7.5" ry="2.5"/><ellipse cx="12" cy="12" rx="5.5" ry="2.5"/><ellipse cx="12" cy="6" rx="3.5" ry="2.5"/></svg></div>
+        <div class="benefit-body">
+          <h3>Kameny napřed</h3>
+          <p>Plánujte od nejdůležitějšího směrem dolů. Všechny větve svého života vidíte v jednom pohledu.</p>
+        </div>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#A259FF;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20l10 0"/><path d="M6 6l6 -1l6 1"/><path d="M12 3l0 17"/><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0"/><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0"/></svg></div>
+        <div class="benefit-body">
+          <h3>Vidíte rovnováhu</h3>
+          <p>Samá práce a nic pro sebe? Vizuální mapa ukáže nerovnováhu na první pohled.</p>
+        </div>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#1ABCFE;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></div>
+        <div class="benefit-body">
+          <h3>Data jsou vaše</h3>
+          <p>Vaše data žijí ve vašem prohlížeči nebo na vašem Google Disku. Na naše servery se nedostanou. Počítáme jen anonymní návštěvy, bez cookies.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ──────────────────────────────────────────────────────── -->
+<section class="features">
+  <div class="features-inner">
+    <p class="section-label">Klíčové funkce</p>
+    <div class="section-divider"></div>
+    <h2>Mějte svůj týden pod kontrolou</h2>
+    <div class="features-grid">
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#3B82F6;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1"/><path d="M12 9l0 3"/></svg></div>
+        <div class="benefit-body">
+          <h3>Vizuální mapa</h3>
+          <p>Váš týden jako větvený strom — myšlenková mapa. Zátěž a rovnováhu přečtete na první pohled.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#F59E0B;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 5h8"/><path d="M13 9h5"/><path d="M13 15h8"/><path d="M13 19h5"/><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/></svg></div>
+        <div class="benefit-body">
+          <h3>Agenda</h3>
+          <p>Seznam úkolů po dnech — zpožděné, naplánované i hotové na první pohled. Druhý pohled na váš týden.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#10B981;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21l15 -15l-3 -3l-15 15l3 3"/><path d="M15 6l3 3"/><path d="M9 3a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/><path d="M19 13a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/></svg></div>
+        <div class="benefit-body">
+          <h3>Kouzelné selektory</h3>
+          <p>Napište <strong>10x</strong> pro počítadlo, <strong>(po, st, pá)</strong> pro výběr dnů, nebo <strong>denně</strong> pro celý týden.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#EF4444;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.294 -2.333 5.588c0 3.704 3.134 6.706 7 6.706c3.866 0 7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235"/></svg></div>
+        <div class="benefit-body">
+          <h3>Priority</h3>
+          <p>Normální, Vysoká, Kritická — nastavte a vidíte, na čem opravdu nejvíc záleží.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#A259FF;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10h-16l5.5 -6"/><path d="M4 14h16l-5.5 6"/></svg></div>
+        <div class="benefit-body">
+          <h3>Nedokončené → další týden</h3>
+          <p>Přeneste všechny rozpracované úkoly jediným kliknutím — mezi týdny se nic neztratí.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#14B8A6;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></div>
+        <div class="benefit-body">
+          <h3>Opakující se šablony</h3>
+          <p>Označte pravidelné úkoly jednou. Každý nový týden je máte připravené, čítače vynulované.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#F97316;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 1 0 -18a9 8 0 0 1 9 8a4.5 4 0 0 1 -4.5 4h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25"/><path d="M8.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M16.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></svg></div>
+        <div class="benefit-body">
+          <h3>Vaše větve, vaše barvy</h3>
+          <p>Přejmenujte, přidávejte nebo odebírejte větve. Pro každou vyberte barvu — váš život, vaše mapa.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#1ABCFE;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.486 -3.465 3.486h-11.878"/></svg></div>
+        <div class="benefit-body">
+          <h3>Synchronizace zařízení</h3>
+          <p>Volitelná synchronizace mezi zařízeními. Data zůstávají na vašem Google Disku — nikdy na našem.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#EC4899;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M11 4h2"/><path d="M12 17v.01"/></svg></div>
+        <div class="benefit-body">
+          <h3>Optimalizováno pro mobil</h3>
+          <p>Plně responzivní — plánujte a procházejte týden z jakéhokoli zařízení.</p>
+        </div>
+      </div>
+
+      <div class="benefit">
+        <div class="benefit-icon" style="--ico:#FACC15;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></svg></div>
+        <div class="benefit-body">
+          <h3>Klávesové zkratky</h3>
+          <p>Plánování na desktopu zrychlíte hrstkou klávesových zkratek.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Ritual ─────────────────────────────────────────────────────────── -->
+<section class="ritual">
+  <div class="ritual-inner">
+    <h2><strong>Plánujte 10 minut.</strong>Po zbytek týdne víte, na čem záleží.</h2>
+    <p>Ne další produktivní systém. Ne další aplikace, kterou musíte spravovat. Jen týdenní rituál, který vloží velké kameny dřív, než se nádoba zaplní pískem.</p>
+    <a href="/app" class="cta-btn-light">
+      Začněte tento týden
+    </a>
+    <p class="ritual-note">Bez platební karty. Bez instalace.<br>Běží ve vašem prohlížeči. Vaše data zůstávají u vás.</p>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────── -->
+<footer>
+  <a href="/cs/" class="nav-logo" aria-label="Zenit Week">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 3 216 46" width="120" height="26" aria-hidden="true">
+      <text x="2" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
+      <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M 61.5,26 C 70,26 70,36 73.5,36" fill="none" stroke="#1ABCFE" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="57" cy="26" r="4.5" fill="#1a1a2e"/>
+      <circle cx="77" cy="16" r="3.5" fill="#A259FF"/>
+      <circle cx="77" cy="36" r="3.5" fill="#1ABCFE"/>
+      <text x="84" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="700" fill="#1a1a2e">it</text>
+      <text x="108" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="#1a1a2e"> Week</text>
+    </svg>
+  </a>
+  <p>© 2026 Zenit Week · <a href="https://github.com/kruxik/zenit-week/blob/main/LICENSE" target="_blank" rel="noopener">Licence MIT</a> · <a href="https://github.com/kruxik/zenit-week/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Licence třetích stran</a> · <a href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener">Open source</a> · <a href="/privacy">Soukromí</a> · <a href="/terms">Podmínky</a></p>
+  <a href="/app">Otevřít aplikaci →</a>
+</footer>
+
+<script>
+(function() {
+  try {
+    var KEY = 'zw-lang-pref';
+    var currentLang = document.documentElement.lang === 'cs' ? 'cs' : 'en';
+    var otherLang = currentLang === 'cs' ? 'en' : 'cs';
+    Array.prototype.forEach.call(document.querySelectorAll('.lang-link'), function(a) {
+      a.addEventListener('click', function() {
+        try { localStorage.setItem(KEY, a.getAttribute('href').indexOf('/cs') === 0 ? 'cs' : 'en'); } catch (e) {}
+      });
+    });
+    if (localStorage.getItem(KEY)) return;
+    var tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
+    var prefersCs = false;
+    for (var i = 0; i < tags.length; i++) {
+      if (String(tags[i]).toLowerCase().indexOf('cs') === 0) { prefersCs = true; break; }
+    }
+    var preferred = prefersCs ? 'cs' : 'en';
+    if (preferred === currentLang) return;
+    var banner = document.getElementById('lang-banner');
+    if (!banner) return;
+    banner.hidden = false;
+    document.getElementById('lang-banner-cta').addEventListener('click', function() {
+      try { localStorage.setItem(KEY, otherLang); } catch (e) {}
+    });
+    document.getElementById('lang-banner-close').addEventListener('click', function() {
+      try { localStorage.setItem(KEY, currentLang); } catch (e) {}
+      banner.hidden = true;
+    });
+  } catch (e) {}
+})();
+</script>
+
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script>
+  // Analytics is never worth a request the user cannot benefit from: skip it
+  // when the device has no link, and when Data Saver is on.
+  (function () {
+    if (navigator.onLine === false) return;
+    var conn = navigator.connection;
+    if (conn && conn.saveData === true) return;
+    var s = document.createElement('script');
+    s.defer = true;
+    s.src = '/_vercel/insights/script.js';
+    document.head.appendChild(s);
+
+    // Umami, served first-party through the /u/ rewrites in vercel.json, once
+    // the page has loaded and the main thread is idle.
+    function loadUmami() {
+      if (navigator.onLine === false) return;
+      var u = document.createElement('script');
+      u.defer = true;
+      u.src = '/u/script.js';
+      u.setAttribute('data-website-id', '77360782-8018-480d-8567-4f0a7e5d0000');
+      u.setAttribute('data-host-url', location.origin + '/u');
+      document.head.appendChild(u);
+    }
+    function whenIdle() {
+      if ('requestIdleCallback' in window) requestIdleCallback(loadUmami, { timeout: 5000 });
+      else setTimeout(loadUmami, 2000);
+    }
+    if (document.readyState === 'complete') whenIdle();
+    else window.addEventListener('load', whenIdle, { once: true });
+  })();
+</script>
+
+</body>
+</html>
