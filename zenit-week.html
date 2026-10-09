@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-zOcDWzvdNfv6rIklxaHubvR9nepcXrGQR2WtcSKb40U='
+               'sha256-YeIU2tvebuP/Cuo7Ci9CUYuxn+/l3J5dbnWS2cA9ItE='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -227,8 +227,6 @@
     --stats-dropped: #8A94A6;
     --badge-progress-bg: #e8f0fe;
     --badge-progress-text: #1a73e8;
-    --badge-comment-bg: #f3e8ff;
-    --badge-comment-text: #7b2cbf;
 
     /* Node state colors (kept in sync with getThemeColors() in JS) */
     --node-done-bg: #EBEBEB;
@@ -354,8 +352,6 @@
     --stats-dropped: #9AA4B8;
     --badge-progress-bg: #0f1e3a;
     --badge-progress-text: #4da3ff;
-    --badge-comment-bg: #2a1840;
-    --badge-comment-text: #c084fc;
 
     /* Node state colors (kept in sync with getThemeColors() in JS) */
     --node-done-bg: #2c2c2c;
@@ -1775,10 +1771,6 @@
   .daily-log-badge.tick {
     background: var(--badge-progress-bg);
     color: var(--badge-progress-text);
-  }
-  .daily-log-badge.comment {
-    background: var(--badge-comment-bg);
-    color: var(--badge-comment-text);
   }
   .daily-log-badge.dropped {
     background: color-mix(in srgb, var(--stats-dropped) 22%, transparent);
@@ -3917,20 +3909,18 @@
   }
   /* The ring in the canvas colour lifts the pill off the node's border. */
   /* Solid, not the Agenda's pale tint: on the canvas it has to read at the
-     fitted zoom, where a pastel pill disappears into a white node. */
+     fitted zoom, where a pastel pill disappears into a white node. Pill fill
+     and ink are per node (commentBadgeColors), so no fill or colour here. */
   .comment-badge-pill {
-    fill: var(--badge-comment-text);
     stroke: var(--bg-canvas);
     stroke-width: 2.5;
   }
   .comment-badge-icon {
-    color: var(--bg-canvas);
     fill: none;
     stroke: currentColor;
     stroke-width: 2.2;
   }
   .comment-badge-text {
-    fill: var(--bg-canvas);
     font-variant-numeric: tabular-nums;
   }
   .comment-badge:hover .comment-badge-pill {
@@ -7450,6 +7440,64 @@ function fadeBranchHex(hex, alpha = DROPPED_ALPHA) {
   return rgbToHex(r * alpha + bg * k, g * alpha + bg * k, b * alpha + bg * k);
 }
 
+// WCAG relative luminance and contrast ratio of two #rrggbb colours.
+function relLuminance(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function contrastRatio(a, b) {
+  const la = relLuminance(a), lb = relLuminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// `fg` pushed toward black or white (whichever side `bg` is not on) just far
+// enough to reach `min` contrast against `bg` — keeps the hue where it can.
+function ensureContrast(fg, bg, min = 4.5) {
+  const toward = relLuminance(bg) > 0.18 ? 0 : 255;
+  const { r, g, b } = hexToRgb(fg);
+  for (let k = 0; k <= 1; k += 0.05) {
+    const c = rgbToHex(r + (toward - r) * k, g + (toward - g) * k, b + (toward - b) * k);
+    if (contrastRatio(c, bg) >= min) return c;
+  }
+  return toward ? '#ffffff' : '#000000';
+}
+
+// The comment badge wears its node's colours, so it follows the branch and the
+// node's state (done grey, dropped fade, unplanned amber) in both themes. The
+// map pill is solid in the node's border colour (see below for the ink); the
+// Agenda chip is the node's tint with its label colour, darkened or lightened
+// until it reads. A node from another week (Overdue, an earlier day's Done) is
+// not in this week's map, so it falls back to its branch's open palette.
+function commentBadgeColors(node) {
+  const bc = BRANCH_COLORS[node.branch]
+    || deriveBranchPalette(document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666');
+  const { bgColor, borderColor, textColor } = getNodeVisuals(node.id)
+    || { bgColor: bc.light, borderColor: bc.main, textColor: bc.text };
+  // Light theme: always white ink, the pill darkened just enough to carry it
+  // (3:1 — the icon and the bold count are large marks). Dark theme: the pill
+  // keeps the border colour and the ink is whichever of black/white reads.
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const pill = dark ? borderColor : ensureContrast(borderColor, '#ffffff', 3);
+  const pillInk = !dark || contrastRatio('#ffffff', pill) >= contrastRatio('#1a1a1a', pill)
+    ? '#ffffff' : '#1a1a1a';
+  return {
+    pill, pillInk,
+    chip: bgColor, chipInk: ensureContrast(textColor, bgColor),
+  };
+}
+
+function paintMapCommentBadge(g, nodeId) {
+  const badge = g.querySelector(':scope > .comment-badge');
+  if (!badge) return;
+  const { pill, pillInk } = commentBadgeColors(findNode(nodeId));
+  badge.querySelector('.comment-badge-pill').setAttribute('fill', pill);
+  badge.querySelector('.comment-badge-icon').style.color = pillInk;
+  const text = badge.querySelector('.comment-badge-text');
+  if (text) text.setAttribute('fill', pillInk);
+}
+
 function reloadBranchPalettes() {
   Object.keys(BRANCH_COLORS).forEach(b => {
     BRANCH_COLORS[b] = deriveBranchPalette(BRANCH_COLORS[b].main);
@@ -7648,6 +7696,7 @@ function applyTheme(theme) {
   reloadBranchPalettes();
   updateSvgFilters();
   renderIfVisible();
+  if (currentView === 'agenda') renderAgenda(); // comment chips carry theme-derived colours
   updateColorDots();
   updateSummary();
   saveBranchColors(); // propagate theme change to Drive via colors file
@@ -14649,7 +14698,10 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     g.appendChild(t);
   });
 
-  if (node && isActivity && node.comments) g.appendChild(buildMapCommentBadge(node, boxW, boxH));
+  if (node && isActivity && node.comments) {
+    g.appendChild(buildMapCommentBadge(node, boxW, boxH));
+    paintMapCommentBadge(g, id);
+  }
 
   // Counter buttons
   if (type === 'counter') {
@@ -16498,11 +16550,14 @@ function updateNodeUI(nodeId) {
         t.removeAttribute('text-decoration');
       }
     });
-    // Update inline icon badge colors
-    g.querySelectorAll('use').forEach(u => {
+    // Update inline icon badge colors. The comment badge has its own ink —
+    // painting its icon with the label colour left it unreadable on the pill.
+    g.querySelectorAll('use:not(.comment-badge-icon)').forEach(u => {
       u.style.color = textColor;
     });
   }
+
+  paintMapCommentBadge(g, nodeId);
 
   // "+" add-child button background follows done state
   const addBtnCircle = g.querySelector('.add-btn .add-btn-inner > circle');
@@ -21990,6 +22045,9 @@ function buildAgendaItem(node, label, opts = {}) {
     const cmt = document.createElement('span');
     cmt.className = 'daily-log-badge comment';
     cmt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;';
+    const { chip, chipInk } = commentBadgeColors(node);
+    cmt.style.background = chip;
+    cmt.style.color = chipInk;
     cmt.innerHTML = iconSvg('message');
     cmt.title = t('menu.comment');
     const preview = commentPreview(node.comments);
