@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-YeIU2tvebuP/Cuo7Ci9CUYuxn+/l3J5dbnWS2cA9ItE='
+               'sha256-+7UZoCkhZCLyPS/0tq6b16AvSle0OPrUYrX+Vi4OUTc='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -17928,8 +17928,11 @@ function render() {
   const centerG = makeNodeGroup('center', 0, 0, centerDisplayName(), 'center', null, null, null);
   nodesG.appendChild(centerG);
 
-  // Draw all other nodes, pruned ones included but hidden.
-  weekData.nodes.forEach(node => {
+  // Draw all other nodes, pruned ones included but hidden. SVG paints in DOM
+  // order, so the node moved most recently (highest _posTs) goes last and sits
+  // on top of any it overlaps; never-moved nodes keep creation order beneath.
+  const paintOrder = weekData.nodes.slice().sort((a, b) => (a._posTs || 0) - (b._posTs || 0));
+  paintOrder.forEach(node => {
     if (node._editing) return;
     const pos = placed(node.id);
     // Parking a pruned node on a placed ancestor borrows that ancestor's side,
@@ -18067,10 +18070,20 @@ function panNodeIntoView(pos) {
   if (panX !== before.panX || panY !== before.panY) applyTransform();
 }
 
+// Lift a node group to the top of #nodes-layer so a hovered or focused node is
+// never painted under a neighbour it overlaps. Visual only — the next render()
+// restores the _posTs paint order. Skipped when already on top: re-appending
+// the element under the pointer would otherwise re-fire mouseenter forever.
+function raiseNodeGroup(g) {
+  const layer = g?.parentNode;
+  if (layer && layer.lastElementChild !== g) layer.appendChild(g);
+}
+
 function setKbFocus(id, pos) {
   kbFocusId = id;
   hoveredNodeId = id;
   paintKbFocus();
+  raiseNodeGroup(document.querySelector(`.node-group[data-id="${id}"]`));
   panNodeIntoView(pos);
 }
 
@@ -18675,6 +18688,7 @@ function attachNodeListeners() {
     g.addEventListener('mouseenter', () => {
       clearKbFocus();   // the pointer takes the ring back over
       hoveredNodeId = id;
+      raiseNodeGroup(g);
       if (id === 'center') { maybeShowHint('root', g); return; }
       const hintId = hoverHintId(findNode(id));
       if (hintId) maybeShowHint(hintId, g);
