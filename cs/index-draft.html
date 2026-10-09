@@ -392,12 +392,19 @@
     }
 
     /* ── Divider ──────────────────────────────────────────────────── */
-    .section-divider {
-      width: 48px;
-      height: 3px;
+    /* The logo gradient now sits under each section heading instead */
+    .section-divider { display: none; }
+
+    .why h2::after,
+    .preview h2::after,
+    .features h2::after {
+      content: "";
+      display: block;
+      width: 96px;
+      height: 5px;
+      margin: 18px auto 0;
+      border-radius: 3px;
       background: linear-gradient(90deg, var(--family), var(--me));
-      border-radius: 2px;
-      margin: 0 auto 24px;
     }
 
     /* ── Why section ──────────────────────────────────────────────── */
