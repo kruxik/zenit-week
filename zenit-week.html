@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-E4fZtcZpatidO9lUTfs+xtA3pxdYfvkWEAaB/m0b1dE='
+               'sha256-C3MytaaZKkWMWbZrZIIjbslxyFqWwW93zcvsvBolYIU='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3933,8 +3933,36 @@
      band (see centerRingBandStroke) — declaring a stroke here would beat those
      presentation attributes and flatten all four to one colour. */
   .center-ring-track { stroke: rgba(255, 255, 255, 0.35); }
-  .center-ring-arc {
+  .center-ring-arc, .center-ring-shadow {
     transition: stroke-dasharray 0.35s ease, stroke-dashoffset 0.35s ease;
+  }
+  /* Glass collar between the photo and the wedges (see CENTER_COLLAR_R). */
+  .center-collar {
+    fill: rgba(255, 255, 255, 0.26);
+    pointer-events: none;
+  }
+  .center-collar-rim {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.55);
+    stroke-width: 1.5;
+    pointer-events: none;
+  }
+  .center-avatar-rim {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.9);
+    stroke-width: 2.5;
+    pointer-events: none;
+  }
+  .center-ring-label {
+    fill: #ffffff;
+    font-size: 19px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.18);
+    stroke-width: 2px;
+    stroke-linejoin: round;
+    pointer-events: none;
   }
 
 
@@ -7738,7 +7766,10 @@ const NODE_STYLE = {
   // and the face is the one thing on the canvas that is a picture rather than a
   // label — it earns the size. Every root dimension below is that same 1.25×, so
   // the ring inset and the avatar's clearance inside it hold their proportions.
-  center:   { fontSize: 42.5, padX: 47.5, padY: 30, minW: 250, minH: 250, rx: 125, avgCharW: 0.55 },
+  // Grown a further 1.25× (250 → 312.5) with the infographic redesign, so the
+  // wedges' percentages read at whole-week zoom; the root's interior radii,
+  // initials, labels and + buttons scale with it.
+  center:   { fontSize: 53.125, padX: 59.375, padY: 37.5, minW: 312.5, minH: 312.5, rx: 156.25, avgCharW: 0.55 },
   branch:   { fontSize: 22, padX: 25, padY: 19, minW: 160, minH: 64, rx: 16,  avgCharW: 0.55 },
   activity: { fontSize: 13, padX: 14, padY: 10, minW: 80,  minH: 32, rx: 8,   avgCharW: 0.55 },
   counter:  { fontSize: 14, padX: 30, padY: 8,  minW: 80,  minH: 34, rx: 17,  avgCharW: 0.55 }
@@ -7766,23 +7797,37 @@ const CENTER_H = NODE_STYLE.center.minH;
 // fill. So they are set by these three radii, and both come to 2.5. Any wider and
 // they read as borders framing the picture rather than as the ring's own breathing
 // room. Ring outer edge 122.5, inner edge 98.5, against a node edge at 125.
-const CENTER_RING_R  = 110.5;
-const CENTER_RING_SW = 24;
-const CENTER_AVATAR_R = 96;
+//
+// Infographic redesign: the avatar shrank by 30% (96 → 67) and the ring took the
+// whole annulus, so each band is a wedge wide enough to carry its own percentage.
+// The ring's inner edge runs under the photo's edge; a translucent glass collar
+// (CENTER_COLLAR_R) is laid over its inner part, so the wedges read as passing
+// beneath it — the frosted border between picture and chart. Ring outer edge
+// flush with the node edge — no dark rim of the node's fill around the wedges,
+// as in the infographic. Half a unit past the edge so the fill's antialiased
+// boundary cannot leave a grey hairline. Labels sit midway across the band the
+// collar leaves visible. The radii carry the root's 1.25× growth (312.5 node).
+const CENTER_AVATAR_R = 83.75;
+const CENTER_COLLAR_R = 101.25;
+const CENTER_RING_OUTER_R = 156.75;
+const CENTER_RING_R  = (CENTER_AVATAR_R + CENTER_RING_OUTER_R) / 2;
+const CENTER_RING_SW = CENTER_RING_OUTER_R - CENTER_AVATAR_R;
+const CENTER_RING_LABEL_R = (CENTER_COLLAR_R + CENTER_RING_OUTER_R) / 2;
+// A band narrower than this share has no room for its label; it stays unlabelled.
+const CENTER_RING_LABEL_MIN_SHARE = 0.06;
 
 // Initials fill the avatar disc, so they are sized off it rather than off the
 // node's label font — that one only ever paints the signed-out wording, which
 // is a word and not a monogram. Scaled with the disc, so the monogram keeps the
 // same clearance inside it that it had at r 110.
-const CENTER_INITIALS_FONT = 57;
+const CENTER_INITIALS_FONT = 50;
 
 // Hit radius of the root's two "+ branch" discs, which are drawn at r 22.5. The
 // root opens Stats on click, so every pixel that is not the + belongs to a
 // different action — this collar is what keeps "aim at the +" from needing a
 // steady hand. Sized to stay clear of the avatar's vertical extremes: it sits on
-// the node edge at ±125, so at r 40 it reaches x 85, well outside the ring arc's
-// top and bottom where the percentage is read.
-const CENTER_ADD_HIT_R = 40;
+// the node edge at ±156.25, so at r 50 it reaches x 106.25, outside the avatar.
+const CENTER_ADD_HIT_R = 50;
 
 // How far a press on the root may travel and still count as a click rather than
 // a pan. Screen pixels, not world units, so it means the same at every zoom —
@@ -14545,6 +14590,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
     }));
     const arcs = svgEl('g', { class: 'center-ring-arcs', 'data-perimeter': perimeter });
+    const bandDefs = svgEl('defs', {});
     STATS_SPLIT_BANDS.forEach((band, i) => {
       arcs.appendChild(svgEl('path', {
         class: 'center-ring-arc', 'data-band': i,
@@ -14552,8 +14598,42 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
         stroke: centerRingBandStroke(band),
       }));
     });
-    setCenterRingArcs(arcs, computeWeekStats().global, perimeter);
+    // Cast shadows go over every wedge, so each lands on its own band only.
+    STATS_SPLIT_BANDS.forEach((band, i) => {
+      bandDefs.appendChild(centerRingCastShadowGradient(i));
+      arcs.appendChild(svgEl('path', {
+        class: 'center-ring-shadow', 'data-band': i,
+        d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
+        stroke: `url(#center-band-shadow-${i})`, 'pointer-events': 'none',
+      }));
+    });
+    bandDefs.appendChild(centerCollarShadowGradient());
+    g.appendChild(bandDefs);
     g.appendChild(arcs);
+    g.appendChild(svgEl('path', {
+      class: 'center-collar-shadow',
+      d: `${discPathD(CENTER_COLLAR_R + CENTER_COLLAR_SHADOW_W)} ${discPathD(CENTER_COLLAR_R)}`,
+      'fill-rule': 'evenodd', fill: 'url(#center-collar-shadow-grad)', 'pointer-events': 'none',
+    }));
+
+    // Glass collar between the photo and the wedges: a frosted annulus over the
+    // ring's inner edge, a bright rim on its outer edge and one hugging the photo.
+    g.appendChild(svgEl('path', {
+      class: 'center-collar',
+      d: `${discPathD(CENTER_COLLAR_R)} ${discPathD(CENTER_AVATAR_R)}`,
+      'fill-rule': 'evenodd',
+    }));
+    g.appendChild(svgEl('circle', { class: 'center-collar-rim', cx: 0, cy: 0, r: CENTER_COLLAR_R }));
+
+    const labels = svgEl('g', { class: 'center-ring-labels' });
+    STATS_SPLIT_BANDS.forEach((band, i) => {
+      labels.appendChild(svgEl('text', {
+        class: 'center-ring-label', 'data-band': i,
+        'text-anchor': 'middle', 'dominant-baseline': 'central',
+      }));
+    });
+    g.appendChild(labels);
+    setCenterRingArcs(arcs, computeWeekStats().global, perimeter);
 
     // Initials disc first, photo clipped over it. If the photo 404s, is blocked,
     // or was never requested, the initials are simply what remains visible — no
@@ -14582,6 +14662,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
         'pointer-events': 'none',
       }));
     }
+    g.appendChild(svgEl('circle', { class: 'center-avatar-rim', cx: 0, cy: 0, r: CENTER_AVATAR_R }));
   }
 
   // "+ Branch" buttons on the center node's left and right edges. Week label,
@@ -14589,9 +14670,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   // global chrome sitting in a pannable coordinate space.
   if (isCenter) {
     const centerBtnColor = document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666';
-    const centerBtnR = 10 * 1.5 * 1.5;
-    const centerArm = 4.5 * 1.5 * 1.5;
-    const centerPlusSW = (2.5 * 1.5 * 1.5).toFixed(1);
+    const centerBtnR = 10 * 1.5 * 1.5 * 1.25;
+    const centerArm = 4.5 * 1.5 * 1.5 * 1.25;
+    const centerPlusSW = (2.5 * 1.5 * 1.5 * 1.25).toFixed(1);
     ['left', 'right'].forEach(side => {
       const bx = side === 'left' ? -boxW / 2 : boxW / 2;
       const btnG = svgEl('g', { class: 'add-btn add-branch-btn', 'data-side': side, transform: `translate(${bx}, 0)` });
@@ -17802,6 +17883,45 @@ function centerRingBandStroke(band) {
     : `color-mix(in srgb, ${band.color} ${band.opacity * 100}%, var(--border-soft))`;
 }
 
+// The infographic's depth cue: each wedge lies over the next one clockwise and
+// casts a soft shadow onto it. So every band carries a shadow that starts dark
+// at its own start edge — the edge the previous wedge overhangs — and fades out
+// a short way in. Wedges themselves stay flat.
+//
+// The overlay is the band's own dash (shortened, see below), so the shadow can
+// never bleed into a neighbour. Its gradient runs from the origin along the
+// edge's clockwise normal: every point of a radial edge projects to 0 on that
+// axis, so the shadow is the same depth along the whole edge, as a real cast
+// shadow would be.
+const CENTER_CAST_SHADOW_W = 30;
+function centerRingCastShadowGradient(i) {
+  const grad = svgEl('linearGradient', {
+    id: `center-band-shadow-${i}`, gradientUnits: 'userSpaceOnUse',
+    x1: 0, y1: 0, x2: CENTER_CAST_SHADOW_W, y2: 0,
+  });
+  [[0, 0.46], [0.3, 0.23], [0.65, 0.08], [1, 0]].forEach(([offset, opacity]) => {
+    grad.appendChild(svgEl('stop', { offset, 'stop-color': '#000', 'stop-opacity': opacity }));
+  });
+  return grad;
+}
+
+// The soft shadow the glass collar casts onto the wedges just outside it.
+const CENTER_COLLAR_SHADOW_W = 18;
+function centerCollarShadowGradient() {
+  const outer = CENTER_COLLAR_R + CENTER_COLLAR_SHADOW_W;
+  const grad = svgEl('radialGradient', {
+    id: 'center-collar-shadow-grad', gradientUnits: 'userSpaceOnUse', cx: 0, cy: 0, r: outer,
+  });
+  grad.appendChild(svgEl('stop', { offset: CENTER_COLLAR_R / outer, 'stop-color': '#000', 'stop-opacity': 0.28 }));
+  grad.appendChild(svgEl('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': 0 }));
+  return grad;
+}
+
+// The shadow overlay covers at most a quarter-turn of its band. Within that every
+// point lies on the clockwise side of the start edge; past a half-turn the edge's
+// own extension through the centre would cut the band and cast a second shadow.
+const CENTER_CAST_SHADOW_MAX_SHARE = 0.25;
+
 // Shared by the build and the patch so the two can never disagree. Each band is
 // one dash of its own share, offset past everything before it, laid down in
 // STATS_SPLIT_BANDS order — the donut's arithmetic on a circle of a different
@@ -17816,6 +17936,27 @@ function setCenterRingArcs(arcs, stats, perimeter) {
     const len = stats.total > 0 ? (stats[band.key] / stats.total) * perimeter : 0;
     el.setAttribute('stroke-dasharray', `${len} ${perimeter}`);
     el.setAttribute('stroke-dashoffset', -acc);
+    // A band that fills the whole ring has no neighbour to be shadowed by.
+    const shadow = arcs.querySelector(`.center-ring-shadow[data-band="${i}"]`);
+    const shadowGrad = arcs.parentNode?.querySelector(`linearGradient[id="center-band-shadow-${i}"]`);
+    if (shadow && shadowGrad) {
+      const shadowLen = len >= perimeter - 0.01 ? 0 : Math.min(len, perimeter * CENTER_CAST_SHADOW_MAX_SHARE);
+      shadow.setAttribute('stroke-dasharray', `${shadowLen} ${perimeter}`);
+      shadow.setAttribute('stroke-dashoffset', -acc);
+      const a0 = (acc / perimeter) * 2 * Math.PI;
+      shadowGrad.setAttribute('x2', (CENTER_CAST_SHADOW_W * Math.cos(a0)).toFixed(2));
+      shadowGrad.setAttribute('y2', (CENTER_CAST_SHADOW_W * Math.sin(a0)).toFixed(2));
+    }
+    // Percentage at the wedge's angular midpoint. The ring path starts at
+    // 12 o'clock and runs clockwise, so the angle is measured from there.
+    const label = arcs.parentNode?.querySelector(`.center-ring-label[data-band="${i}"]`);
+    if (label) {
+      const share = len / perimeter;
+      const angle = ((acc + len / 2) / perimeter) * 2 * Math.PI;
+      label.setAttribute('x', (CENTER_RING_LABEL_R * Math.sin(angle)).toFixed(1));
+      label.setAttribute('y', (-CENTER_RING_LABEL_R * Math.cos(angle)).toFixed(1));
+      label.textContent = share >= CENTER_RING_LABEL_MIN_SHARE ? `${Math.round(share * 100)}%` : '';
+    }
     acc += len;
   });
 }
