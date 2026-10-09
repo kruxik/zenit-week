@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-VZAKEDEPDx49nfwoBXqKPNBvytggXsVIcZ0Fz1I00vA='
+               'sha256-9QC0vLniuc0xRL4nhBF2BdhNN5irrzse2F/4WRv6zOI='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7825,8 +7825,9 @@ const CENTER_INITIALS_FONT = 50;
 // Hit radius of the root's two "+ branch" discs, which are drawn at r 22.5. The
 // root opens Stats on click, so every pixel that is not the + belongs to a
 // different action — this collar is what keeps "aim at the +" from needing a
-// steady hand. Sized to stay clear of the avatar's vertical extremes: it sits on
-// the node edge at ±156.25, so at r 50 it reaches x 106.25, outside the avatar.
+// steady hand. Sized to stay clear of the avatar: it sits on the outer edge of
+// the pie wedge at 3 or 9 o'clock (setPieChart), at least ±133.4 out, so at r 50
+// it reaches no further in than x 83.4, the avatar's edge.
 const CENTER_ADD_HIT_R = 50;
 // Drawn radius of those discs.
 const CENTER_ADD_BTN_R = 10 * 1.5 * 1.5 * 1.25;
@@ -14627,10 +14628,10 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     // Percentages last, so nothing on the root — plate, its shadow, the photo —
     // can ever cover them.
     g.appendChild(pie.labels);
-    setPieChart(g, computeWeekStats().global, 1, centerAddBtnDiscs(boxW));
   }
 
-  // "+ Branch" buttons on the center node's left and right edges. Week label,
+  // "+ Branch" buttons on the center node's left and right edges — the pie's
+  // edges, set by setPieChart once they exist. Week label,
   // navigation and the week actions all moved to #week-picker — they were
   // global chrome sitting in a pannable coordinate space.
   if (isCenter) {
@@ -14639,8 +14640,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     const centerArm = 4.5 * 1.5 * 1.5 * 1.25;
     const centerPlusSW = (2.5 * 1.5 * 1.5 * 1.25).toFixed(1);
     ['left', 'right'].forEach(side => {
-      const bx = side === 'left' ? -boxW / 2 : boxW / 2;
-      const btnG = svgEl('g', { class: 'add-btn add-branch-btn', 'data-side': side, transform: `translate(${bx}, 0)` });
+      const btnG = svgEl('g', { class: 'add-btn add-branch-btn', 'data-side': side });
       // Invisible hit collar, wider than the drawn disc. The rest of the root is
       // one big "open Stats" target, so without this a click that lands a few
       // pixels off the + silently opens a panel instead of adding a branch.
@@ -14655,6 +14655,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       btnG.appendChild(svgEl('line', { x1: 0, y1: -centerArm, x2: 0, y2: centerArm, stroke: btnSymbolColor, 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
       g.appendChild(btnG);
     });
+    setPieChart(g, computeWeekStats().global);
   }
 
   // Text
@@ -17817,15 +17818,40 @@ function updateSummary() {
 // itself, because updateSummary early-returns on an unchanged signature.
 function updateCenterRing() {
   const g = document.querySelector('.node-group[data-id="center"]');
-  if (g) setPieChart(g, computeWeekStats().global, 1, centerAddBtnDiscs(getNodeSize('center').w));
+  if (g) setPieChart(g, computeWeekStats().global);
 }
 
-// The root's two "+ branch" discs, on its left and right edges, as the areas its
-// percentages must stay off. On a touch screen they are always shown, so a label
-// at 3 or 9 o'clock would sit under one.
-function centerAddBtnDiscs(boxW) {
-  const r = CENTER_ADD_BTN_R;
-  return [{ x: -boxW / 2, y: 0, r }, { x: boxW / 2, y: 0, r }];
+// Outer radius of the chart at angle a: the wedge lying there, the larger of the
+// two where a falls on a boundary, or the track on an empty week.
+function pieEdgeR(shares, rank, a) {
+  let r = 0;
+  let acc = 0;
+  const eps = 1e-6;
+  shares.forEach((share, i) => {
+    const a0 = acc * 2 * Math.PI;
+    const a1 = (acc + share) * 2 * Math.PI;
+    if (share > 0 && a >= a0 - eps && a <= a1 + eps) r = Math.max(r, CENTER_WEDGE_OUTER_R[rank[i]]);
+    acc += share;
+  });
+  return r || CENTER_TRACK_R;
+}
+
+// Sets the root's "+ branch" discs on the chart's edge at 3 and 9 o'clock, and
+// returns them as the areas its percentages must stay off — on a touch screen
+// they are always shown, and on hover on a desktop. A chart without them (Stats)
+// gets an empty list.
+function placePieAddBtns(root, shares, rank) {
+  return [...root.querySelectorAll('.add-branch-btn')].map(btn => {
+    const left = btn.dataset.side === 'left';
+    const x = (left ? -1 : 1) * pieEdgeR(shares, rank, left ? 1.5 * Math.PI : 0.5 * Math.PI);
+    const transform = `translate(${x.toFixed(2)}, 0)`;
+    // A coachmark may be anchored on the +: moving it is a geometry change.
+    if (btn.getAttribute('transform') !== transform) {
+      btn.setAttribute('transform', transform);
+      markMapGeometryChanged();
+    }
+    return { x, y: 0, r: CENTER_ADD_BTN_R };
+  });
 }
 
 // Whether a label box centred on (x, y) comes within `gap` of any of the discs.
@@ -17995,13 +18021,13 @@ function pieLabelFit(text, font, a, rOut) {
 // charts. Bands are laid clockwise from 12 o'clock in STATS_SPLIT_BANDS order.
 // Size comes from rank: largest share first, ties in band order. `fontScale`
 // lets a chart drawn small keep its percentages readable; the fit still holds.
-// `avoid` lists discs ({ x, y, r }) no percentage may overlap.
-function setPieChart(root, stats, fontScale = 1, avoid = []) {
+function setPieChart(root, stats, fontScale = 1) {
   const prefix = root.querySelector('.pie-chart')?.dataset.prefix;
   if (!prefix) return;
   const shares = STATS_SPLIT_BANDS.map(b => (stats.total > 0 ? stats[b.key] / stats.total : 0));
   const rank = new Array(shares.length);
   shares.map((v, i) => i).sort((a, b) => shares[b] - shares[a] || a - b).forEach((i, r) => { rank[i] = r; });
+  const avoid = placePieAddBtns(root, shares, rank);
   // The track stands in for the chart on an empty week only: at full size it
   // would show behind every shorter wedge.
   const track = root.querySelector('.pie-track');
