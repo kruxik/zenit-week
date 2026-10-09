@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-+7UZoCkhZCLyPS/0tq6b16AvSle0OPrUYrX+Vi4OUTc='
+               'sha256-E4fZtcZpatidO9lUTfs+xtA3pxdYfvkWEAaB/m0b1dE='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -17929,9 +17929,13 @@ function render() {
   nodesG.appendChild(centerG);
 
   // Draw all other nodes, pruned ones included but hidden. SVG paints in DOM
-  // order, so the node moved most recently (highest _posTs) goes last and sits
-  // on top of any it overlaps; never-moved nodes keep creation order beneath.
-  const paintOrder = weekData.nodes.slice().sort((a, b) => (a._posTs || 0) - (b._posTs || 0));
+  // order, so whatever goes last sits on top of any node it overlaps. Under auto
+  // layout that is the lower node: badges stick out above a node's top edge, so
+  // painting top-down keeps every comment badge clear of the node above it.
+  // With auto layout off, the node moved most recently (highest _posTs) wins
+  // instead; never-moved nodes keep creation order beneath.
+  const paintKey = autoLayout ? (n => placed(n.id)?.y || 0) : (n => n._posTs || 0);
+  const paintOrder = weekData.nodes.slice().sort((a, b) => paintKey(a) - paintKey(b));
   paintOrder.forEach(node => {
     if (node._editing) return;
     const pos = placed(node.id);
