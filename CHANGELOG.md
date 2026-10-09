@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.10.09] - 2026-10-09
+
+### Added
+
+- **map:** Photo on the root as a concave dish — white top-left lip, inner shade and far-side glow
+- **map:** Root infographic — rank-sized shadowed wedges under a levitating plate with borderless translucent rim, fitted labels, full-size empty-week track
+- **map:** Infographic center node — 1.25× root, 30% smaller avatar, wedges casting shadows with % labels, glass collar, no outer rim
+
+### Changed
+
+- **stats:** Share the root's pie infographic with the Stats view, X% Done on its plate
+
+### Fixed
+
+- **stats:** Legend on its own full-width row on phones — three rows instead of six
+- **map:** Paint nodes top-down under auto layout so comment badges stay visible
+- **map:** Paint nodes by last move and raise hovered/focused node above overlapping neighbours
+- **comments:** Colour comment badges from their node's branch and state; stop node repaint inking the badge icon
+
 ## [v2026.10.08.1] - 2026-10-08
 
 ### Added
