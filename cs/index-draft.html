@@ -310,6 +310,28 @@
       background-clip: text;
       color: transparent;
     }
+    /* Short punch line between paragraphs ("Pravděpodobně ne.", "Nevejdou se.") */
+    .why .why-inner p.punch {
+      font-size: clamp(20px, 2.6vw, 24px);
+      font-weight: 700;
+      color: var(--ink);
+      text-align: center;
+      margin: 8px 0 12px;
+    }
+    /* Section heading in the light style of the problem question, key word in the logo gradient */
+    .why h2.h2-light {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 300;
+      line-height: 1.18;
+      letter-spacing: -0.01em;
+    }
+    .why h2.h2-light strong {
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--family), var(--me));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
     .why .why-inner p.hero-answer {
       font-size: clamp(26px, 4vw, 36px);
       font-weight: 700;
@@ -818,17 +840,15 @@
       </ul>
     </figure>
 
-    <p class="hero-answer">Pravděpodobně ne.</p>
-    <p class="hero-sub">Ne kvůli lenosti nebo nechuti.<br>Protože se ti týden zaplní dřív, než stihneš rozhodnout, co je v něm důležité.</p>
+    <p class="punch">Pravděpodobně ne.</p>
+    <p class="hero-sub">Ne kvůli lenosti nebo nechuti.<br>Protože se ti kalendář zaplní dřív, než stihneš rozhodnout, co je nejdůležitější.</p>
 
 
-    <h2>Sypeš do nádoby nejdřív písek</h2>
+    <h2 class="h2-light">Sypeš do nádoby nejdřív <strong>písek</strong></h2>
     <p>
       Existuje ukázka: nádobu nejdřív naplníš pískem a pak se snažíš vměstnat dovnitř velké kameny: rodinu, zdraví, růst, smysluplnou práci.
     </p>
-    <p>
-      <strong>Nevejdou se.</strong>
-    </p>
+    <p class="punch">Nevejdou se.</p>
     <p>
       Když to ale obrátíš a dáš kameny napřed, písek se kolem nich přirozeně usadí.
     </p>
