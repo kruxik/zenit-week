@@ -530,6 +530,23 @@
       color: var(--muted);
     }
     .jar-caption strong { display: block; font-size: 15px; color: var(--ink); }
+    /* Phones: captions too wide to sit under each jar, so put them in two columns */
+    @media (max-width: 540px) {
+      .jar-captions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        height: auto;
+        margin-top: -16px;
+      }
+      .why .why-inner p.jar-caption {
+        position: static;
+        transform: none;
+        white-space: normal;
+      }
+      .github-btn { padding: 12px 16px; font-size: 14px; white-space: nowrap; }
+    }
+    .hero-title, h2.h2-light { text-wrap: balance; }
 
     /* ── Author ───────────────────────────────────────────────────── */
     .author-photo {
