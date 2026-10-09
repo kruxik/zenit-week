@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-9QC0vLniuc0xRL4nhBF2BdhNN5irrzse2F/4WRv6zOI='
+               'sha256-d5+OVKI7ydF29kJMth7zRLCfynO3/1B5A4stkTYUu3M='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2770,7 +2770,7 @@
     -webkit-backdrop-filter: none;
     background: var(--overlay-bg);
   }
-  /* Same path — SVG drop-shadow filters (the colored glow around branch nodes
+  /* Same path — SVG drop-shadow filters (the shadow under branch nodes
      and the lift shadow on center) are re-rasterized on every pan/zoom frame
      and cause visible jank on Chromebook-class GPUs. Strip via CSS so the
      `filter` attribute set in JS is overridden without touching the render
@@ -14530,7 +14530,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   let filterRef = 'none';
   if (isCenter) filterRef = 'url(#shadow)';
-  else if (isBranch && branch && BRANCH_COLORS[branch]) filterRef = `url(#glow-${branch})`;
+  else if (isBranch && branch && BRANCH_COLORS[branch]) filterRef = 'url(#node-shadow)';
 
   
   let fillAttr = bgColor;
@@ -15168,7 +15168,7 @@ function _scheduleEditRender(immediate = false) {
   // its presentation delay. setTimeout(0) was actively worse (464 ms) because a
   // 0 ms timer is serviced before the frame's rendering opportunity, putting the
   // render back inside the interaction's own frame; afterNextPaint clears it.
-  // The interaction's real cost is paint, not script — see the glow filters on
+  // The interaction's real cost is paint, not script — see the shadow filters on
   // .node-rect, worth ~176 ms of the same tap.
   const run = () => {
     if (myToken !== _editRenderToken) return;   // a newer keystroke owns the reflow now
@@ -18090,7 +18090,7 @@ function render() {
   const defsEl = svgEl('defs', {});
   root.appendChild(defsEl);
 
-  // Node fill gradients + glow filters (dynamic — reflect current BRANCH_COLORS + theme)
+  // Node fill gradients (dynamic — reflect current BRANCH_COLORS + theme)
   const isDark = document.documentElement.dataset.theme === 'dark';
   const gradTopStop = isDark ? '#1a1a1a' : '#ffffff';
   Object.keys(BRANCH_COLORS).forEach(branch => {
@@ -18099,10 +18099,12 @@ function render() {
     grad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? bc.light    : gradTopStop }));
     grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? gradTopStop : bc.light    }));
     defsEl.appendChild(grad);
-    const filt = svgEl('filter', { id: `glow-${branch}`, x: '-40%', y: '-40%', width: '180%', height: '180%' });
-    filt.appendChild(svgEl('feDropShadow', { dx: '0', dy: '0', stdDeviation: '8', 'flood-color': bc.main, 'flood-opacity': isDark ? '0.55' : '0.35' }));
-    defsEl.appendChild(filt);
   });
+  // Branch nodes cast the same neutral shadow as the root pie's wedges
+  // (buildPieChart): lit from the top left, black, deeper in dark mode.
+  const nodeShadow = svgEl('filter', { id: 'node-shadow', x: '-40%', y: '-40%', width: '180%', height: '180%' });
+  nodeShadow.appendChild(svgEl('feDropShadow', { dx: '3', dy: '5', stdDeviation: '6', 'flood-color': '#000', 'flood-opacity': isDark ? '0.448' : '0.28' }));
+  defsEl.appendChild(nodeShadow);
   // Center gradient (theme-aware)
   const centerGrad = svgEl('linearGradient', { id: 'node-grad-center', x1: '0', y1: '0', x2: '0', y2: '1' });
   centerGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? '#666666' : '#454545' }));
