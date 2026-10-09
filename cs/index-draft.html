@@ -319,13 +319,17 @@
       margin: 8px 0 12px;
     }
     /* Section heading in the light style of the problem question, key word in the logo gradient */
-    .why h2.h2-light {
+    .why h2.h2-light,
+    .preview h2.h2-light,
+    .features h2.h2-light {
       font-size: clamp(28px, 5vw, 44px);
       font-weight: 300;
       line-height: 1.18;
       letter-spacing: -0.01em;
     }
-    .why h2.h2-light strong {
+    .why h2.h2-light strong,
+    .preview h2.h2-light strong,
+    .features h2.h2-light strong {
       font-weight: 700;
       background: linear-gradient(90deg, var(--family), var(--me));
       -webkit-background-clip: text;
@@ -872,8 +876,8 @@
   <div class="preview-inner">
     <p class="section-label">Řešení</p>
     <div class="section-divider"></div>
-    <h2>Tvůj týden jako myšlenková mapa</h2>
-    <p>Plánuj vizuálně. Začni největšími kameny. Rovnováhu, nebo její absenci, vidíš na první pohled.</p>
+    <h2 class="h2-light">Tvůj týden jako <strong>myšlenková mapa</strong></h2>
+    <p>Plánuj vizuálně. Začni největšími kameny.<br>Rovnováhu, nebo její absenci, vidíš na první pohled.</p>
 
 
     <!-- Benefits -->
@@ -908,8 +912,8 @@
   <div class="why-inner">
     <p class="section-label">Kdo za tím stojí</p>
     <div class="section-divider"></div>
+    <h2 class="h2-light">Proč jsem <strong>Zenit Week</strong> postavil</h2>
     <img class="author-photo" src="../assets/petr-burian.webp" alt="Petr Burian" width="128" height="128" loading="lazy">
-    <h2>Proč jsem Zenit Week postavil</h2>
     <p>
       Jsem Petr Burian. 16 let jsem byl CTO Livesportu, kde naše týmy postavily Flashscore pro 130 milionů fanoušků. Prošel jsem si burnoutem.
     </p>
@@ -939,7 +943,7 @@
   <div class="features-inner">
     <p class="section-label">Klíčové funkce</p>
     <div class="section-divider"></div>
-    <h2>Co všechno umí</h2>
+    <h2 class="h2-light">Co všechno <strong>umí</strong></h2>
     <div class="features-grid">
 
       <div class="benefit">
