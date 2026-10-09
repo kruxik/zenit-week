@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-C3MytaaZKkWMWbZrZIIjbslxyFqWwW93zcvsvBolYIU='
+               'sha256-0VUvzva2ZsAkHGM5pA1aZDtULWajbJfR03fZuEywwHE='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -3927,41 +3927,15 @@
     filter: brightness(1.06);
   }
 
-  /* Completion ring on the root node. The root's fill is dark in both themes, so
-     the track is a white wash rather than a --border token: those are tuned for
-     page backgrounds and vanish against #333. The arcs carry their own stroke per
-     band (see centerRingBandStroke) — declaring a stroke here would beat those
-     presentation attributes and flatten all four to one colour. */
-  .center-ring-track { stroke: rgba(255, 255, 255, 0.35); }
-  .center-ring-arc, .center-ring-shadow {
-    transition: stroke-dasharray 0.35s ease, stroke-dashoffset 0.35s ease;
-  }
-  /* Glass collar between the photo and the wedges (see CENTER_COLLAR_R). */
-  .center-collar {
-    fill: rgba(255, 255, 255, 0.26);
-    pointer-events: none;
-  }
-  .center-collar-rim {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.55);
-    stroke-width: 1.5;
-    pointer-events: none;
-  }
-  .center-avatar-rim {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.9);
-    stroke-width: 2.5;
-    pointer-events: none;
-  }
+  /* Infographic on the root node (see CENTER_PLATE_R). Wedges, their gradient
+     stops and the labels carry their colours and sizes as attributes set per
+     band — a fill or font-size here would beat those and flatten them. */
+  .center-ring-track { fill: var(--border-soft); pointer-events: none; }
   .center-ring-label {
     fill: #ffffff;
-    font-size: 19px;
-    font-weight: 700;
+    font-weight: 800;
+    letter-spacing: -0.5px;
     font-variant-numeric: tabular-nums;
-    paint-order: stroke;
-    stroke: rgba(0, 0, 0, 0.18);
-    stroke-width: 2px;
-    stroke-linejoin: round;
     pointer-events: none;
   }
 
@@ -7798,23 +7772,31 @@ const CENTER_H = NODE_STYLE.center.minH;
 // they read as borders framing the picture rather than as the ring's own breathing
 // room. Ring outer edge 122.5, inner edge 98.5, against a node edge at 125.
 //
-// Infographic redesign: the avatar shrank by 30% (96 → 67) and the ring took the
-// whole annulus, so each band is a wedge wide enough to carry its own percentage.
-// The ring's inner edge runs under the photo's edge; a translucent glass collar
-// (CENTER_COLLAR_R) is laid over its inner part, so the wedges read as passing
-// beneath it — the frosted border between picture and chart. Ring outer edge
-// flush with the node edge — no dark rim of the node's fill around the wedges,
-// as in the infographic. Half a unit past the edge so the fill's antialiased
-// boundary cannot leave a grey hairline. Labels sit midway across the band the
-// collar leaves visible. The radii carry the root's 1.25× growth (312.5 node).
+// Infographic redesign: the root is a pie chart lying on the canvas with a white
+// plate levitating over its middle, the photo set into the plate. The node's own
+// disc is no longer painted — the wedges and the plate are the whole silhouette.
+// Each wedge runs from the photo's edge (CENTER_WEDGE_INNER_R), under the plate's
+// translucent rim where it shows through dimmed, out to a
+// radius set by its rank: the largest share reaches the node edge, every smaller
+// one stops shorter, and its percentage shrinks with it. So pieces always differ
+// in size, as in the infographic, and the size still says something. The radii
+// carry the root's 1.25× growth (312.5 node). The part of each wedge the plate
+// leaves visible was then grown 30%, so the largest now reaches past the node edge.
 const CENTER_AVATAR_R = 83.75;
-const CENTER_COLLAR_R = 101.25;
-const CENTER_RING_OUTER_R = 156.75;
-const CENTER_RING_R  = (CENTER_AVATAR_R + CENTER_RING_OUTER_R) / 2;
-const CENTER_RING_SW = CENTER_RING_OUTER_R - CENTER_AVATAR_R;
-const CENTER_RING_LABEL_R = (CENTER_COLLAR_R + CENTER_RING_OUTER_R) / 2;
+const CENTER_PLATE_R = 101.25;
+const CENTER_WEDGE_INNER_R = CENTER_AVATAR_R;
+// How much of the chart the plate's rim, between photo and wedges, lets through.
+const CENTER_PLATE_RIM_OPACITY = 0.3;
+// Outer radius and label size by rank, largest share first.
+const CENTER_WEDGE_OUTER_R = [55, 45.75, 37.75, 30.75, 24.75].map(w => CENTER_PLATE_R + w * 1.3);
+const CENTER_WEDGE_FONT = [19, 16, 14, 12.5, 11];
+// The faint ring an empty week shows in place of the chart, as wide as its
+// largest wedge so the branch edges still run in under it.
+const CENTER_TRACK_R = CENTER_WEDGE_OUTER_R[0];
 // A band narrower than this share has no room for its label; it stays unlabelled.
 const CENTER_RING_LABEL_MIN_SHARE = 0.06;
+// Clearance a label keeps from the plate's edge and from its wedge's outer edge.
+const CENTER_LABEL_PAD = 3;
 
 // Initials fill the avatar disc, so they are sized off it rather than off the
 // node's label font — that one only ever paints the signed-out wording, which
@@ -14541,8 +14523,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   const paint = {
     class: 'node-rect',
-    fill: fillAttr,
-    stroke: borderColor,
+    // The root's disc is only its hit area: the infographic paints its silhouette.
+    fill: isCenter ? 'transparent' : fillAttr,
+    stroke: isCenter ? 'none' : borderColor,
     'stroke-width': sw,
     filter: isCenter ? 'none' : filterRef,
   };
@@ -14580,60 +14563,37 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     titleEl.textContent = centerDisplayName();
     g.appendChild(titleEl);
 
-    // Completion ring: the Stats donut's four-arc split, drawn at node scale. The
-    // track is always whole, so an empty week keeps the exact same silhouette as a
-    // finished one — only the arcs over it change. One path per band, all four
-    // always present, so a patch never has to add or remove nodes.
-    const { d: ringD, perimeter } = roundedRectPathD(CENTER_RING_R * 2, CENTER_RING_R * 2, CENTER_RING_R);
+    // The Stats donut's split as an infographic: one wedge per band, all always
+    // present, so a patch never has to add or remove nodes. The track is whole,
+    // so an empty week keeps a ring under the plate. Wedges are appended last
+    // band first: each one lies over the next clockwise and its drop shadow falls
+    // on it, the first one over the last across 12 o'clock.
+    const bandDefs = svgEl('defs', {});
+    STATS_SPLIT_BANDS.forEach((band, i) => bandDefs.appendChild(centerWedgeGradient(band, i)));
+    g.appendChild(bandDefs);
     g.appendChild(svgEl('path', {
       class: 'center-ring-track',
-      d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
+      d: `${discPathD(CENTER_TRACK_R)} ${discPathD(CENTER_WEDGE_INNER_R)}`, 'fill-rule': 'evenodd',
     }));
-    const arcs = svgEl('g', { class: 'center-ring-arcs', 'data-perimeter': perimeter });
-    const bandDefs = svgEl('defs', {});
-    STATS_SPLIT_BANDS.forEach((band, i) => {
-      arcs.appendChild(svgEl('path', {
-        class: 'center-ring-arc', 'data-band': i,
-        d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
-        stroke: centerRingBandStroke(band),
+    const wedges = svgEl('g', { class: 'center-wedges' });
+    for (let i = STATS_SPLIT_BANDS.length - 1; i >= 0; i--) {
+      wedges.appendChild(svgEl('path', {
+        class: 'center-wedge', 'data-band': i, d: '', fill: `url(#center-wedge-grad-${i})`,
+        filter: 'url(#center-wedge-shadow)',
       }));
-    });
-    // Cast shadows go over every wedge, so each lands on its own band only.
-    STATS_SPLIT_BANDS.forEach((band, i) => {
-      bandDefs.appendChild(centerRingCastShadowGradient(i));
-      arcs.appendChild(svgEl('path', {
-        class: 'center-ring-shadow', 'data-band': i,
-        d: ringD, fill: 'none', 'stroke-width': CENTER_RING_SW,
-        stroke: `url(#center-band-shadow-${i})`, 'pointer-events': 'none',
-      }));
-    });
-    bandDefs.appendChild(centerCollarShadowGradient());
-    g.appendChild(bandDefs);
-    g.appendChild(arcs);
-    g.appendChild(svgEl('path', {
-      class: 'center-collar-shadow',
-      d: `${discPathD(CENTER_COLLAR_R + CENTER_COLLAR_SHADOW_W)} ${discPathD(CENTER_COLLAR_R)}`,
-      'fill-rule': 'evenodd', fill: 'url(#center-collar-shadow-grad)', 'pointer-events': 'none',
-    }));
+    }
+    g.appendChild(wedges);
 
-    // Glass collar between the photo and the wedges: a frosted annulus over the
-    // ring's inner edge, a bright rim on its outer edge and one hugging the photo.
-    g.appendChild(svgEl('path', {
-      class: 'center-collar',
-      d: `${discPathD(CENTER_COLLAR_R)} ${discPathD(CENTER_AVATAR_R)}`,
-      'fill-rule': 'evenodd',
+    // The plate levitates over the chart: its drop shadow falls on the wedges.
+    // Opaque under the photo, frosted glass in the rim around it, so the wedges
+    // show through dimmed; the rim's shadow is as light as its fill.
+    const plate = svgEl('g', { class: 'center-plate', filter: 'url(#center-plate-shadow)', 'pointer-events': 'none' });
+    plate.appendChild(svgDisc(CENTER_AVATAR_R, { fill: 'url(#center-plate-grad)' }));
+    plate.appendChild(svgEl('path', {
+      d: `${discPathD(CENTER_PLATE_R)} ${discPathD(CENTER_AVATAR_R)}`, 'fill-rule': 'evenodd',
+      fill: 'url(#center-plate-grad)', 'fill-opacity': CENTER_PLATE_RIM_OPACITY,
     }));
-    g.appendChild(svgEl('circle', { class: 'center-collar-rim', cx: 0, cy: 0, r: CENTER_COLLAR_R }));
-
-    const labels = svgEl('g', { class: 'center-ring-labels' });
-    STATS_SPLIT_BANDS.forEach((band, i) => {
-      labels.appendChild(svgEl('text', {
-        class: 'center-ring-label', 'data-band': i,
-        'text-anchor': 'middle', 'dominant-baseline': 'central',
-      }));
-    });
-    g.appendChild(labels);
-    setCenterRingArcs(arcs, computeWeekStats().global, perimeter);
+    g.appendChild(plate);
 
     // Initials disc first, photo clipped over it. If the photo 404s, is blocked,
     // or was never requested, the initials are simply what remains visible — no
@@ -14646,7 +14606,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     const faceText = svgEl('text', {
       x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central',
       'font-family': 'inherit', 'font-size': googleUserInitials ? CENTER_INITIALS_FONT : fontSize,
-      'font-weight': '700', fill: textColor, 'pointer-events': 'none',
+      'font-weight': '700', fill: googleUserInitials ? textColor : (isDarkTheme ? '#f2f2f2' : '#2b2b33'),
+      'pointer-events': 'none',
     });
     faceText.textContent = centerNodeText();
     g.appendChild(faceText);
@@ -14662,7 +14623,18 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
         'pointer-events': 'none',
       }));
     }
-    g.appendChild(svgEl('circle', { class: 'center-avatar-rim', cx: 0, cy: 0, r: CENTER_AVATAR_R }));
+
+    // Percentages last, so nothing on the root — plate, its shadow, the photo —
+    // can ever cover them.
+    const labels = svgEl('g', { class: 'center-ring-labels' });
+    STATS_SPLIT_BANDS.forEach((band, i) => {
+      labels.appendChild(svgEl('text', {
+        class: 'center-ring-label', 'data-band': i,
+        'text-anchor': 'middle', 'dominant-baseline': 'central',
+      }));
+    });
+    g.appendChild(labels);
+    setCenterWedges(g, computeWeekStats().global);
   }
 
   // "+ Branch" buttons on the center node's left and right edges. Week label,
@@ -17861,11 +17833,8 @@ function updateSummary() {
 // input the percentage depends on. makeNodeGroup still draws the ring correctly
 // itself, because updateSummary early-returns on an unchanged signature.
 function updateCenterRing() {
-  const arcs = document.querySelector('.node-group[data-id="center"] .center-ring-arcs');
-  if (!arcs) return;
-  const perimeter = parseFloat(arcs.dataset.perimeter);
-  if (!perimeter) return;
-  setCenterRingArcs(arcs, computeWeekStats().global, perimeter);
+  const g = document.querySelector('.node-group[data-id="center"]');
+  if (g?.querySelector('.center-wedges')) setCenterWedges(g, computeWeekStats().global);
 }
 
 // The open bands are the same colour at the same 32% as the donut's, but alpha
@@ -17883,81 +17852,88 @@ function centerRingBandStroke(band) {
     : `color-mix(in srgb, ${band.color} ${band.opacity * 100}%, var(--border-soft))`;
 }
 
-// The infographic's depth cue: each wedge lies over the next one clockwise and
-// casts a soft shadow onto it. So every band carries a shadow that starts dark
-// at its own start edge — the edge the previous wedge overhangs — and fades out
-// a short way in. Wedges themselves stay flat.
-//
-// The overlay is the band's own dash (shortened, see below), so the shadow can
-// never bleed into a neighbour. Its gradient runs from the origin along the
-// edge's clockwise normal: every point of a radial edge projects to 0 on that
-// axis, so the shadow is the same depth along the whole edge, as a real cast
-// shadow would be.
-const CENTER_CAST_SHADOW_W = 30;
-function centerRingCastShadowGradient(i) {
-  const grad = svgEl('linearGradient', {
-    id: `center-band-shadow-${i}`, gradientUnits: 'userSpaceOnUse',
-    x1: 0, y1: 0, x2: CENTER_CAST_SHADOW_W, y2: 0,
-  });
-  [[0, 0.46], [0.3, 0.23], [0.65, 0.08], [1, 0]].forEach(([offset, opacity]) => {
-    grad.appendChild(svgEl('stop', { offset, 'stop-color': '#000', 'stop-opacity': opacity }));
-  });
+// Each wedge is shaded along its sweep, lighter where it starts and deeper where
+// it ends, as the infographic's are. The axis is set per patch in setCenterWedges.
+function centerWedgeGradient(band, i) {
+  const base = centerRingBandStroke(band);
+  const grad = svgEl('linearGradient', { id: `center-wedge-grad-${i}`, gradientUnits: 'userSpaceOnUse' });
+  grad.appendChild(svgEl('stop', { offset: 0, 'stop-color': `color-mix(in srgb, ${base} 78%, #ffffff)` }));
+  grad.appendChild(svgEl('stop', { offset: 1, 'stop-color': `color-mix(in srgb, ${base} 90%, #000000)` }));
   return grad;
 }
 
-// The soft shadow the glass collar casts onto the wedges just outside it.
-const CENTER_COLLAR_SHADOW_W = 18;
-function centerCollarShadowGradient() {
-  const outer = CENTER_COLLAR_R + CENTER_COLLAR_SHADOW_W;
-  const grad = svgEl('radialGradient', {
-    id: 'center-collar-shadow-grad', gradientUnits: 'userSpaceOnUse', cx: 0, cy: 0, r: outer,
-  });
-  grad.appendChild(svgEl('stop', { offset: CENTER_COLLAR_R / outer, 'stop-color': '#000', 'stop-opacity': 0.28 }));
-  grad.appendChild(svgEl('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': 0 }));
-  return grad;
+// Point at radius r and angle a, measured clockwise from 12 o'clock.
+function centerPolar(r, a) {
+  return [r * Math.sin(a), -r * Math.cos(a)];
 }
 
-// The shadow overlay covers at most a quarter-turn of its band. Within that every
-// point lies on the clockwise side of the start edge; past a half-turn the edge's
-// own extension through the centre would cut the band and cast a second shadow.
-const CENTER_CAST_SHADOW_MAX_SHARE = 0.25;
+// Annular sector from a0 to a1, as a polygon for the same reason discPathD is one.
+function centerWedgePathD(rIn, rOut, a0, a1) {
+  const steps = Math.max(2, Math.ceil((a1 - a0) / (Math.PI / 90)));
+  const pts = [];
+  for (let k = 0; k <= steps; k++) pts.push(centerPolar(rOut, a0 + (a1 - a0) * k / steps));
+  for (let k = steps; k >= 0; k--) pts.push(centerPolar(rIn, a0 + (a1 - a0) * k / steps));
+  return pts.map(([x, y], k) => `${k ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`).join(' ') + ' Z';
+}
 
-// Shared by the build and the patch so the two can never disagree. Each band is
-// one dash of its own share, offset past everything before it, laid down in
-// STATS_SPLIT_BANDS order — the donut's arithmetic on a circle of a different
-// radius. Caps stay butt, like the donut's: a round cap paints a dot even on a
-// zero-length dash, which on an untouched week would leave a stray pip at 12
-// o'clock, and between two live bands it would overlap its neighbour.
-function setCenterRingArcs(arcs, stats, perimeter) {
+// Places a percentage wholly on its wedge, clear of the plate. Its box, measured
+// along the radius at angle a, reaches half its width × |sin a| plus half its
+// height × |cos a| either side of its centre — wide at 3 and 9 o'clock, short at
+// 12 and 6. The centre sits midway across the visible band but never so close
+// to the plate that the box would slip under it; when the band is too narrow
+// for the box at all, the font shrinks until it fits. Width is estimated from
+// the character count (heavy digits ≈ 0.62 em), so no layout is forced.
+function centerLabelFit(text, font, a, rOut) {
+  const inner = CENTER_PLATE_R + CENTER_LABEL_PAD;
+  const outer = rOut - CENTER_LABEL_PAD;
+  const reach = f => Math.abs(Math.sin(a)) * text.length * f * 0.31 + Math.abs(Math.cos(a)) * f * 0.4;
+  const fitted = Math.min(font, font * (outer - inner) / (2 * Math.max(reach(font), 0.01)));
+  const e = reach(fitted);
+  return { font: fitted, r: Math.min(outer - e, Math.max(inner + e, (inner + outer) / 2)) };
+}
+
+// Shared by the build and the patch so the two can never disagree. Bands are
+// laid clockwise from 12 o'clock in STATS_SPLIT_BANDS order — the donut's
+// arithmetic. Size comes from rank: largest share first, ties in band order.
+function setCenterWedges(g, stats) {
+  const shares = STATS_SPLIT_BANDS.map(b => (stats.total > 0 ? stats[b.key] / stats.total : 0));
+  const rank = new Array(shares.length);
+  shares.map((v, i) => i).sort((a, b) => shares[b] - shares[a] || a - b).forEach((i, r) => { rank[i] = r; });
+  // The track stands in for the chart on an empty week only: at full size it
+  // would show behind every shorter wedge.
+  const track = g.querySelector('.center-ring-track');
+  if (track) track.setAttribute('display', stats.total > 0 ? 'none' : 'inline');
   let acc = 0;
-  STATS_SPLIT_BANDS.forEach((band, i) => {
-    const el = arcs.querySelector(`.center-ring-arc[data-band="${i}"]`);
-    if (!el) return;
-    const len = stats.total > 0 ? (stats[band.key] / stats.total) * perimeter : 0;
-    el.setAttribute('stroke-dasharray', `${len} ${perimeter}`);
-    el.setAttribute('stroke-dashoffset', -acc);
-    // A band that fills the whole ring has no neighbour to be shadowed by.
-    const shadow = arcs.querySelector(`.center-ring-shadow[data-band="${i}"]`);
-    const shadowGrad = arcs.parentNode?.querySelector(`linearGradient[id="center-band-shadow-${i}"]`);
-    if (shadow && shadowGrad) {
-      const shadowLen = len >= perimeter - 0.01 ? 0 : Math.min(len, perimeter * CENTER_CAST_SHADOW_MAX_SHARE);
-      shadow.setAttribute('stroke-dasharray', `${shadowLen} ${perimeter}`);
-      shadow.setAttribute('stroke-dashoffset', -acc);
-      const a0 = (acc / perimeter) * 2 * Math.PI;
-      shadowGrad.setAttribute('x2', (CENTER_CAST_SHADOW_W * Math.cos(a0)).toFixed(2));
-      shadowGrad.setAttribute('y2', (CENTER_CAST_SHADOW_W * Math.sin(a0)).toFixed(2));
+  shares.forEach((share, i) => {
+    const a0 = acc * 2 * Math.PI;
+    const a1 = (acc + share) * 2 * Math.PI;
+    const rOut = CENTER_WEDGE_OUTER_R[rank[i]];
+    const wedge = g.querySelector(`.center-wedge[data-band="${i}"]`);
+    if (wedge) wedge.setAttribute('d', share > 0 ? centerWedgePathD(CENTER_WEDGE_INNER_R, rOut, a0, a1) : '');
+    const grad = g.querySelector(`linearGradient[id="center-wedge-grad-${i}"]`);
+    if (grad) {
+      // A whole ring has no start or end: shade it top to bottom instead.
+      const rMid = (CENTER_PLATE_R + rOut) / 2;
+      const [x1, y1] = share >= 0.999 ? [0, -rOut] : centerPolar(rMid, a0);
+      const [x2, y2] = share >= 0.999 ? [0, rOut] : centerPolar(rMid, a1);
+      grad.setAttribute('x1', x1.toFixed(2));
+      grad.setAttribute('y1', y1.toFixed(2));
+      grad.setAttribute('x2', x2.toFixed(2));
+      grad.setAttribute('y2', y2.toFixed(2));
     }
-    // Percentage at the wedge's angular midpoint. The ring path starts at
-    // 12 o'clock and runs clockwise, so the angle is measured from there.
-    const label = arcs.parentNode?.querySelector(`.center-ring-label[data-band="${i}"]`);
+    // Percentage at the wedge's angular midpoint, across the band the plate leaves.
+    const label = g.querySelector(`.center-ring-label[data-band="${i}"]`);
     if (label) {
-      const share = len / perimeter;
-      const angle = ((acc + len / 2) / perimeter) * 2 * Math.PI;
-      label.setAttribute('x', (CENTER_RING_LABEL_R * Math.sin(angle)).toFixed(1));
-      label.setAttribute('y', (-CENTER_RING_LABEL_R * Math.cos(angle)).toFixed(1));
-      label.textContent = share >= CENTER_RING_LABEL_MIN_SHARE ? `${Math.round(share * 100)}%` : '';
+      const text = share >= CENTER_RING_LABEL_MIN_SHARE ? `${Math.round(share * 100)}%` : '';
+      const mid = (a0 + a1) / 2;
+      const { font, r } = centerLabelFit(text, CENTER_WEDGE_FONT[rank[i]], mid, rOut);
+      const [x, y] = centerPolar(r, mid);
+      label.setAttribute('x', x.toFixed(1));
+      label.setAttribute('y', y.toFixed(1));
+      label.setAttribute('font-size', font.toFixed(1));
+      label.textContent = text;
     }
-    acc += len;
+    acc += share;
   });
 }
 
@@ -18005,6 +17981,27 @@ function render() {
   centerGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? '#666666' : '#454545' }));
   centerGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#444444' : '#252525' }));
   defsEl.appendChild(centerGrad);
+
+  // The root infographic's paint: a plate lit from the top left, a drop shadow
+  // that lifts it off the chart, one each wedge casts onto its neighbour and the
+  // canvas. User space, centred on the
+  // root, so a thin wedge's shadow is not clipped by its own small bounding box.
+  const plateGrad = svgEl('linearGradient', {
+    id: 'center-plate-grad', gradientUnits: 'userSpaceOnUse',
+    x1: -0.7 * CENTER_PLATE_R, y1: -0.8 * CENTER_PLATE_R, x2: 0.7 * CENTER_PLATE_R, y2: 0.9 * CENTER_PLATE_R,
+  });
+  plateGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? '#4a4a52' : '#ffffff' }));
+  plateGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#2c2c32' : '#e4e4ea' }));
+  defsEl.appendChild(plateGrad);
+  const centerShadow = (id, shadows) => {
+    const f = svgEl('filter', { id, filterUnits: 'userSpaceOnUse', x: '-220', y: '-220', width: '440', height: '440' });
+    shadows.forEach(([dx, dy, sd, op]) => f.appendChild(svgEl('feDropShadow', {
+      dx, dy, stdDeviation: sd, 'flood-color': '#000', 'flood-opacity': isDark ? Math.min(1, op * 1.6) : op,
+    })));
+    defsEl.appendChild(f);
+  };
+  centerShadow('center-plate-shadow', [[1, 2, 2, 0.12], [6, 12, 14, 0.3]]);
+  centerShadow('center-wedge-shadow', [[3, 5, 6, 0.28]]);
 
   // Rounds off the root's profile photo. A clipPath rather than a CSS
   // basic-shape so the geometry is plain SVG in every engine.
