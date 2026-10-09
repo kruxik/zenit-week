@@ -261,6 +261,39 @@
       margin: 48px 0 0;
     }
 
+    /* Question mind map: 3D render with the questions laid over its glass pills */
+    .qmap {
+      position: relative;
+      margin: 32px auto 24px;
+      max-width: 680px;
+      container-type: inline-size;
+    }
+    .qmap img { display: block; width: 100%; height: auto; mix-blend-mode: multiply; }
+    .qmap-q {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 26%;
+      text-align: center;
+      font-size: 2.5cqw;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .qmap-list { display: none; }
+    /* Phones: the pills get too small to read, so list the questions below the map */
+    @container (max-width: 520px) {
+      .qmap-q { display: none; }
+      .qmap-list {
+        display: grid;
+        gap: 8px;
+        list-style: none;
+        margin: 8px 0 0;
+        padding: 0;
+        font-size: 16px;
+        font-weight: 600;
+        text-align: center;
+      }
+    }
+
     /* Questions moved from the hero into the Problem section: beat `.why p` */
     .why .why-inner p.hero-hook {
       font-size: clamp(28px, 5vw, 44px);
@@ -764,56 +797,19 @@
       Máš dost času na to,<br>co je opravdu <strong>důležité</strong>?
     </p>
 
-    <ul class="hero-questions">
-      <li>
-        <svg class="branch-svg branch-left" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
-          <defs>
-            <linearGradient id="bl1" x1="70" y1="20" x2="0" y2="20" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="#8F37FF" stop-opacity="0.7"/>
-              <stop offset="100%" stop-color="#8F37FF" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <path d="M 70 20 C 48 20 28 14 0 22" fill="none" stroke="url(#bl1)" stroke-width="3" stroke-linecap="round"/>
-        </svg>
-        Učit se AI, i kdyby jen 10 minut denně?
-      </li>
-      <li>
-        <svg class="branch-svg branch-right" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
-          <defs>
-            <linearGradient id="bl2" x1="0" y1="20" x2="70" y2="20" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="#19C82A" stop-opacity="0.7"/>
-              <stop offset="100%" stop-color="#19C82A" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <path d="M 0 20 C 22 20 48 14 70 22" fill="none" stroke="url(#bl2)" stroke-width="3" stroke-linecap="round"/>
-        </svg>
-        Být naplno se svou rodinou?
-      </li>
-      <li>
-        <svg class="branch-svg branch-right" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
-          <defs>
-            <linearGradient id="bl3" x1="0" y1="20" x2="70" y2="20" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="#1ABCFE" stop-opacity="0.7"/>
-              <stop offset="100%" stop-color="#1ABCFE" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <path d="M 0 20 C 22 20 48 14 70 22" fill="none" stroke="url(#bl3)" stroke-width="3" stroke-linecap="round"/>
-        </svg>
-        Pečovat o svou mysl a tělo?
-      </li>
-      <li>
-        <svg class="branch-svg branch-left" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
-          <defs>
-            <linearGradient id="bl4" x1="70" y1="20" x2="0" y2="20" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="#F83800" stop-opacity="0.7"/>
-              <stop offset="100%" stop-color="#F83800" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <path d="M 70 20 C 48 20 28 26 0 18" fill="none" stroke="url(#bl4)" stroke-width="3" stroke-linecap="round"/>
-        </svg>
-        Budovat něco, co tě posouvá vpřed?
-      </li>
-    </ul>
+    <figure class="qmap">
+      <img src="../assets/mindmap-questions.webp" width="1200" height="800" loading="lazy" alt="Myšlenková mapa se čtyřmi větvemi: učení AI, rodina, mysl a tělo, strategie">
+      <span class="qmap-q" style="left:21.5%;top:21.9%;color:#6010c8">Učit se AI<br>pár minut denně?</span>
+      <span class="qmap-q" style="left:78.5%;top:21.9%;color:#0a7a14">Být naplno<br>se svou rodinou?</span>
+      <span class="qmap-q" style="left:21.5%;top:69.9%;color:#b82000">Promýšlet strategii<br>v klidu?</span>
+      <span class="qmap-q" style="left:78.5%;top:69.9%;color:#0070a0">Pečovat o svou<br>mysl i tělo?</span>
+      <ul class="qmap-list">
+        <li style="color:#6010c8">Učit se AI pár minut denně?</li>
+        <li style="color:#0a7a14">Být naplno se svou rodinou?</li>
+        <li style="color:#b82000">Promýšlet strategii v klidu?</li>
+        <li style="color:#0070a0">Pečovat o svou mysl i tělo?</li>
+      </ul>
+    </figure>
 
     <p class="hero-answer">Pravděpodobně ne.</p>
     <p class="hero-sub">Ne kvůli lenosti nebo nechuti.<br>Protože se ti týden zaplní dřív, než stihneš rozhodnout, co je v něm důležité.</p>
