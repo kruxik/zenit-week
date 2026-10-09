@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-15WEcsTDIETFkNH5duOrKKlEBjYBnzkHunyXxjliTT4='
+               'sha256-kmjt968xVmhRoieUPfKvvPnCDfN8Rd0sAqt37RGqfqY='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5258,9 +5258,11 @@ function _refreshWorkerShell() {
 // `visibilitychange` and `focus` both fire when a desktop tab is switched back
 // to, so the old pair of listeners spent two probes on every single return, and
 // nothing capped how often flipping between tabs could hit the network. Funnel
-// both through one throttled entry point instead — a deploy that lands while a
-// tab sits open is not urgent enough to warrant a round-trip per glance.
-const PROBE_MIN_INTERVAL_MS = 5 * 60 * 1000;
+// both through one throttled entry point instead. The window only has to absorb
+// that pair and rapid flipping: it was once five minutes, and since the boot
+// counts as a probe, a phone opened just before a deploy ignored every return
+// to the app for five minutes after it — the probe is a HEAD, so 30 s is cheap.
+const PROBE_MIN_INTERVAL_MS = 30 * 1000;
 let _lastProbeAt = 0;
 
 function requestAssetUpdateCheck() {
