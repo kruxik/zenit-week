@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-d5+OVKI7ydF29kJMth7zRLCfynO3/1B5A4stkTYUu3M='
+               'sha256-A3g1sJSbdDZDLul3tNEn7z6q+9O5uoz8COCO1+HKx1A='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -893,9 +893,9 @@
      there could only ever name the week for the Mindmap. The toolbar already
      paints above every panel, so nothing per-view keeps this visible.
      Absolutely centred instead of a flex child, so neither the logo's two
-     widths nor the sync button's changing label can shove it sideways. Its
-     buttons and the 1px rules between them reuse .undo-redo-btn /
-     .undo-redo-separator unchanged. */
+     widths nor the sync button's changing label can shove it sideways. One
+     button, dressed as #sync-btn so the toolbar speaks one button style;
+     stepping a week at a time is the [ / ] hotkeys' job. */
   #week-picker {
     position: absolute;
     left: 50%;
@@ -915,13 +915,14 @@
        centring it. The spans share one font-size, so their baselines line up
        under center anyway — keep it that way if either size ever changes. */
     align-items: center;
-    gap: 5px;
+    gap: 7px;
     height: 36px;
     max-width: 100%;
-    padding: 0 6px 0 10px;
-    border: none;
-    background: none;
-    border-radius: 5px;
+    padding: 0 14px 0 12px;
+    background: var(--glass-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px var(--shadow-md);
     cursor: pointer;
     outline: none;
     font-family: inherit;
@@ -930,36 +931,31 @@
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
   }
-  #week-picker-label:hover { background: var(--bg-hover); }
+  #week-picker-label:hover,
+  #week-picker-label[aria-expanded="true"] {
+    background: var(--bg-hover);
+    box-shadow: 0 4px 12px var(--shadow-md);
+  }
+  #week-picker-label:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
   #week-picker-range { font-weight: 500; color: var(--text-subtle); }
   #week-picker-week,
   #week-picker-range { overflow: hidden; text-overflow: ellipsis; }
 
-  /* The chevron is the whole promise that this opens, so it is the one part of
-     the label that never shrinks away — and it turns over while the fold is up. */
-  #week-picker-chevron {
+  /* The icon leads and never shrinks away; the text ellipsises before it does. */
+  #week-picker-icon {
     flex-shrink: 0;
     font-size: 18px;
-    transition: transform 0.15s ease;
   }
-  #week-picker-label[aria-expanded="true"] #week-picker-chevron { transform: rotate(180deg); }
 
   /* The short face — one letter and the number — is what survives on the
      narrowest phones, where the full wording would crowd the logo. */
   #week-picker-week-short { display: none; }
 
-  #week-picker-prev, #week-picker-next { font-size: 22px; }
-
-  /* Away from the present, the label and the arrow that leads back to it share
-     one accent, so "this is not the current week" reads as a single cue rather
-     than two unrelated highlights. */
+  /* Away from the present, the label wears the warning accent: "this is not
+     the current week". */
   #week-picker.off-current #week-picker-label { color: var(--accent-warning-text); }
-  .undo-redo-btn.today-direction {
-    color: var(--accent-warning-text);
-    background: var(--accent-warning-bg);
-  }
 
   /* ── The fold ───────────────────────────────────────────────────────────── */
   /* Same glass surface as the toolbar's other dropdowns (#sync-dropdown,
@@ -1077,22 +1073,17 @@
   .wp-today-item:hover { background: var(--accent-warning-bg); color: var(--accent-warning-text); }
 
   @media (max-width: 520px) {
-    /* The fold carries navigation here, so the arrows and their rules step
-       aside and the logo keeps its full wordmark. The control stops being
-       centred on the viewport and becomes a flex child between the logo and the
-       sync button, because at this width a viewport-centred label sits on top
-       of the logo. */
+    /* The control stops being centred on the viewport, because at this width
+       a viewport-centred label sits on top of the logo. It becomes a flex child
+       pushed right, against the sync button, at #toolbar-right's own gap. */
     #week-picker {
       position: relative;
       left: auto;
       transform: none;
-      margin: 0 4px;
+      margin: 0 12px 0 auto;
       min-width: 0;
       max-width: none;
     }
-    #week-picker-prev,
-    #week-picker-next,
-    #week-picker .undo-redo-separator { display: none; }
     #week-picker-range { display: none; }
     /* Viewport-wide instead of label-wide: a 300px card cannot hang off a
        360px screen if it is pinned to both gutters. */
@@ -4282,24 +4273,14 @@
          Every face is written by updateWeekPicker (week- and language-dependent),
          so only the static aria labels are declared here. -->
     <div id="week-picker">
-      <button type="button" class="undo-redo-btn" id="week-picker-prev"
-              data-i18n-aria="nav.prev" aria-label="Previous">
-        <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-up"/></svg>
-      </button>
-      <div class="undo-redo-separator"></div>
       <!-- aria-label is a placeholder for the empty-until-rendered spans;
            updateWeekPicker replaces it with the full week wording. -->
       <button type="button" id="week-picker-label" aria-label="Week"
               aria-haspopup="dialog" aria-expanded="false" aria-controls="week-picker-fold">
+        <svg class="icon" id="week-picker-icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg>
         <span id="week-picker-week"></span>
         <span id="week-picker-week-short"></span>
         <span id="week-picker-range"></span>
-        <svg class="icon" id="week-picker-chevron" aria-hidden="true"><use href="#icon-caret-down"/></svg>
-      </button>
-      <div class="undo-redo-separator"></div>
-      <button type="button" class="undo-redo-btn" id="week-picker-next"
-              data-i18n-aria="nav.next" aria-label="Next">
-        <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-caret-down"/></svg>
       </button>
       <!-- The fold. Month paging never changes the open week — only a week row
            does — so browsing to September does not drag the app along with it. -->
@@ -24542,10 +24523,6 @@ function updateWeekPicker() {
   const onCurrentWeek = currentWeekKey === twk;
   picker.classList.toggle('off-current', !onCurrentWeek);
 
-  // Accent whichever arrow leads back to the present — neither, when this is it.
-  document.getElementById('week-picker-prev').classList.toggle('today-direction', currentWeekKey > twk);
-  document.getElementById('week-picker-next').classList.toggle('today-direction', currentWeekKey < twk);
-
   // The visible label drops its date range on narrow viewports, so the full
   // wording lives on the button's accessible name. No title — the label is the
   // weeknav coachmark's anchor, and a native tooltip fights it on hover.
@@ -24555,7 +24532,7 @@ function updateWeekPicker() {
   if (isWeekPickerOpen()) renderWeekPickerFold();
 }
 
-// Week navigation, shared by the picker's arrows and the [ / ] hotkeys.
+// Week navigation for the [ / ] hotkeys.
 function stepWeek(delta) {
   return loadAndRender(offsetWeek(currentWeekKey, delta));
 }
@@ -24681,8 +24658,6 @@ function renderWeekPickerFold() {
   const label = document.getElementById('week-picker-label');
   const fold  = document.getElementById('week-picker-fold');
 
-  document.getElementById('week-picker-prev').addEventListener('click', () => stepWeek(-1));
-  document.getElementById('week-picker-next').addEventListener('click', () => stepWeek(+1));
 
   label.addEventListener('click', (e) => {
     e.stopPropagation();   // the document-level dismissal would close it again
