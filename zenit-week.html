@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-tUa4QzqGYHV2xKdoJOHc9lY2lz2PwR+yDiVB85pQD/w='
+               'sha256-15WEcsTDIETFkNH5duOrKKlEBjYBnzkHunyXxjliTT4='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2066,16 +2066,19 @@
     gap: 12px;
     flex-shrink: 0;
   }
-  .stats-donut { width: 160px; height: 160px; }
+  /* The chart's shadows fall past the view box, which frames only the wedges. */
+  .stats-donut { width: 234px; height: 234px; overflow: visible; }
+  /* Sized in the chart's user units: "100%" and "HOTOVO" both keep clear of
+     the plate's opaque middle (r 83.75). */
   .stats-donut-center-num {
-    font-size: 7px;
+    font-size: 44px;
     font-weight: 700;
     fill: var(--text-primary);
   }
   .stats-donut-center-sub {
-    font-size: 2.6px;
+    font-size: 16px;
     font-weight: 600;
-    letter-spacing: 0.5px;
+    letter-spacing: 2px;
     text-transform: uppercase;
     fill: var(--text-placeholder);
   }
@@ -2321,7 +2324,7 @@
     #stats-section-donut { gap: 14px; }
     .stats-legend { grid-template-columns: 1fr; }
     /* Shrink the donut so two columns fit on ~360px phones (e.g. Galaxy S22). */
-    .stats-donut { width: 120px; height: 120px; }
+    .stats-donut { width: 177px; height: 177px; }
     .stats-timeline-col { display: none; }
   }
 
@@ -3930,8 +3933,8 @@
   /* Infographic on the root node (see CENTER_PLATE_R). Wedges, their gradient
      stops and the labels carry their colours and sizes as attributes set per
      band — a fill or font-size here would beat those and flatten them. */
-  .center-ring-track { fill: var(--border-soft); pointer-events: none; }
-  .center-ring-label {
+  .pie-track { fill: var(--border-soft); pointer-events: none; }
+  .pie-label {
     fill: #ffffff;
     font-weight: 800;
     letter-spacing: -0.5px;
@@ -14563,37 +14566,10 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     titleEl.textContent = centerDisplayName();
     g.appendChild(titleEl);
 
-    // The Stats donut's split as an infographic: one wedge per band, all always
-    // present, so a patch never has to add or remove nodes. The track is whole,
-    // so an empty week keeps a ring under the plate. Wedges are appended last
-    // band first: each one lies over the next clockwise and its drop shadow falls
-    // on it, the first one over the last across 12 o'clock.
-    const bandDefs = svgEl('defs', {});
-    STATS_SPLIT_BANDS.forEach((band, i) => bandDefs.appendChild(centerWedgeGradient(band, i)));
-    g.appendChild(bandDefs);
-    g.appendChild(svgEl('path', {
-      class: 'center-ring-track',
-      d: `${discPathD(CENTER_TRACK_R)} ${discPathD(CENTER_WEDGE_INNER_R)}`, 'fill-rule': 'evenodd',
-    }));
-    const wedges = svgEl('g', { class: 'center-wedges' });
-    for (let i = STATS_SPLIT_BANDS.length - 1; i >= 0; i--) {
-      wedges.appendChild(svgEl('path', {
-        class: 'center-wedge', 'data-band': i, d: '', fill: `url(#center-wedge-grad-${i})`,
-        filter: 'url(#center-wedge-shadow)',
-      }));
-    }
-    g.appendChild(wedges);
-
-    // The plate levitates over the chart: its drop shadow falls on the wedges.
-    // Opaque under the photo, frosted glass in the rim around it, so the wedges
-    // show through dimmed; the rim's shadow is as light as its fill.
-    const plate = svgEl('g', { class: 'center-plate', filter: 'url(#center-plate-shadow)', 'pointer-events': 'none' });
-    plate.appendChild(svgDisc(CENTER_AVATAR_R, { fill: 'url(#center-plate-grad)' }));
-    plate.appendChild(svgEl('path', {
-      d: `${discPathD(CENTER_PLATE_R)} ${discPathD(CENTER_AVATAR_R)}`, 'fill-rule': 'evenodd',
-      fill: 'url(#center-plate-grad)', 'fill-opacity': CENTER_PLATE_RIM_OPACITY,
-    }));
-    g.appendChild(plate);
+    // The week's split as the infographic Stats shows too; the photo goes on
+    // its plate and the percentages over everything (see buildPieChart).
+    const pie = buildPieChart('center');
+    g.appendChild(pie.chart);
 
     // Initials disc first, photo clipped over it. If the photo 404s, is blocked,
     // or was never requested, the initials are simply what remains visible — no
@@ -14633,15 +14609,8 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
     // Percentages last, so nothing on the root — plate, its shadow, the photo —
     // can ever cover them.
-    const labels = svgEl('g', { class: 'center-ring-labels' });
-    STATS_SPLIT_BANDS.forEach((band, i) => {
-      labels.appendChild(svgEl('text', {
-        class: 'center-ring-label', 'data-band': i,
-        'text-anchor': 'middle', 'dominant-baseline': 'central',
-      }));
-    });
-    g.appendChild(labels);
-    setCenterWedges(g, computeWeekStats().global);
+    g.appendChild(pie.labels);
+    setPieChart(g, computeWeekStats().global);
   }
 
   // "+ Branch" buttons on the center node's left and right edges. Week label,
@@ -16972,6 +16941,12 @@ const STATS_SPLIT_BANDS = [
   { key: 'dropped',       color: 'var(--stats-dropped)', opacity: 0.55 },
 ];
 
+// The Stats view draws the root's chart (buildPieChart) at a fraction of its
+// size: the view box frames the largest wedge with room for its shadow, and the
+// percentages are scaled up so they still read at that size.
+const STATS_PIE_VIEW_R = 195;
+const STATS_PIE_FONT_SCALE = 1.3;
+
 // ─── Stats Panel (Plan vs Reality) ────────────────────────────────────────────
 // Read-only reflection surface. Reads weekData via computeWeekStats() and never
 // mutates it, so opening/closing/refreshing produces no undo entry. Sections ②③④
@@ -16989,42 +16964,26 @@ function _pct(part, whole) { return whole > 0 ? Math.round((part / whole) * 100)
 // Four-arc donut of the global planned/unplanned × done/open split. Center shows
 // overall completion %. Global by design, so branch count never changes its shape.
 function _statsDonut(c) {
-  // Order: all done first (planned, unplanned), then all open — so the completed
-  // portion is one contiguous arc clockwise from the top.
-  const segs = STATS_SPLIT_BANDS.map(b => ({ v: c[b.key], color: b.color, opacity: b.opacity }));
-  const R = 15.91549; // circumference ≈ 100 → dasharray reads as percent
   const svg = _svgEl('svg', {
-    viewBox: '0 0 36 36', class: 'stats-donut', role: 'img',
+    viewBox: `${-STATS_PIE_VIEW_R} ${-STATS_PIE_VIEW_R} ${2 * STATS_PIE_VIEW_R} ${2 * STATS_PIE_VIEW_R}`,
+    class: 'stats-donut', role: 'img',
     'aria-label': `${c.percent}% ${t('todo.done')}`,
   });
-  svg.appendChild(_svgEl('circle', {
-    cx: 18, cy: 18, r: R, fill: 'none',
-    stroke: 'var(--border-soft)', 'stroke-width': 4,
-  }));
-  const g = _svgEl('g', { transform: 'rotate(-90 18 18)' });
-  let acc = 0;
-  for (const s of segs) {
-    if (c.total <= 0 || s.v <= 0) continue;
-    const p = (s.v / c.total) * 100;
-    g.appendChild(_svgEl('circle', {
-      cx: 18, cy: 18, r: R, fill: 'none',
-      stroke: s.color, 'stroke-width': 4, opacity: s.opacity,
-      'stroke-dasharray': `${p} ${100 - p}`, 'stroke-dashoffset': -acc,
-    }));
-    acc += p;
-  }
-  svg.appendChild(g);
+  const pie = buildPieChart('stats-pie');
+  svg.appendChild(pie.chart);
   const num = _svgEl('text', {
-    x: 18, y: 18, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+    x: 0, y: -6, 'text-anchor': 'middle', 'dominant-baseline': 'central',
     class: 'stats-donut-center-num',
   });
   num.textContent = `${c.percent}%`;
   svg.appendChild(num);
   const sub = _svgEl('text', {
-    x: 18, y: 24, 'text-anchor': 'middle', class: 'stats-donut-center-sub',
+    x: 0, y: 30, 'text-anchor': 'middle', class: 'stats-donut-center-sub',
   });
   sub.textContent = t('todo.done');
   svg.appendChild(sub);
+  svg.appendChild(pie.labels);
+  setPieChart(svg, c, STATS_PIE_FONT_SCALE);
   return svg;
 }
 
@@ -17841,7 +17800,7 @@ function updateSummary() {
 // itself, because updateSummary early-returns on an unchanged signature.
 function updateCenterRing() {
   const g = document.querySelector('.node-group[data-id="center"]');
-  if (g?.querySelector('.center-wedges')) setCenterWedges(g, computeWeekStats().global);
+  if (g) setPieChart(g, computeWeekStats().global);
 }
 
 // The open bands are the same colour at the same 32% as the donut's, but alpha
@@ -17859,27 +17818,97 @@ function centerRingBandStroke(band) {
     : `color-mix(in srgb, ${band.color} ${band.opacity * 100}%, var(--border-soft))`;
 }
 
+// The week's split (STATS_SPLIT_BANDS) as an infographic: a pie whose wedges
+// lie on the canvas under a white plate levitating over its middle. One chart
+// for both places it appears — the root node, which sets its photo on the plate,
+// and the Stats view, which writes the done percentage there. Returns the chart
+// and its percentages apart, so a caller can lay its own content on the plate
+// and still put the labels over everything. `prefix` keeps each chart's paint
+// ids its own: two charts can be in the document at once.
+//
+// Wedges are appended last band first: each one lies over the next clockwise and
+// its drop shadow falls on it, the first one over the last across 12 o'clock.
+// All bands are always present, so a patch never has to add or remove nodes.
+function buildPieChart(prefix) {
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const chart = svgEl('g', { class: 'pie-chart', 'data-prefix': prefix });
+  const defs = svgEl('defs', {});
+  STATS_SPLIT_BANDS.forEach((band, i) => defs.appendChild(pieWedgeGradient(band, `${prefix}-wedge-grad-${i}`)));
+  // The plate is lit from the top left; shadows lift it off the chart and each
+  // wedge off its neighbour and the canvas. User space, centred on the chart, so
+  // a thin wedge's shadow is not clipped by its own small bounding box.
+  const plateGrad = svgEl('linearGradient', {
+    id: `${prefix}-plate-grad`, gradientUnits: 'userSpaceOnUse',
+    x1: -0.7 * CENTER_PLATE_R, y1: -0.8 * CENTER_PLATE_R, x2: 0.7 * CENTER_PLATE_R, y2: 0.9 * CENTER_PLATE_R,
+  });
+  plateGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? '#4a4a52' : '#ffffff' }));
+  plateGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#2c2c32' : '#e4e4ea' }));
+  defs.appendChild(plateGrad);
+  const shadow = (id, shadows) => {
+    const f = svgEl('filter', { id, filterUnits: 'userSpaceOnUse', x: '-220', y: '-220', width: '440', height: '440' });
+    shadows.forEach(([dx, dy, sd, op]) => f.appendChild(svgEl('feDropShadow', {
+      dx, dy, stdDeviation: sd, 'flood-color': '#000', 'flood-opacity': isDark ? Math.min(1, op * 1.6) : op,
+    })));
+    defs.appendChild(f);
+  };
+  shadow(`${prefix}-plate-shadow`, [[1, 2, 2, 0.12], [6, 12, 14, 0.3]]);
+  shadow(`${prefix}-wedge-shadow`, [[3, 5, 6, 0.28]]);
+  chart.appendChild(defs);
+
+  chart.appendChild(svgEl('path', {
+    class: 'pie-track',
+    d: `${discPathD(CENTER_TRACK_R)} ${discPathD(CENTER_WEDGE_INNER_R)}`, 'fill-rule': 'evenodd',
+  }));
+  const wedges = svgEl('g', { class: 'pie-wedges' });
+  for (let i = STATS_SPLIT_BANDS.length - 1; i >= 0; i--) {
+    wedges.appendChild(svgEl('path', {
+      class: 'pie-wedge', 'data-band': i, d: '', fill: `url(#${prefix}-wedge-grad-${i})`,
+      filter: `url(#${prefix}-wedge-shadow)`,
+    }));
+  }
+  chart.appendChild(wedges);
+
+  // The plate levitates over the chart: its drop shadow falls on the wedges.
+  // Opaque in the middle, frosted glass in the rim around it, so the wedges
+  // show through dimmed; the rim's shadow is as light as its fill.
+  const plate = svgEl('g', { class: 'pie-plate', filter: `url(#${prefix}-plate-shadow)`, 'pointer-events': 'none' });
+  plate.appendChild(svgDisc(CENTER_AVATAR_R, { fill: `url(#${prefix}-plate-grad)` }));
+  plate.appendChild(svgEl('path', {
+    d: `${discPathD(CENTER_PLATE_R)} ${discPathD(CENTER_AVATAR_R)}`, 'fill-rule': 'evenodd',
+    fill: `url(#${prefix}-plate-grad)`, 'fill-opacity': CENTER_PLATE_RIM_OPACITY,
+  }));
+  chart.appendChild(plate);
+
+  const labels = svgEl('g', { class: 'pie-labels' });
+  STATS_SPLIT_BANDS.forEach((band, i) => {
+    labels.appendChild(svgEl('text', {
+      class: 'pie-label', 'data-band': i, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+    }));
+  });
+  return { chart, labels };
+}
+
 // Each wedge is shaded along its sweep, lighter where it starts and deeper where
-// it ends, as the infographic's are. The axis is set per patch in setCenterWedges.
-function centerWedgeGradient(band, i) {
+// it ends, as the infographic's are. The axis is set per patch in setPieChart.
+function pieWedgeGradient(band, id) {
   const base = centerRingBandStroke(band);
-  const grad = svgEl('linearGradient', { id: `center-wedge-grad-${i}`, gradientUnits: 'userSpaceOnUse' });
+  const grad = svgEl('linearGradient', { id, gradientUnits: 'userSpaceOnUse' });
   grad.appendChild(svgEl('stop', { offset: 0, 'stop-color': `color-mix(in srgb, ${base} 78%, #ffffff)` }));
   grad.appendChild(svgEl('stop', { offset: 1, 'stop-color': `color-mix(in srgb, ${base} 90%, #000000)` }));
   return grad;
 }
 
 // Point at radius r and angle a, measured clockwise from 12 o'clock.
-function centerPolar(r, a) {
+function piePolar(r, a) {
   return [r * Math.sin(a), -r * Math.cos(a)];
 }
 
 // Annular sector from a0 to a1, as a polygon for the same reason discPathD is one.
-function centerWedgePathD(rIn, rOut, a0, a1) {
+function pieWedgePathD(rIn, rOut, a0, a1) {
   const steps = Math.max(2, Math.ceil((a1 - a0) / (Math.PI / 90)));
   const pts = [];
-  for (let k = 0; k <= steps; k++) pts.push(centerPolar(rOut, a0 + (a1 - a0) * k / steps));
-  for (let k = steps; k >= 0; k--) pts.push(centerPolar(rIn, a0 + (a1 - a0) * k / steps));
+  for (let k = 0; k <= steps; k++) pts.push(piePolar(rOut, a0 + (a1 - a0) * k / steps));
+  for (let k = steps; k >= 0; k--) pts.push(piePolar(rIn, a0 + (a1 - a0) * k / steps));
   return pts.map(([x, y], k) => `${k ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`).join(' ') + ' Z';
 }
 
@@ -17890,7 +17919,7 @@ function centerWedgePathD(rIn, rOut, a0, a1) {
 // to the plate that the box would slip under it; when the band is too narrow
 // for the box at all, the font shrinks until it fits. Width is estimated from
 // the character count (heavy digits ≈ 0.62 em), so no layout is forced.
-function centerLabelFit(text, font, a, rOut) {
+function pieLabelFit(text, font, a, rOut) {
   const inner = CENTER_PLATE_R + CENTER_LABEL_PAD;
   const outer = rOut - CENTER_LABEL_PAD;
   const reach = f => Math.abs(Math.sin(a)) * text.length * f * 0.31 + Math.abs(Math.cos(a)) * f * 0.4;
@@ -17899,42 +17928,45 @@ function centerLabelFit(text, font, a, rOut) {
   return { font: fitted, r: Math.min(outer - e, Math.max(inner + e, (inner + outer) / 2)) };
 }
 
-// Shared by the build and the patch so the two can never disagree. Bands are
-// laid clockwise from 12 o'clock in STATS_SPLIT_BANDS order — the donut's
-// arithmetic. Size comes from rank: largest share first, ties in band order.
-function setCenterWedges(g, stats) {
+// Shared by the build and the patch so the two can never disagree, and by both
+// charts. Bands are laid clockwise from 12 o'clock in STATS_SPLIT_BANDS order.
+// Size comes from rank: largest share first, ties in band order. `fontScale`
+// lets a chart drawn small keep its percentages readable; the fit still holds.
+function setPieChart(root, stats, fontScale = 1) {
+  const prefix = root.querySelector('.pie-chart')?.dataset.prefix;
+  if (!prefix) return;
   const shares = STATS_SPLIT_BANDS.map(b => (stats.total > 0 ? stats[b.key] / stats.total : 0));
   const rank = new Array(shares.length);
   shares.map((v, i) => i).sort((a, b) => shares[b] - shares[a] || a - b).forEach((i, r) => { rank[i] = r; });
   // The track stands in for the chart on an empty week only: at full size it
   // would show behind every shorter wedge.
-  const track = g.querySelector('.center-ring-track');
+  const track = root.querySelector('.pie-track');
   if (track) track.setAttribute('display', stats.total > 0 ? 'none' : 'inline');
   let acc = 0;
   shares.forEach((share, i) => {
     const a0 = acc * 2 * Math.PI;
     const a1 = (acc + share) * 2 * Math.PI;
     const rOut = CENTER_WEDGE_OUTER_R[rank[i]];
-    const wedge = g.querySelector(`.center-wedge[data-band="${i}"]`);
-    if (wedge) wedge.setAttribute('d', share > 0 ? centerWedgePathD(CENTER_WEDGE_INNER_R, rOut, a0, a1) : '');
-    const grad = g.querySelector(`linearGradient[id="center-wedge-grad-${i}"]`);
+    const wedge = root.querySelector(`.pie-wedge[data-band="${i}"]`);
+    if (wedge) wedge.setAttribute('d', share > 0 ? pieWedgePathD(CENTER_WEDGE_INNER_R, rOut, a0, a1) : '');
+    const grad = root.querySelector(`linearGradient[id="${prefix}-wedge-grad-${i}"]`);
     if (grad) {
       // A whole ring has no start or end: shade it top to bottom instead.
       const rMid = (CENTER_PLATE_R + rOut) / 2;
-      const [x1, y1] = share >= 0.999 ? [0, -rOut] : centerPolar(rMid, a0);
-      const [x2, y2] = share >= 0.999 ? [0, rOut] : centerPolar(rMid, a1);
+      const [x1, y1] = share >= 0.999 ? [0, -rOut] : piePolar(rMid, a0);
+      const [x2, y2] = share >= 0.999 ? [0, rOut] : piePolar(rMid, a1);
       grad.setAttribute('x1', x1.toFixed(2));
       grad.setAttribute('y1', y1.toFixed(2));
       grad.setAttribute('x2', x2.toFixed(2));
       grad.setAttribute('y2', y2.toFixed(2));
     }
     // Percentage at the wedge's angular midpoint, across the band the plate leaves.
-    const label = g.querySelector(`.center-ring-label[data-band="${i}"]`);
+    const label = root.querySelector(`.pie-label[data-band="${i}"]`);
     if (label) {
       const text = share >= CENTER_RING_LABEL_MIN_SHARE ? `${Math.round(share * 100)}%` : '';
       const mid = (a0 + a1) / 2;
-      const { font, r } = centerLabelFit(text, CENTER_WEDGE_FONT[rank[i]], mid, rOut);
-      const [x, y] = centerPolar(r, mid);
+      const { font, r } = pieLabelFit(text, CENTER_WEDGE_FONT[rank[i]] * fontScale, mid, rOut);
+      const [x, y] = piePolar(r, mid);
       label.setAttribute('x', x.toFixed(1));
       label.setAttribute('y', y.toFixed(1));
       label.setAttribute('font-size', font.toFixed(1));
@@ -17988,27 +18020,6 @@ function render() {
   centerGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? '#666666' : '#454545' }));
   centerGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#444444' : '#252525' }));
   defsEl.appendChild(centerGrad);
-
-  // The root infographic's paint: a plate lit from the top left, a drop shadow
-  // that lifts it off the chart, one each wedge casts onto its neighbour and the
-  // canvas. User space, centred on the
-  // root, so a thin wedge's shadow is not clipped by its own small bounding box.
-  const plateGrad = svgEl('linearGradient', {
-    id: 'center-plate-grad', gradientUnits: 'userSpaceOnUse',
-    x1: -0.7 * CENTER_PLATE_R, y1: -0.8 * CENTER_PLATE_R, x2: 0.7 * CENTER_PLATE_R, y2: 0.9 * CENTER_PLATE_R,
-  });
-  plateGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isDark ? '#4a4a52' : '#ffffff' }));
-  plateGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#2c2c32' : '#e4e4ea' }));
-  defsEl.appendChild(plateGrad);
-  const centerShadow = (id, shadows) => {
-    const f = svgEl('filter', { id, filterUnits: 'userSpaceOnUse', x: '-220', y: '-220', width: '440', height: '440' });
-    shadows.forEach(([dx, dy, sd, op]) => f.appendChild(svgEl('feDropShadow', {
-      dx, dy, stdDeviation: sd, 'flood-color': '#000', 'flood-opacity': isDark ? Math.min(1, op * 1.6) : op,
-    })));
-    defsEl.appendChild(f);
-  };
-  centerShadow('center-plate-shadow', [[1, 2, 2, 0.12], [6, 12, 14, 0.3]]);
-  centerShadow('center-wedge-shadow', [[3, 5, 6, 0.28]]);
 
   // The photo as a concave dish, lit from the same top left: a thin white lip
   // where the top-left rim catches the light, a broad soft shade the lip casts
