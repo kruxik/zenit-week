@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-kmjt968xVmhRoieUPfKvvPnCDfN8Rd0sAqt37RGqfqY='
+               'sha256-VZAKEDEPDx49nfwoBXqKPNBvytggXsVIcZ0Fz1I00vA='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7828,6 +7828,8 @@ const CENTER_INITIALS_FONT = 50;
 // steady hand. Sized to stay clear of the avatar's vertical extremes: it sits on
 // the node edge at ±156.25, so at r 50 it reaches x 106.25, outside the avatar.
 const CENTER_ADD_HIT_R = 50;
+// Drawn radius of those discs.
+const CENTER_ADD_BTN_R = 10 * 1.5 * 1.5 * 1.25;
 
 // How far a press on the root may travel and still count as a click rather than
 // a pan. Screen pixels, not world units, so it means the same at every zoom —
@@ -14625,7 +14627,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     // Percentages last, so nothing on the root — plate, its shadow, the photo —
     // can ever cover them.
     g.appendChild(pie.labels);
-    setPieChart(g, computeWeekStats().global);
+    setPieChart(g, computeWeekStats().global, 1, centerAddBtnDiscs(boxW));
   }
 
   // "+ Branch" buttons on the center node's left and right edges. Week label,
@@ -14633,7 +14635,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   // global chrome sitting in a pannable coordinate space.
   if (isCenter) {
     const centerBtnColor = document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666';
-    const centerBtnR = 10 * 1.5 * 1.5 * 1.25;
+    const centerBtnR = CENTER_ADD_BTN_R;
     const centerArm = 4.5 * 1.5 * 1.5 * 1.25;
     const centerPlusSW = (2.5 * 1.5 * 1.5 * 1.25).toFixed(1);
     ['left', 'right'].forEach(side => {
@@ -17815,7 +17817,51 @@ function updateSummary() {
 // itself, because updateSummary early-returns on an unchanged signature.
 function updateCenterRing() {
   const g = document.querySelector('.node-group[data-id="center"]');
-  if (g) setPieChart(g, computeWeekStats().global);
+  if (g) setPieChart(g, computeWeekStats().global, 1, centerAddBtnDiscs(getNodeSize('center').w));
+}
+
+// The root's two "+ branch" discs, on its left and right edges, as the areas its
+// percentages must stay off. On a touch screen they are always shown, so a label
+// at 3 or 9 o'clock would sit under one.
+function centerAddBtnDiscs(boxW) {
+  const r = CENTER_ADD_BTN_R;
+  return [{ x: -boxW / 2, y: 0, r }, { x: boxW / 2, y: 0, r }];
+}
+
+// Whether a label box centred on (x, y) comes within `gap` of any of the discs.
+function pieLabelHitsDisc(text, font, x, y, discs, gap) {
+  const hw = text.length * font * 0.31;
+  const hh = font * 0.4;
+  return discs.some(d => {
+    const dx = Math.max(Math.abs(d.x - x) - hw, 0);
+    const dy = Math.max(Math.abs(d.y - y) - hh, 0);
+    return dx * dx + dy * dy < (d.r + gap) * (d.r + gap);
+  });
+}
+
+// Fit for a label that must stay off `avoid`, by the same gap it keeps from the
+// plate and its wedge's edge. The wedge's midpoint when that is clear; otherwise the nearest clear angle, sought clockwise first — below the
+// right-hand +, above the left-hand one — then back, inside the wedge, and past
+// its far end only when no angle on the wedge is clear.
+function pieLabelPlace(text, font, a0, a1, rOut, avoid) {
+  const at = a => {
+    const fit = pieLabelFit(text, font, a, rOut);
+    const [x, y] = piePolar(fit.r, a);
+    return { font: fit.font, x, y, gap: fit.gap };
+  };
+  const hits = p => pieLabelHitsDisc(text, p.font, p.x, p.y, avoid, p.gap);
+  const mid = (a0 + a1) / 2;
+  const first = at(mid);
+  if (!text || !avoid.length || !hits(first)) return first;
+  const step = Math.PI / 180;
+  const clear = a => {
+    const p = at(a);
+    return hits(p) ? null : p;
+  };
+  for (let a = mid + step; a <= a1; a += step) { const p = clear(a); if (p) return p; }
+  for (let a = mid - step; a >= a0; a -= step) { const p = clear(a); if (p) return p; }
+  for (let a = a1; a <= a1 + Math.PI; a += step) { const p = clear(a); if (p) return p; }
+  return first;
 }
 
 // The open bands are the same colour at the same 32% as the donut's, but alpha
@@ -17940,14 +17986,17 @@ function pieLabelFit(text, font, a, rOut) {
   const reach = f => Math.abs(Math.sin(a)) * text.length * f * 0.31 + Math.abs(Math.cos(a)) * f * 0.4;
   const fitted = Math.min(font, font * (outer - inner) / (2 * Math.max(reach(font), 0.01)));
   const e = reach(fitted);
-  return { font: fitted, r: Math.min(outer - e, Math.max(inner + e, (inner + outer) / 2)) };
+  const r = Math.min(outer - e, Math.max(inner + e, (inner + outer) / 2));
+  // Gap left between the box and the nearer of the plate and the wedge's edge.
+  return { font: fitted, r, gap: Math.min(r - e - CENTER_PLATE_R, rOut - r - e) };
 }
 
 // Shared by the build and the patch so the two can never disagree, and by both
 // charts. Bands are laid clockwise from 12 o'clock in STATS_SPLIT_BANDS order.
 // Size comes from rank: largest share first, ties in band order. `fontScale`
 // lets a chart drawn small keep its percentages readable; the fit still holds.
-function setPieChart(root, stats, fontScale = 1) {
+// `avoid` lists discs ({ x, y, r }) no percentage may overlap.
+function setPieChart(root, stats, fontScale = 1, avoid = []) {
   const prefix = root.querySelector('.pie-chart')?.dataset.prefix;
   if (!prefix) return;
   const shares = STATS_SPLIT_BANDS.map(b => (stats.total > 0 ? stats[b.key] / stats.total : 0));
@@ -17979,9 +18028,7 @@ function setPieChart(root, stats, fontScale = 1) {
     const label = root.querySelector(`.pie-label[data-band="${i}"]`);
     if (label) {
       const text = share >= CENTER_RING_LABEL_MIN_SHARE ? `${Math.round(share * 100)}%` : '';
-      const mid = (a0 + a1) / 2;
-      const { font, r } = pieLabelFit(text, CENTER_WEDGE_FONT[rank[i]] * fontScale, mid, rOut);
-      const [x, y] = piePolar(r, mid);
+      const { font, x, y } = pieLabelPlace(text, CENTER_WEDGE_FONT[rank[i]] * fontScale, a0, a1, rOut, avoid);
       label.setAttribute('x', x.toFixed(1));
       label.setAttribute('y', y.toFixed(1));
       label.setAttribute('font-size', font.toFixed(1));
