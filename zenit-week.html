@@ -2321,8 +2321,21 @@
       padding-top: calc(var(--toolbar-h) + var(--panel-header-h) + 20px);
       padding-bottom: 80px;
     }
-    #stats-section-donut { gap: 14px; }
-    .stats-legend { grid-template-columns: 1fr; }
+    /* The legend is too wide for the donut's column (Czech most of all), and
+       stacked inside it took six lines. So the donut column's wrappers dissolve
+       and the section wraps: title, then donut beside the headlines, then the
+       legend on a full-width row of its own in its desktop grid. */
+    #stats-section-donut { gap: 14px; flex-wrap: wrap; }
+    #stats-section-donut .stats-pvr-col,
+    #stats-section-donut .stats-donut-wrap { display: contents; }
+    #stats-section-donut .stats-pvr-col > .help-section-title { flex: 0 0 100%; order: 0; }
+    #stats-section-donut .stats-donut { flex: 0 0 auto; order: 1; }
+    #stats-section-donut .stats-headlines-col { order: 2; }
+    #stats-section-donut .stats-headlines-col > .help-section-title { display: none; }
+    #stats-section-donut .stats-legend {
+      flex: 0 0 100%; order: 3;
+      grid-template-columns: auto auto; justify-content: center;
+    }
     /* Shrink the donut so two columns fit on ~360px phones (e.g. Galaxy S22). */
     .stats-donut { width: 177px; height: 177px; }
     .stats-timeline-col { display: none; }
