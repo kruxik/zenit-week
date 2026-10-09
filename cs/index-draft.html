@@ -240,7 +240,13 @@
       margin-bottom: 20px;
     }
 
-    .hero-title strong { font-weight: 700; }
+    .hero-title strong {
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--family), var(--me));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
 
     .hero-lead {
       font-size: clamp(20px, 3vw, 26px);
