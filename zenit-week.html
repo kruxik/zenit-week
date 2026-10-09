@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-0VUvzva2ZsAkHGM5pA1aZDtULWajbJfR03fZuEywwHE='
+               'sha256-tUa4QzqGYHV2xKdoJOHc9lY2lz2PwR+yDiVB85pQD/w='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -14624,6 +14624,13 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       }));
     }
 
+    // The photo's dished face, over it: the disc paints only the filter's inner
+    // light and shade, never its own fill.
+    g.appendChild(svgDisc(CENTER_AVATAR_R, {
+      class: 'center-avatar-bevel', fill: '#000', filter: 'url(#center-avatar-bevel)',
+      'pointer-events': 'none',
+    }));
+
     // Percentages last, so nothing on the root — plate, its shadow, the photo —
     // can ever cover them.
     const labels = svgEl('g', { class: 'center-ring-labels' });
@@ -18002,6 +18009,33 @@ function render() {
   };
   centerShadow('center-plate-shadow', [[1, 2, 2, 0.12], [6, 12, 14, 0.3]]);
   centerShadow('center-wedge-shadow', [[3, 5, 6, 0.28]]);
+
+  // The photo as a concave dish, lit from the same top left: a thin white lip
+  // where the top-left rim catches the light, a broad soft shade the lip casts
+  // into the dish below it, and a soft glow where the light lands on the far,
+  // bottom-right slope. Each layer is the disc's own outside, offset, blurred
+  // and clipped back to the disc, so it paints only inward from the side the
+  // offset pushes it in from. Merged in order, so the lip sits on the shade.
+  const bevel = svgEl('filter', {
+    id: 'center-avatar-bevel', filterUnits: 'userSpaceOnUse',
+    x: -CENTER_AVATAR_R - 24, y: -CENTER_AVATAR_R - 24,
+    width: 2 * CENTER_AVATAR_R + 48, height: 2 * CENTER_AVATAR_R + 48,
+  });
+  const bevelMerge = svgEl('feMerge', {});
+  [
+    ['shade', '#000', isDark ? 0.35 : 0.22, 6, 8, 10],
+    ['glow', '#fff', isDark ? 0.15 : 0.35, -4, -5, 8],
+    ['light', '#fff', isDark ? 0.45 : 0.9, 2.5, 3, 1.5],
+  ].forEach(([name, color, opacity, dx, dy, blur]) => {
+    bevel.appendChild(svgEl('feFlood', { 'flood-color': color, 'flood-opacity': opacity, result: `${name}-flood` }));
+    bevel.appendChild(svgEl('feComposite', { in: `${name}-flood`, in2: 'SourceAlpha', operator: 'out', result: `${name}-outside` }));
+    bevel.appendChild(svgEl('feOffset', { in: `${name}-outside`, dx, dy, result: `${name}-offset` }));
+    bevel.appendChild(svgEl('feGaussianBlur', { in: `${name}-offset`, stdDeviation: blur, result: `${name}-blur` }));
+    bevel.appendChild(svgEl('feComposite', { in: `${name}-blur`, in2: 'SourceAlpha', operator: 'in', result: name }));
+    bevelMerge.appendChild(svgEl('feMergeNode', { in: name }));
+  });
+  bevel.appendChild(bevelMerge);
+  defsEl.appendChild(bevel);
 
   // Rounds off the root's profile photo. A clipPath rather than a CSS
   // basic-shape so the geometry is plain SVG in every engine.
