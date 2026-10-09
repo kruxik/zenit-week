@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-A3g1sJSbdDZDLul3tNEn7z6q+9O5uoz8COCO1+HKx1A='
+               'sha256-SX7Slifz2/XLkjefG2yiNqpliftqMezMHoQwfprCl5k='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -23412,6 +23412,42 @@ function maybeRefitAfterRemoteChange() {
   fitMindmapView();
 }
 
+// The band of the canvas nothing covers, in canvas pixels. The canvas runs
+// under the toolbar and the bottom row of floating bars, so fitting to its full
+// height parks the map's top and bottom behind them — on a phone, where the map
+// fills the width and height is what limits the fit, that hides real nodes.
+// Measured, not assumed: a bar that is hidden reports an empty rect and drops out.
+const MINDMAP_FIT_TOP_COVERS    = ['toolbar'];
+const MINDMAP_FIT_BOTTOM_COVERS = ['view-toggle-bar', 'undo-redo-bar', 'fab-pill'];
+function mindmapClearBand(svg, h) {
+  const origin = svg.getBoundingClientRect().top || 0;
+  let top = 0, bottom = h;
+  const rectOf = id => {
+    const r = document.getElementById(id)?.getBoundingClientRect();
+    return r && r.height > 0 ? r : null;
+  };
+  MINDMAP_FIT_TOP_COVERS.forEach(id => {
+    const r = rectOf(id);
+    if (r) top = Math.max(top, r.bottom - origin);
+  });
+  MINDMAP_FIT_BOTTOM_COVERS.forEach(id => {
+    const r = rectOf(id);
+    if (r) bottom = Math.min(bottom, r.top - origin);
+  });
+  // A band this thin means the measurements are not of a laid-out page.
+  return bottom - top > h / 3 ? { top, bottom } : { top: 0, bottom: h };
+}
+
+// The map's margin above and below inside that band: the toolbar's own inset,
+// from its buttons' bottom edge to its bottom border, so the map sits off the
+// bars by the same step the bars' buttons sit off their edge.
+function mindmapFitPadY() {
+  const bar  = document.getElementById('toolbar')?.getBoundingClientRect();
+  const btns = document.getElementById('toolbar-right')?.getBoundingClientRect();
+  const inset = bar && btns && btns.height > 0 ? bar.bottom - btns.bottom : 0;
+  return inset > 0 ? inset : 10;
+}
+
 function fitMindmapView() {
   const svg = document.getElementById('main-svg');
   // Canvas may be display:none (mobile, agenda view) → svg has zero size.
@@ -23421,11 +23457,15 @@ function fitMindmapView() {
   // and the zoom slider reflects the true zoom from the start.
   const w = svg.clientWidth  || svg.getBoundingClientRect().width  || window.innerWidth  || 800;
   const h = svg.clientHeight || svg.getBoundingClientRect().height || window.innerHeight || 600;
+  const band = mindmapClearBand(svg, h);
+  const bandH = band.bottom - band.top;
+  const bandMidY = (band.top + band.bottom) / 2;
 
   const positions = computeLayout();
   const nodes = Object.values(positions);
   if (nodes.length > 1) {
     const pad = isMobile ? 20 : 60;
+    const padY = mindmapFitPadY();
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     nodes.forEach(p => {
       const hw = (p.w || 80) / 2;
@@ -23439,19 +23479,19 @@ function fitMindmapView() {
     const zoomCap = isMobile ? ZOOM_MAX_BASE : 0.6;
     const fitZoom = Math.min(
       (w - pad * 2) / (maxX - minX),
-      (h - pad * 2) / (maxY - minY),
+      (bandH - padY * 2) / (maxY - minY),
       zoomCap
     );
     recomputeZoomBounds(fitZoom);
     zoom = ZOOM_DEFAULT;
     panX = w / 2 - ((minX + maxX) / 2) * zoom;
-    panY = h / 2 - ((minY + maxY) / 2) * zoom;
+    panY = bandMidY - ((minY + maxY) / 2) * zoom;
   } else {
     _lastFitExtent = null;
     recomputeZoomBounds(0.6);
     zoom = ZOOM_DEFAULT;
     panX = w / 2;
-    panY = h / 2;
+    panY = bandMidY;
   }
   applyTransform();
 }
