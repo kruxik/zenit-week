@@ -449,8 +449,21 @@
     /* Jar SVG */
     .jar-wrap {
       margin: 44px auto 0;
-      max-width: 440px;
+      max-width: 640px;
     }
+    .jar-wrap img { display: block; width: 100%; height: auto; mix-blend-mode: multiply; }
+    .jar-captions { position: relative; height: 48px; margin-top: -60px; }
+    .why .why-inner p.jar-caption {
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+      margin: 0;
+      white-space: nowrap;
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+    .jar-caption strong { display: block; font-size: 15px; color: var(--ink); }
 
     /* ── Author ───────────────────────────────────────────────────── */
     .author-photo {
@@ -822,101 +835,11 @@
 
     <!-- Jar illustration -->
     <div class="jar-wrap">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 340" width="100%" role="img" aria-label="Dvě skleněné nádoby: jedna naplněná pískem napřed, kam se velké kameny už nevejdou; druhá s velkými kameny vloženými první a pískem zaplňujícím mezery">
-        <defs>
-          <linearGradient id="glass-body" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="#fafbfc" stop-opacity="0.92"/>
-            <stop offset="55%"  stop-color="#eaecef" stop-opacity="0.78"/>
-            <stop offset="100%" stop-color="#d7dadf" stop-opacity="0.85"/>
-          </linearGradient>
-          <linearGradient id="sand-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="#f4dfa6"/>
-            <stop offset="100%" stop-color="#d6ad62"/>
-          </linearGradient>
-          <linearGradient id="sand-top" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="#fff3d0"/>
-            <stop offset="100%" stop-color="#f4dfa6"/>
-          </linearGradient>
-          <radialGradient id="rock-work" cx="32%" cy="28%" r="80%">
-            <stop offset="0%" stop-color="#ff7a52"/><stop offset="60%" stop-color="#ee4f20"/><stop offset="100%" stop-color="#b03000"/>
-          </radialGradient>
-          <radialGradient id="rock-family" cx="32%" cy="28%" r="80%">
-            <stop offset="0%" stop-color="#c389ff"/><stop offset="60%" stop-color="#9d4cff"/><stop offset="100%" stop-color="#6f1ed9"/>
-          </radialGradient>
-          <radialGradient id="rock-me" cx="32%" cy="28%" r="80%">
-            <stop offset="0%" stop-color="#65d4ff"/><stop offset="60%" stop-color="#23b8f7"/><stop offset="100%" stop-color="#0285b8"/>
-          </radialGradient>
-          <filter id="rock-shadow" x="-30%" y="-30%" width="160%" height="180%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0a0a14" flood-opacity="0.32"/>
-          </filter>
-          <filter id="jar-shadow" x="-15%" y="-10%" width="130%" height="125%">
-            <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#1a1a2e" flood-opacity="0.15"/>
-          </filter>
-          <filter id="ground-shadow" x="-20%" y="-50%" width="140%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
-          </filter>
-          <clipPath id="clip-left"> <path d="M 60 90 C 60 82 66 78 82 78 L 158 78 C 174 78 180 82 180 90 L 180 246 Q 180 260 166 260 L 74 260 Q 60 260 60 246 Z"/></clipPath>
-          <clipPath id="clip-right"><path d="M 270 90 C 270 82 276 78 292 78 L 368 78 C 384 78 390 82 390 90 L 390 246 Q 390 260 376 260 L 284 260 Q 270 260 270 246 Z"/></clipPath>
-        </defs>
-
-        <!-- ══ LEFT JAR — sand first (bad) ══ -->
-        <ellipse cx="120" cy="272" rx="58" ry="6" fill="#000" opacity="0.32" filter="url(#ground-shadow)"/>
-        <g filter="url(#jar-shadow)">
-          <path d="M 60 246 Q 60 260 74 260 L 166 260 Q 180 260 180 246 L 180 90 C 180 82 174 78 158 78 L 158 64 L 168 64 Q 172 64 172 60 L 172 46 Q 172 40 166 40 L 74 40 Q 68 40 68 46 L 68 60 Q 68 64 72 64 L 82 64 L 82 78 C 66 78 60 82 60 90 Z"
-                fill="url(#glass-body)" stroke="#c8ccd2" stroke-width="1"/>
-        </g>
-        <line x1="72" y1="50" x2="168" y2="50" stroke="#c8ccd2" stroke-width="0.8" opacity="0.55"/>
-        <g clip-path="url(#clip-left)">
-          <rect x="60" y="105" width="120" height="155" fill="url(#sand-grad)"/>
-          <rect x="60" y="103" width="120" height="6" fill="url(#sand-top)"/>
-          <circle cx="80"  cy="140" r="1.4" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="105" cy="125" r="1"   fill="#a87f3a" opacity="0.4"/>
-          <circle cx="130" cy="138" r="1.6" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="92"  cy="160" r="1.2" fill="#a87f3a" opacity="0.4"/>
-          <circle cx="148" cy="155" r="1"   fill="#a87f3a" opacity="0.4"/>
-          <circle cx="73"  cy="180" r="1.4" fill="#a87f3a" opacity="0.4"/>
-          <circle cx="120" cy="185" r="1.2" fill="#a87f3a" opacity="0.4"/>
-          <circle cx="155" cy="195" r="1"   fill="#a87f3a" opacity="0.35"/>
-          <circle cx="98"  cy="210" r="1.5" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="140" cy="225" r="1.2" fill="#a87f3a" opacity="0.4"/>
-          <g filter="url(#rock-shadow)"><ellipse cx="86"  cy="95" rx="13" ry="7.5" fill="url(#rock-work)"/></g>
-          <g filter="url(#rock-shadow)"><ellipse cx="120" cy="87" rx="14" ry="8"   fill="url(#rock-me)"/></g>
-          <g filter="url(#rock-shadow)"><ellipse cx="153" cy="96" rx="13" ry="7.5" fill="url(#rock-family)"/></g>
-        </g>
-        <text x="120" y="308" text-anchor="middle" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" fill="#1a1a2e">Nejdřív písek</text>
-        <text x="120" y="326" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif"                                                font-size="11" font-weight="400" fill="#888">To důležité se nevejde</text>
-
-        <!-- ══ ARROW ══ -->
-        <text x="225" y="102" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="500" fill="#888">Obráceně</text>
-        <path d="M 187 145 C 200 110, 250 110, 263 145" fill="none" stroke="#b8bcc4" stroke-width="2" stroke-linecap="round"/>
-        <path d="M 264 136 L 263 145 L 256 138"          fill="none" stroke="#b8bcc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-
-        <!-- ══ RIGHT JAR — rocks first (good) ══ -->
-        <ellipse cx="330" cy="272" rx="58" ry="6" fill="#000" opacity="0.32" filter="url(#ground-shadow)"/>
-        <g filter="url(#jar-shadow)">
-          <path d="M 270 246 Q 270 260 284 260 L 376 260 Q 390 260 390 246 L 390 90 C 390 82 384 78 368 78 L 368 64 L 378 64 Q 382 64 382 60 L 382 46 Q 382 40 376 40 L 284 40 Q 278 40 278 46 L 278 60 Q 278 64 282 64 L 292 64 L 292 78 C 276 78 270 82 270 90 Z"
-                fill="url(#glass-body)" stroke="#c8ccd2" stroke-width="1"/>
-        </g>
-        <line x1="282" y1="50" x2="378" y2="50" stroke="#c8ccd2" stroke-width="0.8" opacity="0.55"/>
-        <g clip-path="url(#clip-right)">
-          <g filter="url(#rock-shadow)"><ellipse cx="300" cy="200" rx="30" ry="20" fill="url(#rock-work)"/></g>
-          <g filter="url(#rock-shadow)"><ellipse cx="357" cy="195" rx="28" ry="22" fill="url(#rock-family)"/></g>
-          <g filter="url(#rock-shadow)"><ellipse cx="325" cy="160" rx="30" ry="20" fill="url(#rock-me)"/></g>
-          <rect x="270" y="217" width="120" height="43" fill="url(#sand-grad)"/>
-          <rect x="270" y="215" width="120" height="5"  fill="url(#sand-top)"/>
-          <circle cx="288" cy="232" r="1.3" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="310" cy="240" r="1"   fill="#a87f3a" opacity="0.4"/>
-          <circle cx="335" cy="235" r="1.5" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="358" cy="246" r="1.2" fill="#a87f3a" opacity="0.4"/>
-          <circle cx="378" cy="232" r="1"   fill="#a87f3a" opacity="0.35"/>
-        </g>
-        <g transform="translate(400, 60)">
-          <circle r="13" fill="#e8f8e8" stroke="#2d9e4f" stroke-width="0.8"/>
-          <path d="M -5.5 0 L -1 4 L 6 -4" stroke="#2d9e4f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        </g>
-        <text x="330" y="308" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#1a1a2e">Nejdřív kameny</text>
-        <text x="330" y="326" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="400" fill="#888">Všechno důležité se vejde</text>
-      </svg>
+      <img src="../assets/jars.webp" width="1200" height="800" loading="lazy" alt="Dvě stejné skleněné nádoby. V levé je nejdřív písek, takže se velké kameny nevejdou a jeden spadl vedle. V pravé jsou nejdřív kameny a písek vyplnil mezery kolem nich.">
+      <div class="jar-captions">
+        <p class="jar-caption" style="left:33%"><strong>Nejdřív maily a meetingy</strong>Na to důležité nezbude místo</p>
+        <p class="jar-caption" style="left:71%"><strong>Nejdřív to důležité</strong>Maily a meetingy se vejdou kolem</p>
+      </div>
     </div>
   </div>
 </section>
