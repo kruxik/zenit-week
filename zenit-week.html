@@ -2809,7 +2809,8 @@
     padding: 0 14px;
     border-radius: 5px;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    /* No colour transition: on a switch the old tab would fade out while the new
+       one fades in, so both wear the active fill for a frame or two. */
     color: var(--text-subtle);
     font-size: 13px;
     font-weight: 600;
