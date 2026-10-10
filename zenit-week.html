@@ -927,8 +927,8 @@
     outline: none;
     font-family: inherit;
     font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-weight: 400;
+    color: var(--text-subtle);
     white-space: nowrap;
     overflow: hidden;
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
@@ -936,10 +936,13 @@
   #week-picker-label:hover,
   #week-picker-label[aria-expanded="true"] {
     background: var(--bg-hover);
+    color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
   #week-picker-label:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
-  #week-picker-range { font-weight: 500; color: var(--text-subtle); }
+  /* Grey and regular like #sync-btn; only the week number itself is bold. */
+  #week-picker-week,
+  #week-picker-week-short { font-weight: 700; }
   #week-picker-week,
   #week-picker-range { overflow: hidden; text-overflow: ellipsis; }
 
