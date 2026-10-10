@@ -10,7 +10,7 @@
                'sha256-UPs9OM3KA0MiNt2PoVrYTuWiuMZz54wE+wA4Q3XLuYc='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ZnZVDsUT6/ZjL66TDqf1HN5h49qK/OGIEJpm6ZFI4iI='
+               'sha256-7JxX8UqdWN7nFA8MgobIrOeTemkc9mNIGg3M6xh7lug='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -22159,11 +22159,12 @@ function wrapAgendaRowForSwipe(item, rowId, leftIcon, leftClass = '') {
 // mouseenter) is on that row, and a row without it reads as a different kind
 // of surface. `node` is null for rows that stand for no live node, so the
 // hovered-node hotkeys stay off them.
-// A double tap that lands on a control the row already answers — Done, a badge,
-// the grip — must not also fire the row's own gesture.
+// A tap that lands on a control with its own action — Done, the comment, the
+// grip — must not also fire the row's own gesture. The other badges (unplanned,
+// repeat, dropped, the tick pill) are plain marks and count as the row.
 function agendaRowChildHandlesTap(e) {
   return !!(e.target.closest('.agenda-action-btn')
-    || e.target.closest('.daily-log-badge')
+    || e.target.closest('.daily-log-badge.comment')
     || e.target.closest('.agenda-drag-handle'));
 }
 
@@ -22248,9 +22249,10 @@ function buildAgendaItem(node, label, opts = {}) {
   mainEl.className = 'daily-log-label-main';
   mainEl.textContent = lbl.main;
   labelEl.appendChild(mainEl);
-  // Reveal full ancestor chain on a tap — one gesture on both pointer types.
-  // A stationary tap collides with nothing else on the row: swipe needs 10px of
-  // travel and drag starts on the grip, so neither can fire from a still finger.
+  // Reveal full ancestor chain on a tap anywhere on the row that is not one of
+  // its controls — one gesture on both pointer types. A stationary tap collides
+  // with nothing else: swipe needs 10px of travel and drag starts on the grip,
+  // so neither can fire from a still finger.
   labelEl.dataset.expanded = 'false';
   const expandedEl = document.createElement('span');
   expandedEl.className = 'daily-log-label-expanded';
@@ -22262,7 +22264,10 @@ function buildAgendaItem(node, label, opts = {}) {
   const toggleExpanded = () => {
     labelEl.dataset.expanded = labelEl.dataset.expanded === 'true' ? 'false' : 'true';
   };
-  labelEl.addEventListener('click', e => {
+  // A Later row opens its editor on a mouse click elsewhere on the row, so
+  // there only the label expands.
+  (entryRow ? labelEl : item).addEventListener('click', e => {
+    if (agendaRowChildHandlesTap(e)) return;
     stopClickKeepingDismiss(e);
     // A tap also focuses the row, so every hovered-node hotkey has a touch
     // path — the same state mouseenter and the arrow keys produce. A Later row
