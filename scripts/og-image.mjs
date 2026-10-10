@@ -24,19 +24,19 @@ const APP_URL = pathToFileURL(resolve(REPO, 'zenit-week.html')).href;
 const VARIANTS = [
   {
     lang: 'en',
-    centerLabel: 'Me',
+    centerLabel: 'You',
     labels:   { work: 'Work',  family: 'Family', me: 'Personal', growth: 'Growth' },
-    headline: { thin: 'Plan what',         bold: 'matters.', letterSpacing: -2,  fontSize: 80 },
-    subtitle: ['A visual mind-map week planner.', 'No signup. No servers. Free.'],
+    headline: { bold: 'Visual',   thin: 'weekly planner',   letterSpacing: -2,   fontSize: 64 },
+    subtitle: ['Email and meetings eat your week.', 'Plan what matters first.'],
     outSvg:   resolve(REPO, 'og-image.svg'),
     outPng:   resolve(REPO, 'og-image.png'),
   },
   {
     lang: 'cs',
-    centerLabel: 'Já',
+    centerLabel: 'Ty',
     labels:   { work: 'Práce', family: 'Rodina', me: 'Osobní', growth: 'Rozvoj' },
-    headline: { thin: 'Plánujte to,',      bold: 'na čem záleží.', letterSpacing: -1.5, fontSize: 64 },
-    subtitle: ['Vizuální plánovač týdne.', 'Bez registrace. Bez serverů. Zdarma.'],
+    headline: { bold: 'Vizuální', thin: 'týdenní plánovač', letterSpacing: -1.5, fontSize: 56 },
+    subtitle: ['Týden ti zavalí maily a meetingy.', 'Naplánuj si nejdřív to důležité.'],
     outSvg:   resolve(REPO, 'og-image-cs.svg'),
     outPng:   resolve(REPO, 'og-image-cs.png'),
   },
@@ -55,6 +55,14 @@ const COLORS_SEED = {
   me:     { main: '#1ABCFE' },
   growth: { main: '#19C82A' },
 };
+
+// Shares of the center stats ring, in percent (bands of STATS_SPLIT_BANDS).
+const OG_RING_STATS = { total: 100, plannedDone: 52, unplannedDone: 12, plannedOpen: 28, unplannedOpen: 0, dropped: 8 };
+// Grey per band, same order, lightest for the biggest share.
+const OG_RING_GREYS = ['#9a9aa6', '#7a7a86', '#5e5e6a', '#5e5e6a', '#46464f'];
+
+// Branch nodes are drawn this much larger than in the app.
+const BRANCH_NODE_SCALE = 1.75;
 
 // ─── Seed ────────────────────────────────────────────────────────────────────
 function buildSeedWeek(labels) {
@@ -157,6 +165,38 @@ async function captureMindmap(variant) {
     if (t) t.textContent = centerLabel;
   }, variant.centerLabel);
 
+  // Draw the root as the stats ring the app shows on a week in progress. The
+  // seed has no activities, so the shares are set directly: an empty track
+  // would hide what the center of the map looks like in real use. The labels are
+  // enlarged for the same reason as the branch nodes below.
+  await page.evaluate(({ stats, greys }) => {
+    const g = document.querySelector('.node-group[data-id="center"]');
+    if (!g) return;
+    setPieChart(g, stats, 1.3);
+    // Greys instead of the app's stats colors: next to the four branch colors
+    // they made the card too busy. Lightness still tells the bands apart.
+    g.querySelectorAll('linearGradient[id*="-wedge-grad-"]').forEach(grad => {
+      const base = greys[Number(grad.id.split('-').pop())];
+      const [s0, s1] = grad.querySelectorAll('stop');
+      s0?.setAttribute('stop-color', `color-mix(in srgb, ${base} 85%, #ffffff)`);
+      s1?.setAttribute('stop-color', `color-mix(in srgb, ${base} 90%, #000000)`);
+    });
+    g.querySelectorAll('.pie-wedge').forEach(w => w.removeAttribute('fill-opacity'));
+    // The app labels wedges from 6%; at card size those labels are too small to read.
+    g.querySelectorAll('.pie-label').forEach(l => {
+      if (parseInt(l.textContent, 10) < 10) l.textContent = '';
+    });
+  }, { stats: OG_RING_STATS, greys: OG_RING_GREYS });
+
+  // Branch nodes at their real size are too small to read in a social card.
+  // Scale only the nodes, around their own centers, so the map stays put.
+  await page.evaluate((scale) => {
+    document.querySelectorAll('.node-group').forEach(g => {
+      if (g.dataset.id === 'center') return;
+      g.setAttribute('transform', `${g.getAttribute('transform')} scale(${scale})`);
+    });
+  }, BRANCH_NODE_SCALE);
+
   // Fit content to viewport (same UX as clicking the zoom label).
   await page.evaluate(() => document.getElementById('zoom-label')?.click());
   await page.waitForTimeout(400);
@@ -205,17 +245,19 @@ async function captureMindmap(variant) {
 // placed in the same 480×500 area the hand-drawn mockup used to occupy.
 function buildOgSvg(variant, mindmapB64) {
   const { headline, subtitle } = variant;
-  const headlineThinY = 200;
-  const headlineBoldY = headlineThinY + headline.fontSize * 1.125;
-  const subY1 = Math.round(headlineBoldY + 80);
+  const headlineBoldY = 200;
+  const headlineThinY = headlineBoldY + headline.fontSize * 1.125;
+  const subY1 = Math.round(headlineThinY + 80);
   const subY2 = subY1 + 38;
 
   // Mindmap embed area (right column). Square slot, right padding mirrors
   // the 80px left padding of the brand block. Width is 20% larger than the
   // original 480px footprint; height matches to keep the slot square so the
   // bezier curves read as a square mind-map rather than a wide ribbon.
-  const MM_W = 576;            // 480 * 1.2
-  const MM_H = 576;            // square
+  // Wider than tall since the branch nodes were enlarged: a square slot
+  // shrank the whole map. The text column ends well left of MM_X.
+  const MM_W = 660;
+  const MM_H = 576;
   const MM_X = 1200 - 80 - MM_W; // 544 — right padding == left padding (80)
   const MM_Y = (630 - MM_H) / 2; // 27 — vertically centered
 
@@ -225,6 +267,11 @@ function buildOgSvg(variant, mindmapB64) {
       <stop offset="0%" stop-color="#2a2a4e" stop-opacity="1"/>
       <stop offset="100%" stop-color="#1a1a2e" stop-opacity="1"/>
     </radialGradient>
+    <!-- Logo gradient for the key word, as in the landing page H1 -->
+    <linearGradient id="headline-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#A259FF"/>
+      <stop offset="100%" stop-color="#1ABCFE"/>
+    </linearGradient>
   </defs>
 
   <!-- Background -->
@@ -245,15 +292,15 @@ function buildOgSvg(variant, mindmapB64) {
     </g>
 
     <!-- Headline -->
+    <text x="0" y="${headlineBoldY}" font-size="${headline.fontSize}" font-weight="700" fill="url(#headline-grad)" letter-spacing="${headline.letterSpacing}">${headline.bold}</text>
     <text x="0" y="${headlineThinY}" font-size="${headline.fontSize}" font-weight="300" fill="#fff" letter-spacing="${headline.letterSpacing}">${headline.thin}</text>
-    <text x="0" y="${headlineBoldY}" font-size="${headline.fontSize}" font-weight="700" fill="#fff" letter-spacing="${headline.letterSpacing}">${headline.bold}</text>
 
     <!-- Subtitle -->
     <text x="0" y="${subY1}" font-size="26" font-weight="400" fill="rgba(255,255,255,0.65)">${subtitle[0]}</text>
     <text x="0" y="${subY2}" font-size="26" font-weight="400" fill="rgba(255,255,255,0.65)">${subtitle[1]}</text>
 
     <!-- URL -->
-    <text x="0" y="490" font-size="22" font-weight="600" fill="#1ABCFE">zenitweek.com</text>
+    <text x="0" y="490" font-size="33" font-weight="600" fill="#1ABCFE">zenitweek.com</text>
   </g>
 
   <!-- ══ RIGHT: real mindmap rendering ══ -->
