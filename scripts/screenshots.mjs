@@ -1,6 +1,6 @@
 // Screenshot generator for Zenit Week.
-// Loads the canonical week from assets/zenit-week-2026-05-12.json (with light
-// typo polish), seeds IndexedDB with it, then captures PNGs at desktop and
+// Loads the onboarding playground week from assets/playground-seed.json (the
+// sample week a new user sees), seeds IndexedDB with it, then captures PNGs at desktop and
 // mobile viewports in both views (mindmap + agenda) and both themes (light + dark).
 // Each PNG is also wrapped in a vector laptop / phone SVG frame.
 //
@@ -15,52 +15,24 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..');
 const APP_URL = pathToFileURL(resolve(REPO, 'zenit-week.html')).href;
 const ASSETS = resolve(REPO, 'assets');
-const SOURCE_JSON = resolve(REPO, 'assets', 'zenit-week-2026-05-12.json');
-// Branch palette source of truth — the onboarding playground. The export
-// predates the Growth branch and carries no colour for it, which left it grey.
-const PALETTE_JSON = resolve(REPO, 'assets', 'playground-seed.json');
-
-// The canonical seed week — must match what `todayWeekKey()` resolves to so
-// the app loads it on boot. Week 20 of 2026.
-const SEED_WEEK_KEY = '2026-20';
+// The onboarding playground: the sample week a new user sees on first run.
+// The marketing shots show the same week, so tuning it updates both.
+const SEED_JSON = resolve(REPO, 'assets', 'playground-seed.json');
 
 // ─── Seed data load ──────────────────────────────────────────────────────────
-// Polish: correct obvious typos in user-authored labels so the marketing
-// shots don't immortalise them. Keep the rest of the export untouched.
-const LABEL_FIXES = {
-  'Park walkt together': 'Park walk together',
-  'Dropp of donations':  'Drop off donations',
-  'Codereview':          'Code review',
-};
-
+// Builds the week the way maybeSeedPlayground() in the app does, in English:
+// the Czech `labelCs` / `commentsCs` are dropped. Unlike the app it leaves out
+// `_demo`, which would bring up the "clear the example week" nudge.
 function loadSeed() {
-  const raw = JSON.parse(readFileSync(SOURCE_JSON, 'utf8'));
-  // Each value under .data is a stringified payload. Pick the seed week.
-  const weekRaw = raw.data?.[`zenit-week-${SEED_WEEK_KEY}`];
-  if (!weekRaw) throw new Error(`Seed week ${SEED_WEEK_KEY} missing from ${SOURCE_JSON}`);
-  const week = JSON.parse(weekRaw);
-
-  for (const n of week.nodes) {
-    if (n.label && LABEL_FIXES[n.label]) n.label = LABEL_FIXES[n.label];
-  }
-
-  const colorsRaw = raw.data?.['zenit-week-colors'];
-  const colors = colorsRaw ? JSON.parse(colorsRaw) : {};
+  const seed = JSON.parse(readFileSync(SEED_JSON, 'utf8'));
+  const nodes = (seed.week?.nodes || []).map(({ labelCs, commentsCs, ...rest }) => ({ ...rest, _ts: 0 }));
+  const week = { nodes, tombstones: [], crdtVersion: 0 };
 
   // Every branch renders in its playground colour, so the shots, the OG images
-  // and a freshly seeded app all show the same palette. The export keys colours
-  // by branch id, and a branch added by hand carries a generated id (Growth is
-  // nc6405d8db686 here, not `growth`) — so fall back to matching on the label.
-  const seed = JSON.parse(readFileSync(PALETTE_JSON, 'utf8'));
-  const palette = seed.colors || {};
-  const mainByLabel = {};
-  for (const n of seed.week.nodes) {
-    if (n.type === 'branch' && palette[n.branch]) mainByLabel[n.label] = palette[n.branch].main;
-  }
-  for (const n of week.nodes) {
-    if (n.type !== 'branch') continue;
-    const main = palette[n.branch]?.main ?? mainByLabel[n.label];
-    if (main) colors[n.branch] = { main };
+  // and a freshly seeded app all show the same palette.
+  const colors = {};
+  for (const [branch, c] of Object.entries(seed.colors || {})) {
+    if (c?.main) colors[branch] = { main: c.main };
   }
 
   return { week, colors };
