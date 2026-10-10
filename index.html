@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="A visual mind-map planner for your week. Focus on what matters most, not just what's urgent. No signup. Free.">
+  <meta name="description" content="A free online weekly planner app, laid out as a mind map. Plan meaningful work, family and hobbies first, and fit the rest around them. No signup.">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1a2e'/%3E%3Cpath d='M18,32 C32,32 32,14 42,14' fill='none' stroke='%23A259FF' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M18,32 C32,32 32,50 42,50' fill='none' stroke='%231ABCFE' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='32' r='7' fill='%23f0f0f0'/%3E%3Ccircle cx='48' cy='14' r='5' fill='%23A259FF'/%3E%3Ccircle cx='48' cy='50' r='5' fill='%231ABCFE'/%3E%3C/svg%3E">
-  <title>Zenit Week - Visual weekly planner as a mind map</title>
+  <title>Zenit Week - Free visual weekly planner app</title>
 
   <!-- SEO -->
   <link rel="canonical" href="https://zenitweek.com/">
@@ -20,22 +20,23 @@
 
   <!-- Open Graph -->
   <meta property="og:site_name" content="Zenit Week">
-  <meta property="og:title" content="Zenit Week - Visual weekly planner as a mind map">
-  <meta property="og:description" content="Stop filling your week with sand. Put the big rocks in first.">
+  <meta property="og:title" content="Zenit Week - Free visual weekly planner app">
+  <meta property="og:description" content="Email and meetings eating your week? Plan what matters first.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://zenitweek.com/">
   <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="cs_CZ">
   <meta property="og:image" content="https://zenitweek.com/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Zenit Week — a visual mind-map week planner. Plan what matters.">
+  <meta property="og:image:alt" content="Zenit Week, a visual weekly planner as a mind map. Plan what matters.">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Zenit Week - Visual weekly planner as a mind map">
-  <meta name="twitter:description" content="Stop filling your week with sand. Put the big rocks in first.">
+  <meta name="twitter:title" content="Zenit Week - Free visual weekly planner app">
+  <meta name="twitter:description" content="Email and meetings eating your week? Plan what matters first.">
   <meta name="twitter:image" content="https://zenitweek.com/og-image.png">
-  <meta name="twitter:image:alt" content="Zenit Week — a visual mind-map week planner. Plan what matters.">
+  <meta name="twitter:image:alt" content="Zenit Week, a visual weekly planner as a mind map. Plan what matters.">
 
   <!-- Structured data (schema.org SoftwareApplication) -->
   <script type="application/ld+json">
@@ -43,8 +44,9 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Zenit Week",
-    "description": "A visually rich, single-file mind-map week planner. Privacy-first, your plans never reach our servers, free.",
+    "description": "A visual weekly planner as a mind map. Your plans never reach our servers. Free, no signup.",
     "url": "https://zenitweek.com/",
+    "inLanguage": "en",
     "applicationCategory": "ProductivityApplication",
     "operatingSystem": "Web",
     "browserRequirements": "Requires a modern browser with ES6+ support",
@@ -55,7 +57,8 @@
     },
     "author": {
       "@type": "Person",
-      "name": "Petr Burian"
+      "name": "Petr Burian",
+      "url": "https://www.petrburian.com/"
     },
     "license": "https://opensource.org/licenses/MIT"
   }
@@ -76,6 +79,7 @@
       --work-lt:   #FFF0ED;
       --family-lt: #F3EBFF;
       --me-lt:     #E8F8FF;
+      --me-text:   #0A8CC4; /* darker logo blue for gradient text: 3:1+ on white and grey */
       --radius:    14px;
     }
 
@@ -194,7 +198,7 @@
     .hero {
       max-width: 760px;
       margin: 0 auto;
-      padding: 56px 24px 72px;
+      padding: 64px 24px 48px;
       text-align: center;
     }
 
@@ -228,6 +232,124 @@
       box-shadow: 0 0 0 3px rgba(143,55,255,0.12);
     }
     .hero-badge svg { flex-shrink: 0; }
+
+    .hero-title {
+      font-size: clamp(34px, 6.5vw, 60px);
+      font-weight: 300;
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 20px;
+    }
+
+    .hero-title strong {
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--family), var(--me-text));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-lead {
+      font-size: clamp(20px, 3vw, 26px);
+      font-weight: 300;
+      line-height: 1.35;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+    .hero-lead strong { font-weight: 700; }
+
+    .hero-shot {
+      margin: 48px 0 0;
+    }
+    .mindmap-card.hero-shot { margin-bottom: 0; }
+
+    /* Question mind map: 3D render with the questions laid over its glass pills */
+    .qmap {
+      position: relative;
+      margin: 32px auto 24px;
+      max-width: 680px;
+      container-type: inline-size;
+    }
+    .qmap picture { display: block; }
+    .qmap img { display: block; width: 100%; height: auto; mix-blend-mode: multiply; }
+    .qmap-q {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 26%;
+      text-align: center;
+      font-size: 2.5cqw;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .qmap-you {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      font-size: 2.6cqw;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .qmap-m { display: none; }
+    /* Phones: a portrait render with wide pills, so the questions stay readable inside them */
+    @media (max-width: 540px) {
+      .qmap .qmap-q, .qmap .qmap-you { display: none; }
+      .qmap .qmap-m { display: block; width: 46%; font-size: 4.6cqw; }
+      .qmap .qmap-you.qmap-m { width: auto; font-size: 5.2cqw; }
+    }
+
+    /* Questions moved from the hero into the Problem section: beat `.why p` */
+    .why .why-inner p.hero-hook {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 300;
+      line-height: 1.18;
+      color: var(--ink);
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .why .why-inner p.hero-hook strong {
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--family), var(--me-text));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    /* Short punch line between paragraphs ("Pravděpodobně ne.", "Nevejdou se.") */
+    .why .why-inner p.punch {
+      font-size: clamp(20px, 2.6vw, 24px);
+      font-weight: 700;
+      color: var(--ink);
+      text-align: center;
+      margin: 8px 0 12px;
+    }
+    /* Section heading in the light style of the problem question, key word in the logo gradient */
+    .why h2.h2-light,
+    .preview h2.h2-light,
+    .features h2.h2-light {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 300;
+      line-height: 1.18;
+      letter-spacing: -0.01em;
+    }
+    .why h2.h2-light strong,
+    .preview h2.h2-light strong,
+    .features h2.h2-light strong {
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--family), var(--me-text));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .why .why-inner p.hero-answer {
+      font-size: clamp(26px, 4vw, 36px);
+      font-weight: 700;
+      color: var(--ink);
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .why .why-inner p.hero-sub {
+      text-align: center;
+      margin-bottom: 56px;
+    }
 
     .hero-hook {
       font-size: clamp(32px, 6vw, 56px);
@@ -339,12 +461,19 @@
     }
 
     /* ── Divider ──────────────────────────────────────────────────── */
-    .section-divider {
-      width: 48px;
-      height: 3px;
+    /* The logo gradient now sits under each section heading instead */
+    .section-divider { display: none; }
+
+    .why h2::after,
+    .preview h2::after,
+    .features h2::after {
+      content: "";
+      display: block;
+      width: 96px;
+      height: 5px;
+      margin: 18px auto 0;
+      border-radius: 3px;
       background: linear-gradient(90deg, var(--family), var(--me));
-      border-radius: 2px;
-      margin: 0 auto 24px;
     }
 
     /* ── Why section ──────────────────────────────────────────────── */
@@ -352,7 +481,7 @@
       background: var(--surface);
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
-      padding: 80px 24px;
+      padding: 56px 24px;
       text-align: center;
     }
 
@@ -388,13 +517,122 @@
 
     /* Jar SVG */
     .jar-wrap {
-      margin: 44px auto 0;
-      max-width: 440px;
+      margin: 8px auto 40px;
+      max-width: 640px;
+    }
+    .jar-wrap img { display: block; width: 100%; height: auto; mix-blend-mode: multiply; }
+    .jar-captions { position: relative; height: 48px; margin-top: -60px; }
+    .why .why-inner p.jar-caption {
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+      margin: 0;
+      white-space: nowrap;
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+    .jar-caption strong { display: block; font-size: 15px; color: var(--ink); }
+    /* Phones: captions too wide to sit under each jar, so put them in two columns */
+    @media (max-width: 540px) {
+      .jar-captions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        height: auto;
+        margin-top: -16px;
+      }
+      .why .why-inner p.jar-caption {
+        position: static;
+        transform: none;
+        white-space: normal;
+      }
+      .github-btn { padding: 12px 16px; font-size: 14px; white-space: nowrap; }
+    }
+    .hero-title, h2.h2-light { text-wrap: balance; }
+
+    /* ── Author ───────────────────────────────────────────────────── */
+    .author-photo {
+      display: block;
+      width: 128px;
+      height: 128px;
+      border-radius: 50%;
+      margin: 0 auto 24px;
+      object-fit: cover;
+    }
+    /* Photo beside a left-aligned text column; stacked on phones */
+    .author-grid {
+      display: flex;
+      gap: 32px;
+      align-items: flex-start;
+      max-width: 620px;
+      margin: 8px auto 24px;
+      text-align: left;
+    }
+    .author-grid .author-photo { margin: 4px 0 0; flex-shrink: 0; }
+    .why .author-text p { text-align: left; margin-bottom: 14px; }
+    .author-text a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: var(--family);
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 3px;
+    }
+    .author-text a:hover { text-decoration-color: var(--me); }
+    .why p:not(.jar-caption) strong, .why .author-text strong { color: var(--ink); font-weight: 600; }
+    @media (max-width: 540px) {
+      .author-grid { flex-direction: column; align-items: center; gap: 20px; }
+    }
+    .social-links {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 8px;
+    }
+    .social-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .social-btn:hover { opacity: 0.85; transform: translateY(-2px); }
+    .author-links {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      margin-top: 8px;
+    }
+    .github-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+    .github-btn:hover { opacity: 0.82; }
+    .github-btn svg { flex-shrink: 0; }
+    .author-link {
+      display: inline-block;
+      margin-top: 8px;
+      font-weight: 600;
+      color: var(--ink);
     }
 
     /* ── App preview ──────────────────────────────────────────────── */
     .preview {
-      padding: 80px 24px;
+      padding: 56px 24px;
       text-align: center;
     }
 
@@ -447,13 +685,12 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      color: var(--ico, currentColor);
-      filter: drop-shadow(0 0 6px var(--ico, currentColor));
+      filter: drop-shadow(0 0 6px rgba(162, 89, 255, 0.35));
     }
     .benefit-icon svg {
       width: 28px;
       height: 28px;
-      stroke: currentColor;
+      stroke: url(#logo-gradient);
       fill: none;
       stroke-width: 1.8;
       stroke-linecap: round;
@@ -475,11 +712,10 @@
     }
 
     /* ── Features section ─────────────────────────────────────────── */
+    /* Sections alternate white and light grey; the author section is white, so this one is grey */
     .features {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 80px 24px;
+      background: var(--cloud);
+      padding: 56px 24px;
       text-align: center;
     }
 
@@ -504,7 +740,7 @@
     .ritual {
       background: var(--ink);
       color: #fff;
-      padding: 88px 24px;
+      padding: 62px 24px;
       text-align: center;
     }
 
@@ -520,7 +756,14 @@
       margin-bottom: 20px;
     }
 
-    .ritual h2 strong { font-weight: 700; display: block; margin-bottom: 20px; }
+    .ritual h2 { text-wrap: balance; }
+    .ritual h2 strong {
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--family), var(--me));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
 
     .ritual p:not(.ritual-note) {
       font-size: 17px;
@@ -545,10 +788,24 @@
     }
     .cta-btn-light:hover { transform: translateY(-2px); opacity: 0.92; }
 
+    .skip-link {
+      position: absolute;
+      left: 16px;
+      top: -48px;
+      z-index: 1000;
+      background: var(--ink);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 16px; }
+
     .ritual-note {
       margin-top: 16px;
       font-size: 13px;
-      color: rgba(255,255,255,0.4);
+      color: rgba(255,255,255,0.6);
     }
 
     /* ── Footer ───────────────────────────────────────────────────── */
@@ -576,8 +833,8 @@
 
     /* ── Responsive ───────────────────────────────────────────────── */
     @media (max-width: 540px) {
-      .hero { padding: 28px 20px 56px; }
-      .why, .preview, .features, .ritual { padding: 60px 20px; }
+      .hero { padding: 28px 20px 36px; }
+      .why, .preview, .features, .ritual { padding: 42px 20px; }
       .mindmap-card { padding: 24px 12px; }
       .hero-questions { max-width: 100%; gap: 8px; }
       .hero-questions li {
@@ -594,6 +851,16 @@
   </style>
 </head>
 <body>
+<a class="skip-link" href="#content">Skip to content</a>
+<!-- Logo gradient (violet to blue), shared by the feature icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="logo-gradient" gradientUnits="userSpaceOnUse" x1="2" y1="2" x2="22" y2="22">
+      <stop offset="0" stop-color="#A259FF"/>
+      <stop offset="1" stop-color="#1ABCFE"/>
+    </linearGradient>
+  </defs>
+</svg>
 
 <!-- ── Lang suggestion banner ─────────────────────────────────────── -->
 <aside id="lang-banner" class="lang-banner" hidden aria-label="Language suggestion">
@@ -604,7 +871,7 @@
 
 <!-- ── Nav ──────────────────────────────────────────────────────────── -->
 <nav>
-  <a href="/" class="nav-logo" aria-label="Zenit Week home">
+  <a href="/" class="nav-logo" aria-label="Zenit Week, home">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 3 216 46" width="156" height="34" aria-hidden="true">
       <text x="2" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="#1a1a2e">Zen</text>
       <path d="M 61.5,26 C 70,26 70,16 73.5,16" fill="none" stroke="#A259FF" stroke-width="1.8" stroke-linecap="round"/>
@@ -626,80 +893,24 @@
   </div>
 </nav>
 
+<main id="content">
+
 <!-- ── Hero ─────────────────────────────────────────────────────────── -->
 <section class="hero">
-  <a class="hero-badge" href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 012-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="currentColor"/>
-    </svg>
-    ⭐ Open source · Star us on GitHub →
-  </a>
-
-  <h1 class="hero-hook">
-    Do you have enough time<br>for things that <strong>matter</strong>?
-  </h1>
-
-  <ul class="hero-questions">
-    <li>
-      <svg class="branch-svg branch-left" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
-        <defs>
-          <linearGradient id="bl1" x1="70" y1="20" x2="0" y2="20" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#8F37FF" stop-opacity="0.7"/>
-            <stop offset="100%" stop-color="#8F37FF" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <path d="M 70 20 C 48 20 28 14 0 22" fill="none" stroke="url(#bl1)" stroke-width="3" stroke-linecap="round"/>
-      </svg>
-      Learning AI — even just 10 minutes a day?
-    </li>
-    <li>
-      <svg class="branch-svg branch-right" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
-        <defs>
-          <linearGradient id="bl2" x1="0" y1="20" x2="70" y2="20" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#19C82A" stop-opacity="0.7"/>
-            <stop offset="100%" stop-color="#19C82A" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <path d="M 0 20 C 22 20 48 14 70 22" fill="none" stroke="url(#bl2)" stroke-width="3" stroke-linecap="round"/>
-      </svg>
-      Being fully present with your family?
-    </li>
-    <li>
-      <svg class="branch-svg branch-right" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
-        <defs>
-          <linearGradient id="bl3" x1="0" y1="20" x2="70" y2="20" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#1ABCFE" stop-opacity="0.7"/>
-            <stop offset="100%" stop-color="#1ABCFE" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <path d="M 0 20 C 22 20 48 26 70 18" fill="none" stroke="url(#bl3)" stroke-width="3" stroke-linecap="round"/>
-      </svg>
-      Taking care of your mind and body?
-    </li>
-    <li>
-      <svg class="branch-svg branch-left" width="70" height="40" viewBox="0 0 70 40" aria-hidden="true">
-        <defs>
-          <linearGradient id="bl4" x1="70" y1="20" x2="0" y2="20" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#F83800" stop-opacity="0.7"/>
-            <stop offset="100%" stop-color="#F83800" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <path d="M 70 20 C 48 20 28 26 0 18" fill="none" stroke="url(#bl4)" stroke-width="3" stroke-linecap="round"/>
-      </svg>
-      Building something that moves you forward?
-    </li>
-  </ul>
-
-  <p class="hero-answer">Probably not.</p>
-  <p class="hero-sub">Not because you're lazy or don't want to.<br>Because your week fills up before you decide what goes in.</p>
+  <h1 class="hero-title"><strong>Visual</strong> weekly planner</h1>
+  <p class="hero-lead">Email and meetings eat your week.<br><strong>No time left for what matters.</strong></p>
+  <p class="hero-sub">Big rocks first. Plan meaningful work, family and hobbies in a mind map.<br>Everything else fits around them.</p>
 
   <a href="/app" class="cta-btn">
     <span style="display:flex;flex-direction:column;align-items:center;gap:1px;">
-      <span style="font-size:17px;font-weight:700;line-height:1.2;">Try Zenit Week</span>
-      <span style="font-size:13px;font-weight:400;opacity:0.75;line-height:1.2;">Your visual planner</span>
+      <span style="font-size:17px;font-weight:700;line-height:1.2;">Try the sample week</span>
     </span>
   </a>
-  <p class="cta-note">No credit card. No download.<br>Runs in your browser. Your data stays with you.</p>
+  <p class="cta-note">No signup. No download. Your data stays with you.</p>
+
+  <div class="mindmap-card hero-shot">
+    <img src="assets/hero.webp" width="1600" height="1285" alt="Zenit Week visual weekly planner app: mind map on a laptop, agenda on a phone" fetchpriority="high" style="display:block; width:100%; height:auto;">
+  </div>
 </section>
 
 <!-- ── Why ──────────────────────────────────────────────────────────── -->
@@ -707,118 +918,51 @@
   <div class="why-inner">
     <p class="section-label">The problem</p>
     <div class="section-divider"></div>
-    <h2>You're putting sand in first</h2>
+    <p class="hero-hook">
+      Do you have enough time<br>for what really <strong>matters</strong>?
+    </p>
+
+    <figure class="qmap">
+      <picture>
+        <source media="(max-width: 540px)" srcset="assets/mindmap-questions-mobile.webp" width="800" height="953">
+        <img src="assets/mindmap-questions.webp" width="1200" height="800" loading="lazy" alt="Mind map with four branches: learning AI, family, mind and body, strategy">
+      </picture>
+      <span class="qmap-q" style="left:21.5%;top:21.9%;color:#6010c8">Learning AI<br>a few minutes a day?</span>
+      <span class="qmap-q" style="left:78.5%;top:21.9%;color:#0a7a14">Being fully present<br>with your family?</span>
+      <span class="qmap-q" style="left:21.5%;top:69.9%;color:#b82000">Thinking about<br>strategy in peace?</span>
+      <span class="qmap-q" style="left:78.5%;top:69.9%;color:#0070a0">Taking care of<br>your mind and body?</span>
+      <span class="qmap-you" style="left:49.9%;top:46.9%">You</span>
+      <span class="qmap-you qmap-m" style="left:14.4%;top:45.5%">You</span>
+      <span class="qmap-q qmap-m" style="left:65.9%;top:12.4%;color:#6010c8">Learning AI<br>a few minutes a day?</span>
+      <span class="qmap-q qmap-m" style="left:65.9%;top:34%;color:#0a7a14">Being fully present<br>with your family?</span>
+      <span class="qmap-q qmap-m" style="left:65.9%;top:56.5%;color:#0070a0">Taking care of<br>your mind and body?</span>
+      <span class="qmap-q qmap-m" style="left:65.9%;top:78.1%;color:#b82000">Thinking about<br>strategy in peace?</span>
+    </figure>
+
+    <p class="punch">Probably not.</p>
+    <p class="hero-sub">Not because you're lazy or don't want to.<br>Because your calendar fills up before you decide what matters most.</p>
+
+
+    <h2 class="h2-light">You're putting <strong>sand</strong> in first</h2>
+    <div class="jar-wrap">
+      <img src="assets/jars.webp" width="1200" height="800" loading="lazy" alt="Two identical glass jars. The left one has sand first, so the big rocks don't fit and one has fallen out. The right one has the rocks first and the sand has filled the gaps around them.">
+      <div class="jar-captions">
+        <p class="jar-caption" style="left:33%"><strong>Email first</strong>No room left for what matters</p>
+        <p class="jar-caption" style="left:71%"><strong>What matters first</strong>Email and meetings fit around it</p>
+      </div>
+    </div>
     <p>
-      There's a classic demonstration: fill a jar with sand first, then try to fit in the big rocks — family, health, growth, meaningful work.
+      <strong>There's a classic demonstration:</strong> fill a jar with sand first, then try to fit in the big rocks: family, health, growth, meaningful work.
+    </p>
+    <p class="punch">They don't fit.</p>
+    <p>
+      Reverse it and put the rocks in first, and the sand settles around them naturally.
     </p>
     <p>
-      <strong>They don't fit.</strong>
-    </p>
-    <p>
-      But reverse it — rocks first — and the sand settles around them naturally.
-    </p>
-    <p>
-      Most of us plan our weeks like the first jar. Emails, meetings, and small tasks flood in. By Thursday, there's no room left for what we actually care about.
+      Most of us plan the week like the first jar. Email, meetings and small tasks fill it up. By&nbsp;Thursday, there's no room left for what really matters.
     </p>
 
     <!-- Jar illustration -->
-    <div class="jar-wrap">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 340" width="100%" role="img" aria-label="Two glass jars — one filled with sand first leaves no room for the big rocks; the other has big rocks placed first and sand filling the gaps around them">
-        <defs>
-          <linearGradient id="glass-body" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="#fafbfc" stop-opacity="0.92"/>
-            <stop offset="55%"  stop-color="#eaecef" stop-opacity="0.78"/>
-            <stop offset="100%" stop-color="#d7dadf" stop-opacity="0.85"/>
-          </linearGradient>
-          <linearGradient id="sand-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="#f4dfa6"/>
-            <stop offset="100%" stop-color="#d6ad62"/>
-          </linearGradient>
-          <linearGradient id="sand-top" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="#fff3d0"/>
-            <stop offset="100%" stop-color="#f4dfa6"/>
-          </linearGradient>
-          <radialGradient id="rock-work" cx="32%" cy="28%" r="80%">
-            <stop offset="0%" stop-color="#ff7a52"/><stop offset="60%" stop-color="#ee4f20"/><stop offset="100%" stop-color="#b03000"/>
-          </radialGradient>
-          <radialGradient id="rock-family" cx="32%" cy="28%" r="80%">
-            <stop offset="0%" stop-color="#c389ff"/><stop offset="60%" stop-color="#9d4cff"/><stop offset="100%" stop-color="#6f1ed9"/>
-          </radialGradient>
-          <radialGradient id="rock-me" cx="32%" cy="28%" r="80%">
-            <stop offset="0%" stop-color="#65d4ff"/><stop offset="60%" stop-color="#23b8f7"/><stop offset="100%" stop-color="#0285b8"/>
-          </radialGradient>
-          <filter id="rock-shadow" x="-30%" y="-30%" width="160%" height="180%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0a0a14" flood-opacity="0.32"/>
-          </filter>
-          <filter id="jar-shadow" x="-15%" y="-10%" width="130%" height="125%">
-            <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#1a1a2e" flood-opacity="0.15"/>
-          </filter>
-          <filter id="ground-shadow" x="-20%" y="-50%" width="140%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
-          </filter>
-          <clipPath id="clip-left"> <path d="M 60 90 C 60 82 66 78 82 78 L 158 78 C 174 78 180 82 180 90 L 180 246 Q 180 260 166 260 L 74 260 Q 60 260 60 246 Z"/></clipPath>
-          <clipPath id="clip-right"><path d="M 270 90 C 270 82 276 78 292 78 L 368 78 C 384 78 390 82 390 90 L 390 246 Q 390 260 376 260 L 284 260 Q 270 260 270 246 Z"/></clipPath>
-        </defs>
-
-        <!-- ══ LEFT JAR — sand first (bad) ══ -->
-        <ellipse cx="120" cy="272" rx="58" ry="6" fill="#000" opacity="0.32" filter="url(#ground-shadow)"/>
-        <g filter="url(#jar-shadow)">
-          <path d="M 60 246 Q 60 260 74 260 L 166 260 Q 180 260 180 246 L 180 90 C 180 82 174 78 158 78 L 158 64 L 168 64 Q 172 64 172 60 L 172 46 Q 172 40 166 40 L 74 40 Q 68 40 68 46 L 68 60 Q 68 64 72 64 L 82 64 L 82 78 C 66 78 60 82 60 90 Z"
-                fill="url(#glass-body)" stroke="#c8ccd2" stroke-width="1"/>
-        </g>
-        <line x1="72" y1="50" x2="168" y2="50" stroke="#c8ccd2" stroke-width="0.8" opacity="0.55"/>
-        <g clip-path="url(#clip-left)">
-          <rect x="60" y="105" width="120" height="155" fill="url(#sand-grad)"/>
-          <rect x="60" y="103" width="120" height="6" fill="url(#sand-top)"/>
-          <circle cx="80"  cy="140" r="1.4" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="105" cy="125" r="1"   fill="#a87f3a" opacity="0.4"/>
-          <circle cx="130" cy="138" r="1.6" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="92"  cy="160" r="1.2" fill="#a87f3a" opacity="0.4"/>
-          <circle cx="148" cy="155" r="1"   fill="#a87f3a" opacity="0.4"/>
-          <circle cx="73"  cy="180" r="1.4" fill="#a87f3a" opacity="0.4"/>
-          <circle cx="120" cy="185" r="1.2" fill="#a87f3a" opacity="0.4"/>
-          <circle cx="155" cy="195" r="1"   fill="#a87f3a" opacity="0.35"/>
-          <circle cx="98"  cy="210" r="1.5" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="140" cy="225" r="1.2" fill="#a87f3a" opacity="0.4"/>
-          <g filter="url(#rock-shadow)"><ellipse cx="86"  cy="95" rx="13" ry="7.5" fill="url(#rock-work)"/></g>
-          <g filter="url(#rock-shadow)"><ellipse cx="120" cy="87" rx="14" ry="8"   fill="url(#rock-me)"/></g>
-          <g filter="url(#rock-shadow)"><ellipse cx="153" cy="96" rx="13" ry="7.5" fill="url(#rock-family)"/></g>
-        </g>
-        <text x="120" y="308" text-anchor="middle" font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" fill="#1a1a2e">Sand first</text>
-        <text x="120" y="326" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif"                                                font-size="11" font-weight="400" fill="#888">Big rocks don't fit</text>
-
-        <!-- ══ ARROW ══ -->
-        <text x="225" y="102" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="500" fill="#888">Reverse it</text>
-        <path d="M 187 145 C 200 110, 250 110, 263 145" fill="none" stroke="#b8bcc4" stroke-width="2" stroke-linecap="round"/>
-        <path d="M 264 136 L 263 145 L 256 138"          fill="none" stroke="#b8bcc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-
-        <!-- ══ RIGHT JAR — rocks first (good) ══ -->
-        <ellipse cx="330" cy="272" rx="58" ry="6" fill="#000" opacity="0.32" filter="url(#ground-shadow)"/>
-        <g filter="url(#jar-shadow)">
-          <path d="M 270 246 Q 270 260 284 260 L 376 260 Q 390 260 390 246 L 390 90 C 390 82 384 78 368 78 L 368 64 L 378 64 Q 382 64 382 60 L 382 46 Q 382 40 376 40 L 284 40 Q 278 40 278 46 L 278 60 Q 278 64 282 64 L 292 64 L 292 78 C 276 78 270 82 270 90 Z"
-                fill="url(#glass-body)" stroke="#c8ccd2" stroke-width="1"/>
-        </g>
-        <line x1="282" y1="50" x2="378" y2="50" stroke="#c8ccd2" stroke-width="0.8" opacity="0.55"/>
-        <g clip-path="url(#clip-right)">
-          <g filter="url(#rock-shadow)"><ellipse cx="300" cy="200" rx="30" ry="20" fill="url(#rock-work)"/></g>
-          <g filter="url(#rock-shadow)"><ellipse cx="357" cy="195" rx="28" ry="22" fill="url(#rock-family)"/></g>
-          <g filter="url(#rock-shadow)"><ellipse cx="325" cy="160" rx="30" ry="20" fill="url(#rock-me)"/></g>
-          <rect x="270" y="217" width="120" height="43" fill="url(#sand-grad)"/>
-          <rect x="270" y="215" width="120" height="5"  fill="url(#sand-top)"/>
-          <circle cx="288" cy="232" r="1.3" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="310" cy="240" r="1"   fill="#a87f3a" opacity="0.4"/>
-          <circle cx="335" cy="235" r="1.5" fill="#a87f3a" opacity="0.45"/>
-          <circle cx="358" cy="246" r="1.2" fill="#a87f3a" opacity="0.4"/>
-          <circle cx="378" cy="232" r="1"   fill="#a87f3a" opacity="0.35"/>
-        </g>
-        <g transform="translate(400, 60)">
-          <circle r="13" fill="#e8f8e8" stroke="#2d9e4f" stroke-width="0.8"/>
-          <path d="M -5.5 0 L -1 4 L 6 -4" stroke="#2d9e4f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        </g>
-        <text x="330" y="308" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#1a1a2e">Rocks first</text>
-        <text x="330" y="326" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="400" fill="#888">Everything important fits</text>
-      </svg>
-    </div>
   </div>
 </section>
 
@@ -827,37 +971,62 @@
   <div class="preview-inner">
     <p class="section-label">The solution</p>
     <div class="section-divider"></div>
-    <h2>Your week, as a mind map</h2>
-    <p>Plan visually. Start with your biggest rocks. See balance — or imbalance — at a glance.</p>
+    <h2 class="h2-light">Your week as a <strong>mind map</strong></h2>
+    <p>Zenit&nbsp;Week is an online weekly planner app. Start with your biggest rocks.<br>See your balance, or the lack of it, at a glance.</p>
 
-    <!-- Hero illustration: real app on laptop + phone -->
-    <div class="mindmap-card">
-      <img src="assets/hero.svg" alt="Zenit Week running on a laptop (mind map) and a phone (agenda)" loading="lazy" style="display:block; width:100%; height:auto;">
-    </div>
 
     <!-- Benefits -->
     <div class="benefits">
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#1a1a2e;"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="18" rx="7.5" ry="2.5"/><ellipse cx="12" cy="12" rx="5.5" ry="2.5"/><ellipse cx="12" cy="6" rx="3.5" ry="2.5"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="18" rx="7.5" ry="2.5"/><ellipse cx="12" cy="12" rx="5.5" ry="2.5"/><ellipse cx="12" cy="6" rx="3.5" ry="2.5"/></svg></div>
         <div class="benefit-body">
-          <h3>Rocks first, always</h3>
-          <p>Plan from the most important things down. See every branch of your life in one view.</p>
+          <h3>Rocks first</h3>
+          <p>What matters first, then everything&nbsp;else.</p>
         </div>
       </div>
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#A259FF;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20l10 0"/><path d="M6 6l6 -1l6 1"/><path d="M12 3l0 17"/><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0"/><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20l10 0"/><path d="M6 6l6 -1l6 1"/><path d="M12 3l0 17"/><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0"/><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0"/></svg></div>
         <div class="benefit-body">
           <h3>See your balance</h3>
-          <p>Are you all work and no self? The visual map makes imbalance impossible to ignore.</p>
+          <p>All work and nothing for you? The map shows it.</p>
         </div>
       </div>
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#1ABCFE;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></div>
         <div class="benefit-body">
-          <h3>Fully private</h3>
-          <p>Your data lives in your browser or your own Google Drive. It never reaches our servers. We only count anonymous visits, no cookies.</p>
+          <h3>Your data is yours</h3>
+          <p>In your browser or on Drive. No&nbsp;cookies.</p>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Author ────────────────────────────────────────────────────────── -->
+<section class="why author">
+  <div class="why-inner">
+    <p class="section-label">Who's behind it</p>
+    <div class="section-divider"></div>
+    <h2 class="h2-light">Why I built <strong>Zenit&nbsp;Week</strong></h2>
+    <div class="author-grid">
+      <img class="author-photo" src="assets/petr-burian.webp" alt="Petr Burian" width="128" height="128" loading="lazy">
+      <div class="author-text">
+        <p>I'm <strong><a href="https://www.petrburian.com/" target="_blank" rel="noopener">Petr Burian</a></strong>. For 16 years I was the <strong>CTO</strong> behind <strong><a href="https://www.flashscore.com/" target="_blank" rel="noopener">Flashscore</a></strong>, which our teams built for 130 million sports fans. I went through burnout.</p>
+        <p>Today I <strong>mentor founders, CEOs</strong> and <strong>CTOs</strong>. I help them lead with metrics and get real value out of AI.</p>
+        <p>Near the end of my sabbatical, I worried I wasn't working enough. Then I drew my week as a mind map and it floored me: <strong>the Work branch was 10x bigger</strong> than anything else. Since then, I plan my week around what matters to me.</p>
+        <p>Zenit&nbsp;Week is <strong>free and open source</strong>, so anyone can check that your data stays with you.</p>
+      </div>
+    </div>
+    <div class="social-links">
+      <a class="social-btn" href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener" aria-label="Zenit Week on GitHub" title="GitHub">
+        <svg width="22" height="22" viewBox="0 0 16 16" fill="none" aria-hidden="true"> <path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 012-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="currentColor"/> </svg>
+      </a>
+      <a class="social-btn" href="https://www.linkedin.com/in/burian-petr/" target="_blank" rel="noopener" aria-label="Petr Burian on LinkedIn" title="LinkedIn">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
+      </a>
+      <a class="social-btn" href="https://www.petrburian.com/" target="_blank" rel="noopener" aria-label="Petr Burian's website" title="petrburian.com">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M11.5 3a17 17 0 0 0 0 18"/><path d="M12.5 3a17 17 0 0 1 0 18"/></svg>
+      </a>
     </div>
   </div>
 </section>
@@ -865,88 +1034,56 @@
 <!-- ── Features ──────────────────────────────────────────────────────── -->
 <section class="features">
   <div class="features-inner">
-    <p class="section-label">Key features</p>
+    <p class="section-label">In practice</p>
     <div class="section-divider"></div>
-    <h2>Own your week</h2>
+    <h2 class="h2-light">Sound <strong>familiar</strong>?</h2>
     <div class="features-grid">
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#3B82F6;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1"/><path d="M12 9l0 3"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1"/><path d="M12 9l0 3"/></svg></div>
         <div class="benefit-body">
-          <h3>Visual map</h3>
-          <p>Your week as a branching tree. Workload and balance readable at a glance.</p>
+          <h3>Work eats everything</h3>
+          <p>The map shows at a glance which branch is overloaded and which is empty.</p>
         </div>
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#F59E0B;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 5h8"/><path d="M13 9h5"/><path d="M13 15h8"/><path d="M13 19h5"/><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></svg></div>
         <div class="benefit-body">
-          <h3>Agenda</h3>
-          <p>Per-day list view — see overdue, scheduled and done at a glance. A second take on your week.</p>
+          <h3>I don't know where my time goes</h3>
+          <p>Stats show how much of your plan got done and what gets most of your time.</p>
         </div>
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#10B981;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21l15 -15l-3 -3l-15 15l3 3"/><path d="M15 6l3 3"/><path d="M9 3a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/><path d="M19 13a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 5h8"/><path d="M13 9h5"/><path d="M13 15h8"/><path d="M13 19h5"/><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/></svg></div>
         <div class="benefit-body">
-          <h3>Magic selectors</h3>
-          <p>Type <strong>10x</strong> for a counter, <strong>(mo, we, fr)</strong> to pick days, or <strong>daily</strong> to cover the whole week.</p>
+          <h3>I don't know where to start</h3>
+          <p>Agenda lays out tasks by day. Priorities show what can't wait.</p>
         </div>
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#EF4444;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.294 -2.333 5.588c0 3.704 3.134 6.706 7 6.706c3.866 0 7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10h-16l5.5 -6"/><path d="M4 14h16l-5.5 6"/></svg></div>
         <div class="benefit-body">
-          <h3>Priorities</h3>
-          <p>Normal, High, Critical — set and see what really matters the most.</p>
+          <h3>Every Monday I start from scratch</h3>
+          <p>Carry unfinished tasks into next week in one click.</p>
         </div>
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#A259FF;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10h-16l5.5 -6"/><path d="M4 14h16l-5.5 6"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></div>
         <div class="benefit-body">
-          <h3>Unfinished → next week</h3>
-          <p>Carry every incomplete task forward in one click — nothing slips between weeks.</p>
+          <h3>I write the same tasks every week</h3>
+          <p>Mark recurring tasks once. Type <strong>10x</strong> and you get a counter.</p>
         </div>
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#14B8A6;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M11 4h2"/><path d="M12 17v.01"/></svg></div>
         <div class="benefit-body">
-          <h3>Reusable templates</h3>
-          <p>Mark recurring tasks once. Every new week starts with them ready, counters reset.</p>
-        </div>
-      </div>
-
-      <div class="benefit">
-        <div class="benefit-icon" style="--ico:#F97316;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 1 0 -18a9 8 0 0 1 9 8a4.5 4 0 0 1 -4.5 4h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25"/><path d="M8.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M16.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></svg></div>
-        <div class="benefit-body">
-          <h3>Make it yours</h3>
-          <p>Rename, add or remove branches. Pick a color for each — your life, your map.</p>
-        </div>
-      </div>
-
-      <div class="benefit">
-        <div class="benefit-icon" style="--ico:#1ABCFE;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.486 -3.465 3.486h-11.878"/></svg></div>
-        <div class="benefit-body">
-          <h3>Device sync</h3>
-          <p>Optional cross-device sync. Data stays in your own Drive — never ours.</p>
-        </div>
-      </div>
-
-      <div class="benefit">
-        <div class="benefit-icon" style="--ico:#EC4899;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M11 4h2"/><path d="M12 17v.01"/></svg></div>
-        <div class="benefit-body">
-          <h3>Mobile optimised</h3>
-          <p>Fully responsive — plan and review your week from any device.</p>
-        </div>
-      </div>
-
-      <div class="benefit">
-        <div class="benefit-icon" style="--ico:#FACC15;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></svg></div>
-        <div class="benefit-body">
-          <h3>Hotkeys</h3>
-          <p>Optimize your planning on desktop with a handful of hotkeys.</p>
+          <h3>Ideas hit me on the bus</h3>
+          <p>Save them on your phone with quick add. Find them on your computer at home.</p>
         </div>
       </div>
 
@@ -957,14 +1094,16 @@
 <!-- ── Ritual ─────────────────────────────────────────────────────────── -->
 <section class="ritual">
   <div class="ritual-inner">
-    <h2><strong>Plan in 10 minutes.</strong>The rest of the week, you know what matters.</h2>
-    <p>Not another productivity system. Not another app to manage. Just a weekly ritual that puts the big rocks in before the sand has a chance to fill the jar.</p>
+    <h2><strong>10 minutes</strong> to plan.<br>Know what <strong>matters</strong> all&nbsp;week.</h2>
+    <p>A short ritual at the start of the week is all it takes. Big rocks first, the rest fits around them.</p>
     <a href="/app" class="cta-btn-light">
-      Start this week
+      Plan this week
     </a>
-    <p class="ritual-note">No credit card. No download.<br>Runs in your browser. Your data stays with you.</p>
+    <p class="ritual-note">No signup. No download. Your data stays with you.</p>
   </div>
 </section>
+
+</main>
 
 <!-- ── Footer ─────────────────────────────────────────────────────────── -->
 <footer>
@@ -1053,5 +1192,4 @@
 </script>
 
 </body>
-<!-- bstack-verify: a3f7e1b9c2d40856e7f3a1b9c2d40e56 -->
 </html>
