@@ -106,6 +106,14 @@ Zenit Week runs no servers that hold your data. Your data lives in your browser,
 
 Full details in the [privacy policy](https://zenitweek.com/privacy).
 
+## Who's behind it
+
+I'm [Petr Burian](https://www.petrburian.com/). For 16 years I was the CTO behind Flashscore, which our teams built for 130 million sports fans. Today I mentor founders, CEOs and CTOs.
+
+Near the end of my sabbatical, I worried I wasn't working enough. Then I drew my week as a mind map and it floored me: the Work branch was 10x bigger than anything else. Since then, I plan my week around what matters to me.
+
+[petrburian.com](https://www.petrburian.com/) · [LinkedIn](https://www.linkedin.com/in/burian-petr) · [GitHub](https://github.com/kruxik)
+
 ## Contributing
 
 Architecture, development setup, and guidelines for pull requests are in [CONTRIBUTING.md](CONTRIBUTING.md).
