@@ -268,6 +268,7 @@
       max-width: 680px;
       container-type: inline-size;
     }
+    .qmap picture { display: block; }
     .qmap img { display: block; width: 100%; height: auto; mix-blend-mode: multiply; }
     .qmap-q {
       position: absolute;
@@ -278,20 +279,19 @@
       font-weight: 600;
       line-height: 1.2;
     }
-    .qmap-list { display: none; }
-    /* Phones: the pills get too small to read, so list the questions below the map */
-    @container (max-width: 520px) {
-      .qmap-q { display: none; }
-      .qmap-list {
-        display: grid;
-        gap: 8px;
-        list-style: none;
-        margin: 8px 0 0;
-        padding: 0;
-        font-size: 16px;
-        font-weight: 600;
-        text-align: center;
-      }
+    .qmap-you {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      font-size: 2.6cqw;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .qmap-m { display: none; }
+    /* Phones: a portrait render with wide pills, so the questions stay readable inside them */
+    @media (max-width: 540px) {
+      .qmap .qmap-q, .qmap .qmap-you { display: none; }
+      .qmap .qmap-m { display: block; width: 46%; font-size: 4.6cqw; }
+      .qmap .qmap-you.qmap-m { width: auto; font-size: 5.2cqw; }
     }
 
     /* Questions moved from the hero into the Problem section: beat `.why p` */
@@ -848,17 +848,20 @@
     </p>
 
     <figure class="qmap">
-      <img src="../assets/mindmap-questions.webp" width="1200" height="800" loading="lazy" alt="Myšlenková mapa se čtyřmi větvemi: učení AI, rodina, mysl a tělo, strategie">
+      <picture>
+        <source media="(max-width: 540px)" srcset="../assets/mindmap-questions-mobile.webp" width="800" height="953">
+        <img src="../assets/mindmap-questions.webp" width="1200" height="800" loading="lazy" alt="Myšlenková mapa se čtyřmi větvemi: učení AI, rodina, mysl a tělo, strategie">
+      </picture>
       <span class="qmap-q" style="left:21.5%;top:21.9%;color:#6010c8">Učit se AI<br>pár minut denně?</span>
       <span class="qmap-q" style="left:78.5%;top:21.9%;color:#0a7a14">Být naplno<br>se svou rodinou?</span>
       <span class="qmap-q" style="left:21.5%;top:69.9%;color:#b82000">Promýšlet strategii<br>v klidu?</span>
       <span class="qmap-q" style="left:78.5%;top:69.9%;color:#0070a0">Pečovat o svou<br>mysl i tělo?</span>
-      <ul class="qmap-list">
-        <li style="color:#6010c8">Učit se AI pár minut denně?</li>
-        <li style="color:#0a7a14">Být naplno se svou rodinou?</li>
-        <li style="color:#b82000">Promýšlet strategii v klidu?</li>
-        <li style="color:#0070a0">Pečovat o svou mysl i tělo?</li>
-      </ul>
+      <span class="qmap-you" style="left:49.9%;top:48%">Ty</span>
+      <span class="qmap-you qmap-m" style="left:14.4%;top:45.5%">Ty</span>
+      <span class="qmap-q qmap-m" style="left:65.9%;top:12.4%;color:#6010c8">Učit se AI<br>pár minut denně?</span>
+      <span class="qmap-q qmap-m" style="left:65.9%;top:34%;color:#0a7a14">Být naplno<br>se svou rodinou?</span>
+      <span class="qmap-q qmap-m" style="left:65.9%;top:56.5%;color:#0070a0">Pečovat o svou<br>mysl i tělo?</span>
+      <span class="qmap-q qmap-m" style="left:65.9%;top:78.1%;color:#b82000">Promýšlet strategii<br>v klidu?</span>
     </figure>
 
     <p class="punch">Pravděpodobně ne.</p>
