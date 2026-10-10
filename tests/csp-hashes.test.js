@@ -63,6 +63,18 @@ describe('Landing page CSP headers (vercel.json)', () => {
     }
   });
 
+  it('covers the bare landing URLs, not only their .html names', () => {
+    // The rules once read /:page(...)? and /cs/:page(...)?, which Vercel never
+    // matched for / and /cs/, so the two busiest pages went out without a CSP.
+    // Both sources are plain regular expressions now; read them as such.
+    const strictSources = vercelJson.headers
+      .filter(h => h.headers.some(x => x.key === 'Content-Security-Policy' && x.value.includes('script-src')))
+      .map(h => new RegExp(`^${h.source}$`));
+    for (const path of ['/', '/index.html', '/privacy', '/privacy.html', '/terms', '/terms.html', '/cs', '/cs/', '/cs/index.html']) {
+      expect(strictSources.some(re => re.test(path)), `${path} has no strict CSP`).toBe(true);
+    }
+  });
+
   it('never allows unsafe-inline scripts on landing pages', () => {
     for (const csp of cspHeaders) {
       const scriptSrc = csp.match(/script-src ([^;]*)/)[1];
