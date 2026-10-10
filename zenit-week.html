@@ -960,8 +960,8 @@
   /* ── The fold ───────────────────────────────────────────────────────────── */
   /* Same glass surface as the toolbar's other dropdowns (#sync-dropdown,
      #settings-dropdown) because it drops out of the same bar. Centred on the
-     label; on phones it spans the viewport instead (see the 520px query), which
-     is what keeps a 300px card from hanging off a 360px screen. */
+     label; on phones it is centred on the viewport instead (see the 520px query),
+     which is what keeps it from hanging off a 360px screen. */
   #week-picker-fold {
     position: absolute;
     top: calc(100% + 8px);
@@ -1085,15 +1085,14 @@
       max-width: none;
     }
     #week-picker-range { display: none; }
-    /* Viewport-wide instead of label-wide: a 300px card cannot hang off a
-       360px screen if it is pinned to both gutters. */
+    /* Viewport-centred instead of label-centred, at the same 300px it has in
+       landscape: the label sits off-centre here, so a card centred on it would
+       hang off the screen. Narrower than 316px, it shrinks to the 8px gutters. */
     #week-picker-fold {
       position: fixed;
       top: calc(var(--toolbar-h) + 4px);
-      left: 8px;
-      right: 8px;
-      width: auto;
-      transform: none;
+      left: 50%;
+      width: min(300px, calc(100vw - 16px));
     }
   }
 
