@@ -558,6 +558,21 @@
       margin: 0 auto 24px;
       object-fit: cover;
     }
+    /* Photo beside a left-aligned text column; stacked on phones */
+    .author-grid {
+      display: flex;
+      gap: 32px;
+      align-items: flex-start;
+      max-width: 620px;
+      margin: 8px auto 24px;
+      text-align: left;
+    }
+    .author-grid .author-photo { margin: 4px 0 0; flex-shrink: 0; }
+    .why .author-text p { text-align: left; margin-bottom: 14px; }
+    .why .author-text strong { color: var(--ink); font-weight: 600; }
+    @media (max-width: 540px) {
+      .author-grid { flex-direction: column; align-items: center; gap: 20px; }
+    }
     .author-links {
       display: flex;
       flex-direction: column;
@@ -948,19 +963,15 @@
     <p class="section-label">Kdo za tím stojí</p>
     <div class="section-divider"></div>
     <h2 class="h2-light">Proč jsem <strong>Zenit&nbsp;Week</strong> postavil</h2>
-    <img class="author-photo" src="../assets/petr-burian.webp" alt="Petr Burian" width="128" height="128" loading="lazy">
-    <p>
-      Jsem Petr Burian. 16 let jsem byl CTO Livesportu, kde naše týmy postavily Flashscore pro 130 milionů fanoušků. Prošel jsem si burnoutem.
-    </p>
-    <p>
-      Dnes mentoruji foundery, CEO a CTO. Pomáhám jim vést přes metriky, ne přes kontrolu, a dostat z AI reálný přínos, ne hype.
-    </p>
-    <p>
-      Na konci sabbaticalu jsem se trápil, že moc nepracuju. Rozkreslil jsem si týden do myšlenkové mapy, práci, rodinu i sebe, a sedl si na zadek: větev Práce byla 10x větší než cokoliv jiného. Od té doby si týden plánuju a měřím podle toho, co je pro mě důležité. Jedině tak vidím, jak to skutečně je.
-    </p>
-    <p>
-      Zenit&nbsp;Week je zdarma a jeho kód je otevřený, takže si každý může ověřit, že data opravdu zůstávají u tebe.
-    </p>
+    <div class="author-grid">
+      <img class="author-photo" src="../assets/petr-burian.webp" alt="Petr Burian" width="128" height="128" loading="lazy">
+      <div class="author-text">
+        <p>Jsem <strong>Petr Burian</strong>. 16 let jsem byl <strong>CTO Livesportu</strong>, kde naše týmy postavily Flashscore pro 130 milionů fanoušků. Prošel jsem si burnoutem.</p>
+        <p>Dnes <strong>mentoruji foundery, CEO a CTO</strong>. Pomáhám jim vést přes metriky a dostat z AI reálný přínos.</p>
+        <p>Na konci sabbaticalu jsem se trápil, že moc nepracuju. Rozkreslil jsem si týden do myšlenkové mapy a sedl si na zadek: <strong>větev Práce byla 10x větší</strong> než cokoliv jiného. Od té doby si týden plánuju podle toho, co je pro mě důležité.</p>
+        <p>Zenit&nbsp;Week je <strong>zdarma a open source</strong>, takže si každý může ověřit, že data zůstávají u tebe.</p>
+      </div>
+    </div>
     <div class="author-links">
       <a class="github-btn" href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
