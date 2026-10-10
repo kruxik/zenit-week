@@ -20,12 +20,18 @@ const ASSETS = resolve(REPO, 'assets');
 const SEED_JSON = resolve(REPO, 'assets', 'playground-seed.json');
 
 // ─── Seed data load ──────────────────────────────────────────────────────────
-// Builds the week the way maybeSeedPlayground() in the app does, in English:
-// the Czech `labelCs` / `commentsCs` are dropped. Unlike the app it leaves out
-// `_demo`, which would bring up the "clear the example week" nudge.
-function loadSeed() {
+// Builds the week the way maybeSeedPlayground() in the app does: in Czech
+// `labelCs` / `commentsCs` replace the English text wherever they exist, in
+// English they are dropped. Unlike the app it leaves out `_demo`, which would
+// bring up the "clear the example week" nudge.
+function loadSeed(lang) {
   const seed = JSON.parse(readFileSync(SEED_JSON, 'utf8'));
-  const nodes = (seed.week?.nodes || []).map(({ labelCs, commentsCs, ...rest }) => ({ ...rest, _ts: 0 }));
+  const nodes = (seed.week?.nodes || []).map(({ labelCs, commentsCs, ...rest }) => {
+    const node = { ...rest, _ts: 0 };
+    if (lang === 'cs' && labelCs) node.label = labelCs;
+    if (lang === 'cs' && commentsCs) node.comments = commentsCs;
+    return node;
+  });
   const week = { nodes, tombstones: [], crdtVersion: 0 };
 
   // Every branch renders in its playground colour, so the shots, the OG images
@@ -40,10 +46,10 @@ function loadSeed() {
 
 // ─── Page seeding ────────────────────────────────────────────────────────────
 // Runs in browser context. Writes localStorage + IDB before app first paint.
-async function seedPage(page, { theme, view, week, colors }) {
-  await page.evaluate(async ({ theme, view, week, colors }) => {
+async function seedPage(page, { lang, theme, view, week, colors }) {
+  await page.evaluate(async ({ lang, theme, view, week, colors }) => {
     localStorage.setItem('zenit-week-theme', theme);
-    localStorage.setItem('zenit-week-lang', 'en');
+    localStorage.setItem('zenit-week-lang', lang);
     localStorage.setItem('zenit-week-view', view);
 
     // Open IDB exactly like the app does (DB_NAME='zenit-week-db' v1).
@@ -88,7 +94,7 @@ async function seedPage(page, { theme, view, week, colors }) {
     }
 
     db.close();
-  }, { theme, view, week, colors });
+  }, { lang, theme, view, week, colors });
 }
 
 // ─── Capture matrix ──────────────────────────────────────────────────────────
@@ -100,61 +106,69 @@ const FORMS = {
   mobile:  { width: 390,  height: 844, deviceScaleFactor: 3, isMobile: true, hasTouch: true,    views: ['agenda'] },
 };
 const THEMES = ['light', 'dark'];
+// English gets the whole matrix. Czech only the two shots the hero is built
+// from (scripts/hero-svg.mjs), saved with a `-cs` suffix for cs/index.html.
+const LANGS = ['en', 'cs'];
+const CS_SHOTS = new Set(['light-desktop-mindmap', 'dark-mobile-agenda']);
 
 async function capture() {
   const browser = await chromium.launch();
-  const seed = loadSeed();
 
   const results = {};
-  for (const theme of THEMES) {
-    for (const [form, vp] of Object.entries(FORMS)) {
-      for (const view of vp.views) {
-        const ctx = await browser.newContext({
-          viewport: { width: vp.width, height: vp.height },
-          deviceScaleFactor: vp.deviceScaleFactor,
-          isMobile: !!vp.isMobile,
-          hasTouch: !!vp.hasTouch,
-        });
-        const page = await ctx.newPage();
+  for (const lang of LANGS) {
+    const seed = loadSeed(lang);
+    const suffix = lang === 'en' ? '' : `-${lang}`;
+    for (const theme of THEMES) {
+      for (const [form, vp] of Object.entries(FORMS)) {
+        for (const view of vp.views) {
+          if (lang === 'cs' && !CS_SHOTS.has(`${theme}-${form}-${view}`)) continue;
+          const ctx = await browser.newContext({
+            viewport: { width: vp.width, height: vp.height },
+            deviceScaleFactor: vp.deviceScaleFactor,
+            isMobile: !!vp.isMobile,
+            hasTouch: !!vp.hasTouch,
+          });
+          const page = await ctx.newPage();
 
-        await page.goto(APP_URL, { waitUntil: 'load' });
-        await seedPage(page, { theme, view, week: seed.week, colors: seed.colors });
-        await page.reload({ waitUntil: 'load' });
+          await page.goto(APP_URL, { waitUntil: 'load' });
+          await seedPage(page, { lang, theme, view, week: seed.week, colors: seed.colors });
+          await page.reload({ waitUntil: 'load' });
 
-        // Seeding the view through localStorage alone has come back on the
-        // wrong view (a dark mobile run captured the mindmap), so state the
-        // intent again once the app is live and wait for it to land.
-        await page.waitForFunction(() => typeof window.switchView === 'function', { timeout: 10_000 });
-        await page.evaluate((v) => {
-          if (document.documentElement.dataset.view !== v) window.switchView(v);
-        }, view);
-        await page.waitForFunction(
-          (v) => document.documentElement.dataset.view === v,
-          view,
-          { timeout: 10_000 },
-        );
-
-        if (view === 'mindmap') {
+          // Seeding the view through localStorage alone has come back on the
+          // wrong view (a dark mobile run captured the mindmap), so state the
+          // intent again once the app is live and wait for it to land.
+          await page.waitForFunction(() => typeof window.switchView === 'function', { timeout: 10_000 });
+          await page.evaluate((v) => {
+            if (document.documentElement.dataset.view !== v) window.switchView(v);
+          }, view);
           await page.waitForFunction(
-            () => document.querySelectorAll('#main-svg text').length > 3,
+            (v) => document.documentElement.dataset.view === v,
+            view,
             { timeout: 10_000 },
           );
-          // Fit content to viewport — same UX as clicking the zoom label.
-          await page.evaluate(() => document.getElementById('zoom-label')?.click());
-        } else {
-          await page.waitForFunction(
-            () => document.querySelector('#agenda-view')?.children.length > 0,
-            { timeout: 10_000 },
-          );
+
+          if (view === 'mindmap') {
+            await page.waitForFunction(
+              () => document.querySelectorAll('#main-svg text').length > 3,
+              { timeout: 10_000 },
+            );
+            // Fit content to viewport — same UX as clicking the zoom label.
+            await page.evaluate(() => document.getElementById('zoom-label')?.click());
+          } else {
+            await page.waitForFunction(
+              () => document.querySelector('#agenda-view')?.children.length > 0,
+              { timeout: 10_000 },
+            );
+          }
+          await page.waitForTimeout(500);
+
+          const out = resolve(ASSETS, `screen-${theme}-${form}-${view}${suffix}.png`);
+          await page.screenshot({ path: out, type: 'png' });
+          results[`${theme}-${form}-${view}${suffix}`] = out;
+          console.log(`  ✓ ${out.replace(REPO + '/', '')}`);
+
+          await ctx.close();
         }
-        await page.waitForTimeout(500);
-
-        const out = resolve(ASSETS, `screen-${theme}-${form}-${view}.png`);
-        await page.screenshot({ path: out, type: 'png' });
-        results[`${theme}-${form}-${view}`] = out;
-        console.log(`  ✓ ${out.replace(REPO + '/', '')}`);
-
-        await ctx.close();
       }
     }
   }

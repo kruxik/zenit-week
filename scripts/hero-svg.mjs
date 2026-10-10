@@ -7,6 +7,9 @@
 // The landing pages show the WebP above the fold, because the SVG carries two
 // full-size PNGs and weighs ~650 KB.
 //
+// Builds an English and a Czech variant: hero.* for index.html and the README,
+// hero-cs.* (from the `-cs` screenshots) for cs/index.html.
+//
 // Run: npm run hero:svg
 
 import { chromium } from 'playwright';
@@ -18,10 +21,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..');
 const ASSETS = resolve(REPO, 'assets');
 
-const LAPTOP_PNG = resolve(ASSETS, 'screen-light-desktop-mindmap.png');
-const PHONE_PNG  = resolve(ASSETS, 'screen-dark-mobile-agenda.png');
-const OUT_SVG    = resolve(ASSETS, 'hero.svg');
-const OUT_WEBP   = resolve(ASSETS, 'hero.webp');
+const VARIANTS = ['', '-cs'].map(suffix => ({
+  laptopPng: resolve(ASSETS, `screen-light-desktop-mindmap${suffix}.png`),
+  phonePng:  resolve(ASSETS, `screen-dark-mobile-agenda${suffix}.png`),
+  outSvg:    resolve(ASSETS, `hero${suffix}.svg`),
+  outWebp:   resolve(ASSETS, `hero${suffix}.webp`),
+}));
 // 2x the widest the landing pages show it (~800 CSS px), so it stays sharp on retina.
 const WEBP_WIDTH   = 1600;
 const WEBP_QUALITY = 0.85;
@@ -89,10 +94,8 @@ const PHONE_SCREEN_W = PHONE_W - PHONE_BEZEL * 2;
 const PHONE_SCREEN_H = PHONE_H - PHONE_BEZEL * 2;
 
 // ─── Build SVG ───────────────────────────────────────────────────────────────
-const laptopUri = pngDataUri(LAPTOP_PNG);
-const phoneUri  = pngDataUri(PHONE_PNG);
-
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Zenit Week hero — laptop and phone">
+function buildSvg(laptopUri, phoneUri) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Zenit Week hero — laptop and phone">
   <defs>
     <radialGradient id="bg" cx="50%" cy="30%" r="85%">
       <stop offset="0" stop-color="#f1f3f7"/>
@@ -167,26 +170,30 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" wid
   <image href="${phoneUri}" x="${PHONE_SCREEN_X}" y="${PHONE_SCREEN_Y}" width="${PHONE_SCREEN_W}" height="${PHONE_SCREEN_H}" preserveAspectRatio="xMidYMin slice" clip-path="url(#phone-screen-clip)"/>
 </svg>
 `;
-
-writeFileSync(OUT_SVG, svg);
-console.log(`  ✓ ${OUT_SVG.replace(REPO + '/', '')}`);
+}
 
 // Chromium's canvas encodes WebP natively, so no image library is needed.
 const browser = await chromium.launch();
 const page = await browser.newPage();
-const webpBase64 = await page.evaluate(async ({ svgText, width, quality }) => {
-  const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
-  const img = new Image();
-  img.src = url;
-  await img.decode();
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = Math.round(width * img.naturalHeight / img.naturalWidth);
-  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-  URL.revokeObjectURL(url);
-  return canvas.toDataURL('image/webp', quality).split(',')[1];
-}, { svgText: svg, width: WEBP_WIDTH, quality: WEBP_QUALITY });
-await browser.close();
+for (const { laptopPng, phonePng, outSvg, outWebp } of VARIANTS) {
+  const svg = buildSvg(pngDataUri(laptopPng), pngDataUri(phonePng));
+  writeFileSync(outSvg, svg);
+  console.log(`  ✓ ${outSvg.replace(REPO + '/', '')}`);
 
-writeFileSync(OUT_WEBP, Buffer.from(webpBase64, 'base64'));
-console.log(`  ✓ ${OUT_WEBP.replace(REPO + '/', '')}`);
+  const webpBase64 = await page.evaluate(async ({ svgText, width, quality }) => {
+    const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = Math.round(width * img.naturalHeight / img.naturalWidth);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    return canvas.toDataURL('image/webp', quality).split(',')[1];
+  }, { svgText: svg, width: WEBP_WIDTH, quality: WEBP_QUALITY });
+
+  writeFileSync(outWebp, Buffer.from(webpBase64, 'base64'));
+  console.log(`  ✓ ${outWebp.replace(REPO + '/', '')}`);
+}
+await browser.close();
