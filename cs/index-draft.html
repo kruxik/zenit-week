@@ -642,13 +642,12 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      color: var(--ico, currentColor);
-      filter: drop-shadow(0 0 6px var(--ico, currentColor));
+      filter: drop-shadow(0 0 6px rgba(162, 89, 255, 0.35));
     }
     .benefit-icon svg {
       width: 28px;
       height: 28px;
-      stroke: currentColor;
+      stroke: url(#logo-gradient);
       fill: none;
       stroke-width: 1.8;
       stroke-linecap: round;
@@ -795,6 +794,15 @@
   </style>
 </head>
 <body>
+<!-- Logo gradient (violet to blue), shared by the feature icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="logo-gradient" gradientUnits="userSpaceOnUse" x1="2" y1="2" x2="22" y2="22">
+      <stop offset="0" stop-color="#A259FF"/>
+      <stop offset="1" stop-color="#1ABCFE"/>
+    </linearGradient>
+  </defs>
+</svg>
 
 <!-- ── Lang suggestion banner ─────────────────────────────────────── -->
 <aside id="lang-banner" class="lang-banner" hidden aria-label="Language suggestion">
@@ -910,21 +918,21 @@
     <!-- Benefits -->
     <div class="benefits">
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#1a1a2e;"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="18" rx="7.5" ry="2.5"/><ellipse cx="12" cy="12" rx="5.5" ry="2.5"/><ellipse cx="12" cy="6" rx="3.5" ry="2.5"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="18" rx="7.5" ry="2.5"/><ellipse cx="12" cy="12" rx="5.5" ry="2.5"/><ellipse cx="12" cy="6" rx="3.5" ry="2.5"/></svg></div>
         <div class="benefit-body">
           <h3>Kameny napřed</h3>
           <p>Nejdřív to důležité, pak všechno ostatní.</p>
         </div>
       </div>
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#A259FF;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20l10 0"/><path d="M6 6l6 -1l6 1"/><path d="M12 3l0 17"/><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0"/><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20l10 0"/><path d="M6 6l6 -1l6 1"/><path d="M12 3l0 17"/><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0"/><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0"/></svg></div>
         <div class="benefit-body">
           <h3>Vidíš rovnováhu</h3>
           <p>Samá práce a nic pro sebe? Mapa to ukáže.</p>
         </div>
       </div>
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#1ABCFE;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></div>
         <div class="benefit-body">
           <h3>Data jsou tvoje</h3>
           <p>V prohlížeči nebo na Disku. Bez cookies.</p>
@@ -974,7 +982,7 @@
     <div class="features-grid">
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#3B82F6;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1"/><path d="M12 9l0 3"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1"/><path d="M12 9l0 3"/></svg></div>
         <div class="benefit-body">
           <h3>Vizuální mapa</h3>
           <p>Týden jako myšlenková mapa. Hned vidíš, kde máš moc a kde nic.</p>
@@ -982,7 +990,7 @@
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#F59E0B;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 5h8"/><path d="M13 9h5"/><path d="M13 15h8"/><path d="M13 19h5"/><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 5h8"/><path d="M13 9h5"/><path d="M13 15h8"/><path d="M13 19h5"/><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/></svg></div>
         <div class="benefit-body">
           <h3>Agenda</h3>
           <p>Úkoly po dnech: zpožděné, naplánované i hotové.</p>
@@ -990,7 +998,7 @@
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#F97316;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></svg></div>
         <div class="benefit-body">
           <h3>Statistika</h3>
           <p>Kolik z plánu se splnilo a kam ti čas skutečně jde.</p>
@@ -998,7 +1006,7 @@
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#10B981;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21l15 -15l-3 -3l-15 15l3 3"/><path d="M15 6l3 3"/><path d="M9 3a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/><path d="M19 13a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21l15 -15l-3 -3l-15 15l3 3"/><path d="M15 6l3 3"/><path d="M9 3a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/><path d="M19 13a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/></svg></div>
         <div class="benefit-body">
           <h3>Kouzelné selektory</h3>
           <p>Napiš <strong>10x</strong> pro počítadlo nebo <strong>(po, st, pá)</strong> pro dny.</p>
@@ -1006,7 +1014,7 @@
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#EF4444;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.294 -2.333 5.588c0 3.704 3.134 6.706 7 6.706c3.866 0 7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.294 -2.333 5.588c0 3.704 3.134 6.706 7 6.706c3.866 0 7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235"/></svg></div>
         <div class="benefit-body">
           <h3>Priority</h3>
           <p>Normální, vysoká, kritická. Hned vidíš, na čem záleží.</p>
@@ -1014,7 +1022,7 @@
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#A259FF;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10h-16l5.5 -6"/><path d="M4 14h16l-5.5 6"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10h-16l5.5 -6"/><path d="M4 14h16l-5.5 6"/></svg></div>
         <div class="benefit-body">
           <h3>Nedokončené → další týden</h3>
           <p>Rozpracované úkoly přeneseš jedním kliknutím.</p>
@@ -1022,7 +1030,7 @@
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#14B8A6;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></div>
         <div class="benefit-body">
           <h3>Opakované úkoly</h3>
           <p>Označíš jednou a každý týden je máš připravené.</p>
@@ -1031,7 +1039,7 @@
 
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#1ABCFE;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.486 -3.465 3.486h-11.878"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.486 -3.465 3.486h-11.878"/></svg></div>
         <div class="benefit-body">
           <h3>Synchronizace zařízení</h3>
           <p>Volitelně přes tvůj Google Disk. Naše servery data nevidí.</p>
@@ -1039,7 +1047,7 @@
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#EC4899;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M11 4h2"/><path d="M12 17v.01"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M11 4h2"/><path d="M12 17v.01"/></svg></div>
         <div class="benefit-body">
           <h3>Vždycky po ruce</h3>
           <p>Napadne tě úkol? Rychlým přidáním ho v telefonu uložíš hned.</p>
@@ -1047,7 +1055,7 @@
       </div>
 
       <div class="benefit">
-        <div class="benefit-icon" style="--ico:#FACC15;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></svg></div>
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></svg></div>
         <div class="benefit-body">
           <h3>Klávesové zkratky</h3>
           <p>Na počítači plánuješ rychleji díky zkratkám.</p>
