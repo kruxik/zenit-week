@@ -4,10 +4,10 @@
 //      mindmap as a transparent-bg PNG.
 //   2. Stitches the mindmap into the og-image.svg layout (brand text on the
 //      left, mindmap on the right).
-//   3. Rasterizes the composed SVG to 1200×630 PNG by loading it in Playwright
+//   3. Rasterizes the composed SVG to 1200×630 JPEG by loading it in Playwright
 //      and screenshotting the viewport.
 //
-// Mirrors the hero-svg.mjs pattern: SVG is the source of truth, PNG is derived.
+// Mirrors the hero-svg.mjs pattern: SVG is the source of truth, JPEG is derived.
 //
 // Run: npm run og
 
@@ -29,7 +29,7 @@ const VARIANTS = [
     headline: { bold: 'Visual',   thin: 'weekly planner',   letterSpacing: -2,   fontSize: 64 },
     subtitle: ['Email and meetings eat your week.', 'Plan what matters first.'],
     outSvg:   resolve(REPO, 'og-image.svg'),
-    outPng:   resolve(REPO, 'og-image.png'),
+    outJpg:   resolve(REPO, 'og-image.jpg'),
   },
   {
     lang: 'cs',
@@ -38,7 +38,7 @@ const VARIANTS = [
     headline: { bold: 'Vizuální', thin: 'týdenní plánovač', letterSpacing: -1.5, fontSize: 56 },
     subtitle: ['Týden ti zavalí maily a meetingy.', 'Naplánuj si nejdřív to důležité.'],
     outSvg:   resolve(REPO, 'og-image-cs.svg'),
-    outPng:   resolve(REPO, 'og-image-cs.png'),
+    outJpg:   resolve(REPO, 'og-image-cs.jpg'),
   },
 ];
 
@@ -310,10 +310,13 @@ function buildOgSvg(variant, mindmapB64) {
 }
 
 // ─── Rasterize ───────────────────────────────────────────────────────────────
-async function rasterizeSvgToPng(svgPath, pngPath) {
+const OG_JPEG_QUALITY = 90;
+
+async function rasterizeSvgToJpg(svgPath, jpgPath) {
   // DPR=2 → 2400×1260 raw pixels for the 1200×630 logical canvas. Social
   // scrapers downscale to fit their cards, so a 2× source keeps text and
-  // the embedded mindmap PNG crisp instead of blurring at 1×.
+  // the embedded mindmap PNG crisp instead of blurring at 1×. JPEG keeps
+  // that 2× source near 150 KB; the same image as PNG was over 500 KB.
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: 1200, height: 630 },
@@ -322,7 +325,7 @@ async function rasterizeSvgToPng(svgPath, pngPath) {
   const page = await ctx.newPage();
   await page.goto(pathToFileURL(svgPath).href, { waitUntil: 'load' });
   await page.waitForTimeout(200);
-  await page.screenshot({ path: pngPath, type: 'png', clip: { x: 0, y: 0, width: 1200, height: 630 } });
+  await page.screenshot({ path: jpgPath, type: 'jpeg', quality: OG_JPEG_QUALITY, clip: { x: 0, y: 0, width: 1200, height: 630 } });
   await browser.close();
 }
 
@@ -335,7 +338,7 @@ for (const variant of VARIANTS) {
   writeFileSync(variant.outSvg, buildOgSvg(variant, b64));
   console.log(`  ✓ ${variant.outSvg.replace(REPO + '/', '')}`);
 
-  await rasterizeSvgToPng(variant.outSvg, variant.outPng);
-  console.log(`  ✓ ${variant.outPng.replace(REPO + '/', '')}`);
+  await rasterizeSvgToJpg(variant.outSvg, variant.outJpg);
+  console.log(`  ✓ ${variant.outJpg.replace(REPO + '/', '')}`);
 }
 console.log('Done.');

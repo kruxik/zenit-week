@@ -742,7 +742,7 @@ describe('sw.js — manifest icons', () => {
   });
 
   it('leaves the rest of /assets alone — hero.svg is 632 KB of marketing', () => {
-    for (const path of ['/assets/hero.svg', '/og-image.png', '/assets/playground-seed.json']) {
+    for (const path of ['/assets/hero.svg', '/og-image.jpg', '/assets/playground-seed.json']) {
       expect(w.ctx.isManifestIcon(new URL(path, ORIGIN))).toBe(false);
     }
   });

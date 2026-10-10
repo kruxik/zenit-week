@@ -67,7 +67,7 @@ Open `https://<your-static-domain>/app` from any device. The ngrok web inspector
 | `api/token.js` | Vercel Edge Function that proxies the Google OAuth token exchange to keep `client_secret` server-side. PKCE on the client. |
 | `tests/` | Vitest suite — focused on data logic (week math, transfers, validation, sync conflict resolution). |
 | `docs/specs/`, `docs/plans/`, `docs/ideas/` | Specs, implementation plans, idea sketches. |
-| `og-image*.{svg,png}`, `screenshot.{svg,png}` | Marketing & share assets. |
+| `og-image*.{svg,jpg}`, `screenshot.{svg,png}` | Marketing & share assets. |
 | `vercel.json` | Routes for `/app`, `/privacy`, `/terms`. |
 | `sitemap.xml`, `robots.txt` | SEO essentials. |
 
