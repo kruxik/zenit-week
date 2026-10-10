@@ -16,7 +16,7 @@ No new build tooling. Existing workflow applies:
 
 ```sh
 npm install        # once
-npm test           # vitest — data-logic changes (comments field, merge, snapshot)
+npm test           # vitest - data-logic changes (comments field, merge, snapshot)
 npm run validate   # html-validate
 # manual: open zenit-week.html in a browser
 ```
@@ -39,7 +39,7 @@ Rules:
 
 ## 4. Project structure (where each piece lives in `zenit-week.html`)
 
-Single-file policy — no new files. Insertion points (verified against current code):
+Single-file policy - no new files. Insertion points (verified against current code):
 
 | Piece | Location |
 |---|---|
@@ -53,13 +53,13 @@ Single-file policy — no new files. Insertion points (verified against current 
 
 ## 5. Core features & acceptance criteria
 
-### F1 — Context-menu entry (sole create + edit path)
+### F1 - Context-menu entry (sole create + edit path)
 - New item **"Comment"** (singular), inserted right after "Rename".
 - Visible **only** on activity nodes; hidden for center/branch/counter (follow existing show/hide pattern for type-specific items).
 - Selecting it opens the Comment dialog pre-filled with the node's current `comments` (empty for none).
 - **AC:** right-click/long-press an activity → "Comment" appears after "Rename"; on a branch/counter/center it does not appear. Click opens dialog with existing text.
 
-### F2 — Comment dialog (Help-style large panel)
+### F2 - Comment dialog (Help-style large panel)
 - Mirrors Help dialog (`#help-overlay`/`#help-panel`).
   - Desktop ≥768px: centered floating panel (~592px wide, near-full height, rounded, shadow).
   - Mobile <768px: covers whole area below the toolbar; bottom floating "Close" pill replaces top-right X (mirror `#help-close-bar` behavior).
@@ -69,25 +69,25 @@ Single-file policy — no new files. Insertion points (verified against current 
 - Close via X (desktop) / Close pill (mobile) / `Esc`.
 - **AC:** dialog opens at correct size on both breakpoints; caption shows the exact node label including special chars (e.g. `<b> & "x"`) rendered literally; typing + Esc closes and persists; counter turns to warning past 1000 but still saves.
 
-### F3 — Auto-save on close (with dirty check)
+### F3 - Auto-save on close (with dirty check)
 - On close, if textarea text **differs** from the node's stored `comments`:
-  - call `takeSnapshot()` **before** overwriting (real history fn — `pushHistory` does not exist; `zenit-week.html:3774`),
+  - call `takeSnapshot()` **before** overwriting (real history fn - `pushHistory` does not exist; `zenit-week.html:3774`),
   - write trimmed-of-nothing raw value to `node.comments` (empty string ⇒ clears the comment),
   - bump `_ts`, persist to localStorage, refresh affected UI.
-- If text is **unchanged**, do nothing (no snapshot, no `_ts` bump) — opening/closing must not pollute undo or trigger a Drive sync.
+- If text is **unchanged**, do nothing (no snapshot, no `_ts` bump) - opening/closing must not pollute undo or trigger a Drive sync.
 - **AC:** edit → close → reopen shows new text; Ctrl/⌘+Z restores previous text; open→close with no edit leaves undo stack and `_ts` untouched.
 
-### F4 — Display-only indicator icon
-- `icon-message` shown **only** when `comments` is non-empty. Purely a presence signal — **not clickable**, no hover tooltip.
+### F4 - Display-only indicator icon
+- `icon-message` shown **only** when `comments` is non-empty. Purely a presence signal - **not clickable**, no hover tooltip.
 - **Mind map:** decorative `<use>` on the node's right, after the priority/unplanned/reusable badge row; `pointer-events:none`; its width factored into the badge-row `rightW`/`textX` centering so the label+badges stay centered.
 - **Agenda:** icon on the row's right, before the drag handle.
 - **AC:** adding a comment makes the icon appear in both views without full reload glitches; clearing the comment removes it; clicking the icon does nothing; node label + badges remain visually centered with the icon present.
 
-### F5 — i18n
+### F5 - i18n
 - New key for "Comment" menu label in EN + CS (`TRANSLATIONS`, follow `menu.rename` placement). Any dialog caption fallback / counter label also keyed.
 - **AC:** switching language updates the menu item and dialog chrome.
 
-### F6 — Persistence & sync
+### F6 - Persistence & sync
 - `comments` round-trips through localStorage per ISO week and through Drive export/import.
 - **AC (vitest where logic-testable):** node with `comments` serializes/deserializes intact; Drive merge keeps the higher-`_ts` version's `comments`; clearing on one device (newer `_ts`) wins over older non-empty.
 
@@ -99,7 +99,7 @@ Per CLAUDE.md (these are hard constraints):
 - SVG via `document.createElementNS(...)` / existing `svgEl()` helper.
 - Reuse existing button/dialog classes; no new orphan classes (<5 uses). Reuse `#help-*` structure and `--accent-*` tokens.
 - Surgical UI updates (`updateNodeUI`) over full `render()` where the change is visual-only (indicator toggle).
-- Use `genId()` (not needed here — no new nodes — but never call `crypto.randomUUID()` directly).
+- Use `genId()` (not needed here - no new nodes - but never call `crypto.randomUUID()` directly).
 
 ## 7. Testing strategy
 
@@ -116,7 +116,7 @@ Per CLAUDE.md (these are hard constraints):
 
 **Always do**
 - Comments on activity nodes only.
-- Custom dialog (Help-style) — never native `confirm/alert/prompt`.
+- Custom dialog (Help-style) - never native `confirm/alert/prompt`.
 - `textContent` for all user data; `takeSnapshot()` before mutating; `_ts` bump on real change.
 - EN + CS i18n for any new user-facing string.
 - End with a one-line commit message and ask before committing.

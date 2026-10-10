@@ -146,13 +146,13 @@ describe('third-party notice section', () => {
 
   it('keeps every copyright line and prints shared terms once', () => {
     const section = buildLicenseSection(pkgs);
-    expect(section).toContain('- `b-pkg` (MIT) — Copyright (c) 2020 B');
-    expect(section).toContain('- `a-pkg` (MIT) — Copyright (c) 2019 A');
+    expect(section).toContain('- `b-pkg` (MIT) - Copyright (c) 2020 B');
+    expect(section).toContain('- `a-pkg` (MIT) - Copyright (c) 2019 A');
     expect(section.match(/MIT terms here/g)).toHaveLength(1);
     expect(section).toContain('ISC terms here');
   });
 
-  it('appends once, then replaces in place — idempotent', () => {
+  it('appends once, then replaces in place - idempotent', () => {
     const base = 'MIT License\n\nOwn terms\n';
     const once = applyLicenseSection(base, buildLicenseSection(pkgs));
     expect(once.startsWith(base.trimEnd())).toBe(true);

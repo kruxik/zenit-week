@@ -24,7 +24,7 @@ const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8')
 // task and has its opacity released in the very next rAF, so its first resolved
 // style is already the target and CSS starts no transition at all. The fade was
 // dormant almost always. Any style recalc landing between those two points wakes
-// it — a soft keyboard opening and closing reliably does — so the same tap was
+// it - a soft keyboard opening and closing reliably does - so the same tap was
 // smooth or unusable depending on whether the user had typed recently.
 
 /** Body of the first `function <name>(` in the source, braces matched. */
@@ -77,7 +77,7 @@ describe('rAF tweens never fight a CSS opacity transition', () => {
     // The fix: no opacity, and no transition override to sneak it back in.
     expect(body).not.toMatch(/\.style\.opacity\s*=/);
     expect(body).not.toMatch(/\.style\.transition\s*=/);
-    // Anchor the negatives — they must not pass by the tween having been gutted.
+    // Anchor the negatives - they must not pass by the tween having been gutted.
     expect(body).toMatch(/setAttribute\('transform'/);
     expect(body).toMatch(/setAttribute\('d'/);
   });

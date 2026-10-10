@@ -6,7 +6,7 @@ import { signOut, _state } from './setup.js';
 // Signing out ends this browser's session and nothing else. Revoking was
 // tried and removed: Google's revoke endpoint acts on the grant behind the
 // token it is given, which is this browser's own, so it cannot reach another
-// device — measured twice on real devices — and all it bought was a fresh
+// device - measured twice on real devices - and all it bought was a fresh
 // consent screen on the next sign-in.
 const server = setupServer();
 server.listen({ onUnhandledRequest: 'bypass' });

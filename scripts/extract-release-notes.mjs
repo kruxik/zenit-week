@@ -41,7 +41,7 @@ for (let i = start + 1; i < lines.length; i++) {
   if (/^##\s+/.test(lines[i])) { end = i; break; }
 }
 
-// Strip the heading itself — GitHub Release UI already shows the tag.
+// Strip the heading itself - GitHub Release UI already shows the tag.
 // Trim leading and trailing blank lines.
 const body = lines.slice(start + 1, end).join('\n').replace(/^\s+|\s+$/g, '');
 process.stdout.write(body + '\n');

@@ -1,10 +1,10 @@
 import { mergeWeekData, _weekContentSig, hasEditingNode, applyRemoteMerge, _state, BRANCH_CONFIG } from './setup.js';
 
-// Multi-tab editing (Option B — local sync peer). The CRDT merge itself is
+// Multi-tab editing (Option B - local sync peer). The CRDT merge itself is
 // covered by crdt.test.js; these tests pin the feature-specific properties:
 // convergence on disjoint edits, the _weekContentSig echo-guard, and the
 // edit-in-flight deferral that protects an open inline editor.
-describe('Multi-tab (Option B) — local sync peer', () => {
+describe('Multi-tab (Option B) - local sync peer', () => {
   const mkNode = (id, parent, ts = 100, extra = {}) => ({
     id, parent, branch: 'work', type: 'activity', label: id, children: [], _ts: ts, ...extra,
   });
@@ -30,7 +30,7 @@ describe('Multi-tab (Option B) — local sync peer', () => {
 
   describe('echo-guard: _weekContentSig dedup', () => {
     test('identical content with different _ts has the same signature', () => {
-      // _ts is the LWW clock, not content — it must not break convergence dedup.
+      // _ts is the LWW clock, not content - it must not break convergence dedup.
       const w1 = mkWeek([mkNode('a1', 'work', 100)]);
       const w2 = mkWeek([mkNode('a1', 'work', 999)]);
       expect(_weekContentSig(w1)).toBe(_weekContentSig(w2));
@@ -81,7 +81,7 @@ describe('Multi-tab (Option B) — local sync peer', () => {
     test('a remote branch side-flip refreshes BRANCH_CONFIG (not just node.offY)', async () => {
       // computeLayout reads a branch's left/right from BRANCH_CONFIG, not the node.
       // A remote side change must refresh BRANCH_CONFIG or the branch renders on
-      // its stale side — the bug where vertical position synced but side did not.
+      // its stale side - the bug where vertical position synced but side did not.
       _state.setWeekKey('2026-01');
       _state.clearIDBStore();
       const local = { nodes: [branch('work', 'right', 100)], tombstones: [], savedAt: 1000, crdtVersion: 1 };

@@ -61,7 +61,7 @@ const html = /* html */ `
     justify-content: center;
   }
 
-  /* Direct front view — looking straight at the desk, slight downward tilt
+  /* Direct front view - looking straight at the desk, slight downward tilt
      so we can see the laptop base and the phone in front of it. */
   .scene {
     position: relative;

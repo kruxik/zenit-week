@@ -1,7 +1,7 @@
 // A custom branch color used to survive exactly one refresh. Init called the
-// async loadBranchColors() without awaiting it, then the theme/lang bootstrap —
+// async loadBranchColors() without awaiting it, then the theme/lang bootstrap -
 // which looked for the colors blob in localStorage, where the IndexedDB
-// migration had deleted it, so it always missed — re-saved BRANCH_COLORS while
+// migration had deleted it, so it always missed - re-saved BRANCH_COLORS while
 // those were still the hardcoded defaults. The stored palette was overwritten,
 // the in-memory one finished loading and looked right for that session, and the
 // next refresh showed the default color.
@@ -48,7 +48,7 @@ describe('colors settings bootstrap', () => {
   });
 
   test('a color set in one session is still there in the next two', async () => {
-    // Session 1 — user picks yellow.
+    // Session 1 - user picks yellow.
     BRANCH_COLORS.work = { main: '#FFCD29' };
     await saveBranchColors();
 

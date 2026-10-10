@@ -3,7 +3,7 @@
 // moveNodeToNextWeek reads the next-week record, mutates it, writes it back, and
 // then tombstones the moved subtree in the source week. Without serialization,
 // anything else that writes that record between the read and the write (a second
-// transfer, a Drive pull-merge, a peer-tab merge) is silently overwritten — and
+// transfer, a Drive pull-merge, a peer-tab merge) is silently overwritten - and
 // because the source side is already tombstoned, the nodes are unrecoverable on
 // every device. Reported symptom: ten tasks transferred on a Sunday were gone
 // from both weeks the next morning.
@@ -52,7 +52,7 @@ describe('concurrent transfers to the next week', () => {
     expect(moved.map(n => n.label).sort()).toEqual(ids.map((_, i) => 'task' + (i + 1)).sort());
   });
 
-  test('overlapping transfers all land — none dropped by a stale write', async () => {
+  test('overlapping transfers all land - none dropped by a stale write', async () => {
     const ids = seed(10);
     // Fire every transfer without awaiting in between: each one suspends at its
     // own load of the next-week record, exactly as rapid clicks do in the app.

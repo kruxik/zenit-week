@@ -1,7 +1,7 @@
-# SPEC — Sync Reliability
+# SPEC - Sync Reliability
 
 > Source: incident analysis 2026-09-15 (phone restamped every node of week 2026-38 at 06:30:17.473Z, then won LWW against the desktop's evening work).
-> Branch: `main` (small, independent fixes — no feature branch unless asked)
+> Branch: `main` (small, independent fixes - no feature branch unless asked)
 > Scope: Drive sync only. No visual change anywhere. Data model gains one bookkeeping field (`_posTs`).
 
 ---
@@ -17,7 +17,7 @@ Make a stale device unable to overwrite fresher work on another device, and clos
 | Excluded | Why |
 |---|---|
 | Repairing already-duplicated Drive files (`zenit-week-2026-16.json` exists twice) | Historic. The user has said the old data does not matter. Only prevent new duplicates and make every device pick the same copy deterministically. |
-| Field-level CRDT for every node property | Overkill. Two timestamps — content and layout — cover every real conflict the app produces. |
+| Field-level CRDT for every node property | Overkill. Two timestamps - content and layout - cover every real conflict the app produces. |
 | Removing the undo force-push | Separate concern. This spec only narrows what an undo restamps. |
 | `fetch keepalive` at teardown | A week file is ~75 KB; `keepalive` bodies are capped at 64 KB. The service-worker queue already exists and is conflict-safe; use it. |
 
@@ -43,14 +43,14 @@ On a device holding a stale copy, any of these promotes the stale copy of every 
 One new per-node bookkeeping field:
 
 ```
-_posTs   // epoch ms — last change of offX / offY / side. Same role as _ts, layout only.
+_posTs   // epoch ms - last change of offX / offY / side. Same role as _ts, layout only.
 ```
 
 - Missing `_posTs` reads as `0` (`migrateCrdt` backfills it, like `_ts`).
-- Stripped from `_weekContentSig` exactly as `_ts` is — it is bookkeeping, not content.
+- Stripped from `_weekContentSig` exactly as `_ts` is - it is bookkeeping, not content.
 - Never exported into the user-facing meaning of a node; never rendered.
 
-`_ts` keeps its meaning — **content** changed — and is no longer touched by layout operations.
+`_ts` keeps its meaning - **content** changed - and is no longer touched by layout operations.
 
 ---
 
@@ -76,14 +76,14 @@ Call sites that **keep** `touchNode` (content): `handleNodeDrop` rebind path (pa
 
 ### 4.2 No recenter-all from a touch pan (fix 2)
 
-In the `pointerup` handler's `panningFromCenter` branch: when `e.pointerType === 'touch'`, a pan that started on the root is a pan and nothing else — no snapshot, no offset reset, no save. Mouse and pen keep today's behaviour (drag the root → recenter all). The sub-slop click path (open Stats) is unchanged for every pointer type.
+In the `pointerup` handler's `panningFromCenter` branch: when `e.pointerType === 'touch'`, a pan that started on the root is a pan and nothing else - no snapshot, no offset reset, no save. Mouse and pen keep today's behaviour (drag the root → recenter all). The sub-slop click path (open Stats) is unchanged for every pointer type.
 
 ### 4.3 Undo restamps only what it changes (fix 3)
 
-In `_applySnapshot`, replace the blanket `for (const n of restoredPrimary.nodes) n._ts = tsNow` with a per-node comparison against the live node of the same id (live = `weekData.nodes` for the displayed week, else the IDB record — the array `livePrimaryNodes` already exists there):
+In `_applySnapshot`, replace the blanket `for (const n of restoredPrimary.nodes) n._ts = tsNow` with a per-node comparison against the live node of the same id (live = `weekData.nodes` for the displayed week, else the IDB record - the array `livePrimaryNodes` already exists there):
 
 - Node absent from live → `_ts = tsNow`, `_posTs = tsNow` (it is being re-created; it must win).
-- Content differs (any field other than `_ts`, `_posTs`, `_editing`, `offX`, `offY`, `side`, `children` — compare with a sorted-key JSON of the remaining fields) → `_ts = tsNow`.
+- Content differs (any field other than `_ts`, `_posTs`, `_editing`, `offX`, `offY`, `side`, `children` - compare with a sorted-key JSON of the remaining fields) → `_ts = tsNow`.
 - Only `offX` / `offY` / `side` differ → `_posTs = tsNow`, keep live `_ts`.
 - Nothing differs → copy the live node's `_ts` and `_posTs` (the snapshot's stamps are older than live and must not roll back).
 
@@ -96,7 +96,7 @@ Every name lookup resolves duplicates with one rule so every device picks the sa
 > **Survivor** = the file with the newest `modifiedTime`; tie → lexically smallest `id`.
 
 - `findDriveFileId`, `getDriveFileId` (search half) and `listAllDriveWeekFiles` request `files(id,name,modifiedTime,appProperties)` and apply the rule when a name returns more than one file. `listAllDriveWeekFiles` pushes **one** entry per week key (the survivor) so `driveMap` and `driveFileIdCache` cannot flip between copies.
-- `getDriveFileId` create half: after the `POST`, run the name query once more. If it now returns more than one file, apply the rule. If the survivor is not the file just created, **delete the file just created** (it is the empty placeholder this device made seconds ago — nothing is lost) and cache the survivor. If the delete fails, still cache the survivor; the other copy is inert because no device will resolve to it.
+- `getDriveFileId` create half: after the `POST`, run the name query once more. If it now returns more than one file, apply the rule. If the survivor is not the file just created, **delete the file just created** (it is the empty placeholder this device made seconds ago - nothing is lost) and cache the survivor. If the delete fails, still cache the survivor; the other copy is inert because no device will resolve to it.
 - Nothing merges, repairs or deletes pre-existing duplicates. Week 2026-16 keeps both files; both devices simply agree on the same one from now on.
 
 ### 4.5 "Seen" only when applied (fix 5)
@@ -115,18 +115,18 @@ Inside `syncWeekFromDrive`, right after the merge is applied **or deferred**, if
 Callers stop setting `lastSeenRemoteHash` themselves:
 
 - `pollDriveMeta` week loop and `pollDriveChanges` week branch: pass `{ seenHash: remoteHash }`, drop the `lastSeenRemoteHash.set` after the call.
-- `initDriveSync` step 3: keep the direct `lastSeenRemoteHash.set` **only** for the "identical hash" branch. For `toMerge` weeks, pass `{ seenHash: driveEntry.contentHash }` through both step 4a and step 4b calls. Step 0's pull of the shown week passes nothing (the hash is not known yet); step 4a's `continue` for the shown week is unchanged, and step 3 will set the hash for it only if identical — otherwise the next poll reconciles it, which is the correct outcome.
+- `initDriveSync` step 3: keep the direct `lastSeenRemoteHash.set` **only** for the "identical hash" branch. For `toMerge` weeks, pass `{ seenHash: driveEntry.contentHash }` through both step 4a and step 4b calls. Step 0's pull of the shown week passes nothing (the hash is not known yet); step 4a's `continue` for the shown week is unchanged, and step 3 will set the hash for it only if identical - otherwise the next poll reconciles it, which is the correct outcome.
 - Colors and schedule keep their current `lastSeenRemote…` handling; out of scope.
 
 ### 4.6 No silent stall (fix 6)
 
 **On `visibilitychange` → `hidden`** (the existing listener that stops the poll and flushes), before `flushAllPendingSyncToDrive()`:
 
-1. If an inline editor is open (`editState` set), `commitEdit()` — the same thing the input's `blur` does; mobile keyboards close on hide anyway.
+1. If an inline editor is open (`editState` set), `commitEdit()` - the same thing the input's `blur` does; mobile keyboards close on hide anyway.
 2. If a map drag is in flight (`dragState.activeNodeId`), abort it exactly as the `pointercancel` handler does (reuse that code path: extract it into a function both call).
-3. `_atomicOpsDepth = 0`, then `_flushPendingSync()` — the deferred merge and the parked upload keys are released. A gesture cannot survive the page being hidden, so a depth left above zero here is a leak, not an operation.
+3. `_atomicOpsDepth = 0`, then `_flushPendingSync()` - the deferred merge and the parked upload keys are released. A gesture cannot survive the page being hidden, so a depth left above zero here is a leak, not an operation.
 
-**At teardown** (`pagehide` / `beforeunload`, `_flushOnTeardown`): stop calling `syncWeekToDrive` — its pull-merge-push cannot finish once navigation starts. Instead, for every pending week (the same set `flushAllPendingSyncToDrive` builds), `_offlineUploadQueue.add(wk)` + `_persistOfflineUpload(wk)`, exactly as the offline branch already does, and `_registerUploadSync()`. The worker's `canPushEntry` guard keeps this conflict-safe: it only pushes when Drive still holds a revision this device reconciled. `visibilitychange` → `hidden` keeps the direct `syncWeekToDrive` flush (the page is still alive there).
+**At teardown** (`pagehide` / `beforeunload`, `_flushOnTeardown`): stop calling `syncWeekToDrive` - its pull-merge-push cannot finish once navigation starts. Instead, for every pending week (the same set `flushAllPendingSyncToDrive` builds), `_offlineUploadQueue.add(wk)` + `_persistOfflineUpload(wk)`, exactly as the offline branch already does, and `_registerUploadSync()`. The worker's `canPushEntry` guard keeps this conflict-safe: it only pushes when Drive still holds a revision this device reconciled. `visibilitychange` → `hidden` keeps the direct `syncWeekToDrive` flush (the page is still alive there).
 
 **At boot**, after `initDriveSync` resolves without error: `_clearOfflineUploadQueue()`. Init has just reconciled every week, so a queued entry is stale, and on browsers without Background Sync (Safari, Firefox) it would otherwise sit forever.
 
@@ -150,12 +150,12 @@ Callers stop setting `lastSeenRemoteHash` themselves:
 
 All in `tests/`, run by `npm test`. Existing files to extend are named; new files where none fits.
 
-- `crdt.test.js` — I2 with four cases: local newer content + remote newer position; the reverse; both newer on the same side; one side missing `_posTs` (legacy → 0). Plus I3.
-- New `layout-stamps.test.js` — `touchLayout` sets `_posTs` only; recenter-all stamps `_posTs` on every non-center node and leaves every `_ts` unchanged (I1); `migrateCrdt` backfills `_posTs = 0`.
-- `history.test.js` — I4: undo over an unchanged week leaves stamps alone; undo that reverts one node's `done` restamps only that node's `_ts`; undo that reverts one node's offset restamps only its `_posTs`.
-- `drive-file-id-cache.test.js` — I5: the survivor rule on a two-file listing (newer `modifiedTime` wins; tie by id); `listAllDriveWeekFiles` emits one entry per week; the create path deletes its own placeholder when a second query shows an older survivor.
-- `sync-convergence.test.js` — I6: a `syncWeekFromDrive` that returns `'failed'` leaves `lastSeenRemoteHash` unset; `'applied'` and `'deferred'` set it.
-- New `visibility-flush.test.js` — I7 with a stuck `_atomicOpsDepth` and a parked upload key; teardown parks pending weeks in the offline queue instead of calling `syncWeekToDrive`.
+- `crdt.test.js` - I2 with four cases: local newer content + remote newer position; the reverse; both newer on the same side; one side missing `_posTs` (legacy → 0). Plus I3.
+- New `layout-stamps.test.js` - `touchLayout` sets `_posTs` only; recenter-all stamps `_posTs` on every non-center node and leaves every `_ts` unchanged (I1); `migrateCrdt` backfills `_posTs = 0`.
+- `history.test.js` - I4: undo over an unchanged week leaves stamps alone; undo that reverts one node's `done` restamps only that node's `_ts`; undo that reverts one node's offset restamps only its `_posTs`.
+- `drive-file-id-cache.test.js` - I5: the survivor rule on a two-file listing (newer `modifiedTime` wins; tie by id); `listAllDriveWeekFiles` emits one entry per week; the create path deletes its own placeholder when a second query shows an older survivor.
+- `sync-convergence.test.js` - I6: a `syncWeekFromDrive` that returns `'failed'` leaves `lastSeenRemoteHash` unset; `'applied'` and `'deferred'` set it.
+- New `visibility-flush.test.js` - I7 with a stuck `_atomicOpsDepth` and a parked upload key; teardown parks pending weeks in the offline queue instead of calling `syncWeekToDrive`.
 - `npm run validate` and `npm run csp` after the last edit (inline-script hash).
 
 Manual (phone + desktop, both signed in): drag a node on the phone while the desktop marks the same node done → desktop keeps done, phone adopts done and keeps its position. Pan from the root on the phone → map pans, nothing saved.

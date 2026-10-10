@@ -158,7 +158,7 @@ describe('Transfers - Week to Week', () => {
   });
 
   describe('day selectors and quantifiers on transfer', () => {
-    const DAYS = [3, 1, 0, 5]; // We, Mo, Su, Fr — dragged out of week order
+    const DAYS = [3, 1, 0, 5]; // We, Mo, Su, Fr - dragged out of week order
     const seedPrev = (extra = {}) => {
       const dayIds = DAYS.map(d => 'd' + d);
       const b = mkBranch('me', ['r1', 'p1']);

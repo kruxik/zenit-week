@@ -1,4 +1,4 @@
-# git-cliff configuration — Zenit Week
+# git-cliff configuration - Zenit Week
 # Generates CHANGELOG.md sections from Conventional Commits, formatted as
 # Keep a Changelog. Tag scheme is CalVer: vYYYY.MM.DD[.N].
 
@@ -8,7 +8,7 @@ header = """# Changelog
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
+and this project uses [CalVer](https://calver.org/) - `vYYYY.MM.DD[.N]`.
 
 """
 
@@ -36,6 +36,10 @@ filter_unconventional = true
 filter_commits = true
 tag_pattern = "v[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
 topo_order = false
+# No em dash in release notes, even when a commit message has one.
+commit_preprocessors = [
+    { pattern = "\u2014", replace = "-" },
+]
 sort_commits = "newest"
 
 commit_parsers = [

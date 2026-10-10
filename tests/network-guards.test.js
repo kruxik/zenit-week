@@ -11,7 +11,7 @@ import {
 const sandbox = _state.sandbox;
 
 // The app calls the bare global `fetch`, which resolves through the VM's global
-// object — swapping it out captures every request the code under test makes.
+// object - swapping it out captures every request the code under test makes.
 let realFetch;
 let calls;
 
@@ -43,7 +43,7 @@ describe('isDefinitelyOffline', () => {
     expect(isDefinitelyOffline()).toBe(true);
   });
 
-  it('is false when a link is reported — true proves nothing, so it must not gate', () => {
+  it('is false when a link is reported - true proves nothing, so it must not gate', () => {
     sandbox.navigator.onLine = true;
     expect(isDefinitelyOffline()).toBe(false);
   });
@@ -81,7 +81,7 @@ describe('netFetch', () => {
   });
 
   it('rejects a request that never answers, rather than hanging forever', async () => {
-    // A server that accepts the connection and says nothing — the exact failure
+    // A server that accepts the connection and says nothing - the exact failure
     // that used to leave the sync badge spinning for the rest of the session.
     stubFetch((_input, init) => new Promise((_resolve, reject) => {
       init.signal.addEventListener('abort', () => reject(init.signal.reason));
@@ -180,7 +180,7 @@ describe('requestPersistentStorage', () => {
     expect(asked).toBe(1);
   });
 
-  it('never re-asks once granted — that would be a second permission prompt', async () => {
+  it('never re-asks once granted - that would be a second permission prompt', async () => {
     let asked = 0;
     sandbox.navigator.storage = {
       persisted: async () => true,

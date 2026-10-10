@@ -37,7 +37,7 @@ describe('fix #1 – adding a child to a done parent clears parent done', () => 
     return [b, a1, a2];
   }
 
-  test('startAddNode — parent stays done while editing (propagation deferred)', () => {
+  test('startAddNode - parent stays done while editing (propagation deferred)', () => {
     setUp(donedTree());
     startAddNode('a1');
     // Done propagation is deferred to commitEdit so a discard doesn't
@@ -188,7 +188,7 @@ describe('fix #4 – cascading undone resets counter val to 0', () => {
     expect(counter.doneAt).toBeUndefined();
   });
 
-  test('cascade does not decrement — resets to 0 regardless of prior val', () => {
+  test('cascade does not decrement - resets to 0 regardless of prior val', () => {
     const b  = mkBranch('work', ['a1']);
     const a1 = mkActivity('a1', 'work', 'work', { done: true, doneAt: 'ts', children: ['c1'] });
     const c1 = mkCounter('c1', 'a1', 'work', 10, 10); // larger counter

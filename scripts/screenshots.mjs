@@ -152,7 +152,7 @@ async function capture() {
               () => document.querySelectorAll('#main-svg text').length > 3,
               { timeout: 10_000 },
             );
-            // Fit content to viewport — same UX as clicking the zoom label.
+            // Fit content to viewport - same UX as clicking the zoom label.
             await page.evaluate(() => document.getElementById('zoom-label')?.click());
           } else {
             await page.waitForFunction(

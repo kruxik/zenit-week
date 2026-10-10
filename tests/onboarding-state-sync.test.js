@@ -1,4 +1,4 @@
-// Onboarding state is a device fact — "this browser has seen the tour" — not
+// Onboarding state is a device fact - "this browser has seen the tour" - not
 // user data. It lives in localStorage so a data wipe doesn't replay the first
 // run, and it rides in the settings file so a second device stays quiet too.
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -48,7 +48,7 @@ describe('Onboarding state in the settings blob', () => {
     expect(readTipsSeen()).toEqual({ 'tip-a': true, 'tip-b': true });
   });
 
-  it('adopts onboarded and nudged from the remote — true always wins', () => {
+  it('adopts onboarded and nudged from the remote - true always wins', () => {
     mergeRemoteOnboarding(remote({ onboarded: true, nudged: true }), false);
     expect(readBoolPref('zenit-week-onboarded', false)).toBe(true);
     expect(readBoolPref('zenit-week-playground-nudged', false)).toBe(true);
@@ -74,7 +74,7 @@ describe('Onboarding state in the settings blob', () => {
 
   // An import on another device force-pushes a reset token; every other device
   // wipes its local zenit-week-* keys and resyncs. The tab keeps running, so the
-  // in-memory seen map survives the wipe — comparing against it found nothing
+  // in-memory seen map survives the wipe - comparing against it found nothing
   // new to store, and the emptied store then replayed every tip on next load.
   it('re-persists the seen map after a local wipe', () => {
     _state.setTipsSeen({ 'tip-a': true });
@@ -89,7 +89,7 @@ describe('Onboarding state in the settings blob', () => {
     _state.clearLocalStorage();
     mergeRemoteOnboarding(remote({ tipsEnabled: false }), false);
     expect(readBoolPref('zenit-week-tips-enabled', true)).toBe(false);
-    _state.resetTips();   // the switch lives in memory too — don't leak "off"
+    _state.resetTips();   // the switch lives in memory too - don't leak "off"
   });
 
   it('asks for a push only when this device knows more', () => {

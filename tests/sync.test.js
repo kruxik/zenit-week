@@ -23,7 +23,7 @@ const handlers = [
     const body = await request.json();
     // A refresh grant with no body token models the HttpOnly cookie supplying it
     // server-side (the production path); an explicit token is the migration path.
-    // A refresh grant carries no token in the body — the HttpOnly cookie
+    // A refresh grant carries no token in the body - the HttpOnly cookie
     // supplies it server-side, so any refresh grant models a valid session.
     if (body.grant_type === 'refresh_token' || body.code === 'valid_code') {
       return HttpResponse.json({
@@ -149,7 +149,7 @@ describe('Google Drive Sync', () => {
       expect(callCount).toBe(2);
     });
 
-    // An expired or revoked refresh cookie — the proxy rejects the grant.
+    // An expired or revoked refresh cookie - the proxy rejects the grant.
     const rejectRefresh = () => server.use(
       http.post('http://localhost/api/token', () =>
         HttpResponse.json({ error: 'invalid_grant' }, { status: 400 }))
@@ -181,7 +181,7 @@ describe('Google Drive Sync', () => {
     });
 
     // No verdict ever arrived. A fast reload aborts the in-flight token call,
-    // and the proxy answers 500 when it cannot reach Google — neither means the
+    // and the proxy answers 500 when it cannot reach Google - neither means the
     // refresh cookie is dead, so the stored session must survive.
     const softFailures = {
       'an aborted request':  () => HttpResponse.error(),

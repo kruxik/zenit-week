@@ -59,7 +59,7 @@ function sampleWeek() {
 // Mimics what syncWeekFromDrive does to bytes pulled from Drive.
 const normalizeAsPulled = (data) => migrateCrdt(validateAndRepair(clone(data)));
 
-describe('Drive sync — content-hash convergence (ping-pong guard)', () => {
+describe('Drive sync - content-hash convergence (ping-pong guard)', () => {
   describe('weekContentHash ignores bookkeeping churn', () => {
     test('crdtVersion does not affect the hash', () => {
       const a = sampleWeek();
@@ -134,7 +134,7 @@ describe('Drive sync — content-hash convergence (ping-pong guard)', () => {
     });
   });
 
-  describe('merge convergence — the loop must terminate', () => {
+  describe('merge convergence - the loop must terminate', () => {
     test('merging identical content yields the same content hash (no upload scheduled)', () => {
       const remote = sampleWeek();
       const local = clone(remote);
@@ -174,7 +174,7 @@ describe('Drive sync — content-hash convergence (ping-pong guard)', () => {
   });
 });
 
-describe('Colors sync — content-hash convergence', () => {
+describe('Colors sync - content-hash convergence', () => {
   // Shape produced by saveBranchColors(): savedAt + per-branch {main} + theme + lang.
   const sampleColors = () => ({
     savedAt: 1000,
@@ -228,7 +228,7 @@ describe('Colors sync — content-hash convergence', () => {
 });
 
 // ── End-to-end: a clean pull must not cascade into re-upload / re-download ──────
-describe('Drive sync E2E — clean pull does not ping-pong', () => {
+describe('Drive sync E2E - clean pull does not ping-pong', () => {
   const WK = '2026-01'; // currentWeekKey in the test harness
   const FILE_ID = 'file_id_2026_01';
 
@@ -297,8 +297,8 @@ describe('Drive sync E2E — clean pull does not ping-pong', () => {
 // byte-for-byte what we already hold, so the merge is a no-op and never re-uploads
 // to rewrite the appProperty. Without a "remote hash we last reconciled" guard, the
 // poll would compare that stale hash against our canonical hash forever and
-// re-download the file every cycle — a read-only download storm.
-describe('Drive sync E2E — legacy-scheme appProperty self-heals (no download storm)', () => {
+// re-download the file every cycle - a read-only download storm.
+describe('Drive sync E2E - legacy-scheme appProperty self-heals (no download storm)', () => {
   const WK = '2026-01';
   const FILE_ID = 'file_id_2026_01';
 
@@ -354,17 +354,17 @@ describe('Drive sync E2E — legacy-scheme appProperty self-heals (no download s
     await pollDriveMeta(WK);      // subsequent polls must not re-download
     await pollDriveMeta(WK);
     expect(mediaFetchCount).toBe(0);
-    expect(patchCount).toBe(0);   // identical content — never corrects the appProperty by re-upload
+    expect(patchCount).toBe(0);   // identical content - never corrects the appProperty by re-upload
   });
 });
 
 // The colors/settings file has the same legacy-appProperty failure mode as week
 // files, on a separate poll branch. A colors file written by an older hashing
 // scheme advertises a contentHash that never matches colorsSyncedHash (canonical),
-// and syncColorsFromDrive only ever rewrites colorsSyncedHash to canonical — it
-// never re-uploads to correct the appProperty — so the poll re-downloaded it every
+// and syncColorsFromDrive only ever rewrites colorsSyncedHash to canonical - it
+// never re-uploads to correct the appProperty - so the poll re-downloaded it every
 // cycle. lastSeenRemoteColorsHash breaks that loop.
-describe('Colors sync E2E — legacy-scheme appProperty self-heals (no download storm)', () => {
+describe('Colors sync E2E - legacy-scheme appProperty self-heals (no download storm)', () => {
   const COLORS_FILE_ID = 'file_id_colors';
   const remoteColors = { savedAt: 5000, work: { main: '#F24E1E' }, family: { main: '#A259FF' }, me: { main: '#1ABCFE' }, theme: 'light', lang: 'en' };
   const legacyHash = colorsContentHash(remoteColors) + '_legacy';
@@ -416,7 +416,7 @@ describe('Colors sync E2E — legacy-scheme appProperty self-heals (no download 
 // One changes.list drain per cycle replaces per-file appProperties GETs. These pin
 // the contract: baseline-then-drain, react once to a reported change, suppress the
 // echo of our own uploads, and stay quiet when nothing changed.
-describe('Drive sync E2E — Changes API poll (flagged)', () => {
+describe('Drive sync E2E - Changes API poll (flagged)', () => {
   const WK = '2026-01';
   const FILE_ID = 'file_id_2026_01';
   const remoteMedia = sampleWeek();
@@ -471,7 +471,7 @@ describe('Drive sync E2E — Changes API poll (flagged)', () => {
     changes: [{ removed: false, fileId: FILE_ID, file: { id: FILE_ID, name: `zenit-week-${WK}.json`, appProperties: { contentHash: hash } } }],
   });
 
-  test('first tick only baselines the cursor — no changes processed, no download', async () => {
+  test('first tick only baselines the cursor - no changes processed, no download', async () => {
     await pollDriveChanges(WK);
     expect(startTokenCalls).toBe(1);
     expect(mediaFetchCount).toBe(0);
@@ -493,18 +493,18 @@ describe('Drive sync E2E — Changes API poll (flagged)', () => {
     _state.setLastSyncedHash(WK, remoteHash); // simulate: we just uploaded this content
     changesPayload = weekChange(remoteHash);  // Drive echoes our own write back
     await pollDriveChanges(WK);
-    expect(mediaFetchCount).toBe(0);     // recognised as our own content — no re-download
+    expect(mediaFetchCount).toBe(0);     // recognised as our own content - no re-download
   });
 });
 
 // ── I6: lastSeenRemoteHash is only ever set to a hash that was actually merged ──
 //
 // The poll used to record "seen" at the call site, right after awaiting the
-// pull — whether or not the pull did anything. A 401, an exhausted retry or the
+// pull - whether or not the pull did anything. A 401, an exhausted retry or the
 // undo force-push guard therefore left the device convinced it had reconciled a
 // revision it never downloaded, and no later poll would go back for it: a
 // silent stall that only a sign-out could clear.
-describe('Drive sync — "seen" only when applied (I6)', () => {
+describe('Drive sync - "seen" only when applied (I6)', () => {
   const WK = '2026-01';
   const FILE_ID = 'file_seen';
   const remoteMedia = sampleWeek();
@@ -583,7 +583,7 @@ describe('Drive sync — "seen" only when applied (I6)', () => {
     _state.setUndoRedoForcePush(null);
   });
 
-  test('a 304 returns "unchanged" — nothing was merged, so nothing is marked seen', async () => {
+  test('a 304 returns "unchanged" - nothing was merged, so nothing is marked seen', async () => {
     mediaStatus = 304;
     const outcome = await syncWeekFromDrive(WK, { seenHash: REMOTE_HASH });
     expect(outcome).toBe('unchanged');

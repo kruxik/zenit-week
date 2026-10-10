@@ -35,7 +35,7 @@ describe('orderedInsertIndex', () => {
 
   it('keeps an equal ordinal after the sibling already placed', () => {
     // Indices slide down as siblings leave the source week, so a tie means the
-    // arriving node sat later — it must not jump ahead.
+    // arriving node sat later - it must not jump ahead.
     expect(orderedInsertIndex(['1'], 1, ordOf)).toBe(1);
   });
 
@@ -45,7 +45,7 @@ describe('orderedInsertIndex', () => {
   });
 });
 
-describe('moveNodeToNextWeek — source-week ordering', () => {
+describe('moveNodeToNextWeek - source-week ordering', () => {
   beforeEach(() => {
     _state.clearLocalStorage();
     _state.reset();
@@ -71,7 +71,7 @@ describe('moveNodeToNextWeek — source-week ordering', () => {
       ],
     });
 
-    // Home is sent first, Networking second — the reverse of the source order.
+    // Home is sent first, Networking second - the reverse of the source order.
     await move('home-task');
     await move('net-task');
 

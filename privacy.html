@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="index,follow">
-  <title>Privacy Policy — Zenit Week</title>
+  <title>Privacy Policy - Zenit Week</title>
   <link rel="canonical" href="https://zenitweek.com/privacy">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1a2e'/%3E%3Cpath d='M18,32 C32,32 32,14 42,14' fill='none' stroke='%23A259FF' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M18,32 C32,32 32,50 42,50' fill='none' stroke='%231ABCFE' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='32' r='7' fill='%23f0f0f0'/%3E%3Ccircle cx='48' cy='14' r='5' fill='%23A259FF'/%3E%3Ccircle cx='48' cy='50' r='5' fill='%231ABCFE'/%3E%3C/svg%3E">
   <style>
@@ -58,7 +58,7 @@
 
     <div class="tldr">
       <strong>TL;DR</strong>
-      Zenit Week runs no servers that hold your data and stores no user data. Your plans live in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see them. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel, plus aggregated, cookieless usage counts (no personal identifiers, never your task content) from Vercel Web Analytics and Umami, used to size traffic, see which countries the app is used from and whether people come back to plan another week. If you sign in with Google, one strictly-necessary cookie keeps you signed in; we set no advertising or tracking cookies and show no cookie banner.
+      Zenit Week runs no servers that hold your data and stores no user data. Your plans live in your browser, or - if you opt in - in your own Google Drive's hidden app folder. We never see them. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel, plus aggregated, cookieless usage counts (no personal identifiers, never your task content) from Vercel Web Analytics and Umami, used to size traffic, see which countries the app is used from and whether people come back to plan another week. If you sign in with Google, one strictly-necessary cookie keeps you signed in; we set no advertising or tracking cookies and show no cookie banner.
     </div>
 
     <h2>1. Controller</h2>
@@ -78,11 +78,11 @@
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.1 In your browser (always)</h3>
     <p>The app uses your browser's local storage (<code>localStorage</code> and <code>IndexedDB</code>) to keep:</p>
     <ul>
-      <li><strong>Planning data</strong> — your weekly mind maps, branches, activities, counters, daily logs.</li>
-      <li><strong>Preferences</strong> — theme (light/dark), language (en/cs), branch colors, layout settings.</li>
-      <li><strong>Sync state</strong> — internal flags such as a per-device reset token used to avoid overwriting newer data on other devices.</li>
+      <li><strong>Planning data</strong> - your weekly mind maps, branches, activities, counters, daily logs.</li>
+      <li><strong>Preferences</strong> - theme (light/dark), language (en/cs), branch colors, layout settings.</li>
+      <li><strong>Sync state</strong> - internal flags such as a per-device reset token used to avoid overwriting newer data on other devices.</li>
     </ul>
-    <p>This data never leaves your device unless you explicitly enable Google Drive sync. If you sign in with Google, a long-lived Google OAuth refresh token is also stored on your device, but in a cookie rather than local storage — see §3.</p>
+    <p>This data never leaves your device unless you explicitly enable Google Drive sync. If you sign in with Google, a long-lived Google OAuth refresh token is also stored on your device, but in a cookie rather than local storage - see §3.</p>
 
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.2 In your own Google Drive (only if you sign in)</h3>
     <p>If you choose to sign in with Google, the app stores a copy of your planning data inside <em>your own</em> Google Drive, in a private app-specific folder, using the <code>drive.appdata</code> scope. This folder is invisible to other apps and to us. We never read, copy, or process your Drive data on any server.</p>
@@ -94,7 +94,7 @@
     <p>Zenit Week uses <strong>no advertising, analytics, or behavioural-tracking cookies</strong>. We do not profile users, do not track you across other websites, and do not use any persistent identifier stored on your device for analytics.</p>
     <p>The app sets a <strong>single strictly-necessary cookie</strong>, and only if you choose to sign in with Google Drive sync:</p>
     <ul>
-      <li><code>zw_rt</code> — stores your Google OAuth <strong>refresh token</strong>, a long-lived credential issued by Google that lets the app refresh its access to <em>your own</em> Drive (the app-specific folder described in §4) without prompting you again. It is set by our <code>/api/token</code> endpoint as an <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code> cookie scoped to the <code>/api/token</code> path, so it cannot be read by JavaScript and is sent only to that endpoint. It lasts up to 180 days and is deleted when you sign out. It is used solely to keep you signed in — never for tracking. You can revoke it at any time (see §10).</li>
+      <li><code>zw_rt</code> - stores your Google OAuth <strong>refresh token</strong>, a long-lived credential issued by Google that lets the app refresh its access to <em>your own</em> Drive (the app-specific folder described in §4) without prompting you again. It is set by our <code>/api/token</code> endpoint as an <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code> cookie scoped to the <code>/api/token</code> path, so it cannot be read by JavaScript and is sent only to that endpoint. It lasts up to 180 days and is deleted when you sign out. It is used solely to keep you signed in - never for tracking. You can revoke it at any time (see §10).</li>
     </ul>
     <p>To understand basic, aggregate usage of the site (number of visits, number of page views, and the country a request comes from) we use <strong>Vercel Web Analytics</strong>, a privacy-first, cookieless analytics product provided by our hosting provider Vercel. It runs on:</p>
     <ul>
@@ -110,27 +110,27 @@
     </ul>
     <p>The only detail sent with these events is the app's interface language (<code>en</code> or <code>cs</code>). Never a task name, comment, branch name or any other content you write. On the app page, the URL is reported without its query string and fragment, so neither a sign-in code nor the week you are looking at reaches Umami.</p>
     <p>Umami works without cookies and without writing anything to <code>localStorage</code>, <code>IndexedDB</code>, or any other client-side storage, and the app adds no storage of its own for it: each event is worked out from what the app is doing at that moment, not from a stored marker. The script and the counts travel through our own domain (<code>zenitweek.com/u/</code>), which forwards them to Umami together with your IP address and user agent. Umami uses these to derive a salted session hash, with a salt that rotates, so visits cannot be linked over the long term or across sites, and to look up an approximate location (country, region, city). Umami's tracking database has no field for the IP address itself. It also records the browser, operating system, device type, screen size and browser language. We only ever see the aggregated results.</p>
-    <p>Neither of these requires a consent banner. The <code>zw_rt</code> authentication cookie is <strong>strictly necessary</strong> to provide a feature you explicitly request — staying signed in to Google Drive sync — and is therefore exempt from the consent requirement of Article 5(3) of the ePrivacy Directive ("cookie law"); it is set only after you initiate sign-in and is never used for tracking. The Vercel Web Analytics and Umami processing stores nothing on your device and keeps no analytics identifier there, so it likewise falls outside Article 5(3). Zenit Week therefore does not show a cookie banner. The transient processing of your IP address by Vercel and Umami is necessary to deliver the site and to produce the aggregate counts, relying on the legal basis of legitimate interest under Article 6(1)(f) GDPR (interest: understanding aggregate use of a free, open-source tool in order to maintain and improve it). You can object to this processing at any time — see §10.</p>
+    <p>Neither of these requires a consent banner. The <code>zw_rt</code> authentication cookie is <strong>strictly necessary</strong> to provide a feature you explicitly request - staying signed in to Google Drive sync - and is therefore exempt from the consent requirement of Article 5(3) of the ePrivacy Directive ("cookie law"); it is set only after you initiate sign-in and is never used for tracking. The Vercel Web Analytics and Umami processing stores nothing on your device and keeps no analytics identifier there, so it likewise falls outside Article 5(3). Zenit Week therefore does not show a cookie banner. The transient processing of your IP address by Vercel and Umami is necessary to deliver the site and to produce the aggregate counts, relying on the legal basis of legitimate interest under Article 6(1)(f) GDPR (interest: understanding aggregate use of a free, open-source tool in order to maintain and improve it). You can object to this processing at any time - see §10.</p>
     <p>Apart from the two analytics scripts above (both served from our own domain), the marketing pages (homepage in EN and CS, privacy, terms) load no other third-party scripts. The app page (<code>/app</code>) additionally loads Google's official JavaScript client library (<code>apis.google.com/js/api.js</code>) so that Google Drive sync can work if you choose to sign in. That library does not transmit any data to Google until you initiate sign-in.</p>
 
     <h2>4. Service providers (sub-processors)</h2>
     <p>We rely on the following providers strictly to deliver the service:</p>
     <ul>
       <li>
-        <strong>Vercel Inc.</strong> — static-site hosting, the OAuth token-exchange serverless function (<code>/api/token</code>, which also sets the strictly-necessary authentication cookie described in §3), the Umami relay function (<code>/api/umami-send</code>, see §3), and cookieless aggregate analytics via Vercel Web Analytics (see §3). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
+        <strong>Vercel Inc.</strong> - static-site hosting, the OAuth token-exchange serverless function (<code>/api/token</code>, which also sets the strictly-necessary authentication cookie described in §3), the Umami relay function (<code>/api/umami-send</code>, see §3), and cookieless aggregate analytics via Vercel Web Analytics (see §3). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
       </li>
       <li>
         <strong>Umami Software, Inc.</strong> (28 Geary St, Suite 650 #243, San Francisco, California, USA) - cookieless aggregate analytics via Umami Cloud (see §3). Receives IP addresses, user agents and the page and event data described in §3, forwarded through our domain. Umami Cloud runs on servers in the US and the EU. See <a href="https://umami.is/privacy" target="_blank" rel="noopener">Umami's Privacy Policy</a>, their <a href="https://umami.is/dpa" target="_blank" rel="noopener">Data Processing Agreement</a> and <a href="https://umami.is/subprocessors" target="_blank" rel="noopener">sub-processors</a>.
       </li>
       <li>
-        <strong>Google LLC</strong> — Google Identity Services and Google Drive APIs, used only when you sign in. Data is stored in <em>your own</em> Drive account, governed by your Google Account terms. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
+        <strong>Google LLC</strong> - Google Identity Services and Google Drive APIs, used only when you sign in. Data is stored in <em>your own</em> Drive account, governed by your Google Account terms. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
       </li>
     </ul>
 
     <h2>5. Google API scopes</h2>
     <p>When you sign in with Google, the app requests one scope only:</p>
     <ul>
-      <li><code>https://www.googleapis.com/auth/drive.appdata</code> — read and write files in the hidden app-data folder of <em>your</em> Google Drive. No access to any other files in your Drive, no access to your Gmail, Calendar, profile photo, or any other Google service.</li>
+      <li><code>https://www.googleapis.com/auth/drive.appdata</code> - read and write files in the hidden app-data folder of <em>your</em> Google Drive. No access to any other files in your Drive, no access to your Gmail, Calendar, profile photo, or any other Google service.</li>
     </ul>
     <p>
       Zenit Week's use and transfer of information received from Google APIs adheres to the
@@ -143,16 +143,16 @@
 
     <h2>7. Legal basis (GDPR Article 6)</h2>
     <ul>
-      <li><strong>Article 6(1)(a) — Consent.</strong> Google Drive sign-in and Drive sync are strictly opt-in. You can withdraw consent at any time by signing out in the app or revoking access in your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account settings</a>; withdrawal does not affect the lawfulness of processing before withdrawal.</li>
-      <li><strong>Article 6(1)(f) — Legitimate interest.</strong> Storing your plans in your browser is necessary to provide the core functionality of the app on your device. Vercel's transient processing of IP/request metadata is necessary to deliver the website and prevent abuse; Vercel and Umami process it to produce the aggregate, cookieless usage statistics described in §3 so we can understand how this free, open-source tool is used and maintained.</li>
+      <li><strong>Article 6(1)(a) - Consent.</strong> Google Drive sign-in and Drive sync are strictly opt-in. You can withdraw consent at any time by signing out in the app or revoking access in your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account settings</a>; withdrawal does not affect the lawfulness of processing before withdrawal.</li>
+      <li><strong>Article 6(1)(f) - Legitimate interest.</strong> Storing your plans in your browser is necessary to provide the core functionality of the app on your device. Vercel's transient processing of IP/request metadata is necessary to deliver the website and prevent abuse; Vercel and Umami process it to produce the aggregate, cookieless usage statistics described in §3 so we can understand how this free, open-source tool is used and maintained.</li>
     </ul>
 
     <h2>8. Retention and deletion</h2>
     <ul>
-      <li><strong>Local browser data</strong> — retained until you clear your browser's site data, use the in-app sign-out (which removes the OAuth refresh token), or uninstall/reset your browser.</li>
-      <li><strong>Drive data</strong> — retained in <em>your</em> Google Drive until you delete it directly or revoke the app's access. We hold no copies.</li>
-      <li><strong>Vercel request logs</strong> — handled per Vercel's standard retention (typically up to 30 days for operational logs).</li>
-      <li><strong>Vercel Web Analytics</strong> — only aggregate counts (visits, page views, country) are retained, per Vercel's analytics retention policy. The raw IP address used to derive the daily salted hash and the country is not stored alongside the aggregated record.</li>
+      <li><strong>Local browser data</strong> - retained until you clear your browser's site data, use the in-app sign-out (which removes the OAuth refresh token), or uninstall/reset your browser.</li>
+      <li><strong>Drive data</strong> - retained in <em>your</em> Google Drive until you delete it directly or revoke the app's access. We hold no copies.</li>
+      <li><strong>Vercel request logs</strong> - handled per Vercel's standard retention (typically up to 30 days for operational logs).</li>
+      <li><strong>Vercel Web Analytics</strong> - only aggregate counts (visits, page views, country) are retained, per Vercel's analytics retention policy. The raw IP address used to derive the daily salted hash and the country is not stored alongside the aggregated record.</li>
       <li><strong>Umami Cloud</strong> - page views, the three app events and the session attributes described in §3 (no IP address, no task content) are kept for the data-retention period of our Umami Cloud plan and then deleted. We look at them only as aggregated reports.</li>
     </ul>
 
@@ -166,16 +166,16 @@
       <li>Have inaccurate data rectified (Art. 16);</li>
       <li>Have your data erased (Art. 17);</li>
       <li>Restrict or object to processing (Arts. 18, 21);</li>
-      <li>Receive your data in a portable format (Art. 20) — the app's <em>Settings → Export</em> feature does this directly;</li>
+      <li>Receive your data in a portable format (Art. 20) - the app's <em>Settings → Export</em> feature does this directly;</li>
       <li>Withdraw any previously given consent (Art. 7).</li>
     </ul>
     <p>Because we hold no data ourselves, most rights are exercised directly:</p>
     <ul>
-      <li><strong>Local data</strong> — clear your browser's site data, or use Settings → Reset in the app.</li>
-      <li><strong>Drive data</strong> — manage in your <a href="https://drive.google.com" target="_blank" rel="noopener">Google Drive</a>; revoke our access in your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account permissions</a>.</li>
+      <li><strong>Local data</strong> - clear your browser's site data, or use Settings → Reset in the app.</li>
+      <li><strong>Drive data</strong> - manage in your <a href="https://drive.google.com" target="_blank" rel="noopener">Google Drive</a>; revoke our access in your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account permissions</a>.</li>
     </ul>
     <p>For any question or formal request, write to <a href="mailto:petr@petrburian.com">petr@petrburian.com</a>. We respond within 30 days at no charge, in line with Article 12 GDPR.</p>
-    <p>You have the right to lodge a complaint with the Czech Data Protection Authority (<a href="https://www.uoou.cz" target="_blank" rel="noopener">Úřad pro ochranu osobních údajů — ÚOOÚ</a>) or with the supervisory authority in your EU country of residence.</p>
+    <p>You have the right to lodge a complaint with the Czech Data Protection Authority (<a href="https://www.uoou.cz" target="_blank" rel="noopener">Úřad pro ochranu osobních údajů - ÚOOÚ</a>) or with the supervisory authority in your EU country of residence.</p>
 
     <h2>11. Children</h2>
     <p>Zenit Week is not directed at children under 16. We do not knowingly collect data from children. If you believe a child has used the app and you are their guardian, contact us and we will help you remove any associated data from your devices and your Google Drive (we cannot delete it ourselves because we hold no copies).</p>

@@ -127,7 +127,7 @@ describe('CRDT - mergeWeekData', () => {
     expect(mergeWeekData(local, remote).agendaOrder['k'].ids).toEqual(['fresh']);
   });
 
-  // I2 — content follows _ts, position follows _posTs, both tie to remote.
+  // I2 - content follows _ts, position follows _posTs, both tie to remote.
   describe('position LWW by _posTs (I2)', () => {
     const mkPos = (id, { ts, posTs, label, offX, offY }) => ({
       id, parent: 'work', branch: 'work', type: 'activity',
@@ -152,7 +152,7 @@ describe('CRDT - mergeWeekData', () => {
       expect(n.offY).toBe(10);
     });
 
-    test('both stamps newer on the same side — that side wins outright', () => {
+    test('both stamps newer on the same side - that side wins outright', () => {
       const local  = mkWeek([mkPos('a1', { ts: 300, posTs: 300, label: 'local',  offX: 10, offY: 10 })], [], 1000);
       const remote = mkWeek([mkPos('a1', { ts: 100, posTs: 100, label: 'remote', offX: 99, offY: 99 })], [], 2000);
       const n = mergeWeekData(local, remote).nodes.find(x => x.id === 'a1');
@@ -196,7 +196,7 @@ describe('CRDT - mergeWeekData', () => {
     });
   });
 
-  // I3 — bookkeeping stamps are not content.
+  // I3 - bookkeeping stamps are not content.
   test('_weekContentSig ignores _ts and _posTs (I3)', () => {
     const a = mkWeek([{ id: 'a1', parent: 'work', branch: 'work', type: 'activity',
                         label: 'x', children: [], _ts: 1, _posTs: 2 }], [], 1000);

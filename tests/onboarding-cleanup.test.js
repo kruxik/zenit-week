@@ -29,7 +29,7 @@ function seededWeek() {
 
 const ids = () => _state.get().nodes.map(n => n.id).sort();
 
-describe('Onboarding cleanup — Clear example tasks (S3)', () => {
+describe('Onboarding cleanup - Clear example tasks (S3)', () => {
   beforeEach(() => {
     _state.reset();
     _state.setWeekKey('2026-20');
@@ -71,7 +71,7 @@ describe('Onboarding cleanup — Clear example tasks (S3)', () => {
     expect(family.children).toEqual([]);
   });
 
-  it('is undoable — snapshot restores the removed nodes', async () => {
+  it('is undoable - snapshot restores the removed nodes', async () => {
     const before = ids();
     clearExampleTasks();
     expect(ids()).not.toEqual(before);

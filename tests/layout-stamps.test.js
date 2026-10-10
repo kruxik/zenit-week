@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { _state, touchLayout, touchNode, findNode, handleNodeDrop, migrateCrdt } from './setup.js';
 
-// I1 — a layout-only operation never changes _ts on any node.
+// I1 - a layout-only operation never changes _ts on any node.
 //
 // The incident this pins: a stale phone panned from the root, every node got a
 // fresh _ts, and the next push made that stale week the LWW winner everywhere.
@@ -88,7 +88,7 @@ describe('recenter-all from the root (I1)', () => {
     expect(findNode('t1').offX).toBe(0);
   });
 
-  // Fix 2 — a finger pan that started on the root is a pan and nothing else.
+  // Fix 2 - a finger pan that started on the root is a pan and nothing else.
   it('a touch pan from the root changes nothing at all', () => {
     const before = stamps();
     const undoBefore = _state.getUndoStack().length;
@@ -113,7 +113,7 @@ describe('drag drop stamps position, not content (I1)', () => {
     _state.set(week());
   });
 
-  // Reorder within the same parent — the non-rebind path.
+  // Reorder within the same parent - the non-rebind path.
   it('leaves _ts alone on the dragged node, its subtree and its parent', () => {
     const before = stamps();
     _state.setViewport({ panX: 0, panY: 0, zoom: 1 });
@@ -127,7 +127,7 @@ describe('drag drop stamps position, not content (I1)', () => {
       },
       descendantSet: new Set(['t1', 'a1']),
     });
-    // Empty space below x1 — far from every node box, so nothing rebinds.
+    // Empty space below x1 - far from every node box, so nothing rebinds.
     handleNodeDrop(900, 900);
 
     for (const n of _state.get().nodes) {

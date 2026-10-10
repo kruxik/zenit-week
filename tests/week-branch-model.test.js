@@ -1,4 +1,4 @@
-// A new week copies its branches from the week the user last shaped — the
+// A new week copies its branches from the week the user last shaped - the
 // previous week is the role model. The lookup is nearest-first, so opening a
 // week across a gap (or before every week that exists) still lands on the
 // user's own branches instead of the defaults.
@@ -22,7 +22,7 @@ describe('New week inherits the branches of the last shaped week', () => {
     _state.clearIDBStore();
     _state.reset();
     _state.useRealIDB(true);
-    // fake-indexeddb outlives a single test — start each one on an empty store.
+    // fake-indexeddb outlives a single test - start each one on an empty store.
     for (const wk of await listWeekKeysIDB()) await deleteWeekIDB(wk);
   });
   afterEach(() => _state.useRealIDB(false));

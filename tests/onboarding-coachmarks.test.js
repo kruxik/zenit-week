@@ -11,7 +11,7 @@ import {
   replayTips,
 } from './setup.js';
 
-describe('Coachmark hints — engine + seam (PB1)', () => {
+describe('Coachmark hints - engine + seam (PB1)', () => {
   beforeEach(() => {
     _state.resetTips();
   });
@@ -78,7 +78,7 @@ describe('Coachmark hints — engine + seam (PB1)', () => {
   });
 
   // views and undo anchor to a control, not a node, so they must never join the
-  // competition for a hovered task — a matcher-less hint would throw there.
+  // competition for a hovered task - a matcher-less hint would throw there.
   it('control-anchored hints stay out of the node competition', () => {
     expect(hintIdsByPriority()).not.toContain('views');
     expect(hintIdsByPriority()).not.toContain('undo');

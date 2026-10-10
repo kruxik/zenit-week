@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { animatePanTo, panState, endPan, sandboxGlobal } from './setup.js';
 
-// Three triggers ask for the reveal pan on mobile — the optimistic one at focus,
-// the keyboard-settled one, and a 500ms fallback — and they usually name the
+// Three triggers ask for the reveal pan on mobile - the optimistic one at focus,
+// the keyboard-settled one, and a 500ms fallback - and they usually name the
 // same target. A device trace (Galaxy S22, Chrome 151) showed the fallback
 // restarting the tween 109ms into it: the running ease decelerated and the new
 // one accelerated from rest again, which is what "laggy" actually looked like.

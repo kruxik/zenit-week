@@ -37,7 +37,7 @@ describe('Onboarding auto-nudge (S4)', () => {
 
   it('does not count day children, tick children or the counter node', () => {
     const w = week({ userCount: 3, demoCount: 5 });
-    // One of the user's tasks gets days assigned and a counter with ticks —
+    // One of the user's tasks gets days assigned and a counter with ticks -
     // all app-created bookkeeping under a task that already counts as one.
     w.nodes.push(
       { id: 'day1', type: 'activity', dayChild: true, dayIndex: 1, branch: 'work', parent: 'u0', label: 'Mo', children: [] },

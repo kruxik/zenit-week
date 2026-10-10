@@ -34,7 +34,7 @@ describe('centerDisplayName', () => {
     });
 
     it('does not dress a handle up as a name', () => {
-      // Deliberately not capitalized — see firstNameFrom's comment.
+      // Deliberately not capitalized - see firstNameFrom's comment.
       expect(firstNameFrom('', 'petr.burian@example.com')).toBe('petr.burian');
     });
 
@@ -79,7 +79,7 @@ describe('centerDisplayName', () => {
   });
 });
 
-// What the root circle paints. The photo is not a tier here — it is layered over
+// What the root circle paints. The photo is not a tier here - it is layered over
 // the initials in the DOM, so a failed or skipped image reveals them.
 describe('centerNodeText', () => {
   afterEach(() => {
@@ -104,7 +104,7 @@ describe('centerNodeText', () => {
     expect(centerNodeText()).toBe('KR');
   });
 
-  it('stays initials in Czech — a name is not translated', () => {
+  it('stays initials in Czech - a name is not translated', () => {
     _state.setGoogleUser('Petr Burian', 'kruxik@gmail.com');
     _state.setLang('cs');
     expect(centerNodeText()).toBe('PB');
@@ -198,8 +198,8 @@ describe('root completion ring', () => {
   it('maps a percentage onto a dasharray that never exceeds the circle', () => {
     const { perimeter } = ring();
     const dash = (pct) => (pct / 100) * perimeter;
-    expect(dash(0)).toBe(0);                              // empty week — bare track
-    expect(dash(100)).toBeCloseTo(perimeter, 6);           // finished — closed ring
+    expect(dash(0)).toBe(0);                              // empty week - bare track
+    expect(dash(100)).toBeCloseTo(perimeter, 6);           // finished - closed ring
     expect(dash(50)).toBeCloseTo(perimeter / 2, 6);
     expect(dash(37)).toBeLessThan(perimeter);
   });

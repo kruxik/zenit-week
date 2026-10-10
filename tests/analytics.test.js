@@ -63,7 +63,7 @@ function seededWeek() {
   return { nodes };
 }
 
-describe('analytics — app_opened and the pre-load queue', () => {
+describe('analytics - app_opened and the pre-load queue', () => {
   afterEach(() => { removeTracker(); clearQueue(); });
 
   it('holds events raised before the tracker loads and sends app_opened once per page', () => {
@@ -109,7 +109,7 @@ describe('analytics — app_opened and the pre-load queue', () => {
   });
 });
 
-describe('analytics — first_node_created', () => {
+describe('analytics - first_node_created', () => {
   let track;
   beforeEach(() => {
     clearQueue();
@@ -183,7 +183,7 @@ describe('analytics — first_node_created', () => {
   });
 });
 
-describe('analytics — returned_new_week', () => {
+describe('analytics - returned_new_week', () => {
   const TODAY = '2026-20';
   let track;
 

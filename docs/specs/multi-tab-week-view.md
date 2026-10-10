@@ -1,6 +1,6 @@
-# Spec — Multi-tab editing (Option B: local sync peer)
+# Spec - Multi-tab editing (Option B: local sync peer)
 
-Status: Draft · Feature spec (not a project spec — commands/structure/style live
+Status: Draft · Feature spec (not a project spec - commands/structure/style live
 in `CLAUDE.md`). Companion idea one-pager: `docs/ideas/multi-tab-week-view.md`.
 
 ## 1. Objective
@@ -9,7 +9,7 @@ Let a user open Zenit Week in multiple browser tabs at once (same browser =
 shared IndexedDB), edit freely in every tab, and never see a blocking overlay.
 Concurrent edits to the same week reconcile automatically and without data loss.
 
-Target user: a single person planning across two monitors — e.g. drafting the new
+Target user: a single person planning across two monitors - e.g. drafting the new
 week in tab A while viewing/adjusting last week in tab B.
 
 Success = the "Application Blocked" overlay is gone, two tabs editing two
@@ -18,15 +18,15 @@ converge to a merged, lossless result.
 
 ### Why this is small
 The conflict engine already exists for Google Drive sync and is reused verbatim:
-- `mergeWeekData(local, remote)` — CRDT, LWW per node by `_ts`, union tombstones,
+- `mergeWeekData(local, remote)` - CRDT, LWW per node by `_ts`, union tombstones,
   tree rebuild.
-- `applyRemoteMerge` → `_commitRemoteMerge` — write IDB, re-render only if content
+- `applyRemoteMerge` → `_commitRemoteMerge` - write IDB, re-render only if content
   changed (`_weekContentSig`), update sync state.
 - `beginAtomicOp` / `endAtomicOp` / `isAtomicOpActive` / `pendingRemoteMerge` /
-  `_flushPendingMerge` — already defer a remote merge while an edit is in flight.
+  `_flushPendingMerge` - already defer a remote merge while an edit is in flight.
 
 A peer tab is just another "remote." The new work is the **transport** (a
-BroadcastChannel signal + reload) plus loop/echo suppression — not a new model.
+BroadcastChannel signal + reload) plus loop/echo suppression - not a new model.
 
 ## 2. Behavior / Acceptance Criteria
 
@@ -36,7 +36,7 @@ BroadcastChannel signal + reload) plus loop/echo suppression — not a new model
 - [ ] `tabChannel` (`BroadcastChannel('zenit-week-tabs')`) is retained and
       repurposed as the change-signal bus.
 - [ ] The `#single-tab-overlay` element and its i18n keys are removed (or left
-      dead only if removal is risky — prefer removal).
+      dead only if removal is risky - prefer removal).
 
 ### B. Broadcast on save
 - [ ] After a successful `saveWeek(wk, data)` IDB write, broadcast
@@ -55,21 +55,21 @@ On `week-saved` for `wk` from another origin:
      (already converged; prevents ping-pong).
   3. `merged = mergeWeekData(structuredClone(weekData), remoteData)`.
   4. `applyRemoteMerge(wk, merged, json, hash, /*scheduleUpload*/ false, remoteData)`
-     — reuses the existing atomic-op deferral and no-op-render guard.
+     - reuses the existing atomic-op deferral and no-op-render guard.
 - [ ] The merge path must **re-broadcast only if it changed the record** (merged
       sig ≠ remote sig), and that re-broadcast must not re-trigger the originator
       into an infinite loop (sig-equality guard in step C.2 terminates it).
 
 ### D. Mid-edit / undo safety (the real risk)
 - [ ] A `week-saved` arriving while a node is `_editing` (active rename) must NOT
-      discard the in-progress edit. Reuse `isAtomicOpActive()` deferral — confirm
+      discard the in-progress edit. Reuse `isAtomicOpActive()` deferral - confirm
       label edits are wrapped so `pendingRemoteMerge` holds until `commitEdit`.
 - [ ] A merge that lands on the current week after the user has built an undo
       stack leaves the local undo/redo stack **untouched** (resolved, was Open Q1):
       a merged change is a new converged state, not an undoable local action, so it
       pushes no snapshot and clears nothing. Undo continues to replay the local
       tab's own history. Accepted edge case: an undo can momentarily reintroduce a
-      node the peer deleted — the next save re-runs the merge and the tombstone
+      node the peer deleted - the next save re-runs the merge and the tombstone
       wins again, so it self-heals.
 - [ ] No merge is applied between a structural mutation and its `saveWeek` (the
       `beginAtomicOp`/`endAtomicOp` window already covers multi-step ops).
@@ -87,10 +87,10 @@ On `week-saved` for `wk` from another origin:
 - SharedWorker / single-source-of-truth rewrite.
 - Leader/follower writer election.
 - Cross-device realtime beyond existing Drive sync.
-- Any blocking/lock UI — explicitly being removed, not relocated.
+- Any blocking/lock UI - explicitly being removed, not relocated.
 
 ## 4. Testing Strategy
-Automated (vitest — data logic):
+Automated (vitest - data logic):
 - [ ] `mergeWeekData` fed two divergent copies of one week (disjoint edits) →
       union, no loss.
 - [ ] Conflicting edit to the *same* node → higher `_ts` wins.
@@ -111,13 +111,13 @@ Manual (two real tabs, per `CLAUDE.md` testing notes):
 
 ## 5. Boundaries
 Always:
-- Reuse `mergeWeekData` / `applyRemoteMerge` — do not author a second conflict model.
+- Reuse `mergeWeekData` / `applyRemoteMerge` - do not author a second conflict model.
 - Keep everything in `zenit-week.html` (single-file policy).
 - Use the custom confirm dialog pattern if any prompt is ever needed (none expected).
 
 Ask first:
 - Any change to the on-disk week record shape (`crdtVersion`, `tombstones`, `_ts`)
-  — it's shared with the Drive format.
+  - it's shared with the Drive format.
 
 Never:
 - Reintroduce a blocking overlay or a global single-tab lock.
@@ -126,8 +126,8 @@ Never:
   still applies; signals carry only `wk`, `sig`, `origin`).
 
 ## 6. Open Questions
-1. **Visual cue** when another tab changed your current week — silent re-render
+1. **Visual cue** when another tab changed your current week - silent re-render
    (default), subtle flash, or a small "updated" toast?
-2. **Signal payload** — is `_weekContentSig` enough, or also carry `crdtVersion`
+2. **Signal payload** - is `_weekContentSig` enough, or also carry `crdtVersion`
    for cheap pre-load dedup before hitting IDB?
 ```

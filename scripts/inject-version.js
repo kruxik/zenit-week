@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Build-time version injector — replaces __APP_VERSION__ in zenit-week.html
+// Build-time version injector - replaces __APP_VERSION__ in zenit-week.html
 // with the CalVer git tag. Runs on Vercel via `npm run build`. Never
 // executed in the browser. Vercel strips the .git directory from its build
 // container, so the canonical path is the GitHub API; git CLI is used only
@@ -18,7 +18,7 @@ export async function resolveVersion(opts = {}) {
   const runGit     = opts.runGit     || runGitDescribe;
   const fetchTags  = opts.fetchTags  || fetchLatestCalverTagFromGitHub;
 
-  // Diagnostic logging — useful for understanding Vercel build env.
+  // Diagnostic logging - useful for understanding Vercel build env.
   console.log(`[inject-version] VERCEL_GIT_COMMIT_REF=${env.VERCEL_GIT_COMMIT_REF || '(unset)'}`);
   console.log(`[inject-version] VERCEL_GIT_REPO_OWNER=${env.VERCEL_GIT_REPO_OWNER || '(unset)'}`);
   console.log(`[inject-version] VERCEL_GIT_REPO_NAME=${env.VERCEL_GIT_REPO_NAME || '(unset)'}`);
@@ -36,7 +36,7 @@ export async function resolveVersion(opts = {}) {
   if (tag && VERSION_REGEX.test(tag)) return tag;
 
   // 3. Vercel build (no .git): fetch tags via GitHub API. Only attempted
-  //    when a repo slug is resolvable — keeps tests offline by default.
+  //    when a repo slug is resolvable - keeps tests offline by default.
   const slug = resolveRepoSlug(env);
   if (slug) {
     try {
@@ -47,7 +47,7 @@ export async function resolveVersion(opts = {}) {
     }
   }
 
-  // 4. SHA fallback — still ships a self-consistent build, just not a release.
+  // 4. SHA fallback - still ships a self-consistent build, just not a release.
   const sha = env.VERCEL_GIT_COMMIT_SHA;
   if (sha && /^[0-9a-f]{7,}$/i.test(sha)) return `dev-${sha.slice(0, 7).toLowerCase()}`;
   return 'dev';
@@ -114,10 +114,10 @@ function runGitDescribe() {
 
 export async function main() {
   // `vercel dev` runs the build on every startup. Substituting would dirty the
-  // working tree on every restart (footgun before commits). Skip entirely —
+  // working tree on every restart (footgun before commits). Skip entirely -
   // the runtime falls back to "dev" when it sees the unsubstituted placeholder.
   if (process.env.VERCEL_ENV === 'development') {
-    console.log(`[inject-version] dev mode — skipping substitution`);
+    console.log(`[inject-version] dev mode - skipping substitution`);
     return;
   }
   const __dirname = dirname(fileURLToPath(import.meta.url));

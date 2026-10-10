@@ -4,7 +4,7 @@ import { _state, triggerKeydown, setHoveredNode, getHoveredNode, findNode } from
 // The hovered-node hotkeys act on the map, and the map is not what a typing
 // user is looking at. Quick add keeps focus in its field between entries so the
 // mobile keyboard never dismisses, and whatever was dragged last stays hovered
-// — so a Backspace aimed at the text was deleting that node instead.
+// - so a Backspace aimed at the text was deleting that node instead.
 describe('hovered-node hotkeys while typing', () => {
   const mkBranch = (id) => ({ id, type: 'branch', branch: id, label: id, children: ['a1'], side: 'left', _ts: 0 });
   const mkActivity = (id, parent) => ({

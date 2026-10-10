@@ -41,7 +41,7 @@ describe('weeksInYear', () => {
 
   // Timezone-safety: weeksInYear internally constructs Date.UTC(year, 11, 28).
   // In UTC-negative timezones that midnight UTC timestamp reads as Dec 27 locally,
-  // which is week 52 — wrong for 53-week years like 2020.
+  // which is week 52 - wrong for 53-week years like 2020.
   // The fix (noon UTC) ensures Dec 28 is always read as Dec 28 in any timezone.
   // This test verifies getISOWeek is given a date that is unambiguously Dec 28 UTC.
   test('getISOWeek on Dec 28 noon UTC of a 53-week year always returns week 53', () => {
@@ -243,7 +243,7 @@ describe('validateAndRepair', () => {
   test('children of a missing branch are not silently lost', () => {
     // If the branch node itself is gone but its children are still in data,
     // the repair must not garbage-collect those children once the branch is restored.
-    // (Current behaviour GCs them — this test documents the expectation after the fix.)
+    // (Current behaviour GCs them - this test documents the expectation after the fix.)
     const data = defaultWeekData();
     data.nodes.find(n => n.id === 'work').children = ['task-1'];
     data.nodes.push({ id: 'task-1', type: 'activity', parent: 'work', label: 'Task', children: [] });

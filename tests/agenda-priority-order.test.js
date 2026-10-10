@@ -78,7 +78,7 @@ describe('pinToTopOfAgenda', () => {
     expect(loadAgendaGroupOrder(0, 'anyday')).toEqual([id]); // seeded fresh
   });
 
-  test('is idempotent — re-pinning keeps the row at front, deduped', () => {
+  test('is idempotent - re-pinning keeps the row at front, deduped', () => {
     const id = addActivity('Read');
     pinToTopOfAgenda(id);
     pinToTopOfAgenda(id);
@@ -103,7 +103,7 @@ describe('restoreToAgendaOrder', () => {
 
     restoreToAgendaOrder(id);
     expect(loadAgendaGroupOrder(2, 'anyday')).toEqual([id, 'x', 'y']);
-    // Groups with no manual order stay empty — restore never seeds them.
+    // Groups with no manual order stay empty - restore never seeds them.
     expect(loadAgendaGroupOrder(0, 'anyday')).toEqual([]);
   });
 

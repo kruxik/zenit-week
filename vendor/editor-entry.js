@@ -1,6 +1,6 @@
 // Entry point for the lazy-loaded comment editor bundle (vendor/editor.<hash>.js).
 //
-// RE-EXPORTS ONLY. No application logic may live here — not the schema, not the
+// RE-EXPORTS ONLY. No application logic may live here - not the schema, not the
 // Markdown bridge, not autosave, not the loader. Those stay in zenit-week.html
 // under the single-file policy; this file exists only because third-party code
 // is too heavy to inline. Each package is exposed as its own namespace so the

@@ -38,7 +38,7 @@ function triggerCommitEdit(nodeId, inputLabel, isNew = false) {
   commitEdit('none');
 }
 
-// parseTodoDays returns a Set from a VM context — compare as sorted arrays
+// parseTodoDays returns a Set from a VM context - compare as sorted arrays
 function days(label) { return [...parseTodoDays(label)].sort((a, b) => a - b); }
 
 // ─── parseTodoDays ────────────────────────────────────────────────────────────
@@ -121,14 +121,14 @@ describe('stripDayGroups', () => {
   });
 
   test('preserves empty parens (not a day group)', () => {
-    // "()" has no tokens — not a day group
+    // "()" has no tokens - not a day group
     expect(stripDayGroups('A ()')).toBe('A ()');
   });
 });
 
-// ─── commitEdit — day-child creation ─────────────────────────────────────────
+// ─── commitEdit - day-child creation ─────────────────────────────────────────
 
-describe('commitEdit — day-child creation', () => {
+describe('commitEdit - day-child creation', () => {
   function setupWithActivity(label, extra = {}) {
     const b = mkBranch('work', ['a1']);
     const a = mkActivity('a1', 'work', 'work', { label, ...extra });
@@ -189,7 +189,7 @@ describe('commitEdit — day-child creation', () => {
     expect(kid.type).toBe('activity');
   });
 
-  test('appends only missing day-children — existing Mo state preserved', () => {
+  test('appends only missing day-children - existing Mo state preserved', () => {
     const b = mkBranch('work', ['a1']);
     const a = mkActivity('a1', 'work', 'work', { label: 'Running', children: ['c1'] });
     const mo = mkActivity('c1', 'a1', 'work', { label: 'Mo', dayChild: true, dayIndex: 1, done: true });
@@ -253,7 +253,7 @@ describe('commitEdit — day-child creation', () => {
     expect(node.label).toBe('Running');
     expect(node.children.map(findNode).filter(k => k.dayChild)).toHaveLength(2);
 
-    // Re-edit with single day token "(th)" — must extend, not revert
+    // Re-edit with single day token "(th)" - must extend, not revert
     triggerCommitEdit(id, 'Running (th)');
     node = findNode(id);
     expect(node.label).toBe('Running'); // (th) stripped, not kept inline
@@ -280,7 +280,7 @@ describe('commitEdit — day-child creation', () => {
     expect(node.label).toBe('Pushups 10x');
     expect(node.children.map(findNode).filter(k => k.dayChild)).toHaveLength(2);
 
-    // Re-edit with Nx only (no day tokens) — user is switching modes:
+    // Re-edit with Nx only (no day tokens) - user is switching modes:
     // day-children drop, tick-children (1..10) take their place, Nx stripped.
     triggerCommitEdit(id, 'Pushups 10x');
     node = findNode(id);
@@ -305,9 +305,9 @@ describe('commitEdit — day-child creation', () => {
   });
 });
 
-// ─── commitEdit — day-child rename ───────────────────────────────────────────
+// ─── commitEdit - day-child rename ───────────────────────────────────────────
 
-describe('commitEdit — day-child rename', () => {
+describe('commitEdit - day-child rename', () => {
   function setupDayChild(dayIndex, label) {
     const b = mkBranch('work', ['a1']);
     const a = mkActivity('a1', 'work', 'work', { label: 'Running', children: ['dc1'] });
@@ -334,12 +334,12 @@ describe('commitEdit — day-child rename', () => {
 
   test('day-child rename to valid token does NOT create grandchildren', () => {
     const id = setupDayChild(1, 'Mo');
-    triggerCommitEdit(id, 'we'); // valid canonical token — becomes We, no children
+    triggerCommitEdit(id, 'we'); // valid canonical token - becomes We, no children
     expect(findNode(id).children).toHaveLength(0);
     expect(findNode(id).label).toBe('We');
   });
 
-  test('invalid token reverts — no change to children', () => {
+  test('invalid token reverts - no change to children', () => {
     const id = setupDayChild(1, 'Mo');
     triggerCommitEdit(id, 'TT');
     expect(findNode(id).label).toBe('Mo');
@@ -410,9 +410,9 @@ describe('migrateDayCounters', () => {
   });
 });
 
-// ─── validateAndRepair — dayChild/dayIndex preserved ─────────────────────────
+// ─── validateAndRepair - dayChild/dayIndex preserved ─────────────────────────
 
-describe('validateAndRepair — dayChild/dayIndex fields preserved', () => {
+describe('validateAndRepair - dayChild/dayIndex fields preserved', () => {
   test('dayChild and dayIndex survive repair', () => {
     const data = defaultWeekData();
     data.nodes[0].children = ['a1', 'dc1'];
@@ -446,9 +446,9 @@ describe('validateAndRepair — dayChild/dayIndex fields preserved', () => {
   });
 });
 
-// ─── transferReusable — day-children carry over ───────────────────────────────
+// ─── transferReusable - day-children carry over ───────────────────────────────
 
-describe('transferReusable — day-children of reusable parents carry over', () => {
+describe('transferReusable - day-children of reusable parents carry over', () => {
   beforeEach(() => { _state.clearLocalStorage(); });
 
   test('day-children of reusable parent are transferred with done reset', async () => {
@@ -539,7 +539,7 @@ describe('getAgendaItems', () => {
 
   test('single-day annotated activity with no day-leaf children is included', () => {
     const branch = mkBranch('work', ['p1']);
-    // "Yoga (tu)" — single-day hint, no day-child leaves
+    // "Yoga (tu)" - single-day hint, no day-child leaves
     const p1 = mkActivity('p1', 'work', 'work', { label: 'Yoga (tu)', children: [] });
     setUp([branch, p1]);
     expect(getAgendaItems(2).map(n => n.id)).toEqual(['p1']); // tu = dayIndex 2
@@ -573,9 +573,9 @@ describe('getOverdueItems', () => {
   test('today=Wednesday(3): returns Mon+Tue undone nodes', () => {
     const branch = mkBranch('work', ['p1']);
     const p1 = mkActivity('p1', 'work', 'work', { children: ['mo', 'tu', 'we'] });
-    const mo = mkDayLeaf('mo', 'p1', 1);  // Monday — overdue
-    const tu = mkDayLeaf('tu', 'p1', 2);  // Tuesday — overdue
-    const we = mkDayLeaf('we', 'p1', 3);  // Wednesday — today, not overdue
+    const mo = mkDayLeaf('mo', 'p1', 1);  // Monday - overdue
+    const tu = mkDayLeaf('tu', 'p1', 2);  // Tuesday - overdue
+    const we = mkDayLeaf('we', 'p1', 3);  // Wednesday - today, not overdue
     setUp([branch, p1, mo, tu, we]);
     const result = getOverdueItems(d(3)); // inject Wednesday
     expect(result.map(n => n.id).sort()).toEqual(['mo', 'tu'].sort());
@@ -592,7 +592,7 @@ describe('getOverdueItems', () => {
   test('today=Monday(1): no past days → empty', () => {
     const branch = mkBranch('work', ['p1']);
     const p1 = mkActivity('p1', 'work', 'work', { children: ['su'] });
-    const su = mkDayLeaf('su', 'p1', 0); // Sunday — isoWeekPos=7, not before Mon=1
+    const su = mkDayLeaf('su', 'p1', 0); // Sunday - isoWeekPos=7, not before Mon=1
     setUp([branch, p1, su]);
     expect(getOverdueItems(d(1))).toEqual([]); // inject Monday
   });
@@ -602,7 +602,7 @@ describe('getOverdueItems', () => {
     const p1 = mkActivity('p1', 'work', 'work', { children: ['mo', 'fr', 'su'] });
     const mo = mkDayLeaf('mo', 'p1', 1);  // isoWeekPos=1 < 7
     const fr = mkDayLeaf('fr', 'p1', 5);  // isoWeekPos=5 < 7
-    const su = mkDayLeaf('su', 'p1', 0);  // today — not overdue
+    const su = mkDayLeaf('su', 'p1', 0);  // today - not overdue
     setUp([branch, p1, mo, fr, su]);
     const result = getOverdueItems(d(0)); // inject Sunday
     expect(result.map(n => n.id).sort()).toEqual(['fr', 'mo'].sort());
@@ -740,7 +740,7 @@ describe('getAnyDayItems', () => {
   });
 });
 
-// ─── crossDayDone filter — scenario coverage ──────────────────────────────────
+// ─── crossDayDone filter - scenario coverage ──────────────────────────────────
 // These tests verify the filter logic used in renderAgendaTabContent to build
 // the Done section.  A done item belongs to the day it was marked done (doneAt),
 // not its scheduled day.
@@ -849,7 +849,7 @@ describe('crossDayDone filter logic', () => {
     expect(result.map(n => n.id)).not.toContain('p1');
   });
 
-  // donedOn via legacy doneAt only (backward compat — no donedOn field)
+  // donedOn via legacy doneAt only (backward compat - no donedOn field)
   test('legacy node with only doneAt (no donedOn) still matches via doneAt prefix', () => {
     const branch = mkBranch('work', ['p1']);
     const p1 = mkActivity('p1', 'work', 'work', {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Build-time seed injector — mirrors assets/playground-seed.json into the
+// Build-time seed injector - mirrors assets/playground-seed.json into the
 // `const PLAYGROUND_SEED = …` block in zenit-week.html (between the
 // PLAYGROUND_SEED_START/END markers). The JSON file is the single editable
 // source of truth for the onboarding playground; this keeps the inlined copy
@@ -16,7 +16,7 @@ const START = '/* PLAYGROUND_SEED_START */';
 const END = '/* PLAYGROUND_SEED_END */';
 
 // Build the `const PLAYGROUND_SEED = {…};` line from the JSON source.
-// Only `week` and `colors` are inlined — the `_comment` doc field is dropped.
+// Only `week` and `colors` are inlined - the `_comment` doc field is dropped.
 export function buildSeedBlock(jsonText) {
   const parsed = JSON.parse(jsonText);
   const seed = { week: parsed.week, colors: parsed.colors };

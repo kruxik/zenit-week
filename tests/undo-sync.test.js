@@ -33,7 +33,7 @@ let remoteData;
 const handlers = [
   http.post('http://localhost/api/token', async ({ request }) => {
     const body = await request.json();
-    // Refresh grants carry no body token — the HttpOnly cookie supplies it.
+    // Refresh grants carry no body token - the HttpOnly cookie supplies it.
     if (body.grant_type === 'refresh_token') return HttpResponse.json({ access_token: 'at', expires_in: 3600 });
     return HttpResponse.json({ error: 'invalid_grant' }, { status: 400 });
   }),
@@ -114,7 +114,7 @@ describe('Undo/redo vs Drive sync', () => {
   });
 
   // Was: "undo bumps _ts on all restored nodes". Stamping the whole week is the
-  // incident this spec closes — a stale device promoted every node it had never
+  // incident this spec closes - a stale device promoted every node it had never
   // touched and then won the next merge. Only what the undo reverts is stamped.
   test('undo bumps _ts on the node it reverts, and only that node', async () => {
     _state.set(buildLocalData([

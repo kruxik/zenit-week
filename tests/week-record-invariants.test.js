@@ -5,7 +5,7 @@
 // A node that disappears without a tombstone is a silent local delete: no merge
 // can distinguish it from "never existed", so the next Drive pull either
 // resurrects it (confusing) or, if every device agrees, loses it for good. A
-// node that gains a tombstone but no replacement anywhere is the harder failure —
+// node that gains a tombstone but no replacement anywhere is the harder failure -
 // tombstones are permanent, so nothing can ever bring it back.
 //
 // These tests drive the real mutation paths and assert the invariant after each,
@@ -56,7 +56,7 @@ function expectTombstonesHaveReplacements(before, after, destinations, label = '
   expect(orphaned, `${label}: tombstoned with no copy anywhere`).toEqual([]);
 }
 
-describe('week-record invariants — same-week edits', () => {
+describe('week-record invariants - same-week edits', () => {
   beforeEach(() => {
     _state.clearLocalStorage();
     _state.clearIDBStore();
@@ -127,7 +127,7 @@ describe('week-record invariants — same-week edits', () => {
   });
 });
 
-describe('week-record invariants — cross-week transfer over real IndexedDB', () => {
+describe('week-record invariants - cross-week transfer over real IndexedDB', () => {
   const WK = '2026-30';
   const NEXT = '2026-31';
 
@@ -194,7 +194,7 @@ describe('week-record invariants — cross-week transfer over real IndexedDB', (
     await Promise.all(ids.map(id => _state.moveNodeToNextWeek(id)));
 
     // loadWeek runs validateAndRepair, which garbage-collects anything not
-    // reachable from a branch through children arrays — a copy wired up wrongly
+    // reachable from a branch through children arrays - a copy wired up wrongly
     // would survive the write and vanish here, after the source was tombstoned.
     const reloaded = await loadWeek(NEXT);
     expect(reloaded.nodes.filter(n => n.type === 'activity')).toHaveLength(6);

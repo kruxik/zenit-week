@@ -1,7 +1,7 @@
 # Implementation Plan: UI Panels & Overlays Tests
 
 ## Overview
-While the core logic of Zenit Week is heavily tested, the specialized floating UI panels and overlays—such as the Daily Log, Agenda View, Settings, and custom dialogs—lack comprehensive test coverage. These components manage complex data-to-DOM mappings, state-driven rendering, and localization. This plan introduces tests for these components, utilizing Playwright for end-to-end interactions to ensure DOM elements reflect internal state accurately.
+While the core logic of Zenit Week is heavily tested, the specialized floating UI panels and overlays-such as the Daily Log, Agenda View, Settings, and custom dialogs-lack comprehensive test coverage. These components manage complex data-to-DOM mappings, state-driven rendering, and localization. This plan introduces tests for these components, utilizing Playwright for end-to-end interactions to ensure DOM elements reflect internal state accurately.
 
 ## Architecture Decisions
 - **Framework:** Playwright (integrated alongside SVG Visual Integrity and User Interaction tests).

@@ -1,13 +1,13 @@
 # Contributing to Zenit Week
 
-Thanks for taking a look. Zenit Week aims to stay simple, portable, and visually rich. The single-file architecture is the unusual constraint — most of the project's design choices flow from it.
+Thanks for taking a look. Zenit Week aims to stay simple, portable, and visually rich. The single-file architecture is the unusual constraint - most of the project's design choices flow from it.
 
 ## How to run
 
 1. Clone the repository.
-2. Open `zenit-week.html` in any modern browser — no server required for the app itself.
-3. To work on Google Drive sync locally, run `npx vercel dev` (or `vercel dev` if you have the CLI installed globally). You'll need a `.env.local` based on `.env.local.example` for the OAuth client secret. The app will be served at `http://localhost:3000/app` — Google allows OAuth on plain HTTP only for `localhost` / `127.0.0.1`. **Note:** don't add a `dev` npm script that wraps `vercel dev` — Vercel auto-detects it as the project's dev command and recurses into itself.
-4. To test sync from another device (phone, tablet, second laptop) or over HTTPS, use the ngrok tunnel workflow — see [Testing OAuth over HTTPS / cross-device](#testing-oauth-over-https--cross-device) below.
+2. Open `zenit-week.html` in any modern browser - no server required for the app itself.
+3. To work on Google Drive sync locally, run `npx vercel dev` (or `vercel dev` if you have the CLI installed globally). You'll need a `.env.local` based on `.env.local.example` for the OAuth client secret. The app will be served at `http://localhost:3000/app` - Google allows OAuth on plain HTTP only for `localhost` / `127.0.0.1`. **Note:** don't add a `dev` npm script that wraps `vercel dev` - Vercel auto-detects it as the project's dev command and recurses into itself.
+4. To test sync from another device (phone, tablet, second laptop) or over HTTPS, use the ngrok tunnel workflow - see [Testing OAuth over HTTPS / cross-device](#testing-oauth-over-https--cross-device) below.
 5. To run the test suite and HTML validator:
 
    ```sh
@@ -18,7 +18,7 @@ Thanks for taking a look. Zenit Week aims to stay simple, portable, and visually
 
 ### Testing OAuth over HTTPS / cross-device
 
-`http://localhost` works only on the dev machine itself. To open the app on a phone, tablet, or any other device — or to exercise the HTTPS code path — tunnel `vercel dev` through ngrok with a reserved static domain.
+`http://localhost` works only on the dev machine itself. To open the app on a phone, tablet, or any other device - or to exercise the HTTPS code path - tunnel `vercel dev` through ngrok with a reserved static domain.
 
 One-time setup:
 
@@ -45,11 +45,11 @@ npx vercel dev        # terminal 1
 npm run tunnel        # terminal 2
 ```
 
-Open `https://<your-static-domain>/app` from any device. The ngrok web inspector at `http://localhost:4040` shows every request — useful for debugging the OAuth round-trip.
+Open `https://<your-static-domain>/app` from any device. The ngrok web inspector at `http://localhost:4040` shows every request - useful for debugging the OAuth round-trip.
 
 ## Principles
 
-- **Single-file policy.** The entire app must remain within `zenit-week.html`. This is the project's defining constraint — it makes Zenit Week a portable utility anyone can download, audit, and run offline. Don't split it.
+- **Single-file policy.** The entire app must remain within `zenit-week.html`. This is the project's defining constraint - it makes Zenit Week a portable utility anyone can download, audit, and run offline. Don't split it.
 - **Vanilla only.** No frameworks (React, Vue, Tailwind, etc.). Standard HTML5, CSS3, ES6+ JavaScript. SVG for graphics. The marketing pages (`index.html`, `cs/index.html`) follow the same rule.
 - **Privacy.** No servers, no analytics, no tracking. User data lives on their device (`localStorage` / `IndexedDB`) or in their own Google Drive. Never on our infrastructure. The only server-side code (`api/token.js`) exists solely to keep the OAuth client secret out of the browser.
 - **No browser dialogs.** Don't use `alert()`, `confirm()`, or `prompt()`. Use the in-app `showAppConfirm({ title, body, okLabel, danger, onConfirm })` helper, or follow the `#app-confirm-overlay` / `#app-confirm-dialog` pattern.
@@ -61,11 +61,11 @@ Open `https://<your-static-domain>/app` from any device. The ngrok web inspector
 
 | Path | Purpose |
 | :--- | :--- |
-| `zenit-week.html` | The entire app — HTML, CSS, JS, SVG icons, all in one file. |
+| `zenit-week.html` | The entire app - HTML, CSS, JS, SVG icons, all in one file. |
 | `index.html`, `cs/index.html` | Marketing homepages (English & Czech). |
 | `privacy.html`, `terms.html` | Legal pages. |
 | `api/token.js` | Vercel Edge Function that proxies the Google OAuth token exchange to keep `client_secret` server-side. PKCE on the client. |
-| `tests/` | Vitest suite — focused on data logic (week math, transfers, validation, sync conflict resolution). |
+| `tests/` | Vitest suite - focused on data logic (week math, transfers, validation, sync conflict resolution). |
 | `docs/specs/`, `docs/plans/`, `docs/ideas/` | Specs, implementation plans, idea sketches. |
 | `og-image*.{svg,jpg}`, `screenshot.{svg,png}` | Marketing & share assets. |
 | `vercel.json` | Routes for `/app`, `/privacy`, `/terms`. |
@@ -83,7 +83,7 @@ weekData = {
       // timestamps:
       doneAt,                 // set when marked done
       unplannedAt,            // set when marked unplanned
-      _ts                     // epoch ms — Drive merge conflict resolution
+      _ts                     // epoch ms - Drive merge conflict resolution
     }
   ]
 }
@@ -120,17 +120,17 @@ The app uses both `localStorage` and `IndexedDB`:
 
 ### Rendering pipeline
 
-- **`render()`** — full re-render. Call on structural changes only (add/remove/move).
-- **`updateNodeUI(id)`** — surgical visual update for a single node. Use this for status toggles, label edits, color changes — anything that doesn't change topology.
-- **`updateSummary()`** — refreshes the stats panel.
-- **`computeLayout()`** — calculates radial positions. Recursive height + priority-based scaling (critical: 2.0x, high: 1.5x, normal: 1.0x). Branches split left/right per `BRANCH_CONFIG`.
+- **`render()`** - full re-render. Call on structural changes only (add/remove/move).
+- **`updateNodeUI(id)`** - surgical visual update for a single node. Use this for status toggles, label edits, color changes - anything that doesn't change topology.
+- **`updateSummary()`** - refreshes the stats panel.
+- **`computeLayout()`** - calculates radial positions. Recursive height + priority-based scaling (critical: 2.0x, high: 1.5x, normal: 1.0x). Branches split left/right per `BRANCH_CONFIG`.
 
 ### Key functions
 
 | Function | Notes |
 | :--- | :--- |
 | `findNode(id)` | O(1) lookup via `nodeMap` (a `Map<id, node>`, rebuilt on every structural change). |
-| `genId()` | Generates a node id via `crypto.randomUUID()`, with a `crypto.getRandomValues` fallback for plain-HTTP contexts. **Always call this — never `crypto.randomUUID()` directly.** |
+| `genId()` | Generates a node id via `crypto.randomUUID()`, with a `crypto.getRandomValues` fallback for plain-HTTP contexts. **Always call this - never `crypto.randomUUID()` directly.** |
 | `getDescendantIds(id)` | Recursively collects a subtree. |
 | `validateAndRepair()` | Garbage collection + orphan cleanup. Run on load and after imports. |
 | `transferUnfinished()` | Copies incomplete activities from the previous ISO week to the current one. |
@@ -148,7 +148,7 @@ The app uses both `localStorage` and `IndexedDB`:
 ## Development workflow
 
 1. **Edit** `zenit-week.html` directly.
-2. **Test in the browser** — refresh and manually verify drag-and-drop, zoom/pan, undo/redo, and `localStorage` persistence across refreshes.
+2. **Test in the browser** - refresh and manually verify drag-and-drop, zoom/pan, undo/redo, and `localStorage` persistence across refreshes.
 3. **For data-logic changes**, also run the automated suite:
 
    ```sh
@@ -166,7 +166,7 @@ The app uses both `localStorage` and `IndexedDB`:
 ## Submitting changes
 
 1. Create a branch.
-2. Make focused commits — one logical change per commit. Conventional Commits format (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`) is preferred.
+2. Make focused commits - one logical change per commit. Conventional Commits format (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`) is preferred.
 3. Open a PR with a clear description of what changed and why. Screenshots help for UI changes.
 
 ## Testing

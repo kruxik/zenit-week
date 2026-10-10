@@ -43,7 +43,7 @@ function setUp(nodes) {
 
 // ─── No filter (null) ─────────────────────────────────────────────────────────
 
-describe('dayFilterMatches — no filter', () => {
+describe('dayFilterMatches - no filter', () => {
   test('center → true', () => {
     setUp([mkBranch('b1')]);
     expect(dayFilterMatches('center')).toBe(true);
@@ -85,7 +85,7 @@ describe('dayFilterMatches — no filter', () => {
 
 // ─── Day filter d=1 (Monday) ──────────────────────────────────────────────────
 
-describe('dayFilterMatches — day filter 1 (Mon)', () => {
+describe('dayFilterMatches - day filter 1 (Mon)', () => {
   test('day-child dayIndex=1 → true', () => {
     const b = mkBranch('b1');
     const a = mkActivity('a1', 'b1', 'b1');
@@ -188,7 +188,7 @@ describe('dayFilterMatches — day filter 1 (Mon)', () => {
 
 // ─── Unscheduled filter ───────────────────────────────────────────────────────
 
-describe('dayFilterMatches — unscheduled filter', () => {
+describe('dayFilterMatches - unscheduled filter', () => {
   test('activity with no day-children, no counter, no label days → true', () => {
     const b = mkBranch('b1');
     const a = mkActivity('a1', 'b1', 'b1');
@@ -259,7 +259,7 @@ describe('dayFilterMatches — unscheduled filter', () => {
 
 // ─── Ancestor / branch visibility ────────────────────────────────────────────
 
-describe('dayFilterMatches — tick children', () => {
+describe('dayFilterMatches - tick children', () => {
   function pushups(tickDays) {
     const b = mkBranch('b1');
     const a = mkActivity('a1', 'b1', 'b1', { label: 'Pushups 3x' });
@@ -316,7 +316,7 @@ describe('dayFilterMatches — tick children', () => {
   });
 });
 
-describe('dayFilterMatches — ancestor visibility', () => {
+describe('dayFilterMatches - ancestor visibility', () => {
   test('Activity should be visible if its grandchild matches the day filter', () => {
     // Week -> Me (branch) -> Sports (a1) -> Running (a2) -> We (dc)
     const b = mkBranch('me');
@@ -361,7 +361,7 @@ describe('dayFilterMatches — ancestor visibility', () => {
 
 // ─── Overdue filter ──────────────────────────────────────────────────────────
 
-describe('dayFilterMatches — overdue filter', () => {
+describe('dayFilterMatches - overdue filter', () => {
   let todayIdx, todayPos;
 
   beforeEach(() => {
@@ -466,7 +466,7 @@ describe('day-filter layout pruning', () => {
   });
 
   test('the center always survives, even on a day with nothing on it', () => {
-    const pos = layoutWith(5); // Friday — nothing scheduled
+    const pos = layoutWith(5); // Friday - nothing scheduled
     expect(pos['center']).toBeDefined();
     expect(pos['work']).toBeUndefined();
     expect(pos['play']).toBeUndefined();
@@ -481,7 +481,7 @@ describe('day-filter layout pruning', () => {
       .toBeLessThanOrEqual(Math.abs(sand['work'].y - sand['aMon'].y));
   });
 
-  test('composes with the view level — Rocks still wins on depth', () => {
+  test('composes with the view level - Rocks still wins on depth', () => {
     const pos = layoutWith(1, 'rocks');
     expect(pos['work']).toBeDefined();   // matches Monday, depth 1
     expect(pos['aMon']).toBeDefined();   // matches Monday, depth 2
@@ -492,7 +492,7 @@ describe('day-filter layout pruning', () => {
 
 // A multi-day activity lays its day leaves out as a staggered zigzag block once
 // there are 3+ of them. Filtering to one day leaves a single survivor, which must
-// land exactly where a lone day leaf lands — the zigzag metrics have to be built
+// land exactly where a lone day leaf lands - the zigzag metrics have to be built
 // from the filtered child set, not the raw one, or the survivor is staggered
 // against siblings that aren't on screen and stranded inside a block sized for
 // all seven days.

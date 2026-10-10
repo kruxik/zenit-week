@@ -1,4 +1,4 @@
-// Vercel Node serverless function — first-party relay for Umami Cloud events.
+// Vercel Node serverless function - first-party relay for Umami Cloud events.
 // The tracker posts to /u/api/send (rewritten here in vercel.json). A plain
 // rewrite to gateway.umami.is reaches Umami from Vercel's own IP, so every
 // visitor showed up in Frankfurt. This relay passes the visitor's IP along in

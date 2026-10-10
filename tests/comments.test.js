@@ -45,7 +45,7 @@ describe('planCommentWrite (node comments dirty-check)', () => {
   });
 });
 
-describe('validateAndRepair — comments tolerance', () => {
+describe('validateAndRepair - comments tolerance', () => {
   it('keeps a non-empty string comment on an activity node', () => {
     const data = validateAndRepair(treeWithActivity({ comments: 'keep me' }));
     expect(findById(data, 'a1').comments).toBe('keep me');
@@ -79,7 +79,7 @@ describe('validateAndRepair — comments tolerance', () => {
   });
 });
 
-describe('mergeWeekData — comments LWW per node', () => {
+describe('mergeWeekData - comments LWW per node', () => {
   const wrap = (act) => {
     const data = treeWithActivity(act);
     data.savedAt = act._ts || 1;

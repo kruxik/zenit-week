@@ -74,7 +74,7 @@ describe('Zig-Zag Layout', () => {
   });
 
   test('every stagger pair is one gap apart, whatever the node widths', () => {
-    // d1 is a wide oval (critical badge), d3 a plain circle — both in the near
+    // d1 is a wide oval (critical badge), d3 a plain circle - both in the near
     // column. Flushing them to the column boundary is what keeps the gap to the
     // far column identical for both; centring on the widest member would leave
     // the circle short of it.
@@ -93,7 +93,7 @@ describe('Zig-Zag Layout', () => {
 
     const positions = computeLayout();
     // Columns face each other, so the clear space between two staggered nodes
-    // is the centre distance less both half-widths — direction-agnostic.
+    // is the centre distance less both half-widths - direction-agnostic.
     const innerGap = (a, b) =>
       Math.abs(positions[b].x - positions[a].x) - (getNodeSize(a).w + getNodeSize(b).w) / 2;
 
@@ -160,7 +160,7 @@ describe('Zig-Zag Layout', () => {
 
     const positions = computeLayout();
 
-    // Zig-zag is independent of autoLayout — day-children always stagger to fit.
+    // Zig-zag is independent of autoLayout - day-children always stagger to fit.
     expect(positions['d1'].x).not.toBe(positions['d2'].x);
     expect(positions['d1'].x).toBe(positions['d3'].x);
     expect(Math.abs(positions['d2'].x - positions['d1'].x)).toBeCloseTo(60.1, 1);

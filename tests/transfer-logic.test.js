@@ -75,7 +75,7 @@ describe('Data Transfer', () => {
     await transferUnfinished();
     const data = _state.get();
 
-    // Exactly one "together" container under the branch — no duplicate
+    // Exactly one "together" container under the branch - no duplicate
     const togethers = data.nodes.filter(n => n.label?.toLowerCase() === 'together' && n.parent === 'fam');
     expect(togethers).toHaveLength(1);
     expect(togethers[0].id).toBe('tog-manual'); // reused the existing manual node
@@ -113,12 +113,12 @@ describe('Data Transfer', () => {
     await transferUnfinished();
     const data = _state.get();
 
-    // Leaves are not merged — both survive
+    // Leaves are not merged - both survive
     const games = data.nodes.filter(n => n.label === 'Games' && n.parent === 'fam');
     expect(games).toHaveLength(2);
   });
 
-  it('keeps manual nodes on top — transferred nodes land below them, not at the top', async () => {
+  it('keeps manual nodes on top - transferred nodes land below them, not at the top', async () => {
     const prevWeek = '2026-17';
     const currWeek = '2026-18';
     _state.setWeekKey(currWeek);

@@ -14,7 +14,7 @@ describe('import-pending flag', () => {
   });
 
   it('reads a legacy "1" as age zero rather than as fresh', () => {
-    // The old shape says an import is pending but not when — and a flag that
+    // The old shape says an import is pending but not when - and a flag that
     // cannot state its age must never win, or the upgrade reintroduces the bug.
     expect(normalizeImportPending('1')).toEqual({ importedAt: 0 });
   });
@@ -71,7 +71,7 @@ describe('import push decision', () => {
   it('decides per week, not once for the whole account', () => {
     const drive = new Map([
       ['2026-38', { savedAt: 1_000_000 }],  // older than the import
-      ['2026-39', { savedAt: 3_000_000 }],  // newer — another device wrote it
+      ['2026-39', { savedAt: 3_000_000 }],  // newer - another device wrote it
       ['2026-40', undefined],               // not on Drive at all
     ]);
     const decisions = [...drive].map(([wk, entry]) => [wk, importPushDecision(IMPORTED_AT, entry)]);

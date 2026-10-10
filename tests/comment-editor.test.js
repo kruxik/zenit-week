@@ -30,7 +30,7 @@ describe('comment text ↔ ProseMirror doc', () => {
     '\n\nblank lines\n\n\nkept\n\n',
     'trailing spaces   \n   leading spaces',
     '\ttabs\tinside\t',
-    'ěščřžýáíé — emoji 👍 and CJK 漢字',
+    'ěščřžýáíé - emoji 👍 and CJK 漢字',
     '[text](https://example.com) _under_ `code` > quote',
     ' ',
     '\n',
@@ -194,7 +194,7 @@ describe('typing in the rich editor never fires app hotkeys', () => {
   });
 });
 
-describe('rich blocks — editing commands', () => {
+describe('rich blocks - editing commands', () => {
   const at = (text, pos) => {
     const doc = commentTextToDoc(schema, text);
     return state.EditorState.create({ doc, selection: state.TextSelection.create(doc, pos), plugins: [history.history()] });
@@ -279,7 +279,7 @@ describe('rich blocks — editing commands', () => {
   });
 });
 
-describe('rich inline — marks', () => {
+describe('rich inline - marks', () => {
   const para = (...nodes) => schema.node('doc', null, [schema.node('paragraph', null, nodes)]);
   const txt = (t, ...marks) => schema.text(t, marks);
   const { strong, em, link } = schema.marks;
@@ -310,7 +310,7 @@ describe('rich inline — marks', () => {
     expect(commentDocToText(para(txt('site', link.create({ href, auto: true }))))).toBe(`[site](${href})`);
   });
 
-  it('marks exclude one another — the grammar has no nesting', () => {
+  it('marks exclude one another - the grammar has no nesting', () => {
     const doc = para(txt('word', em.create()));
     let st = state.EditorState.create({ doc, selection: state.TextSelection.create(doc, 1, 5) });
     commands.toggleMark(strong)(st, tr => { st = st.apply(tr); });
@@ -318,7 +318,7 @@ describe('rich inline — marks', () => {
   });
 });
 
-describe('rich inline — paste allow-list', () => {
+describe('rich inline - paste allow-list', () => {
   const allRules = () => [
     ...Object.values(schema.nodes).flatMap(t => t.spec.parseDOM || []),
     ...Object.values(schema.marks).flatMap(t => t.spec.parseDOM || []),
@@ -351,12 +351,12 @@ describe('rich inline — paste allow-list', () => {
   });
 });
 
-describe('rich inline — input rules', () => {
+describe('rich inline - input rules', () => {
   const rules = commentInputRuleList(pm, schema);
   // Mirrors prosemirror-inputrules: the typed character is part of the match
   // but not yet part of the document.
   const typeInto = (before, typed) => {
-    // Raw text, not through the tokenizer — which would already link a URL.
+    // Raw text, not through the tokenizer - which would already link a URL.
     const doc = schema.node('doc', null, [schema.node('paragraph', null, [schema.text(before)])]);
     const cursor = doc.content.size - 1;
     const st = state.EditorState.create({ doc, selection: state.TextSelection.create(doc, cursor) });
@@ -460,14 +460,14 @@ describe('pre-release review fixes', () => {
   const reread = (doc) => commentTextToDoc(schema, commentDocToText(doc));
 
   it.each(['[ a ](https://x.cz)', '[ ](https://x.cz)', '[a ](https://x.cz)'])(
-    '%j — brackets with edge spaces are literal, and round-trip', (text) => {
+    '%j - brackets with edge spaces are literal, and round-trip', (text) => {
       const doc = commentTextToDoc(schema, text);
-      // No bracket link — only the bare URL inside may autolink, showing itself.
+      // No bracket link - only the bare URL inside may autolink, showing itself.
       doc.firstChild.forEach(n => n.marks.forEach(m => expect(n.text).toBe(m.attrs.href)));
       expect(commentDocToText(doc)).toBe(text);
     });
 
-  it('ProseMirror merges touching same-mark runs — why an untouched dialog keeps its source', () => {
+  it('ProseMirror merges touching same-mark runs - why an untouched dialog keeps its source', () => {
     expect(commentDocToText(commentTextToDoc(schema, '**a****b**'))).toBe('**ab**');
     const editor = { dirty: false, source: '**a****b**', view: { state: { doc: commentTextToDoc(schema, '**a****b**') } } };
     expect(commentEditorText(editor)).toBe('**a****b**');
@@ -488,7 +488,7 @@ describe('pre-release review fixes', () => {
     const doc = para(txt('x](https://evil.cz)', link.create({ href: 'https://a.cz' })));
     const back = reread(doc).firstChild;
     // Degraded to plain text: at most the bare URL autolinks, and then the
-    // link's visible text is its own destination — nothing hides a target.
+    // link's visible text is its own destination - nothing hides a target.
     back.forEach(n => n.marks.forEach(m => expect(n.text).toBe(m.attrs.href)));
     expect(back.textContent).toBe('x](https://evil.cz)');
   });
@@ -527,7 +527,7 @@ describe('pre-release review fixes', () => {
 describe('comment panel takes the visible area above a phone keyboard', () => {
   const vv = (height, offsetTop = 0, scale = 1) => ({ height, offsetTop, scale });
 
-  it('matches the visible area exactly — top and height', () => {
+  it('matches the visible area exactly - top and height', () => {
     expect(commentViewportBox(800, vv(450, 0), true)).toEqual({ top: 0, height: 450 });
     expect(commentViewportBox(800, vv(450.6, 212.3), true)).toEqual({ top: 212, height: 451 });
   });
@@ -555,7 +555,7 @@ describe('phone panels pin their caption (Help, Comment)', () => {
     expect(shouldPinPanelCaption({ narrow: true, keyboard: true, scrollTop: 0 })).toBe(true);
   });
 
-  it('once pinned, stays pinned until back at the top — no flip-flop', () => {
+  it('once pinned, stays pinned until back at the top - no flip-flop', () => {
     expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 30, pinned: true })).toBe(true);
     expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 30, pinned: false })).toBe(false);
     expect(shouldPinPanelCaption({ narrow: true, keyboard: false, scrollTop: 0, pinned: true })).toBe(false);
@@ -579,7 +579,7 @@ describe('numbered lists', () => {
     expect(doc.child(1).attrs.number).toBe('1');
   });
 
-  it('once edited, a run is written the way it shows — counting on from its first item', () => {
+  it('once edited, a run is written the way it shows - counting on from its first item', () => {
     expect(commentDocToText(commentTextToDoc(schema, '1. a\n1. b\n1. c'))).toBe('1. a\n2. b\n3. c');
     expect(commentDocToText(commentTextToDoc(schema, '3. a\n9. b'))).toBe('3. a\n4. b');
     expect(commentDocToText(commentTextToDoc(schema, '1. a\ntext\n5. b\n5. c'))).toBe('1. a\ntext\n5. b\n6. c');
@@ -663,7 +663,7 @@ describe('opening a comment link has one way in', () => {
   const code = html.match(/<script\s+id="app-script">([\s\S]*?)<\/script>/)[1].replace(/^\s*\/\/.*$/gm, '');
 
   it('only the confirm dialog opens a link, and every entry point asks it', () => {
-    // openCommentLink: its definition, and the dialog's OK — nothing else.
+    // openCommentLink: its definition, and the dialog's OK - nothing else.
     expect(code.match(/openCommentLink\(/g)).toHaveLength(2);
     expect(code).toMatch(/onConfirm: \(\) => openCommentLink\(href\)/);
     // Editor tap (touch), editor Cmd/Ctrl-click, Agenda preview click.

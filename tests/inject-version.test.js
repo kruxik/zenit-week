@@ -5,7 +5,7 @@ import {
   substitutePlaceholder,
 } from '../scripts/inject-version.js';
 
-// Default mocks — tests opt in to the real network path explicitly.
+// Default mocks - tests opt in to the real network path explicitly.
 const NO_FETCH = async () => null;
 
 describe('resolveVersion', () => {

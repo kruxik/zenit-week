@@ -9,7 +9,7 @@ import { takeSnapshot, undo, redo, openDB, saveWeekIDB, loadWeekIDB, _state } fr
 const mkBranch = (id, children = []) =>
   ({ id, type: 'branch', branch: id, label: id, children, side: 'left', _ts: 0 });
 
-describe('Bug A — refreshNextWeekCache tracks the current week', () => {
+describe('Bug A - refreshNextWeekCache tracks the current week', () => {
   beforeEach(() => {
     _state.clearLocalStorage();
     _state.clearIDBStore();
@@ -36,13 +36,13 @@ describe('Bug A — refreshNextWeekCache tracks the current week', () => {
   // The regression that caused the user-reported bug: prev/next navigation goes
   // through loadAndRender (not the hashchange handler), so the cache refresh must
   // live there. Drive the real navigation function and confirm the cache aligns
-  // with the week we landed on — not the week we left.
+  // with the week we landed on - not the week we left.
   test('navigation via loadAndRender refreshes the cache for the new week', async () => {
     const next = { nodes: [mkBranch('work')], tombstones: [] };
     await _state.saveWeekIDB('2099-02', next);
     _state.setLocalStorage('zenit-week-2099-01', { nodes: [mkBranch('work')], tombstones: [] });
 
-    // Land on a stale value, then navigate — loadAndRender must overwrite it.
+    // Land on a stale value, then navigate - loadAndRender must overwrite it.
     _state.setNextWeekRawCache(JSON.stringify({ nodes: [mkBranch('stale')], tombstones: [] }));
     await _state.loadAndRender('2099-01');
 
@@ -50,7 +50,7 @@ describe('Bug A — refreshNextWeekCache tracks the current week', () => {
   });
 });
 
-describe('Bug B — undo of a move un-resurrects the next-week copy', () => {
+describe('Bug B - undo of a move un-resurrects the next-week copy', () => {
   const WK = '2026-01';
   const NEXT = '2026-02';
 
@@ -114,7 +114,7 @@ describe('Bug B — undo of a move un-resurrects the next-week copy', () => {
     };
     _state.set(structuredClone(week));
     await saveWeekIDB(WK, structuredClone(week));
-    // Next week already holds unrelated work — an earlier transfer, or another device.
+    // Next week already holds unrelated work - an earlier transfer, or another device.
     await saveWeekIDB(NEXT, {
       nodes: [mkBranch('work', ['keep1']),
         { id: 'keep1', type: 'activity', parent: 'work', branch: 'work', label: 'keep me', children: [], done: false, _ts: 500 }],
@@ -162,7 +162,7 @@ describe('Bug B — undo of a move un-resurrects the next-week copy', () => {
         { id: 'keep1', type: 'activity', parent: 'work', branch: 'work', label: 'keep me', children: [], done: false, _ts: 500 }],
       tombstones: [],
     });
-    // Snapshot taken before the next week existed locally — the case that used to
+    // Snapshot taken before the next week existed locally - the case that used to
     // make undo replace the whole week with an empty record.
     _state.setNextWeekRawCache(null);
     takeSnapshot();

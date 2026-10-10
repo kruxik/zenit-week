@@ -1,6 +1,6 @@
 // Sign-in used to spend a full round trip turning the current week's file name
 // into a Drive file id before it could ask for the content. The ids are stable
-// per account, so they are kept across sessions — which only works if a stale
+// per account, so they are kept across sessions - which only works if a stale
 // one (file deleted elsewhere, or a different account signing in) is detected
 // and dropped rather than retried into a wall.
 import { describe, test, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
@@ -42,7 +42,7 @@ describe('persisted Drive file ids', () => {
     expect(_state.getDriveFileId('2026-34')).toBe('file_34');
   });
 
-  test('are ignored for a different account — those ids address another Drive', () => {
+  test('are ignored for a different account - those ids address another Drive', () => {
     _state.setLocalStorage(IDS_KEY, { email: 'a@example.com', ids: { '2026-34': 'file_34' } });
     _state.loadDriveFileIds('b@example.com');
     expect(_state.getDriveFileId('2026-34')).toBeNull();
@@ -123,7 +123,7 @@ describe('a stale persisted id', () => {
   });
 });
 
-// I5 — two devices resolving the same file name from the same listing must pick
+// I5 - two devices resolving the same file name from the same listing must pick
 // the same file id. Drive lets two devices create the same name in the same
 // second; nothing here repairs an existing split, it only stops the two copies
 // from being used alternately.

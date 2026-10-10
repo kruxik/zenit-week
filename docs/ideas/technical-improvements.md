@@ -4,7 +4,7 @@ This document tracks identified technical improvements for the Zenit Week applic
 
 ## 1. Security: XSS Mitigation (Critical)
 **Issue:** Activity and todo item labels were migrated to `textContent` (fixed). Branch labels still use `innerHTML` in two places: the Summary panel (line ~5993) and the Daily log legend (line ~6027), e.g. `row.innerHTML = \`...\${b.label}:\``.
-**Risk:** A branch name containing `<script>` or an `onerror` attribute executes in the page. This is directly reachable via Google Drive sync — a tampered Drive file with a malicious branch label survives `validateAndRepair` and reaches these `innerHTML` calls.
+**Risk:** A branch name containing `<script>` or an `onerror` attribute executes in the page. This is directly reachable via Google Drive sync - a tampered Drive file with a malicious branch label survives `validateAndRepair` and reaches these `innerHTML` calls.
 **Recommendations:**
 - Replace the two remaining `innerHTML` template literals that embed `b.label` with DOM construction (`createElement` + `textContent`) or introduce a small `escapeHtml(str)` utility and apply it to every user-controlled string passed to `innerHTML`.
 
@@ -13,13 +13,13 @@ This document tracks identified technical improvements for the Zenit Week applic
 **Risk:** An attacker who can write to the user's Google Drive `appDataFolder` (e.g. via a compromised Google session or a malicious app with Drive scope) can inject XSS payloads that survive the repair pass and reach `innerHTML` renders.
 **Recommendations:**
 - Add a string-field sanitization pass inside `validateAndRepair` that truncates labels beyond a max length and strips/encodes HTML-special characters (`<`, `>`, `"`, `&`).
-- Alternatively, fix all `innerHTML` call-sites (see §1) so raw label strings are never treated as HTML — this is the higher-leverage fix.
+- Alternatively, fix all `innerHTML` call-sites (see §1) so raw label strings are never treated as HTML - this is the higher-leverage fix.
 
 ## 1c. Security: Drive Colors File Theme Validation (Low)
 **Issue:** When syncing the colors/settings file from Drive, `remoteData.theme` is written directly to `localStorage` and applied to `document.documentElement.dataset.theme` (line ~3710) without checking that the value is `'light'` or `'dark'`.
 **Risk:** An arbitrary string in `dataset.theme` could match unintended CSS attribute selectors; combined with `'unsafe-inline'` styles it widens any XSS surface.
 **Recommendations:**
-- Validate before applying: `if (['light', 'dark'].includes(remoteData.theme))` — reject anything else.
+- Validate before applying: `if (['light', 'dark'].includes(remoteData.theme))` - reject anything else.
 - Same pattern for `remoteData.lang`: validate it is a known locale key before setting `currentLang`.
 
 ## 2. Performance: Rendering & Layout

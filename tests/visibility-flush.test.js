@@ -1,4 +1,4 @@
-// I7 — hiding the page must leave nothing holding sync open.
+// I7 - hiding the page must leave nothing holding sync open.
 //
 // A gesture cannot survive the page being hidden, so anything still open at
 // that moment is a leak, not an operation: an inline editor parks every remote
@@ -80,7 +80,7 @@ describe('visibilitychange → hidden releases every sync hold (I7)', () => {
     expect(_state.getAtomicOpsDepth()).toBe(0);
   });
 
-  test('the hidden path still uploads directly — the page is alive there', async () => {
+  test('the hidden path still uploads directly - the page is alive there', async () => {
     const uploaded = [];
     await _state.withStubbedUploads(uploaded, async () => {
       _state.setSyncDebounceTimer('2026-39');
@@ -115,7 +115,7 @@ describe('teardown parks instead of uploading', () => {
     });
     expect(_state.getOfflineUploadQueue().sort()).toEqual(['2026-38', '2026-39']);
 
-    // Parking is async and serialised — let the queue writes settle.
+    // Parking is async and serialised - let the queue writes settle.
     await _state.offlineQueueSettled();
     const stored = await _state.loadValueIDB(QUEUE_KEY);
     expect((stored || []).map(e => e.weekKey).sort()).toEqual(['2026-38', '2026-39']);

@@ -2,13 +2,13 @@
 // it as a destructive write.
 //
 //   P1b: only the displayed week was flushed on tab close, so a transfer's
-//        queued upload of the *next* week was dropped — nothing else ever
+//        queued upload of the *next* week was dropped - nothing else ever
 //        uploads a week the user isn't looking at.
 //   P2:  the import-pending flag is written to IndexedDB but was read from
 //        localStorage, so an import never force-pushed and imported data was
 //        merged against whatever Drive already held.
 //   P3:  undo tombstoned every live node missing from its snapshot, including
-//        nodes another device had just sent — a permanent, cross-device delete.
+//        nodes another device had just sent - a permanent, cross-device delete.
 import { describe, test, expect, beforeEach } from 'vitest';
 import { _state, takeSnapshot, undo, saveWeekIDB } from './setup.js';
 
@@ -31,7 +31,7 @@ function reset() {
   _state.resetSyncState();
 }
 
-describe('P1b — tab teardown flushes every queued week', () => {
+describe('P1b - tab teardown flushes every queued week', () => {
   beforeEach(reset);
 
   test('flush covers the current week and every debounced week', async () => {
@@ -55,7 +55,7 @@ describe('P1b — tab teardown flushes every queued week', () => {
   });
 });
 
-describe('P2 — import-pending flag is read from the store it is written to', () => {
+describe('P2 - import-pending flag is read from the store it is written to', () => {
   beforeEach(reset);
 
   test('false when nothing is pending', async () => {
@@ -73,7 +73,7 @@ describe('P2 — import-pending flag is read from the store it is written to', (
   });
 });
 
-describe('P3 — undo does not delete another device\'s work', () => {
+describe('P3 - undo does not delete another device\'s work', () => {
   beforeEach(reset);
 
   test('a node that arrived from a peer survives an unrelated undo', async () => {

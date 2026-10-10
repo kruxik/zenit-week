@@ -7,8 +7,8 @@ import {
   isReloadNavigation, readReloadRestore, saveViewStateOnLeave, reloadApp, reloadAppFresh,
 } from './setup.js';
 
-// Every reload — browser F5 / Cmd+R / its button, the pull-down
-// gesture, the quiet update reload — goes one way: saved on `pagehide`,
+// Every reload - browser F5 / Cmd+R / its button, the pull-down
+// gesture, the quiet update reload - goes one way: saved on `pagehide`,
 // restored at boot only when the browser reports a reload. These tests pin
 // both halves, and the source guards below keep a second path from creeping
 // back in.
@@ -33,7 +33,7 @@ describe('isReloadNavigation', () => {
   });
 });
 
-describe('readReloadRestore — the way in', () => {
+describe('readReloadRestore - the way in', () => {
   const KEY = _state.getRestoreKey();
   const saved = (over = {}) => JSON.stringify(buildRestorePayload({
     panX: 1, panY: 2, zoom: 1, currentView: 'agenda', currentWeekKey: '2026-40',
@@ -52,7 +52,7 @@ describe('readReloadRestore — the way in', () => {
     expect(readReloadRestore({ storage, perf: perf('reload'), currentWeekKey: '2026-40', now: 2000 }).helpOpen).toBe(true);
   });
 
-  it('a fresh open never restores — and still consumes what the last tab left', () => {
+  it('a fresh open never restores - and still consumes what the last tab left', () => {
     const storage = memStorage({ [KEY]: saved() });
     expect(readReloadRestore({ storage, perf: perf('navigate'), currentWeekKey: '2026-40', now: 2000 })).toBe(null);
     expect(storage.has(KEY)).toBe(false);
@@ -116,14 +116,14 @@ describe('the way out, and the two ways to reload', () => {
   });
 });
 
-describe('one path — source guards', () => {
+describe('one path - source guards', () => {
   const html = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'zenit-week.html'), 'utf8');
   const script = html.match(/<script\s+id="app-script">([\s\S]*?)<\/script>/)[1];
   const code = script.replace(/^\s*\/\/.*$/gm, ''); // line comments only
   const body = (name) => {
     const start = code.search(new RegExp(`(?:async\\s+)?function ${name}\\s*\\(`));
     expect(start, `${name} exists`).toBeGreaterThan(-1);
-    // The body's brace follows the parameter list — which may itself hold a
+    // The body's brace follows the parameter list - which may itself hold a
     // destructuring `{ … }`, so look for `) {`, not the first brace.
     let depth = 0, i = code.indexOf(') {', start) + 2;
     const from = i;

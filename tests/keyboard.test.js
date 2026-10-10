@@ -13,7 +13,7 @@ function esc(extra = {}) {
   });
 }
 
-describe('ESC key — closes Agenda on desktop', () => {
+describe('ESC key - closes Agenda on desktop', () => {
   beforeEach(() => {
     _state.setCurrentView('mindmap');
     _state.setWindowInnerWidth(1280);
@@ -244,10 +244,10 @@ describe('Mindmap keyboard focus', () => {
 });
 
 
-// R9: L opens the Agenda on the Later tab. It was free — X is dropped and 9
-// belongs to the numeric day strip — and it must stand down wherever the user
+// R9: L opens the Agenda on the Later tab. It was free - X is dropped and 9
+// belongs to the numeric day strip - and it must stand down wherever the user
 // is typing, or "later" would land in a task name.
-describe('L — Later tab', () => {
+describe('L - Later tab', () => {
   function press(extra = {}) {
     _state.triggerKeydown({
       key: 'l',

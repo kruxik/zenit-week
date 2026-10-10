@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8');
 
-// The mindmap SVG is rebuilt whole — every node group, every edge — so switchView
+// The mindmap SVG is rebuilt whole - every node group, every edge - so switchView
 // used to pay ~105 ms of script on a full week each time the user came back to it,
 // however little had changed. It now rebuilds only when the map actually fell
 // behind, which on a Galaxy S22 took that switch from 328 ms to 240 ms INP
@@ -10,8 +10,8 @@ const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8')
 //
 // That trade rests on one invariant: _mapDirty is set whenever a render is asked
 // for and not performed. Only the mobile agenda skips, because it hides the
-// canvas. If a second skip is ever added — another view that hides the map, a
-// different width rule, an early return for a background tab — and it does not
+// canvas. If a second skip is ever added - another view that hides the map, a
+// different width rule, an early return for a background tab - and it does not
 // flag, the map silently keeps showing stale data until something unrelated
 // forces a rebuild. That is a correctness bug with no visible failure at the call
 // site, and nothing else in the suite would catch it, so it is pinned here.
@@ -35,7 +35,7 @@ describe('the map is only rebuilt when it fell behind', () => {
 
     // Every early exit is a skipped render, so each one has to set the flag
     // before it leaves. The tail call to render() is the only way out that does
-    // not — it rendered.
+    // not - it rendered.
     const earlyReturns = body.match(/return\s*;/g) || [];
     expect(earlyReturns.length).toBeGreaterThan(0);
     const flagged = body.match(/_mapDirty\s*=\s*true\s*;\s*return\s*;/g) || [];
@@ -59,7 +59,7 @@ describe('the map is only rebuilt when it fell behind', () => {
   test('nothing else writes the flag without saying so', () => {
     // Three writes exist by design: the declaration, the skip in
     // renderIfVisible, and the clear in render(). A fourth means someone is
-    // steering the rebuild from somewhere new — which may well be right, but it
+    // steering the rebuild from somewhere new - which may well be right, but it
     // belongs in this test's reasoning rather than slipping in unnoticed.
     const KNOWN = ['renderIfVisible', 'render'];
     const writes = SRC.match(/_mapDirty\s*=\s*(true|false)/g) || [];

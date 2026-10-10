@@ -139,7 +139,7 @@ function navEvent(url, preloadResponse) {
   return ev;
 }
 
-describe('sw.js — request routing', () => {
+describe('sw.js - request routing', () => {
   let w;
   beforeEach(() => { w = loadWorker(); });
 
@@ -190,7 +190,7 @@ describe('sw.js — request routing', () => {
     expect(ev.responses).toHaveLength(0);
   });
 
-  it('never claims another origin — Drive traffic must pass straight through', () => {
+  it('never claims another origin - Drive traffic must pass straight through', () => {
     expect(w.ctx.isAppDocument(new URL('https://www.googleapis.com/drive/v3/files'))).toBe(false);
     expect(w.ctx.isAppDocument(new URL('https://evil.example/app'))).toBe(false);
   });
@@ -240,7 +240,7 @@ describe('sw.js — request routing', () => {
   });
 });
 
-describe('sw.js — version token', () => {
+describe('sw.js - version token', () => {
   let w;
   beforeEach(() => { w = loadWorker(); });
 
@@ -259,10 +259,10 @@ describe('sw.js — version token', () => {
   });
 });
 
-describe('sw.js — serving the shell', () => {
+describe('sw.js - serving the shell', () => {
   it('answers from cache without ever waiting on the network', async () => {
     // The network here never answers. If the shell response were on the
-    // critical path at all, this test would hang instead of asserting — which
+    // critical path at all, this test would hang instead of asserting - which
     // is precisely the launch failure the worker exists to prevent.
     let release;
     const w = loadWorker({ fetchImpl: () => new Promise(r => { release = r; }) });
@@ -317,7 +317,7 @@ describe('sw.js — serving the shell', () => {
   });
 });
 
-describe('sw.js — foreign documents', () => {
+describe('sw.js - foreign documents', () => {
   // A tunnel's own page is a 200 text/html document. Cached under the shell key
   // it becomes the app on that device, which is how one ngrok browser warning
   // turned into a permanently blank screen that survived every reload.
@@ -357,7 +357,7 @@ describe('sw.js — foreign documents', () => {
   });
 });
 
-describe('sw.js — revalidation', () => {
+describe('sw.js - revalidation', () => {
   it('tells every open tab when the deployed version changed', async () => {
     const w = loadWorker({
       clients: [`${ORIGIN}/app`, `${ORIGIN}/app`],
@@ -441,7 +441,7 @@ describe('sw.js — revalidation', () => {
   });
 });
 
-describe('sw.js — marketing pages', () => {
+describe('sw.js - marketing pages', () => {
   it('serves a cached landing page so an offline reader still reaches the app link', async () => {
     const w = loadWorker({ fetchImpl: () => Promise.reject(new Error('offline')) });
     await w.cache.put('/', makeResponse({ etag: '"landing"', tag: 'landing' }));
@@ -458,7 +458,7 @@ describe('sw.js — marketing pages', () => {
     expect([...w.cache.store.keys()].sort()).toEqual(['/', '/privacy']);
   });
 
-  it('never announces a marketing update to the app — there is nothing to reload', async () => {
+  it('never announces a marketing update to the app - there is nothing to reload', async () => {
     const w = loadWorker({
       clients: [`${ORIGIN}/app`],
       fetchImpl: () => Promise.resolve(makeResponse({ etag: '"v2"' })),
@@ -479,7 +479,7 @@ describe('sw.js — marketing pages', () => {
   });
 });
 
-describe('sw.js — activation', () => {
+describe('sw.js - activation', () => {
   it('warms the shell from an open tab so the very first visit survives going offline', async () => {
     const w = loadWorker({ clients: [`${ORIGIN}/app?code=oauth-secret`] });
     await w.ctx.warmShell();
@@ -560,7 +560,7 @@ function makeDriveFetch({ props = { contentHash: '999' }, token = 'tok', overrid
   return { impl, calls };
 }
 
-describe('sw.js — offline upload queue: the safety rule', () => {
+describe('sw.js - offline upload queue: the safety rule', () => {
   let w;
   beforeEach(() => { w = loadWorker(); });
 
@@ -595,7 +595,7 @@ describe('sw.js — offline upload queue: the safety rule', () => {
   });
 });
 
-describe('sw.js — offline upload queue: draining', () => {
+describe('sw.js - offline upload queue: draining', () => {
   it('pushes a parked week and clears it from the queue', async () => {
     const misc = { [QUEUE_KEY]: [mkEntry()] };
     const drive = makeDriveFetch();
@@ -708,7 +708,7 @@ describe('sw.js — offline upload queue: draining', () => {
 // user installs the app, which is exactly when they may be offline. They are
 // also the only static files vercel.json sets no Cache-Control for.
 
-// Mirrors ICON_PATHS in sw.js — a top-level const lives in the script's lexical
+// Mirrors ICON_PATHS in sw.js - a top-level const lives in the script's lexical
 // scope, not on the context object, so it cannot be read back out of the worker.
 const ICON_PATHS = [
   '/assets/icon-192.png',
@@ -727,7 +727,7 @@ function iconEvent(url, mode = 'no-cors') {
   };
 }
 
-describe('sw.js — manifest icons', () => {
+describe('sw.js - manifest icons', () => {
   let w;
   beforeEach(() => { w = loadWorker(); });
 
@@ -741,7 +741,7 @@ describe('sw.js — manifest icons', () => {
     expect(w.ctx.isManifestIcon(new URL('/assets/icon-512-maskable.png', ORIGIN))).toBe(false);
   });
 
-  it('leaves the rest of /assets alone — hero.svg is 632 KB of marketing', () => {
+  it('leaves the rest of /assets alone - hero.svg is 632 KB of marketing', () => {
     for (const path of ['/assets/hero.svg', '/og-image.jpg', '/assets/playground-seed.json']) {
       expect(w.ctx.isManifestIcon(new URL(path, ORIGIN))).toBe(false);
     }
@@ -764,7 +764,7 @@ describe('sw.js — manifest icons', () => {
     expect(w.fetches).toHaveLength(before);
   });
 
-  it('survives an install with no link — one bad icon must not fail the install', async () => {
+  it('survives an install with no link - one bad icon must not fail the install', async () => {
     const bad = loadWorker({ fetchImpl: () => Promise.reject(new Error('offline')) });
     await expect(bad.ctx.precacheIcons()).resolves.toBeUndefined();
     expect(bad.cache.store.size).toBe(0);
@@ -833,7 +833,7 @@ function langEvent(url, acceptLanguage) {
 
 const offlineWorker = () => loadWorker({ fetchImpl: () => Promise.reject(new Error('offline')) });
 
-describe('sw.js — offline fallback', () => {
+describe('sw.js - offline fallback', () => {
   it('answers 503 as a document, not as plain text', async () => {
     const w = offlineWorker();
     const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
@@ -841,7 +841,7 @@ describe('sw.js — offline fallback', () => {
     expect(resp.headers['Content-Type']).toMatch(/text\/html/);
   });
 
-  it('is never stored — a cached "you are offline" would outlive being offline', async () => {
+  it('is never stored - a cached "you are offline" would outlive being offline', async () => {
     const w = offlineWorker();
     const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
     expect(resp.headers['Cache-Control']).toBe('no-store');
@@ -892,7 +892,7 @@ describe('sw.js — offline fallback', () => {
     expect(String(resp.body)).toContain('href="/privacy"');
   });
 
-  it('never puts the request path in the markup — /app/… takes any trailing segment', async () => {
+  it('never puts the request path in the markup - /app/… takes any trailing segment', async () => {
     const w = offlineWorker();
     const hostile = `${ORIGIN}/app/"><script>alert(1)</script>`;
     const resp = await w.ctx.shellResponse(navEvent(hostile));
@@ -900,7 +900,7 @@ describe('sw.js — offline fallback', () => {
     expect(String(resp.body)).not.toContain('alert(1)');
   });
 
-  it('keeps the cached copy authoritative — the fallback is a last resort', async () => {
+  it('keeps the cached copy authoritative - the fallback is a last resort', async () => {
     const w = offlineWorker();
     await w.cache.put('/__zw-shell__', makeResponse({ tag: 'cached-shell' }));
     const resp = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`));
@@ -914,7 +914,7 @@ describe('sw.js — offline fallback', () => {
 // worker. It costs no extra traffic here: a cache hit already spends one
 // request on revalidation, and that is the request the preload becomes.
 
-describe('sw.js — navigation preload', () => {
+describe('sw.js - navigation preload', () => {
   it('turns it on during activation', async () => {
     const w = loadWorker();
     const calls = [];
@@ -1032,7 +1032,7 @@ describe('sw.js — navigation preload', () => {
 // build it should be on. An enhancement only: Chromium-only, gated on an
 // installed PWA and site engagement, with the browser setting the real cadence.
 
-describe('sw.js — periodic refresh', () => {
+describe('sw.js - periodic refresh', () => {
   it('only answers its own tag', () => {
     const w = loadWorker();
     const waits = [];
@@ -1056,7 +1056,7 @@ describe('sw.js — periodic refresh', () => {
 
   it('waits for a real visit when nothing is cached yet', async () => {
     // No client is open during a periodic sync, so there is nothing to learn the
-    // shell URL from — refreshing a shell we never had is not this event's job.
+    // shell URL from - refreshing a shell we never had is not this event's job.
     const w = loadWorker();
     await w.ctx.periodicRefresh();
     expect(w.cache.store.has('/__zw-shell__')).toBe(false);
@@ -1077,7 +1077,7 @@ describe('sw.js — periodic refresh', () => {
     expect(misc[QUEUE_KEY]).toEqual([]);
   });
 
-  it('does not escalate an upload failure — the sync event owns retrying', async () => {
+  it('does not escalate an upload failure - the sync event owns retrying', async () => {
     const misc = { [QUEUE_KEY]: [mkEntry()] };
     const w = loadWorker({
       misc,
@@ -1116,7 +1116,7 @@ function imgEvent(url) {
   };
 }
 
-describe('sw.js — avatar photo', () => {
+describe('sw.js - avatar photo', () => {
   let w;
   beforeEach(() => { w = loadWorker(); });
 
@@ -1134,7 +1134,7 @@ describe('sw.js — avatar photo', () => {
     }
   });
 
-  it('leaves the Drive API alone — sync traffic must never be cached', () => {
+  it('leaves the Drive API alone - sync traffic must never be cached', () => {
     expect(w.ctx.isAvatarPhoto(new URL('https://www.googleapis.com/drive/v3/files'))).toBe(false);
   });
 
@@ -1160,7 +1160,7 @@ describe('sw.js — avatar photo', () => {
     expect(w.fetches).toHaveLength(0);
   });
 
-  it('keeps exactly one — an opaque entry costs far more quota than its bytes', async () => {
+  it('keeps exactly one - an opaque entry costs far more quota than its bytes', async () => {
     const older = 'https://lh3.googleusercontent.com/a/older=s96-c';
     await w.cache.put(older, makeResponse({ tag: 'old-photo' }));
     const ev = imgEvent(PHOTO);
@@ -1180,7 +1180,7 @@ describe('sw.js — avatar photo', () => {
     expect(w.cache.store.has('/assets/icon-192.png')).toBe(true);
   });
 
-  it('drops the photo on sign-out — it identifies who was signed in', async () => {
+  it('drops the photo on sign-out - it identifies who was signed in', async () => {
     await w.cache.put(PHOTO, makeResponse({ tag: 'photo' }));
     await w.cache.put('/__zw-shell__', makeResponse({ tag: 'shell' }));
     await w.ctx.clearAvatars();
@@ -1203,10 +1203,10 @@ describe('sw.js — avatar photo', () => {
 //
 // A free-tier ngrok domain answers a browser-shaped request with its own warning
 // page instead of the app. The worker must not cache it (covered under foreign
-// documents) *and* must not be stopped by it — before the opt-out header, a shell
+// documents) *and* must not be stopped by it - before the opt-out header, a shell
 // cached once behind such a tunnel could never be refreshed again.
 
-describe('sw.js — tunnel interstitial', () => {
+describe('sw.js - tunnel interstitial', () => {
   it('sends the opt-out header on the revalidation fetch', async () => {
     const w = loadWorker();
     await w.cache.put('/__zw-shell__', makeResponse({ etag: '"v1"' }));
@@ -1347,7 +1347,7 @@ describe('sw.js — tunnel interstitial', () => {
   });
 });
 
-describe('sw.js — editor vendor bundle', () => {
+describe('sw.js - editor vendor bundle', () => {
   const NEW = '/vendor/editor.0123456789abcdef.js';
   const OLD = '/vendor/editor.fedcba9876543210.js';
   const script = (tag = 'bundle') => makeResponse({ tag, extraHeaders: { 'content-type': 'application/javascript; charset=utf-8' } });
@@ -1392,7 +1392,7 @@ describe('sw.js — editor vendor bundle', () => {
   });
 });
 
-describe('sw.js — refresh on request', () => {
+describe('sw.js - refresh on request', () => {
   function refreshEvent(sourceUrl) {
     const replies = [];
     const waits = [];

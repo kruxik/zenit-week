@@ -4,7 +4,7 @@
 // tab that stayed visible kept yesterday's agenda tab selected. The ISO week
 // was never re-read at all: nothing compared currentWeekKey against today's
 // week while the app sat open, so a tab open across Sunday night kept showing
-// last week — with a "today" that no longer existed in it — until the user
+// last week - with a "today" that no longer existed in it - until the user
 // navigated, reset the view or reloaded.
 import { describe, test, expect, beforeEach } from 'vitest';
 import { _state, checkDateRollover } from './setup.js';
@@ -24,7 +24,7 @@ function captureNavigation() {
   return calls;
 }
 
-describe('week rollover — following the new week', () => {
+describe('week rollover - following the new week', () => {
   beforeEach(reset);
 
   test('moves a tab sitting on last week onto the new one', () => {
@@ -74,7 +74,7 @@ describe('week rollover — following the new week', () => {
   });
 });
 
-describe('week rollover — the day index', () => {
+describe('week rollover - the day index', () => {
   beforeEach(reset);
 
   test('re-defaults the agenda to the new today', () => {
@@ -110,7 +110,7 @@ describe('week rollover — the day index', () => {
   });
 });
 
-describe('week rollover — deferring to the user', () => {
+describe('week rollover - deferring to the user', () => {
   beforeEach(reset);
 
   test('refuses to move the week out from under an open inline editor', () => {

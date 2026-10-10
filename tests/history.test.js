@@ -55,7 +55,7 @@ describe('History & Global State restoration', () => {
     expect(t('help.title')).toBe('Help & Hotkeys');
   });
 
-  // I4 — an undo stamps only what it actually changes. Restamping the whole
+  // I4 - an undo stamps only what it actually changes. Restamping the whole
   // snapshot is what let a stale device win the next LWW merge for a week's
   // worth of nodes it had never touched.
   describe('undo restamps only what it changes (I4)', () => {
@@ -143,7 +143,7 @@ describe('History & Global State restoration', () => {
     _state.set({ nodes: [mkBranch('work')] });
     takeSnapshot();
     
-    // Change week. No second snapshot — takeSnapshot captures the state to
+    // Change week. No second snapshot - takeSnapshot captures the state to
     // return to, so snapshotting after the change would make undo a no-op.
     // (It used to pass anyway: the repair pass resurrected the missing branch.)
     _state.setWeekKey('2026-02');

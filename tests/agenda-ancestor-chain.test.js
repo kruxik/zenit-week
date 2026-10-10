@@ -77,7 +77,7 @@ describe('getAgendaAncestorChain', () => {
 
 
 // A Later row stands for a schedule entry, not a node in this week, so the
-// chain cannot be walked — it comes from the path the entry carries. The rows
+// chain cannot be walked - it comes from the path the entry carries. The rows
 // must still read exactly like the task rows they become.
 describe('Later rows use the same label logic as a day row', () => {
   const entry = (over = {}) => ({

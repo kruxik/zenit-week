@@ -4,7 +4,7 @@ import { _state, handleNodeDrop, findNode } from './setup.js';
 // Work → Family rebind of a subtree:
 //   work → "Test Work" → { Alfa, Beta }
 // Dragging "Test Work" onto the Family branch must recolor the whole subtree,
-// not just the dragged node — colors, summary stats and CFD filters all read
+// not just the dragged node - colors, summary stats and CFD filters all read
 // each node's own `branch` field rather than walking up to its parent.
 describe('Drag rebind across branches', () => {
   beforeEach(() => {

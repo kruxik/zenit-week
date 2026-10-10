@@ -47,7 +47,7 @@ describe('Landing page CSP headers (vercel.json)', () => {
     .map(h => h.value);
 
   it('serves a script-src CSP for the landing routes', () => {
-    // One for /, /privacy, /terms — one for /cs.
+    // One for /, /privacy, /terms - one for /cs.
     expect(cspHeaders.length).toBe(2);
   });
 

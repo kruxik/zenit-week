@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Comment editor vendor bundle builder — `npm run editor:build`.
+// Comment editor vendor bundle builder - `npm run editor:build`.
 //
 // Bundles vendor/editor-entry.js (ProseMirror re-exports, nothing else) into
 // one minified IIFE at vendor/editor.<contenthash>.js, appends the licence
@@ -21,12 +21,12 @@ import { applyCsp } from './csp-hashes.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ENTRY = 'vendor/editor-entry.js';
 const VENDOR_DIR = 'vendor';
-// Browser global the IIFE assigns — the loader in zenit-week.html reads it.
+// Browser global the IIFE assigns - the loader in zenit-week.html reads it.
 export const GLOBAL_NAME = 'ZenitProseMirror';
 export const BUNDLE_FILE_REGEX = /^editor\.[0-9a-f]{16}\.js$/;
 
 // Anything outside this list stops the build. Widening it is a deliberate,
-// reviewed decision — never a quick fix to get a release out.
+// reviewed decision - never a quick fix to get a release out.
 export const ALLOWED_LICENSES = ['MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0'];
 
 // The marked constant in the main app script. Only the object literal between
@@ -46,7 +46,7 @@ export function bundleFileName(bytes) {
 }
 
 // An SPDX expression is allowed when every AND-term is allowed and, within an
-// OR-group, at least one alternative is. Parentheses are ignored — nothing we
+// OR-group, at least one alternative is. Parentheses are ignored - nothing we
 // bundle nests them, and a nested expression falls through to "not allowed".
 export function isLicenseAllowed(license) {
   if (typeof license !== 'string' || !license.trim()) return false;
@@ -79,7 +79,7 @@ function readLicenseText(dir) {
 }
 
 // Every third-party package that contributed bytes to the bundle, sorted by
-// name so the notice block — and therefore the content hash — is stable.
+// name so the notice block - and therefore the content hash - is stable.
 export function collectPackages(metafile, root = ROOT) {
   const dirs = new Set();
   for (const input of Object.keys(metafile.inputs)) {
@@ -106,7 +106,7 @@ export function buildNotices(packages) {
 }
 
 // THIRD_PARTY_NOTICES.md lists everything the app ships, so the editor's
-// packages are listed there too — generated from the same package walk as the
+// packages are listed there too - generated from the same package walk as the
 // bundle, between two marker comments, so a dependency added or dropped by an
 // update can never leave the notices behind. LICENSE stays the app's own MIT
 // text alone, which is what lets GitHub detect it. Packages sharing identical
@@ -132,7 +132,7 @@ export function buildLicenseSection(packages) {
     groups.get(terms).push({ ...p, copyright });
   }
   const parts = [...groups.entries()].map(([terms, pkgs]) => {
-    const list = pkgs.map(p => `- \`${p.name}\` (${p.license})${p.copyright.length ? ` — ${p.copyright.join('; ')}` : ''}`);
+    const list = pkgs.map(p => `- \`${p.name}\` (${p.license})${p.copyright.length ? ` - ${p.copyright.join('; ')}` : ''}`);
     return `${list.join('\n')}\n\n\`\`\`text\n${terms}\n\`\`\``;
   });
   return [
@@ -210,7 +210,7 @@ export async function main() {
   const htmlPath = resolve(ROOT, 'zenit-week.html');
   const html = readFileSync(htmlPath, 'utf8');
   // The constant sits inside the main inline script, so its CSP hash moves
-  // with it — refresh the hashes in the same write.
+  // with it - refresh the hashes in the same write.
   const out = applyCsp(applyEditorConstant(html, { src: `/${VENDOR_DIR}/${fileName}`, integrity: sriHash(bytes) }));
   if (out !== html) writeFileSync(htmlPath, out);
 
@@ -219,7 +219,7 @@ export async function main() {
   const licenseOut = applyLicenseSection(license, buildLicenseSection(packages));
   if (licenseOut !== license) writeFileSync(licensePath, licenseOut);
 
-  console.log(`[editor-build] ${VENDOR_DIR}/${fileName} — ${bytes.length} bytes, ${packages.length} packages`
+  console.log(`[editor-build] ${VENDOR_DIR}/${fileName} - ${bytes.length} bytes, ${packages.length} packages`
     + (out === html ? ', page already up to date' : ', page constant + CSP updated')
     + (licenseOut === license ? '' : ', notices updated'));
 }

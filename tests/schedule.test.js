@@ -58,7 +58,7 @@ import {
 } from './setup.js';
 
 // Both schedule writers refuse a date already past, so every test that calls
-// one needs a fixed "today" — otherwise the suite would start failing the day
+// one needs a fixed "today" - otherwise the suite would start failing the day
 // the wall clock passed its fixtures.
 function freezeToday(iso) {
   const when = new Date(`${iso}T12:00:00`);
@@ -83,13 +83,13 @@ function sendEntry(...args) {
   return Array.isArray(written) ? written[0] : written;
 }
 
-// Minimal entry factory — S1 only exercises the occurrence math, so nothing
+// Minimal entry factory - S1 only exercises the occurrence math, so nothing
 // beyond anchor / repeat / end is needed here.
 function entry(anchor, repeat = null, end = { type: 'never' }) {
   return { id: 'e1', label: 'Task', branch: 'work', anchor, repeat, end };
 }
 
-describe('Occurrence math — units', () => {
+describe('Occurrence math - units', () => {
   it('repeat null yields exactly the anchor', () => {
     const e = entry('2026-03-31');
     expect(nextOccurrence(e, '2026-01-01')).toBe('2026-03-31');
@@ -136,7 +136,7 @@ describe('Occurrence math — units', () => {
   });
 });
 
-describe('Occurrence math — month-end clamping', () => {
+describe('Occurrence math - month-end clamping', () => {
   it('clamps 31 Jan into February and returns to 31 March', () => {
     const e = entry('2026-01-31', { every: 1, unit: 'month' });
     expect(occurrencesInRange(e, '2026-01-01', '2026-06-30'))
@@ -174,7 +174,7 @@ describe('Occurrence math — month-end clamping', () => {
   });
 });
 
-describe('Occurrence math — end conditions', () => {
+describe('Occurrence math - end conditions', () => {
   it('never runs out with end never', () => {
     const e = entry('2026-01-01', { every: 1, unit: 'year' }, { type: 'never' });
     expect(nextOccurrence(e, '2126-01-01')).toBe('2126-01-01');
@@ -207,7 +207,7 @@ describe('Occurrence math — end conditions', () => {
   });
 });
 
-describe('Occurrence math — dates and robustness', () => {
+describe('Occurrence math - dates and robustness', () => {
   it('returns the anchor when fromDate precedes it', () => {
     const e = entry('2026-06-15', { every: 1, unit: 'month' });
     expect(nextOccurrence(e, '2020-01-01')).toBe('2026-06-15');
@@ -251,7 +251,7 @@ describe('Occurrence math — dates and robustness', () => {
   });
 });
 
-describe('Schedule store — validate and repair', () => {
+describe('Schedule store - validate and repair', () => {
   const good = () => ({
     id: 's1', label: 'Tax return', branch: 'work', priority: 'high',
     path: ['Admin'],
@@ -392,7 +392,7 @@ describe('Schedule store — validate and repair', () => {
   });
 });
 
-describe('Schedule store — occurrenceNodeId', () => {
+describe('Schedule store - occurrenceNodeId', () => {
   it('is deterministic for the same inputs', () => {
     expect(occurrenceNodeId('s1', '2026-03-31')).toBe(occurrenceNodeId('s1', '2026-03-31'));
   });
@@ -428,7 +428,7 @@ describe('Schedule store — occurrenceNodeId', () => {
   });
 });
 
-describe('Schedule store — persistence', () => {
+describe('Schedule store - persistence', () => {
   beforeEach(async () => {
     _state.useRealIDB(true);
     const db = await openDB();
@@ -564,7 +564,7 @@ describe('Materialisation on week open', () => {
 
     const node = data.nodes.find(n => n.schedId === 's1');
     expect(node.type).toBe('activity');
-    // One day is an annotation, never a day child — 2026-05-13 is a Wednesday.
+    // One day is an annotation, never a day child - 2026-05-13 is a Wednesday.
     expect(node.label).toBe('Tax return (We)');
     expect(node.children).toEqual([]);
     expect(data.nodes.filter(n => n.dayChild)).toEqual([]);
@@ -727,7 +727,7 @@ describe('Materialisation on week open', () => {
   });
 
   // R2: withWeekLock is not re-entrant. Materialisation runs under the lock for
-  // the week being opened, so nothing it calls may take that lock again — a
+  // the week being opened, so nothing it calls may take that lock again - a
   // re-entrant call would wait on a lock its own caller holds and never resolve.
   it('opens a week under the lock without ever re-taking it', async () => {
     seed(entry());
@@ -764,7 +764,7 @@ describe('Materialisation on week open', () => {
   });
 
   // R6: materialisation takes no snapshot, so nothing can undo it. The worry
-  // was an undo restoring a state from before the plant — the node would leave
+  // was an undo restoring a state from before the plant - the node would leave
   // with no tombstone, and the next open would re-plant it. It cannot happen:
   // materialisation runs at week open, before any user action in that week, so
   // every snapshot the week can hold was taken after the plant.
@@ -880,7 +880,7 @@ describe('Send to date…', () => {
     expect(_state.getSchedule().entries).toHaveLength(0);
   });
 
-  it('accepts an end date equal to the anchor — a series of one', () => {
+  it('accepts an end date equal to the anchor - a series of one', () => {
     const e = sendEntry('a1', {
       date: '2026-09-14', every: 1, unit: 'week', endType: 'until', endDate: '2026-09-14',
     });
@@ -896,7 +896,7 @@ describe('Send to date…', () => {
   });
 
   it('retags the node in place for a date inside this week', () => {
-    // Tuesday of the week already open — the weekday selector's job, not the
+    // Tuesday of the week already open - the weekday selector's job, not the
     // schedule's. Nothing leaves the week and no entry is written.
     expect(sendNodeToDate('a1', { date: '2026-05-12', unit: null })).toEqual([]);
     expect(_state.getSchedule().entries).toEqual([]);
@@ -1011,7 +1011,7 @@ describe('Send to date…', () => {
 
     const undone = await loadWeek('2026-21');
     expect(undone.nodes.some(n => n.schedId)).toBe(false);
-    // The husk goes with it — an empty parent is not what the week looked like.
+    // The husk goes with it - an empty parent is not what the week looked like.
     expect(undone.nodes.some(n => n.label === 'Big project')).toBe(false);
 
     await redo();
@@ -1099,7 +1099,7 @@ describe('Send to date…', () => {
   });
 });
 
-describe('Occurrence math — walking backwards', () => {
+describe('Occurrence math - walking backwards', () => {
   const e = (anchor, repeat, end = { type: 'never' }) => ({ id: 'e1', label: 'T', anchor, repeat, end });
 
   it('finds the last occurrence on or before a date', () => {
@@ -1507,7 +1507,7 @@ describe('Editing an entry from the Later tab', () => {
 
   it('lets a series keep an anchor that is already past', () => {
     // The anchor of a repeating series is where it started, so it is allowed to
-    // stay behind today — only moving it back further is refused.
+    // stay behind today - only moving it back further is refused.
     _state.setSchedule({ entries: [entry({ anchor: '2026-01-05' })], tombstones: [], crdtVersion: 0 });
     const out = updateScheduleEntry('s1', { date: '2026-01-05', every: '1', unit: 'month' });
     expect(out.anchor).toBe('2026-01-05');
@@ -1559,7 +1559,7 @@ describe('Editing an entry from the Later tab', () => {
     expect(_state.getSchedule().entries[0].anchor).toBe('2026-05-13');
   });
 
-  it('affects future occurrences only — a materialised node is untouched', () => {
+  it('affects future occurrences only - a materialised node is untouched', () => {
     const e = entry();
     _state.setSchedule({ entries: [e], tombstones: [], crdtVersion: 0 });
     const data = week();
@@ -1627,7 +1627,7 @@ describe('Delete semantics', () => {
   });
 
   // Deleting an occurrence is the one delete that asks, because "this one" and
-  // "the series" are both ordinary readings of the gesture — the same question
+  // "the series" are both ordinary readings of the gesture - the same question
   // the Later tab asks from the other end of the task.
   function answerDeleteDialog(run, answer) {
     const real = sandboxGlobal.showAppConfirm;
@@ -1725,7 +1725,7 @@ describe('Delete semantics', () => {
     const ids = [occurrenceNodeId('s1', DATE), occurrenceNodeId('s1', DATE + ':day')];
     expect(_state.get().tombstones).toEqual(expect.arrayContaining(ids));
 
-    // This week now yields nothing, but the series survives — the following
+    // This week now yields nothing, but the series survives - the following
     // week's occurrence still arrives.
     expect(materialiseWeek(WK, _state.get())).toBe(false);
     const next = week();
@@ -1818,7 +1818,7 @@ describe('Schedule Drive sync', () => {
   });
 
   describe('content hash', () => {
-    it('ignores entry order — two devices need not agree on it', () => {
+    it('ignores entry order - two devices need not agree on it', () => {
       const a = entry({ id: 'a' });
       const b = entry({ id: 'b' });
       expect(scheduleContentHash(sched([a, b]))).toBe(scheduleContentHash(sched([b, a])));
@@ -2010,7 +2010,7 @@ describe('Date formatting', () => {
     expect(formatDayLabel(null, 'en')).toBe('');
   });
 
-  it('month headings stay nominative — a month named alone is not a date', () => {
+  it('month headings stay nominative - a month named alone is not a date', () => {
     expect(laterMonthLabel('2026-01')).toBe('Jan 2026');
     _state.setLang('cs');
     expect(laterMonthLabel('2026-01')).toBe('leden 2026');
@@ -2113,7 +2113,7 @@ describe('Pulling an occurrence into the current week', () => {
     expect(occurrences(next).map(n => n.schedDate)).toEqual(['2026-06-01']);
   });
 
-  it('is idempotent — a second pull plants nothing further', async () => {
+  it('is idempotent - a second pull plants nothing further', async () => {
     _state.setSchedule({ entries: [entry()], tombstones: [], crdtVersion: 0 });
     await pullOccurrenceIntoWeek('s1', FUTURE, 1);
     const after = _state.get().nodes.length;
@@ -2138,7 +2138,7 @@ describe('Pulling an occurrence into the current week', () => {
 // each carrying the path it hung under, and the shared path is what puts those
 // leaves back under one node when the week that owns the date rebuilds them.
 
-describe('Send to date — leaves and path', () => {
+describe('Send to date - leaves and path', () => {
   const WK = '2026-20';
   freezeToday('2026-05-11');
 
@@ -2184,7 +2184,7 @@ describe('Send to date — leaves and path', () => {
     expect(entries.map(e => e.label)).toEqual(['Go for a run', 'Stretching']);
     entries.forEach(e => expect(e.path).toEqual(['Health', 'Running']));
     expect(entries.every(e => e.anchor === '2026-09-15')).toBe(true);
-    // The parent leaves with them — nothing of it stays behind to close twice.
+    // The parent leaves with them - nothing of it stays behind to close twice.
     ['r1', 'g1', 's1n'].forEach(id => expect(findNode(id)).toBeUndefined());
     expect(findNode('h1').children).toEqual([]);
   });
@@ -2289,7 +2289,7 @@ describe('Send to date — leaves and path', () => {
   });
 });
 
-describe('Materialisation — path', () => {
+describe('Materialisation - path', () => {
   // 2026-W20 runs Mon 2026-05-11 … Sun 2026-05-17.
   const WK = '2026-20';
   const DATE = '2026-05-13';
@@ -2341,7 +2341,7 @@ describe('Materialisation — path', () => {
     expect(leaf.parent).toBe(running.id);
     expect(leaf.children).toEqual([]);
     expect(leaf.label).toBe('Go for a run (We)');
-    // Scaffolding is not an occurrence — only the leaf carries the stamps.
+    // Scaffolding is not an occurrence - only the leaf carries the stamps.
     expect(health.schedId).toBeUndefined();
     expect(running.schedId).toBeUndefined();
   });
@@ -2371,7 +2371,7 @@ describe('Materialisation — path', () => {
     data.nodes.find(n => n.id === 'me').children.push('mine');
 
     materialiseWeek(WK, data);
-    // Matched through its day tag — one Health, not a second one beside it.
+    // Matched through its day tag - one Health, not a second one beside it.
     expect(data.nodes.filter(n => /health/i.test(n.label || ''))).toHaveLength(1);
     expect(byLabel(data, 'Running').parent).toBe('mine');
   });

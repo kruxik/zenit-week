@@ -32,7 +32,7 @@ describe('_weekCompletion (4-week CFD)', () => {
     });
   });
 
-  it('counts only leaves — a parent with active children is excluded', () => {
+  it('counts only leaves - a parent with active children is excluded', () => {
     const data = { nodes: [
       { id: 'center', type: 'center' },
       { id: 'b1', type: 'branch', parent: 'center', children: ['a1'] },

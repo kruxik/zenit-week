@@ -1,6 +1,6 @@
 name: Deploy to Production
 
-# Triggers on version tags — e.g. git tag v1.2.3 && git push origin v1.2.3
+# Triggers on version tags - e.g. git tag v1.2.3 && git push origin v1.2.3
 on:
   push:
     tags:
@@ -80,7 +80,7 @@ jobs:
               --title "${{ github.ref_name }}" \
               --notes-file "$NOTES_FILE"
           else
-            echo "No CHANGELOG.md section for ${{ github.ref_name }} — falling back to auto-generated notes"
+            echo "No CHANGELOG.md section for ${{ github.ref_name }} - falling back to auto-generated notes"
             gh release create "${{ github.ref_name }}" \
               --title "${{ github.ref_name }}" \
               --generate-notes

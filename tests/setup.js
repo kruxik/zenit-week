@@ -69,7 +69,7 @@ function elementStub() {
   };
 }
 
-// Minimal sandbox — only what the pure functions need.
+// Minimal sandbox - only what the pure functions need.
 // window.addEventListener is stubbed so the 'load' callback never fires.
 const sandbox = {
   crypto: globalThis.crypto,
@@ -162,7 +162,7 @@ const sandbox = {
   location: { hash: '' },
   // The app strips the hash on today's week via history.replaceState (and never
   // pushes). Both stubs mirror the browser's observable effect for our call
-  // sites — every one passes pathname + search, i.e. a hash-less URL.
+  // sites - every one passes pathname + search, i.e. a hash-less URL.
   history: {
     replaceState: () => { sandbox.location.hash = ''; },
     pushState:    () => { sandbox.location.hash = ''; },
@@ -176,7 +176,7 @@ const sandbox = {
   // never keeps the test worker alive.
   setInterval: (fn, ms) => { const t = setInterval(fn, ms); if (t.unref) t.unref(); return t; },
   clearInterval,
-  // Date getter — re-reads host global on each access so withFrozenDate()
+  // Date getter - re-reads host global on each access so withFrozenDate()
   // overrides propagate into the VM sandbox.
   get Date() { return globalThis.Date; },
   indexedDB: fakeIndexedDB,
@@ -195,7 +195,7 @@ const sandbox = {
     }),
   },
   _idbStore: {},
-  // Test state bridge — populated by the appended accessor snippet below
+  // Test state bridge - populated by the appended accessor snippet below
   _state: {},
 };
 sandbox.window.fetch = sandbox.fetch;
@@ -240,7 +240,7 @@ applyRemoteMerge = function(w, d, j, h, s, r) {
 };
 
 // Mock IDB functions by default to keep existing tests synchronous and stable.
-// Opt out with _state.useRealIDB(true) — required for anything testing the
+// Opt out with _state.useRealIDB(true) - required for anything testing the
 // async read-modify-write behaviour of week records, since the synchronous
 // localStorage stand-ins below make those look atomic.
 //
@@ -364,7 +364,7 @@ startDriveSession = () => {};
 onTokensReceived = async (token) => {
   googleAccessToken = token;
   _tokenReceivedAt = Date.now();
-  _cancelRefreshRetry();   // mirrors the real one — a token ends the retry loop
+  _cancelRefreshRetry();   // mirrors the real one - a token ends the retry loop
 };
 forcePushAllToDrive = () => {};
 initDriveSync = () => Promise.resolve();
@@ -372,7 +372,7 @@ scheduleDriveSync = () => {};
 todayWeekKey = () => _todayWeekKeyOverride || currentWeekKey;
 let _todayWeekKeyOverride = null;
 
-// Network guards — the constants are top-level \`const\`s, which live in the
+// Network guards - the constants are top-level \`const\`s, which live in the
 // context's lexical scope rather than on the global object, so they need an
 // accessor like the module-level \`let\`s below.
 _state.getNetTimeouts = function() {
@@ -435,7 +435,7 @@ _state.getCommentEditor = function() { return commentEditor; };
 _state.setCurrentView = function(v) { currentView = v; };
 _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
-// hoveredNodeId / kbFocusId are module-level \`let\`s — the hotkeys read the first
+// hoveredNodeId / kbFocusId are module-level \`let\`s - the hotkeys read the first
 // and the arrow keys write the second, so both need an accessor to test.
 _state.setHoveredNode = function(id) { hoveredNodeId = id; };
 _state.getHoveredNode = function() { return hoveredNodeId; };
@@ -788,7 +788,7 @@ export const {
   mergeWeekData,
   migrateCrdt,
   withWeekLock,
-  // Multi-tab (Option B) — local sync peer
+  // Multi-tab (Option B) - local sync peer
   _weekContentSig,
   hasEditingNode,
   applyRemoteMerge,
@@ -800,7 +800,7 @@ export const {
   orderedInsertIndex,
   // Onboarding _demo drop-on-touch
   touchNode,
-  // Layout stamp (_posTs) — position changes, never content
+  // Layout stamp (_posTs) - position changes, never content
   touchLayout,
   // Onboarding cleanup
   clearExampleTasks,

@@ -7,7 +7,7 @@ import {
 const inline = (str) => tokenizeComment(str)[0].inline.map(({ type, text, href }) =>
   (href !== undefined ? { type, text, href } : { type, text }));
 
-describe('comment grammar — blocks', () => {
+describe('comment grammar - blocks', () => {
   it.each([
     ['plain text', 'paragraph', undefined],
     ['# Heading', 'heading', undefined],
@@ -41,7 +41,7 @@ describe('comment grammar — blocks', () => {
   });
 });
 
-describe('comment grammar — inline', () => {
+describe('comment grammar - inline', () => {
   it('bold, italic, link and autolink', () => {
     expect(inline('**b** *i* [t](https://a.cz) https://b.cz/x')).toEqual([
       { type: 'bold', text: 'b' },
@@ -86,7 +86,7 @@ describe('isSafeCommentUrl', () => {
   ])('rejects %j', (url) => expect(isSafeCommentUrl(url)).toBe(false));
 });
 
-describe('comment round trip — tokens re-serialize byte-identically', () => {
+describe('comment round trip - tokens re-serialize byte-identically', () => {
   // Comments the way people actually write them, literal Markdown-ish
   // characters and whitespace included.
   const corpus = [
@@ -99,7 +99,7 @@ describe('comment round trip — tokens re-serialize byte-identically', () => {
     '#hashtag and #another\n## not a heading\n* not a bullet',
     'snake_case_var, a*b*c, 5 * 3 = 15, ***stars***, **unclosed',
     '[broken](javascript:alert(1)) [ok](mailto:me@example.com)',
-    'Czech: ěščřžýáíéůú ĚŠČŘŽ — emoji 👍🏽 and 漢字',
+    'Czech: ěščřžýáíéůú ĚŠČŘŽ - emoji 👍🏽 and 漢字',
     '\n\n\n',
     '- [X] capital\n- [ ]no space\n-  two spaces',
     '* star\n- dash\n* mixed *italic* inside\n*not a bullet*',

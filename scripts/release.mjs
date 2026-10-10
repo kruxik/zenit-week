@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Release orchestrator — prepares a CalVer release locally.
+// Release orchestrator - prepares a CalVer release locally.
 //
 // Flow:
 //   1. Verify the working tree is clean and we're on main.
@@ -14,7 +14,7 @@
 //   4. Open $VISUAL || $EDITOR || vi on CHANGELOG.md so the human can
 //      polish the generated entries.
 //   5. Confirm, commit "chore(release): vX", tag vX.
-//   6. Print the push instruction — never push automatically; tag push
+//   6. Print the push instruction - never push automatically; tag push
 //      is what triggers production deploy via deploy-production.yml.
 
 import { execSync, spawnSync } from 'node:child_process';
@@ -52,7 +52,7 @@ function assertOnMain() {
   if (branch !== 'main') die(`Releases must be cut from main (currently on ${branch}).`);
 }
 
-// The packages bundled into vendor/editor.<hash>.js — every exact-pinned
+// The packages bundled into vendor/editor.<hash>.js - every exact-pinned
 // prosemirror-* devDependency.
 export function editorPackages(pkgJson) {
   return Object.keys(pkgJson.devDependencies || {}).filter(name => name.startsWith('prosemirror-')).sort();
@@ -102,7 +102,7 @@ function runEditorChecks() {
     die(`Could not check editor packages for updates: ${err.message}`);
   }
   if (outdated.length) {
-    die(`Editor packages are behind — bump them deliberately, rebuild and run the editor checklist:\n  ${outdated.join('\n  ')}`);
+    die(`Editor packages are behind - bump them deliberately, rebuild and run the editor checklist:\n  ${outdated.join('\n  ')}`);
   }
   console.log('✅ Editor packages are current');
 
@@ -111,10 +111,10 @@ function runEditorChecks() {
   try {
     shInherit('npm run editor:build');
   } catch {
-    die('Editor bundle build failed (see output above — a disallowed licence stops it).');
+    die('Editor bundle build failed (see output above - a disallowed licence stops it).');
   }
   if (editorBundleStatus() !== before) {
-    die('The committed editor bundle is stale — `npm run editor:build` changed it. Commit the rebuilt bundle and page, then release.');
+    die('The committed editor bundle is stale - `npm run editor:build` changed it. Commit the rebuilt bundle and page, then release.');
   }
   console.log('✅ Editor bundle matches its sources, licences allowed');
 
@@ -195,7 +195,7 @@ function runGitCliff(version) {
 
 function openInEditor(file) {
   const editor = process.env.VISUAL || process.env.EDITOR || 'vi';
-  console.log(`\n📝 Opening ${file} in ${editor} — polish the new section, save, exit.\n`);
+  console.log(`\n📝 Opening ${file} in ${editor} - polish the new section, save, exit.\n`);
   const res = spawnSync(editor, [file], { stdio: 'inherit', shell: false });
   if (res.status !== 0) die(`Editor exited with status ${res.status}.`);
 }
@@ -213,7 +213,7 @@ async function main() {
   assertOnMain();
   runEditorChecks();
   if (checksOnly) {
-    console.log('\n🧪 Checks only — no changelog, no commit, no tag.\n');
+    console.log('\n🧪 Checks only - no changelog, no commit, no tag.\n');
     return;
   }
 
@@ -256,7 +256,7 @@ async function main() {
 
   shInherit('git add CHANGELOG.md');
   shInherit(`git commit -m "chore(release): ${version}"`);
-  // Annotated tag — `git push --follow-tags` only pushes annotated tags,
+  // Annotated tag - `git push --follow-tags` only pushes annotated tags,
   // so lightweight tags get left behind on the local machine and never
   // trigger the deploy workflow.
   shInherit(`git tag -a ${version} -m "Release ${version}"`);

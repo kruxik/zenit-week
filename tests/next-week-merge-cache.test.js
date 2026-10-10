@@ -13,7 +13,7 @@ import {
 // _commitRemoteMerge, bypassing saveWeek's _nextWeekRawCache refresh. A stale
 // cache made the next undo/redo restore an outdated next-week blob and
 // _tombstoneRemovedNodes() then tombstoned (and force-pushed) the live nodes the
-// merge had just pulled in — wiping a node and its subtree everywhere.
+// merge had just pulled in - wiping a node and its subtree everywhere.
 
 const WK = '2026-01';
 const NK = '2026-02'; // offsetWeek(WK, +1)

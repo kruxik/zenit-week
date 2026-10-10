@@ -24,7 +24,7 @@ afterEach(() => {
 
 // ─── Mindmap ──────────────────────────────────────────────────────────────────
 
-describe('resetView — mindmap', () => {
+describe('resetView - mindmap', () => {
   test('clears activeDayFilter when already on current week', async () => {
     setUp({ weekKey: '2026-05', view: 'mindmap' });
     _state.setActiveDayFilter(3);
@@ -64,7 +64,7 @@ describe('resetView — mindmap', () => {
 
 // ─── Agenda ───────────────────────────────────────────────────────────────────
 
-describe('resetView — agenda', () => {
+describe('resetView - agenda', () => {
   test('sets agendaActiveTab to current day of week', async () => {
     setUp({ weekKey: '2026-05', view: 'agenda' });
     _state.setAgendaActiveTab(4);

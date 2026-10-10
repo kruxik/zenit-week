@@ -38,18 +38,18 @@ SOFTWARE.
 The lazy-loaded comment editor (`vendor/editor.<hash>.js`) bundles the
 following packages, each used under the licence terms that follow its list.
 
-- `orderedmap` (MIT) — Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-commands` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-history` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-inputrules` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-keymap` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-model` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-schema-list` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-state` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-transform` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `prosemirror-view` (MIT) — Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
-- `rope-sequence` (MIT) — Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin>
-- `w3c-keyname` (MIT) — Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `orderedmap` (MIT) - Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-commands` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-history` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-inputrules` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-keymap` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-model` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-schema-list` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-state` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-transform` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `prosemirror-view` (MIT) - Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+- `rope-sequence` (MIT) - Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin>
+- `w3c-keyname` (MIT) - Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
 
 ```text
 Permission is hereby granted, free of charge, to any person obtaining a copy

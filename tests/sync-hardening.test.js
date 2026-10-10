@@ -1,7 +1,7 @@
 // Four smaller defects found while tracing the cross-week data loss.
 //
 //   1. A reset triggered from another device wiped only localStorage, but week
-//      records live in IndexedDB — so it discarded nothing.
+//      records live in IndexedDB - so it discarded nothing.
 //   2. validateAndRepair dropped unreachable nodes silently, the one remaining
 //      way a node can leave the data with no tombstone and no trace.
 //   3. The pull that runs immediately before an upload was conditional, so a
@@ -28,7 +28,7 @@ describe('validateAndRepair announces what it garbage-collects', () => {
   test('warns, naming every dropped node', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     // 'ghost' names its parent but the parent does not list it as a child, so it
-    // is unreachable from any branch — exactly the shape a mis-wired cross-week
+    // is unreachable from any branch - exactly the shape a mis-wired cross-week
     // copy has, and previously deleted without a word.
     validateAndRepair({
       nodes: [mkBranch('work', ['a']), mkNode('a', 'work'), mkNode('ghost', 'work')],
@@ -81,7 +81,7 @@ describe('reset from another device clears IndexedDB too', () => {
     expect(_state.getLocalStorage('zenit-week-theme')).toBeUndefined();
   });
 
-  test('onboarding state survives — the reset discards data, not the tour', async () => {
+  test('onboarding state survives - the reset discards data, not the tour', async () => {
     writeBoolPref('zenit-week-onboarded', true);
     writeBoolPref('zenit-week-playground-nudged', true);
     writeBoolPref('zenit-week-tips-enabled', false);

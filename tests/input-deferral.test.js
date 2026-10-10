@@ -8,7 +8,7 @@ const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8')
 // paint instead of letting the compositor run ahead. Measured on a Galaxy S22:
 // 4 frames at a 75 ms gap inline, against 13-16 frames at 25 ms when deferred by
 // one macrotask. It cost a full day to find, because it is invisible to any
-// scripted benchmark — calling switchViewLevel() from a script never enters the
+// scripted benchmark - calling switchViewLevel() from a script never enters the
 // input path at all.
 const SLIDE_TRIGGERS = ['switchViewLevel', 'pressViewLevel', 'stepPebbles', 'setDayFilter', '_setViewLevel', 'repackWithSlide'];
 

@@ -86,7 +86,7 @@ describe('isAppQuiescent', () => {
   });
 
   it('allows the reload where connection info is unavailable', () => {
-    // navigator.connection is Chromium-only — absence must not block updates.
+    // navigator.connection is Chromium-only - absence must not block updates.
     expect(isAppQuiescent(allClearState({ effectiveType: null })).quiescent).toBe(true);
     expect(isAppQuiescent(allClearState({ effectiveType: undefined })).quiescent).toBe(true);
   });

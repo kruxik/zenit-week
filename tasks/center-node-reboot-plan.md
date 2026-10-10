@@ -1,4 +1,4 @@
-# Plan — Center Node Reboot: Identity In, Chrome Out
+# Plan - Center Node Reboot: Identity In, Chrome Out
 
 Source idea: [`docs/ideas/center-node-reboot.md`](../docs/ideas/center-node-reboot.md)
 Supersedes: [`docs/ideas/root-3-brick-nav.md`](../docs/ideas/root-3-brick-nav.md)
@@ -22,22 +22,22 @@ in a completion ring traced on the pill's own outline. The day-filter chip vacat
 
 ## Architecture Decisions
 
-**AD1 — The week bar lives inside `#canvas-container`, not `<body>`.**
+**AD1 - The week bar lives inside `#canvas-container`, not `<body>`.**
 `#day-filter-chip` is already `position:absolute` inside the canvas container; the
 bar takes the same slot and the same containing block. This buys hide-in-agenda for
 free: `.app-panel` is `z-index:2000` and full-viewport on mobile, so a canvas-scoped
 bar is covered exactly the way the center node is today. Week navigation from the
-agenda view stays out of scope — it does not exist today either.
+agenda view stays out of scope - it does not exist today either.
 
-**AD2 — The ring is the pill's own outline, not a separate donut.**
+**AD2 - The ring is the pill's own outline, not a separate donut.**
 Draw a rounded-rect outline `<path>` matching the center rect's geometry and set
 `stroke-dasharray` from the percentage. Starts at top-center, fills clockwise.
-- *Rejected:* `pathLength` on `<rect>` — cleaner, but Safari support is unverified.
-- *Rejected:* a small `_statsDonut`-style circle inside the pill — adds width to a
+- *Rejected:* `pathLength` on `<rect>` - cleaner, but Safari support is unverified.
+- *Rejected:* a small `_statsDonut`-style circle inside the pill - adds width to a
   node whose width feeds layout, and duplicates the Stats panel visual.
-- *Rejected:* making the root circular — a true ring, but changes `CENTER_W` (see AD3).
+- *Rejected:* making the root circular - a true ring, but changes `CENTER_W` (see AD3).
 
-**AD3 — ~~`CENTER_W` / `CENTER_H` stay at 240×80.~~ Superseded 2026-08-17: the root
+**AD3 - ~~`CENTER_W` / `CENTER_H` stay at 240×80.~~ Superseded 2026-08-17: the root
 becomes a 160×160 circle.**
 The original caution was that `computeLayout` reads
 `positions['center'] = {w: CENTER_W, h: CENTER_H}` and derives branch `baseDistance`
@@ -46,10 +46,10 @@ risk was overstated: `layout.test.js` asserts only *relative* positions
 (`d1.x === d2.x`, zig-zag vStep), and neither `reset-view.test.js` nor
 `zoom.test.js` references the center's size at all. Going circular costs no test
 churn. Branch edges also land better: a circle's left and right extremities are
-exactly `(±r, 0)`, which is precisely where `drawEdges` already starts them —
+exactly `(±r, 0)`, which is precisely where `drawEdges` already starts them -
 truer than it ever was for a pill.
 
-**AD8 — The root shows the user, in three tiers, and the ring goes *inside* it.**
+**AD8 - The root shows the user, in three tiers, and the ring goes *inside* it.**
 Photo → initials → `Me`/`Já`, mirroring what the toolbar avatar already resolves.
 Rather than duplicating that decision, the photo-vs-initials test is extracted from
 `showSignedInAvatar` into one predicate both callers share. The initials layer is
@@ -60,37 +60,37 @@ The ring is inset inside the circle's edge, not wrapped around the outside. Outs
 its leftmost and rightmost points sit exactly where the branch edges run, and every
 edge would visibly cross it.
 
-**AD4 — Ring is drawn at build time and patched in `updateSummary()`.**
+**AD4 - Ring is drawn at build time and patched in `updateSummary()`.**
 `updateNodeUI()` cannot carry it: it calls `findNode(nodeId)`, which returns `null`
-for the virtual `center`, and early-returns. `updateSummary()` is the correct hook —
+for the virtual `center`, and early-returns. `updateSummary()` is the correct hook -
 it already fires from all six mutation paths and its `_computeSummarySignature()`
 covers exactly the ring's inputs (`done`, `val`, `max`, `priority`, `branch`,
 `unplanned`). Because it early-returns on an unchanged signature, `makeNodeGroup`
 must draw the ring correctly itself rather than relying on the patch.
 
-**AD5 — `formatWeekLabel()` becomes single-line.**
+**AD5 - `formatWeekLabel()` becomes single-line.**
 It currently returns a `\n`-joined two-line string for SVG text. Both callers change
 in this work (`_computeNodeSize`'s center branch and the center render), so the `\n`
 has no remaining consumer. The bar wants one line.
 
-**AD6 — The trigger is `☰`, not a gear.**
+**AD6 - The trigger is `☰`, not a gear.**
 `#fab-settings` already means *app settings*. A second gear meaning *week actions*
 is an ambiguity, not a shortcut. The `☰` reuses `showContextMenu('center')` verbatim,
-anchored to the button's bounding rect — no new dropdown code.
+anchored to the button's bounding rect - no new dropdown code.
 
-**AD7 — The bottom stack gets two shared CSS vars.**
+**AD7 - The bottom stack gets two shared CSS vars.**
 Three fixed elements now compete for the space above the bottom nav
 (`#view-level-bar` at 62, `#view-level-toast` at 68/118, and the chip). Rather than a
 fourth set of magic offsets, define `--stack-l1` / `--stack-l2` once and have the chip
 and toast reference them. Toast steps up over a visible chip via
-`body:has(#day-filter-chip.visible)` — a pattern already used for `#quick-add-panel`.
+`body:has(#day-filter-chip.visible)` - a pattern already used for `#quick-add-panel`.
 
 ## Dependency graph
 ```
 S1  Pure helpers (centerDisplayName, roundedRectPathD, formatWeekLabel single-line)
      │   no call sites yet → app behaviour unchanged
      ├──> S2a  #week-bar: DOM + CSS + i18n + arrows + today-label + ☰
-     │      │   (week nav now exists in two places — both work)
+     │      │   (week nav now exists in two places - both work)
      │      └──> S2b  Strip nav bricks / gear / outer pill from the center node;
      │                 center label → centerDisplayName()
      │                      │
@@ -123,7 +123,7 @@ rounded-rect path plus its analytic perimeter `2(w-2rx) + 2(h-2rx) + 2πrx`.
 
 **Verification:**
 - [ ] `npm test -- i18n center` and a new `tests/center-node.test.js` pass
-- [ ] `npm test` fully green (formatWeekLabel's shape change breaks nothing else —
+- [ ] `npm test` fully green (formatWeekLabel's shape change breaks nothing else -
       grep confirms only two callers)
 
 **Dependencies:** None
@@ -137,7 +137,7 @@ rounded-rect path plus its analytic perimeter `2(w-2rx) + 2(h-2rx) + 2πrx`.
 
 ### Phase 2: Chrome eviction
 
-#### Task 2.1: `#week-bar` — arrows, today-label, week-actions
+#### Task 2.1: `#week-bar` - arrows, today-label, week-actions
 **Description:** New bar inside `#canvas-container` at `top:68px`, centered, styled as
 a peer of `#day-filter-chip` (glass background, `--border-subtle`, pill radius). Holds
 `‹`, the single-line week label, `☰`, `›`. Arrows call
@@ -152,7 +152,7 @@ refreshes label + accents, called from `loadAndRender`, the `hashchange` handler
 - [ ] Arrows navigate weeks and the label tracks; the direction toward today is accented
 - [ ] Clicking the label from any week lands on the current week and drops the tint
 - [ ] `☰` opens the same menu the center gear opens today
-- [ ] The whole bar fits a 320px viewport in EN and CS — the date range hides below
+- [ ] The whole bar fits a 320px viewport in EN and CS - the date range hides below
       360px, mirroring the `#day-filter-chip-label` pattern
 - [ ] Bar is absent in agenda view (mobile) and behind the panel (desktop), with no
       z-index fight
@@ -168,8 +168,8 @@ refreshes label + accents, called from `loadAndRender`, the `hashchange` handler
 **Estimated scope:** M (one file, but four concerns: markup, CSS, wiring, i18n)
 
 #### Task 2.2: Strip nav bricks, gear and outer pill from the center node
-**Description:** Delete the `isCenter` chrome from `makeNodeGroup` — the two
-`week-nav-btn` brick groups, the `.gear-btn`, and the `.center-outer-pill` rect — plus
+**Description:** Delete the `isCenter` chrome from `makeNodeGroup` - the two
+`week-nav-btn` brick groups, the `.gear-btn`, and the `.center-outer-pill` rect - plus
 their CSS blocks and the two `e.target.closest('.week-nav-btn')` guards in the
 `pointerdown` and `click` handlers. The center's label switches from
 `formatWeekLabel(...)` to `centerDisplayName()` in both `_computeNodeSize` and the
@@ -183,7 +183,7 @@ render path. Right-click / long-press on the center still opens the week menu.
       `Backspace` still triggers the Clear Week confirm
 
 **Verification:**
-- [ ] `npm test` green — `layout.test.js`, `reset-view.test.js`, `zoom.test.js`
+- [ ] `npm test` green - `layout.test.js`, `reset-view.test.js`, `zoom.test.js`
       unchanged and passing, proving `CENTER_W`/`CENTER_H` were not disturbed
 - [ ] Manual: pan by dragging the center; confirm no dead click zones where the
       bricks used to be
@@ -194,14 +194,14 @@ render path. Right-click / long-press on the center still opens the week menu.
 
 ### Checkpoint C2
 - [ ] `npm test` + `npm run validate` green
-- [ ] Week navigation works from the bar with the canvas at any zoom or pan offset —
+- [ ] Week navigation works from the bar with the canvas at any zoom or pan offset -
       the original complaint is resolved and measurable
 - [ ] Human review before the ring goes in
 
 ### Phase 3: The center earns its pixels
 
 #### Task 3.1: Completion ring on the center pill
-**Description:** Draw a `roundedRectPathD` outline over the center rect in two layers —
+**Description:** Draw a `roundedRectPathD` outline over the center rect in two layers -
 a full-perimeter track in `--border-soft` and an accent arc whose `stroke-dasharray` is
 `percent` of the perimeter, using `computeWeekStats().global.percent` (the same
 priority-weighted number the Stats donut shows). Add `updateCenterRing()` and call it
@@ -242,7 +242,7 @@ vars, and step the toast up one level while the chip is visible via
 **Verification:**
 - [ ] `npm test` + `npm run validate` green
 - [ ] Manual: set a day filter, open the view-level row, flip a level to fire the
-      toast — all three legible at once, at 320px and desktop
+      toast - all three legible at once, at 320px and desktop
 
 **Dependencies:** None (parallelizable with 2.x and 3.1)
 **Files touched:** `zenit-week.html`
@@ -256,7 +256,7 @@ vars, and step the toast up one level while the chip is visible via
 
 #### Task 4.1: og-image strip-list and regenerated marketing assets
 **Description:** `scripts/og-image.mjs` removes `.gear-btn, .week-nav-btn, .add-btn`
-from the center — the first two selectors become dead. Update the selector and comment,
+from the center - the first two selectors become dead. Update the selector and comment,
 decide whether the ring stays in the marketing image (recommend: strip it; a static
 image showing a stranger's completion percentage is noise), then regenerate.
 
@@ -269,7 +269,7 @@ image showing a stranger's completion percentage is noise), then regenerate.
 **Verification:**
 - [ ] `npm run og`, `npm run screenshots`, `npm run hero:svg` all succeed
 - [ ] Visual check of every regenerated asset
-- [ ] `npm run build` green (no new inline scripts, so `csp-hashes` should be a no-op —
+- [ ] `npm run build` green (no new inline scripts, so `csp-hashes` should be a no-op -
       confirm rather than assume)
 
 **Dependencies:** 2.2, 3.1
@@ -277,7 +277,7 @@ image showing a stranger's completion percentage is noise), then regenerate.
 `screenshot.svg`, `assets/*`
 **Estimated scope:** S
 
-### Checkpoint C4 — Complete
+### Checkpoint C4 - Complete
 - [ ] `npm test`, `npm run validate`, `npm run build` green
 - [ ] CHANGELOG entry
 - [ ] Ready for review
@@ -285,21 +285,21 @@ image showing a stranger's completion percentage is noise), then regenerate.
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Ring goes stale after a surgical update — fails **silently** | High | `updateNodeUI` cannot reach `center` (AD4). Draw in `makeNodeGroup`, patch in `updateSummary`, and make the `D`-toggle case an explicit AC in 3.1 |
+| Ring goes stale after a surgical update - fails **silently** | High | `updateNodeUI` cannot reach `center` (AD4). Draw in `makeNodeGroup`, patch in `updateSummary`, and make the `D`-toggle case an explicit AC in 3.1 |
 | Week bar overflows a 320px viewport, worse in CS | Med | Hide the date range below 360px, exactly as `#day-filter-chip-label` already does; measure both languages |
 | Three-way overlap in the bottom stack | Med | Two shared CSS vars + `:has()` toast step-up (AD7); AC 3.2 enumerates all four state combinations |
-| Touching `CENTER_W` cascades into `computeLayout` | Low (avoided) | AD3 — constants untouched; the three layout-sensitive test files must stay green *unmodified* as the proof |
+| Touching `CENTER_W` cascades into `computeLayout` | Low (avoided) | AD3 - constants untouched; the three layout-sensitive test files must stay green *unmodified* as the proof |
 | Deleting the bricks leaves dead click zones or breaks pan | Low | Remove both `week-nav-btn` guards in the same task as the bricks; explicit pan AC in 2.2 |
 | `displayName` is an unhelpful handle for some accounts | Low | Fallback chain + 16-char clamp in 1.1; no stored override by design |
 | og-image degrades quietly (2 center texts → 1) | Low | The script already handles extra texts defensively; regenerate and eyeball in 4.1 |
 
 ## Open Questions
-1. **`ctx-current-week` after the label becomes a today-button** — keep it in the menu
+1. **`ctx-current-week` after the label becomes a today-button** - keep it in the menu
    for one release as a redundant path, or delete it now? *Recommendation: keep; it
    costs nothing and removal is a separate cleanup.*
-2. **Ring on an empty week** — track-only (recommended, and what 3.1 specifies), or
+2. **Ring on an empty week** - track-only (recommended, and what 3.1 specifies), or
    suppress the ring entirely until the week has content?
-3. **Ring in the OG image** — strip (recommended) or keep as a product tell?
+3. **Ring in the OG image** - strip (recommended) or keep as a product tell?
 4. **Confirm week navigation stays mindmap-only.** AD1 preserves today's behaviour,
    but a DOM bar makes agenda-view week nav nearly free later. Out of scope here.
 

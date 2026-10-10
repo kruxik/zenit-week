@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
+and this project uses [CalVer](https://calver.org/) - `vYYYY.MM.DD[.N]`.
 
 ## [v2026.10.10] - 2026-10-10
 
@@ -85,15 +85,15 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - **map:** Fit the mindmap between the top bar and the bottom buttons, with the toolbar's own inset as vertical margin
 - **map:** Set the root's + branch buttons on the pie's actual edge at 3 and 9 o'clock
 - **map:** Keep the root's pie percentages off the + branch buttons, at the same gap they keep from the chart's edges
-- **update:** Throttle the foreground version probe to 30 s, not 5 min — a phone opened just before a deploy ignored every return for five minutes
+- **update:** Throttle the foreground version probe to 30 s, not 5 min - a phone opened just before a deploy ignored every return for five minutes
 
 ## [v2026.10.09] - 2026-10-09
 
 ### Added
 
-- **map:** Photo on the root as a concave dish — white top-left lip, inner shade and far-side glow
-- **map:** Root infographic — rank-sized shadowed wedges under a levitating plate with borderless translucent rim, fitted labels, full-size empty-week track
-- **map:** Infographic center node — 1.25× root, 30% smaller avatar, wedges casting shadows with % labels, glass collar, no outer rim
+- **map:** Photo on the root as a concave dish - white top-left lip, inner shade and far-side glow
+- **map:** Root infographic - rank-sized shadowed wedges under a levitating plate with borderless translucent rim, fitted labels, full-size empty-week track
+- **map:** Infographic center node - 1.25× root, 30% smaller avatar, wedges casting shadows with % labels, glass collar, no outer rim
 
 ### Changed
 
@@ -101,7 +101,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
 ### Fixed
 
-- **stats:** Legend on its own full-width row on phones — three rows instead of six
+- **stats:** Legend on its own full-width row on phones - three rows instead of six
 - **map:** Paint nodes top-down under auto layout so comment badges stay visible
 - **map:** Paint nodes by last move and raise hovered/focused node above overlapping neighbours
 - **comments:** Colour comment badges from their node's branch and state; stop node repaint inking the badge icon
@@ -138,7 +138,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 ### Added
 
 - **seo:** Put "weekly planner" / "plánovač týdne" in page titles, add app meta description
-- **quick-add:** Receipt rows echo the entry as typed — Nx and day selectors kept, no n/total pill
+- **quick-add:** Receipt rows echo the entry as typed - Nx and day selectors kept, no n/total pill
 - **transfer:** With Auto layout on, transferred day selectors arrive Mo–Su and quantifiers 1..N
 - **quick-add:** Added entry rows show their node's colours, status icons and counter
 - **quick-add:** Context menu, swipe and double-click rename on added entry rows
@@ -174,7 +174,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
 ### Changed
 
-- **comments:** One way to open a comment link — the confirm dialog, from every entry point
+- **comments:** One way to open a comment link - the confirm dialog, from every entry point
 - **reload:** One reload path for the browser, logo, pull-down and update reload
 - **panels:** Share one pinned-caption behaviour for Help and Comment on phones
 
@@ -206,7 +206,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 ### Changed
 
 - **sync:** Poll Drive's change feed instead of one request per watched file
-- **auth:** Drop "Sign out of all devices" — revoke cannot reach another device
+- **auth:** Drop "Sign out of all devices" - revoke cannot reach another device
 - **sync:** Stop each edit costing two pull-merge round trips
 
 ### Fixed
@@ -320,7 +320,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 ### Changed
 
 - **schedule:** Send a dated task as its leaves, one entry each
-- **delete:** Delete without asking — Drop is already its own choice
+- **delete:** Delete without asking - Drop is already its own choice
 - **dialogs:** Give every dialog one caption, field and button vocabulary
 - **agenda:** Share one inline rename between task rows and entries
 - **schedule:** Show dates in each language's own convention
@@ -364,7 +364,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - **week:** Model a new week on the last week the user shaped
 - **week:** Give a fresh week the playground's branches
 - **onboarding:** Seed the playground week in the user's language
-- **dev:** In-app perf probe — phase marks, frame gaps and LoAF, on device
+- **dev:** In-app perf probe - phase marks, frame gaps and LoAF, on device
 - **mindmap:** Keep the view-level row open while it names an active filter
 - **mindmap:** Drop the day-filter chip; the row shows the filter
 - **onboarding:** Gate the first touch on node tips too
@@ -385,7 +385,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - **onboarding:** Add the priority hint, taught on hover of a high or critical task
 - **onboarding:** Add the done hint, taught on hover as no. 6
 - **onboarding:** Teach hints on hover per node kind, add the unplanned hint
-- **onboarding:** Animate the coachmark in — ring pulse, bubble grows from its arrow
+- **onboarding:** Animate the coachmark in - ring pulse, bubble grows from its arrow
 - **dev:** Add a host-gated "Reset to first visit" switch in Settings
 - **onboarding:** Add "Replay tips" button in Settings (PB4)
 - **onboarding:** Views coachmark on first hover of view bars (PB3)
@@ -398,7 +398,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 ### Changed
 
 - **coachmark:** Stop forcing layout every frame to track a still bubble
-- **view-slide:** Stop fading revealed nodes — it promoted 400 layers
+- **view-slide:** Stop fading revealed nodes - it promoted 400 layers
 - **sync:** Put the week on screen ahead of everything else on sign-in
 - **onboarding:** Restack the cleanup nudge and widen it on phones
 - **reveal-pan:** Start the mobile pan with the keyboard, and never restart it
@@ -785,7 +785,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - **agenda:** Enable swipe gestures on Done items (right=undone, left=menu)
 - **agenda:** Record manual sort drag in undo/redo history
 - **menu:** Mark today in Reschedule submenu with "(Today)/(Dnes)"
-- **agenda:** Add (now)/(teď) magic selector — freezes to today and pins to top of agenda
+- **agenda:** Add (now)/(teď) magic selector - freezes to today and pins to top of agenda
 - **days:** Add (today)/(dnes) and (tomorrow)/(zítra) magic selectors, frozen on edit
 
 ### Changed
@@ -833,16 +833,16 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
 ### Fixed
 
-- **cs:** Typo on homepage — "dáme" → "dáte" in stones/sand metaphor
+- **cs:** Typo on homepage - "dáme" → "dáte" in stones/sand metaphor
 
 ## [v2026.05.13] - 2026-05-12
 
 ### Added
 
-- **agenda:** Tick-parent menu — per-tick ops act on tick; rename/reschedule stay on parent
+- **agenda:** Tick-parent menu - per-tick ops act on tick; rename/reschedule stay on parent
 - **tick:** Allow unplanned/reusable/next-week/priority/delete in tick context menu
 - **agenda:** One Done row per tick-today with cumulative position pill
-- **tick:** Cap Nx at 100 — clamp higher counts silently
+- **tick:** Cap Nx at 100 - clamp higher counts silently
 - **counter:** Replace mindmap counter pill with tick-children leaves
 
 ### Fixed
@@ -947,7 +947,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - Highlight drop target during node drag
 - Edge autoscroll while dragging mind-map nodes
 - Drag handle on nodes for touch-friendly move/rebind
-- Dynamic zoom range — 100% always fits whole map
+- Dynamic zoom range - 100% always fits whole map
 
 ## [v2026.05.07] - 2026-05-07
 
@@ -989,7 +989,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - Show + icon on hover target during drag for rebind hint
 - Dim dragged node subtree to 40% opacity during drag
 - Add button-like hover on collapsed status panel inner area
-- Show inbox nodes in Agenda — Any Day or day tab based on label tokens
+- Show inbox nodes in Agenda - Any Day or day tab based on label tokens
 - Hide add-child button and menu item on inbox nodes
 - Blur and dim canvas behind quick-add panel like Help overlay
 - Clear inbox flag when dragging node to a permanent parent
@@ -1026,7 +1026,7 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
 - Show partially ticked counters in Daily Log with active +1 button
 - Hide view-toggle labels on mobile, match button size to undo/redo pill
-- Reorganize UI corners — badge on avatar, settings FAB, undo/redo pill
+- Reorganize UI corners - badge on avatar, settings FAB, undo/redo pill
 - Replace long-press rename with long-press drag-to-reorder on mobile agenda items
 - Close Agenda panel with ESC on desktop
 
@@ -1045,11 +1045,11 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - Implement Google Drive sync tests and fix un-awaited merge operation
 - Implement single-tab enforcement and storage quota handling
 - Implement IndexedDB storage and localStorage migration
-- Show reusable icon badge on agenda items — refreshes immediately on toggle
-- Replace long-press context menu with rename on mobile agenda — swipe left handles context menu
-- Hide done/undone/+1 buttons on mobile agenda — swipe handles those actions, label uses the freed space
-- Agenda swipe gestures with visual feedback — item slides to reveal done/undone or menu action, highlights on swipe, stays highlighted while context menu is open
-- Add swipe gesture visual feedback to agenda items — item slides to reveal done/undone (green/amber) on right swipe and menu icon (indigo) on left swipe, with 20% threshold and snap-back
+- Show reusable icon badge on agenda items - refreshes immediately on toggle
+- Replace long-press context menu with rename on mobile agenda - swipe left handles context menu
+- Hide done/undone/+1 buttons on mobile agenda - swipe handles those actions, label uses the freed space
+- Agenda swipe gestures with visual feedback - item slides to reveal done/undone or menu action, highlights on swipe, stays highlighted while context menu is open
+- Add swipe gesture visual feedback to agenda items - item slides to reveal done/undone (green/amber) on right swipe and menu icon (indigo) on left swipe, with 20% threshold and snap-back
 - Show floating ghost row while touch-dragging agenda item on mobile
 - Touch-drag sorting via agenda grip handle on mobile
 - Add manual drag-and-drop sorting per group in agenda view
@@ -1062,8 +1062,8 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - Highlight agenda items on mouse hover using the same focused style as keyboard navigation
 - Add left/right arrow key navigation between day tabs in activity panel
 - Add Clear Day Filter escape hatch to center-node context menu (Track C step 4)
-- Add node-assignment hotkeys 1–7/8 — radio for single-day, checkbox for multi-day children (Track C step 3)
-- Add day-filter engine — activeDayFilter state, getDayFilterOpacity(), applyFilters() replacing applyViewLevel() (Track C step 1)
+- Add node-assignment hotkeys 1–7/8 - radio for single-day, checkbox for multi-day children (Track C step 3)
+- Add day-filter engine - activeDayFilter state, getDayFilterOpacity(), applyFilters() replacing applyViewLevel() (Track C step 1)
 
 ### Changed
 
@@ -1110,16 +1110,16 @@ and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 - Close context menu when swipe gesture is confirmed
 - Align max swipe distance to action area width (25%) so icon is centered at max position
 - Reduce agenda section divider margins so adjacent items match the height of regular items
-- Restore agenda item height on mobile — min-height 48px matches desktop button-defined height
-- Restore agenda item dividers lost when wrapping items in swipe wrapper — move border-bottom to wrapper
-- Remove background colors from swipe action areas — show icons only
-- Hide swipe action areas when not actively swiping — visibility:hidden by default, revealed only via is-swiping class set on touchmove confirmation
+- Restore agenda item height on mobile - min-height 48px matches desktop button-defined height
+- Restore agenda item dividers lost when wrapping items in swipe wrapper - move border-bottom to wrapper
+- Remove background colors from swipe action areas - show icons only
+- Hide swipe action areas when not actively swiping - visibility:hidden by default, revealed only via is-swiping class set on touchmove confirmation
 - Preserve full branch path in mindmap day filter
 - Enable manual positioning and reordering for day-child nodes in manual mode
 - Split import try/catch, stop Drive poll before re-init to prevent reset-token race wipe
 - Reset agenda to today's tab when logo is clicked while in agenda view
 - Remove redundant plus icon from +1 counter button in activity panel
-- Keyboard navigation in agenda list — stable focus, proper scroll, no wrap
+- Keyboard navigation in agenda list - stable focus, proper scroll, no wrap
 - Replace blue outline on focused agenda item with full-width muted background highlight
 - Restore agenda context menu visibility by increasing z-index
 - Agenda panel mobile layout overflow and active tab styling

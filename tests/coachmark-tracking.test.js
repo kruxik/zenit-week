@@ -12,7 +12,7 @@ const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8')
 //
 // The loop therefore measures only when its cheap key changes: pan, zoom, the
 // viewport, or _mapGeometrySeq. That key is a guess about *whether* to measure,
-// never a source of truth for where the bubble goes — a slow resync backs it up
+// never a source of truth for where the bubble goes - a slow resync backs it up
 // so a miss drifts for at most half a second. What it cannot survive is a node
 // mover that never bumps the counter and happens between resyncs.
 

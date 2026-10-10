@@ -1,4 +1,4 @@
-// Vercel Node serverless function — Google OAuth token exchange proxy
+// Vercel Node serverless function - Google OAuth token exchange proxy
 // Holds GOOGLE_CLIENT_SECRET server-side so it never appears in browser code.
 // The Google refresh token is kept in an HttpOnly cookie (never exposed to JS)
 // rather than returned to the client. Handles authorization_code and
@@ -16,8 +16,8 @@ const COOKIE_MAX_AGE = 180 * 24 * 60 * 60; // 180 days
 // revoke_legacy is transitional: it relays a caller-supplied token to Google
 // with no session of its own, so it is an open (if harmless) relay. It stays
 // only long enough for stragglers to open the app once after the cookie
-// change (2026-07-28). Past this date it answers 410 and the whole action —
-// plus purgeLegacyRefreshToken()'s network call in zenit-week.html — should
+// change (2026-07-28). Past this date it answers 410 and the whole action -
+// plus purgeLegacyRefreshToken()'s network call in zenit-week.html - should
 // be deleted outright.
 const LEGACY_REVOKE_SUNSET = Date.parse('2026-11-01T00:00:00Z');
 
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
   const { grant_type, code, code_verifier, redirect_uri, refresh_token } = req.body || {};
 
   // Legacy cleanup: revoke a plaintext refresh token the client found left over
-  // in localStorage from before the cookie change. The cookie is untouched —
+  // in localStorage from before the cookie change. The cookie is untouched -
   // this token is not a session here, just a credential to retire.
   if (grant_type === 'revoke_legacy') {
     if (Date.now() >= LEGACY_REVOKE_SUNSET) return res.status(410).json({ error: 'gone' });
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
 
   // Sign-out: drop this browser's session and nothing else. Google is not
   // told. Its revoke endpoint acts on the grant behind the token it is given,
-  // which is this browser's own — it cannot reach another device's session,
+  // which is this browser's own - it cannot reach another device's session,
   // and all it bought here was a fresh consent screen on the next sign-in.
   // Clearing the cookie is the entire session; the access token dies with the
   // page that holds it.
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'missing_params' });
     Object.assign(params, { code, code_verifier, redirect_uri });
   } else if (grant_type === 'refresh_token') {
-    // The HttpOnly cookie is the sole source — a body-supplied token is ignored.
+    // The HttpOnly cookie is the sole source - a body-supplied token is ignored.
     const cookieToken = readCookie(req, REFRESH_COOKIE);
     if (!cookieToken) return res.status(400).json({ error: 'missing_params' });
     params.refresh_token = cookieToken;

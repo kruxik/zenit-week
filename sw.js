@@ -1,4 +1,4 @@
-/* Zenit Week — offline-first app shell.
+/* Zenit Week - offline-first app shell.
  *
  * The whole application is one ~640 KB HTML document served with
  * `Cache-Control: max-age=0, must-revalidate`, which means every launch used to
@@ -25,8 +25,8 @@
 const CACHE_NAME = 'zw-shell-v3';
 
 // The four icons the web app manifest points at. Every other asset the app
-// needs is inline in the document — favicons are canvas-rendered data: URLs and
-// the UI icons are an inline SVG sprite — so these are the only static files
+// needs is inline in the document - favicons are canvas-rendered data: URLs and
+// the UI icons are an inline SVG sprite - so these are the only static files
 // that have to survive going offline. They are also the only ones `vercel.json`
 // sets no Cache-Control for, which left them revalidating on the install path.
 // The 512 maskable variant is on disk but deliberately absent from the manifest
@@ -61,7 +61,7 @@ function timeoutSignal(ms) {
 // A free-tier tunnel (ngrok) answers a browser-shaped request with an
 // interstitial of its own rather than the app: 200, text/html, and an
 // `ngrok-error-code` header. isForeignDocument() refuses to store that, which is
-// right — but on its own it leaves the shell unrefreshable behind such a tunnel,
+// right - but on its own it leaves the shell unrefreshable behind such a tunnel,
 // because every revalidation is thrown away and the cache stays pinned to
 // whatever build it caught first, with no way out but clearing it by hand. This
 // header is the documented opt-out. Every other host ignores an unknown request
@@ -69,12 +69,12 @@ function timeoutSignal(ms) {
 // switched on for development.
 const OWN_FETCH_HEADERS = { 'ngrok-skip-browser-warning': '1' };
 
-// The worker's own fetches were never the whole story. The browser's requests —
-// a navigation, an <img> on the landing page — cannot carry that header, so on a
+// The worker's own fetches were never the whole story. The browser's requests -
+// a navigation, an <img> on the landing page - cannot carry that header, so on a
 // device without ngrok's click-through cookie (it expires; a dev reset or a new
 // profile never had it) every one of them came back as the warning: a blank app
 // and broken pictures. Only the free-tier domains show the warning, so every
-// path that re-issues a browser request is gated on BEHIND_FREE_TUNNEL —
+// path that re-issues a browser request is gated on BEHIND_FREE_TUNNEL -
 // production behaves exactly as it did before.
 const FREE_TUNNEL_SUFFIXES = ['.ngrok-free.dev', '.ngrok-free.app'];
 const BEHIND_FREE_TUNNEL = FREE_TUNNEL_SUFFIXES.some(s => self.location.hostname.endsWith(s));
@@ -86,7 +86,7 @@ function isTunnelPage(res) {
 
 // The browser's request again, with the opt-out. No deadline: like the cold
 // shell, this is the only route to the resource. A navigation must answer with
-// `redirect: 'manual'` — handing it a followed redirect is a network error —
+// `redirect: 'manual'` - handing it a followed redirect is a network error -
 // and the browser follows the opaque redirect itself.
 function tunnelFetch(href, redirect) {
   return fetch(href, { headers: OWN_FETCH_HEADERS, redirect });
@@ -98,7 +98,7 @@ function isTunnelSubresource(req, url) {
     && req.mode !== 'navigate' && !!req.destination;
 }
 
-// Every fetch the worker issues on its own behalf — never the navigation, which
+// Every fetch the worker issues on its own behalf - never the navigation, which
 // belongs to the browser. `no-cache` sends a conditional request, so an
 // unchanged document costs a 304 rather than another full download.
 function ownFetch(path) {
@@ -113,7 +113,7 @@ function isAppDocument(url) {
   return url.origin === self.location.origin && APP_PATH.test(url.pathname);
 }
 
-// The comment editor's vendor bundle — content-hashed, so the name is the
+// The comment editor's vendor bundle - content-hashed, so the name is the
 // identity. Matched on the exact shape scripts/build-editor.mjs writes, never on
 // the directory alone.
 const VENDOR_BUNDLE_PATH = /^\/vendor\/editor\.[0-9a-f]{16}\.js$/;
@@ -124,14 +124,14 @@ function isVendorBundle(url) {
 
 // Cache-first, never revalidated: the name is the content hash, so a new
 // build is a new URL, never new bytes at an old one. That makes the rich
-// comment editor open offline after one online visit — the page's idle
+// comment editor open offline after one online visit - the page's idle
 // prefetch is what first requests it, so the worker learns the current name
 // from the page rather than carrying one of its own.
 //
 // A miss is refetched with OWN_FETCH_HEADERS: a <script> tag cannot send them,
 // and behind a free-tier tunnel the browser's own request is answered with the
-// interstitial. Nothing is trusted on the worker's word — the page still
-// checks SRI on whatever this returns — but only a real script is stored, so a
+// interstitial. Nothing is trusted on the worker's word - the page still
+// checks SRI on whatever this returns - but only a real script is stored, so a
 // foreign page can never pin itself into the cache and fail SRI forever.
 async function vendorResponse(event, url) {
   const path = url.pathname;
@@ -171,7 +171,7 @@ function isManifestIcon(url) {
   return url.origin === self.location.origin && ICON_PATHS.includes(url.pathname);
 }
 
-// The Google profile photo — the only cross-origin subresource the app loads.
+// The Google profile photo - the only cross-origin subresource the app loads.
 // Matched on the exact host suffix, never a substring: `googleusercontent.com`
 // appearing anywhere in an attacker-chosen hostname must not qualify.
 function isAvatarPhoto(url) {
@@ -180,7 +180,7 @@ function isAvatarPhoto(url) {
 }
 
 // The marketing pages are ordinary, distinct documents, so unlike the shell they
-// are cached under their own keys — normalised, because each answers on both a
+// are cached under their own keys - normalised, because each answers on both a
 // bare and an .html path and a query string never changes what is served.
 // Returns the cache key, or null for anything not a marketing document.
 const MARKETING_KEYS = {
@@ -246,7 +246,7 @@ function writeUploadQueue(db, entries) {
 
 // The safety rule, in one place. `props` is the file's Drive appProperties, or
 // null when the file is gone. A push is safe only when Drive still holds a
-// revision this device has already reconciled — anything else means another
+// revision this device has already reconciled - anything else means another
 // device wrote while we were offline, and blindly pushing would lose their work.
 function canPushEntry(entry, props) {
   if (!props) return false;
@@ -259,7 +259,7 @@ function canPushEntry(entry, props) {
 
 // The refresh token is an HttpOnly cookie, so the worker can mint an access
 // token without the page ever having run. Returns null when the session is gone
-// (signed out, cookie expired) — that is a reason to drop the queue, not retry.
+// (signed out, cookie expired) - that is a reason to drop the queue, not retry.
 async function mintAccessToken() {
   const resp = await fetch('/api/token', {
     method: 'POST',
@@ -317,7 +317,7 @@ async function notifyUploaded(entry) {
 
 // Throws when anything is worth retrying, so the browser re-fires the sync
 // event on its own backoff. Entries are only kept for a retry when the failure
-// was transient — a conflict or a missing file is resolved by the page instead,
+// was transient - a conflict or a missing file is resolved by the page instead,
 // and staying in the queue would mean retrying forever.
 async function drainUploadQueue() {
   if (self.navigator && self.navigator.onLine === false) throw new Error('offline');
@@ -369,7 +369,7 @@ self.addEventListener('sync', event => {
 // Keeps the cached shell current between visits, so opening the app lands on the
 // build it should be on rather than the one from last week plus a quiet-refresh
 // dance. Chromium-only, gated on an installed PWA and site engagement, and the
-// browser decides the real cadence — so this is an enhancement, never the
+// browser decides the real cadence - so this is an enhancement, never the
 // mechanism. The quiet-refresh probe in the page remains the guarantee.
 //
 // It deliberately does NOT pre-pull the user's Drive data. Reconciling a remote
@@ -398,7 +398,7 @@ self.addEventListener('periodicsync', event => {
 });
 
 self.addEventListener('install', event => {
-  // The shell itself is not precached — the first navigation populates it. The
+  // The shell itself is not precached - the first navigation populates it. The
   // icons are, because nothing in the page ever requests them: the browser
   // fetches them when the user installs the app, which is exactly the moment
   // they may be offline. One failure must not fail the install, so each is
@@ -424,7 +424,7 @@ async function precacheIcons() {
 // Lets the browser start the navigation request in parallel with booting this
 // worker, instead of the worker booting first and only then reaching for the
 // network. It costs no extra traffic: a cache hit already spends one request on
-// revalidation, and that is the request the preload becomes — see
+// revalidation, and that is the request the preload becomes - see
 // revalidateDocument, which consumes it rather than issuing its own.
 async function enableNavigationPreload() {
   if (!self.registration || !self.registration.navigationPreload) return;
@@ -446,7 +446,7 @@ self.addEventListener('activate', event => {
 });
 
 // The navigation that installs the worker is not itself intercepted, so without
-// this the very first visit would leave the cache empty — install the app, go
+// this the very first visit would leave the cache empty - install the app, go
 // offline, and it would be dead. Fetch the shell once on activation instead.
 async function warmShell() {
   const cache = await caches.open(CACHE_NAME);
@@ -495,7 +495,7 @@ self.addEventListener('fetch', event => {
   }
   // The landing and legal pages are what people bookmark and share, so a reader
   // who has the app cached but hits `/` first should not meet a browser error
-  // page. Only the documents are cached — assets/hero.svg alone is 632 KB and
+  // page. Only the documents are cached - assets/hero.svg alone is 632 KB and
   // loads lazily, so it is left to fail into its alt text.
   const key = marketingKey(url);
   if (key) event.respondWith(cachedDocument(event, key, false));
@@ -504,7 +504,7 @@ self.addEventListener('fetch', event => {
 // A tunnel, proxy or captive portal can answer a navigation with a page of its
 // own: ngrok's free-tier browser warning is a 200 text/html document carrying an
 // `ngrok-error-code` header. Stored under the shell key it *becomes* the app on
-// that device — every later navigation is served the warning from cache, which
+// that device - every later navigation is served the warning from cache, which
 // reads as a blank screen and survives reloads, because the worker never gets to
 // ask the network again. So a document is stored only when nothing about it says
 // it came from somewhere else. Silence is consent: the app's own response
@@ -534,7 +534,7 @@ function discardResponse(res) {
 
 // Cache-first with no revalidation, unlike the documents. An icon is content-
 // stable for the life of a build, and a build that changes one ships a new
-// CACHE_NAME — so a background check would only ever confirm what we hold.
+// CACHE_NAME - so a background check would only ever confirm what we hold.
 async function cachedIcon(event, path) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(path);
@@ -556,7 +556,7 @@ async function cachedIcon(event, path) {
 //
 // Cache-first and never revalidated: a Google photo URL carries its own content
 // id, so a changed photo arrives as a different URL rather than new bytes at the
-// same one. The page cannot do this itself — reading the bytes would need
+// same one. The page cannot do this itself - reading the bytes would need
 // fetch() and therefore googleusercontent.com in connect-src, and widening what
 // the document may talk to costs more than the photo is worth. A worker's own
 // fetches are not governed by that CSP.
@@ -569,7 +569,7 @@ async function cachedAvatar(event, href) {
   if (cached) return cached;
   const fresh = await fetch(event.request);
   // An opaque response reports status 0 and ok false, so "did it work" is not a
-  // question that can be answered here — store it and let the img tag decide.
+  // question that can be answered here - store it and let the img tag decide.
   event.waitUntil(storeAvatar(cache, href, fresh.clone()));
   return fresh;
 }
@@ -579,7 +579,7 @@ async function storeAvatar(cache, href, response) {
   await dropOtherAvatars(cache, href);
 }
 
-// Photo URLs rotate, so without this every past avatar would accumulate — each
+// Photo URLs rotate, so without this every past avatar would accumulate - each
 // one an opaque entry costing far more quota than its bytes.
 async function dropOtherAvatars(cache, keepHref) {
   const keys = await cache.keys();
@@ -610,7 +610,7 @@ self.addEventListener('message', event => {
 });
 
 // The page's probe found a new deploy and is about to reload. The reload is
-// answered from this cache, so bring it up to date first and say when done —
+// answered from this cache, so bring it up to date first and say when done -
 // otherwise the reload lands on the same stale build. The page arms its own
 // reload, so this does not notify. The reply is sent whatever happens: the
 // page is waiting on it.
@@ -622,7 +622,7 @@ async function refreshShellFor(event) {
     try {
       const url = new URL(event.source.url);
       if (isAppDocument(url)) path = url.pathname;
-    } catch (_) { /* no usable source URL — '/app' serves the same document */ }
+    } catch (_) { /* no usable source URL - '/app' serves the same document */ }
     if (cached) await revalidateDocument(cache, SHELL_KEY, cached, path, false);
   } catch (err) {
     console.debug('[sw] refresh-shell-failed', err && err.message);
@@ -638,20 +638,20 @@ async function refreshShellFor(event) {
 // text/plain, which reads as a broken server rather than as "you are offline".
 //
 // The app ships English and Czech but the worker cannot read the stored
-// language — localStorage is unavailable here, and the choice is stored in a
+// language - localStorage is unavailable here, and the choice is stored in a
 // document that by definition has never loaded on this device. Accept-Language
 // is all there is, and it is the same signal the browser itself would use.
 const OFFLINE_COPY = {
   en: {
     lang:  'en',
-    title: 'Zenit Week — offline',
+    title: 'Zenit Week - offline',
     head:  'You are offline',
     body:  'This device has not installed Zenit Week yet. Connect once and it will keep working offline from then on.',
     retry: 'Try again',
   },
   cs: {
     lang:  'cs',
-    title: 'Zenit Week — offline',
+    title: 'Zenit Week - offline',
     head:  'Jsi offline',
     body:  'Na tomto zařízení ještě není Zenit Week nainstalovaný. Připoj se jednou a od té chvíle bude fungovat i offline.',
     retry: 'Zkusit znovu',
@@ -725,7 +725,7 @@ async function cachedDocument(event, cacheKey, notify) {
   const path = new URL(event.request.url).pathname;
   // The browser fires this the moment the navigation starts, whether or not we
   // end up using it, so both branches below hand it on rather than starting a
-  // second request. A rejection is just "no preload" — never a failed response.
+  // second request. A rejection is just "no preload" - never a failed response.
   const preload = preloadResponse(event);
   if (cached) {
     // Stale-while-revalidate: paint from cache, check for a new deploy after.
@@ -737,8 +737,8 @@ async function cachedDocument(event, cacheKey, notify) {
     // The browser's request carries no opt-out, so a free tunnel answers it
     // with its warning: ask again with the header before showing that.
     if (BEHIND_FREE_TUNNEL && isTunnelPage(fresh)) fresh = discardResponse(fresh) || await tunnelFetch(event.request.url, 'manual');
-    // Should the warning still come back, hand it on — it is what the user has
-    // to see and click through — but never keep it.
+    // Should the warning still come back, hand it on - it is what the user has
+    // to see and click through - but never keep it.
     if (fresh && fresh.ok && !isForeignDocument(fresh)) await cache.put(cacheKey, fresh.clone());
     return fresh;
   } catch (err) {
@@ -757,12 +757,12 @@ function revalidateShell(cache, cached, path) {
 }
 
 async function revalidateDocument(cache, cacheKey, cached, path, notify, preload = null, servedClientId = null) {
-  // Only trusted in the negative — see isDefinitelyOffline() in the app.
+  // Only trusted in the negative - see isDefinitelyOffline() in the app.
   if (self.navigator && self.navigator.onLine === false) return;
   let fresh = preload ? await preload : null;
   // The preload is the browser's own navigation request, so it carries none of
   // the worker's headers and a tunnel answers it with an interstitial. An
-  // unusable preload therefore means "ask again properly", never "give up" —
+  // unusable preload therefore means "ask again properly", never "give up" -
   // abandoning the revalidation here is what pins a cache to a stale build for
   // good, since the next navigation is served from that same cache and the
   // network is never consulted again.
@@ -770,11 +770,11 @@ async function revalidateDocument(cache, cacheKey, cached, path, notify, preload
   if (!fresh) {
     try {
       // The preload above is the browser's own navigation request, which the app
-      // document's must-revalidate makes conditional too — so either route costs
+      // document's must-revalidate makes conditional too - so either route costs
       // the same on an unchanged deploy.
       fresh = await ownFetch(path);
     } catch (err) {
-      return; // Offline or the link died — the cached copy stays authoritative.
+      return; // Offline or the link died - the cached copy stays authoritative.
     }
   }
   if (!fresh || !fresh.ok || isForeignDocument(fresh)) return;
@@ -789,7 +789,7 @@ async function revalidateDocument(cache, cacheKey, cached, path, notify, preload
 }
 
 // Every open tab, plus the page this very navigation is creating. That page is
-// the one most certainly stale — it was just handed the old copy — yet it may
+// the one most certainly stale - it was just handed the old copy - yet it may
 // not be listed by matchAll() until it is ready, which a fast revalidation can
 // beat. clients.get() waits for it.
 async function shellUpdateRecipients(servedClientId) {

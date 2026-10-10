@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { _state, computeWeekStats, materialiseWeek, emptySchedule } from './setup.js';
 
-// T1 (revised) — single priority-weighted lens feeding both the summary box and the
+// T1 (revised) - single priority-weighted lens feeding both the summary box and the
 // Stats panel. Load is split planned/unplanned × done/open and weighted by priority
 // (critical=5, high=3, normal=1); a counter contributes val of its weight as done and
 // (max-val) as open, so partial progress counts fractionally.
@@ -21,7 +21,7 @@ function setNodes(nodes) {
   }
 }
 
-describe('computeWeekStats — weighted 2×2 split (normal priority)', () => {
+describe('computeWeekStats - weighted 2×2 split (normal priority)', () => {
   beforeEach(() => {
     setNodes([
       mkBranch('work'),
@@ -51,7 +51,7 @@ describe('computeWeekStats — weighted 2×2 split (normal priority)', () => {
   });
 });
 
-describe('computeWeekStats — priority weighting', () => {
+describe('computeWeekStats - priority weighting', () => {
   it('weights done/open by priority (critical=5, high=3, normal=1)', () => {
     setNodes([
       mkBranch('work'),
@@ -79,7 +79,7 @@ describe('computeWeekStats — priority weighting', () => {
   });
 });
 
-describe('computeWeekStats — counters count fractionally', () => {
+describe('computeWeekStats - counters count fractionally', () => {
   it('splits a counter into val (done) and max-val (open) of its weight', () => {
     setNodes([mkBranch('work'), mkCounter('c1', 'work', 3, 10)]);
     const g = computeWeekStats().global;
@@ -107,7 +107,7 @@ describe('computeWeekStats — counters count fractionally', () => {
   });
 });
 
-describe('computeWeekStats — structural rules', () => {
+describe('computeWeekStats - structural rules', () => {
   it('excludes _editing nodes entirely', () => {
     setNodes([
       mkBranch('work'),
@@ -165,7 +165,7 @@ describe('computeWeekStats — structural rules', () => {
   });
 });
 
-describe('computeWeekStats — box/panel agreement', () => {
+describe('computeWeekStats - box/panel agreement', () => {
   it('global percent equals weighted done ÷ total (matches the summary box)', () => {
     setNodes([
       mkBranch('work'),
@@ -183,7 +183,7 @@ describe('computeWeekStats — box/panel agreement', () => {
 
 
 // A materialised occurrence is an ordinary planned task. It never arrives with
-// the unplanned flag, so it must never land in the unplanned band — the whole
+// the unplanned flag, so it must never land in the unplanned band - the whole
 // point of scheduling something ahead is that it was planned.
 describe('materialised occurrences count as planned', () => {
   beforeEach(() => {

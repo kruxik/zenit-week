@@ -6,7 +6,7 @@ const sandbox = _state.sandbox;
 // The saved token is the last deployed version this device has seen, not the
 // one the page runs. A phone once sat a build behind because the worker's
 // "shell updated" report matched that saved token and was dropped.
-describe('quiet refresh — a stale shell is never ignored', () => {
+describe('quiet refresh - a stale shell is never ignored', () => {
   let reloadTries;
   let realTry;
 
@@ -36,7 +36,7 @@ describe('quiet refresh — a stale shell is never ignored', () => {
     expect(sandbox.localStorage.getItem('zenit-week-asset-etag')).toBe('"v2"');
   });
 
-  it('only seeds a baseline from the first probe — a page fresh off the network is current', async () => {
+  it('only seeds a baseline from the first probe - a page fresh off the network is current', async () => {
     await _noteProbedVersion('"v1"');
     expect(_state.getPendingReload()).toBe(false);
     expect(sandbox.localStorage.getItem('zenit-week-asset-etag')).toBe('"v1"');

@@ -5,7 +5,7 @@ const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8')
 
 // The dev-only Settings block shipped visible on zenitweek.com. The host guard
 // was never the problem: the markup carries `hidden`, and init only clears it
-// on a development host. What leaked it was the cascade — the UA stylesheet
+// on a development host. What leaked it was the cascade - the UA stylesheet
 // offers `[hidden] { display: none }`, a zero-id/zero-class rule that any
 // component rule beats, and `.settings-section` sets `display: flex`. The block
 // rendered even though nothing ever unhid it.
@@ -13,13 +13,13 @@ const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8')
 // So the guard belongs in CSS, and it has to be the kind no later rule can
 // undo. These tests hold that in place, and hold the reveal on the host check.
 
-/** The app's main stylesheet — the largest <style> block in the document. */
+/** The app's main stylesheet - the largest <style> block in the document. */
 function mainStylesheet() {
   const blocks = [...SRC.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]);
   return blocks.sort((a, b) => b.length - a.length)[0];
 }
 
-/** Brace nesting depth at an index — 0 means a top-level rule, not inside @media. */
+/** Brace nesting depth at an index - 0 means a top-level rule, not inside @media. */
 function depthAt(css, index) {
   let depth = 0;
   for (let i = 0; i < index; i++) {

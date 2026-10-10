@@ -1,6 +1,6 @@
 // Open Graph image generator. For each locale (en, cs) it:
-//   1. Seeds the real Zenit Week app with a minimal week — the root circle plus
-//      four branches (Work/Family/Me/Growth) — and captures the rendered
+//   1. Seeds the real Zenit Week app with a minimal week - the root circle plus
+//      four branches (Work/Family/Me/Growth) - and captures the rendered
 //      mindmap as a transparent-bg PNG.
 //   2. Stitches the mindmap into the og-image.svg layout (brand text on the
 //      left, mindmap on the right).
@@ -42,7 +42,7 @@ const VARIANTS = [
   },
 ];
 
-// Capture viewport — aspect ratio chosen so the laid-out mindmap (4 branches,
+// Capture viewport - aspect ratio chosen so the laid-out mindmap (4 branches,
 // 2 per side) fills it after fit-to-viewport with minimal whitespace.
 const VP_W = 1300;
 const VP_H = 1000;
@@ -151,15 +151,15 @@ async function captureMindmap(variant) {
     { timeout: 10_000 },
   );
 
-  // Relabel the root with the marketing line. Signed out — which a headless
-  // capture always is — the root reads "Me"/"Já", and the seed already has a
+  // Relabel the root with the marketing line. Signed out - which a headless
+  // capture always is - the root reads "Me"/"Já", and the seed already has a
   // branch by that name, so leaving it alone would put the same word twice in
   // one picture. Its completion ring is left as it renders: the seed has no
   // activities, so the ring is empty rather than showing invented progress.
   await page.evaluate((centerLabel) => {
     const g = document.querySelector('.node-group[data-id="center"]');
     if (!g) return;
-    // +Branch buttons are in-app chrome — pure noise in a static image.
+    // +Branch buttons are in-app chrome - pure noise in a static image.
     g.querySelectorAll('.add-btn').forEach(n => n.remove());
     const t = g.querySelector('text');
     if (t) t.textContent = centerLabel;
@@ -233,7 +233,7 @@ async function captureMindmap(variant) {
     const pad = 30;
     return { x: r.x - pad, y: r.y - pad, width: r.width + pad * 2, height: r.height + pad * 2 };
   });
-  if (!clip) throw new Error('map-root not found — render failed');
+  if (!clip) throw new Error('map-root not found - render failed');
 
   const buf = await page.screenshot({ omitBackground: true, type: 'png', clip });
   await browser.close();
@@ -258,8 +258,8 @@ function buildOgSvg(variant, mindmapB64) {
   // shrank the whole map. The text column ends well left of MM_X.
   const MM_W = 660;
   const MM_H = 576;
-  const MM_X = 1200 - 80 - MM_W; // 544 — right padding == left padding (80)
-  const MM_Y = (630 - MM_H) / 2; // 27 — vertically centered
+  const MM_X = 1200 - 80 - MM_W; // 544 - right padding == left padding (80)
+  const MM_Y = (630 - MM_H) / 2; // 27 - vertically centered
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
   <defs>

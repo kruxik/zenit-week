@@ -56,7 +56,7 @@ function tickKids(nodeId) {
 
 // ─── Creation ────────────────────────────────────────────────────────────────
 
-describe('applyMagicLabel — tick-children creation', () => {
+describe('applyMagicLabel - tick-children creation', () => {
   test('"Pushups 3x" creates 3 tick-children labelled 1..3', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 3x', true);
@@ -77,7 +77,7 @@ describe('applyMagicLabel — tick-children creation', () => {
     expect(tickKids(id)).toHaveLength(0);
   });
 
-  test('N is capped at 100 — anything higher silently clamps', () => {
+  test('N is capped at 100 - anything higher silently clamps', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 250x', true);
     expect(tickKids(id)).toHaveLength(100);
@@ -107,7 +107,7 @@ describe('applyMagicLabel — tick-children creation', () => {
 
 // ─── Grow / shrink ───────────────────────────────────────────────────────────
 
-describe('applyMagicLabel — tick-children grow / shrink', () => {
+describe('applyMagicLabel - tick-children grow / shrink', () => {
   test('editing 3x → 5x adds tickIndex 4 and 5', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 3x', true);
@@ -143,7 +143,7 @@ describe('applyMagicLabel — tick-children grow / shrink', () => {
   });
 
   test('renaming parent without Nx preserves tick-children', () => {
-    // "Clean 3x" → "Clean" + 3 ticks. Then rename to "Clean house" — ticks stay.
+    // "Clean 3x" → "Clean" + 3 ticks. Then rename to "Clean house" - ticks stay.
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Clean 3x', true);
     const initialTickIds = tickKids(id).map(t => t.id);
@@ -283,7 +283,7 @@ describe('legacy counter coexistence', () => {
 
 // ─── Agenda integration ──────────────────────────────────────────────────────
 
-describe('agenda integration — tick-children parent', () => {
+describe('agenda integration - tick-children parent', () => {
   test('parent activity with tick-children is treated as a leaf-activity', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 3x', true);
@@ -340,7 +340,7 @@ describe('agenda integration — tick-children parent', () => {
       expect(anyDay).not.toContain(tk.id);
     });
 
-    // Same for day-scheduled agenda — tick-children must not surface as rows.
+    // Same for day-scheduled agenda - tick-children must not surface as rows.
     for (let d = 0; d <= 6; d++) {
       const items = getAgendaItems(d).map(n => n.id);
       tickKids(id).forEach(tk => {
@@ -352,7 +352,7 @@ describe('agenda integration — tick-children parent', () => {
 
 // ─── Layout integration ──────────────────────────────────────────────────────
 
-describe('layout — tick-children zigzag', () => {
+describe('layout - tick-children zigzag', () => {
   test('3 tick-children occupy alternating columns (zigzag x-positions)', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 3x', true);

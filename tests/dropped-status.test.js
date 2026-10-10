@@ -29,7 +29,7 @@ function setUp(nodes) {
   _state.setWeekKey('2026-01');
 }
 
-// ─── T1 — set and clear ──────────────────────────────────────────────────────
+// ─── T1 - set and clear ──────────────────────────────────────────────────────
 
 describe('T1 – setStatus dropped / undropped', () => {
   test("'dropped' sets the flag and the timestamp", () => {
@@ -54,7 +54,7 @@ describe('T1 – setStatus dropped / undropped', () => {
   });
 });
 
-// ─── T2 — D1, mutual exclusion in both directions ────────────────────────────
+// ─── T2 - D1, mutual exclusion in both directions ────────────────────────────
 
 describe('T2 – D1: dropped and done are mutually exclusive', () => {
   test('dropping a done node clears done, doneAt and donedOn', () => {
@@ -101,7 +101,7 @@ describe('T2 – D1: dropped and done are mutually exclusive', () => {
   });
 });
 
-// ─── T3 — D2, independence from unplanned ────────────────────────────────────
+// ─── T3 - D2, independence from unplanned ────────────────────────────────────
 
 describe('T3 – D2: unplanned survives a drop/undrop round trip', () => {
   test('unplanned and unplannedAt are untouched', () => {
@@ -120,7 +120,7 @@ describe('T3 – D2: unplanned survives a drop/undrop round trip', () => {
   });
 });
 
-// ─── T4 — D3, counter freeze ─────────────────────────────────────────────────
+// ─── T4 - D3, counter freeze ─────────────────────────────────────────────────
 
 describe('T4 – D3: dropping a counter freezes val', () => {
   test('dropping a counter directly leaves val where it stands', () => {
@@ -152,7 +152,7 @@ describe('T4 – D3: dropping a counter freezes val', () => {
   });
 });
 
-// ─── T5 — cascade down ───────────────────────────────────────────────────────
+// ─── T5 - cascade down ───────────────────────────────────────────────────────
 
 describe('T5 – dropping a parent drops the whole subtree', () => {
   test('every descendant gains dropped and droppedAt', () => {
@@ -185,7 +185,7 @@ describe('T5 – dropping a parent drops the whole subtree', () => {
   });
 });
 
-// ─── T6 / T7 / T8 — roll-up ──────────────────────────────────────────────────
+// ─── T6 / T7 / T8 - roll-up ──────────────────────────────────────────────────
 
 describe('T6 – roll-up: every child dropped → parent dropped, never done', () => {
   test('parent gains dropped and droppedAt, and stays not-done', () => {
@@ -287,7 +287,7 @@ describe('T8 – roll-up: one child still open → parent is neither', () => {
   });
 });
 
-// ─── T9 — regression: a week with no dropped nodes ───────────────────────────
+// ─── T9 - regression: a week with no dropped nodes ───────────────────────────
 
 describe('T9 – no dropped nodes: the done roll-up is unchanged', () => {
   test('all children done → parent and branch done, no dropped field invented', () => {
@@ -337,7 +337,7 @@ describe('T9 – no dropped nodes: the done roll-up is unchanged', () => {
   });
 });
 
-// ─── T17 — undo ──────────────────────────────────────────────────────────────
+// ─── T17 - undo ──────────────────────────────────────────────────────────────
 
 describe('T17 – undo restores the pre-drop state', () => {
   test('undo clears dropped and restores done with its timestamps', async () => {
@@ -376,7 +376,7 @@ describe('T17 – undo restores the pre-drop state', () => {
   });
 });
 
-// ─── S2 — entry points ───────────────────────────────────────────────────────
+// ─── S2 - entry points ───────────────────────────────────────────────────────
 
 describe('hotkey X on the hovered node', () => {
   function pressX(extra = {}) {
@@ -436,7 +436,7 @@ describe('hotkey X on the hovered node', () => {
   });
 });
 
-describe('context menu — Dropped item visibility', () => {
+describe('context menu - Dropped item visibility', () => {
   const isVisible = (id) => _state.getElement(id).style.display !== 'none';
 
   beforeEach(() => {
@@ -486,7 +486,7 @@ describe('context menu — Dropped item visibility', () => {
     expect(isVisible('ctx-dropped')).toBe(false);
   });
 
-  test('a counter offers Dropped — D3 freezes it rather than filling it', () => {
+  test('a counter offers Dropped - D3 freezes it rather than filling it', () => {
     setUp([
       mkBranch('work', ['a1']),
       mkActivity('a1', 'work', 'work', { children: ['c1'] }),
@@ -499,7 +499,7 @@ describe('context menu — Dropped item visibility', () => {
   });
 });
 
-describe('i18n — new keys exist in both languages', () => {
+describe('i18n - new keys exist in both languages', () => {
   test('menu.dropped and help.dropped resolve in en and cs', () => {
     _state.setLang('en');
     expect(t('menu.dropped')).toBe('Dropped');
@@ -512,7 +512,7 @@ describe('i18n — new keys exist in both languages', () => {
   });
 });
 
-// ─── S3 — lifecycle: transfers, movement and overdue ─────────────────────────
+// ─── S3 - lifecycle: transfers, movement and overdue ─────────────────────────
 
 describe('T10 – transferUnfinished skips dropped nodes', () => {
   beforeEach(() => {
@@ -650,7 +650,7 @@ describe('T13 – dropped tasks never surface as overdue or unscheduled', () => 
   });
 });
 
-// ─── S4 — stats ──────────────────────────────────────────────────────────────
+// ─── S4 - stats ──────────────────────────────────────────────────────────────
 
 describe('T14 – computeWeekStats peels dropped into its own bucket', () => {
   test('dropped stays in total, is absent from done, and leaves the open buckets', () => {
@@ -700,7 +700,7 @@ describe('T14 – computeWeekStats peels dropped into its own bucket', () => {
     expect(c.total).toBe(1);
   });
 
-  test('D3 — a dropped counter keeps its ticks as done and freezes the remainder', () => {
+  test('D3 - a dropped counter keeps its ticks as done and freezes the remainder', () => {
     setUp([
       mkBranch('work', ['a1']),
       mkActivity('a1', 'work', 'work', { children: ['c1'] }),
@@ -797,7 +797,7 @@ describe('T16 – the summary signature notices a drop', () => {
   });
 });
 
-// ─── S5 — agenda ─────────────────────────────────────────────────────────────
+// ─── S5 - agenda ─────────────────────────────────────────────────────────────
 
 describe('the Agenda Dropped group', () => {
   const AT = (d, h = 9) => `2026-01-0${d}T0${h}:00:00.000Z`;
@@ -831,7 +831,7 @@ describe('the Agenda Dropped group', () => {
       mkActivity('a1', 'work', 'work', { dropped: true, droppedAt: AT(4) }),
     ]);
 
-    // It is gone from Any day (S3) but not lost — it lands here instead.
+    // It is gone from Any day (S3) but not lost - it lands here instead.
     expect(getAnyDayItems()).toEqual([]);
     expect(getDroppedItems(day(4)).map(n => n.id)).toEqual(['a1']);
   });
@@ -877,7 +877,7 @@ describe('the Agenda Dropped group', () => {
     expect(getDroppedItems(day(2))).toEqual([]);
   });
 
-  test('T5.6 — a dropped task scheduled for a past day is still not overdue', () => {
+  test('T5.6 - a dropped task scheduled for a past day is still not overdue', () => {
     setUp([
       mkBranch('work', ['a1']),
       mkActivity('a1', 'work', 'work', { label: 'Yoga (tu)', dropped: true, droppedAt: AT(2) }),
@@ -894,7 +894,7 @@ describe('the Agenda Dropped group', () => {
     ]);
 
     // The Dropped row's button and swipe-right share one closure, which fires
-    // 'undropped' — not 'undone', which would leave the flag set.
+    // 'undropped' - not 'undone', which would leave the flag set.
     setStatus('a1', 'undropped');
 
     expect(findNode('a1').dropped).toBe(false);
@@ -902,7 +902,7 @@ describe('the Agenda Dropped group', () => {
     expect(getDroppedItems(day(2))).toEqual([]);
   });
 
-  test('i18n — agenda.dropped exists in both languages', () => {
+  test('i18n - agenda.dropped exists in both languages', () => {
     _state.setLang('en');
     expect(t('agenda.dropped')).toBe('Dropped');
     _state.setLang('cs');
@@ -911,7 +911,7 @@ describe('the Agenda Dropped group', () => {
   });
 });
 
-// ─── S6 — delete is delete ───────────────────────────────────────────────────
+// ─── S6 - delete is delete ───────────────────────────────────────────────────
 
 describe('delete never asks which of the two the user meant', () => {
   let asked;
@@ -931,7 +931,7 @@ describe('delete never asks which of the two the user meant', () => {
   }
 
   // Drop is its own menu item and its own hotkey, so choosing Delete is
-  // already the answer to that question — asking again would be asking twice.
+  // already the answer to that question - asking again would be asking twice.
   test('an activity deletes immediately', () => {
     setUp(week());
 
@@ -1089,7 +1089,7 @@ describe('done wins over dropped, everywhere it is set', () => {
   });
 });
 
-// ─── T9 — rescheduling a day-child keeps every sibling's outcome ──────────────
+// ─── T9 - rescheduling a day-child keeps every sibling's outcome ──────────────
 
 describe('T9 – setActivityDays preserves dropped day-children', () => {
   // "Running (mo, th, fr, su)" with Th and Fr dropped. Moving Fr to Sa used to

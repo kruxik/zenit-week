@@ -1,11 +1,11 @@
-# Plan — Onboarding Part A: Seed Playground
+# Plan - Onboarding Part A: Seed Playground
 
 Source spec: [`docs/specs/onboarding-part-a-playground.md`](../docs/specs/onboarding-part-a-playground.md)
 Seed content: [`assets/playground-seed.json`](../assets/playground-seed.json)
 Task list: `tasks/todo.md` · Single file: `zenit-week.html`
 
 ## Principles
-- **Vertical slices.** Each task delivers one complete, testable path (loader→render, edit→flag-drop, action→cleanup, threshold→nudge) — not horizontal layers.
+- **Vertical slices.** Each task delivers one complete, testable path (loader→render, edit→flag-drop, action→cleanup, threshold→nudge) - not horizontal layers.
 - **Single-file policy.** All app code lands in `zenit-week.html`. Only the build/inject script is separate.
 - **Each slice ships with:** code + EN/CS i18n (where user-visible) + vitest coverage. `npm test` and `npm run validate` green before commit.
 
@@ -27,13 +27,13 @@ Strict order: **S1 → S2 → S3 → S4.** No parallelism (each builds on the pr
 - New-week shape (`tombstones`/`crdtVersion`): `loadWeek()` `:7207`. `todayWeekKey()` `:6960`.
 - Colors: `saveBranchColors` / `COLORS_STORAGE_KEY` (`zenit-week-colors` in misc); palette `BRANCH_COLOR_PALETTE` `:4553` (Growth green `#0ACF83`).
 - Mutators for `_demo` drop: inline-input commit `_openInlineInput` `:9712`; move/drag drop handler; done/unplanned setters (D/U keys + ctx menu); priority setter; counter tick; add-child/add-node; (delete = N/A).
-- Snapshot/undo chokepoint: `takeSnapshot()` `:4369` (node-agnostic — do NOT use for per-node drop).
+- Snapshot/undo chokepoint: `takeSnapshot()` `:4369` (node-agnostic - do NOT use for per-node drop).
 - Confirm dialog: `showAppConfirm({title,body,okLabel,danger,onConfirm})`. Buttons: `.agenda-action-btn`.
 - Help panel: `#help-panel` / `#help-content` (`:2831`). Build script: `scripts/inject-version.js`, npm `build`.
 
 ---
 
-## S1 — Seed embedding + first-run loader  *(the spine; delivers the aha)*
+## S1 - Seed embedding + first-run loader  *(the spine; delivers the aha)*
 **Goal:** Empty DB (or `#playground`) → current week boots fully populated from the seed, with Growth green.
 
 Subtasks:
@@ -57,7 +57,7 @@ Subtasks:
 
 ---
 
-## S2 — `_demo` drop-on-touch
+## S2 - `_demo` drop-on-touch
 **Goal:** The moment the user makes a seed node theirs, it stops being demo scaffolding.
 
 Subtasks:
@@ -76,7 +76,7 @@ Subtasks:
 
 ---
 
-## S3 — Manual cleanup ("Clear example tasks")
+## S3 - Manual cleanup ("Clear example tasks")
 **Goal:** One action removes only untouched demo nodes; branches and user work survive; undoable.
 
 Subtasks:
@@ -98,8 +98,8 @@ Subtasks:
 
 ---
 
-## S4 — Gentle auto-nudge banner
-**Goal:** Once the user has clearly started their own week, gently offer cleanup — once.
+## S4 - Gentle auto-nudge banner
+**Goal:** Once the user has clearly started their own week, gently offer cleanup - once.
 
 Subtasks:
 1. Threshold logic: real user nodes (non-`_demo`, minus original branch count) ≥ 3 **and** ≥1 `_demo` node remains.
