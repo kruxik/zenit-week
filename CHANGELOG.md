@@ -5,6 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) — `vYYYY.MM.DD[.N]`.
 
+## [v2026.10.10] - 2026-10-10
+
+### Added
+
+- **onboarding:** Refresh playground seed and ship bilingual seed comments
+
+### Changed
+
+- **privacy:** Mention the Umami relay function in the privacy policy and README
+- **landing:** Give the Czech landing page its own hero image in Czech
+- **landing:** Regenerate the hero image and screenshots with the new week picker and day strip
+- **week-picker:** Grey regular label like #sync-btn, only the week number bold
+- **week-picker:** Keep the fold 300px wide and centred on phones instead of spanning the viewport
+- **panels:** Give the caption bar the top bar's frosted glass blur
+- **dropdowns:** Make the week picker, dropdowns and dialogs fully opaque
+- **week-picker:** Use square-rounded arrow icons for month navigation
+- **onboarding:** Shorten the Addy Osmani sample task and regenerate the hero image
+- **landing:** Regenerate the hero image and screenshots with the icon spacing fixed
+- **assets:** Remove the May 2026 week export the screenshots no longer read
+- **landing:** Take the hero image and screenshots from the playground seed
+- **landing:** Regenerate the hero image and screenshots from the current app
+- **og:** Ship the share images as JPEG, about 150 KB instead of 550 KB
+- **og:** Match the share images to the new landing page
+- **landing:** Ship the redesigned English homepage from the draft
+- **landing:** Bold only the key words in the author text of both homepages
+- **landing:** Replace the author photo with the retouched one from the Transformation Summit slides
+- **landing:** Link the author name to petrburian.com and add the author URL to the structured data
+- **landing:** Turn the English features section into the user problems it solves
+- **landing:** Turn the Czech features section into the user problems it solves
+- **landing:** Shorten the Czech ritual heading to two lines like the English draft
+- **landing:** Link Flashscore in the author section of both homepages
+- **landing:** Center the desktop "Ty"/"You" label in the mind map sphere
+- **landing:** Break the Czech hero lead into two lines like the English draft
+- **landing:** Draft the English homepage from the redesigned Czech one
+- **landing:** Ship the redesigned Czech homepage from the draft
+- **landing:** Export the hero as WebP from npm run hero:svg and show it above the fold in the Czech homepage draft
+- **landing:** Work the online weekly planner keywords into the Czech homepage draft title, description and text
+- **landing:** Replace the author links in the Czech homepage draft with GitHub, LinkedIn and web icon buttons
+- **landing:** Shorten the author story in the Czech homepage draft, left-align it beside the photo and bold the key facts
+- **landing:** Color every feature icon in the Czech homepage draft with the logo gradient
+- **landing:** Shorten the three solution cards of the Czech homepage draft to two lines
+- **landing:** Give the features section of the Czech homepage draft the grey background so sections alternate
+- **landing:** Tighten the vertical spacing between sections of the Czech homepage draft
+- **landing:** Restyle the closing ritual heading and drop the "not another" lines in the Czech homepage draft
+- **landing:** Reword the mobile feature card of the Czech homepage draft around quick add
+- **landing:** Shorten the feature card texts of the Czech homepage draft to two lines on phones
+- **landing:** Replace the branch colors card with a stats card in the Czech homepage draft
+- **landing:** Keep the Zenit Week name on one line in the Czech homepage draft
+- **landing:** Show the jars right under the sand heading in the Czech homepage draft
+- **landing:** Add a portrait glass mind map for phones and a "Ty" label in the center of the Czech homepage draft
+- **landing:** Use the light gradient heading style for every section of the Czech homepage draft
+- **landing:** Restyle the problem section of the Czech homepage draft with lighter headings and smaller punch lines
+- **landing:** Color the key word of the Czech homepage draft problem question with the logo gradient
+- **landing:** Replace the question bubbles in the Czech homepage draft with a glass mind map render and sharper questions
+- **landing:** Replace the drawn jars in the Czech homepage draft with a 3D illustration and plain-language captions
+- **landing:** Underline section headings in the Czech homepage draft with the logo gradient
+- **landing:** Color the key word of the Czech homepage draft headline with the logo gradient
+- **landing:** Move the GitHub button from the hero to the author section of the Czech homepage draft
+- **landing:** Switch the Czech homepage draft to informal address and gender-neutral wording
+- **landing:** Shorten the Czech homepage draft title and refresh its meta and share descriptions
+- **landing:** Make the ritual section of the Czech homepage draft day-neutral with a clearer call to action
+- **landing:** Rewrite the feature cards in the Czech homepage draft in natural Czech
+- **landing:** Add an author section to the Czech homepage draft with Petr's story behind Zenit Week
+- **landing:** Draft the Czech homepage hero with the product name, the real problem and the app screenshot up top
+
+### Fixed
+
+- **analytics:** Pass the visitor's IP to Umami so locations stop showing Vercel's Frankfurt
+- **view-toggle:** Drop the colour transition so the active fill swaps in one frame instead of overlapping
+- **agenda:** Align the list top with the day strip so the sticky heading neither gaps nor jumps
+- **agenda:** Tapping a row's badges or empty space expands it instead of clearing focus
+- **map:** Keep priority and badge icons clear of the label at every zoom level
+- **sw:** Get past the ngrok free-tier warning on tunnel hosts only
+- **landing:** Point the LinkedIn and MIT license links at their final URLs
+- **map:** Show the node drag grip on touch screens only, so it no longer covers elements below a hovered node on desktop
+- **landing:** Add a main landmark, a skip link and stronger text contrast to the Czech homepage draft
+- **landing:** Fix jar captions, the GitHub button and heading wraps on phones in the Czech homepage draft
+- **map:** Fit the mindmap between the top bar and the bottom buttons, with the toolbar's own inset as vertical margin
+- **map:** Set the root's + branch buttons on the pie's actual edge at 3 and 9 o'clock
+- **map:** Keep the root's pie percentages off the + branch buttons, at the same gap they keep from the chart's edges
+- **update:** Throttle the foreground version probe to 30 s, not 5 min — a phone opened just before a deploy ignored every return for five minutes
+
 ## [v2026.10.09] - 2026-10-09
 
 ### Added
