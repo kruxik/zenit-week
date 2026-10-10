@@ -570,6 +570,14 @@
     }
     .author-grid .author-photo { margin: 4px 0 0; flex-shrink: 0; }
     .why .author-text p { text-align: left; margin-bottom: 14px; }
+    .author-text a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: var(--family);
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 3px;
+    }
+    .author-text a:hover { text-decoration-color: var(--me); }
     .why p:not(.jar-caption) strong, .why .author-text strong { color: var(--ink); font-weight: 600; }
     @media (max-width: 540px) {
       .author-grid { flex-direction: column; align-items: center; gap: 20px; }
@@ -1002,7 +1010,7 @@
     <div class="author-grid">
       <img class="author-photo" src="../assets/petr-burian.webp" alt="Petr Burian" width="128" height="128" loading="lazy">
       <div class="author-text">
-        <p>Jsem <strong>Petr Burian</strong>. 16 let jsem byl <strong>CTO Livesportu</strong>, kde naše týmy postavily Flashscore pro 130 milionů fanoušků. Prošel jsem si burnoutem.</p>
+        <p>Jsem <strong>Petr Burian</strong>. 16 let jsem byl <strong>CTO Livesportu</strong>, kde naše týmy postavily <strong><a href="https://www.flashscore.com/" target="_blank" rel="noopener">Flashscore</a></strong> pro 130 milionů fanoušků. Prošel jsem si burnoutem.</p>
         <p>Dnes <strong>mentoruji foundery, CEO a CTO</strong>. Pomáhám jim vést přes metriky a dostat z AI reálný přínos.</p>
         <p>Na konci sabbaticalu jsem se trápil, že moc nepracuju. Rozkreslil jsem si týden do myšlenkové mapy a sedl si na zadek: <strong>větev Práce byla 10x větší</strong> než cokoliv jiného. Od té doby si týden plánuju podle toho, co je pro mě důležité.</p>
         <p>Zenit&nbsp;Week je <strong>zdarma a open source</strong>, takže si každý může ověřit, že data zůstávají u tebe.</p>
