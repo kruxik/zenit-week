@@ -1982,7 +1982,9 @@
     justify-content: space-between;
     gap: 12px;
     padding: 0 24px;
-    background: var(--bg-surface);
+    background: var(--toolbar-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border-soft);
   }
   .app-panel-title {
@@ -2765,6 +2767,11 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--overlay-bg);
+  }
+  html.reduce-effects .app-panel-header {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--bg-surface);
   }
   /* Same path — SVG drop-shadow filters (the shadow under branch nodes
      and the lift shadow on center) are re-rasterized on every pan/zoom frame
