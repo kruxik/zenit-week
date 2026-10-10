@@ -3053,7 +3053,11 @@
     width: 100%;
     min-width: 0;
     padding: 0;
-    padding-top: calc(var(--toolbar-h) + var(--panel-header-h));
+    /* Exactly the header's bottom edge, in the same box the header is placed
+       in — so on desktop it inherits the 1px border correction too. Any offset
+       here leaves a slit of rows showing above a stuck .today-done-divider, or
+       makes the first divider jump when it starts sticking. */
+    padding-top: calc(var(--panel-header-top) + var(--panel-header-h));
     padding-bottom: 66px;
   }
 
