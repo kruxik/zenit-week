@@ -67,7 +67,7 @@ function makeIndexedDb(misc, { stores = ['weeks', 'misc'] } = {}) {
 
 // Boots sw.js in an isolated context with the worker globals it expects, and
 // hands back both the context and the recorded event listeners.
-function loadWorker({ onLine, fetchImpl, clients = [], misc = null, served = {} } = {}) {
+function loadWorker({ onLine, fetchImpl, clients = [], misc = null, served = {}, origin = ORIGIN } = {}) {
   const listeners = {};
   const cache = makeCache();
   const posted = [];
@@ -108,7 +108,7 @@ function loadWorker({ onLine, fetchImpl, clients = [], misc = null, served = {} 
     },
   };
   ctx.self = {
-    location: new URL('/sw.js', ORIGIN),
+    location: new URL('/sw.js', origin),
     navigator: onLine === undefined ? {} : { onLine },
     skipWaiting: () => { ctx.self._skipWaitingCalls = (ctx.self._skipWaitingCalls || 0) + 1; },
     clients: {
@@ -1250,6 +1250,90 @@ describe('sw.js — tunnel interstitial', () => {
     }
     expect(w.ctx.isVendorBundle(new URL('https://evil.example/vendor/editor.0123456789abcdef.js'))).toBe(false);
     expect(w.ctx.isVendorBundle(new URL('/vendor/editor.0123456789abcdef.js', ORIGIN))).toBe(true);
+  });
+
+  const TUNNEL = 'https://dev-name.ngrok-free.dev';
+  const warning = () => makeResponse({ etag: null, tag: 'warning', extraHeaders: { 'content-type': 'text/html', 'ngrok-error-code': 'ERR_NGROK_6024' } });
+  const subresource = (url, destination) => {
+    const ev = navEvent(url);
+    ev.request.mode = 'no-cors';
+    ev.request.destination = destination;
+    return ev;
+  };
+
+  it('re-issues a cold navigation with the opt-out when the browser got the warning', async () => {
+    const w = loadWorker({ origin: TUNNEL, fetchImpl: () => Promise.resolve(makeResponse({ etag: '"v1"', tag: 'app' })) });
+    const ev = navEvent(`${TUNNEL}/app?code=abc`, Promise.resolve(warning()));
+    const res = await w.ctx.shellResponse(ev);
+    expect(res.tag).toBe('app');
+    expect(w.fetches[0].input).toBe(`${TUNNEL}/app?code=abc`);
+    expect(w.fetches[0].init).toEqual({ headers: { 'ngrok-skip-browser-warning': '1' }, redirect: 'manual' });
+    expect(w.cache.store.get('/__zw-shell__').tag).toBe('app');
+  });
+
+  it('re-issues a cold landing page the same way', async () => {
+    const w = loadWorker({ origin: TUNNEL, fetchImpl: () => Promise.resolve(makeResponse({ tag: 'landing' })) });
+    const ev = navEvent(`${TUNNEL}/`, Promise.resolve(warning()));
+    w.listeners.fetch(ev);
+    expect((await ev.responses[0]).tag).toBe('landing');
+  });
+
+  it('hands the warning on, uncached, when the retry gets it too', async () => {
+    const w = loadWorker({ origin: TUNNEL, fetchImpl: () => Promise.resolve(warning()) });
+    const res = await w.ctx.shellResponse(navEvent(`${TUNNEL}/app`, Promise.resolve(warning())));
+    expect(res.tag).toBe('warning');
+    expect(w.cache.store.has('/__zw-shell__')).toBe(false);
+  });
+
+  it('re-issues landing-page images with the opt-out behind a free tunnel', async () => {
+    const w = loadWorker({ origin: TUNNEL });
+    const ev = subresource(`${TUNNEL}/assets/hero.webp`, 'image');
+    w.listeners.fetch(ev);
+    expect(ev.responses).toHaveLength(1);
+    await ev.responses[0];
+    expect(w.fetches[0].input).toBe(`${TUNNEL}/assets/hero.webp`);
+    expect(w.fetches[0].init).toEqual({ headers: { 'ngrok-skip-browser-warning': '1' }, redirect: 'follow' });
+  });
+
+  it('leaves subresources alone on any other host, and the page\'s own fetches everywhere', () => {
+    const prod = loadWorker();
+    const img = subresource(`${ORIGIN}/assets/hero.webp`, 'image');
+    prod.listeners.fetch(img);
+    expect(img.responses).toHaveLength(0);
+
+    const tunnel = loadWorker({ origin: TUNNEL });
+    const own = subresource(`${TUNNEL}/app?v=1`, '');
+    own.request.mode = 'cors';
+    tunnel.listeners.fetch(own);
+    expect(own.responses).toHaveLength(0);
+    const foreign = subresource('https://evil.example/x.png', 'image');
+    tunnel.listeners.fetch(foreign);
+    expect(foreign.responses).toHaveLength(0);
+  });
+
+  it('changes nothing off a free tunnel: icons go out as the browser\'s own request', async () => {
+    const w = loadWorker();
+    const ev = subresource(`${ORIGIN}/assets/icon-192.png`, 'image');
+    w.listeners.fetch(ev);
+    await ev.responses[0];
+    expect(w.fetches[0].input).toBe(ev.request);
+    expect(w.fetches[0].init).toBeUndefined();
+  });
+
+  it('changes nothing off a free tunnel: a cold navigation is never re-issued', async () => {
+    const w = loadWorker();
+    const res = await w.ctx.shellResponse(navEvent(`${ORIGIN}/app`, Promise.resolve(warning())));
+    expect(res.tag).toBe('warning');
+    expect(w.fetches).toHaveLength(0);
+  });
+
+  it('never stores the warning as a manifest icon', async () => {
+    const w = loadWorker({ origin: TUNNEL, fetchImpl: () => Promise.resolve(warning()) });
+    const ev = subresource(`${TUNNEL}/assets/icon-192.png`, 'image');
+    w.listeners.fetch(ev);
+    await ev.responses[0];
+    expect(w.fetches[0].init.headers).toEqual({ 'ngrok-skip-browser-warning': '1' });
+    expect(w.cache.store.has('/assets/icon-192.png')).toBe(false);
   });
 
   it('still refuses to cache an interstitial that answers its own fetch', async () => {

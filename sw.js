@@ -69,6 +69,35 @@ function timeoutSignal(ms) {
 // switched on for development.
 const OWN_FETCH_HEADERS = { 'ngrok-skip-browser-warning': '1' };
 
+// The worker's own fetches were never the whole story. The browser's requests —
+// a navigation, an <img> on the landing page — cannot carry that header, so on a
+// device without ngrok's click-through cookie (it expires; a dev reset or a new
+// profile never had it) every one of them came back as the warning: a blank app
+// and broken pictures. Only the free-tier domains show the warning, so every
+// path that re-issues a browser request is gated on BEHIND_FREE_TUNNEL —
+// production behaves exactly as it did before.
+const FREE_TUNNEL_SUFFIXES = ['.ngrok-free.dev', '.ngrok-free.app'];
+const BEHIND_FREE_TUNNEL = FREE_TUNNEL_SUFFIXES.some(s => self.location.hostname.endsWith(s));
+
+function isTunnelPage(res) {
+  const headers = res && res.headers;
+  return !!(headers && typeof headers.get === 'function' && headers.get('ngrok-error-code'));
+}
+
+// The browser's request again, with the opt-out. No deadline: like the cold
+// shell, this is the only route to the resource. A navigation must answer with
+// `redirect: 'manual'` — handing it a followed redirect is a network error —
+// and the browser follows the opaque redirect itself.
+function tunnelFetch(href, redirect) {
+  return fetch(href, { headers: OWN_FETCH_HEADERS, redirect });
+}
+
+// A page's own fetch() has destination '' and sets its headers itself.
+function isTunnelSubresource(req, url) {
+  return BEHIND_FREE_TUNNEL && url.origin === self.location.origin
+    && req.mode !== 'navigate' && !!req.destination;
+}
+
 // Every fetch the worker issues on its own behalf — never the navigation, which
 // belongs to the browser. `no-cache` sends a conditional request, so an
 // unchanged document costs a 304 rather than another full download.
@@ -455,6 +484,10 @@ self.addEventListener('fetch', event => {
     event.respondWith(vendorResponse(event, url));
     return;
   }
+  if (isTunnelSubresource(req, url)) {
+    event.respondWith(tunnelFetch(req.url, 'follow'));
+    return;
+  }
   if (req.mode !== 'navigate') return;
   if (isAppDocument(url)) {
     event.respondWith(shellResponse(event));
@@ -507,8 +540,10 @@ async function cachedIcon(event, path) {
   const cached = await cache.match(path);
   if (cached) return cached;
   try {
-    const fresh = await fetch(event.request);
-    if (fresh && fresh.ok) await cache.put(path, fresh.clone());
+    // Behind a free tunnel the browser's request is answered with the warning,
+    // which would otherwise be stored as the icon. Nowhere else is it touched.
+    const fresh = BEHIND_FREE_TUNNEL ? await tunnelFetch(path, 'follow') : await fetch(event.request);
+    if (fresh && fresh.ok && !(BEHIND_FREE_TUNNEL && isTunnelPage(fresh))) await cache.put(path, fresh.clone());
     return fresh;
   } catch (err) {
     // No cached copy and no link: let the browser render its own broken-image
@@ -698,9 +733,12 @@ async function cachedDocument(event, cacheKey, notify) {
     return cached;
   }
   try {
-    const fresh = (preload && await preload) || await fetch(event.request);
-    // Hand the page on either way — a tunnel warning is exactly what the user
-    // has to see and click through — but never keep it.
+    let fresh = (preload && await preload) || await fetch(event.request);
+    // The browser's request carries no opt-out, so a free tunnel answers it
+    // with its warning: ask again with the header before showing that.
+    if (BEHIND_FREE_TUNNEL && isTunnelPage(fresh)) fresh = discardResponse(fresh) || await tunnelFetch(event.request.url, 'manual');
+    // Should the warning still come back, hand it on — it is what the user has
+    // to see and click through — but never keep it.
     if (fresh && fresh.ok && !isForeignDocument(fresh)) await cache.put(cacheKey, fresh.clone());
     return fresh;
   } catch (err) {
