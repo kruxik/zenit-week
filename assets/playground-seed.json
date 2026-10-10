@@ -1,5 +1,5 @@
 {
-  "_comment": "Playground onboarding seed. Loaded into an empty IndexedDB on first run (#playground). The loader stamps _demo:true + fresh _ts per node and sets the week key to the current ISO week. Tune labels/structure here directly; labelCs holds the Czech label where it differs from the English one.",
+  "_comment": "Playground onboarding seed. Loaded into an empty IndexedDB on first run (#playground). The loader stamps _demo:true + fresh _ts per node and sets the week key to the current ISO week. Tune labels/structure here directly; labelCs / commentsCs hold the Czech label / comment where they differ from the English ones.",
   "week": {
     "nodes": [
       {
@@ -69,8 +69,10 @@
         "type": "activity",
         "branch": "work",
         "parent": "work",
-        "label": "Q1 OKR draft",
-        "labelCs": "Návrh OKR na Q1",
+        "label": "Q4 OKR draft",
+        "labelCs": "Návrh OKR na Q4",
+        "comments": "# Agenda\n- [x] Ask Product for priorities\n- [ ] Tech debt in engineering\n- [ ] Customer journey goals",
+        "commentsCs": "# Agenda\n- [x] Zeptat se produktu na priority\n- [ ] Technický dluh v engineeringu\n- [ ] Cíle pro customer journey",
         "done": false,
         "unplanned": false,
         "children": [],
@@ -253,7 +255,8 @@
           "nee26e3ba5df6"
         ],
         "offX": 0,
-        "offY": 0
+        "offY": 0,
+        "reusable": true
       },
       {
         "id": "n11a2a4a26dd6",
@@ -269,7 +272,8 @@
         "doneAt": "2026-05-09T18:58:19.644Z",
         "donedOn": "2026-05-09",
         "offX": 0,
-        "offY": 0
+        "offY": 0,
+        "reusable": true
       },
       {
         "id": "n1474e7ac7516",
@@ -283,7 +287,8 @@
         "unplanned": false,
         "children": [],
         "offX": 0,
-        "offY": 0
+        "offY": 0,
+        "reusable": true
       },
       {
         "id": "n566977f573a3",
@@ -297,7 +302,8 @@
         "unplanned": false,
         "children": [],
         "offX": 0,
-        "offY": 0
+        "offY": 0,
+        "reusable": true
       },
       {
         "id": "n59733bcc6638",
@@ -311,7 +317,8 @@
         "unplanned": false,
         "children": [],
         "offX": 0,
-        "offY": 0
+        "offY": 0,
+        "reusable": true
       },
       {
         "id": "nfadba4369111",
@@ -325,7 +332,8 @@
         "unplanned": false,
         "children": [],
         "offX": 0,
-        "offY": 0
+        "offY": 0,
+        "reusable": true
       },
       {
         "id": "n6b02b4d97ed5",
@@ -339,7 +347,8 @@
         "unplanned": false,
         "children": [],
         "offX": 0,
-        "offY": 0
+        "offY": 0,
+        "reusable": true
       },
       {
         "id": "nee26e3ba5df6",
@@ -353,14 +362,15 @@
         "unplanned": false,
         "children": [],
         "offX": 0,
-        "offY": 0
+        "offY": 0,
+        "reusable": true
       },
       {
         "id": "n601d146212c8",
         "type": "activity",
         "branch": "growth",
         "parent": "ne123a2b09d2e",
-        "label": "Claude Design",
+        "label": "Multi-Agent Teams",
         "priority": "high",
         "done": false,
         "unplanned": false,
@@ -388,8 +398,8 @@
         "type": "activity",
         "branch": "growth",
         "parent": "growth",
-        "label": "Watch Tristan Harris video",
-        "labelCs": "Pustit si video Tristana Harrise",
+        "label": "Addy Osmani: Comprehension Debt",
+        "comments": "https://addyosmani.com/blog/comprehension-debt/",
         "done": false,
         "unplanned": true,
         "children": [],

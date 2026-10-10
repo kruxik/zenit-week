@@ -4,8 +4,10 @@ import { _state, relabelDemoNodes } from './setup.js';
 // Builds a week shaped like a freshly seeded playground in the given language.
 function seedWeek(lang) {
   const nodes = _state.getPlaygroundSeed().week.nodes.map(n => {
-    const { labelCs, ...rest } = n;
-    return { ...rest, label: (lang === 'cs' && labelCs) || n.label, _demo: true, _ts: 1 };
+    const { labelCs, commentsCs, ...rest } = n;
+    const node = { ...rest, label: (lang === 'cs' && labelCs) || n.label, _demo: true, _ts: 1 };
+    if (n.comments) node.comments = (lang === 'cs' && commentsCs) || n.comments;
+    return node;
   });
   return { nodes, tombstones: [], crdtVersion: 0 };
 }
@@ -24,7 +26,25 @@ describe('Playground relabel on language switch', () => {
 
     const byId = new Map(_state.get().nodes.map(n => [n.id, n]));
     expect(byId.get('family').label).toBe('Rodina');       // branch
-    expect(byId.get('nc615d740acdd').label).toBe('Návrh OKR na Q1');
+    expect(byId.get('nc615d740acdd').label).toBe('Návrh OKR na Q4');
+  });
+
+  it('re-labels untouched demo comments into the new language', () => {
+    const okr = () => _state.get().nodes.find(n => n.id === 'nc615d740acdd');
+    expect(okr().comments).toMatch(/Ask Product for priorities/);
+    _state.setLang('cs');
+    relabelDemoNodes();
+    expect(okr().comments).toMatch(/Zeptat se produktu na priority/);
+    _state.setLang('en');
+    relabelDemoNodes();
+    expect(okr().comments).toMatch(/Ask Product for priorities/);
+  });
+
+  it('keeps seed comments that read the same in both languages', () => {
+    _state.setLang('cs');
+    relabelDemoNodes();
+    expect(_state.get().nodes.find(n => n.id === 'nae518b467484').comments)
+      .toBe('https://addyosmani.com/blog/comprehension-debt/');
   });
 
   it('keeps seed labels that read the same in both languages', () => {
