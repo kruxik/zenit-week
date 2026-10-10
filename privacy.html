@@ -54,7 +54,7 @@
   <nav><a href="/">← Zenit Week</a></nav>
   <main>
     <h1>Privacy Policy</h1>
-    <p class="meta">Last updated: 8 October 2026</p>
+    <p class="meta">Last updated: 10 October 2026</p>
 
     <div class="tldr">
       <strong>TL;DR</strong>
@@ -73,7 +73,7 @@
     </p>
 
     <h2>2. What data we process and where it lives</h2>
-    <p>Zenit Week has <strong>no servers that ever receive your planning data</strong>. Our only server-side component is the OAuth token-exchange function described in §7, which handles sign-in credentials and nothing else. Your planning data is never transmitted to or stored by us. The only data involved is processed in the locations listed below.</p>
+    <p>Zenit Week has <strong>no servers that ever receive your planning data</strong>. Our only server-side components are two small functions: the OAuth token-exchange function described in §7, which handles sign-in credentials and nothing else, and a relay at <code>/api/umami-send</code> that passes Umami's cookieless usage counts, together with your IP address, on to Umami (see §3) and stores nothing. Your planning data is never transmitted to or stored by us. The only data involved is processed in the locations listed below.</p>
 
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.1 In your browser (always)</h3>
     <p>The app uses your browser's local storage (<code>localStorage</code> and <code>IndexedDB</code>) to keep:</p>
@@ -88,7 +88,7 @@
     <p>If you choose to sign in with Google, the app stores a copy of your planning data inside <em>your own</em> Google Drive, in a private app-specific folder, using the <code>drive.appdata</code> scope. This folder is invisible to other apps and to us. We never read, copy, or process your Drive data on any server.</p>
 
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.3 Transient network data (during page loads)</h3>
-    <p>When you open the website, our hosting provider Vercel processes your IP address and standard HTTP request metadata (user agent, referrer, timestamps) for the time strictly necessary to serve the page and operate the OAuth token-exchange endpoint at <code>/api/token</code>. Vercel does not share this with us in identifiable form. See §4 (Service providers) for details.</p>
+    <p>When you open the website, our hosting provider Vercel processes your IP address and standard HTTP request metadata (user agent, referrer, timestamps) for the time strictly necessary to serve the page and operate our two serverless functions: the OAuth token-exchange endpoint at <code>/api/token</code> and the Umami relay at <code>/api/umami-send</code>. Vercel does not share this with us in identifiable form. See §4 (Service providers) for details.</p>
 
     <h2>3. Cookies and analytics</h2>
     <p>Zenit Week uses <strong>no advertising, analytics, or behavioural-tracking cookies</strong>. We do not profile users, do not track you across other websites, and do not use any persistent identifier stored on your device for analytics.</p>
@@ -117,7 +117,7 @@
     <p>We rely on the following providers strictly to deliver the service:</p>
     <ul>
       <li>
-        <strong>Vercel Inc.</strong> — static-site hosting, the OAuth token-exchange serverless function (<code>/api/token</code>, which also sets the strictly-necessary authentication cookie described in §3), and cookieless aggregate analytics via Vercel Web Analytics (see §3). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
+        <strong>Vercel Inc.</strong> — static-site hosting, the OAuth token-exchange serverless function (<code>/api/token</code>, which also sets the strictly-necessary authentication cookie described in §3), the Umami relay function (<code>/api/umami-send</code>, see §3), and cookieless aggregate analytics via Vercel Web Analytics (see §3). Processes IP addresses and HTTP request metadata in transit. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a> and their <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Data Processing Agreement</a>.
       </li>
       <li>
         <strong>Umami Software, Inc.</strong> (28 Geary St, Suite 650 #243, San Francisco, California, USA) - cookieless aggregate analytics via Umami Cloud (see §3). Receives IP addresses, user agents and the page and event data described in §3, forwarded through our domain. Umami Cloud runs on servers in the US and the EU. See <a href="https://umami.is/privacy" target="_blank" rel="noopener">Umami's Privacy Policy</a>, their <a href="https://umami.is/dpa" target="_blank" rel="noopener">Data Processing Agreement</a> and <a href="https://umami.is/subprocessors" target="_blank" rel="noopener">sub-processors</a>.

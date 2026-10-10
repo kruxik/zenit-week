@@ -102,7 +102,7 @@ Drag the background to pan. Scroll or pinch to zoom. Click the logo to fit every
 
 ## Privacy
 
-Zenit Week runs no servers that hold your data. Your data lives in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see it. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel. Signing in with Google goes through one small serverless function of ours that exchanges OAuth tokens; it never sees your plans.
+Zenit Week runs no servers that hold your data. Your data lives in your browser, or — if you opt in — in your own Google Drive's hidden app folder. We never see it. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel, plus cookieless, aggregated usage counts from Vercel Web Analytics and Umami (no personal identifiers, never your task content). Signing in with Google goes through one small serverless function of ours that exchanges OAuth tokens; it never sees your plans. A second one passes Umami's usage counts on to Umami together with your IP address, so Umami can look up the country, and stores nothing.
 
 Full details in the [privacy policy](https://zenitweek.com/privacy).
 
