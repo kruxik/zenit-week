@@ -3897,15 +3897,17 @@
     touch-action: none;
   }
   .drag-handle:active { cursor: grabbing; }
-  .node-group:hover .drag-handle,
-  .node-group.selected .drag-handle {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .dragging-active .node-group:hover .drag-handle {
-    opacity: 1;
-  }
+  /* Touch only: a mouse drags the node body itself, so on desktop the grip
+     would just cover whatever sits below the node. */
   @media (pointer: coarse) {
+    .node-group:hover .drag-handle,
+    .node-group.selected .drag-handle {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .dragging-active .node-group:hover .drag-handle {
+      opacity: 1;
+    }
     .node-group.selected .node-rect {
       stroke-dasharray: 4 3;
     }
