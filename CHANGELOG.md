@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) - `vYYYY.MM.DD[.N]`.
 
+## [v2026.10.10.1] - 2026-10-10
+
+### Changed
+
+- **readme:** Add author section and align package metadata with the website
+- Replace every em dash with a hyphen and add a test that keeps them out
+- **cs:** Address the user informally (tykání) across the app, like the landing page
+
+### Security
+
+- **landing:** Apply the strict CSP to / and /cs/, which the route patterns missed
+
 ## [v2026.10.10] - 2026-10-10
 
 ### Added
