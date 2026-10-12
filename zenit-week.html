@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-rw7FSO1XguFQMX8Ba2aA66/GOoDywNeH9D7YIA1P3HA='
+               'sha256-K+1aB5iqdsVAYG8Y/3pSFxQv914bEDrDZ3jbBaJ5Y1c='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -4254,6 +4254,7 @@
   <symbol id="icon-circle-half-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 3v18"/><path d="M12 14l7 -7"/><path d="M12 19l8.5 -8.5"/><path d="M12 9l4.5 -4.5"/></symbol>
   <symbol id="icon-circle-number-0" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M10 10v4a2 2 0 1 0 4 0v-4a2 2 0 1 0 -4 0"/></symbol>
   <symbol id="icon-repeat" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3"/><path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3"/></symbol>
+  <symbol id="icon-player-track-next" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 5v14l8 -7z"/><path d="M14 5v14l8 -7z"/></symbol>
   <symbol id="icon-repeat-off" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 12v-3c0 -1.336 .873 -2.468 2.08 -2.856m3.92 -.144h10m-3 -3l3 3l-3 3"/><path d="M20 12v3a3 3 0 0 1 -.133 .886m-1.99 1.984a3 3 0 0 1 -.877 .13h-13m3 3l-3 -3l3 -3"/><path d="M3 3l18 18"/></symbol>
   <symbol id="icon-battery-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 7h11a2 2 0 0 1 2 2v.5a.5 .5 0 0 0 .5 .5a.5 .5 0 0 1 .5 .5v3a.5 .5 0 0 1 -.5 .5a.5 .5 0 0 0 -.5 .5v.5a2 2 0 0 1 -2 2h-11a2 2 0 0 1 -2 -2v-6a2 2 0 0 1 2 -2"/><path d="M7 10l0 4"/><path d="M10 10l0 4"/></symbol>
   <symbol id="icon-sitemap" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1" /><path d="M12 9l0 3" /></symbol>
@@ -11310,6 +11311,7 @@ const TRANSLATIONS = {
     'help.sendToDateHint':        'Right-click a task with no sub-tasks → Reschedule → Date.',
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
     'agenda.emptyLaterHint':      'Send a task to a date to plan past this week.',
+    'agenda.laterContinues':      'Repeats - more dates appear here as they come closer.',
     'sendFuture.title':           'Set a date',
     'sendFuture.date':            'Date',
     'sendFuture.repeat':          'Repeat',
@@ -11677,6 +11679,7 @@ const TRANSLATIONS = {
     'help.sendToDateHint':        'Klikni pravým tlačítkem na úkol bez podúkolů → Přeplánovat → Datum.',
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
     'agenda.emptyLaterHint':      'Pošli úkol na datum a naplánuješ ho za tento týden.',
+    'agenda.laterContinues':      'Opakuje se - další termíny se tu objeví, až se přiblíží.',
     'sendFuture.title':           'Nastavit datum',
     'sendFuture.date':            'Datum',
     'sendFuture.repeat':          'Opakování',
@@ -21868,10 +21871,12 @@ function agendaTabOrder() {
 // entry behind them: already-materialised nodes are ordinary nodes and are
 // edited in their own week.
 
-// How far ahead the list looks, and how many rows any one entry may contribute.
-// A daily entry would otherwise fill the tab by itself and bury every yearly
-// obligation the list exists to surface.
-const LATER_HORIZON_MONTHS = 12;
+// How far ahead the list looks, and how many rows any one entry may contribute
+// - whichever runs out first. A daily entry would otherwise fill the tab by
+// itself and bury every yearly obligation the list exists to surface. The
+// window is short on purpose: a repeat shows enough dates to delete the odd
+// one, and the rest arrive as the window moves.
+const LATER_HORIZON_WEEKS = 12;
 const LATER_ROWS_PER_ENTRY = 12;
 
 // Where the list starts: the Monday after the week today falls in. Anything
@@ -21950,32 +21955,46 @@ async function primeLaterBuried(keys) {
 // it from the schedule, so it does not remove it from here either: Later is the
 // one place the standing intentions are listed, and a task appearing both here
 // and on the map is the same task seen from its two ends.
+//
+// The window caps how many dates an entry shows, never whether it shows: an
+// entry with nothing inside it - a date sent two years out, a repeat every two
+// years - still lists its first live occurrence, so a task sent far ahead never
+// seems to vanish. An entry's last row carries `continues` when the series has
+// another date after it, which is what the row's "more follow" badge reads.
 function getLaterOccurrences(fromDate = laterFloorDate()) {
   const from = parseDayString(fromDate);
   if (!from || !scheduleData || !Array.isArray(scheduleData.entries)) return [];
-  const months = from.y * 12 + (from.m - 1) + LATER_HORIZON_MONTHS;
-  const ty = Math.floor(months / 12);
-  const tm = months % 12 + 1;
-  const to = formatDayString(ty, tm, Math.min(from.d, daysInMonth(ty, tm)));
+  const to = dayStringFromNumber(dayNumber(from) + LATER_HORIZON_WEEKS * 7 - 1);
+  const dayAfter = date => dayStringFromNumber(dayNumber(parseDayString(date)) + 1);
 
   const rows = [];
   const unknown = new Set();
+  // An occurrence its week has buried was deleted there on purpose; that week
+  // will never plant it again, so neither may this list offer it.
+  const isLive = (entry, date) => {
+    const wk = weekKeyForDayString(date);
+    const buried = wk ? _laterBuried.get(wk) : null;
+    if (buried) return !buried.has(occurrenceNodeId(entry.id, date));
+    if (wk) unknown.add(wk);
+    return true;
+  };
   scheduleData.entries.forEach(entry => {
-    let taken = 0;
+    const dates = [];
     for (const date of occurrencesInRange(entry, fromDate, to)) {
-      if (taken >= LATER_ROWS_PER_ENTRY) break;
-      // An occurrence its week has buried was deleted there on purpose; that
-      // week will never plant it again, so neither may this list offer it.
-      const wk = weekKeyForDayString(date);
-      const buried = wk ? _laterBuried.get(wk) : null;
-      if (buried) {
-        if (buried.has(occurrenceNodeId(entry.id, date))) continue;
-      } else if (wk) {
-        unknown.add(wk);
-      }
-      rows.push({ entry, date });
-      taken++;
+      if (dates.length >= LATER_ROWS_PER_ENTRY) break;
+      if (isLive(entry, date)) dates.push(date);
     }
+    if (!dates.length) {
+      let date = nextOccurrence(entry, dayAfter(to));
+      for (let i = 0; date && i < LATER_ROWS_PER_ENTRY; i++) {
+        if (isLive(entry, date)) { dates.push(date); break; }
+        date = nextOccurrence(entry, dayAfter(date));
+      }
+    }
+    if (!dates.length) return;
+    const last = dates[dates.length - 1];
+    const continues = !!nextOccurrence(entry, dayAfter(last));
+    dates.forEach(date => rows.push({ entry, date, continues: continues && date === last }));
   });
   if (unknown.size) primeLaterBuried(unknown);
   rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -22302,6 +22321,20 @@ function buildAgendaItem(node, label, opts = {}) {
     when.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;font-variant-numeric:tabular-nums;';
     when.textContent = formatDayLabel(opts.date);
     item.appendChild(when);
+    // The series goes on past the last date Later shows. A tap explains it,
+    // because a phone has no hover to show the title.
+    if (opts.continues) {
+      const more = document.createElement('span');
+      more.className = 'daily-log-badge';
+      more.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;flex-shrink:0;cursor:pointer;';
+      more.innerHTML = iconSvg('player-track-next'); // static, constant markup
+      more.title = t('agenda.laterContinues');
+      more.addEventListener('click', e => {
+        stopClickKeepingDismiss(e);
+        showToast(t('agenda.laterContinues'), 4000);
+      });
+      item.appendChild(more);
+    }
   }
 
   // Unplanned badge
@@ -23109,7 +23142,7 @@ function renderLaterTab(content) {
   content.appendChild(list);
 
   let month = null;
-  rows.forEach(({ entry, date }) => {
+  rows.forEach(({ entry, date, continues }) => {
     const key = laterMonthKey(date);
     if (key !== month) {
       month = key;
@@ -23118,7 +23151,7 @@ function renderLaterTab(content) {
       list.appendChild(makeSectionDivider(laterMonthLabel(key), count));
     }
     const row = laterRowNode(entry, date);
-    const item = buildAgendaItem(row, getAgendaNodeLabel(row), { entry, date });
+    const item = buildAgendaItem(row, getAgendaNodeLabel(row), { entry, date, continues });
     // Same two gestures as every other row: right-swipe runs the row's primary
     // action, left-swipe opens its context menu. Here the primary action is the
     // date dialog, so it takes the place Done holds on a task row.

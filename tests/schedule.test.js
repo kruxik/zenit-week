@@ -1343,10 +1343,51 @@ describe('Later tab', () => {
     expect(rows.every(r => r.date >= '2026-09-01')).toBe(true);
   });
 
-  it('looks a year ahead', () => {
-    seed(entry({ anchor: '2026-09-01', repeat: { every: 1, unit: 'year' } }));
+  it('looks 12 weeks ahead', () => {
+    seed(entry({ anchor: '2026-09-01', repeat: { every: 1, unit: 'month' } }));
     const dates = getLaterOccurrences('2026-09-01').map(r => r.date);
-    expect(dates).toEqual(['2026-09-01', '2027-09-01']);
+    expect(dates).toEqual(['2026-09-01', '2026-10-01', '2026-11-01']);
+  });
+
+  it('shows at most 12 dates of a weekly entry, the 12-week window', () => {
+    seed(entry({ anchor: '2026-09-07', repeat: { every: 1, unit: 'week' } }));
+    const dates = getLaterOccurrences('2026-09-07').map(r => r.date);
+    expect(dates).toHaveLength(12);
+    expect(dates[11]).toBe('2026-11-23');
+  });
+
+  it('still lists a one-off far past the window', () => {
+    seed(entry({ anchor: '2028-02-01' }));
+    const rows = getLaterOccurrences('2026-10-19');
+    expect(rows.map(r => r.date)).toEqual(['2028-02-01']);
+    expect(rows[0].continues).toBe(false);
+  });
+
+  it('lists the first date of a repeat with none inside the window', () => {
+    seed(entry({ anchor: '2027-06-01', repeat: { every: 2, unit: 'year' } }));
+    const rows = getLaterOccurrences('2026-10-19');
+    expect(rows.map(r => r.date)).toEqual(['2027-06-01']);
+    expect(rows[0].continues).toBe(true);
+  });
+
+  it('marks only the last row of an open-ended series as continuing', () => {
+    seed(entry({ anchor: '2026-09-07', repeat: { every: 1, unit: 'week' } }));
+    const rows = getLaterOccurrences('2026-09-07');
+    expect(rows.filter(r => r.continues).map(r => r.date)).toEqual(['2026-11-23']);
+  });
+
+  it('does not mark a series that ends inside the window', () => {
+    seed(entry({ anchor: '2026-09-07', repeat: { every: 1, unit: 'week' }, end: { type: 'count', n: 3 } }));
+    const rows = getLaterOccurrences('2026-09-07');
+    expect(rows).toHaveLength(3);
+    expect(rows.some(r => r.continues)).toBe(false);
+  });
+
+  it('skips a buried first date beyond the window to the next one', async () => {
+    seed(entry({ anchor: '2028-02-01', repeat: { every: 1, unit: 'year' } }));
+    saveWeek('2028-05', { nodes: [], tombstones: [occurrenceNodeId('s1', '2028-02-01')] });
+    await primeLaterBuried(['2028-05']);
+    expect(getLaterOccurrences('2026-10-19').map(r => r.date)).toEqual(['2029-02-01']);
   });
 
   it('caps a daily entry so it cannot bury the yearly ones', () => {
