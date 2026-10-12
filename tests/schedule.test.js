@@ -272,6 +272,15 @@ describe('Schedule store - validate and repair', () => {
     expect(out.crdtVersion).toBe(3);
   });
 
+  it('keeps a comment and the reusable flag, and drops junk ones', () => {
+    const kept = validateAndRepairSchedule({ entries: [{ ...good(), comments: '- [ ] call', reusable: true }] }, ['work']);
+    expect(kept.entries[0].comments).toBe('- [ ] call');
+    expect(kept.entries[0].reusable).toBe(true);
+    const junk = validateAndRepairSchedule({ entries: [{ ...good(), comments: 42, reusable: 'yes' }] }, ['work']);
+    expect('comments' in junk.entries[0]).toBe(false);
+    expect('reusable' in junk.entries[0]).toBe(false);
+  });
+
   it('heals a stored weekday tag without touching _ts', () => {
     const raw = { entries: [{ ...good(), label: 'Pay the bill (we)' }], tombstones: [], crdtVersion: 0 };
     const out = validateAndRepairSchedule(raw, ['work']);
@@ -573,6 +582,24 @@ describe('Materialisation on week open', () => {
     expect(data.nodes.find(n => n.id === 'work').children).toContain(node.id);
   });
 
+  it('copies the comment and the reusable flag onto every occurrence', () => {
+    seed(entry({ anchor: '2026-05-11', repeat: { every: 1, unit: 'day' }, comments: 'Bring receipts', reusable: true }));
+    const data = week();
+    materialiseWeek(WK, data);
+    const nodes = occurrences(data);
+    expect(nodes).toHaveLength(7);
+    expect(nodes.every(n => n.comments === 'Bring receipts' && n.reusable === true)).toBe(true);
+  });
+
+  it('plants no comment when the entry has none', () => {
+    seed(entry());
+    const data = week();
+    materialiseWeek(WK, data);
+    const node = occurrences(data)[0];
+    expect('comments' in node).toBe(false);
+    expect(node.reusable).toBe(false);
+  });
+
   it('carries the entry priority onto the occurrence', () => {
     seed(entry({ priority: 'critical' }));
     const data = week();
@@ -868,6 +895,20 @@ describe('Send to date…', () => {
     expect(entry.anchor).toBe('2026-09-14');
     expect(entry.repeat).toBeNull();
     expect(entry.end).toEqual({ type: 'never' });
+  });
+
+  it('carries the comment and the reusable flag onto the entry', () => {
+    findNode('a1').comments = '# Notes\n- bring receipts';
+    findNode('a1').reusable = true;
+    const entry = sendEntry('a1', { date: '2026-09-14', unit: null });
+    expect(entry.comments).toBe('# Notes\n- bring receipts');
+    expect(entry.reusable).toBe(true);
+  });
+
+  it('writes neither field when the task has none', () => {
+    const entry = sendEntry('a1', { date: '2026-09-14', unit: null });
+    expect('comments' in entry).toBe(false);
+    expect('reusable' in entry).toBe(false);
   });
 
   it('refuses an end date before the anchor', () => {
@@ -1418,6 +1459,12 @@ describe('Later tab', () => {
     expect(row.label).toBe('Pay the bill');
     expect(row.branch).toBe('work');
     expect(row.schedDate).toBe('2026-09-14');
+  });
+
+  it('shows the entry comment and reusable flag on the row', () => {
+    const row = laterRowNode(entry({ comments: 'Bring receipts', reusable: true }), '2026-09-14');
+    expect(row.comments).toBe('Bring receipts');
+    expect(row.reusable).toBe(true);
   });
 
   it('carries priority onto the row but normalises normal away', () => {

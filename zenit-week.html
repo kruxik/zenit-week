@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-K+1aB5iqdsVAYG8Y/3pSFxQv914bEDrDZ3jbBaJ5Y1c='
+               'sha256-3ZEU8JtxYogZB3fzrA6F/aj/Zs+DRG5UdNfg9ZQPeOs='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5577,7 +5577,7 @@ function stashViewStateForReload() {
     panX, panY, zoom,
     currentView, currentWeekKey,
     hoveredNodeId,
-    commentNodeId: commentTargetId,
+    commentNodeId: commentEntryId ? null : commentTargetId,
     helpOpen: isHelpOpen(),
     now: Date.now(),
   });
@@ -6138,6 +6138,10 @@ function validateAndRepairSchedule(raw, branchIds) {
       branch: repairScheduleBranch(e.branch, branches),
       priority: SCHEDULE_PRIORITIES.has(e.priority) ? e.priority : 'normal',
       path: repairSchedulePath(e.path),
+      // Optional, and absent rather than empty when unset, so an entry written
+      // before they existed keeps its content hash and is not re-uploaded.
+      ...(typeof e.comments === 'string' && e.comments !== '' ? { comments: e.comments } : {}),
+      ...(e.reusable === true ? { reusable: true } : {}),
       anchor: e.anchor,
       repeat: repairScheduleRepeat(e.repeat),
       end: repairScheduleEnd(e.end),
@@ -13028,7 +13032,8 @@ function plantOccurrence(ctx, entry, date, dayIndex) {
     id, type: 'activity', branch, parent: host.id,
     label: `${entry.label} (${dayAbbr(dayIndex)})`.trim(),
     done: false, unplanned: false,
-    priority, reusable: false,
+    priority, reusable: entry.reusable === true,
+    ...(entry.comments ? { comments: entry.comments } : {}),
     children: [],
     schedId: entry.id, schedDate: date,
     _ts: stamp,
@@ -19172,9 +19177,10 @@ function sendSubtreeOverCap(node) {
   return canSendToDate(node) && captureSendLeaves(node) === null;
 }
 
-// The node's own state becomes the entry's: label, branch and priority travel,
-// nothing else. Everything a week gives a node - done, comments, day tags - is
-// a property of that week's copy, not of the standing intention.
+// The node's own state becomes the entry's: label, branch, priority, comment and
+// the reusable flag travel, and every occurrence gets a copy of them. Everything
+// a week gives a node - done, dropped, day tags, ticks - is a property of that
+// week's copy, not of the standing intention.
 function sendNodeToDate(nodeId, options) {
   const node = findNode(nodeId);
   if (!canSendToDate(node)) return null;
@@ -19230,6 +19236,8 @@ function sendNodeToDate(nodeId, options) {
     // parent they sent - on the map that priority was already cascading down.
     priority: leaf.node.priority || node.priority || 'normal',
     path: leaf.path,
+    ...(typeof leaf.node.comments === 'string' && leaf.node.comments !== '' ? { comments: leaf.node.comments } : {}),
+    ...(leaf.node.reusable ? { reusable: true } : {}),
     anchor,
     repeat: unit ? { every, unit } : null,
     end,
@@ -19608,16 +19616,16 @@ function showContextMenu(x, y, nodeId) {
   const isCounter  = node && node.type === 'counter';
 
   // Entry mode: answered before any node rule runs, because there is no node for one to
-  // read. Only the four that act on an entry are shown, and everything else is
+  // read. Only the items that act on an entry are shown, and everything else is
   // hidden first, so a menu item added later cannot appear here by accident.
-  // Reschedule, priority, rename and delete all affect future occurrences;
+  // Reschedule, priority, rename, comment and delete all affect future occurrences;
   // nodes already materialised are ordinary nodes edited in their own week.
   if (agendaEntryCtx) {
     ctxMenu.querySelectorAll('.ctx-item, .ctx-separator').forEach(el => { el.style.display = 'none'; });
     const entry = scheduleData.entries.find(e => e.id === agendaEntryCtx.entryId);
     const prio = entry ? (entry.priority || 'normal') : 'normal';
     const allowed = ['ctx-reschedule', 'ctx-sep-1', 'ctx-prio-normal', 'ctx-prio-high',
-                     'ctx-prio-critical', 'ctx-sep-2', 'ctx-rename', 'ctx-sep-3', 'ctx-delete'];
+                     'ctx-prio-critical', 'ctx-sep-2', 'ctx-rename', 'ctx-comment', 'ctx-sep-3', 'ctx-delete'];
     allowed.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = '';
@@ -20409,7 +20417,9 @@ document.getElementById('ctx-rename').addEventListener('click', () => {
 
 document.getElementById('ctx-comment').addEventListener('click', () => {
   const id = contextTarget;
+  const entryCtx = agendaEntryCtx;
   hideContextMenu();
+  if (entryCtx) { openEntryCommentDialog(entryCtx.entryId, entryCtx.date); return; }
   // The comment dialog sits below the quick-add panel, so the panel yields.
   if (window.isQuickAddOpen()) window.closeQuickAdd();
   if (id) openCommentDialog(id);
@@ -20575,6 +20585,7 @@ function commentPreview(str) {
 const COMMENT_SOFT_LIMIT = 1000; // recommended length only: longer comments are stored whole
 const COMMENT_AUTOSAVE_MS = 800;
 let commentTargetId = null;
+let commentEntryId = null; // set while the dialog edits a schedule entry's comment
 let commentSnapshotTaken = false; // one undo step per dialog session, not per keystroke
 let commentSaveTimer = null;
 let commentSession = 0;      // bumped per open/close, so a late bundle never mounts into a stale dialog
@@ -21354,12 +21365,31 @@ function updateCommentCounter() {
   counter.classList.toggle('over', len > COMMENT_SOFT_LIMIT);
 }
 
-function openCommentDialog(nodeId) {
-  const node = findNode(nodeId);
-  if (!node) return;
+// The record the open comment belongs to: a node of this week, or - opened from
+// a Later row - the schedule entry, which has no node yet. Either carries its
+// text in `comments`, so the dialog reads and writes them the same way.
+function commentRecord() {
+  if (commentEntryId) return (scheduleData && scheduleData.entries || []).find(e => e.id === commentEntryId) || null;
+  return commentTargetId ? findNode(commentTargetId) : null;
+}
+
+// A Later row's comment is the entry's, so editing it changes what every
+// occurrence planted from now on receives. Occurrences already planted are
+// ordinary nodes with their own copy, edited in their own week - the same rule
+// rename and priority follow from a Later row. `commentTargetId` holds the
+// row's occurrence id only so every "is the dialog open" check keeps working.
+function openEntryCommentDialog(entryId, date) {
+  if (!(scheduleData && scheduleData.entries || []).some(e => e.id === entryId)) return;
+  return openCommentDialog(occurrenceNodeId(entryId, date), entryId);
+}
+
+function openCommentDialog(nodeId, entryId = null) {
+  commentEntryId = entryId;
   commentTargetId = nodeId;
+  const node = commentRecord();
+  if (!node) { commentEntryId = null; commentTargetId = null; return; }
   commentSnapshotTaken = false;
-  document.getElementById('comment-title').textContent = nodeDisplayLabel(node);
+  document.getElementById('comment-title').textContent = entryId ? node.label : nodeDisplayLabel(node);
   unmountCommentEditor();
   const session = ++commentSession;
   commentTyped = false;
@@ -21405,7 +21435,7 @@ function persistCommentDraft() {
   commentSaveTimer = null;
   const id = commentTargetId;
   if (!id) return;
-  const node = findNode(id);
+  const node = commentRecord();
   if (!node) return;
   // Only the user's own edits are written. A dialog nobody typed in must never
   // write - sync may have stored a newer version since it opened, and writing
@@ -21425,6 +21455,12 @@ function persistCommentDraft() {
   }
   if (write) node.comments = write;
   else delete node.comments;  // empty clears the field
+  if (commentEntryId) {
+    node._ts = Date.now();    // the entry's own LWW stamp, as for any entry edit
+    saveSchedule();
+    if (currentView === 'agenda') renderAgenda();
+    return;
+  }
   touchNode(id);              // bump _ts for Drive LWW merge
   saveWeek(currentWeekKey, weekData);
 
@@ -21562,7 +21598,7 @@ function isCommentSessionDirty() {
 // their text stands, and the newer save wins as for any other edit.
 function refreshOpenComment() {
   if (!commentTargetId || isCommentSessionDirty()) return;
-  const node = findNode(commentTargetId);
+  const node = commentRecord();
   if (!node) return;
   const stored = node.comments || '';
   if (stored === commentBaseline) return;
@@ -21593,6 +21629,7 @@ function closeCommentDialog() {
   unmountCommentEditor();
   commentSession++;
   commentTargetId = null;
+  commentEntryId = null;
 }
 window.closeCommentDialog = closeCommentDialog;
 
@@ -22039,6 +22076,8 @@ function laterRowNode(entry, date) {
     schedPath: Array.isArray(entry.path) ? entry.path : [],
     label: entry.label,
     priority: entry.priority && entry.priority !== 'normal' ? entry.priority : null,
+    ...(entry.comments ? { comments: entry.comments } : {}),
+    reusable: entry.reusable === true,
     children: [],
     done: false,
     schedId: entry.id,
@@ -22397,9 +22436,11 @@ function buildAgendaItem(node, label, opts = {}) {
       count.textContent = `${preview.checks.done}/${preview.checks.total}`;
       cmt.appendChild(count);
     }
+    // A Later row has no node yet - its comment is the entry's.
     cmt.addEventListener('click', e => {
       stopClickKeepingDismiss(e);
-      openCommentDialog(node.id);
+      if (entryRow) openEntryCommentDialog(entryRow.id, opts.date);
+      else openCommentDialog(node.id);
     });
     item.appendChild(cmt);
   }

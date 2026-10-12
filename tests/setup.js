@@ -824,6 +824,7 @@ export const {
   // Node comments
   planCommentWrite,
   openCommentDialog,
+  openEntryCommentDialog,
   closeCommentDialog,
   persistCommentDraft,
   loadCommentEditor,

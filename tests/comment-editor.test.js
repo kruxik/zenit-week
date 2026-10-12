@@ -9,7 +9,7 @@ import * as commands from 'prosemirror-commands';
 import * as inputrules from 'prosemirror-inputrules';
 import {
   _state, sandboxGlobal, findNode, triggerKeydown,
-  openCommentDialog, closeCommentDialog, persistCommentDraft, loadCommentEditor,
+  openCommentDialog, openEntryCommentDialog, closeCommentDialog, persistCommentDraft, loadCommentEditor,
   buildCommentSchema, commentTextToDoc, commentDocToText, commentTextSlice, isTypingTarget,
   toggleCommentCheck, commentEnterCommand, commentLiftAtStart, commentToggleAtCaret, commentInputRuleList,
   commentBlockToggle, commentToolbarState, shouldPrefetchCommentEditor, commentEditorText, commentViewportBox, shouldPinPanelCaption,
@@ -172,6 +172,61 @@ describe('comment dialog with no edit', () => {
     expect(findNode('a1')._ts).toBe(5);
     expect(findNode('a1').comments).toBe('keep');
     expect(_state.getUndoStack().length).toBe(undoBefore);
+  });
+});
+
+describe('comment dialog on a schedule entry (Later row)', () => {
+  const seedEntry = (over = {}) => _state.setSchedule({
+    entries: [{
+      id: 's1', label: 'Pay tax', branch: 'work', priority: 'normal', path: [],
+      anchor: '2027-03-01', repeat: null, end: { type: 'never' },
+      plantedThrough: null, planted: [], _ts: 5, ...over,
+    }],
+    tombstones: [], crdtVersion: 0,
+  });
+  const theEntry = () => _state.getSchedule().entries[0];
+  const doc = sandboxGlobal.document;
+
+  beforeEach(() => {
+    _state.set({ nodes: [
+      { id: 'work', type: 'branch', branch: 'work', label: 'Work', children: [], side: 'left', _ts: 0 },
+    ] });
+  });
+
+  it('reads and writes the entry, not a week node', () => {
+    seedEntry({ comments: 'note' });
+    const ta = doc.getElementById('comment-textarea');
+    openEntryCommentDialog('s1', '2027-03-01').catch(() => {});
+    expect(ta.value).toBe('note');
+    expect(doc.getElementById('comment-title').textContent).toBe('Pay tax');
+    ta.value = 'note edited';
+    _state.setCommentTyped(true);
+    closeCommentDialog();
+    expect(theEntry().comments).toBe('note edited');
+    expect(theEntry()._ts).toBeGreaterThan(5);
+    expect(_state.get().nodes).toHaveLength(1);
+  });
+
+  it('clearing the text removes the field', () => {
+    seedEntry({ comments: 'note' });
+    openEntryCommentDialog('s1', '2027-03-01').catch(() => {});
+    doc.getElementById('comment-textarea').value = '';
+    _state.setCommentTyped(true);
+    closeCommentDialog();
+    expect('comments' in theEntry()).toBe(false);
+  });
+
+  it('open then close writes nothing', () => {
+    seedEntry({ comments: 'keep' });
+    openEntryCommentDialog('s1', '2027-03-01').catch(() => {});
+    closeCommentDialog();
+    expect(theEntry()._ts).toBe(5);
+    expect(theEntry().comments).toBe('keep');
+  });
+
+  it('does not open for an entry that is gone', () => {
+    seedEntry();
+    expect(openEntryCommentDialog('nope', '2027-03-01')).toBeUndefined();
   });
 });
 

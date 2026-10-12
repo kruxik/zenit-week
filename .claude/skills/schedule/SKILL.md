@@ -16,6 +16,8 @@ schedule = {
   entries: [
     { id, label, branch, priority,
       path,            // ['Health', 'Running'] - ancestor labels, outermost first, nearest 6 kept
+      comments,        // optional - the leaf's comment, copied onto every occurrence
+      reusable,        // optional, true only - copied onto every occurrence
       anchor,          // 'YYYY-MM-DD' - the first occurrence
       repeat,          // { every: N, unit: 'day'|'week'|'month'|'year' } | null
       end,             // { type: 'never' } | { type: 'count', n } | { type: 'until', date }
