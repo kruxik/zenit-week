@@ -1571,7 +1571,7 @@
   #color-picker-panel {
     display: none;
     position: fixed;
-    z-index: 1200;
+    z-index: 3000; /* Popover layer, peer of #context-menu: above every view (.app-panel 2000) and the toolbar */
     box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
     width: 200px;
     flex-direction: column;
@@ -1649,7 +1649,7 @@
   #baseline-panel {
     display: none;
     position: fixed;
-    z-index: 1200;
+    z-index: 3000; /* Popover layer, peer of #context-menu: above every view (.app-panel 2000) and the toolbar */
     box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
     width: 200px;
     flex-direction: column;
