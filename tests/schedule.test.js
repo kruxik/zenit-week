@@ -37,6 +37,7 @@ import {
   formatDayLabel,
   laterMonthKey,
   laterMonthLabel,
+  formatLaterRowDate,
   laterRowNode,
   occurrenceNodeId,
   findNode,
@@ -1445,9 +1446,15 @@ describe('Later tab', () => {
     expect(getLaterOccurrences('2026-09-01')).toEqual([]);
   });
 
+  it('dates a row briefly - weekday, then day and month', () => {
+    expect(formatLaterRowDate('2026-11-23', 'en')).toBe('Mo, Nov 23');
+    expect(formatLaterRowDate('2026-11-23', 'cs')).toBe('Po 23. 11.');
+    expect(formatLaterRowDate('2028-02-01', 'en')).toBe('Tu, Feb 1');
+  });
+
   it('groups by month, with localised month names', () => {
     expect(laterMonthKey('2026-11-02')).toBe('2026-11');
-    expect(laterMonthLabel('2026-11')).toBe('Nov 2026');
+    expect(laterMonthLabel('2026-11')).toBe('November 2026');
     _state.setLang('cs');
     expect(laterMonthLabel('2026-11')).toBe('listopad 2026');
   });
@@ -2099,7 +2106,7 @@ describe('Date formatting', () => {
   });
 
   it('month headings stay nominative - a month named alone is not a date', () => {
-    expect(laterMonthLabel('2026-01')).toBe('Jan 2026');
+    expect(laterMonthLabel('2026-01')).toBe('January 2026');
     _state.setLang('cs');
     expect(laterMonthLabel('2026-01')).toBe('leden 2026');
     expect(formatDayLabel('2026-01-02')).toBe('2. ledna 2026');

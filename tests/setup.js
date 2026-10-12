@@ -702,6 +702,7 @@ export const {
   formatDayLabel,
   laterMonthKey,
   laterMonthLabel,
+  formatLaterRowDate,
   laterRowNode,
   materialiseWeek,
   weekDayStrings,
