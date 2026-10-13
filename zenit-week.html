@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Tgfw2qBQXH00FkCCL8tT0UWz0QoBRdstrEPJLF6Xs2Q='
+               'sha256-cAGMTgJlAvr+YwveTtFb0iWx6mM7UgDacztRC9WDURc='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -10979,7 +10979,6 @@ let agendaTickCtx = null; // { parentId, specificTickId|null } or null
 // accident and act on a phantom.
 let agendaEntryCtx = null; // { entryId, date } or null
 let editState = null;           // { nodeId, isNew, originalLabel }
-let _editJustCommitted = false; // true for 600ms after commit, guards resize handler
 let hoveredNodeId = null;  // Track currently hovered node
 let currentViewLevel = 'full'; // 'full' | 'pebbles' | 'rocks'
 // Levels Pebbles reveals beyond its base depth. Each repeat of Pebbles (button
@@ -16244,9 +16243,6 @@ function commitEdit(followUp = 'auto') {
   if (!editState) return;
   const { nodeId, isNew, originalLabel } = editState;
   editState = null;
-  // Keyboard dismissal fires resize after editState clears; guard for 600ms
-  _editJustCommitted = true;
-  setTimeout(() => { _editJustCommitted = false; }, 600);
 
   if (!label) {
     // Empty label → treat as cancel
@@ -26978,6 +26974,11 @@ window.addEventListener('load', async () => {
 });
 
 let _resizeRefitTimer = null;
+// The width the map was last refitted for. On a touch device a height-only
+// resize is the soft keyboard or the address bar coming and going - after a
+// node save, around the comment editor, mid-scroll - and must leave the user's
+// zoom alone. Only a width change (rotation, split screen) is a new viewport.
+let _resizeRefitWidth = window.innerWidth;
 window.addEventListener('resize', () => {
   if (typeof editState !== 'undefined' && editState) {
     // Reposition the input only. Node geometry lives in SVG coordinates, so a
@@ -26986,11 +26987,12 @@ window.addEventListener('resize', () => {
     resizeInlineInput(false, false);
     return;
   }
-  if (_editJustCommitted) return;
+  if (isMobile && window.innerWidth === _resizeRefitWidth) return;
   clearTimeout(_resizeRefitTimer);
   _resizeRefitTimer = setTimeout(() => {
     const canvasEl = document.getElementById('canvas-container');
     if (canvasEl && getComputedStyle(canvasEl).display === 'none') return;
+    _resizeRefitWidth = window.innerWidth;
     fitMindmapView();
   }, 200);
 });
