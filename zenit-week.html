@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-cAGMTgJlAvr+YwveTtFb0iWx6mM7UgDacztRC9WDURc='
+               'sha256-01HxiJEQ7Q06OBkdBy0221AXW3n4kIeK9MPHuWuaszg='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -11300,7 +11300,9 @@ const TRANSLATIONS = {
     'menu.transferUnfinished':    'Transfer Unfinished',
     'menu.transferReusable':      'Transfer Reusable',
     'menu.clearWeek':             'Clear the Week',
-    'confirm.clearWeek':          'This will remove all tasks from the current week. This cannot be undone.',
+    'confirm.clearWeek':          'This will remove all tasks from the current week. Start over with a blank canvas, or with example tasks to explore?',
+    'confirm.clearWeekBlank':     'Blank canvas',
+    'confirm.clearWeekPlayground': 'Playground',
     'confirm.deleteEntryTitle':   'Delete scheduled task?',
     'confirm.deleteEntryBody':    'Delete only this occurrence, or the whole series? Occurrences in past weeks stay exactly where they are.',
     'confirm.deleteEntryOccurrence': 'This occurrence',
@@ -11668,7 +11670,9 @@ const TRANSLATIONS = {
     'menu.transferUnfinished':    'Přenést nedokončené',
     'menu.transferReusable':      'Přenést opakované',
     'menu.clearWeek':             'Vymazat týden',
-    'confirm.clearWeek':          'Tímto odstraníš všechny úkoly z aktuálního týdne. Tuto akci nelze vrátit.',
+    'confirm.clearWeek':          'Tímto odstraníš všechny úkoly z aktuálního týdne. Začít znovu s prázdným plátnem, nebo s ukázkovými úkoly na vyzkoušení?',
+    'confirm.clearWeekBlank':     'Prázdné plátno',
+    'confirm.clearWeekPlayground': 'Hřiště',
     'confirm.deleteEntryTitle':   'Smazat naplánovaný úkol?',
     'confirm.deleteEntryBody':    'Smazat jen tento výskyt, nebo celou sérii? Výskyty v minulých týdnech zůstanou beze změny.',
     'confirm.deleteEntryOccurrence': 'Tento výskyt',
@@ -18776,24 +18780,7 @@ function _windowKeydownHandler(e) {
   } else if (e.key === 'Backspace' || e.key === 'Delete') {
     if (id === 'center') {
       e.preventDefault();
-      showAppConfirm({
-        title: t('menu.clearWeek'),
-        body: t('confirm.clearWeek'),
-        okLabel: t('menu.clearWeek'),
-        onConfirm: async () => {
-          const clearIds = weekData.nodes
-            .filter(n => n.type !== 'branch' && n.type !== 'center')
-            .map(n => n.id);
-          tombstoneNodes(clearIds);
-          weekData.nodes = weekData.nodes.filter(n => n.type === 'branch' || n.type === 'center');
-          weekData.nodes.forEach(n => { n.children = []; });
-          rebuildNodeMap();
-          await saveWeek(currentWeekKey, weekData);
-          syncBranchConfig();
-          renderIfVisible();
-          if (currentView === 'agenda') renderAgenda();
-        }
-      });
+      weekActionClearWeek();
       return;
     }
     if (node.type === 'branch' && weekData.nodes.filter(n => n.type === 'branch').length <= 1) return;
@@ -20298,7 +20285,27 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   });
 })();
 
-async function weekActionClearWeek() {
+// Every Clear the Week entry point asks first: a blank canvas, or the
+// playground's example tasks to explore with.
+function weekActionClearWeek() {
+  showAppConfirm({
+    title: t('menu.clearWeek'),
+    body: t('confirm.clearWeek'),
+    okLabel: t('confirm.clearWeekBlank'),
+    danger: true,
+    onConfirm: () => clearWeek(false),
+    secondaryLabel: t('confirm.clearWeekPlayground'),
+    onSecondary: () => clearWeek(true),
+  });
+}
+
+// Removes every task of the current week, keeping its branches. With
+// `withPlayground` the week is refilled with the playground seed. Its nodes get
+// fresh ids, so a tombstone left by an earlier clear can never swallow them, and
+// they are not `_demo` - the user asked for them, so no merge strips them as
+// scaffolding. A seed branch the week already has is reused, label and color
+// included.
+async function clearWeek(withPlayground) {
   takeSnapshot();
   const clearIds = weekData.nodes
     .filter(n => n.type !== 'branch' && n.type !== 'center')
@@ -20306,6 +20313,20 @@ async function weekActionClearWeek() {
   tombstoneNodes(clearIds);
   weekData.nodes = weekData.nodes.filter(n => n.type === 'branch' || n.type === 'center');
   weekData.nodes.forEach(n => { n.children = []; });
+  if (withPlayground) {
+    const idMap = new Map();
+    (PLAYGROUND_SEED.week.nodes || []).forEach(n => {
+      const kept = n.type === 'branch' && findNode(n.id);
+      idMap.set(n.id, kept ? n.id : genId());
+    });
+    const idFor = (id) => idMap.get(id) || id;
+    playgroundSeedNodes(Date.now(), idFor).forEach(n => {
+      const existing = n.type === 'branch' && findNode(n.id);
+      if (existing) existing.children = n.children;
+      else weekData.nodes.push(n);
+    });
+    await applyPlaygroundColors(idFor, (b) => idMap.get(b) === b);
+  }
   rebuildNodeMap();
   await saveWeek(currentWeekKey, weekData);
   syncBranchConfig();
@@ -25948,24 +25969,13 @@ async function maybeSeedPlayground() {
   // wherever it differs (terms like "Code review" read the same in both). Only
   // the text for the current language is stored - from here on the node is plain
   // user data.
-  const nodes = (PLAYGROUND_SEED.week.nodes || []).map(n => {
-    const { labelCs, commentsCs, ...rest } = n;
-    const node = { ...rest, label: seedLabel(n), _demo: true, _ts: now };
-    if (n.comments) node.comments = seedComments(n);
-    return node;
-  });
+  const nodes = playgroundSeedNodes(now).map(n => ({ ...n, _demo: true }));
   const week = { nodes, tombstones: [], crdtVersion: 0 };
   await saveWeekIDB(wk, week);
 
   // Apply + persist branch colors (incl. the custom Growth green) so they
   // render deterministically and survive reload / Drive sync.
-  const seedColors = PLAYGROUND_SEED.colors || {};
-  Object.keys(seedColors).forEach(b => {
-    if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
-    const main = seedColors[b] && seedColors[b].main;
-    if (main) BRANCH_COLORS[b] = deriveBranchPalette(main);
-  });
-  if (Object.keys(seedColors).length) await saveBranchColors();
+  await applyPlaygroundColors();
 
   writeBoolPref(ONBOARDED_KEY, true);
   saveBranchColors();   // carries the onboarding state out to the other devices
@@ -25975,6 +25985,34 @@ async function maybeSeedPlayground() {
     history.replaceState(null, '', location.pathname + location.search);
   }
   return true;
+}
+
+// The seed week's nodes in the current language, stamped with `ts`. `idFor`
+// maps a seed id to the id the node is stored under (identity by default).
+function playgroundSeedNodes(ts, idFor = (id) => id) {
+  return (PLAYGROUND_SEED.week.nodes || []).map(n => {
+    const { labelCs, commentsCs, ...rest } = n;
+    const node = { ...rest, id: idFor(n.id), label: seedLabel(n), _ts: ts };
+    if (n.comments) node.comments = seedComments(n);
+    if (n.parent) node.parent = idFor(n.parent);
+    if (n.branch) node.branch = idFor(n.branch);
+    node.children = (n.children || []).map(idFor);
+    return node;
+  });
+}
+
+// Applies and persists the seed's branch colors; `idFor` as in
+// playgroundSeedNodes(), and `skip` names branches whose color stays as it is.
+async function applyPlaygroundColors(idFor = (id) => id, skip = () => false) {
+  const seedColors = PLAYGROUND_SEED.colors || {};
+  let changed = false;
+  Object.keys(seedColors).forEach(b => {
+    if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
+    if (skip(b)) return;
+    const main = seedColors[b] && seedColors[b].main;
+    if (main) { BRANCH_COLORS[idFor(b)] = deriveBranchPalette(main); changed = true; }
+  });
+  if (changed) await saveBranchColors();
 }
 
 // The seed node's label in the current language: `labelCs` wherever the Czech

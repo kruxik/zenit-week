@@ -658,6 +658,7 @@ export const loadWeek = (...args) => sandbox.loadWeek(...args);
 export const saveWeek = (...args) => sandbox.saveWeek(...args);
 export const runMigrationIfNeeded = (...args) => sandbox.runMigrationIfNeeded(...args);
 export const maybeSeedPlayground = (...args) => sandbox.maybeSeedPlayground(...args);
+export const clearWeek = (...args) => sandbox.clearWeek(...args);
 export const checkDateRollover = (...args) => sandbox.checkDateRollover(...args);
 
 export const {
