@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-xYygEcEkX3jGqXgPN1lX1ZRr5jGcqCokwiV8wOZH2K8='
+               'sha256-HuRrQe4HE6WIOO7ICBYXJlMFrm19+eKUcHdAtNP3QH4='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -13461,7 +13461,11 @@ function getPriorityScale(nodeId) {
 }
 
 function getPriorityWeight(nodeId) {
-  const prio = getEffectivePriority(nodeId);
+  return priorityWeightOf(getEffectivePriority(nodeId));
+}
+
+// Effort weight of a priority: critical 5x, high 3x, anything else 1x.
+function priorityWeightOf(prio) {
   if (prio === 'critical') return 5;
   if (prio === 'high') return 3;
   return 1;
@@ -16582,6 +16586,41 @@ function _computeSummarySignature() {
 //   weighted - priority-weighted effort load; counters fractional val/max (overload story)
 // Leaf = a non-branch/center node with no active (non-_editing) children; counters are
 // leaves. _editing nodes are excluded entirely (mirrors updateSummary).
+// One priority-weighted lens: load split by planned/unplanned × done/open. `weightOf`
+// gives a leaf's weight (critical 5×, high 3×, normal 1×); a counter contributes val of
+// its weight as done and (max-val) as open, so partial progress counts fractionally.
+// total/done/percent equal the old weighted figures, so the summary box stays identical.
+function weightedBuckets(nodes, weightOf) {
+  let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0, dropped = 0;
+  for (const n of nodes) {
+    const w = weightOf(n);
+    let doneAmt, openAmt;
+    if (n.type === 'counter') {
+      const max = n.max || 0;
+      const val = Math.min(n.val || 0, max);
+      doneAmt = val * w;
+      openAmt = (max - val) * w;
+    } else {
+      doneAmt = n.done ? w : 0;
+      openAmt = n.done ? 0 : w;
+    }
+    // Dropped work stays in the denominator but leaves the open buckets: "still
+    // could happen" and "will not happen" are different facts. What a dropped
+    // counter already ticked off still counts as done - only the frozen
+    // remainder is recorded as never-happening (D3).
+    if (n.dropped) {
+      dropped += openAmt;
+      if (n.unplanned) unplannedDone += doneAmt; else plannedDone += doneAmt;
+    }
+    else if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
+    else { plannedDone += doneAmt; plannedOpen += openAmt; }
+  }
+  const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen + dropped;
+  const done = plannedDone + unplannedDone;
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, dropped, total, done, percent };
+}
+
 function computeWeekStats() {
   const leaves = weekData.nodes.filter(n => {
     if (n._editing) return false;
@@ -16593,40 +16632,7 @@ function computeWeekStats() {
     return activeChildren.length === 0;
   });
 
-  // One priority-weighted lens: load split by planned/unplanned × done/open. Weight is
-  // getPriorityWeight (critical 5×, high 3×, normal 1×); a counter contributes val of its
-  // weight as done and (max-val) as open, so partial progress counts fractionally. total/
-  // done/percent equal the old weighted figures, so the summary box stays identical.
-  function statsOf(nodes) {
-    let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0, dropped = 0;
-    for (const n of nodes) {
-      const w = getPriorityWeight(n.id);
-      let doneAmt, openAmt;
-      if (n.type === 'counter') {
-        const max = n.max || 0;
-        const val = Math.min(n.val || 0, max);
-        doneAmt = val * w;
-        openAmt = (max - val) * w;
-      } else {
-        doneAmt = n.done ? w : 0;
-        openAmt = n.done ? 0 : w;
-      }
-      // Dropped work stays in the denominator but leaves the open buckets: "still
-      // could happen" and "will not happen" are different facts. What a dropped
-      // counter already ticked off still counts as done - only the frozen
-      // remainder is recorded as never-happening (D3).
-      if (n.dropped) {
-        dropped += openAmt;
-        if (n.unplanned) unplannedDone += doneAmt; else plannedDone += doneAmt;
-      }
-      else if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
-      else { plannedDone += doneAmt; plannedOpen += openAmt; }
-    }
-    const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen + dropped;
-    const done = plannedDone + unplannedDone;
-    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, dropped, total, done, percent };
-  }
+  const statsOf = nodes => weightedBuckets(nodes, n => getPriorityWeight(n.id));
 
   const global = statsOf(leaves);
   const perBranch = {};
@@ -16746,17 +16752,7 @@ function _statsLegend(hasUnplanned, hasDropped = false) {
     const group = document.createElement('span');
     group.className = 'stats-legend-states';
     for (const st of states) {
-      const item = document.createElement('span');
-      item.className = 'stats-legend-item';
-      const dot = document.createElement('span');
-      dot.className = 'stats-legend-dot';
-      dot.style.background = cat.color;
-      dot.style.opacity = st.opacity;
-      item.appendChild(dot);
-      const label = document.createElement('span');
-      label.textContent = t(st.key);
-      item.appendChild(label);
-      group.appendChild(item);
+      group.appendChild(_statsLegendItem('span', cat.color, t(st.key), { opacity: st.opacity }));
     }
     wrap.appendChild(group);
   }
@@ -16767,17 +16763,7 @@ function _statsLegend(hasUnplanned, hasDropped = false) {
     wrap.appendChild(document.createElement('span'));
     const group = document.createElement('span');
     group.className = 'stats-legend-states';
-    const item = document.createElement('span');
-    item.className = 'stats-legend-item';
-    const dot = document.createElement('span');
-    dot.className = 'stats-legend-dot';
-    dot.style.background = 'var(--stats-dropped)';
-    dot.style.opacity = 0.55;
-    item.appendChild(dot);
-    const label = document.createElement('span');
-    label.textContent = t('stats.dropped');
-    item.appendChild(label);
-    group.appendChild(item);
+    group.appendChild(_statsLegendItem('span', 'var(--stats-dropped)', t('stats.dropped'), { opacity: 0.55 }));
     wrap.appendChild(group);
   }
   return wrap;
@@ -16878,6 +16864,22 @@ function _statsBarSeg(widthPct, bgColor, hatch) {
 
 // Neutral status legend (solid = done, faded = open, hatched = unplanned) - decodes the
 // shading shared by every branch-tinted bar.
+// One legend entry: a swatch in `color` and its label. `opacity` and `hatch`
+// shade the swatch the way the bar segment it names is shaded.
+function _statsLegendItem(tag, color, text, { opacity, hatch = false } = {}) {
+  const item = document.createElement(tag);
+  item.className = 'stats-legend-item';
+  const dot = document.createElement('span');
+  dot.className = 'stats-legend-dot' + (hatch ? ' stats-seg-hatch' : '');
+  dot.style.background = color;
+  if (opacity !== undefined) dot.style.opacity = opacity;
+  item.appendChild(dot);
+  const label = document.createElement('span');
+  label.textContent = text;
+  item.appendChild(label);
+  return item;
+}
+
 function _statsStatusLegend(hasUnplanned, hasDropped = false) {
   const items = [
     { key: 'stats.legendDone',      opacity: 1,   hatch: false },
@@ -16888,17 +16890,9 @@ function _statsStatusLegend(hasUnplanned, hasDropped = false) {
   const wrap = document.createElement('div');
   wrap.className = 'stats-bar-legend';
   for (const it of items) {
-    const row = document.createElement('div');
-    row.className = 'stats-legend-item';
-    const dot = document.createElement('span');
-    dot.className = 'stats-legend-dot' + (it.hatch ? ' stats-seg-hatch' : '');
-    dot.style.background = it.dropped ? 'var(--stats-dropped)' : 'var(--text-placeholder)';
-    dot.style.opacity = it.opacity;
-    row.appendChild(dot);
-    const label = document.createElement('span');
-    label.textContent = t(it.key);
-    row.appendChild(label);
-    wrap.appendChild(row);
+    wrap.appendChild(_statsLegendItem('div',
+      it.dropped ? 'var(--stats-dropped)' : 'var(--text-placeholder)', t(it.key),
+      { opacity: it.opacity, hatch: it.hatch }));
   }
   return wrap;
 }
@@ -17101,18 +17095,7 @@ function _renderStatsTimelineSection(leaves) {
   const legend = document.createElement('div');
   legend.className = 'stats-bar-legend stats-tl-legend';
   [['stats.tlDone', 'var(--stats-plan)'], ['stats.tlUnpl', 'var(--stats-unplan)']]
-    .forEach(([key, color]) => {
-      const item = document.createElement('div');
-      item.className = 'stats-legend-item';
-      const dot = document.createElement('span');
-      dot.className = 'stats-legend-dot';
-      dot.style.background = color;
-      item.appendChild(dot);
-      const label = document.createElement('span');
-      label.textContent = t(key);
-      item.appendChild(label);
-      legend.appendChild(item);
-    });
+    .forEach(([key, color]) => legend.appendChild(_statsLegendItem('div', color, t(key))));
   colEl.appendChild(legend);
 
   sec.appendChild(colEl);
@@ -17128,37 +17111,18 @@ function _renderStatsTimelineSection(leaves) {
 function _weekCompletion(data, branchId) {
   if (!data || !Array.isArray(data.nodes)) return null;
   const byId = new Map(data.nodes.map(n => [n.id, n]));
-  const weightOf = (n) => n.priority === 'critical' ? 5 : n.priority === 'high' ? 3 : 1;
-  let plannedDone = 0, plannedOpen = 0, unplannedDone = 0, unplannedOpen = 0, dropped = 0;
-  for (const n of data.nodes) {
-    if (n._editing || n.type === 'branch' || n.type === 'center') continue;
-    if (branchId && n.branch !== branchId) continue;
-    const hasActiveChild = (n.children || []).some(cid => {
+  const leaves = data.nodes.filter(n => {
+    if (n._editing || n.type === 'branch' || n.type === 'center') return false;
+    if (branchId && n.branch !== branchId) return false;
+    // count leaves only, matching computeWeekStats()
+    return !(n.children || []).some(cid => {
       const c = byId.get(cid);
       return c && !c._editing;
     });
-    if (hasActiveChild) continue; // count leaves only, matching computeWeekStats()
-    const w = weightOf(n);
-    let doneAmt, openAmt;
-    if (n.type === 'counter') {
-      const max = n.max || 0;
-      const val = Math.min(n.val || 0, max);
-      doneAmt = val * w; openAmt = (max - val) * w;
-    } else {
-      doneAmt = n.done ? w : 0; openAmt = n.done ? 0 : w;
-    }
-    if (n.dropped) {
-      dropped += openAmt;
-      if (n.unplanned) unplannedDone += doneAmt; else plannedDone += doneAmt;
-    }
-    else if (n.unplanned) { unplannedDone += doneAmt; unplannedOpen += openAmt; }
-    else { plannedDone += doneAmt; plannedOpen += openAmt; }
-  }
-  const total = plannedDone + plannedOpen + unplannedDone + unplannedOpen + dropped;
-  if (total <= 0) return null; // blank week → an empty column in the diagram
-  const done = plannedDone + unplannedDone;
-  return { plannedDone, plannedOpen, unplannedDone, unplannedOpen, dropped,
-           total, done, percent: Math.round((done / total) * 100) };
+  });
+  // Reads n.priority directly - the global nodeMap knows only the open week.
+  const stats = weightedBuckets(leaves, n => priorityWeightOf(n.priority));
+  return stats.total > 0 ? stats : null; // blank week → an empty column in the diagram
 }
 
 // Cumulative Flow Diagram across the last N ISO weeks (oldest → current). Each
