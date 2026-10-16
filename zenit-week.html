@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-2NKSqlYDiOzZdS8OVeMsRRGu+tyiz0SRQ6VZ4NsJxeQ='
+               'sha256-AEDXLVB8k8oQHy6Vult8HiigDMvo8K2XMgTsTp1OA28='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -12036,14 +12036,7 @@ function validateAndRepair(data) {
   data.nodes.forEach(n => {
     if (!Array.isArray(n.children) || n.children.length < 2) return;
     const hasTickChild = n.children.some(cid => nodeMap.get(cid)?.tickChild);
-    if (hasTickChild) {
-      n.children.sort((aId, bId) => {
-        const a = nodeMap.get(aId), b = nodeMap.get(bId);
-        const ka = !a?.tickChild ? -1 : (a.tickIndex ?? 999);
-        const kb = !b?.tickChild ? -1 : (b.tickIndex ?? 999);
-        return ka - kb;
-      });
-    }
+    if (hasTickChild) sortTickChildren(n, id => nodeMap.get(id));
   });
 
   return data;
@@ -12100,27 +12093,12 @@ function migrateDayCounters(data) {
     if (node.done) { node.done = false; delete node.doneAt; }
     const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
     days.forEach(dayIndex => {
-      const id = genId();
-      const child = {
-        id, type: 'activity', dayChild: true, dayIndex,
-        branch: node.branch, parent: node.id,
-        label: langLabels[dayIndex],
-        done: false, unplanned: node.unplanned || false,
-        priority: node.priority || null,
-        reusable: node.reusable || false,
-        children: [], _ts: Date.now(),
-      };
+      const child = childActivityOf(node, { dayChild: true, dayIndex, label: langLabels[dayIndex] });
       toAdd.push(child);
-      node.children.push(id);
+      node.children.push(child.id);
     });
     // Sort day-children in ISO week order (Mon first, Sun last)
-    node.children.sort((aId, bId) => {
-      const a = nodeMap.get(aId) || toAdd.find(n => n.id === aId);
-      const b = nodeMap.get(bId) || toAdd.find(n => n.id === bId);
-      const ka = !a?.dayChild ? -1 : (a.dayIndex === 0 ? 7 : (a.dayIndex ?? 8));
-      const kb = !b?.dayChild ? -1 : (b.dayIndex === 0 ? 7 : (b.dayIndex ?? 8));
-      return ka - kb;
-    });
+    sortDayChildren(node, id => nodeMap.get(id) || toAdd.find(n => n.id === id));
   });
   data.nodes = data.nodes.filter(n => !toRemove.has(n.id));
   toAdd.forEach(n => data.nodes.push(n));
@@ -15142,18 +15120,34 @@ function smoothPanToRevealNode(nodeId) {
   animatePanTo(cW / 2 - pos.x * zoom, cH / 2 - pos.y * zoom, nodeId, 350, positions);
 }
 
-function createDayChild(parentId, dayIndex) {
-  const parent = findNode(parentId);
-  const label = dayAbbr(dayIndex);
-  const id = genId();
-  const node = {
-    id, type: 'activity', dayChild: true, dayIndex,
-    branch: parent.branch, parent: parentId,
-    label, done: false, unplanned: parent.unplanned || false,
+// A new child activity of `parent`, inheriting the parent's branch and its
+// unplanned / priority / reusable flags. `fields` adds or overrides the rest.
+function childActivityOf(parent, fields) {
+  return {
+    id: genId(), type: 'activity',
+    branch: parent.branch, parent: parent.id,
+    done: false, unplanned: parent.unplanned || false,
     priority: parent.priority || null,
     reusable: parent.reusable || false,
     children: [], _ts: Date.now(),
+    ...fields,
   };
+}
+
+// Removes managed children `ids` from `parent` and from the week, burying them
+// so no merge revives them. The caller stamps the parent if its content changed.
+function removeChildNodes(parent, ids) {
+  tombstoneNodes(ids);
+  const removeSet = new Set(ids);
+  parent.children = parent.children.filter(id => !removeSet.has(id));
+  weekData.nodes = weekData.nodes.filter(n => !removeSet.has(n.id));
+  rebuildNodeMap();
+}
+
+function createDayChild(parentId, dayIndex) {
+  const parent = findNode(parentId);
+  const node = childActivityOf(parent, { dayChild: true, dayIndex, label: dayAbbr(dayIndex) });
+  const id = node.id;
   weekData.nodes.push(node);
   parent.children.push(id);
   rebuildNodeMap();
@@ -15239,10 +15233,7 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false, remap = null) 
     prevState.set(remap.to, prevState.get(remap.from));
     prevState.delete(remap.from);
   }
-  tombstoneNodes(dayChildIds);
-  weekData.nodes = weekData.nodes.filter(n => !dayChildIds.includes(n.id));
-  node.children = node.children.filter(id => !dayChildIds.includes(id));
-  rebuildNodeMap();
+  removeChildNodes(node, dayChildIds);
 
   const sortedDays = [...newDays].sort((a, b) => isoWeekPos(a) - isoWeekPos(b));
   const useChildren = sortedDays.length >= 2 || (keepAsChildren && sortedDays.length === 1);
@@ -15319,12 +15310,7 @@ function applyMagicLabel(nodeId) {
   const _nxVal = _nxMatch ? parseInt(_nxMatch[1], 10) : 0;
   const _wantsTicks = _nxVal >= 2 && parsedDays.size === 0;
   if (hasDayChildren && _wantsTicks) {
-    const dayIds = node.children.map(findNode).filter(n => n?.dayChild).map(n => n.id);
-    tombstoneNodes(dayIds);
-    const removeSet = new Set(dayIds);
-    node.children = node.children.filter(id => !removeSet.has(id));
-    weekData.nodes = weekData.nodes.filter(n => !removeSet.has(n.id));
-    rebuildNodeMap();
+    removeChildNodes(node, node.children.map(findNode).filter(n => n?.dayChild).map(n => n.id));
     touchNode(nodeId);
     hasDayChildren = false;
   }
@@ -15374,12 +15360,7 @@ function applyMagicLabel(nodeId) {
       .sort((a, b) => (a.tickIndex || 0) - (b.tickIndex || 0));
 
     if (existingTicks.length > tickCount) {
-      const toRemove = existingTicks.slice(tickCount).map(n => n.id);
-      tombstoneNodes(toRemove);
-      const removeSet = new Set(toRemove);
-      node.children = node.children.filter(id => !removeSet.has(id));
-      weekData.nodes = weekData.nodes.filter(n => !removeSet.has(n.id));
-      rebuildNodeMap();
+      removeChildNodes(node, existingTicks.slice(tickCount).map(n => n.id));
       touchNode(nodeId);
     } else if (existingTicks.length < tickCount) {
       const nextIdx = existingTicks.length > 0
@@ -15431,10 +15412,7 @@ function applyMagicLabel(nodeId) {
 function _removeLegacyCounter(node) {
   const counterNode = node.children.map(findNode).find(n => n && n.type === 'counter');
   if (!counterNode) return false;
-  tombstoneNodes([counterNode.id]);
-  node.children = node.children.filter(id => id !== counterNode.id);
-  weekData.nodes = weekData.nodes.filter(n => n.id !== counterNode.id);
-  rebuildNodeMap();
+  removeChildNodes(node, [counterNode.id]);
   touchNode(node.id);
   return true;
 }
@@ -15446,11 +15424,7 @@ function _purgeNxChildren(node) {
   let removed = _removeLegacyCounter(node);
   const tickIds = node.children.map(findNode).filter(n => n?.tickChild).map(n => n.id);
   if (tickIds.length > 0) {
-    tombstoneNodes(tickIds);
-    const removeSet = new Set(tickIds);
-    node.children = node.children.filter(id => !removeSet.has(id));
-    weekData.nodes = weekData.nodes.filter(n => !removeSet.has(n.id));
-    rebuildNodeMap();
+    removeChildNodes(node, tickIds);
     touchNode(node.id);
     removed = true;
   }
@@ -15462,26 +15436,19 @@ function _purgeNxChildren(node) {
 function createTickChild(parentId, tickIndex) {
   const parent = findNode(parentId);
   if (!parent) return null;
-  const id = genId();
-  const node = {
-    id, type: 'activity', tickChild: true, tickIndex,
-    branch: parent.branch, parent: parentId,
-    label: String(tickIndex),
-    done: false,
-    unplanned: parent.unplanned || false,
-    priority: parent.priority || null,
-    reusable: parent.reusable || false,
-    children: [], _ts: Date.now(),
-  };
+  const node = childActivityOf(parent, { tickChild: true, tickIndex, label: String(tickIndex) });
+  const id = node.id;
   weekData.nodes.push(node);
   parent.children.push(id);
   rebuildNodeMap();
   return id;
 }
 
-function sortTickChildren(node) {
+// `lookup` resolves an id against the data being sorted - the live week by
+// default; load-time repair and migration pass their own record's map.
+function sortTickChildren(node, lookup = findNode) {
   node.children.sort((aId, bId) => {
-    const a = findNode(aId), b = findNode(bId);
+    const a = lookup(aId), b = lookup(bId);
     const ka = !a?.tickChild ? -1 : (a.tickIndex ?? 999);
     const kb = !b?.tickChild ? -1 : (b.tickIndex ?? 999);
     return ka - kb;
@@ -15552,9 +15519,9 @@ function isoWeekPos(dayIndex) {
 }
 
 // Re-sorts a node's children by ISO week order (non-day first, then Mon–Sun, null last)
-function sortDayChildren(node) {
+function sortDayChildren(node, lookup = findNode) {
   node.children.sort((aId, bId) => {
-    const a = findNode(aId), b = findNode(bId);
+    const a = lookup(aId), b = lookup(bId);
     const ka = !a?.dayChild ? -1 : (a.dayIndex === 0 ? 7 : (a.dayIndex ?? 8));
     const kb = !b?.dayChild ? -1 : (b.dayIndex === 0 ? 7 : (b.dayIndex ?? 8));
     return ka - kb;
@@ -15810,17 +15777,9 @@ function startAddNode(parentId) {
   probeMark('add:start');
   takeSnapshot();
   probeMark('add:snapshot');
-  const branch = parent.branch || parent.id;
-  const id = genId();
-  const node = {
-    id, type: 'activity', branch, parent: parentId,
-    label: '', done: false, unplanned: parent.unplanned || false,
-    priority: parent.priority || null,
-    reusable: parent.reusable || false,
-    children: [],
-    _editing: true,
-    _ts: Date.now(),
-  };
+  // A branch is its own branch: its children carry its id.
+  const node = childActivityOf(parent, { branch: parent.branch || parent.id, label: '', _editing: true });
+  const id = node.id;
   weekData.nodes.push(node);
   rebuildNodeMap();
   parent.children.push(id);
