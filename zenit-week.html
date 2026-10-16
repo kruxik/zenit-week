@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-01HxiJEQ7Q06OBkdBy0221AXW3n4kIeK9MPHuWuaszg='
+               'sha256-eaqRGitMipzu06Mob+IV9a2dk+9Ij24vjTRv0vx8udw='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1313,7 +1313,12 @@
     white-space: nowrap;
   }
 
-  #sync-dropdown-last-sync {
+  /* The tip reads as a second status line under Last sync: what the red cloud
+     means and what, if anything, to do. Empty - and so gone - unless in error. */
+  #sync-dropdown-tip:empty { display: none; }
+
+  #sync-dropdown-last-sync,
+  #sync-dropdown-tip {
     font-size: 11px;
     color: var(--text-secondary);
     padding: 0 0 2px;
@@ -4402,7 +4407,9 @@
               <div id="sync-dropdown-email"></div>
             </div>
           </div>
+          <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
           <div id="sync-dropdown-last-sync">Last sync: -</div>
+          <div id="sync-dropdown-tip" role="status"></div>
           <div class="settings-separator"></div>
           <button type="button" role="menuitem" class="agenda-action-btn" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out</button>
         </div>
@@ -8520,6 +8527,35 @@ const SYNC_STATE_TITLE_KEYS = {
   error:        'sync.badge.error',
 };
 
+// The one-line tip the dropdown shows for each error message: either that the
+// app is already recovering, or the single step the user has to take.
+const SYNC_ERROR_TIP_KEYS = {
+  'sync.msg.reconnecting':         'sync.tip.reconnecting',
+  'sync.msg.failedSavedLocal':     'sync.tip.failedSavedLocal',
+  'sync.msg.failedUsingLocal':     'sync.tip.failedUsingLocal',
+  'sync.msg.failedNoFile':         'sync.tip.failedNoFile',
+  'sync.msg.driveInitFailed':      'sync.tip.driveInitFailed',
+  'sync.msg.initFailedRetry':      'sync.tip.initFailedRetry',
+  'sync.msg.signinFailedNetwork':  'sync.tip.signinFailedNetwork',
+  'sync.msg.signinFailedSecurity': 'sync.tip.signinFailedSecurity',
+  'sync.msg.importIncomplete':     'sync.tip.importIncomplete',
+};
+
+function syncErrorTipKey() {
+  if (syncStatus !== 'error') return null;
+  // Offline, every failure comes down to the same thing: the edits are parked
+  // on this device and leave on their own once the link is back.
+  if (isDefinitelyOffline()) return 'sync.tip.offline';
+  return SYNC_ERROR_TIP_KEYS[lastSyncMessageKey] || null;
+}
+
+function updateDropdownTip() {
+  const el = document.getElementById('sync-dropdown-tip');
+  if (!el) return;
+  const key = syncErrorTipKey();
+  el.textContent = key ? `${t('sync.issueLabel')}: ${t(key)}` : '';
+}
+
 // Re-render any sync UI text that's set imperatively, so language switches
 // (and first paint) display localized strings.
 function refreshSyncUiText() {
@@ -8531,6 +8567,7 @@ function refreshSyncUiText() {
     if (key) stateBtn.title = t(key);
   }
   updateDropdownSyncTime();
+  updateDropdownTip();
 }
 
 // Set when a photo exists but was skipped because the device had no link, so
@@ -9039,6 +9076,7 @@ function setSyncStatus(status, messageKey) {
   stateBtn.dataset.status = status;   // CSS swaps the cloud glyph off this
   const key = messageKey || SYNC_STATE_TITLE_KEYS[status];
   stateBtn.title = key ? t(key) : '';
+  updateDropdownTip();
 }
 
 // ─── TASK-08: First-sync session bootstrap ────────────────────────────────────
@@ -11548,6 +11586,8 @@ const TRANSLATIONS = {
     'sync.btnTitle':              'Sign in with Google to sync across devices. Your data is stored only in your own Google Drive - Zenit Week never sees or stores it.',
     'sync.stateAria':             'Sync options',
     'sync.lastSyncLabel':         'Last sync',
+    'sync.statusCaption':         'Sync status',
+    'sync.issueLabel':            'Issue',
     'sync.signOut':               'Sign out',
     'sync.signOutConfirm.title':      'Sign out?',
     'sync.signOutConfirm.body':       'Your data stays in your Google Drive, and your other devices stay signed in.\nWhat to do with the local copy on this device?\nAny pending changes will sync before signing out.',
@@ -11577,6 +11617,16 @@ const TRANSLATIONS = {
     'sync.msg.importSynced':      'Imported data synced to Drive',
     'sync.msg.importIncomplete':  'Import sync incomplete - will retry on next sign-in',
     'sync.msg.resyncing':         'New data detected - resyncing from Drive…',
+    'sync.tip.reconnecting':            'Reconnecting automatically',
+    'sync.tip.offline':                 'Offline - changes upload when back online',
+    'sync.tip.failedSavedLocal':        'Saved locally - uploads on next sync',
+    'sync.tip.failedUsingLocal':        'Showing local data - retrying',
+    'sync.tip.failedNoFile':            'Drive file unreachable - retrying',
+    'sync.tip.driveInitFailed':         'Check your connection, then reload',
+    'sync.tip.initFailedRetry':         'Sign out and sign in again',
+    'sync.tip.signinFailedNetwork':     'Check your connection and sign in again',
+    'sync.tip.signinFailedSecurity':    'Sign-in interrupted - try again',
+    'sync.tip.importIncomplete':        'Import not fully uploaded - sign in again to finish',
   },
   cs: {
     'nav.prev':                   'Předchozí',
@@ -11918,6 +11968,8 @@ const TRANSLATIONS = {
     'sync.btnTitle':              'Přihlas se přes Google a synchronizuj data mezi zařízeními. Data se ukládají pouze na tvém Disku Google - Zenit Week k nim nemá přístup.',
     'sync.stateAria':             'Možnosti synchronizace',
     'sync.lastSyncLabel':         'Aktualizace',
+    'sync.statusCaption':         'Stav synchronizace',
+    'sync.issueLabel':            'Problém',
     'sync.signOut':               'Odhlásit se',
     'sync.signOutConfirm.title':      'Odhlásit se?',
     'sync.signOutConfirm.body':       'Tvoje data zůstávají na tvém Disku Google a ostatní zařízení zůstanou přihlášená.\nVyber, co udělat s lokální kopií na tomto zařízení?\nNesynchronizované změny se před odhlášením nahrají.',
@@ -11947,6 +11999,16 @@ const TRANSLATIONS = {
     'sync.msg.importSynced':      'Importovaná data synchronizována s Diskem Google',
     'sync.msg.importIncomplete':  'Synchronizace importu neúplná - zkusím to při příštím přihlášení',
     'sync.msg.resyncing':         'Detekována nová data - synchronizuji z Disku Google…',
+    'sync.tip.reconnecting':            'Automaticky se připojuji',
+    'sync.tip.offline':                 'Offline - změny se nahrají po připojení',
+    'sync.tip.failedSavedLocal':        'Uloženo lokálně - nahraje se při další synchronizaci',
+    'sync.tip.failedUsingLocal':        'Zobrazuji lokální data - zkouším znovu',
+    'sync.tip.failedNoFile':            'Soubor na Disku nedostupný - zkouším znovu',
+    'sync.tip.driveInitFailed':         'Zkontroluj připojení a obnov aplikaci',
+    'sync.tip.initFailedRetry':         'Odhlas se a znovu přihlas',
+    'sync.tip.signinFailedNetwork':     'Zkontroluj připojení a přihlas se znovu',
+    'sync.tip.signinFailedSecurity':    'Přihlášení přerušeno - zkus to znovu',
+    'sync.tip.importIncomplete':        'Import se nenahrál celý - přihlas se znovu',
   },
 };
 
@@ -25302,7 +25364,10 @@ document.getElementById('sync-btn').addEventListener('click', () => { startSignI
   stateBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     dropdown.classList.toggle('visible');
-    if (dropdown.classList.contains('visible')) updateDropdownSyncTime();
+    if (dropdown.classList.contains('visible')) {
+      updateDropdownSyncTime();
+      updateDropdownTip();   // offline-ness can change without a status change
+    }
   });
 
   signoutBtn.addEventListener('click', () => {
