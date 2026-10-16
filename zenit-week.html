@@ -1959,15 +1959,14 @@
     z-index: 2000;
     opacity: 0;
     pointer-events: none;
-    transform: translateY(20px);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+    /* Fade only: a full-height window has no room to rise into. */
+    transition: opacity 0.3s ease;
   }
   .app-panel.visible,
   .app-panel.active {
     display: flex;
     opacity: 1;
     pointer-events: all;
-    transform: translateY(0);
   }
 
   @media (min-width: 768px) {
@@ -1981,10 +1980,8 @@
       border: 1px solid var(--border-default);
       border-radius: 8px;
       box-shadow: 0 20px 60px var(--shadow-xl);
-      transform: translateX(-50%) translateY(20px);
+      transform: translateX(-50%);
     }
-    .app-panel.visible,
-    .app-panel.active { transform: translateX(-50%) translateY(0); }
   }
 
   .app-panel-header {
@@ -2442,6 +2439,7 @@
     right: 12px;
     width: 300px;
     border-radius: 8px;
+    animation: fadeIn 0.12s ease-out;
   }
   /* mobile: slide-up panel anchored to bottom */
   #quick-add-panel.is-mobile {
@@ -2892,14 +2890,13 @@
   /* ─── Pre-paint view state ───────────────────────────────────────────────── */
   /* Set by inline <head> script from localStorage so the correct view is
      visible on first paint, avoiding a mindmap→agenda flash on refresh. */
-  /* .app-panel starts hidden (opacity 0, translateY, no pointer events), so the
+  /* .app-panel starts hidden (opacity 0, no pointer events), so the
      pre-paint rule has to open it fully, not just flip `display`. */
   html[data-view="agenda"] #agenda-view,
   html[data-view="stats"] #stats-panel {
     display: flex;
     opacity: 1;
     pointer-events: all;
-    transform: translateY(0);
   }
   @media (max-width: 767px) {
     html[data-view="agenda"] #canvas-container,
@@ -2908,7 +2905,6 @@
   @media (min-width: 768px) {
     html[data-view="agenda"] #agenda-view,
     html[data-view="stats"] #stats-panel {
-      transform: translateX(-50%) translateY(0);
       opacity: 1;
       pointer-events: all;
     }
@@ -3203,6 +3199,7 @@
     min-width: 100px;
     box-shadow: 0 8px 32px var(--shadow-md);
     display: none;
+    animation: fadeIn 0.1s ease-out;
   }
   #ctx-reschedule-submenu.visible,
   #day-filter-menu.visible { display: block; }
