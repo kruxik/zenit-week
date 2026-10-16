@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-jqa6kYuBYrFFSCKNMGa2isYObogCRfT0TUfYvyda6A8='
+               'sha256-VmHfahB48gFSXctYhAl5ctZ7AOEfv9O8XfWxk0/CFNg='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -12802,7 +12802,12 @@ function findReuseTarget(source, destNodes, destParentId, lookup) {
   return hit || null;
 }
 
-async function transferUnfinished() {
+// Shared engine of Transfer Unfinished and Transfer Reusable: copies the chosen
+// previous-week nodes into the current week, merging into a same-named node
+// where one already sits, and wires them in their previous-week order.
+// `pickIds(prevData, prevById, branchIds)` returns the old ids to carry;
+// `prepareCopy(copy, oldId)` strips what must not travel with a fresh copy.
+async function transferFromPrevWeek(pickIds, prepareCopy) {
   const prevWeekKey = offsetWeek(currentWeekKey, -1);
   const prevData = await loadWeek(prevWeekKey);
   if (!prevData || !prevData.nodes) return;
@@ -12814,10 +12819,6 @@ async function transferUnfinished() {
   const branchIds = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
   const lookup = id => prevById.get(id);
 
-  // A dropped task is closed, not unfinished - declining to carry it forward is
-  // precisely what dropping it meant.
-  const candidates = prevData.nodes.filter(n => !n.done && !n.dropped && n.type !== 'branch');
-
   // Resolve parents before their children so name-merge can match against an
   // already-mapped destination parent.
   const depthOf = id => {
@@ -12825,45 +12826,37 @@ async function transferUnfinished() {
     while (cur && !branchIds.has(cur.parent)) { d++; cur = prevById.get(cur.parent); }
     return d;
   };
-  candidates.sort((a, b) => depthOf(a.id) - depthOf(b.id));
+  const oldIds = pickIds(prevData, prevById, branchIds).sort((a, b) => depthOf(a) - depthOf(b));
 
   const oldToNew = new Map();
   const newNodes = [];
 
   // 1. Create mapping and new node objects (top-down)
-  candidates.forEach(c => {
+  oldIds.forEach(oldId => {
+    const c = prevById.get(oldId);
+    if (!c) return;
     const destParentId = branchIds.has(c.parent) ? c.parent : oldToNew.get(c.parent);
     const existing = findReuseTarget(c, weekData.nodes, destParentId, lookup);
     if (existing) {
-      oldToNew.set(c.id, existing.id);
+      oldToNew.set(oldId, existing.id);
     } else {
       const id = genId();
       const newNode = {
         ...c,
         id,
-        prevId: c.id,
+        prevId: oldId,
         done: false,
         unplanned: false,
+        // Revives a dropped reusable task: a weekly recurring task must not be
+        // killed forever by one bad week. Same reasoning the unplanned flag gets.
         dropped: false,
         children: [],
         _ts: Date.now(),
       };
       delete newNode.droppedAt;
-      // A carried-forward copy is an ordinary task, not the occurrence it came
-      // from: keeping the pair would let a later materialisation mistake it for
-      // a delivery it had already made.
-      delete newNode.schedId;
-      delete newNode.schedDate;
-      // Transferring an unplanned task re-plans it: it was chosen for this week,
-      // so the badge and its arrival stamp don't carry over.
-      delete newNode.unplannedAt;
-      if (newNode.type === 'counter') newNode.val = 0;
-      if (newNode.tickChild) {
-        delete newNode.doneAt;
-        delete newNode.donedOn;
-      }
+      prepareCopy(newNode, oldId);
       newNodes.push(newNode);
-      oldToNew.set(c.id, id);
+      oldToNew.set(oldId, id);
     }
   });
 
@@ -12917,6 +12910,28 @@ async function transferUnfinished() {
   endAtomicOp();
   renderIfVisible();
   applyAutoLayout();
+}
+
+function transferUnfinished() {
+  return transferFromPrevWeek(
+    // A dropped task is closed, not unfinished - declining to carry it forward is
+    // precisely what dropping it meant.
+    prevData => prevData.nodes.filter(n => !n.done && !n.dropped && n.type !== 'branch').map(n => n.id),
+    copy => {
+      // A carried-forward copy is an ordinary task, not the occurrence it came
+      // from: keeping the pair would let a later materialisation mistake it for
+      // a delivery it had already made.
+      delete copy.schedId;
+      delete copy.schedDate;
+      // Transferring an unplanned task re-plans it: it was chosen for this week,
+      // so the badge and its arrival stamp don't carry over.
+      delete copy.unplannedAt;
+      if (copy.type === 'counter') copy.val = 0;
+      if (copy.tickChild) {
+        delete copy.doneAt;
+        delete copy.donedOn;
+      }
+    });
 }
 
 // ─── Materialisation ──────────────────────────────────────────────────────────
@@ -13203,155 +13218,51 @@ async function materialiseOpenWeek() {
   if (currentView === 'agenda') renderAgenda();
 }
 
-async function transferReusable() {
-  const prevWeekKey = offsetWeek(currentWeekKey, -1);
-  const prevData = await loadWeek(prevWeekKey);
-  if (!prevData || !prevData.nodes) return;
+function transferReusable() {
+  let ancestorIds;
+  return transferFromPrevWeek(
+    (prevData, prevById, branches) => {
+      // 1. Collect reusable activity nodes + their managed leaf children
+      //    (legacy counter, day-children, tick-children).
+      const reusableIds = new Set(prevData.nodes.filter(n => n.reusable === true).map(n => n.id));
+      const candidateIds = new Set(prevData.nodes
+        .filter(n => n.reusable === true ||
+          (n.type === 'counter' && reusableIds.has(n.parent)) ||
+          (n.dayChild === true && reusableIds.has(n.parent)) ||
+          (n.tickChild === true && reusableIds.has(n.parent)))
+        .map(n => n.id)
+      );
 
-  beginAtomicOp();
-
-  takeSnapshot();
-
-  const prevById = new Map(prevData.nodes.map(n => [n.id, n]));
-  const branches = new Set(prevData.nodes.filter(n => n.type === 'branch').map(n => n.id));
-
-  // 1. Collect reusable activity nodes + their managed leaf children
-  //    (legacy counter, day-children, tick-children).
-  const reusableIds = new Set(prevData.nodes.filter(n => n.reusable === true).map(n => n.id));
-  const candidateIds = new Set(prevData.nodes
-    .filter(n => n.reusable === true ||
-      (n.type === 'counter' && reusableIds.has(n.parent)) ||
-      (n.dayChild === true && reusableIds.has(n.parent)) ||
-      (n.tickChild === true && reusableIds.has(n.parent)))
-    .map(n => n.id)
-  );
-
-  // 2. Walk up parent chains to find non-reusable ancestor shells needed
-  //    to bridge the gap between a branch and a reusable subtree.
-  const ancestorIds = new Set();
-  candidateIds.forEach(id => {
-    const node = prevById.get(id);
-    if (!node) return;
-    let parentId = node.parent;
-    while (parentId && !branches.has(parentId) && !candidateIds.has(parentId)) {
-      if (!ancestorIds.has(parentId)) {
-        ancestorIds.add(parentId);
-        // Continue walking up from this ancestor
-        const ancestor = prevById.get(parentId);
-        parentId = ancestor ? ancestor.parent : null;
+      // 2. Walk up parent chains to find non-reusable ancestor shells needed
+      //    to bridge the gap between a branch and a reusable subtree.
+      ancestorIds = new Set();
+      candidateIds.forEach(id => {
+        const node = prevById.get(id);
+        if (!node) return;
+        let parentId = node.parent;
+        while (parentId && !branches.has(parentId) && !candidateIds.has(parentId)) {
+          if (!ancestorIds.has(parentId)) {
+            ancestorIds.add(parentId);
+            // Continue walking up from this ancestor
+            const ancestor = prevById.get(parentId);
+            parentId = ancestor ? ancestor.parent : null;
+          } else {
+            break; // already recorded, chain already walked
+          }
+        }
+      });
+      return [...ancestorIds, ...candidateIds];
+    },
+    (copy, oldId) => {
+      delete copy.doneAt;
+      delete copy.unplannedAt;
+      if (ancestorIds.has(oldId)) {
+        delete copy.reusable; // shell - not marked reusable
       } else {
-        break; // already recorded, chain already walked
-      }
-    }
-  });
-
-  // 3. Build combined ordered list: ancestors (top-down by depth) first, then candidates
-  //    Top-down ordering ensures parents exist in oldToNew before their children are wired.
-  function depthOf(id) {
-    let d = 0;
-    let cur = prevById.get(id);
-    while (cur && !branches.has(cur.parent)) {
-      d++;
-      cur = prevById.get(cur.parent);
-    }
-    return d;
-  }
-  // Sort the whole set top-down so a parent is always mapped before its
-  // children - required for name-merge to match against a resolved parent.
-  const allOldIds = [...ancestorIds, ...candidateIds].sort((a, b) => depthOf(a) - depthOf(b));
-
-  const lookup = id => prevById.get(id);
-  const oldToNew = new Map();
-  const newNodes = [];
-
-  // 4. Create mapping and new node objects (top-down)
-  allOldIds.forEach(oldId => {
-    const c = prevById.get(oldId);
-    if (!c) return;
-    const isAncestor = ancestorIds.has(oldId);
-
-    const destParentId = branches.has(c.parent) ? c.parent : oldToNew.get(c.parent);
-    const existing = findReuseTarget(c, weekData.nodes, destParentId, lookup);
-    if (existing) {
-      oldToNew.set(oldId, existing.id);
-    } else {
-      const id = genId();
-      const newNode = {
-        ...c,
-        id,
-        prevId: oldId,
-        done: false,
-        unplanned: false,
-        children: [],
-        _ts: Date.now(),
-      };
-      delete newNode.doneAt;
-      delete newNode.unplannedAt;
-      // A weekly recurring task must not be killed forever by one bad week.
-      // Same reasoning the unplanned flag already gets.
-      newNode.dropped = false;
-      delete newNode.droppedAt;
-      if (isAncestor) {
-        delete newNode.reusable; // shell - not marked reusable
-      } else {
-        newNode.reusable = true;
-        if (newNode.type === 'counter') { newNode.val = 0; newNode.ticks = []; }
-        if (newNode.dayChild) { newNode.done = false; delete newNode.doneAt; }
-      }
-      newNodes.push(newNode);
-      oldToNew.set(oldId, id);
-    }
-  });
-
-  // 5. Add new nodes to weekData (children wired below in original order)
-  newNodes.forEach(newNode => weekData.nodes.push(newNode));
-
-  // 6. Wire hierarchy by iterating old parent.children arrays to preserve visual order
-  const wiredParentIds = new Set();
-  prevData.nodes.forEach(oldParent => {
-    if (!oldParent.children?.length) return;
-
-    const targetParent = branches.has(oldParent.id)
-      ? weekData.nodes.find(n => n.id === oldParent.id)
-      : weekData.nodes.find(n => n.id === oldToNew.get(oldParent.id));
-    if (!targetParent) return;
-
-    oldParent.children.forEach(oldChildId => {
-      const newChildId = oldToNew.get(oldChildId);
-      if (!newChildId) return;
-      const childNode = weekData.nodes.find(n => n.id === newChildId);
-      if (!childNode) return;
-      childNode.parent = targetParent.id;
-      if (!targetParent.children.includes(newChildId)) {
-        targetParent.children.push(newChildId);
+        copy.reusable = true;
+        if (copy.type === 'counter') { copy.val = 0; copy.ticks = []; }
       }
     });
-
-    wiredParentIds.add(targetParent.id);
-    const oldPos = new Map();
-    oldParent.children.forEach((cid, i) => oldPos.set(cid, i));
-    targetParent.children.sort((a, b) => {
-      const na = weekData.nodes.find(n => n.id === a);
-      const nb = weekData.nodes.find(n => n.id === b);
-      // Transferred nodes (matched by prevId) sort by their prev-week position.
-      // Unmatched nodes - those created manually in this week - have no prev-week
-      // position; anchor them to the front so transferred nodes land below them
-      // instead of jumping to the top (stable sort keeps their relative order).
-      const pa = na?.prevId != null && oldPos.has(na.prevId) ? oldPos.get(na.prevId) : -Infinity;
-      const pb = nb?.prevId != null && oldPos.has(nb.prevId) ? oldPos.get(nb.prevId) : -Infinity;
-      return pa - pb;
-    });
-  });
-  rebuildNodeMap();
-  orderTransferredDayAndTicks(wiredParentIds);
-
-  // Merging into an existing parent can flip its done/unplanned status.
-  newNodes.forEach(n => { syncStatusUp(n.id, 'done'); syncStatusUp(n.id, 'unplanned'); });
-
-  await saveWeek(currentWeekKey, weekData);
-  endAtomicOp();
-  renderIfVisible();
-  applyAutoLayout();
 }
 
 async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
