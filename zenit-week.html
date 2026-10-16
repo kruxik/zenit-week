@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-eaqRGitMipzu06Mob+IV9a2dk+9Ij24vjTRv0vx8udw='
+               'sha256-PDpMHnUWMKd49yHH88YEjFUCSrTjZpEpa2CvXlJMldA='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -1236,30 +1236,31 @@
     #sync-state-btn[data-status="syncing"] .sync-glyph-syncing { animation: none; }
   }
 
+  /* A popup dialog hung under the cloud: the shared .dialog-shell surface and
+     caption bar, positioned like the toolbar's other dropdowns. */
   #sync-dropdown {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    background: var(--settings-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
     box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
-    padding: 12px 14px;
     z-index: 1001;
     min-width: 264px;
     max-width: 320px;
     display: none;
     flex-direction: column;
-    gap: 6px;
     animation: fadeIn 0.12s ease-out;
   }
 
   #sync-dropdown.visible { display: flex; }
 
-  /* An account menu, read top to bottom: who you are, when it last synced,
-     then what you can do. Everything is left-aligned against one edge - the
+  /* Account, sync status and Sign out are short lines that belong together;
+     the dialog's default 12px gap would scatter them. */
+  #sync-dropdown .dialog-body {
+    gap: 6px;
+    padding: 14px;
+  }
+
+  /* Read top to bottom: who you are, the sync status, then what you can do. Everything is left-aligned against one edge - the
      centred text and the two full-size glass buttons this replaced gave four
      competing alignments in a 264px box. */
   #sync-dropdown-account {
@@ -4399,19 +4400,28 @@
             <path d="M3 3l18 18"/>
           </svg>
         </button>
-        <div id="sync-dropdown" role="menu">
-          <div id="sync-dropdown-account">
-            <div id="sync-dropdown-avatar" aria-hidden="true"></div>
-            <div id="sync-dropdown-identity">
-              <div id="sync-dropdown-name"></div>
-              <div id="sync-dropdown-email"></div>
-            </div>
+        <div id="sync-dropdown" class="dialog-shell" role="dialog" aria-labelledby="sync-dropdown-title">
+          <div class="dialog-header">
+            <div class="dialog-title" id="sync-dropdown-title" data-i18n="sync.dialogTitle">Google Drive sync</div>
+            <button type="button" class="help-close-btn" id="sync-dropdown-close"
+              data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+              <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+            </button>
           </div>
-          <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
-          <div id="sync-dropdown-last-sync">Last sync: -</div>
-          <div id="sync-dropdown-tip" role="status"></div>
-          <div class="settings-separator"></div>
-          <button type="button" role="menuitem" class="agenda-action-btn" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out</button>
+          <div class="dialog-body">
+            <div id="sync-dropdown-account">
+              <div id="sync-dropdown-avatar" aria-hidden="true"></div>
+              <div id="sync-dropdown-identity">
+                <div id="sync-dropdown-name"></div>
+                <div id="sync-dropdown-email"></div>
+              </div>
+            </div>
+            <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
+            <div id="sync-dropdown-last-sync">Last sync: -</div>
+            <div id="sync-dropdown-tip" role="status"></div>
+            <div class="settings-separator"></div>
+            <button type="button" class="agenda-action-btn" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out</button>
+          </div>
         </div>
       </div>
     </div>
@@ -11586,6 +11596,7 @@ const TRANSLATIONS = {
     'sync.btnTitle':              'Sign in with Google to sync across devices. Your data is stored only in your own Google Drive - Zenit Week never sees or stores it.',
     'sync.stateAria':             'Sync options',
     'sync.lastSyncLabel':         'Last sync',
+    'sync.dialogTitle':           'Google Drive sync',
     'sync.statusCaption':         'Sync status',
     'sync.issueLabel':            'Issue',
     'sync.signOut':               'Sign out',
@@ -11968,6 +11979,7 @@ const TRANSLATIONS = {
     'sync.btnTitle':              'Přihlas se přes Google a synchronizuj data mezi zařízeními. Data se ukládají pouze na tvém Disku Google - Zenit Week k nim nemá přístup.',
     'sync.stateAria':             'Možnosti synchronizace',
     'sync.lastSyncLabel':         'Aktualizace',
+    'sync.dialogTitle':           'Synchronizace s Diskem Google',
     'sync.statusCaption':         'Stav synchronizace',
     'sync.issueLabel':            'Problém',
     'sync.signOut':               'Odhlásit se',
@@ -25360,6 +25372,12 @@ document.getElementById('sync-btn').addEventListener('click', () => { startSignI
   const stateBtn   = document.getElementById('sync-state-btn');
   const dropdown   = document.getElementById('sync-dropdown');
   const signoutBtn = document.getElementById('sync-dropdown-signout');
+  const closeBtn   = document.getElementById('sync-dropdown-close');
+
+  // A click inside the dialog keeps it open; only the X, Escape, Sign out or
+  // a click elsewhere closes it.
+  dropdown.addEventListener('click', (e) => e.stopPropagation());
+  closeBtn.addEventListener('click', () => dropdown.classList.remove('visible'));
 
   stateBtn.addEventListener('click', (e) => {
     e.stopPropagation();
