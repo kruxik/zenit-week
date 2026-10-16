@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-1WtE7r0yniobtDTeKlTKx7a/ifF/XPf0qkkBSZ+uPkw='
+               'sha256-xYygEcEkX3jGqXgPN1lX1ZRr5jGcqCokwiV8wOZH2K8='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -23024,6 +23024,11 @@ function recomputeZoomBounds(fitZoom) {
   ZOOM_MAX = Math.max(ZOOM_MAX_BASE, ZOOM_DEFAULT * 2);
   LOG_ZOOM_MIN = Math.log(ZOOM_MIN);
   LOG_ZOOM_MAX = Math.log(ZOOM_MAX);
+  positionZoomDefaultMarker();
+}
+
+// Places the default-zoom tick on the zoom track for the current bounds.
+function positionZoomDefaultMarker() {
   const defaultMarker = document.getElementById('zoom-default-marker');
   if (defaultMarker) {
     const defaultPct = (Math.log(ZOOM_DEFAULT) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
@@ -23084,6 +23089,12 @@ const REFIT_EXTENT_RATIO = 1.2;
 // Size of the laid-out map, independent of zoom, pan and the DOM - the same
 // bounding box fitMindmapView fits to. null when there is nothing to measure.
 function mindmapContentExtent(positions = computeLayout()) {
+  const b = mindmapNodeBounds(positions);
+  return b && { w: b.maxX - b.minX, h: b.maxY - b.minY };
+}
+
+// Bounding box of the laid-out nodes; null when there is nothing to measure.
+function mindmapNodeBounds(positions) {
   const nodes = Object.values(positions);
   if (nodes.length <= 1) return null;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -23095,7 +23106,7 @@ function mindmapContentExtent(positions = computeLayout()) {
     minY = Math.min(minY, p.y - hh);
     maxY = Math.max(maxY, p.y + hh);
   });
-  return { w: maxX - minX, h: maxY - minY };
+  return { minX, maxX, minY, maxY };
 }
 
 // Whether the map changed size enough to be worth re-fitting. Symmetric: a map
@@ -23181,20 +23192,11 @@ function fitMindmapView() {
   const bandH = band.bottom - band.top;
   const bandMidY = (band.top + band.bottom) / 2;
 
-  const positions = computeLayout();
-  const nodes = Object.values(positions);
-  if (nodes.length > 1) {
+  const bounds = mindmapNodeBounds(computeLayout());
+  if (bounds) {
+    const { minX, maxX, minY, maxY } = bounds;
     const pad = isMobile ? 20 : 60;
     const padY = mindmapFitPadY();
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    nodes.forEach(p => {
-      const hw = (p.w || 80) / 2;
-      const hh = (p.h || 36) / 2;
-      minX = Math.min(minX, p.x - hw);
-      maxX = Math.max(maxX, p.x + hw);
-      minY = Math.min(minY, p.y - hh);
-      maxY = Math.max(maxY, p.y + hh);
-    });
     _lastFitExtent = { w: maxX - minX, h: maxY - minY };
     const zoomCap = isMobile ? ZOOM_MAX_BASE : 0.6;
     const fitZoom = Math.min(
@@ -23304,13 +23306,15 @@ function zoomAt(cx, cy, factor) {
   }
 }
 
+// One wheel notch zooms the map 5% about the pointer.
+function wheelZoomAt(e) {
+  const rect = container.getBoundingClientRect();
+  zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.05 : (1 / 1.05));
+}
+
 container.addEventListener('wheel', (e) => {
   e.preventDefault();
-  const rect = container.getBoundingClientRect();
-  const cx = e.clientX - rect.left;
-  const cy = e.clientY - rect.top;
-  const factor = e.deltaY < 0 ? 1.05 : (1 / 1.05);
-  zoomAt(cx, cy, factor);
+  wheelZoomAt(e);
 }, { passive: false });
 
 // Trackpad pinch on macOS/Windows fires `wheel` with ctrlKey. While agenda is
@@ -23326,11 +23330,7 @@ document.addEventListener('wheel', (e) => {
   if (currentView !== 'agenda') return;
   e.preventDefault();
   if (window.innerWidth < 768) return;
-  const rect = container.getBoundingClientRect();
-  const cx = e.clientX - rect.left;
-  const cy = e.clientY - rect.top;
-  const factor = e.deltaY < 0 ? 1.05 : (1 / 1.05);
-  zoomAt(cx, cy, factor);
+  wheelZoomAt(e);
 }, { passive: false });
 
 container.addEventListener('pointerdown', (e) => {
@@ -26425,12 +26425,7 @@ window.addEventListener('load', async () => {
   }
   switchView(currentView); // apply persisted view (mindmap / agenda / stats)
 
-  // Position the default-zoom marker on the track
-  const defaultMarker = document.getElementById('zoom-default-marker');
-  if (defaultMarker) {
-    const defaultPct = (Math.log(ZOOM_DEFAULT) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
-    defaultMarker.style.left = defaultPct + '%';
-  }
+  positionZoomDefaultMarker();
 
   // OS-specific hotkey labels for Help
   const { mod, shift } = platformKeys();
