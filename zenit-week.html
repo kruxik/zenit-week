@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-tFo8ZIcwetjNR9aEaqNuynYbO+RK2UwAqBX3DuHC7Mg='
+               'sha256-Nld1TCaZqJhlu32xG6dCpTdItBdwEJ9GBVSeBlYCCgE='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -16620,31 +16620,25 @@ const STATS_PIE_FONT_SCALE = 1.3;
 // are populated by later tasks; T2 ships the shell + a live ① readout.
 let _statsPanelOpen = false;
 
-const _SVGNS = 'http://www.w3.org/2000/svg';
-function _svgEl(tag, attrs) {
-  const el = document.createElementNS(_SVGNS, tag);
-  for (const k in attrs) el.setAttribute(k, attrs[k]);
-  return el;
-}
 function _pct(part, whole) { return whole > 0 ? Math.round((part / whole) * 100) : 0; }
 
 // Four-arc donut of the global planned/unplanned × done/open split. Center shows
 // overall completion %. Global by design, so branch count never changes its shape.
 function _statsDonut(c) {
-  const svg = _svgEl('svg', {
+  const svg = svgEl('svg', {
     viewBox: `${-STATS_PIE_VIEW_R} ${-STATS_PIE_VIEW_R} ${2 * STATS_PIE_VIEW_R} ${2 * STATS_PIE_VIEW_R}`,
     class: 'stats-donut', role: 'img',
     'aria-label': `${c.percent}% ${t('todo.done')}`,
   });
   const pie = buildPieChart('stats-pie');
   svg.appendChild(pie.chart);
-  const num = _svgEl('text', {
+  const num = svgEl('text', {
     x: 0, y: -6, 'text-anchor': 'middle', 'dominant-baseline': 'central',
     class: 'stats-donut-center-num',
   });
   num.textContent = `${c.percent}%`;
   svg.appendChild(num);
-  const sub = _svgEl('text', {
+  const sub = svgEl('text', {
     x: 0, y: 30, 'text-anchor': 'middle', class: 'stats-donut-center-sub',
   });
   sub.textContent = t('todo.done');
@@ -17104,7 +17098,7 @@ function _buildCfdSvg(weeks) {
   const y = (v) => PAD_T + (1 - v / maxY) * plotH;
   const valOf = (w, key) => (w.stats ? (w.stats[key] || 0) : 0);
 
-  const svg = _svgEl('svg', {
+  const svg = svgEl('svg', {
     viewBox: `0 0 ${W} ${H}`, class: 'stats-trend-svg', role: 'img',
     'aria-label': _cfdSubText(n),
   });
@@ -17113,14 +17107,14 @@ function _buildCfdSvg(weeks) {
   // cumulative top of the band below and its own cumulative top. Wrapped in a group
   // at 70% opacity so the fills sit back a touch - grid, axes and the scope line stay
   // at full strength.
-  const areas = _svgEl('g', { opacity: 0.7 });
+  const areas = svgEl('g', { opacity: 0.7 });
   svg.appendChild(areas);
   let lower = weeks.map(() => 0);
   for (const band of STATS_SPLIT_BANDS) {
     const upper = weeks.map((w, i) => lower[i] + valOf(w, band.key));
     const top = upper.map((v, i) => `${x(i)},${y(v)}`);
     const bot = lower.map((v, i) => `${x(i)},${y(v)}`).reverse();
-    areas.appendChild(_svgEl('path', {
+    areas.appendChild(svgEl('path', {
       d: `M${top.join('L')}L${bot.join('L')}Z`,
       fill: band.color, opacity: band.opacity,
     }));
@@ -17128,7 +17122,7 @@ function _buildCfdSvg(weeks) {
   }
 
   // Scope line - crisp top edge of the stack (total weighted load each week).
-  svg.appendChild(_svgEl('polyline', {
+  svg.appendChild(svgEl('polyline', {
     points: weeks.map((w, i) => `${x(i)},${y(valOf(w, 'total'))}`).join(' '),
     fill: 'none', stroke: 'var(--text-faint)', 'stroke-width': 1.25,
     'stroke-linejoin': 'round', opacity: 0.55,
@@ -17137,11 +17131,11 @@ function _buildCfdSvg(weeks) {
   // Helper grid - drawn AFTER the areas so the guides float over the fills, but kept
   // as faint hairlines (sub-pixel width, low opacity) so they read as a whisper, not
   // a cage. Solid, not dotted: thin + transparent looks cleaner than dots on fills.
-  const hair = (attrs, op) => _svgEl('line', {
+  const hair = (attrs, op) => svgEl('line', {
     ...attrs, stroke: 'var(--text-faint)', 'stroke-width': 0.375, opacity: op,
   });
   const axisLabel = (val, yv, bold) => {
-    const lab = _svgEl('text', {
+    const lab = svgEl('text', {
       x: PAD_L - 5, y: yv + CAP / 2, 'text-anchor': 'end',
       fill: 'var(--text-faint)', 'font-size': FONT, 'font-weight': 600,
       'fill-opacity': bold ? 0.85 : 0.55,
@@ -17179,14 +17173,14 @@ function _buildCfdSvg(weeks) {
   const labelStep = n <= 4 ? 1 : n <= 8 ? 2 : 3;
   weeks.forEach((w, i) => {
     if ((n - 1 - i) % labelStep !== 0) return;
-    const wlab = _svgEl('text', {
+    const wlab = svgEl('text', {
       x: x(i), y: H - 6, 'text-anchor': 'middle',
       fill: 'var(--text-faint)', 'font-size': FONT, 'font-weight': 600,
     });
     wlab.textContent = t('stats.weekPrefix') + w.week;
     svg.appendChild(wlab);
     if (i === n - 1) {
-      svg.appendChild(_svgEl('circle', {
+      svg.appendChild(svgEl('circle', {
         cx: x(i), cy: H - 2.5, r: 1.6, fill: 'var(--accent-primary)',
       }));
     }
