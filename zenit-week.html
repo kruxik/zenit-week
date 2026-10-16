@@ -3684,12 +3684,9 @@
     max-width: calc(100vw - 40px);
     display: flex;
     flex-direction: column;
-    transform: translateY(12px);
-    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  }
-  #app-confirm-overlay.visible #app-confirm-dialog,
-  #send-future-overlay.visible #send-future-dialog {
-    transform: translateY(0);
+    /* The shared popup entrance. It restarts on every open because the overlay
+       around it flips from display:none, which a transition would never see. */
+    animation: fadeIn 0.12s ease-out;
   }
   .dialog-actions .agenda-action-btn,
   #settings-dropdown .agenda-action-btn,
