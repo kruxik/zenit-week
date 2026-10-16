@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-OuWOx094BSZjnDk/CXyDsMXPbNAyWo9qOdvKAWD7tXQ='
+               'sha256-tFo8ZIcwetjNR9aEaqNuynYbO+RK2UwAqBX3DuHC7Mg='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -21690,52 +21690,47 @@ function renderAgendaStrip() {
     strip.appendChild(sep);
   }
 
+  // One tab. `key` is what agendaActiveTab holds for it - 'overdue', 'later' or
+  // a numeric weekday - and is compared strictly; dataset.tab is its string.
+  function addTab(key, text, extraClass = '') {
+    const btn = document.createElement('button');
+    btn.className = 'agenda-tab' + (agendaActiveTab === key ? ' active' : '') + extraClass;
+    btn.dataset.tab = String(key);
+    btn.textContent = text;
+    btn.addEventListener('click', () => { agendaActiveTab = key; renderAgenda(); });
+    strip.appendChild(btn);
+    // Scroll active tab into view
+    if (agendaActiveTab === key) {
+      requestAnimationFrame(() => scrollAgendaTabIntoView(strip, btn));
+    }
+    return btn;
+  }
+
   // Overdue tab - current week only; see isCurrentWeekOpen.
   if (onCurrentWeek) {
-    const overdueBtn = document.createElement('button');
-    overdueBtn.className = 'agenda-tab' + (agendaActiveTab === 'overdue' ? ' active' : '');
-    overdueBtn.dataset.tab = 'overdue';
-    const overdueLabel = document.createTextNode(t('agenda.overdue'));
-    overdueBtn.appendChild(overdueLabel);
+    const overdueBtn = addTab('overdue', t('agenda.overdue'));
     if (overdueCount > 0) {
       const badge = document.createElement('span');
       badge.className = 'agenda-overdue-badge';
       badge.textContent = String(overdueCount);
       overdueBtn.appendChild(badge);
     }
-    overdueBtn.addEventListener('click', () => { agendaActiveTab = 'overdue'; renderAgenda(); });
-    strip.appendChild(overdueBtn);
-
-    // Scroll overdue tab into view
-    if (agendaActiveTab === 'overdue') {
-      requestAnimationFrame(() => scrollAgendaTabIntoView(strip, overdueBtn));
-    }
   }
 
   // Day tabs in ISO week order
   AGENDA_DAY_ORDER.forEach(dayIdx => {
     addSeparator();
-
-    const btn = document.createElement('button');
     // Today's dot, like the Overdue tab and the week chip, only means something
     // in the week today falls in; elsewhere it marked an arbitrary weekday.
     const isToday = onCurrentWeek && dayIdx === new Date().getDay();
-    btn.className = 'agenda-tab' + (agendaActiveTab === dayIdx ? ' active' : '') + (isToday ? ' agenda-tab-today' : '');
-    btn.dataset.tab = String(dayIdx);
     // Off-week the face carries the date instead of the weekday; the tabs keep
     // their fixed Mon→Sun order either way, so nothing about the day is lost.
-    btn.textContent = onCurrentWeek ? langLabels[dayIdx] : formatTabDate(dayIdx);
+    const btn = addTab(dayIdx, onCurrentWeek ? langLabels[dayIdx] : formatTabDate(dayIdx),
+      isToday ? ' agenda-tab-today' : '');
     // The face drops the weekday off-week, so the accessible name keeps it.
     if (!onCurrentWeek) {
       const langFull = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
       btn.setAttribute('aria-label', `${langFull[dayIdx]} ${formatTabDate(dayIdx)}`);
-    }
-    btn.addEventListener('click', () => { agendaActiveTab = dayIdx; renderAgenda(); });
-    strip.appendChild(btn);
-
-    // Scroll active tab into view
-    if (agendaActiveTab === dayIdx) {
-      requestAnimationFrame(() => scrollAgendaTabIntoView(strip, btn));
     }
   });
 
@@ -21744,15 +21739,7 @@ function renderAgendaStrip() {
   // added to the strip's staleness key: only the active tab and the language
   // change what it draws, and both are already in it.
   addSeparator();
-  const laterBtn = document.createElement('button');
-  laterBtn.className = 'agenda-tab' + (agendaActiveTab === 'later' ? ' active' : '');
-  laterBtn.dataset.tab = 'later';
-  laterBtn.textContent = t('agenda.later');
-  laterBtn.addEventListener('click', () => { agendaActiveTab = 'later'; renderAgenda(); });
-  strip.appendChild(laterBtn);
-  if (agendaActiveTab === 'later') {
-    requestAnimationFrame(() => scrollAgendaTabIntoView(strip, laterBtn));
-  }
+  addTab('later', t('agenda.later'));
 }
 
 // Group heading inside an agenda list. Shared by the day tabs and the Later
