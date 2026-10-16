@@ -217,16 +217,10 @@
     --kbd-bg: #f1f3f4;
 
     /* Status badges */
-    --badge-done-bg: #e6f4ea;
-    --badge-done-text: #1e8e3e;
-    --badge-unplanned-bg: #FFF9DB;
-    --badge-unplanned-text: #E67700;
     /* Stats-panel accent - modern green/orange, shared by the donut, The Week and the CFD */
     --stats-plan: #15C9A0;
     --stats-unplan: #F5A524;
     --stats-dropped: #8A94A6;
-    --badge-progress-bg: #e8f0fe;
-    --badge-progress-text: #1a73e8;
 
     /* Node state colors (kept in sync with getThemeColors() in JS) */
     --node-done-bg: #EBEBEB;
@@ -342,16 +336,10 @@
     --kbd-bg: #2a2a2a;
 
     /* Status badges */
-    --badge-done-bg: #0f2e17;
-    --badge-done-text: #2ecc71;
-    --badge-unplanned-bg: #332600;
-    --badge-unplanned-text: #ffaa33;
     /* Stats-panel accent - modern green/orange, shared by the donut, The Week and the CFD */
     --stats-plan: #34E6BE;
     --stats-unplan: #FFB54D;
     --stats-dropped: #9AA4B8;
-    --badge-progress-bg: #0f1e3a;
-    --badge-progress-text: #4da3ff;
 
     /* Node state colors (kept in sync with getThemeColors() in JS) */
     --node-done-bg: #2c2c2c;
@@ -1733,9 +1721,9 @@
     padding: 2px 9px;
     border-radius: 8px;
   }
-  .daily-log-footer-badge.done     { background: var(--badge-done-bg); color: var(--badge-done-text); }
-  .daily-log-footer-badge.unplanned{ background: var(--badge-unplanned-bg); color: var(--badge-unplanned-text); }
-  .daily-log-footer-badge.progress  { background: var(--badge-progress-bg); color: var(--badge-progress-text); }
+  .daily-log-footer-badge.done     { background: var(--accent-success-bg); color: var(--accent-success-text); }
+  .daily-log-footer-badge.unplanned{ background: var(--accent-warning-bg); color: var(--accent-warning-text); }
+  .daily-log-footer-badge.progress  { background: var(--accent-progress-bg); color: var(--accent-primary); }
 
   .daily-log-empty {
     text-align: center;
@@ -1763,16 +1751,16 @@
     border-radius: 8px;
   }
   .daily-log-badge.done {
-    background: var(--badge-done-bg);
-    color: var(--badge-done-text);
+    background: var(--accent-success-bg);
+    color: var(--accent-success-text);
   }
   .daily-log-badge.unplanned {
-    background: var(--badge-unplanned-bg);
-    color: var(--badge-unplanned-text);
+    background: var(--accent-warning-bg);
+    color: var(--accent-warning-text);
   }
   .daily-log-badge.tick {
-    background: var(--badge-progress-bg);
-    color: var(--badge-progress-text);
+    background: var(--accent-progress-bg);
+    color: var(--accent-primary);
   }
   .daily-log-badge.dropped {
     background: color-mix(in srgb, var(--stats-dropped) 22%, transparent);
@@ -2394,8 +2382,8 @@
     margin-top: 14px;
     padding: 6px 12px;
     border-radius: 7px;
-    background: var(--badge-done-bg);
-    color: var(--badge-done-text);
+    background: var(--accent-success-bg);
+    color: var(--accent-success-text);
     font-size: 12.5px;
     font-weight: 600;
   }
