@@ -6,7 +6,7 @@
 import { describe, test, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import { _state, syncWeekFromDrive, pickDriveSurvivor, listAllDriveWeekFiles } from './setup.js';
+import { _state, syncWeekFromDrive, pickDriveSurvivor, listAllDriveWeekFiles, _uploadColorsToDrive } from './setup.js';
 
 const IDS_KEY = 'zenit-week-drive-file-ids';
 
@@ -250,5 +250,45 @@ describe('creating a week file that another device just created', () => {
     const id = await _state.resolveDriveFileId('2026-31');
     expect(id).toBe('mine');
     expect(calls.some(c => c.startsWith('delete:'))).toBe(false);
+  });
+});
+
+// The colours uploader's 404 branch named a variable that does not exist in
+// its scope, so the throw was swallowed by its own catch and the dead id was
+// kept: every retry PATCHed the same missing file until the attempts ran out.
+describe('a stale colours file id on upload', () => {
+  const seen = [];
+  const server = setupServer(
+    http.get('https://www.googleapis.com/drive/v3/files', () => {
+      seen.push({ kind: 'search' });
+      return HttpResponse.json({ files: [{ id: 'colors_fresh' }] });
+    }),
+    http.patch('https://www.googleapis.com/upload/drive/v3/files/:id', ({ params }) => {
+      seen.push({ kind: 'patch', id: params.id });
+      if (params.id === 'colors_gone') return new HttpResponse(null, { status: 404 });
+      return HttpResponse.json({ id: params.id });
+    }),
+  );
+
+  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  afterAll(() => server.close());
+  beforeEach(() => {
+    seen.length = 0;
+    _state.clearLocalStorage();
+    _state.clearIDBStore();
+    _state.resetSyncState();
+    _state.setAccessToken('test-token');
+  });
+  afterEach(() => _state.setAccessToken(null));
+
+  test('is dropped on a 404 and the upload lands on a freshly resolved id', async () => {
+    _state.setDriveFileId('colors', 'colors_gone');
+
+    const ok = await _uploadColorsToDrive();
+
+    expect(ok).toBe(true);
+    expect(seen.map(s => s.kind)).toEqual(['patch', 'search', 'patch']);
+    expect(seen.at(-1).id).toBe('colors_fresh');
+    expect(_state.getDriveFileId('colors')).toBe('colors_fresh');
   });
 });

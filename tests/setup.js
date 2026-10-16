@@ -925,6 +925,7 @@ export const {
   syncWeekFromDrive,
   syncWeekToDrive,
   syncColorsFromDrive,
+  _uploadColorsToDrive,
   pollDriveMeta,
   pollDriveChanges,
   silentRefresh,
