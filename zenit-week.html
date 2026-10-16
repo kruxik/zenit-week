@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-HP7tcH0qyfBK+JxtPAAfl5OsjbjBydU7Pg9ir11Lb3A='
+               'sha256-jqa6kYuBYrFFSCKNMGa2isYObogCRfT0TUfYvyda6A8='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -9509,8 +9509,7 @@ async function syncWeekFromDrive(wKey, { force = false, seenHash = null, callerW
       }
 
       if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
-        delay *= 2;
+        delay = await driveBackoff(delay);
         continue;
       }
 
@@ -9569,6 +9568,12 @@ async function syncWeekFromDrive(wKey, { force = false, seenHash = null, callerW
 // parsed JSON body (null when empty); rejects with an Error carrying .status
 // and .result - the same shapes gapi.client.request gave callers. 401 recovery
 // (one silent refresh + retry) comes from authFetch.
+// Waits out a Drive 429/503 with jitter and returns the doubled delay for the next try.
+async function driveBackoff(delay) {
+  await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+  return delay * 2;
+}
+
 async function driveApiRequest(config) {
   const MAX_RETRIES = 5;
   let delay = 1000;
@@ -9584,8 +9589,7 @@ async function driveApiRequest(config) {
     try { result = await resp.json(); } catch { /* 204 / empty body */ }
     if (resp.ok) return { status: resp.status, result };
     if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
-      await new Promise(r => setTimeout(r, delay + Math.random() * 500));
-      delay *= 2;
+      delay = await driveBackoff(delay);
       continue;
     }
     const err = new Error(`[Drive] ${config.method || 'GET'} ${url.pathname} → HTTP ${resp.status}`);
@@ -9593,6 +9597,41 @@ async function driveApiRequest(config) {
     err.result = result;
     throw err;
   }
+}
+
+// One multipart PATCH of a JSON record to its Drive file, with the shared retry
+// policy: 429/503 back off, any throw or other failure retries at once. Resolves
+// 'ok', 'unauthorized' (401 - _handleAuthExpiry already called), 'error' (logged
+// after the last attempt) or 'exhausted' (a 404 on the last attempt, silent).
+// `forgetOn404` drops a stale cached file id so the next attempt re-resolves it.
+async function driveUploadMultipart(fileKey, json, appProps, { maxRetries, forgetOn404 = false, label }) {
+  let delay = 1000;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const fileId = await getDriveFileId(fileKey);
+      const boundary = 'ZenitWeek_' + Date.now();
+      const meta = JSON.stringify({ appProperties: appProps });
+      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
+      const resp = await authFetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+      );
+      if (resp.status === 401) return 'unauthorized';
+      if (forgetOn404 && resp.status === 404) { forgetDriveFileId(fileKey); continue; } // stale id - re-resolve
+      if ((resp.status === 429 || resp.status === 503) && attempt < maxRetries) {
+        delay = await driveBackoff(delay);
+        continue;
+      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return 'ok';
+    } catch (err) {
+      if (attempt >= maxRetries) {
+        console.error(`[Drive] ${label} error:`, err);
+        return 'error';
+      }
+    }
+  }
+  return 'exhausted';
 }
 
 // Lookup-only counterpart to getDriveFileId: returns the file id if the week
@@ -10008,37 +10047,14 @@ async function _uploadWeekToDrive(wKey, json) {
   // agrees on it regardless of crdtVersion/savedAt/key-order churn.
   const hash = parsed ? weekContentHash(parsed) : fnv1a32(json);
 
-  const MAX_RETRIES = 5;
-  let delay = 1000;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const fileId = await getDriveFileId(wKey);
-      const boundary = 'ZenitWeek_' + Date.now();
-      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
-      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-      const resp = await authFetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
-        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
-      );
-      if (resp.status === 401) return false; // auth expired - _handleAuthExpiry already called
-      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
-        delay *= 2;
-        continue;
-      }
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      lastSyncedHash.set(wKey, hash);
-      lastSyncedAt = Date.now();
-      updateDropdownSyncTime();
-      return true;
-    } catch (err) {
-      if (attempt >= MAX_RETRIES) {
-        console.error(`[Drive] _uploadWeekToDrive(${wKey}) error:`, err);
-        return false;
-      }
-    }
-  }
-  return false;
+  const result = await driveUploadMultipart(wKey, json,
+    { savedAt: String(savedAt), contentHash: String(hash) },
+    { maxRetries: 5, label: `_uploadWeekToDrive(${wKey})` });
+  if (result !== 'ok') return false;
+  lastSyncedHash.set(wKey, hash);
+  lastSyncedAt = Date.now();
+  updateDropdownSyncTime();
+  return true;
 }
 
 async function syncWeekToDrive(wKey) {
@@ -10082,38 +10098,13 @@ async function _uploadColorsToDrive(resetToken) {
   try { parsed = JSON.parse(json); savedAt = parsed.savedAt ?? 0; } catch { /* ignore */ }
   // contentHash written to Drive is content-only so every device agrees on it.
   const hash = parsed ? colorsContentHash(parsed) : fnv1a32(json);
-  const MAX_RETRIES = 3;
-  let delay = 1000;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const fileId = await getDriveFileId('colors');
-      const boundary = 'ZenitWeek_' + Date.now();
-      const appProps = { savedAt: String(savedAt), contentHash: String(hash) };
-      if (resetToken) appProps.resetToken = resetToken;
-      const meta = JSON.stringify({ appProperties: appProps });
-      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-      const resp = await authFetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
-        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
-      );
-      if (resp.status === 401) return false;
-      if (resp.status === 404) { forgetDriveFileId('colors'); continue; } // stale id - re-resolve
-      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
-        delay *= 2;
-        continue;
-      }
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      colorsSyncedHash = hash;
-      return true;
-    } catch (err) {
-      if (attempt >= MAX_RETRIES) {
-        console.error('[Drive] _uploadColorsToDrive error:', err);
-        return false;
-      }
-    }
-  }
-  return false;
+  const appProps = { savedAt: String(savedAt), contentHash: String(hash) };
+  if (resetToken) appProps.resetToken = resetToken;
+  const result = await driveUploadMultipart('colors', json, appProps,
+    { maxRetries: 3, forgetOn404: true, label: '_uploadColorsToDrive' });
+  if (result !== 'ok') return false;
+  colorsSyncedHash = hash;
+  return true;
 }
 
 // The import-pending flag lives in IndexedDB - importAllData writes it with
@@ -10372,39 +10363,15 @@ async function syncColorsToDrive() {
   if (colorsSyncedHash === hash) return;
   setSyncStatus('syncing', 'sync.msg.syncing');
   const savedAt = stored.savedAt ?? 0;
-  const MAX_RETRIES = 3;
-  let delay = 1000;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const fileId = await getDriveFileId('colors');
-      const boundary = 'ZenitWeek_' + Date.now();
-      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
-      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-      const resp = await authFetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
-        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
-      );
-      if (resp.status === 401) return;
-      if (resp.status === 404) { forgetDriveFileId('colors'); continue; } // stale id - re-resolve
-      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
-        delay *= 2;
-        continue;
-      }
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      colorsSyncedHash = hash;
-      lastSyncedAt = Date.now();
-      updateDropdownSyncTime();
-      setSyncStatus('connected', 'sync.msg.synced');
-      return;
-    } catch (err) {
-      if (attempt >= MAX_RETRIES) {
-        console.error('[Drive] syncColorsToDrive error:', err);
-        setSyncStatus('error', 'sync.msg.failedSavedLocal');
-        return;
-      }
-    }
-  }
+  const result = await driveUploadMultipart('colors', json,
+    { savedAt: String(savedAt), contentHash: String(hash) },
+    { maxRetries: 3, forgetOn404: true, label: 'syncColorsToDrive' });
+  if (result === 'error') setSyncStatus('error', 'sync.msg.failedSavedLocal');
+  if (result !== 'ok') return;
+  colorsSyncedHash = hash;
+  lastSyncedAt = Date.now();
+  updateDropdownSyncTime();
+  setSyncStatus('connected', 'sync.msg.synced');
 }
 
 // Onboarding state merges instead of losing to last-write-wins: a tip read on
@@ -10568,38 +10535,13 @@ async function syncScheduleToDrive() {
   const hash = scheduleContentHash(stored);
   if (scheduleSyncedHash === hash) return;
   const savedAt = stored.savedAt ?? 0;
-  const MAX_RETRIES = 3;
-  let delay = 1000;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const fileId = await getDriveFileId('schedule');
-      const boundary = 'ZenitWeek_' + Date.now();
-      const meta = JSON.stringify({ appProperties: { savedAt: String(savedAt), contentHash: String(hash) } });
-      const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`;
-      const resp = await authFetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
-        { method: 'PATCH', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
-      );
-      if (resp.status === 401) return;
-      if (resp.status === 404) { forgetDriveFileId('schedule'); continue; } // stale id - re-resolve
-      if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, delay + Math.random() * 500));
-        delay *= 2;
-        continue;
-      }
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      scheduleSyncedHash = hash;
-      return;
-    } catch (err) {
-      if (attempt >= MAX_RETRIES) {
-        // Logged, not surfaced as a sync failure: the weeks are what the status
-        // line speaks for, and a schedule that will retry on the next change
-        // must not make a healthy week sync look broken.
-        console.error('[Drive] syncScheduleToDrive error:', err);
-        return;
-      }
-    }
-  }
+  // A failure is logged by the helper, not surfaced as a sync failure: the weeks
+  // are what the status line speaks for, and a schedule that will retry on the
+  // next change must not make a healthy week sync look broken.
+  const result = await driveUploadMultipart('schedule', json,
+    { savedAt: String(savedAt), contentHash: String(hash) },
+    { maxRetries: 3, forgetOn404: true, label: 'syncScheduleToDrive' });
+  if (result === 'ok') scheduleSyncedHash = hash;
 }
 
 async function syncScheduleFromDrive() {
