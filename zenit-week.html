@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-HuRrQe4HE6WIOO7ICBYXJlMFrm19+eKUcHdAtNP3QH4='
+               'sha256-kTWYx7Zeof0S6dFDi3lhpdDbOR7VaxiZdM5l6TiTHs8='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -14380,61 +14380,39 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     const hasReusableIcon  = node && isActivity && i === 0 && node.reusable;
     const hasDroppedIcon   = node && (isActivity || isBranch) && i === 0 && node.dropped;
 
-    if (hasPriorityIcon || hasUnplannedIcon || hasReusableIcon || hasDroppedIcon) {
+    // Right-hand badges in drawing order. The ban survives greyscale,
+    // colour-blindness and the zoomed-out Rocks view, where the diagonal
+    // alone gets thin.
+    const rightIcons = [
+      hasUnplannedIcon && '#icon-bolt',
+      hasReusableIcon  && '#icon-repeat',
+      hasDroppedIcon   && '#icon-ban',
+    ].filter(Boolean);
+
+    if (hasPriorityIcon || rightIcons.length) {
       const textOnlyW = measureText(line, fontSize, fontWeight);
       const leftW  = hasPriorityIcon ? badgeSize + badgeGap : 0;
-      const rightW = (hasUnplannedIcon ? badgeGap + badgeSize : 0)
-                   + (hasReusableIcon  ? badgeGap + badgeSize : 0)
-                   + (hasDroppedIcon   ? badgeGap + badgeSize : 0);
+      const rightW = rightIcons.length * (badgeGap + badgeSize);
       // Center [priorityIcon?][text][boltIcon?][repeatIcon?][banIcon?] around x=0
       const textX = (leftW - rightW) / 2;
       t.setAttribute('x', textX);
+      const badge = (href, x) => g.appendChild(svgEl('use', {
+        href,
+        width: badgeSize, height: badgeSize,
+        x,
+        y: textY - badgeSize / 2 - fontSize * 0.35,
+        style: `color:${textColor};fill:none;stroke:currentColor`,
+      }));
 
       if (hasPriorityIcon) {
         const priorityIcon = node.priority === 'high' ? 'alert-circle' : 'flame';
-        g.appendChild(svgEl('use', {
-          href: `#icon-${priorityIcon}`,
-          width: badgeSize, height: badgeSize,
-          x: textX - textOnlyW / 2 - badgeGap - badgeSize,
-          y: textY - badgeSize / 2 - fontSize * 0.35,
-          style: `color:${textColor};fill:none;stroke:currentColor`,
-        }));
+        badge(`#icon-${priorityIcon}`, textX - textOnlyW / 2 - badgeGap - badgeSize);
       }
-
       let rightCursor = textX + textOnlyW / 2 + badgeGap;
-      if (hasUnplannedIcon) {
-        g.appendChild(svgEl('use', {
-          href: '#icon-bolt',
-          width: badgeSize, height: badgeSize,
-          x: rightCursor,
-          y: textY - badgeSize / 2 - fontSize * 0.35,
-          style: `color:${textColor};fill:none;stroke:currentColor`,
-        }));
+      rightIcons.forEach(href => {
+        badge(href, rightCursor);
         rightCursor += badgeSize + badgeGap;
-      }
-
-      if (hasReusableIcon) {
-        g.appendChild(svgEl('use', {
-          href: '#icon-repeat',
-          width: badgeSize, height: badgeSize,
-          x: rightCursor,
-          y: textY - badgeSize / 2 - fontSize * 0.35,
-          style: `color:${textColor};fill:none;stroke:currentColor`,
-        }));
-        rightCursor += badgeSize + badgeGap;
-      }
-
-      if (hasDroppedIcon) {
-        // Survives greyscale, colour-blindness and the zoomed-out Rocks view,
-        // where the diagonal alone gets thin.
-        g.appendChild(svgEl('use', {
-          href: '#icon-ban',
-          width: badgeSize, height: badgeSize,
-          x: rightCursor,
-          y: textY - badgeSize / 2 - fontSize * 0.35,
-          style: `color:${textColor};fill:none;stroke:currentColor`,
-        }));
-      }
+      });
     }
     t.textContent = line;
     if (node && node.done && (isActivity || isBranch)) {
