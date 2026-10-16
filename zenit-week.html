@@ -975,18 +975,21 @@
      #settings-dropdown) because it drops out of the same bar. Centred on the
      label; on phones it is centred on the viewport instead (see the 520px query),
      which is what keeps it from hanging off a 360px screen. */
-  #week-picker-fold {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: 300px;
+  #week-picker-fold,
+  #settings-dropdown {
     background: var(--settings-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
     box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
+  }
+  #week-picker-fold {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
     padding: 8px 0;
     /* Above the toolbar's own 2600 so no panel header clips it, below
        #settings-dropdown's 2700, which can open over it. */
@@ -1366,12 +1369,6 @@
     bottom: 58px;
     right: 12px;
     top: auto;
-    background: var(--settings-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
     padding: 10px;
     z-index: 2700; /* Above Agenda mobile panel (2000) and toolbar (2600) */
     min-width: 200px;
@@ -1584,7 +1581,8 @@
     margin-left: 2px;
   }
 
-  #color-picker-panel {
+  #color-picker-panel,
+  #baseline-panel {
     display: none;
     position: fixed;
     z-index: 3000; /* Popover layer, peer of #context-menu: above every view (.app-panel 2000) and the toolbar */
@@ -1593,7 +1591,8 @@
     flex-direction: column;
     animation: fadeIn 0.1s ease-out;
   }
-  #color-picker-panel.visible { display: flex; }
+  #color-picker-panel.visible,
+  #baseline-panel.visible { display: flex; }
 
   #cp-sb-canvas {
     width: 160px;
@@ -1661,17 +1660,6 @@
 
   #cp-buttons { width: 100%; }
   #cp-apply { flex: 1; }
-
-  #baseline-panel {
-    display: none;
-    position: fixed;
-    z-index: 3000; /* Popover layer, peer of #context-menu: above every view (.app-panel 2000) and the toolbar */
-    box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
-    width: 200px;
-    flex-direction: column;
-    animation: fadeIn 0.1s ease-out;
-  }
-  #baseline-panel.visible { display: flex; }
 
   #bp-input-row {
     display: flex;
@@ -2972,23 +2960,8 @@
     flex-shrink: 0;
   }
 
-  .agenda-overdue-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: 9px;
-    background: var(--accent-danger);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-  }
-
-  .agenda-overdue-badge:empty { display: none; }
-
+  /* Count pills: the overdue tab badge and the agenda section counts. */
+  .agenda-overdue-badge,
   .agenda-section-count {
     display: inline-flex;
     align-items: center;
@@ -2997,12 +2970,13 @@
     height: 18px;
     padding: 0 5px;
     border-radius: 9px;
-    background: var(--text-placeholder);
-    color: var(--bg-surface);
     font-size: 11px;
     font-weight: 700;
     line-height: 1;
   }
+  .agenda-overdue-badge { background: var(--accent-danger); color: #fff; }
+  .agenda-overdue-badge:empty { display: none; }
+  .agenda-section-count { background: var(--text-placeholder); color: var(--bg-surface); }
 
   /* .app-panel-content supplies the full-height scroll region; the list is
      full-bleed (no side padding) and its rows sit directly under the day-strip,
