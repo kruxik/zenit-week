@@ -190,14 +190,5 @@ describe('Persistence (IndexedDB)', () => {
         _state.sandbox.openDB = originalOpenDB;
       }
     });
-
-    it('should show blocked overlay if IDB is blocked', async () => {
-      const overlay = _state.getElement('single-tab-overlay');
-      expect(overlay.classList.contains('visible')).toBe(false);
-      
-      _state.sandbox.onDbBlocked();
-      
-      expect(overlay.classList.contains('visible')).toBe(true);
-    });
   });
 });

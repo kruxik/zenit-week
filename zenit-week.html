@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-5IaN8ZTVQ9LekzM9/jtZJoZA/N0ANIXIPItc7EvK52w='
+               'sha256-HP7tcH0qyfBK+JxtPAAfl5OsjbjBydU7Pg9ir11Lb3A='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -2781,7 +2781,7 @@
   html.reduce-effects #agenda-overlay {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    background: var(--overlay-bg);
+    background: var(--bg-overlay);
   }
   html.reduce-effects .app-panel-header {
     backdrop-filter: none;
@@ -4128,34 +4128,6 @@
   body.app-loading #main-svg {
     opacity: 0;
   }
-
-  /* Single-tab enforcement overlay */
-  #single-tab-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: var(--bg-overlay);
-    backdrop-filter: blur(8px);
-    z-index: 10000;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-primary);
-    text-align: center;
-    padding: 24px;
-  }
-  #single-tab-overlay.visible { display: flex; }
-  #single-tab-overlay .card {
-    background: var(--bg-surface);
-    border-radius: 8px;
-    box-shadow: 0 20px 60px var(--shadow-xl);
-    padding: 28px 32px;
-    max-width: calc(100vw - 40px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  #single-tab-overlay h1 { font-weight: 400; margin-bottom: 12px; }
-  #single-tab-overlay p { opacity: 0.8; max-width: 400px; line-height: 1.5; margin: 0; white-space: pre-line; }
 </style>
 <!-- Theme init: runs synchronously before first paint to prevent flash of wrong theme -->
 <script>
@@ -4218,12 +4190,6 @@
 </script>
 </head>
 <body class="app-loading">
-<div id="single-tab-overlay">
-  <div class="card">
-    <h1 data-i18n="blocked.title">Storage busy</h1>
-    <p data-i18n="blocked.body">Zenit Week's storage is being upgraded in another tab. This tab will be ready in a moment - try refreshing.</p>
-  </div>
-</div>
 <!--
   UI icons from Tabler Icons - https://tabler.io/icons
   Copyright (c) 2020-2026 Paweł Kuna. MIT License; full text in
@@ -5476,7 +5442,6 @@ window.__quietRefreshReloadNow = function() {
 // Wired to mouseup/touchend/keyup, endAtomicOp, visibilitychange, and the
 // asset probe itself - any of these may transition the app into quiescence.
 const QUIESCENCE_PANEL_IDS = [
-  'single-tab-overlay',
   'app-confirm-overlay',
   'send-future-overlay',
   'context-menu',
@@ -5788,18 +5753,10 @@ const _PENDING_OAUTH_CALLBACK = (() => {
 // ─── Cross-tab channel ────────────────────────────────────────────────────────
 // Multi-tab editing is allowed (Option B - local sync peer). This channel is the
 // local change bus (the `week-saved` signal is wired in a later task). There is no
-// proactive single-tab lock anymore. The blocked overlay below is now only a
-// failsafe for a genuine IndexedDB version-upgrade block (see onDbBlocked) - a
-// rare, transient state, not "already open in another tab".
+// single-tab lock.
 const tabChannel = new BroadcastChannel('zenit-week-tabs');
 // Stable id for this tab, so a tab can ignore the echoes of its own broadcasts.
 const TAB_ID = genId();
-let _isBlocked = false;
-
-function showBlockedOverlay() {
-  _isBlocked = true;
-  document.getElementById('single-tab-overlay').classList.add('visible');
-}
 
 // Local change bus. A tab broadcasts `week-saved` after persisting a week
 // (see saveWeek) or after a merge that produced new content (see
@@ -5853,10 +5810,6 @@ const DB_VERSION = 1;
 let _db = null;
 let _dbPromise = null;
 
-function onDbBlocked() {
-  showBlockedOverlay();
-}
-
 function openDB() {
   if (_dbPromise) return _dbPromise;
   _dbPromise = new Promise((resolve, reject) => {
@@ -5870,7 +5823,6 @@ function openDB() {
         db.createObjectStore('misc');
       }
     };
-    request.onblocked = () => onDbBlocked();
     request.onsuccess = (e) => {
       _db = e.target.result;
       resolve(_db);
@@ -11576,8 +11528,6 @@ const TRANSLATIONS = {
     'help.dropped':               'Dropped',
     'help.close':                 'Close',
     'filter.unscheduled':         'Unscheduled',
-    'blocked.title':              'Storage busy',
-    'blocked.body':               'Zenit Week’s storage is being upgraded in another tab. This tab will be ready in a moment - try refreshing.',
     'multitab.updated':           'Updated from another tab',
     'filter.showing':             'Showing',
     'filter.emptyDay':            '- nothing planned',
@@ -11959,8 +11909,6 @@ const TRANSLATIONS = {
     'help.dropped':               'Vyřazeno',
     'help.close':                 'Zavřít',
     'filter.unscheduled':         'Bez termínu',
-    'blocked.title':              'Úložiště je zaneprázdněné',
-    'blocked.body':               'Úložiště Zenit Week se aktualizuje v jiném panelu. Tento panel bude za chvíli připraven - zkus obnovit stránku.',
     'multitab.updated':           'Aktualizováno z jiného panelu',
     'filter.showing':             'Zobrazeno',
     'filter.emptyDay':            '- nic naplánováno',
