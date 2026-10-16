@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-VmHfahB48gFSXctYhAl5ctZ7AOEfv9O8XfWxk0/CFNg='
+               'sha256-y8/nxI3VCX3fPHAnq6QDn0mDv5kigqotNSDVckgvn2g='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -22669,6 +22669,74 @@ function renderAgendaTabContent() {
       return { wrapper: all[hit], before: hit < srcIdx };
     }
 
+    function markAgendaDropTarget(cy, srcId) {
+      clearAgendaDropMarkers();
+      const t = findAgendaDropTargetByY(cy, srcId);
+      if (t) t.wrapper.classList.add(
+        t.before ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
+    }
+
+    // Moves srcId before/after the drop target `t` and saves the group order.
+    // Atomic-op bracketing stays with the caller: touch ends its op here and
+    // now, the native drag only on dragend, which also fires without a drop.
+    function commitAgendaReorder(srcId, t) {
+      if (!t) return;
+      const current = currentGroupOrder();
+      const fromIdx = current.indexOf(srcId);
+      if (fromIdx === -1) return;
+      const targetId = t.wrapper.dataset.nodeId;
+      if (current.indexOf(targetId) === -1) return;
+      takeSnapshot();
+      current.splice(fromIdx, 1);
+      const toIdx = current.indexOf(targetId);
+      current.splice(t.before ? toIdx : toIdx + 1, 0, srcId);
+      saveAgendaGroupOrder(tabKey, groupKey, current);
+      renderAgenda();
+    }
+
+    // Edge auto-scroll of the agenda list during a drag. Move events only fire
+    // while the pointer moves, so a pointer parked at the edge would stall; a
+    // rAF loop seeded with the last Y keeps scrolling regardless. `isLive`
+    // gates the loop to the drag, `onScrolled` re-aims the drop marker.
+    const AGENDA_SCROLL_EDGE = 100;
+    const AGENDA_SCROLL_MAX_SPEED = 18;
+    function makeAgendaEdgeScroller(isLive, onScrolled) {
+      let raf = 0;
+      let speed = 0;
+      function tick() {
+        raf = 0;
+        if (!isLive() || speed === 0) return;
+        const container = document.getElementById('agenda-tab-content');
+        if (!container) return;
+        const before = container.scrollTop;
+        container.scrollTop = before + speed;
+        if (container.scrollTop === before) { speed = 0; return; }
+        onScrolled();
+        raf = requestAnimationFrame(tick);
+      }
+      return {
+        update(cy) {
+          const container = document.getElementById('agenda-tab-content');
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const topDist = cy - rect.top;
+          const botDist = rect.bottom - cy;
+          if (topDist < AGENDA_SCROLL_EDGE) {
+            speed = -Math.max(2, Math.round((1 - topDist / AGENDA_SCROLL_EDGE) * AGENDA_SCROLL_MAX_SPEED));
+          } else if (botDist < AGENDA_SCROLL_EDGE) {
+            speed = Math.max(2, Math.round((1 - botDist / AGENDA_SCROLL_EDGE) * AGENDA_SCROLL_MAX_SPEED));
+          } else {
+            speed = 0;
+          }
+          if (speed !== 0 && !raf) raf = requestAnimationFrame(tick);
+        },
+        stop() {
+          if (raf) { cancelAnimationFrame(raf); raf = 0; }
+          speed = 0;
+        },
+      };
+    }
+
     nodes.forEach(row => {
       // Rows are { id, node, tickRecord?, anyDay? } descriptors: `id` keys the
       // row (a tick row keys by its tick id so two ticks of one parent on the
@@ -22695,60 +22763,15 @@ function renderAgendaTabContent() {
         let touchSrcId = null;
         let ghost = null;
         let touchOffsetY = 0;
-        let lastTouchX = 0;
         let lastTouchY = 0;
-        let scrollRaf = 0;
-        let scrollSpeed = 0;
-
-        const SCROLL_EDGE = 100;
-        const SCROLL_MAX_SPEED = 18;
-
-        function refreshDropTarget(cx, cy) {
-          clearAgendaDropMarkers();
-          const t = findAgendaDropTargetByY(cy, row.id);
-          if (t) t.wrapper.classList.add(
-            t.before ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
-        }
-
-        function updateAutoScroll(cy) {
-          const container = document.getElementById('agenda-tab-content');
-          if (!container) return;
-          const rect = container.getBoundingClientRect();
-          const topDist = cy - rect.top;
-          const botDist = rect.bottom - cy;
-          if (topDist < SCROLL_EDGE) {
-            scrollSpeed = -Math.max(2, Math.round((1 - topDist / SCROLL_EDGE) * SCROLL_MAX_SPEED));
-          } else if (botDist < SCROLL_EDGE) {
-            scrollSpeed = Math.max(2, Math.round((1 - botDist / SCROLL_EDGE) * SCROLL_MAX_SPEED));
-          } else {
-            scrollSpeed = 0;
-          }
-          if (scrollSpeed !== 0 && !scrollRaf) {
-            scrollRaf = requestAnimationFrame(autoScrollTick);
-          }
-        }
-
-        function autoScrollTick() {
-          scrollRaf = 0;
-          if (!touchSrcId || scrollSpeed === 0) return;
-          const container = document.getElementById('agenda-tab-content');
-          if (!container) return;
-          const before = container.scrollTop;
-          container.scrollTop = before + scrollSpeed;
-          if (container.scrollTop === before) {
-            scrollSpeed = 0;
-            return;
-          }
-          refreshDropTarget(lastTouchX, lastTouchY);
-          scrollRaf = requestAnimationFrame(autoScrollTick);
-        }
+        const scroller = makeAgendaEdgeScroller(
+          () => touchSrcId, () => markAgendaDropTarget(lastTouchY, row.id));
 
         function initTouchDrag(touch) {
           touchSrcId = row.id;
           beginAtomicOp();
           const rect = el.getBoundingClientRect();
           touchOffsetY = touch.clientY - rect.top;
-          lastTouchX = touch.clientX;
           lastTouchY = touch.clientY;
 
           // Clone only the visible .agenda-item, not the full swipe wrapper -
@@ -22781,19 +22804,17 @@ function renderAgendaTabContent() {
           if (!touchSrcId) return;
           e.preventDefault();
           const touch = e.touches[0];
-          lastTouchX = touch.clientX;
           lastTouchY = touch.clientY;
 
           if (ghost) ghost.style.top = `${touch.clientY - touchOffsetY}px`;
 
-          refreshDropTarget(touch.clientX, touch.clientY);
-          updateAutoScroll(touch.clientY);
+          markAgendaDropTarget(touch.clientY, row.id);
+          scroller.update(touch.clientY);
         }
 
         function finishTouchDrag(e) {
           if (!touchSrcId) return;
-          if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = 0; }
-          scrollSpeed = 0;
+          scroller.stop();
           document.removeEventListener('touchmove', onDocTouchMove);
           document.removeEventListener('touchend', finishTouchDrag);
           document.removeEventListener('touchcancel', finishTouchDrag);
@@ -22803,20 +22824,7 @@ function renderAgendaTabContent() {
           const srcId = touchSrcId;
           touchSrcId = null;
           const touch = e.changedTouches[0];
-          const t = findAgendaDropTargetByY(touch.clientY, srcId);
-          if (t) {
-            const current = currentGroupOrder();
-            const fromIdx = current.indexOf(srcId);
-            const targetId = t.wrapper.dataset.nodeId;
-            if (fromIdx !== -1 && current.indexOf(targetId) !== -1) {
-              takeSnapshot();
-              current.splice(fromIdx, 1);
-              const toIdx = current.indexOf(targetId);
-              current.splice(t.before ? toIdx : toIdx + 1, 0, srcId);
-              saveAgendaGroupOrder(tabKey, groupKey, current);
-              renderAgenda();
-            }
-          }
+          commitAgendaReorder(srcId, findAgendaDropTargetByY(touch.clientY, srcId));
           endAtomicOp();
         }
 
@@ -22837,59 +22845,16 @@ function renderAgendaTabContent() {
       // Only Y picks the slot; release anywhere on the page commits.
       let docDragOver = null;
       let docDrop = null;
-      // Edge auto-scroll for the native desktop drag. dragover only fires while
-      // the pointer moves, so a stationary cursor parked at the edge would stall;
-      // a rAF loop seeded with the last dragover Y keeps scrolling regardless.
-      const DOC_SCROLL_EDGE = 100;
-      const DOC_SCROLL_MAX_SPEED = 18;
-      let docScrollRaf = 0;
-      let docScrollSpeed = 0;
       let lastDocDragY = 0;
-
-      const refreshDocDropTarget = (cy) => {
-        clearAgendaDropMarkers();
-        const t = findAgendaDropTargetByY(cy, dragSrcId);
-        if (t) t.wrapper.classList.add(
-          t.before ? 'agenda-item-drop-above' : 'agenda-item-drop-below');
-      };
-
-      const updateDocAutoScroll = (cy) => {
-        const container = document.getElementById('agenda-tab-content');
-        if (!container) return;
-        const rect = container.getBoundingClientRect();
-        const topDist = cy - rect.top;
-        const botDist = rect.bottom - cy;
-        if (topDist < DOC_SCROLL_EDGE) {
-          docScrollSpeed = -Math.max(2, Math.round((1 - topDist / DOC_SCROLL_EDGE) * DOC_SCROLL_MAX_SPEED));
-        } else if (botDist < DOC_SCROLL_EDGE) {
-          docScrollSpeed = Math.max(2, Math.round((1 - botDist / DOC_SCROLL_EDGE) * DOC_SCROLL_MAX_SPEED));
-        } else {
-          docScrollSpeed = 0;
-        }
-        if (docScrollSpeed !== 0 && !docScrollRaf) {
-          docScrollRaf = requestAnimationFrame(docAutoScrollTick);
-        }
-      };
-
-      function docAutoScrollTick() {
-        docScrollRaf = 0;
-        if (!dragSrcId || docScrollSpeed === 0) return;
-        const container = document.getElementById('agenda-tab-content');
-        if (!container) return;
-        const before = container.scrollTop;
-        container.scrollTop = before + docScrollSpeed;
-        if (container.scrollTop === before) { docScrollSpeed = 0; return; }
-        refreshDocDropTarget(lastDocDragY);
-        docScrollRaf = requestAnimationFrame(docAutoScrollTick);
-      }
+      const docScroller = makeAgendaEdgeScroller(
+        () => dragSrcId, () => markAgendaDropTarget(lastDocDragY, dragSrcId));
 
       const cleanupDocDrag = () => {
         if (docDragOver) document.removeEventListener('dragover', docDragOver);
         if (docDrop) document.removeEventListener('drop', docDrop);
         docDragOver = null;
         docDrop = null;
-        if (docScrollRaf) { cancelAnimationFrame(docScrollRaf); docScrollRaf = 0; }
-        docScrollSpeed = 0;
+        docScroller.stop();
       };
       el.addEventListener('dragstart', (e) => {
         if (!mousedownOnHandle) { e.preventDefault(); return; }
@@ -22908,8 +22873,8 @@ function renderAgendaTabContent() {
           ev.preventDefault();
           if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
           lastDocDragY = ev.clientY;
-          refreshDocDropTarget(ev.clientY);
-          updateDocAutoScroll(ev.clientY);
+          markAgendaDropTarget(ev.clientY, dragSrcId);
+          docScroller.update(ev.clientY);
         };
         docDrop = (ev) => {
           if (!dragSrcId) return;
@@ -22918,18 +22883,7 @@ function renderAgendaTabContent() {
           const t = findAgendaDropTargetByY(ev.clientY, srcId);
           clearAgendaDropMarkers();
           cleanupDocDrag();
-          if (!t) return;
-          const current = currentGroupOrder();
-          const fromIdx = current.indexOf(srcId);
-          if (fromIdx === -1) return;
-          const targetId = t.wrapper.dataset.nodeId;
-          if (current.indexOf(targetId) === -1) return;
-          takeSnapshot();
-          current.splice(fromIdx, 1);
-          const toIdx = current.indexOf(targetId);
-          current.splice(t.before ? toIdx : toIdx + 1, 0, srcId);
-          saveAgendaGroupOrder(tabKey, groupKey, current);
-          renderAgenda();
+          commitAgendaReorder(srcId, t);
         };
         document.addEventListener('dragover', docDragOver);
         document.addEventListener('drop', docDrop);
