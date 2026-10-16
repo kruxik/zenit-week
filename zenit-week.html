@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-UMTFRDFKNqNBM7Lgkw5af/jK+oiEBuvwlws9dLRk6b8='
+               'sha256-AzZ4HjlVk+SJeUWVBxJnBzn6HG1wtdvvWBg69rN0XLQ='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -24939,8 +24939,7 @@ settingsFab.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
   const fabPill = document.getElementById('fab-pill');
   if (!settingsDropdown.contains(e.target) && !fabPill.contains(e.target)) {
-    settingsDropdown.classList.remove('visible');
-    settingsFab.classList.remove('active');
+    closeSettingsDropdown();
   }
 });
 
@@ -25234,8 +25233,7 @@ document.addEventListener('click', (e) => {
   // Shared by the FAB and the global Q hotkey, so both routes behave the same.
   function toggleQuickAdd() {
     // Close settings dropdown if open
-    settingsDropdown.classList.remove('visible');
-    settingsFab.classList.remove('active');
+    closeSettingsDropdown();
     if (panel.classList.contains('is-open')) {
       closeQuickAdd();
     } else {
@@ -25326,8 +25324,7 @@ if (tipsReplayBtn) {
     replayTips();
     syncTipsToggleUI();
     // Close settings so the next first-time action can surface a tip.
-    settingsDropdown.classList.remove('visible');
-    settingsFab.classList.remove('active');
+    closeSettingsDropdown();
     if (typeof showToast === 'function') showToast(t('settings.tipsReplayDone'));
   });
 }
@@ -26364,8 +26361,7 @@ window.addEventListener('load', async () => {
       devProbeBtn.addEventListener('click', () => {
         // Close settings first, then arm on a fresh task: the trace must start
         // from an idle main thread, not from inside this click.
-        settingsDropdown.classList.remove('visible');
-        settingsFab.classList.remove('active');
+        closeSettingsDropdown();
         deferFromInput(startPerfProbe);
       });
     }
@@ -26386,8 +26382,7 @@ window.addEventListener('load', async () => {
   const settingsHelpBtn = document.getElementById('settings-help-btn');
   if (settingsHelpBtn) {
     settingsHelpBtn.addEventListener('click', () => {
-      settingsDropdown.classList.remove('visible');
-      settingsFab.classList.remove('active');
+      closeSettingsDropdown();
       openHelp();
     });
   }
