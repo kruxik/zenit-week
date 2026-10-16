@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-AEDXLVB8k8oQHy6Vult8HiigDMvo8K2XMgTsTp1OA28='
+               'sha256-1WtE7r0yniobtDTeKlTKx7a/ifF/XPf0qkkBSZ+uPkw='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -5728,15 +5728,30 @@ function openDB() {
   return _dbPromise;
 }
 
-async function loadWeekIDB(wk) {
+// One read request against `storeName`; resolves with its result.
+async function idbRead(storeName, makeRequest) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction('weeks', 'readonly');
-    const store = tx.objectStore('weeks');
-    const request = store.get(wk);
-    request.onsuccess = () => resolve(request.result ? request.result.data : null);
+    const request = makeRequest(db.transaction(storeName, 'readonly').objectStore(storeName));
+    request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+// One write against `storeName`; resolves once the transaction has committed.
+async function idbWrite(storeName, write) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    write(tx.objectStore(storeName));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadWeekIDB(wk) {
+  const record = await idbRead('weeks', store => store.get(wk));
+  return record ? record.data : null;
 }
 
 async function saveWeekIDB(wk, data) {
@@ -5790,48 +5805,20 @@ function withWeekLock(wk, fn) {
   return run;
 }
 
-async function listWeekKeysIDB() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('weeks', 'readonly');
-    const store = tx.objectStore('weeks');
-    const request = store.getAllKeys();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+function listWeekKeysIDB() {
+  return idbRead('weeks', store => store.getAllKeys());
 }
 
-async function deleteWeekIDB(wk) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('weeks', 'readwrite');
-    const store = tx.objectStore('weeks');
-    store.delete(wk);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+function deleteWeekIDB(wk) {
+  return idbWrite('weeks', store => store.delete(wk));
 }
 
-async function loadValueIDB(key) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('misc', 'readonly');
-    const store = tx.objectStore('misc');
-    const request = store.get(key);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+function loadValueIDB(key) {
+  return idbRead('misc', store => store.get(key));
 }
 
-async function saveValueIDB(key, value) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('misc', 'readwrite');
-    const store = tx.objectStore('misc');
-    store.put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+function saveValueIDB(key, value) {
+  return idbWrite('misc', store => store.put(value, key));
 }
 
 // ─── Audit log (diagnostics) ──────────────────────────────────────────────────
@@ -5901,15 +5888,8 @@ window.zwAudit = {
   clear: async () => { auditBuffer = []; await saveValueIDB(AUDIT_KEY, []); },
 };
 
-async function deleteValueIDB(key) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('misc', 'readwrite');
-    const store = tx.objectStore('misc');
-    store.delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+function deleteValueIDB(key) {
+  return idbWrite('misc', store => store.delete(key));
 }
 
 // ─── Schedule store ───────────────────────────────────────────────────────────
