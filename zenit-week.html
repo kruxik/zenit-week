@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-y8/nxI3VCX3fPHAnq6QDn0mDv5kigqotNSDVckgvn2g='
+               'sha256-2NKSqlYDiOzZdS8OVeMsRRGu+tyiz0SRQ6VZ4NsJxeQ='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -19854,45 +19854,24 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
     const todayIdx = new Date().getDay();
 
-    const pull = dayIdx => async e => {
-      e.stopPropagation();
+    const pull = dayIdx => async () => {
       hideContextMenu();
       const moved = await pullOccurrenceIntoWeek(entryId, date, dayIdx);
       if (moved && dayIdx === todayIdx) pinToTopOfAgenda(occurrenceNodeId(entryId, date));
       renderAgenda();
     };
 
-    const nowBtn = document.createElement('div');
-    nowBtn.className = 'ctx-item';
-    nowBtn.textContent = t('menu.now') || 'Now';
-    nowBtn.addEventListener('click', pull(todayIdx));
-    rescheduleSubmenu.appendChild(nowBtn);
+    addCtxItem(rescheduleSubmenu, t('menu.now') || 'Now', pull(todayIdx));
+    addCtxSeparator(rescheduleSubmenu);
 
-    const nowSep = document.createElement('div');
-    nowSep.className = 'ctx-separator';
-    rescheduleSubmenu.appendChild(nowSep);
+    AGENDA_DAY_ORDER.forEach(dayIdx => addCtxItem(rescheduleSubmenu,
+      btn => appendDayLabel(btn, langLabels[dayIdx], dayIdx, todayIdx), pull(dayIdx)));
 
-    AGENDA_DAY_ORDER.forEach(dayIdx => {
-      const btn = document.createElement('div');
-      btn.className = 'ctx-item';
-      appendDayLabel(btn, langLabels[dayIdx], dayIdx, todayIdx);
-      btn.addEventListener('click', pull(dayIdx));
-      rescheduleSubmenu.appendChild(btn);
-    });
-
-    const dateSep = document.createElement('div');
-    dateSep.className = 'ctx-separator';
-    rescheduleSubmenu.appendChild(dateSep);
-
-    const dateBtn = document.createElement('div');
-    dateBtn.className = 'ctx-item';
-    dateBtn.textContent = t('menu.sendToDate');
-    dateBtn.addEventListener('click', e => {
-      e.stopPropagation();
+    addCtxSeparator(rescheduleSubmenu);
+    addCtxItem(rescheduleSubmenu, t('menu.sendToDate'), () => {
       hideContextMenu();
       window.openSendFuture({ entryId });
     });
-    rescheduleSubmenu.appendChild(dateBtn);
   }
 
   function showRescheduleSubmenu() {
@@ -19960,11 +19939,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     // "Now" - set to today and pin to top of today's agenda (mirrors the
     // (now) magic-token effect). For leaf mode with a today-collision (another
     // sibling already owns today) we silently fall through to just pinning.
-    const nowBtn = document.createElement('div');
-    nowBtn.className = 'ctx-item';
-    nowBtn.textContent = t('menu.now') || 'Now';
-    nowBtn.addEventListener('click', e => {
-      e.stopPropagation();
+    addCtxItem(rescheduleSubmenu, t('menu.now') || 'Now', () => {
       if (mode === 'tick') {
         if ((node.dayIndex ?? null) !== todayIdx) {
           takeSnapshot();
@@ -19987,99 +19962,47 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       pinToTopOfAgenda(targetId);
       afterMutation();
     });
-    rescheduleSubmenu.appendChild(nowBtn);
-    const nowSep = document.createElement('div');
-    nowSep.className = 'ctx-separator';
-    rescheduleSubmenu.appendChild(nowSep);
+    addCtxSeparator(rescheduleSubmenu);
 
-    if (mode === 'tick') {
-      AGENDA_DAY_ORDER.forEach(dayIdx => {
-        const isAssigned = assignedDays.has(dayIdx);
-        const btn = document.createElement('div');
-        btn.className = 'ctx-item' + (isAssigned ? ' ctx-item-selected' : '');
-        setDayLabel(btn, dayIdx);
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
+    AGENDA_DAY_ORDER.forEach(dayIdx => {
+      const isAssigned = assignedDays.has(dayIdx);
+      // A leaf cannot take a day a sibling leaf already owns.
+      const isCollision = mode === 'leaf' && isAssigned && node.dayIndex !== dayIdx;
+      addCtxItem(rescheduleSubmenu, btn => setDayLabel(btn, dayIdx), () => {
+        if (mode === 'tick') {
           // Radio toggle: re-picking the assigned day clears it.
-          const next = isAssigned ? null : dayIdx;
           takeSnapshot();
-          if (setTickDay(targetId, next)) afterMutation();
-        });
-        rescheduleSubmenu.appendChild(btn);
-      });
-    } else if (mode === 'leaf') {
-      AGENDA_DAY_ORDER.forEach(dayIdx => {
-        const isThis      = node.dayIndex === dayIdx;
-        const isAssigned  = assignedDays.has(dayIdx);
-        const isCollision = isAssigned && !isThis;
-        const btn = document.createElement('div');
-        btn.className = 'ctx-item' +
-          (isAssigned  ? ' ctx-item-selected'  : '') +
-          (isCollision ? ' ctx-item-disabled'   : '');
-        setDayLabel(btn, dayIdx);
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
-          if (applyDayReschedule(targetId, mode, {
-            currentDays: assignedDays,
-            currentDayIndex: node.dayIndex,
-            newDayIndex: dayIdx,
-          })) afterMutation();
-        });
-        rescheduleSubmenu.appendChild(btn);
-      });
-    } else {
-      AGENDA_DAY_ORDER.forEach(dayIdx => {
-        const isAssigned = assignedDays.has(dayIdx);
-        const btn = document.createElement('div');
-        btn.className = 'ctx-item' + (isAssigned ? ' ctx-item-selected' : '');
-        setDayLabel(btn, dayIdx);
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
-          if (applyDayReschedule(targetId, mode, {
-            currentDays: assignedDays,
-            newDayIndex: dayIdx,
-          })) afterMutation();
-        });
-        rescheduleSubmenu.appendChild(btn);
-      });
-    }
+          if (setTickDay(targetId, isAssigned ? null : dayIdx)) afterMutation();
+        } else if (applyDayReschedule(targetId, mode, {
+          currentDays: assignedDays,
+          ...(mode === 'leaf' ? { currentDayIndex: node.dayIndex } : {}),
+          newDayIndex: dayIdx,
+        })) afterMutation();
+      }, [isAssigned && 'ctx-item-selected', isCollision && 'ctx-item-disabled'].filter(Boolean).join(' '));
+    });
 
     // A date is the same choice as a weekday, one horizon further out: this
     // week's Monday, or the 31st of March. The node's subtree travels with it,
     // so only the mechanical leaves - ticks and day-children - are excluded.
     if (canSendToDate(findNode(targetId))) {
-      const dateSep = document.createElement('div');
-      dateSep.className = 'ctx-separator';
-      rescheduleSubmenu.appendChild(dateSep);
-      const dateBtn = document.createElement('div');
-      dateBtn.className = 'ctx-item';
-      dateBtn.textContent = t('menu.sendToDate');
-      dateBtn.addEventListener('click', e => {
-        e.stopPropagation();
+      addCtxSeparator(rescheduleSubmenu);
+      addCtxItem(rescheduleSubmenu, t('menu.sendToDate'), () => {
         hideContextMenu();
         window.openSendFuture(targetId);
       });
-      rescheduleSubmenu.appendChild(dateBtn);
     }
 
     // "Clear all" - only when any day is assigned
     if (assignedDays.size > 0) {
-      const sep = document.createElement('div');
-      sep.className = 'ctx-separator';
-      rescheduleSubmenu.appendChild(sep);
-      const clearBtn = document.createElement('div');
-      clearBtn.className = 'ctx-item danger';
-      clearBtn.textContent = t('menu.clearDay') || 'Any';
-      clearBtn.addEventListener('click', e => {
-        e.stopPropagation();
+      addCtxSeparator(rescheduleSubmenu);
+      addCtxItem(rescheduleSubmenu, t('menu.clearDay') || 'Any', () => {
         if (mode === 'tick') {
           takeSnapshot();
           if (setTickDay(targetId, null)) afterMutation();
         } else if (applyDayReschedule(targetId, 'clear', { currentDays: assignedDays })) {
           afterMutation();
         }
-      });
-      rescheduleSubmenu.appendChild(clearBtn);
+      }, 'danger');
     }
 
     positionRescheduleSubmenu();
@@ -24377,29 +24300,44 @@ function dayFilterGlyph(day) {
 // Rebuilt on open so day names and the selected row follow the current language
 // and filter. Borrows the context menu's rows (.ctx-item / .ctx-separator), so
 // there is no second menu component to keep in style.
+// One row of a context menu or submenu. `label` is plain text, or a function
+// that fills the row (a weekday label with its dot). The click never reaches
+// the document's outside-click dismissal; closing the menu is the caller's call.
+function addCtxItem(menu, label, onClick, extraClass = '') {
+  const row = document.createElement('div');
+  row.className = extraClass ? `ctx-item ${extraClass}` : 'ctx-item';
+  if (typeof label === 'function') label(row); else row.textContent = label;
+  row.addEventListener('click', e => {
+    e.stopPropagation();
+    onClick(e);
+  });
+  menu.appendChild(row);
+  return row;
+}
+
+function addCtxSeparator(menu) {
+  const sep = document.createElement('div');
+  sep.className = 'ctx-separator';
+  menu.appendChild(sep);
+}
+
 function openDayFilterMenu() {
   const menu = document.getElementById('day-filter-menu');
   const btn = document.getElementById('day-filter-btn');
   if (!menu || !btn) return;
   menu.replaceChildren();
 
-  const addRow = (label, day) => {
-    const row = document.createElement('div');
-    row.className = 'ctx-item' + (activeDayFilter === day ? ' ctx-item-selected' : '');
+  const addRow = (label, day) => addCtxItem(menu,
     // typeof guard: 'overdue'/'unscheduled'/null are not weekdays, so no dot.
-    appendDayLabel(row, label, typeof day === 'number' ? day : null);
-    row.addEventListener('click', e => {
-      e.stopPropagation();
+    row => appendDayLabel(row, label, typeof day === 'number' ? day : null),
+    () => {
       closeDayFilterMenu();
       deferFromInput(() => setDayFilter(day));
-    });
-    menu.appendChild(row);
-  };
+    },
+    activeDayFilter === day ? 'ctx-item-selected' : '');
 
   dayFilterOrder().forEach(day => addRow(dayFilterName(day), day));
-  const sep = document.createElement('div');
-  sep.className = 'ctx-separator';
-  menu.appendChild(sep);
+  addCtxSeparator(menu);
   addRow(t('filter.none'), null);
 
   // The row is docked bottom-centre, so the menu opens upward and centres on the
