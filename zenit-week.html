@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-blgBbfmIsHblLlA1ykk4amJxJPPRcx7DuW4GAPs6Y2k='
+               'sha256-UMTFRDFKNqNBM7Lgkw5af/jK+oiEBuvwlws9dLRk6b8='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -6471,14 +6471,17 @@ function initFlowTrace() {
 // the delete, so the cached handle is closed first; if something else still
 // holds one we give up after a moment rather than hanging on a dialog the dev
 // cannot dismiss.
-function devDeleteDatabase() {
+// Deletes the app's IndexedDB database, closing this tab's handle first so the
+// delete is not blocked by it. Resolves on success, error or block; with
+// `timeoutMs` it also gives up waiting after that long.
+function deleteAppDatabase(timeoutMs) {
   if (_db) { try { _db.close(); } catch { /* already closing */ } }
   _db = null;
   _dbPromise = null;
   return new Promise(resolve => {
     let settled = false;
     const done = () => { if (!settled) { settled = true; resolve(); } };
-    setTimeout(done, 3000);
+    if (timeoutMs) setTimeout(done, timeoutMs);
     const req = indexedDB.deleteDatabase(DB_NAME);
     req.onsuccess = done;
     req.onerror = done;
@@ -6486,17 +6489,23 @@ function devDeleteDatabase() {
   });
 }
 
+// Removes every localStorage key starting with `prefix`, except those in `keep`.
+function wipeLocalKeys(prefix, keep = new Set()) {
+  const keysToWipe = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith(prefix) && !keep.has(k)) keysToWipe.push(k);
+  }
+  keysToWipe.forEach(k => localStorage.removeItem(k));
+}
+
 async function devResetApp() {
   // Re-checked at call time, not just at render time: the settings entry is one
   // way in, but this must also refuse a console call on a production page.
   if (!devResetEnabled()) return;
 
-  await devDeleteDatabase();
-
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith('zenit-week')) localStorage.removeItem(k);
-  }
+  await deleteAppDatabase(3000);
+  wipeLocalKeys('zenit-week');
   try { sessionStorage.clear(); } catch { /* private mode */ }
 
   // The shell cache and the worker itself go too - a first visit has neither.
@@ -8826,25 +8835,14 @@ const SIGNOUT_PRESERVE_KEYS = new Set([
 async function signOutAndClear() {
   await signOut();
 
-  // Close open IDB handle so deleteDatabase doesn't get onblocked
-  if (_db) { try { _db.close(); } catch {} _db = null; }
-  _dbPromise = null;
-
+  // No timeout: sign-out waits for the delete rather than reload over it.
   try {
-    await new Promise((resolve) => {
-      const req = indexedDB.deleteDatabase(DB_NAME);
-      req.onsuccess = req.onerror = req.onblocked = () => resolve();
-    });
+    await deleteAppDatabase();
   } catch (err) {
     console.warn('[clear] IDB delete failed:', err);
   }
 
-  const keysToWipe = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k?.startsWith('zenit-week-') && !SIGNOUT_PRESERVE_KEYS.has(k)) keysToWipe.push(k);
-  }
-  keysToWipe.forEach(k => localStorage.removeItem(k));
+  wipeLocalKeys('zenit-week-', SIGNOUT_PRESERVE_KEYS);
 
   reloadAppFresh();
 }
@@ -10625,12 +10623,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
     // discards this device's data, not its memory of having seen the tour.
     ...ONBOARDING_DEVICE_KEYS,
   ]);
-  const keysToWipe = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith('zenit-week-') && !KEEP_KEYS.has(key)) keysToWipe.push(key);
-  }
-  keysToWipe.forEach(k => localStorage.removeItem(k));
+  wipeLocalKeys('zenit-week-', KEEP_KEYS);
   // Week records and the settings blob live in IndexedDB. Wiping only
   // localStorage left every week in place, so a reset triggered from another
   // device silently did nothing - initDriveSync then merged the "reset" Drive
