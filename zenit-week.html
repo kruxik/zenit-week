@@ -2040,21 +2040,34 @@
   /* ─── Quick-Add Panel ───────────────────────────────────────────────────── */
   /* Stats panel - mirrors the Help dialog layout (desktop centered panel, mobile
      full-area with a bottom "Close" pill). Opened by clicking the summary box. */
-  #stats-overlay {
+  /* One dimming scrim below the toolbar for every panel and quick add. Each
+     id keeps its own z-index; quick add opens with .is-open and display:block,
+     the panels with .visible and display:flex. */
+  #stats-overlay,
+  #quick-add-backdrop,
+  #agenda-overlay,
+  #help-overlay,
+  #comment-overlay {
     position: fixed;
-    top: 56px;
+    top: var(--toolbar-h);
     left: 0;
     width: 100%;
-    height: calc(100% - 56px);
+    height: calc(100% - var(--toolbar-h));
     background: var(--overlay-sm);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     display: none;
-    z-index: 950;
+    z-index: 950; /* Above canvas, below panels/toolbar */
     opacity: 0;
     transition: opacity 0.3s ease;
   }
-  #stats-overlay.visible { display: flex; opacity: 1; }
+  #stats-overlay.visible,
+  #agenda-overlay.visible,
+  #help-overlay.visible,
+  #comment-overlay.visible {
+    display: flex;
+    opacity: 1;
+  }
 
   /* Hero: two top-aligned columns - Plan vs Reality (left) and The Week (right). */
   #stats-section-donut {
@@ -2402,18 +2415,7 @@
   }
 
   #quick-add-backdrop {
-    display: none;
-    position: fixed;
-    top: 56px;
-    left: 0;
-    width: 100%;
-    height: calc(100% - 56px);
-    background: var(--overlay-sm);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
     z-index: 2590;
-    opacity: 0;
-    transition: opacity 0.3s ease;
   }
   #quick-add-backdrop.is-open {
     display: block;
@@ -2747,24 +2749,6 @@
   }
 
   /* ─── Agenda Overlay (Blur) ──────────────────────────────────────────────── */
-  #agenda-overlay {
-    position: fixed;
-    top: 56px; /* Below toolbar */
-    left: 0;
-    width: 100%;
-    height: calc(100% - 56px);
-    background: var(--overlay-sm);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    display: none;
-    z-index: 950; /* Above canvas, below Agenda panel */
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  #agenda-overlay.visible {
-    display: flex;
-    opacity: 1;
-  }
   /* Pinch gestures on agenda should never resize the agenda panel itself.
      touch-action: pan-x pan-y allows the inner list + day-strip to keep
      scrolling but stops the browser from interpreting two-finger touch as
@@ -3226,25 +3210,6 @@
     outline: none;
   }
 
-  #help-overlay {
-    position: fixed;
-    top: 56px; /* Below toolbar */
-    left: 0;
-    width: 100%;
-    height: calc(100% - 56px);
-    background: var(--overlay-sm);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    display: none;
-    z-index: 950; /* Above canvas, below panels/toolbar */
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  #help-overlay.visible {
-    display: flex;
-    opacity: 1;
-  }
-
   /* Mobile: floating "Close" pill replaces the top-right X while help is open */
   #help-close-bar,
   #comment-close-bar {
@@ -3316,25 +3281,6 @@
 
   /* Comment dialog - mirrors the Help dialog layout (desktop centered panel,
      mobile full-area with bottom "Close" pill). */
-  #comment-overlay {
-    position: fixed;
-    top: 56px;
-    left: 0;
-    width: 100%;
-    height: calc(100% - 56px);
-    background: var(--overlay-sm);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    display: none;
-    z-index: 950;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  #comment-overlay.visible {
-    display: flex;
-    opacity: 1;
-  }
-
   #comment-close { flex-shrink: 0; }
 
   /* Not a scroll region - the textarea fills the panel, so the top offset clears
