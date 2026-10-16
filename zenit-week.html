@@ -2746,7 +2746,9 @@
      positioned; nothing about the map is worth showing before it. */
   #map-root:not(.map-ready) { visibility: hidden; }
 
-  .view-toggle-btn {
+  /* Bar buttons: the view tabs and the dialogs' X / Close pill. */
+  .view-toggle-btn,
+  .help-close-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2755,8 +2757,6 @@
     padding: 0 14px;
     border-radius: 5px;
     cursor: pointer;
-    /* No colour transition: on a switch the old tab would fade out while the new
-       one fades in, so both wear the active fill for a frame or two. */
     color: var(--text-subtle);
     font-size: 13px;
     font-weight: 600;
@@ -2767,10 +2767,14 @@
     outline: none;
   }
 
-  .view-toggle-btn:hover {
+  .view-toggle-btn:hover,
+  .help-close-btn:hover {
     background: var(--bg-hover);
     color: var(--text-dim);
   }
+  /* View tabs take no colour transition: on a switch the old tab would fade out
+     while the new one fades in, so both wear the active fill for a frame or two. */
+  .help-close-btn { transition: background 0.15s, color 0.15s; }
 
   .view-toggle-btn.active {
     background: var(--view-btn-active-bg);
@@ -3152,29 +3156,6 @@
     left: 50%;
     transform: translateX(-50%);
     display: none;
-  }
-  .help-close-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    height: 36px;
-    padding: 0 14px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    color: var(--text-subtle);
-    font-size: 13px;
-    font-weight: 600;
-    border: none;
-    background: none;
-    user-select: none;
-    white-space: nowrap;
-    outline: none;
-  }
-  .help-close-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-dim);
   }
 
   /* ─── Phone: modal panels (Help, Comment) ───────────────────────────────────
