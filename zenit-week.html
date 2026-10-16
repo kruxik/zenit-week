@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Nld1TCaZqJhlu32xG6dCpTdItBdwEJ9GBVSeBlYCCgE='
+               'sha256-blgBbfmIsHblLlA1ykk4amJxJPPRcx7DuW4GAPs6Y2k='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7676,9 +7676,7 @@ function buildMapCommentBadge(node, boxW, boxH) {
   const x = boxW / 2 - w / 2;
   const y = -boxH / 2 - B.h / 2;
   const g = svgEl('g', { class: 'comment-badge', 'data-id': node.id });
-  const title = svgEl('title');
-  title.textContent = t('menu.comment');
-  g.appendChild(title);
+  g.appendChild(svgText('title', {}, t('menu.comment')));
   // Generous transparent hit area: the pill alone is a small finger target.
   g.appendChild(svgEl('rect', { x: x - 6, y: y - 6, width: w + 12, height: B.h + 12, fill: 'transparent' }));
   g.appendChild(svgEl('rect', {
@@ -7693,15 +7691,13 @@ function buildMapCommentBadge(node, boxW, boxH) {
     'pointer-events': 'none',
   }));
   if (label) {
-    const text = svgEl('text', {
+    g.appendChild(svgText('text', {
       x: x + B.pad + B.icon + B.gap, y: y + B.h / 2,
       'dominant-baseline': 'central',
       'font-size': B.font, 'font-weight': '700',
       class: 'comment-badge-text',
       'pointer-events': 'none',
-    });
-    text.textContent = label;
-    g.appendChild(text);
+    }, label));
   }
   return g;
 }
@@ -14209,6 +14205,13 @@ function svgEl(tag, attrs) {
   return el;
 }
 
+// An SVG element carrying text - a <text> or a <title> tooltip.
+function svgText(tag, attrs, text) {
+  const el = svgEl(tag, attrs);
+  el.textContent = text;
+  return el;
+}
+
 function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   const g = svgEl('g', { class: 'node-group', 'data-id': id });
   
@@ -14271,9 +14274,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   if (isCenter) {
     // Named, so a screen reader and a hover both get something better than an
     // unlabelled image.
-    const titleEl = svgEl('title', {});
-    titleEl.textContent = centerDisplayName();
-    g.appendChild(titleEl);
+    g.appendChild(svgText('title', {}, centerDisplayName()));
 
     // The week's split as the infographic Stats shows too; the photo goes on
     // its plate and the percentages over everything (see buildPieChart).
@@ -14288,14 +14289,12 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
         fill: googleUserInitialsColor || '#888888',
       }));
     }
-    const faceText = svgEl('text', {
+    g.appendChild(svgText('text', {
       x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central',
       'font-family': 'inherit', 'font-size': googleUserInitials ? CENTER_INITIALS_FONT : fontSize,
       'font-weight': '700', fill: googleUserInitials ? textColor : (isDarkTheme ? '#f2f2f2' : '#2b2b33'),
       'pointer-events': 'none',
-    });
-    faceText.textContent = centerNodeText();
-    g.appendChild(faceText);
+    }, centerNodeText()));
 
     if (canShowAvatarPhoto()) {
       g.appendChild(svgEl('image', {
@@ -16632,17 +16631,13 @@ function _statsDonut(c) {
   });
   const pie = buildPieChart('stats-pie');
   svg.appendChild(pie.chart);
-  const num = svgEl('text', {
+  svg.appendChild(svgText('text', {
     x: 0, y: -6, 'text-anchor': 'middle', 'dominant-baseline': 'central',
     class: 'stats-donut-center-num',
-  });
-  num.textContent = `${c.percent}%`;
-  svg.appendChild(num);
-  const sub = svgEl('text', {
+  }, `${c.percent}%`));
+  svg.appendChild(svgText('text', {
     x: 0, y: 30, 'text-anchor': 'middle', class: 'stats-donut-center-sub',
-  });
-  sub.textContent = t('todo.done');
-  svg.appendChild(sub);
+  }, t('todo.done')));
   svg.appendChild(pie.labels);
   setPieChart(svg, c, STATS_PIE_FONT_SCALE);
   return svg;
@@ -17135,13 +17130,11 @@ function _buildCfdSvg(weeks) {
     ...attrs, stroke: 'var(--text-faint)', 'stroke-width': 0.375, opacity: op,
   });
   const axisLabel = (val, yv, bold) => {
-    const lab = svgEl('text', {
+    svg.appendChild(svgText('text', {
       x: PAD_L - 5, y: yv + CAP / 2, 'text-anchor': 'end',
       fill: 'var(--text-faint)', 'font-size': FONT, 'font-weight': 600,
       'fill-opacity': bold ? 0.85 : 0.55,
-    });
-    lab.textContent = String(val);
-    svg.appendChild(lab);
+    }, String(val)));
   };
 
   // Horizontal load gridlines every 50 weighted points, plus a slightly firmer peak
@@ -17173,12 +17166,10 @@ function _buildCfdSvg(weeks) {
   const labelStep = n <= 4 ? 1 : n <= 8 ? 2 : 3;
   weeks.forEach((w, i) => {
     if ((n - 1 - i) % labelStep !== 0) return;
-    const wlab = svgEl('text', {
+    svg.appendChild(svgText('text', {
       x: x(i), y: H - 6, 'text-anchor': 'middle',
       fill: 'var(--text-faint)', 'font-size': FONT, 'font-weight': 600,
-    });
-    wlab.textContent = t('stats.weekPrefix') + w.week;
-    svg.appendChild(wlab);
+    }, t('stats.weekPrefix') + w.week));
     if (i === n - 1) {
       svg.appendChild(svgEl('circle', {
         cx: x(i), cy: H - 2.5, r: 1.6, fill: 'var(--accent-primary)',
