@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Lnm9K3ndZrz5JmwDFAE35gDvGQqMNvlk8UOnBeGg+dA='
+               'sha256-OuWOx094BSZjnDk/CXyDsMXPbNAyWo9qOdvKAWD7tXQ='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -23573,20 +23573,7 @@ window.addEventListener('pointerup', (e) => {
   pendingDrag = null;
 
   if (dragState.activeNodeId) {
-    stopDragAutoScroll();
-    clearDragTarget();
-    Object.keys(dragState.initialPositions).forEach(id => {
-      const el = document.querySelector(`.node-group[data-id="${id}"]`);
-      if (el) {
-        el.removeAttribute('pointer-events');
-        el.style.transition = '';
-        el.style.opacity = '';
-      }
-    });
-    document.querySelectorAll('#top-lines-layer path').forEach(path => {
-      path.style.opacity = '';
-    });
-    document.getElementById('main-svg').classList.remove('dragging-active');
+    resetNodeDragVisuals();
     handleNodeDrop(e.clientX, e.clientY);
     dragState.activeNodeId = null;
     endAtomicOp();
@@ -23636,23 +23623,29 @@ function endCenterPan(e) {
 // atomic op it opened, and leave the node where the layout puts it. The gesture
 // is over either way - the pointer was cancelled, or the page is being hidden
 // with a finger still down. An atomic op left open blocks every remote merge.
+// Undoes everything a node drag painted: auto-scroll, the drop-target mark, the
+// dimmed dragged subtree and its lines. Runs before the drop is hit-tested.
+function resetNodeDragVisuals() {
+  stopDragAutoScroll();
+  clearDragTarget();
+  Object.keys(dragState.initialPositions).forEach(id => {
+    const el = document.querySelector(`.node-group[data-id="${id}"]`);
+    if (el) {
+      el.removeAttribute('pointer-events');
+      el.style.transition = '';
+      el.style.opacity = '';
+    }
+  });
+  document.querySelectorAll('#top-lines-layer path').forEach(path => {
+    path.style.opacity = '';
+  });
+  document.getElementById('main-svg').classList.remove('dragging-active');
+}
+
 function abortActiveDrag() {
   pendingDrag = null;
   if (dragState.activeNodeId) {
-    stopDragAutoScroll();
-    clearDragTarget();
-    Object.keys(dragState.initialPositions).forEach(id => {
-      const el = document.querySelector(`.node-group[data-id="${id}"]`);
-      if (el) {
-        el.removeAttribute('pointer-events');
-        el.style.transition = '';
-        el.style.opacity = '';
-      }
-    });
-    document.querySelectorAll('#top-lines-layer path').forEach(path => {
-      path.style.opacity = '';
-    });
-    document.getElementById('main-svg').classList.remove('dragging-active');
+    resetNodeDragVisuals();
     endAtomicOp();
   }
   dragState.activeNodeId = null;
