@@ -576,12 +576,18 @@
      view-toggle bar, disclosed by clicking the already-active Mindmap tab (see
      toggleViewLevels). Costs zero pixels shut, opens right next to its own
      disclosure, and stays open while levels are flipped. */
-  #view-level-bar {
+  /* The floating glass bars: bottom chrome, the mobile Close pills and the
+     import toast. Each id below keeps only where it sits and what it adds;
+     every other rule on these ids out-specifies this one, so order is safe. */
+  #view-level-bar,
+  #fab-pill,
+  #undo-redo-bar,
+  #import-progress-toast,
+  #view-toggle-bar,
+  #help-close-bar,
+  #comment-close-bar {
     position: fixed;
-    left: 50%;
-    bottom: var(--stack-l1);
     display: flex;
-    flex-direction: row;
     align-items: center;
     gap: 0;
     background: var(--glass-bg);
@@ -591,8 +597,12 @@
     border-radius: 8px;
     box-shadow: 0 2px 8px var(--shadow-md);
     padding: 3px;
-    z-index: 2500; /* peer of #view-toggle-bar */
+    z-index: 2500; /* Above Agenda/Help panels (2000) */
     user-select: none;
+  }
+  #view-level-bar {
+    left: 50%;
+    bottom: var(--stack-l1);
     opacity: 0;
     transform: translateX(-50%) translateY(6px);
     pointer-events: none;
@@ -1879,21 +1889,9 @@
 
   /* Help System */
   #fab-pill {
-    position: fixed;
     bottom: 12px;
     right: 12px;
-    display: flex;
-    align-items: center;
-    gap: 0;
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px var(--shadow-md);
-    padding: 3px;
     z-index: 1000;
-    user-select: none;
   }
   #fab-settings, #fab-add {
     width: 36px;
@@ -2562,21 +2560,8 @@
 
   /* ─── Undo / Redo Bar ───────────────────────────────────────────────────── */
   #undo-redo-bar {
-    position: fixed;
     bottom: 12px;
     left: 12px;
-    display: flex;
-    align-items: center;
-    gap: 0;
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px var(--shadow-md);
-    padding: 3px;
-    z-index: 2500;
-    user-select: none;
   }
 
   .undo-redo-btn {
@@ -2615,25 +2600,14 @@
 
   /* ─── Import Progress Toast ───────────────────────────────────────────────── */
   #import-progress-toast {
-    position: fixed;
     bottom: 68px;
     left: 50%;
     transform: translateX(-50%);
-    display: flex;
-    align-items: center;
     gap: 8px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px var(--shadow-md);
     padding: 8px 14px;
-    z-index: 2500;
     font-size: 13px;
     font-weight: 600;
     color: var(--text-dim);
-    user-select: none;
     opacity: 1;
     transition: opacity 0.4s ease;
     white-space: nowrap;
@@ -2730,22 +2704,9 @@
 
   /* ─── View Toggle Bar ────────────────────────────────────────────────────── */
   #view-toggle-bar {
-    position: fixed;
     bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    gap: 0;
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px var(--shadow-md);
-    padding: 3px;
-    z-index: 2500; /* Above Agenda/Help panels (2000) */
-    user-select: none;
   }
 
   /* ─── Agenda Overlay (Blur) ──────────────────────────────────────────────── */
@@ -3213,21 +3174,10 @@
   /* Mobile: floating "Close" pill replaces the top-right X while help is open */
   #help-close-bar,
   #comment-close-bar {
-    position: fixed;
     bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
     display: none;
-    align-items: center;
-    background: var(--glass-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px var(--shadow-md);
-    padding: 3px;
-    z-index: 2500;
-    user-select: none;
   }
   .help-close-btn {
     display: flex;
