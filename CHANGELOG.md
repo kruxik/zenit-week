@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) - `vYYYY.MM.DD[.N]`.
 
+## [v2026.10.17] - 2026-10-17
+
+### Added
+
+- **sync:** Turn the sync menu into a captioned popup dialog
+- **sync:** Show sync status and a one-line issue tip in the sync menu
+- **week:** Clear the Week asks blank canvas or playground, from every entry point
+
+### Changed
+
+- **css:** Read badge colours from the accent tokens instead of duplicate badge tokens
+- **settings:** Close the settings dropdown through its one helper
+- **storage:** Share database deletion and key wiping between reset and sign-out
+- **svg:** Build text and title elements through svgText
+- **stats:** Drop the private SVG element builder in favour of svgEl
+- **agenda:** Build the day-strip tabs through one helper
+- **map:** Share the node drag visual teardown between drop and cancel
+- **status:** Route setStatus done/dropped writes through shared outcome helpers
+- **map:** Draw node status badges through one helper and an ordered icon list
+- **css:** Share one base rule between the view tabs and the dialog close buttons
+- **css:** Group the popover, count-pill and toolbar-popup surface clones
+- **stats:** Share the weighted bucket split, priority weight and legend item builder
+- **map:** Share node bounds, default-zoom marker and wheel zoom helpers
+- **storage:** Route IndexedDB reads and writes through two shared helpers
+- **children:** Build, remove and sort managed child tasks through shared helpers
+- **css:** Share one glass surface rule between the floating bars and pills
+- **menus:** Build context-menu rows and separators through shared helpers
+- **css:** Share one scrim rule between the panel and quick-add backdrops
+- **agenda:** Share drop marker, reorder commit and edge auto-scroll between touch and mouse drag
+- **transfer:** Share one engine between Transfer Unfinished and Transfer Reusable
+- **sync:** Route all Drive multipart uploads through one retrying helper
+- **multitab:** Remove the unreachable IndexedDB blocked overlay
+
+### Fixed
+
+- **agenda:** Give the reduce-effects backdrop a defined overlay token so weak devices still dim the map
+- **sync:** Forget a stale colours file id on 404 instead of throwing on an undefined name
+
 ## [v2026.10.13] - 2026-10-13
 
 ### Fixed
