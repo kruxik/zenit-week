@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-rpSYAYnVq7DV6k75dENi7kKD1k8PgrZ8CV8XeAddYas='
+               'sha256-4Fn1N23KiBf9YfCiGgRj+99kauSMHNaMkxHWMWDc3wQ='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8724,26 +8724,42 @@ async function _awaitIdentityGate() {
   if (gate && !(await gate.promise)) throw new Error('[Drive] Sync paused: account change not confirmed');
 }
 
-// The Drive user behind the current token, or null when the session ended or
-// the gate was shut meanwhile (sign-out). Network trouble is retried on the
-// refresh backoff - giving up would mean either uploading unverified or never
-// syncing again until a reload.
+// The Drive user behind the current token. Resolves { user, unreachable }:
+// `user` is null when the session ended or the gate was shut meanwhile
+// (sign-out, an interactive sign-in), and `unreachable` is set when Drive kept
+// failing - one attempt per step of the refresh backoff, then the caller gives
+// up for now (verifyDriveIdentity) rather than holding every waiter forever.
 async function _fetchDriveUserForGate(gate) {
-  for (let attempt = 0; ; attempt++) {
+  const attempts = REFRESH_RETRY_DELAYS.length;
+  for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       const resp = await driveApiRequest({
         path: DRIVE_ABOUT_URL,
         params: { fields: DRIVE_ABOUT_FIELDS },
         skipIdentityGate: true,
       });
-      return resp.result?.user || null;
+      return { user: resp.result?.user || null, unreachable: false };
     } catch (err) {
-      if (gate.settled || !googleAccessToken || err?.status === 401) return null;
+      if (gate.settled || !googleAccessToken || err?.status === 401) break;
+      if (attempt === attempts - 1) return { user: null, unreachable: true };
       setSyncStatus('error', 'sync.msg.reconnecting');
-      const delay = REFRESH_RETRY_DELAYS[Math.min(attempt, REFRESH_RETRY_DELAYS.length - 1)];
-      await new Promise(r => setTimeout(r, delay));
+      await new Promise(r => setTimeout(r, REFRESH_RETRY_DELAYS[attempt]));
+      if (gate.settled) break;
     }
   }
+  return { user: null, unreachable: false };
+}
+
+// Drive would not say who the token belongs to. The gate stays shut - nothing
+// uploads unverified - but the session is kept: the reconnecting badge shows,
+// and the refresh retry (also run at once on tab focus and on going online)
+// brings a fresh token, whose onTokensReceived runs the check again.
+// The poll is left running: its requests fail at the gate until a check passes.
+function _pauseUnverifiedSync() {
+  console.warn('[Drive] Could not confirm the account behind the session - sync paused');
+  setSyncStatus('error', 'sync.msg.reconnecting');
+  _refreshRetryIndex = Math.max(_refreshRetryIndex, REFRESH_RETRY_DELAYS.length - 1);
+  _scheduleRefreshRetry();
 }
 
 function _confirmAccountSwitch(knownEmail, newEmail) {
@@ -8762,19 +8778,28 @@ function _confirmAccountSwitch(knownEmail, newEmail) {
 
 // Compares the account behind the current token with the one this device was
 // signed in as. Resolves { verdict, user }:
-//   'unknown'  - no stored identity to compare against; nothing was checked
-//   'same'     - the stored account; `user` is the fresh profile
-//   'switched' - another account, and the user chose to use it here (the
-//                per-account caches are dropped and the identity is stored)
-//   'declined' - the user chose to sign out, or the session ended meanwhile;
-//                nothing was sent to that account
+//   'recorded'   - no stored identity to compare against; the account behind
+//                  the token is stored as this device's before anything else
+//                  is sent, so the next silent session has one to compare
+//   'same'       - the stored account; `user` is the fresh profile
+//   'switched'   - another account, and the user chose to use it here (the
+//                  per-account caches are dropped and the identity is stored)
+//   'unverified' - Drive would not answer; sync is paused, the session kept,
+//                  and the check runs again with the next token
+//   'declined'   - the user chose to sign out, or the session ended meanwhile;
+//                  nothing was sent to that account
 async function verifyDriveIdentity() {
   const known = getStoredAuth()?.email || '';
-  if (!known) return { verdict: 'unknown', user: null };
   const gate = _openIdentityGate();   // synchronous - shut before any await
-  const user = await _fetchDriveUserForGate(gate);
-  if (gate.settled || !user) { gate.settle(false); return { verdict: 'declined', user: null }; }
+  const { user, unreachable } = await _fetchDriveUserForGate(gate);
+  if (gate.settled || !user) {
+    const gaveUp = !gate.settled && unreachable;
+    gate.settle(false);
+    if (gaveUp) { _pauseUnverifiedSync(); return { verdict: 'unverified', user: null }; }
+    return { verdict: 'declined', user: null };
+  }
   const email = user.emailAddress || '';
+  if (!known) { _storeDriveUser(user); _passIdentityGate(gate); return { verdict: 'recorded', user }; }
   if (email === known) { _passIdentityGate(gate); return { verdict: 'same', user }; }
 
   stopDrivePoll();
@@ -8799,7 +8824,7 @@ async function _verifyRenewedIdentity() {
   // A check already running reads googleAccessToken afresh - no second one.
   if (_identityGate && !_identityGate.settled) return;
   const { verdict } = await verifyDriveIdentity();
-  if (verdict === 'declined') return;
+  if (verdict === 'declined' || verdict === 'unverified') return;
   // The new account has its own Drive: seed it like a fresh sign-in.
   if (verdict === 'switched') { startDriveSession(); return; }
   // If an import happened while signed out, force-push on token renewal
@@ -8876,6 +8901,10 @@ async function handleAuthCode(callback) {
     // The user picked this account on Google's own screen just now - switching
     // accounts this way needs no second question (startDriveSession).
     _interactiveSignIn = true;
+    // Release anything still waiting on an earlier check before dropping it -
+    // a gate nulled unsettled would strand its waiters for good. A check in
+    // flight sees the gate settled and stands down.
+    if (_identityGate) _identityGate.settle(true);
     _identityGate = null;
     // The refresh token is set as an HttpOnly cookie by /api/token and is never
     // exposed to JS; persist only a non-sensitive session marker here.
@@ -9035,6 +9064,12 @@ async function startDriveSession() {
   if (!interactive) {
     const check = await verifyDriveIdentity();
     if (check.verdict === 'declined') { flowFinish('drive session declined'); return; }
+    if (check.verdict === 'unverified') {
+      // Not started after all: the token the retry brings starts it afresh.
+      _driveSessionStarted = false;
+      flowFinish('drive session unverified');
+      return;
+    }
     verifiedUser = check.user;
   }
 

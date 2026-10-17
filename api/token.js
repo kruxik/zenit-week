@@ -48,19 +48,26 @@ function isLocalHost(req) {
 }
 
 // Sec-Fetch-Site is the browser's own verdict and wins when present; only
-// same-origin passes (same-site would admit a sibling subdomain). Without it,
-// a present Origin must name this host. With neither header the caller is not
-// a browser (curl, a test harness) - every browser that could be steered by a
-// hostile page sends Origin on a POST - and such a caller cannot plant a cookie
-// in someone else's browser, so it is let through.
+// same-origin passes (same-site would admit a sibling subdomain, and 'none' is
+// a user-typed navigation, never the page's own fetch). Without it, Origin
+// must be this deployment's full origin: https:// plus the Host, with http://
+// accepted only on a localhost dev server. Anything else fails closed - an
+// opaque 'null' Origin, and a request with neither header. The page's own
+// calls (exchangeToken, and sw.js mintAccessToken) are same-origin POST
+// fetches, which every browser sends with Origin, so the only callers that
+// arrive with neither are non-browsers, and nothing here is for them.
 function isSameOriginRequest(req) {
   const site = req.headers['sec-fetch-site'];
   if (site) return String(site).toLowerCase() === 'same-origin';
   const origin = req.headers.origin;
-  if (!origin) return true;
-  let originHost;
-  try { originHost = new URL(String(origin)).host.toLowerCase(); } catch { return false; }
-  return originHost === String(req.headers.host || '').toLowerCase();
+  if (!origin) return false;
+  const host = String(req.headers.host || '').toLowerCase();
+  if (!host) return false;
+  let parsed;
+  try { parsed = new URL(String(origin)); } catch { return false; }
+  const allowed = [`https://${host}`];
+  if (isLocalHost(req)) allowed.push(`http://${host}`);
+  return allowed.includes(parsed.origin.toLowerCase());
 }
 
 function isJsonRequest(req) {

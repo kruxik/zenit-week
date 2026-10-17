@@ -260,6 +260,16 @@ function canPushEntry(entry, props) {
 // The refresh token is an HttpOnly cookie, so the worker can mint an access
 // token without the page ever having run. Returns null when the session is gone
 // (signed out, cookie expired) - that is a reason to drop the queue, not retry.
+//
+// This token bypasses the page's account-change guard (verifyDriveIdentity in
+// zenit-week.html): the worker never asks Drive who it now speaks for. That is
+// safe only because every queued entry carries the fileId the page resolved
+// under the original account, and fetchDriveProps and pushEntry address that
+// id and nothing else. If the cookie now names another Google account, that
+// account cannot see the file and answers 404, which drops the entry
+// (fetchDriveProps -> gone) without writing anything. Do not let the worker
+// resolve, list or create files by name - that would make it upload into
+// whichever account the cookie holds.
 async function mintAccessToken() {
   const resp = await fetch('/api/token', {
     method: 'POST',

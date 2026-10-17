@@ -6,13 +6,14 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import { _state, sandboxGlobal, verifyDriveIdentity, authFetch } from './setup.js';
+import { _state, sandboxGlobal, verifyDriveIdentity, authFetch, handleAuthCode } from './setup.js';
 
 const GOOGLE_AUTH_STORAGE_KEY = 'zenit-week-google-auth';
 const VICTIM = 'me@example.com';
 const OTHER  = 'someone-else@example.com';
 
 let aboutEmail;
+let aboutStatus;     // HTTP status the about lookup answers with
 let tokenBodies;
 let driveRequests;   // every googleapis request except the about lookup
 let aboutCalls;
@@ -26,6 +27,7 @@ const server = setupServer(
   }),
   http.get('https://www.googleapis.com/drive/v3/about', () => {
     aboutCalls++;
+    if (aboutStatus !== 200) return HttpResponse.json({ error: 'nope' }, { status: aboutStatus });
     return HttpResponse.json({ user: { emailAddress: aboutEmail, displayName: 'X', photoLink: '' } });
   }),
   http.all('https://www.googleapis.com/*', ({ request }) => {
@@ -47,6 +49,7 @@ describe('account-change guard', () => {
     _state.resetSyncState();
     _state.clearLocalStorage();
     aboutEmail = VICTIM;
+    aboutStatus = 200;
     tokenBodies = [];
     driveRequests = [];
     aboutCalls = 0;
@@ -77,11 +80,79 @@ describe('account-change guard', () => {
     expect(_state.getIdentityGate()).toBe(null);
   });
 
-  test('no stored identity: nothing to compare, nothing fetched', async () => {
+  test('no stored identity: the account is fetched and recorded, no question asked', async () => {
     _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+    aboutEmail = OTHER;
     const { verdict } = await verifyDriveIdentity();
-    expect(verdict).toBe('unknown');
-    expect(aboutCalls).toBe(0);
+    expect(verdict).toBe('recorded');
+    expect(aboutCalls).toBe(1);
+    expect(asked).toBe(null);
+    expect(storedEmail()).toBe(OTHER);
+    expect(_state.getIdentityGate()).toBe(null);
+  });
+
+  test('no stored identity: a Drive request waits until the identity is recorded', async () => {
+    _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+    let emailWhenRequested;
+    server.use(http.get('https://www.googleapis.com/drive/v3/files', () => {
+      emailWhenRequested = storedEmail();
+      driveRequests.push('GET /drive/v3/files');
+      return HttpResponse.json({ files: [] });
+    }));
+    const check = verifyDriveIdentity();
+    const req = authFetch('https://www.googleapis.com/drive/v3/files?q=x');
+    await check;
+    await req;
+    expect(driveRequests).toEqual(['GET /drive/v3/files']);
+    expect(emailWhenRequested).toBe(VICTIM);
+  });
+
+  describe('Drive will not say who the token belongs to', () => {
+    const realSetTimeout = sandboxGlobal.setTimeout;
+    beforeEach(() => {
+      // Collapse the backoff waits so the capped attempts run in one tick each.
+      sandboxGlobal.setTimeout = (fn) => realSetTimeout(fn, 0);
+      aboutStatus = 403;
+    });
+    afterEach(() => { sandboxGlobal.setTimeout = realSetTimeout; });
+
+    test('gives up after the capped attempts, pauses sync and keeps the session', async () => {
+      _state.setSyncStatus('connected');
+      const { verdict } = await verifyDriveIdentity();
+      expect(verdict).toBe('unverified');
+      expect(aboutCalls).toBe(4);
+      expect(asked).toBe(null);
+      expect(_state.getIdentityGate().settled).toBe(true);
+      expect(_state.getIdentityGate().ok).toBe(false);
+      expect(storedEmail()).toBe(VICTIM);
+      expect(_state.getAccessToken()).toBe('token_from_cookie');
+      expect(tokenBodies).toEqual([]);
+      expect(_state.getSyncStatus()).toBe('error');
+      expect(_state.hasRefreshRetryPending()).toBe(true);
+    });
+
+    test('a waiter is released (rejected) when it gives up, and nothing uploads', async () => {
+      const check = verifyDriveIdentity();
+      const upload = authFetch('https://www.googleapis.com/upload/drive/v3/files/x?uploadType=multipart',
+        { method: 'PATCH', body: '{}' });
+      upload.catch(() => {});
+      await check;
+      await expect(upload).rejects.toThrow(/paused/);
+      const late = authFetch('https://www.googleapis.com/drive/v3/files?q=x');
+      late.catch(() => {});
+      await expect(late).rejects.toThrow(/paused/);
+      expect(driveRequests).toEqual([]);
+    });
+
+    test('the next check (reconnect) runs again and reopens sync', async () => {
+      await verifyDriveIdentity();
+      aboutStatus = 200;
+      const { verdict } = await verifyDriveIdentity();
+      expect(verdict).toBe('same');
+      expect(_state.getIdentityGate()).toBe(null);
+      await authFetch('https://www.googleapis.com/drive/v3/files?q=x');
+      expect(driveRequests).toEqual(['GET /drive/v3/files']);
+    });
   });
 
   test('a different account asks, naming both emails, as a danger dialog', async () => {
@@ -166,6 +237,31 @@ describe('account-change guard', () => {
       expect(tokenBodies.map(b => b.grant_type)).toEqual(['logout']);
     });
 
+    test('a silent session with no stored identity records it before the seed', async () => {
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+      let emailAtSeed;
+      sandboxGlobal.initDriveSync = () => { initCalls++; emailAtSeed = storedEmail(); return Promise.resolve(); };
+      await _state.startDriveSessionReal();
+      expect(asked).toBe(null);
+      expect(initCalls).toBe(1);
+      expect(emailAtSeed).toBe(VICTIM);
+    });
+
+    test('a silent session that cannot verify never seeds and can start again', async () => {
+      const realSetTimeout = sandboxGlobal.setTimeout;
+      sandboxGlobal.setTimeout = (fn) => realSetTimeout(fn, 0);
+      aboutStatus = 503;
+      try {
+        await _state.startDriveSessionReal();
+      } finally {
+        sandboxGlobal.setTimeout = realSetTimeout;
+      }
+      expect(initCalls).toBe(0);
+      expect(driveRequests).toEqual([]);
+      expect(_state.getDriveSessionStarted()).toBe(false);
+      expect(storedEmail()).toBe(VICTIM);
+    });
+
     test('an interactive sign-in into another account keeps today\'s behaviour: no question', async () => {
       aboutEmail = OTHER;
       _state.setInteractiveSignIn(true);
@@ -174,5 +270,22 @@ describe('account-change guard', () => {
       expect(initCalls).toBe(1);
       expect(storedEmail()).toBe(OTHER);
     });
+  });
+
+  test('an interactive sign-in releases a request still waiting on an open check', async () => {
+    aboutEmail = OTHER;
+    answer = null;
+    const check = verifyDriveIdentity();
+    const req = authFetch('https://www.googleapis.com/drive/v3/files?q=x');
+    await new Promise(r => setTimeout(r, 20));
+    expect(pendingDialog).not.toBe(null);
+    sandboxGlobal.sessionStorage.setItem(_state.pkceSessionKey,
+      JSON.stringify({ verifier: 'v', redirectUri: 'http://localhost/', state: 's' }));
+    await handleAuthCode({ code: 'c', state: 's' });
+    await req;
+    expect(driveRequests).toEqual(['GET /drive/v3/files']);
+    expect(_state.getIdentityGate()).toBe(null);
+    pendingDialog.onConfirm();
+    expect((await check).verdict).toBe('declined');
   });
 });

@@ -161,6 +161,14 @@ const sandbox = {
     key(i)        { return Object.keys(sandbox._lsStore)[i] ?? null; },
     get length()  { return Object.keys(sandbox._lsStore).length; },
   },
+  // The OAuth callback reads its PKCE record from here (handleAuthCode).
+  _ssStore: {},
+  sessionStorage: {
+    getItem(k)    { return sandbox._ssStore[k] ?? null; },
+    setItem(k, v) { sandbox._ssStore[k] = String(v); },
+    removeItem(k) { delete sandbox._ssStore[k]; },
+    clear()       { sandbox._ssStore = {}; },
+  },
   location: { hash: '' },
   // The app strips the hash on today's week via history.replaceState (and never
   // pushes). Both stubs mirror the browser's observable effect for our call
@@ -503,6 +511,9 @@ _state.setInteractiveSignIn = function(v) { _interactiveSignIn = !!v; };
 _state.getChangesPageToken = function() { return _changesPageToken; };
 _state.setChangesPageToken = function(t) { _changesPageToken = t; };
 _state.getSyncStatus = function() { return syncStatus; };
+_state.setSyncStatus = function(s) { syncStatus = s; };
+_state.getDriveSessionStarted = function() { return _driveSessionStarted; };
+_state.pkceSessionKey = PKCE_SESSION_KEY;
 _state.hasRefreshRetryPending = function() { return _refreshRetryTimer !== null; };
 _state.getUndoRedoForcePush = function() { return _undoRedoForcePush; };
 _state.recordRemoteArrivals = function(wk, local, merged) { _recordRemoteArrivals(wk, local, merged); };
@@ -929,6 +940,7 @@ export const {
   // Google Drive Sync
   attemptSilentRestore,
   verifyDriveIdentity,
+  handleAuthCode,
   // Duplicate-file resolution
   pickDriveSurvivor,
   listAllDriveWeekFiles,

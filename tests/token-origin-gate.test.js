@@ -115,9 +115,41 @@ describe('api/token origin and content-type gate', () => {
     expect(res.headers['Set-Cookie']).toMatch(/^zw_rt=;/);
   });
 
-  it('lets a non-browser caller (neither header) through', async () => {
+  it('fails closed when neither Sec-Fetch-Site nor Origin is sent', async () => {
     const res = mockRes();
     await handler(post({ 'content-type': 'application/json' }, { grant_type: 'logout' }), res);
+    expect(res.statusCode).toBe(403);
+    expect(res.headers['Set-Cookie']).toBeUndefined();
+  });
+
+  it('rejects an opaque Origin: null (sandboxed frame, data: URL)', async () => {
+    const res = mockRes();
+    await handler(post({ origin: 'null', 'content-type': 'application/json' }, CODE_BODY), res);
+    expect(res.statusCode).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects Sec-Fetch-Site: none (a user-initiated navigation, not the page)', async () => {
+    const res = mockRes();
+    await handler(post({
+      'sec-fetch-site': 'none',
+      origin: 'https://zenitweek.com',
+      'content-type': 'application/json',
+    }, CODE_BODY), res);
+    expect(res.statusCode).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an http:// Origin on a non-localhost host even when the host matches', async () => {
+    const res = mockRes();
+    await handler(post({ origin: 'http://zenitweek.com', 'content-type': 'application/json' }, CODE_BODY), res);
+    expect(res.statusCode).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts the full https:// origin when Sec-Fetch-Site is absent', async () => {
+    const res = mockRes();
+    await handler(post({ origin: 'https://zenitweek.com', 'content-type': 'application/json' }, { grant_type: 'logout' }), res);
     expect(res.statusCode).toBe(204);
   });
 
