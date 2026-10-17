@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-CuEzGgJxVfAjq4n3a+3lleUV5nkpIXw7egQG3CqLhgU='
+               'sha256-rpSYAYnVq7DV6k75dENi7kKD1k8PgrZ8CV8XeAddYas='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -7335,6 +7335,11 @@ function reloadBranchPalettes() {
 
 // Branch ids are genId() UUIDs or the legacy 'work' / 'family' / 'me' names.
 const BRANCH_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+// Node ids share the branch-id shape: genId() ('n' + 12 hex), 'center' and the
+// branch ids all fit. Anything else is tampered data and never reaches a selector.
+// The one way to find a node's SVG group: the id is escaped for the selector.
+function nodeGroupEl(id) { return document.querySelector(`.node-group[data-id="${CSS.escape(String(id))}"]`); }
+function isValidNodeId(id) { return typeof id === 'string' && BRANCH_ID_RE.test(id); }
 
 // ─── Onboarding state ────────────────────────────────────────────────────────
 // "This browser has already been taught the app" - the same class of thing as
@@ -7491,7 +7496,7 @@ async function bootstrapColorsSettings() {
 function updateColorDots() {
   Object.keys(BRANCH_COLORS).forEach(b => {
     const color = BRANCH_COLORS[b].main;
-    document.querySelectorAll(`[data-branch-dot="${b}"]`).forEach(el => { el.style.background = color; });
+    document.querySelectorAll(`[data-branch-dot="${CSS.escape(b)}"]`).forEach(el => { el.style.background = color; });
   });
 }
 
@@ -11991,6 +11996,11 @@ function validateAndRepair(data) {
     return defaultWeekData();
   }
 
+  // 0. Drop nodes whose id is not a well-formed id (tampered Drive/import data).
+  // Their references go with them in step 1; valid descendants that were only
+  // reachable through a dropped node fall to the unreachable-node GC below.
+  data.nodes = data.nodes.filter(n => n && typeof n === 'object' && isValidNodeId(n.id));
+
   // 0. Strip leftover editing flags
   data.nodes.forEach(n => { delete n._editing; });
 
@@ -12118,6 +12128,10 @@ function validateAndRepair(data) {
 
 function migrateCrdt(data) {
   if (!Array.isArray(data.tombstones)) data.tombstones = [];
+  data.tombstones = data.tombstones.filter(isValidNodeId);
+  if (Array.isArray(data.nodes)) {
+    data.nodes = data.nodes.filter(n => n && typeof n === 'object' && isValidNodeId(n.id));
+  }
   if (typeof data.crdtVersion !== 'number') data.crdtVersion = 0;
   const fallbackTs = typeof data.savedAt === 'number' ? data.savedAt : 0;
   (data.nodes || []).forEach((n, i) => {
@@ -14885,7 +14899,7 @@ function updateEdgeColorTo(nodeId) {
   const branchId = (child && child.type === 'branch') ? child.id : (child?.branch);
   if (!branchId) return;
   const colorHex = edgeColorFor(nodeId, branchId);
-  const grad = defsEl.querySelector(`#grad-${fromId}-${nodeId}`);
+  const grad = defsEl.querySelector('#' + CSS.escape(`grad-${fromId}-${nodeId}`));
   if (!grad) return;
   grad.querySelectorAll('stop').forEach(s => s.setAttribute('stop-color', colorHex));
 }
@@ -14893,7 +14907,7 @@ function updateEdgeColorTo(nodeId) {
 function makeTaperedCurve(x1, y1, x2, y2, colorHex, swStart, swEnd, fromId, toId, defsEl, bend) {
   const gradId = `grad-${fromId || 'c'}-${toId || 'c'}`;
 
-  let grad = defsEl.querySelector(`#${gradId}`);
+  let grad = defsEl.querySelector('#' + CSS.escape(gradId));
   if (!grad) {
     grad = svgEl('linearGradient', { id: gradId, gradientUnits: 'userSpaceOnUse' });
     grad.appendChild(svgEl('stop', { offset: '0%', 'stop-color': colorHex, 'stop-opacity': '0.9' }));
@@ -16336,7 +16350,7 @@ function syncStatusUp(nodeId, prop) {
 }
 
 function updateNodeUI(nodeId) {
-  const g = document.querySelector(`.node-group[data-id="${nodeId}"]`);
+  const g = nodeGroupEl(nodeId);
   if (!g) return;
 
   const node = findNode(nodeId);
@@ -16594,7 +16608,7 @@ function isVirtuallyDone(nodeId) {
 }
 
 function applyVirtualDoneUI(id, isVirtual) {
-  const g = document.querySelector(`.node-group[data-id="${id}"]`);
+  const g = nodeGroupEl(id);
   if (!g) return;
   if (isVirtual) {
     const { DONE_BG, DONE_BORDER, DONE_TEXT } = getThemeColors();
@@ -18095,7 +18109,7 @@ function setKbFocus(id, pos) {
   kbFocusId = id;
   hoveredNodeId = id;
   paintKbFocus();
-  raiseNodeGroup(document.querySelector(`.node-group[data-id="${id}"]`));
+  raiseNodeGroup(nodeGroupEl(id));
   panNodeIntoView(pos);
 }
 
@@ -23431,7 +23445,7 @@ function cacheDragSubtree(id, anchorClientX, anchorClientY, lastClientX, lastCli
   idsToDrag.forEach(idToDrag => {
     const p = positions[idToDrag];
     if (p) initialPositions[idToDrag] = { x: p.x, y: p.y };
-    const el = document.querySelector(`.node-group[data-id="${idToDrag}"]`);
+    const el = nodeGroupEl(idToDrag);
     if (el) {
       nodeEls[idToDrag] = el;
       el.style.transition = 'none';
@@ -23613,11 +23627,11 @@ function updateDragTarget(cx, cy) {
 
   if (dragState.targetId === targetId) return;
   if (dragState.targetId) {
-    const prev = document.querySelector(`.node-group[data-id="${dragState.targetId}"]`);
+    const prev = nodeGroupEl(dragState.targetId);
     if (prev) prev.classList.remove('drag-target');
   }
   if (targetId) {
-    const cur = document.querySelector(`.node-group[data-id="${targetId}"]`);
+    const cur = nodeGroupEl(targetId);
     if (cur) cur.classList.add('drag-target');
   }
   dragState.targetId = targetId;
@@ -23625,7 +23639,7 @@ function updateDragTarget(cx, cy) {
 
 function clearDragTarget() {
   if (!dragState.targetId) return;
-  const el = document.querySelector(`.node-group[data-id="${dragState.targetId}"]`);
+  const el = nodeGroupEl(dragState.targetId);
   if (el) el.classList.remove('drag-target');
   dragState.targetId = null;
 }
@@ -23744,7 +23758,7 @@ function resetNodeDragVisuals() {
   stopDragAutoScroll();
   clearDragTarget();
   Object.keys(dragState.initialPositions).forEach(id => {
-    const el = document.querySelector(`.node-group[data-id="${id}"]`);
+    const el = nodeGroupEl(id);
     if (el) {
       el.removeAttribute('pointer-events');
       el.style.transition = '';
@@ -24058,7 +24072,7 @@ function repackLayout() {
     else p.removeAttribute('data-bend');
     p.setAttribute('data-x1', e.x1); p.setAttribute('data-y1', e.y1);
     p.setAttribute('data-x2', e.x2); p.setAttribute('data-y2', e.y2);
-    const grad = defsEl && defsEl.querySelector(`#grad-${fromId || 'c'}-${toId || 'c'}`);
+    const grad = defsEl && defsEl.querySelector('#' + CSS.escape(`grad-${fromId || 'c'}-${toId || 'c'}`));
     if (grad) {
       grad.setAttribute('x1', e.x1); grad.setAttribute('y1', e.y1);
       grad.setAttribute('x2', e.x2); grad.setAttribute('y2', e.y2);
@@ -26085,7 +26099,7 @@ function renderCoachmarkContent(hint) {
 // groups, so prefer a fresh lookup by data-id over the (possibly stale) ref.
 function _resolveCoachmarkAnchor() {
   if (_coachmarkAnchorId) {
-    const byId = document.querySelector(`.node-group[data-id="${_coachmarkAnchorId}"]`);
+    const byId = nodeGroupEl(_coachmarkAnchorId);
     if (byId) return byId;
   }
   return _coachmarkAnchorEl;
@@ -26281,7 +26295,7 @@ function flushPendingHint() {
   _pendingHint = null;
   if (!pending) return;
   const el = pending.anchorId
-    ? (document.querySelector(`.node-group[data-id="${CSS.escape(pending.anchorId)}"]`) || pending.anchorEl)
+    ? (nodeGroupEl(CSS.escape(pending.anchorId)) || pending.anchorEl)
     : pending.anchorEl;
   if (!el || el.isConnected === false) return; // anchor gone - nothing to point at
   maybeShowHint(pending.id, el, pending.pulseTarget);

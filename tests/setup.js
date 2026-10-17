@@ -87,6 +87,8 @@ const sandbox = {
     return globalThis.fetch(finalUrl, options);
   },
   console,
+  // Minimal CSS.escape: backslash-escapes everything outside [A-Za-z0-9_-].
+  CSS: { escape: (v) => String(v).replace(/[^A-Za-z0-9_-]/g, c => '\\' + c) },
   CustomEvent: class {
     constructor(type) { this.type = type; }
   },
@@ -720,6 +722,8 @@ export const {
   loadSchedule,
   saveSchedule,
   genId,
+  isValidNodeId,
+  nodeGroupEl,
   defaultWeekData,
   validateAndRepair,
   animatePanTo,
