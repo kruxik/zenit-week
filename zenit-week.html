@@ -10,10 +10,10 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-aa12ndW+q6IN8oLA6s/pCkvXH7jdQpiFbqhSPLxDW/4=';
-  connect-src  'self' https://*.googleapis.com;
+               'sha256-cZDLhs69aybUqnve9cplN4mEp4rSoSSgHj3yRHh/4S0=';
+  connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
-  img-src      'self' data: https://*.googleusercontent.com;
+  img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
   style-src    'unsafe-inline';
   manifest-src 'self' data:;
   base-uri     'none';
@@ -7429,7 +7429,7 @@ function sanitizeColorsData(raw) {
   if (!raw || typeof raw !== 'object') return out;
   if (Number.isFinite(raw.savedAt)) out.savedAt = raw.savedAt;
   if (raw.theme === 'light' || raw.theme === 'dark') out.theme = raw.theme;
-  if (typeof raw.lang === 'string' && Object.prototype.hasOwnProperty.call(TRANSLATIONS, raw.lang)) {
+  if (isKnownLang(raw.lang)) {
     out.lang = raw.lang;
   }
   const onboarding = sanitizeOnboarding(raw.onboarding);
@@ -10476,7 +10476,7 @@ async function syncColorsFromDrive() {
       }
       await loadBranchColors();    // now derives palettes against the correct theme
       reloadBranchPalettes(); // ensure light/text variants are re-derived for new theme
-      if (remoteData.lang && remoteData.lang in TRANSLATIONS && remoteData.lang !== currentLang) {
+      if (isKnownLang(remoteData.lang) && remoteData.lang !== currentLang) {
         currentLang = remoteData.lang;
         localStorage.setItem('zenit-week-lang', remoteData.lang);
         applyTranslations();
@@ -10884,12 +10884,17 @@ let currentWeekKey = '';   // 'YYYY-WW'
 // should show anyway.
 let weekData = { nodes: [], tombstones: [] };
 let currentLang = 'en';
+// Own keys only: `in` would also accept 'constructor' or '__proto__' from a
+// synced file or a browser language tag.
+function isKnownLang(code) {
+  return typeof code === 'string' && Object.prototype.hasOwnProperty.call(TRANSLATIONS, code);
+}
 function detectBrowserLang() {
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language || 'en'];
   for (const tag of tags) {
     const code = tag.toLowerCase().split('-')[0];
     if (code === 'cs') return 'cs';
-    if (typeof TRANSLATIONS !== 'undefined' && code in TRANSLATIONS) return code;
+    if (typeof TRANSLATIONS !== 'undefined' && isKnownLang(code)) return code;
   }
   return 'en';
 }

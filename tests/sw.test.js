@@ -1121,7 +1121,7 @@ describe('sw.js - avatar photo', () => {
   beforeEach(() => { w = loadWorker(); });
 
   it('claims the Google photo hosts', () => {
-    for (const href of ['https://lh3.googleusercontent.com/a/x', 'https://googleusercontent.com/a/x']) {
+    for (const href of ['lh3', 'lh4', 'lh5', 'lh6'].map(h => `https://${h}.googleusercontent.com/a/x`)) {
       expect(w.ctx.isAvatarPhoto(new URL(href))).toBe(true);
     }
   });
@@ -1129,7 +1129,11 @@ describe('sw.js - avatar photo', () => {
   it('matches the host suffix, not a substring an attacker can choose', () => {
     for (const href of ['https://googleusercontent.com.evil.example/a/x',
                         'https://evil-googleusercontent.com/a/x',
-                        'http://lh3.googleusercontent.com/a/x']) {
+                        'http://lh3.googleusercontent.com/a/x',
+                        'https://googleusercontent.com/a/x',
+                        'https://lh7.googleusercontent.com/a/x',
+                        'https://docs.googleusercontent.com/a/x',
+                        'https://evil.lh3.googleusercontent.com/a/x']) {
       expect(w.ctx.isAvatarPhoto(new URL(href))).toBe(false);
     }
   });

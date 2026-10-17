@@ -172,11 +172,14 @@ function isManifestIcon(url) {
 }
 
 // The Google profile photo - the only cross-origin subresource the app loads.
-// Matched on the exact host suffix, never a substring: `googleusercontent.com`
-// appearing anywhere in an attacker-chosen hostname must not qualify.
+// Matched on the exact host, never a suffix: Drive's photoLink is served from
+// lh3 (lh4 to lh6 have appeared), and the CSP img-src lists those same four
+// hosts, so any other googleusercontent.com name (user content, not avatars)
+// is neither loaded nor cached. Keep this and the meta CSP in step.
+const AVATAR_PHOTO_HOSTS = ['lh3.googleusercontent.com', 'lh4.googleusercontent.com',
+  'lh5.googleusercontent.com', 'lh6.googleusercontent.com'];
 function isAvatarPhoto(url) {
-  return url.protocol === 'https:'
-    && (url.hostname === 'googleusercontent.com' || url.hostname.endsWith('.googleusercontent.com'));
+  return url.protocol === 'https:' && AVATAR_PHOTO_HOSTS.includes(url.hostname);
 }
 
 // The marketing pages are ordinary, distinct documents, so unlike the shell they

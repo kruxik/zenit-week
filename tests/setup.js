@@ -902,7 +902,7 @@ export const {
   fnv1a32,
   weekContentHash,
   colorsContentHash,
-  sanitizeColorsData,
+  sanitizeColorsData, isKnownLang,
   onboardingSettings,
   mergeRemoteOnboarding,
   readBoolPref,

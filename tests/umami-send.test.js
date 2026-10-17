@@ -29,6 +29,7 @@ describe('api/umami-send', () => {
     const req = {
       method: 'POST',
       headers: {
+        'sec-fetch-site': 'same-origin',
         'content-type': 'application/json',
         'user-agent': 'Mozilla/5.0 test',
         'x-umami-website-id': 'site',
@@ -54,7 +55,7 @@ describe('api/umami-send', () => {
   });
 
   it('falls back to the first X-Forwarded-For entry without x-real-ip', async () => {
-    const req = { method: 'POST', headers: { 'x-forwarded-for': '198.51.100.4, 10.0.0.1' }, body: {} };
+    const req = { method: 'POST', headers: { 'sec-fetch-site': 'same-origin', 'x-forwarded-for': '198.51.100.4, 10.0.0.1' }, body: {} };
     await handler(req, mockRes());
     expect(fetchMock.mock.calls[0][1].headers['x-umami-client-ip']).toBe('198.51.100.4');
   });
@@ -69,7 +70,7 @@ describe('api/umami-send', () => {
   it('answers 502 when Umami is unreachable', async () => {
     fetchMock.mockRejectedValueOnce(new Error('down'));
     const res = mockRes();
-    await handler({ method: 'POST', headers: {}, body: {} }, res);
+    await handler({ method: 'POST', headers: { 'sec-fetch-site': 'same-origin' }, body: {} }, res);
     expect(res.statusCode).toBe(502);
   });
 });

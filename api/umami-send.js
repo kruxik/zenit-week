@@ -8,7 +8,12 @@
 // Tested 2026-10-10: x-umami-client-ip moved a test visit to its own country,
 // X-Forwarded-For left it on the sender's.
 
+import { isSameOriginRequest } from './_lib/same-origin.js';
+
 const UMAMI_SEND_URL = 'https://gateway.umami.is/api/send';
+
+// Umami events are a few hundred bytes; anything past this is not a tracker.
+const MAX_BODY_BYTES = 8 * 1024;
 
 // Request headers the tracker sets that Umami needs to see.
 const FORWARDED_HEADERS = ['content-type', 'user-agent', 'x-umami-website-id', 'x-umami-hostname', 'x-umami-cache'];
@@ -25,14 +30,17 @@ function clientIp(req) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
 
+  if (!isSameOriginRequest(req)) return res.status(403).json({ error: 'cross_site_request' });
+
+  const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
+  if (Buffer.byteLength(body) > MAX_BODY_BYTES) return res.status(413).json({ error: 'payload_too_large' });
+
   const headers = {};
   for (const name of FORWARDED_HEADERS) {
     if (req.headers[name]) headers[name] = String(req.headers[name]);
   }
   const ip = clientIp(req);
   if (ip) headers['x-umami-client-ip'] = ip;
-
-  const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
 
   try {
     const upstream = await fetch(UMAMI_SEND_URL, { method: 'POST', headers, body });
