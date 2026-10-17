@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-AzZ4HjlVk+SJeUWVBxJnBzn6HG1wtdvvWBg69rN0XLQ='
+               'sha256-CuEzGgJxVfAjq4n3a+3lleUV5nkpIXw7egQG3CqLhgU='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8185,6 +8185,16 @@ let _tokenReceivedAt = 0;         // epoch ms when current access token was obta
 let _refreshPromise = null;       // deduplicates concurrent 401 refresh attempts
 let _driveSessionStarted = false; // true after startDriveSession has run for this sign-in
 let _isFirstConnection = false;   // true when this browser has never synced with Drive before
+// Account-change guard (see verifyDriveIdentity). A token obtained without the
+// user choosing an account - silent restore, the 55-min renewal, a 401 refresh -
+// may belong to a different Google account than the one this device was signed
+// in with: the refresh cookie can be replaced from outside the page. While the
+// gate is open every Drive request waits on it, so nothing reaches that account
+// until the user says it may.
+let _interactiveSignIn = false;   // set by handleAuthCode: the user just picked this account
+let _identityGate = null;         // { promise, settle, settled, ok } while unverified or declined
+const DRIVE_ABOUT_URL    = 'https://www.googleapis.com/drive/v3/about';
+const DRIVE_ABOUT_FIELDS = 'user(displayName,emailAddress,photoLink)';
 let lastSyncedAt = null;        // timestamp of last successful Drive upload or download
 let _pollTimer = null;          // setInterval handle for 10s background metadata poll
 const POLL_INTERVAL_MS = 10_000;
@@ -8633,17 +8643,21 @@ function _handleAuthExpiry() {
 
 // Authenticated fetch: injects Bearer token, recovers from 401 with one silent refresh+retry.
 // Concurrent 401s share a single refresh attempt via _refreshPromise dedup in silentRefresh().
-async function authFetch(url, options = {}) {
+// `skipIdentityGate` is for the identity check's own request and nothing else.
+async function authFetch(url, { skipIdentityGate = false, ...options } = {}) {
   const withAuth = opts => ({
     ...opts,
     headers: { ...(opts.headers || {}), 'Authorization': `Bearer ${googleAccessToken}` },
   });
+  if (!skipIdentityGate) await _awaitIdentityGate();
   const resp = await netFetch(url, withAuth(options));
   if (resp.status !== 401) return resp;
 
   const stored = getStoredAuth();
   if (!stored?.hasSession) { _handleAuthExpiry(); return resp; }
   if (!_handleRefreshResult(await silentRefresh())) return resp;
+  // The refresh may have brought a different account - wait for its verdict.
+  if (!skipIdentityGate) await _awaitIdentityGate();
   return netFetch(url, withAuth(options));
 }
 
@@ -8671,10 +8685,120 @@ async function onTokensReceived(accessToken) {
     loadDriveFileIds(getStoredAuth()?.email || '');
     startDriveSession(); // avatar + full Drive seed (first sign-in only)
   } else {
-    // Token renewal: authFetch reads googleAccessToken directly, nothing to update.
-    // If an import happened while signed out, force-push on token renewal
-    isImportPending().then(pending => { if (pending) forcePushAllToDrive(); });
+    // Token renewal: authFetch reads googleAccessToken directly, nothing to
+    // update - but the token may now speak for another account. Not awaited:
+    // the check's own request can need a refresh, which would wait on this one.
+    _verifyRenewedIdentity();
   }
+}
+
+// ─── Account-change guard ─────────────────────────────────────────────────────
+function _openIdentityGate() {
+  let resolve;
+  const gate = { settled: false, ok: null };
+  gate.promise = new Promise(r => { resolve = r; });
+  gate.settle = ok => {
+    if (gate.settled) return;
+    gate.settled = true;
+    gate.ok = ok;
+    resolve(ok);
+  };
+  _identityGate = gate;
+  return gate;
+}
+
+// A confirmed gate is removed; a declined one stays shut until the next
+// interactive sign-in, so a straggling upload can never slip through.
+function _passIdentityGate(gate) {
+  gate.settle(true);
+  if (_identityGate === gate) _identityGate = null;
+}
+
+async function _awaitIdentityGate() {
+  const gate = _identityGate;
+  if (gate && !(await gate.promise)) throw new Error('[Drive] Sync paused: account change not confirmed');
+}
+
+// The Drive user behind the current token, or null when the session ended or
+// the gate was shut meanwhile (sign-out). Network trouble is retried on the
+// refresh backoff - giving up would mean either uploading unverified or never
+// syncing again until a reload.
+async function _fetchDriveUserForGate(gate) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const resp = await driveApiRequest({
+        path: DRIVE_ABOUT_URL,
+        params: { fields: DRIVE_ABOUT_FIELDS },
+        skipIdentityGate: true,
+      });
+      return resp.result?.user || null;
+    } catch (err) {
+      if (gate.settled || !googleAccessToken || err?.status === 401) return null;
+      setSyncStatus('error', 'sync.msg.reconnecting');
+      const delay = REFRESH_RETRY_DELAYS[Math.min(attempt, REFRESH_RETRY_DELAYS.length - 1)];
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
+function _confirmAccountSwitch(knownEmail, newEmail) {
+  return new Promise(resolve => {
+    showAppConfirm({
+      title:       t('sync.accountSwitch.title'),
+      body:        t('sync.accountSwitch.body', { old: knownEmail, new: newEmail }),
+      okLabel:     t('sync.accountSwitch.use'),
+      cancelLabel: t('sync.signOut'),
+      danger:      true,
+      onConfirm:   () => resolve(true),
+      onCancel:    () => resolve(false),
+    });
+  });
+}
+
+// Compares the account behind the current token with the one this device was
+// signed in as. Resolves { verdict, user }:
+//   'unknown'  - no stored identity to compare against; nothing was checked
+//   'same'     - the stored account; `user` is the fresh profile
+//   'switched' - another account, and the user chose to use it here (the
+//                per-account caches are dropped and the identity is stored)
+//   'declined' - the user chose to sign out, or the session ended meanwhile;
+//                nothing was sent to that account
+async function verifyDriveIdentity() {
+  const known = getStoredAuth()?.email || '';
+  if (!known) return { verdict: 'unknown', user: null };
+  const gate = _openIdentityGate();   // synchronous - shut before any await
+  const user = await _fetchDriveUserForGate(gate);
+  if (gate.settled || !user) { gate.settle(false); return { verdict: 'declined', user: null }; }
+  const email = user.emailAddress || '';
+  if (email === known) { _passIdentityGate(gate); return { verdict: 'same', user }; }
+
+  stopDrivePoll();
+  console.warn('[Drive] Account behind the session changed - sync paused until confirmed');
+  const accepted = await _confirmAccountSwitch(known, email);
+  if (gate.settled) return { verdict: 'declined', user: null };
+  if (!accepted) {
+    gate.settle(false);
+    // No pre-sign-out flush: whatever is pending belongs to the other account.
+    googleAccessToken = null;
+    await signOut();
+    return { verdict: 'declined', user: null };
+  }
+  _forgetDriveAccountCaches();
+  _storeDriveUser(user);
+  showSignedInState(user);
+  _passIdentityGate(gate);
+  return { verdict: 'switched', user };
+}
+
+async function _verifyRenewedIdentity() {
+  // A check already running reads googleAccessToken afresh - no second one.
+  if (_identityGate && !_identityGate.settled) return;
+  const { verdict } = await verifyDriveIdentity();
+  if (verdict === 'declined') return;
+  // The new account has its own Drive: seed it like a fresh sign-in.
+  if (verdict === 'switched') { startDriveSession(); return; }
+  // If an import happened while signed out, force-push on token renewal
+  isImportPending().then(pending => { if (pending) forcePushAllToDrive(); });
 }
 
 // ─── Interactive sign-in: full-page redirect with PKCE (Safari-compatible) ────
@@ -8744,6 +8868,10 @@ async function handleAuthCode(callback) {
       return;
     }
     _isFirstConnection = !getStoredAuth();
+    // The user picked this account on Google's own screen just now - switching
+    // accounts this way needs no second question (startDriveSession).
+    _interactiveSignIn = true;
+    _identityGate = null;
     // The refresh token is set as an HttpOnly cookie by /api/token and is never
     // exposed to JS; persist only a non-sensitive session marker here.
     localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify({ hasSession: true }));
@@ -8760,6 +8888,8 @@ async function handleAuthCode(callback) {
 // fresh consent screen on the next sign-in. Dropping the access token this
 // page holds and clearing the refresh cookie is the whole of the session.
 async function signOut() {
+  // A request waiting on an unconfirmed account must give up, not upload.
+  if (_identityGate) _identityGate.settle(false);
   stopDrivePoll();
   if (tokenRenewalTimer)        { clearInterval(tokenRenewalTimer);        tokenRenewalTimer = null; }
   clearAllSyncDebounceTimers();
@@ -8785,24 +8915,30 @@ async function signOut() {
     navigator.serviceWorker.controller.postMessage({ type: 'zw-clear-avatar' });
   }
 
-  colorsSyncedHash = null;
-  lastSeenRemoteColorsHash = null;
-  scheduleSyncedHash = null;
-  lastSeenRemoteScheduleHash = null;
   googleAccessToken = null;
   _driveSessionStarted = false;
   _isFirstConnection = false;
-  clearDriveFileIds();
-  lastSyncedHash.clear();
-  lastSeenRemoteHash.clear();
-  _changesPageToken = null;
-  etagCache.clear();
+  _forgetDriveAccountCaches();
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
   showSignedOutButton('sync.btnLabel');
   setSyncStatus('disconnected');
   // Clear the HttpOnly refresh cookie server-side (JS can't read it). Google
   // keeps the grant, so the other devices stay signed in.
   exchangeToken({ grant_type: 'logout' }).catch(() => {});
+}
+
+// Everything this device remembers about one account's Drive files - shared
+// by sign-out and by switching accounts (verifyDriveIdentity).
+function _forgetDriveAccountCaches() {
+  colorsSyncedHash = null;
+  lastSeenRemoteColorsHash = null;
+  scheduleSyncedHash = null;
+  lastSeenRemoteScheduleHash = null;
+  clearDriveFileIds();
+  lastSyncedHash.clear();
+  lastSeenRemoteHash.clear();
+  _changesPageToken = null;
+  etagCache.clear();
 }
 
 // Sign out AND wipe all local USER data (weeks, colors, sync caches, undo/redo).
@@ -8848,6 +8984,21 @@ function setSyncStatus(status, messageKey) {
   updateDropdownTip();
 }
 
+// Cache user info so the avatar renders instantly on the next page load.
+function _storeDriveUser(user) {
+  const storedAuth = getStoredAuth();
+  if (!storedAuth) return;
+  // A different account than the one the cached ids were stamped with -
+  // those ids address files this session cannot see.
+  if (storedAuth.email && storedAuth.email !== (user?.emailAddress || '')) clearDriveFileIds();
+  storedAuth.email       = user?.emailAddress || '';
+  storedAuth.displayName = user?.displayName  || '';
+  // Sized before caching so the inline first-paint script requests the same
+  // URL the app does later - one Cache Storage entry, not two.
+  storedAuth.photoLink   = sizedAvatarUrl(user?.photoLink || '');
+  localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(storedAuth));
+}
+
 // ─── TASK-08: First-sync session bootstrap ────────────────────────────────────
 // Runs once per sign-in: fetches the user profile for the avatar, seeds all
 // weeks from Drive, and starts the poll. Plain authenticated REST throughout -
@@ -8869,35 +9020,39 @@ async function startDriveSession() {
   // lookup - which only refreshes a name and a photo - waits until the week the
   // user is looking at is on screen. Signing in to look at your week and being
   // shown your own face instead is the wrong order of business.
+  // The one exception to data-first: a session the user did not just pick an
+  // account for is checked against the stored identity before anything is
+  // read or written - otherwise the local-only weeks below would upload into
+  // whatever account the refresh cookie now names. Costs one round trip.
+  let verifiedUser = null;
+  const interactive = _interactiveSignIn;
+  _interactiveSignIn = false;
+  if (!interactive) {
+    const check = await verifyDriveIdentity();
+    if (check.verdict === 'declined') { flowFinish('drive session declined'); return; }
+    verifiedUser = check.user;
+  }
+
   let shownWeekDone;
   const shownWeekReady = new Promise(resolve => { shownWeekDone = resolve; });
   const sessionSync = initDriveSync(shownWeekDone); // TASK-09 - list all files + 3-phase seed
   try {
     // Whichever settles first: the week landing, or the whole sync giving up.
     await Promise.race([shownWeekReady, sessionSync]);
-    // Fetch user info via Drive about (works with drive.appdata scope)
-    const endAbout = traceSpan('drive:about');
-    const aboutResp = await driveApiRequest({
-      path: 'https://www.googleapis.com/drive/v3/about',
-      params: { fields: 'user(displayName,emailAddress,photoLink)' },
-    });
-    endAbout();
-    const user = aboutResp.result?.user;
+    let user = verifiedUser;
+    if (!user) {
+      // Fetch user info via Drive about (works with drive.appdata scope)
+      const endAbout = traceSpan('drive:about');
+      const aboutResp = await driveApiRequest({
+        path: DRIVE_ABOUT_URL,
+        params: { fields: DRIVE_ABOUT_FIELDS },
+      });
+      endAbout();
+      user = aboutResp.result?.user;
+    }
     showSignedInState(user);
     traceMilestone('avatar painted');
-    // Cache user info so avatar renders instantly on next page load
-    const storedAuth = getStoredAuth();
-    if (storedAuth) {
-      // A different account than the one the cached ids were stamped with -
-      // those ids address files this session cannot see.
-      if (storedAuth.email && storedAuth.email !== (user?.emailAddress || '')) clearDriveFileIds();
-      storedAuth.email       = user?.emailAddress || '';
-      storedAuth.displayName = user?.displayName  || '';
-      // Sized before caching so the inline first-paint script requests the same
-      // URL the app does later - one Cache Storage entry, not two.
-      storedAuth.photoLink   = sizedAvatarUrl(user?.photoLink || '');
-      localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(storedAuth));
-    }
+    _storeDriveUser(user);
     setSyncStatus('connected', 'sync.msg.synced');
     await sessionSync;
     startDrivePoll(currentWeekKey);
@@ -9397,6 +9552,7 @@ async function driveApiRequest(config) {
       method:  config.method || 'GET',
       headers: config.headers,
       body:    config.body,
+      skipIdentityGate: !!config.skipIdentityGate,
     });
     let result = null;
     try { result = await resp.json(); } catch { /* 204 / empty body */ }
@@ -11298,6 +11454,9 @@ const TRANSLATIONS = {
     'sync.signOutConfirm.body':       'Your data stays in your Google Drive, and your other devices stay signed in.\nWhat to do with the local copy on this device?\nAny pending changes will sync before signing out.',
     'sync.signOutConfirm.keepLocal':  'Keep data',
     'sync.signOutConfirm.clearLocal': 'Clear & sign out',
+    'sync.accountSwitch.title':       'Different Google account',
+    'sync.accountSwitch.body':        'This device was signed in as {old}, but Google Drive now answers as {new}.\nSync is paused and nothing has been uploaded.\nUse {new} on this device, or sign out?',
+    'sync.accountSwitch.use':         'Use this account',
     'app-confirm.cancel':         'Cancel',
     'sync.reconnect':             'Reconnect',
     'sync.badge.disconnected':    'Not connected to Google Drive',
@@ -11679,6 +11838,9 @@ const TRANSLATIONS = {
     'sync.signOutConfirm.body':       'Tvoje data zůstávají na tvém Disku Google a ostatní zařízení zůstanou přihlášená.\nVyber, co udělat s lokální kopií na tomto zařízení?\nNesynchronizované změny se před odhlášením nahrají.',
     'sync.signOutConfirm.keepLocal':  'Ponechat data',
     'sync.signOutConfirm.clearLocal': 'Smazat a odhlásit',
+    'sync.accountSwitch.title':       'Jiný účet Google',
+    'sync.accountSwitch.body':        'Toto zařízení bylo přihlášené jako {old}, ale Disk Google teď hlásí účet {new}.\nSynchronizace je pozastavená a nic se nenahrálo.\nPoužít na tomto zařízení účet {new}, nebo se odhlásit?',
+    'sync.accountSwitch.use':         'Použít tento účet',
     'app-confirm.cancel':         'Zrušit',
     'sync.reconnect':             'Připojit znovu',
     'sync.badge.disconnected':    'Nepřipojeno k Disku Google',
@@ -24867,9 +25029,18 @@ window.addEventListener('pagehide', _flushOnTeardown);
   const okBtn        = document.getElementById('app-confirm-ok');
   let _onConfirm     = null;
   let _onSecondary   = null;
+  let _onCancel      = null;
 
-  function closeAppConfirm() {
+  // Hides without an outcome - the OK and secondary paths, which have their own.
+  function hideAppConfirm() {
     overlay.classList.remove('visible');
+    _onCancel = null;
+  }
+  // Dismissal: the X, Cancel, the backdrop and Esc. `onCancel` runs once.
+  function closeAppConfirm() {
+    const onCancel = _onCancel;
+    hideAppConfirm();
+    if (onCancel) onCancel();
   }
   // The X and Cancel are one outcome, and Esc reaches them through the shared
   // dismissal walk rather than a listener of this dialog's own.
@@ -24880,12 +25051,15 @@ window.addEventListener('pagehide', _flushOnTeardown);
     title, body,
     okLabel = 'OK', danger = false, onConfirm,
     secondaryLabel = null, secondaryDanger = false, onSecondary = null,
+    cancelLabel = null, onCancel = null,
   }) {
     titleEl.textContent  = title;
     bodyEl.textContent   = body;
     okBtn.textContent    = okLabel;
     okBtn.classList.toggle('danger', danger);
+    cancelBtn.textContent = cancelLabel || t('app-confirm.cancel');
     _onConfirm = onConfirm;
+    _onCancel  = onCancel;
 
     if (secondaryLabel) {
       secondaryBtn.textContent = secondaryLabel;
@@ -24905,11 +25079,11 @@ window.addEventListener('pagehide', _flushOnTeardown);
   closeBtn.addEventListener('click', closeAppConfirm);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAppConfirm(); });
   secondaryBtn.addEventListener('click', () => {
-    closeAppConfirm();
+    hideAppConfirm();
     if (_onSecondary) _onSecondary();
   });
   okBtn.addEventListener('click', () => {
-    closeAppConfirm();
+    hideAppConfirm();
     if (_onConfirm) _onConfirm();
   });
 })();

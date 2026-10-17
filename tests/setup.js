@@ -360,6 +360,8 @@ scheduleColorsSync = () => {};
 isAtomicOpActive = () => false;
 stopDrivePoll = () => {};
 startDrivePoll = () => {};
+// Kept for the account-change guard tests, which drive the real ordering.
+const _realStartDriveSession = startDriveSession;
 startDriveSession = () => {};
 onTokensReceived = async (token) => {
   googleAccessToken = token;
@@ -490,7 +492,12 @@ _state.resetSyncState = function() {
   if (tokenRenewalTimer) { clearInterval(tokenRenewalTimer); tokenRenewalTimer = null; }
   _cancelRefreshRetry();
   syncStatus = 'disconnected';
+  _identityGate = null;
+  _interactiveSignIn = false;
 };
+_state.getIdentityGate = function() { return _identityGate; };
+_state.startDriveSessionReal = function() { return _realStartDriveSession(); };
+_state.setInteractiveSignIn = function(v) { _interactiveSignIn = !!v; };
 _state.getChangesPageToken = function() { return _changesPageToken; };
 _state.setChangesPageToken = function(t) { _changesPageToken = t; };
 _state.getSyncStatus = function() { return syncStatus; };
@@ -917,6 +924,7 @@ export const {
   shouldShowUpdateBanner,
   // Google Drive Sync
   attemptSilentRestore,
+  verifyDriveIdentity,
   // Duplicate-file resolution
   pickDriveSurvivor,
   listAllDriveWeekFiles,

@@ -5,6 +5,14 @@
 // refresh_token grants, a logout action that ends this browser's session, and
 // revoke_legacy for retiring plaintext tokens left in localStorage before the
 // cookie change.
+//
+// Every POST must be a same-origin JSON request (isSameOriginRequest,
+// isJsonRequest). The refresh cookie is SameSite=Lax, which stops a cross-site
+// page from *sending* it but not from *setting* it: a top-level form POST from
+// another site would otherwise swap in the attacker's own refresh token, or
+// clear the victim's with a logout. A form cannot send application/json, and a
+// cross-site fetch that does is preflighted and refused (OPTIONS grants no
+// CORS), so the two checks close that door from both sides.
 
 const GOOGLE_CLIENT_ID = '458902252486-kh8ptv2b2b2q1echn99soes191smr56p.apps.googleusercontent.com';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -39,6 +47,27 @@ function isLocalHost(req) {
   return /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
 }
 
+// Sec-Fetch-Site is the browser's own verdict and wins when present; only
+// same-origin passes (same-site would admit a sibling subdomain). Without it,
+// a present Origin must name this host. With neither header the caller is not
+// a browser (curl, a test harness) - every browser that could be steered by a
+// hostile page sends Origin on a POST - and such a caller cannot plant a cookie
+// in someone else's browser, so it is let through.
+function isSameOriginRequest(req) {
+  const site = req.headers['sec-fetch-site'];
+  if (site) return String(site).toLowerCase() === 'same-origin';
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  let originHost;
+  try { originHost = new URL(String(origin)).host.toLowerCase(); } catch { return false; }
+  return originHost === String(req.headers.host || '').toLowerCase();
+}
+
+function isJsonRequest(req) {
+  const type = String(req.headers['content-type'] || '');
+  return type.split(';')[0].trim().toLowerCase() === 'application/json';
+}
+
 function setRefreshCookie(req, res, token) {
   const attrs = [
     `${REFRESH_COOKIE}=${encodeURIComponent(token)}`,
@@ -66,6 +95,9 @@ function clearRefreshCookie(req, res) {
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+  // Before any action, logout and revoke_legacy included - see the header.
+  if (!isSameOriginRequest(req)) return res.status(403).json({ error: 'cross_site_request' });
+  if (!isJsonRequest(req)) return res.status(415).json({ error: 'unsupported_media_type' });
 
   const secret = process.env.GOOGLE_CLIENT_SECRET;
   if (!secret) return res.status(500).json({ error: 'server_misconfigured' });
