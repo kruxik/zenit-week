@@ -262,6 +262,39 @@ describe('account-change guard', () => {
       expect(storedEmail()).toBe(VICTIM);
     });
 
+    test('a decline that keeps the session (about 401s) lets the next token start it afresh', async () => {
+      aboutStatus = 401;
+      _state.setDriveSessionStarted(true);
+      await _state.startDriveSessionReal();
+      expect(initCalls).toBe(0);
+      expect(_state.getAccessToken()).toBe('token_from_cookie');
+      expect(_state.getIdentityGate().ok).toBe(false);
+      expect(_state.getDriveSessionStarted()).toBe(false);
+    });
+
+    test('a decline that signs out leaves the session flag to signOut, not started', async () => {
+      aboutEmail = OTHER;
+      answer = 'cancel';
+      _state.setDriveSessionStarted(true);
+      await _state.startDriveSessionReal();
+      expect(_state.getAccessToken()).toBe(null);
+      expect(_state.getDriveSessionStarted()).toBe(false);
+      expect(initCalls).toBe(0);
+    });
+
+    test('a check released by an interactive sign-in does not reset the live session', async () => {
+      aboutEmail = OTHER;
+      answer = null;
+      _state.setDriveSessionStarted(true);
+      const session = _state.startDriveSessionReal();
+      await new Promise(r => setTimeout(r, 20));
+      expect(pendingDialog).not.toBe(null);
+      _state.getIdentityGate().settle(true);   // what handleAuthCode does
+      pendingDialog.onConfirm();
+      await session;
+      expect(_state.getDriveSessionStarted()).toBe(true);
+    });
+
     test('an interactive sign-in into another account keeps today\'s behaviour: no question', async () => {
       aboutEmail = OTHER;
       _state.setInteractiveSignIn(true);
@@ -287,5 +320,54 @@ describe('account-change guard', () => {
     expect(_state.getIdentityGate()).toBe(null);
     pendingDialog.onConfirm();
     expect((await check).verdict).toBe('declined');
+  });
+  describe('poll and cached file ids around the identity check', () => {
+    const realStop = sandboxGlobal.stopDrivePoll;
+    const realStart = sandboxGlobal.startDrivePoll;
+    const realSetTimeout = sandboxGlobal.setTimeout;
+    let polls;   // 'start' / 'stop', in order
+    beforeEach(() => {
+      polls = [];
+      sandboxGlobal.stopDrivePoll = () => { polls.push('stop'); };
+      sandboxGlobal.startDrivePoll = () => { polls.push('start'); };
+    });
+    afterEach(() => {
+      sandboxGlobal.stopDrivePoll = realStop;
+      sandboxGlobal.startDrivePoll = realStart;
+      sandboxGlobal.setTimeout = realSetTimeout;
+    });
+
+    test('an unverified check stops the poll, and a later passing renewal restarts it once', async () => {
+      sandboxGlobal.setTimeout = (fn) => realSetTimeout(fn, 0);
+      aboutStatus = 403;
+      expect((await verifyDriveIdentity()).verdict).toBe('unverified');
+      expect(polls).toEqual(['stop']);
+      aboutStatus = 200;
+      await _state.verifyRenewedIdentity();
+      expect(polls).toEqual(['stop', 'start']);
+    });
+
+    test('a renewal that stays unverified does not restart the poll', async () => {
+      sandboxGlobal.setTimeout = (fn) => realSetTimeout(fn, 0);
+      aboutStatus = 403;
+      await _state.verifyRenewedIdentity();
+      expect(polls).toEqual(['stop']);
+    });
+
+    test('a recorded identity loads the cached Drive file ids for that account', async () => {
+      _state.setLocalStorage('zenit-week-drive-file-ids', { email: OTHER, ids: { '2026-14': 'file-abc' } });
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+      aboutEmail = OTHER;
+      expect((await verifyDriveIdentity()).verdict).toBe('recorded');
+      expect(_state.getDriveFileId('2026-14')).toBe('file-abc');
+    });
+
+    test('a recorded identity does not load ids cached for another account', async () => {
+      _state.setLocalStorage('zenit-week-drive-file-ids', { email: VICTIM, ids: { '2026-14': 'file-abc' } });
+      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });
+      aboutEmail = OTHER;
+      await verifyDriveIdentity();
+      expect(_state.getDriveFileId('2026-14')).toBe(null);
+    });
   });
 });

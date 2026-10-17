@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-4Fn1N23KiBf9YfCiGgRj+99kauSMHNaMkxHWMWDc3wQ='
+               'sha256-4HmbxxbtBXBH2ImEzncOMD18ztlUBsegEn97San7CsI='
                'sha256-yplM5x7qyibjp/2ZXf4CLvNatwgSzhm2+AlAyNUkv/E=';
   connect-src  'self' https://*.googleapis.com;
   worker-src   'self';
@@ -8754,9 +8754,11 @@ async function _fetchDriveUserForGate(gate) {
 // uploads unverified - but the session is kept: the reconnecting badge shows,
 // and the refresh retry (also run at once on tab focus and on going online)
 // brings a fresh token, whose onTokensReceived runs the check again.
-// The poll is left running: its requests fail at the gate until a check passes.
+// The poll is stopped (its ticks would only throw at the gate); the next check
+// that passes restarts it - startDriveSession, or _verifyRenewedIdentity.
 function _pauseUnverifiedSync() {
   console.warn('[Drive] Could not confirm the account behind the session - sync paused');
+  stopDrivePoll();
   setSyncStatus('error', 'sync.msg.reconnecting');
   _refreshRetryIndex = Math.max(_refreshRetryIndex, REFRESH_RETRY_DELAYS.length - 1);
   _scheduleRefreshRetry();
@@ -8799,7 +8801,12 @@ async function verifyDriveIdentity() {
     return { verdict: 'declined', user: null };
   }
   const email = user.emailAddress || '';
-  if (!known) { _storeDriveUser(user); _passIdentityGate(gate); return { verdict: 'recorded', user }; }
+  if (!known) {
+    _storeDriveUser(user);
+    loadDriveFileIds(email);   // onTokensReceived had no email to load them for
+    _passIdentityGate(gate);
+    return { verdict: 'recorded', user };
+  }
   if (email === known) { _passIdentityGate(gate); return { verdict: 'same', user }; }
 
   stopDrivePoll();
@@ -8827,6 +8834,9 @@ async function _verifyRenewedIdentity() {
   if (verdict === 'declined' || verdict === 'unverified') return;
   // The new account has its own Drive: seed it like a fresh sign-in.
   if (verdict === 'switched') { startDriveSession(); return; }
+  // A pause stopped the poll; startDrivePoll replaces any timer, so this is
+  // the same restart whether or not one was running.
+  startDrivePoll(currentWeekKey);
   // If an import happened while signed out, force-push on token renewal
   isImportPending().then(pending => { if (pending) forcePushAllToDrive(); });
 }
@@ -9063,7 +9073,15 @@ async function startDriveSession() {
   _interactiveSignIn = false;
   if (!interactive) {
     const check = await verifyDriveIdentity();
-    if (check.verdict === 'declined') { flowFinish('drive session declined'); return; }
+    if (check.verdict === 'declined') {
+      // A decline that signed out already reset this. One that kept the session
+      // (the about call 401ed) leaves its gate shut and the token set: let the
+      // next token start the session. A gate released by an interactive
+      // sign-in is gone, and that session is the live one - leave it be.
+      if (googleAccessToken && _identityGate?.ok === false) _driveSessionStarted = false;
+      flowFinish('drive session declined');
+      return;
+    }
     if (check.verdict === 'unverified') {
       // Not started after all: the token the retry brings starts it afresh.
       _driveSessionStarted = false;

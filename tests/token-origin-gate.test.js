@@ -115,6 +115,40 @@ describe('api/token origin and content-type gate', () => {
     expect(res.headers['Set-Cookie']).toMatch(/^zw_rt=;/);
   });
 
+  it.each([
+    ['127.0.0.1:3000', 'http://127.0.0.1:3000'],
+    ['[::1]:3000', 'http://[::1]:3000'],
+  ])('accepts a loopback dev request on %s whose Origin matches the host', async (host, origin) => {
+    const res = mockRes();
+    await handler({
+      method: 'POST',
+      headers: { host, origin, 'content-type': 'application/json' },
+      body: { grant_type: 'logout' },
+    }, res);
+    expect(res.statusCode).toBe(204);
+  });
+
+  it('rejects a localhost Origin whose port differs from the Host', async () => {
+    const res = mockRes();
+    await handler({
+      method: 'POST',
+      headers: { host: 'localhost:3000', origin: 'http://localhost:4000', 'content-type': 'application/json' },
+      body: { grant_type: 'logout' },
+    }, res);
+    expect(res.statusCode).toBe(403);
+    expect(res.headers['Set-Cookie']).toBeUndefined();
+  });
+
+  it('rejects a localhost Origin whose host differs from the Host', async () => {
+    const res = mockRes();
+    await handler({
+      method: 'POST',
+      headers: { host: 'localhost:3000', origin: 'http://127.0.0.1:3000', 'content-type': 'application/json' },
+      body: { grant_type: 'logout' },
+    }, res);
+    expect(res.statusCode).toBe(403);
+  });
+
   it('fails closed when neither Sec-Fetch-Site nor Origin is sent', async () => {
     const res = mockRes();
     await handler(post({ 'content-type': 'application/json' }, { grant_type: 'logout' }), res);

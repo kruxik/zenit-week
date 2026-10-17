@@ -513,6 +513,8 @@ _state.setChangesPageToken = function(t) { _changesPageToken = t; };
 _state.getSyncStatus = function() { return syncStatus; };
 _state.setSyncStatus = function(s) { syncStatus = s; };
 _state.getDriveSessionStarted = function() { return _driveSessionStarted; };
+_state.verifyRenewedIdentity = function() { return _verifyRenewedIdentity(); };
+_state.setDriveSessionStarted = function(v) { _driveSessionStarted = !!v; };
 _state.pkceSessionKey = PKCE_SESSION_KEY;
 _state.hasRefreshRetryPending = function() { return _refreshRetryTimer !== null; };
 _state.getUndoRedoForcePush = function() { return _undoRedoForcePush; };
