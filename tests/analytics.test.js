@@ -1,10 +1,15 @@
-// Umami product events. Each one is derived from a state change the app already
+// Umami product events (sent by the page itself, no tracker script). Each one is derived from a state change the app already
 // makes - never from a marker of its own, because storing or reading anything
 // on the device purely for analytics would need consent (ePrivacy). These tests
 // pin the triggers: what fires, what must not, and that a missing or broken
 // tracker can never surface as an error in the app.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import {
   _state,
   sandboxGlobal,
@@ -21,17 +26,28 @@ const sb = sandboxGlobal;
 
 function run(code) { return vm.runInContext(code, sb); }
 
+// The sender goes through netFetch -> the sandbox's fetch. Stub it on the
+// sandbox, serve a production host, and read what would have gone to the relay.
 function installTracker(impl) {
-  const track = vi.fn(impl || (() => {}));
-  sb.window.umami = { track };
-  return track;
+  const send = vi.fn(impl || (async () => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({}) })));
+  sb.fetch = send;
+  sb.window.fetch = send;
+  sb.location.hostname = 'zenitweek.com';
+  sb.location.pathname = '/';
+  sb.location.origin = 'https://zenitweek.com';
+  run('_analyticsStarted = true');
+  return send;
 }
 
-function removeTracker() { delete sb.window.umami; }
+function removeTracker() {
+  delete sb.location.hostname;
+  run('_analyticsStarted = false; _analyticsCache = ""; _appOpenedTracked = false');
+}
 
 function clearQueue() { run('_analyticsQueue.length = 0'); }
 
-function eventNames(track) { return track.mock.calls.map(c => c[0]); }
+function bodyOf(call) { return JSON.parse(call[1].body); }
+function eventNames(send) { return send.mock.calls.map(c => bodyOf(c).payload.name); }
 
 function mkBranch(id, children = []) {
   return { id, type: 'branch', branch: id, label: id, children, side: 'left', _ts: 0 };
@@ -63,49 +79,105 @@ function seededWeek() {
   return { nodes };
 }
 
-describe('analytics - app_opened and the pre-load queue', () => {
+describe('analytics - sender, page view and the pre-start queue', () => {
   afterEach(() => { removeTracker(); clearQueue(); });
 
-  it('holds events raised before the tracker loads and sends app_opened once per page', () => {
-    removeTracker();
+  it('holds events raised before start and sends page view, app_opened once, then the queue', () => {
+    const send = installTracker();
+    run('_analyticsStarted = false');
     clearQueue();
     expect(() => sb.trackEvent('returned_new_week')).not.toThrow();
+    expect(send).not.toHaveBeenCalled();
 
-    const track = installTracker();
-    sb.onAnalyticsLoaded();
-    sb.onAnalyticsLoaded();
-    expect(eventNames(track)).toEqual(['app_opened', 'returned_new_week']);
+    sb.startAnalytics();
+    sb.startAnalytics();
+    const bodies = send.mock.calls.map(bodyOf);
+    expect(bodies.map(b => b.payload.name)).toEqual([undefined, 'app_opened', 'returned_new_week']);
   });
 
-  it('sends only the UI language, never task content', () => {
-    const track = installTracker();
+  it('page view posts the Umami payload to the same-origin relay, without search or hash', () => {
+    const send = installTracker();
+    run('_analyticsStarted = false');
+    sb.location.pathname = '/app';
+    sb.location.search = '?code=SECRET';
+    sb.location.hash = '#2026-14';
+    sb.startAnalytics();
+    const [url, init] = send.mock.calls[0];
+    expect(url).toBe('/u/api/send');
+    expect(init.method).toBe('POST');
+    expect(init.keepalive).toBe(true);
+    expect(init.headers['Content-Type']).toBe('application/json');
+    const body = bodyOf(send.mock.calls[0]);
+    expect(body.type).toBe('event');
+    expect(Object.keys(body.payload).sort()).toEqual(
+      ['hostname', 'language', 'referrer', 'screen', 'title', 'url', 'website']);
+    expect(body.payload.website).toBe('77360782-8018-480d-8567-4f0a7e5d0000');
+    expect(body.payload.hostname).toBe('zenitweek.com');
+    expect(body.payload.url).toBe('/app');
+    expect(JSON.stringify(body)).not.toMatch(/SECRET|2026-14/);
+    delete sb.location.search;
+    sb.location.hash = '';
+  });
+
+  it('an event carries its name and only the UI language as data', () => {
+    const send = installTracker();
     _state.setLang('cs');
     sb.trackEvent('first_node_created');
-    expect(track).toHaveBeenCalledWith('first_node_created', { lang: 'cs' });
+    const body = bodyOf(send.mock.calls[0]);
+    expect(body.type).toBe('event');
+    expect(body.payload.name).toBe('first_node_created');
+    expect(body.payload.data).toEqual({ lang: 'cs' });
     _state.setLang('en');
   });
 
-  it('caps the in-memory queue so an absent tracker cannot grow it', () => {
-    removeTracker();
+  it('echoes the cache token Umami returned as x-umami-cache', async () => {
+    const send = installTracker(async () => ({ ok: true, json: async () => ({ cache: 'tok1' }) }));
+    sb.trackEvent('app_opened');
+    await new Promise(r => setTimeout(r, 10));
+    sb.trackEvent('first_node_created');
+    expect(send.mock.calls[0][1].headers['x-umami-cache']).toBeUndefined();
+    expect(send.mock.calls[1][1].headers['x-umami-cache']).toBe('tok1');
+  });
+
+  it('sends nothing off production hosts', () => {
+    const send = installTracker();
+    sb.location.hostname = 'localhost';
+    sb.trackEvent('app_opened');
+    sb.startAnalytics();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('caps the in-memory queue so a page that never starts cannot grow it', () => {
+    installTracker();
+    run('_analyticsStarted = false');
     clearQueue();
     for (let i = 0; i < 50; i++) sb.trackEvent('first_node_created');
     expect(run('_analyticsQueue.length')).toBe(10);
   });
 
-  it('never throws when the tracker throws or rejects', () => {
+  it('swallows a fetch that throws, rejects or answers garbage', async () => {
     installTracker(() => { throw new Error('blocked'); });
     expect(() => sb.trackEvent('app_opened')).not.toThrow();
     installTracker(() => Promise.reject(new Error('offline')));
     expect(() => sb.trackEvent('app_opened')).not.toThrow();
+    installTracker(async () => ({ ok: true, json: async () => { throw new Error('bad json'); } }));
+    expect(() => sb.trackEvent('app_opened')).not.toThrow();
+    await new Promise(r => setTimeout(r, 10));
   });
 
   it('writes nothing to localStorage', () => {
     _state.clearLocalStorage();
     installTracker();
     sb.trackEvent('app_opened');
-    removeTracker();
-    sb.trackEvent('app_opened');
     expect(Object.keys(sb._lsStore)).toEqual([]);
+  });
+
+  it('loads no third-party script: no loader, no Vercel Insights, no window.va', () => {
+    const html = readFileSync(resolve(__dirname, '../zenit-week.html'), 'utf8');
+    expect(html).not.toMatch(/\/u\/script\.js/);
+    expect(html).not.toMatch(/_vercel\/insights/);
+    expect(html).not.toMatch(/window\.va\b|window\.umami/);
+    expect(html).not.toMatch(/createElement\(['"]script['"]\)[\s\S]{0,200}(umami|insights)/);
   });
 });
 
@@ -269,6 +341,6 @@ describe('analytics - returned_new_week', () => {
     removeTracker();
     await saveWeekIDB('2026-19', { nodes: [mkBranch('work')] });
     await expect(openAndSave(TODAY)).resolves.toBeTruthy();
-    expect(run('_analyticsQueue.slice()')).toEqual(['returned_new_week']);
+    expect(run('_analyticsQueue.slice()')).toEqual([]);
   });
 });
