@@ -33,15 +33,15 @@ describe('History & Global State restoration', () => {
 
   test('undo restores theme', async () => {
     const doc = _state.getDocument();
-    doc.documentElement.dataset.theme = 'light';
-    _state.setLocalStorage('zenit-week-theme', 'light');
+    applyTheme('light');
     takeSnapshot();
     
     applyTheme('dark');
     expect(doc.documentElement.dataset.theme).toBe('dark');
     
     await undo();
-    expect(JSON.parse(_state.getLocalStorage('zenit-week-theme'))).toBe('light');
+    expect(_state.getLocalStorage('zenit-week-theme')).toBe('light');
+    expect(doc.documentElement.dataset.theme).toBe('light');
   });
 
   test('undo restores language', async () => {

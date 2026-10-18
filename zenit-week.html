@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-cZDLhs69aybUqnve9cplN4mEp4rSoSSgHj3yRHh/4S0=';
+               'sha256-RIEeToBcyhQYJIqR8CdegXSX8Bi/a012tvaxqhufGWo=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -7061,11 +7061,7 @@ async function _applySnapshot(raw) {
 
   // Restore theme if snapshot captured it
   if (snapshot.theme !== undefined) {
-    const t = snapshot.theme || 'light';
-    localStorage.setItem('zenit-week-theme', t);
-    document.documentElement.dataset.theme = t === 'dark' ? 'dark' : '';
-    reloadBranchPalettes();
-    updateSvgFilters();
+    applyTheme(snapshot.theme);
   }
 
   // Restore language if snapshot captured it
@@ -7520,11 +7516,16 @@ function updateThemeColor() {
   document.querySelector('meta[name="theme-color"]').content = dark ? '#111111' : '#ffffff';
 }
 
+// The one way a theme is applied - the toggle, Drive sync, undo/redo and
+// import all come through here, so none of them can miss the status-bar
+// colour or the Settings switch. Undo snapshots and the Drive push belong to
+// the user's own toggle and stay in its click handler.
 function applyTheme(theme) {
-  takeSnapshot();
+  theme = theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
   localStorage.setItem('zenit-week-theme', theme);
   updateThemeColor();
+  syncThemeToggleUI();
   // Re-derive branch palettes for new theme and re-render SVG layer
   reloadBranchPalettes();
   updateSvgFilters();
@@ -7532,8 +7533,6 @@ function applyTheme(theme) {
   if (currentView === 'agenda') renderAgenda(); // comment chips carry theme-derived colours
   updateColorDots();
   updateSummary();
-  saveBranchColors(); // propagate theme change to Drive via colors file
-  // syncThemeToggleUI() is called by the toggle click handler after applyTheme
 }
 function getThemeColors() {
   const dark = document.documentElement.dataset.theme === 'dark';
@@ -10471,8 +10470,7 @@ async function syncColorsFromDrive() {
       await saveValueIDB(COLORS_STORAGE_KEY, remoteData);
       // Apply theme to DOM before loading colors - deriveBranchPalette reads the DOM theme.
       if (remoteData.theme === 'light' || remoteData.theme === 'dark') {
-        localStorage.setItem('zenit-week-theme', remoteData.theme);
-        document.documentElement.dataset.theme = remoteData.theme === 'dark' ? 'dark' : '';
+        applyTheme(remoteData.theme);
       }
       await loadBranchColors();    // now derives palettes against the correct theme
       reloadBranchPalettes(); // ensure light/text variants are re-derived for new theme
@@ -12742,8 +12740,7 @@ async function importAllData(file) {
       redoStack = [];
       if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
       currentLang = localStorage.getItem('zenit-week-lang') || 'en';
-      const importedTheme = localStorage.getItem('zenit-week-theme') || 'light';
-      document.documentElement.dataset.theme = importedTheme === 'dark' ? 'dark' : '';
+      applyTheme(localStorage.getItem('zenit-week-theme'));
       await loadBranchColors();
       reloadBranchPalettes();
       // Same reason as boot: entries must be in memory before the first week
@@ -25592,8 +25589,9 @@ function syncThemeToggleUI() {
 
 document.getElementById('theme-toggle').addEventListener('click', () => {
   const dark = document.documentElement.dataset.theme === 'dark';
+  takeSnapshot();
   applyTheme(dark ? 'light' : 'dark');
-  syncThemeToggleUI();
+  saveBranchColors(); // propagate theme change to Drive via colors file
 });
 
 // Sync toggle to whatever theme was applied by the pre-paint script
