@@ -6,11 +6,11 @@
   default-src  'none';
   script-src   'self'
                'sha256-9cHk6BCgeoaZ3r+XHirBQXVF1CuGv1rw0EZVt4ISDiQ='
-               'sha256-Y+82jK1htj+LRGINk8nVHvUIpfKyEkBhaHi3JjWCgi8='
+               'sha256-Eb714yfcTC94dtr1Jp6/cuqxaILMzVLouNmVKkT2KiE='
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-RIEeToBcyhQYJIqR8CdegXSX8Bi/a012tvaxqhufGWo=';
+               'sha256-oTBjejat4MlCjzbTO83HDUc1wm537xMNCGDgbrBDje0=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -125,6 +125,7 @@
   [hidden] { display: none !important; }
 
   :root {
+    color-scheme: light;
     /* Backgrounds */
     --bg-page: #f9f9f9;
     --bg-canvas: #ffffff;
@@ -244,6 +245,7 @@
   }
 
   [data-theme="dark"] {
+    color-scheme: dark;
     /* Backgrounds */
     --bg-page: #111111;
     --bg-canvas: #1a1a1a;
@@ -1391,7 +1393,8 @@
     margin: 2px 0;
   }
 
-  #lang-select {
+  #lang-select,
+  #theme-select {
     width: 100%;
     padding: 5px 8px;
     border-radius: 8px;
@@ -1402,7 +1405,8 @@
     cursor: pointer;
     outline: none;
   }
-  #lang-select:focus { border-color: var(--border-hover); }
+  #lang-select:focus,
+  #theme-select:focus { border-color: var(--border-hover); }
 
   /* Theme toggle pill */
   .theme-toggle-row {
@@ -1411,19 +1415,6 @@
     justify-content: space-between;
     gap: 8px;
     padding: 2px 2px;
-  }
-
-  .theme-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    transition: color 0.2s;
-    min-width: 28px;
-  }
-
-  .theme-label.active {
-    color: var(--text-primary);
-    font-weight: 700;
   }
 
   .theme-toggle {
@@ -3971,9 +3962,14 @@
 <script>
   (function() {
     'use strict';
+    // The stored value is a preference (system / light / dark). Until the
+    // one-time move to System has run, a saved light/dark counts as system too,
+    // so the first paint already matches what migrateThemeToSystem() settles on.
     const saved = localStorage.getItem('zenit-week-theme');
+    const migrated = localStorage.getItem('zenit-week-theme-system-migrated');
+    const fixed = migrated && (saved === 'light' || saved === 'dark') ? saved : null;
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = saved || (prefersDark ? 'dark' : 'light');
+    const theme = fixed || (prefersDark ? 'dark' : 'light');
     if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
     document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#111111' : '#ffffff';
   })();
@@ -4584,14 +4580,12 @@ Or remove them later in Settings → Help.</div>
   </div>
   <div class="settings-separator"></div>
   <div class="settings-section">
-    <div class="settings-label" data-i18n="settings.appearance">Appearance</div>
-    <div class="theme-toggle-row">
-      <span class="theme-label active" id="theme-label-light" data-i18n="settings.light">Light</span>
-      <button type="button" class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" data-i18n-title="settings.toggleDark" title="Toggle dark mode" data-i18n-aria="settings.toggleDark" aria-label="Toggle dark mode">
-        <span class="theme-toggle-thumb"></span>
-      </button>
-      <span class="theme-label" id="theme-label-dark" data-i18n="settings.dark">Dark</span>
-    </div>
+    <div class="settings-label" id="theme-select-label" data-i18n="settings.appearance">Theme</div>
+    <select id="theme-select" aria-labelledby="theme-select-label">
+      <option value="system" data-i18n="settings.system">System</option>
+      <option value="light" data-i18n="settings.light">Light</option>
+      <option value="dark" data-i18n="settings.dark">Dark</option>
+    </select>
   </div>
   <div class="settings-separator"></div>
   <div class="settings-section">
@@ -7424,7 +7418,7 @@ function sanitizeColorsData(raw) {
   const out = {};
   if (!raw || typeof raw !== 'object') return out;
   if (Number.isFinite(raw.savedAt)) out.savedAt = raw.savedAt;
-  if (raw.theme === 'light' || raw.theme === 'dark') out.theme = raw.theme;
+  if (isKnownTheme(raw.theme)) out.theme = raw.theme;
   if (isKnownLang(raw.lang)) {
     out.lang = raw.lang;
   }
@@ -7457,7 +7451,7 @@ async function saveBranchColors() {
   Object.keys(BRANCH_COLORS).forEach(b => {
     toSave[b] = { main: BRANCH_COLORS[b].main };
   });
-  toSave.theme = localStorage.getItem('zenit-week-theme') || 'light';
+  toSave.theme = currentThemePref();
   toSave.lang  = currentLang || 'en';
   toSave.onboarding = onboardingSettings();
   await saveValueIDB(COLORS_STORAGE_KEY, toSave);
@@ -7485,6 +7479,19 @@ async function bootstrapColorsSettings() {
   // BRANCH_COLORS holds right now, so without this it depends on the caller
   // having awaited the load - the ordering that broke above.
   await loadBranchColors();
+  await saveBranchColors();
+}
+
+// One-time move of every existing device to System. Before the select had a
+// System option, a saved light/dark was just the last toggle position, not a
+// deliberate pin. Saving pushes 'system' to Drive with a fresh savedAt, so an
+// older remote light/dark does not win it back on the next pull.
+async function migrateThemeToSystem() {
+  if (localStorage.getItem(THEME_MIGRATED_KEY)) return;
+  const pinned = localStorage.getItem('zenit-week-theme') !== null && currentThemePref() !== 'system';
+  localStorage.setItem(THEME_MIGRATED_KEY, '1');
+  if (!pinned) return;
+  applyTheme('system');
   await saveBranchColors();
 }
 
@@ -7516,16 +7523,37 @@ function updateThemeColor() {
   document.querySelector('meta[name="theme-color"]').content = dark ? '#111111' : '#ffffff';
 }
 
-// The one way a theme is applied - the toggle, Drive sync, undo/redo and
-// import all come through here, so none of them can miss the status-bar
-// colour or the Settings switch. Undo snapshots and the Drive push belong to
-// the user's own toggle and stay in its click handler.
-function applyTheme(theme) {
-  theme = theme === 'dark' ? 'dark' : 'light';
-  document.documentElement.dataset.theme = theme;
-  localStorage.setItem('zenit-week-theme', theme);
+// The stored theme is a preference: 'system' follows the OS, 'light' and
+// 'dark' pin it. data-theme always holds the resolved light/dark, so CSS and
+// every `dataset.theme === 'dark'` reader never see 'system'.
+const THEME_PREFS = ['system', 'light', 'dark'];
+const THEME_MIGRATED_KEY = 'zenit-week-theme-system-migrated';
+const systemDarkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+function isKnownTheme(v) {
+  return THEME_PREFS.includes(v);
+}
+
+function currentThemePref() {
+  const saved = localStorage.getItem('zenit-week-theme');
+  return isKnownTheme(saved) ? saved : 'system';
+}
+
+function resolveTheme(pref) {
+  if (pref === 'light' || pref === 'dark') return pref;
+  return systemDarkQuery && systemDarkQuery.matches ? 'dark' : 'light';
+}
+
+// The one way a theme is applied - the Settings select, Drive sync, undo/redo,
+// import and an OS light/dark flip all come through here, so none of them can
+// miss the status-bar colour or the Settings select. Undo snapshots and the
+// Drive push belong to the user's own choice and stay in its change handler.
+function applyTheme(pref) {
+  pref = isKnownTheme(pref) ? pref : 'system';
+  document.documentElement.dataset.theme = resolveTheme(pref);
+  localStorage.setItem('zenit-week-theme', pref);
   updateThemeColor();
-  syncThemeToggleUI();
+  syncThemeSelectUI();
   // Re-derive branch palettes for new theme and re-render SVG layer
   reloadBranchPalettes();
   updateSvgFilters();
@@ -8990,6 +9018,7 @@ function _forgetDriveAccountCaches() {
 // reloads the page to boot into a clean default state.
 const SIGNOUT_PRESERVE_KEYS = new Set([
   'zenit-week-theme',
+  THEME_MIGRATED_KEY,
   'zenit-week-lang',
   'zenit-week-view',
   'zenit-week-autolayout',
@@ -10469,7 +10498,7 @@ async function syncColorsFromDrive() {
     if (remoteSavedAt > localSavedAt) {
       await saveValueIDB(COLORS_STORAGE_KEY, remoteData);
       // Apply theme to DOM before loading colors - deriveBranchPalette reads the DOM theme.
-      if (remoteData.theme === 'light' || remoteData.theme === 'dark') {
+      if (isKnownTheme(remoteData.theme)) {
         applyTheme(remoteData.theme);
       }
       await loadBranchColors();    // now derives palettes against the correct theme
@@ -10817,6 +10846,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   const KEEP_KEYS = new Set([
     GOOGLE_AUTH_STORAGE_KEY,
     'zenit-week-storage-migrated',
+    THEME_MIGRATED_KEY,
     'zenit-week-reset-token',
     // Same reasoning as SIGNOUT_PRESERVE_KEYS: an import on another device
     // discards this device's data, not its memory of having seen the tour.
@@ -11184,7 +11214,7 @@ const TRANSLATIONS = {
     'settings.appearance':        'Theme',
     'settings.light':             'Light',
     'settings.dark':              'Dark',
-    'settings.toggleDark':        'Toggle dark mode',
+    'settings.system':            'System',
     'settings.zoom':              'Zoom',
     'settings.resetView':         'Click to reset view',
     'settings.language':          'Language',
@@ -11568,7 +11598,7 @@ const TRANSLATIONS = {
     'settings.appearance':        'Téma',
     'settings.light':             'Světlý',
     'settings.dark':              'Tmavý',
-    'settings.toggleDark':        'Přepnout tmavý režim',
+    'settings.system':            'Podle systému',
     'settings.zoom':              'Přiblížení',
     'settings.resetView':         'Kliknutím resetovat pohled',
     'settings.language':          'Jazyk',
@@ -25576,26 +25606,28 @@ document.addEventListener('click', (e) => {
 })();
 
 
-// ─── Theme Toggle ─────────────────────────────────────────────────────────────
-function syncThemeToggleUI() {
-  const dark = document.documentElement.dataset.theme === 'dark';
-  const toggle = document.getElementById('theme-toggle');
-  const labelLight = document.getElementById('theme-label-light');
-  const labelDark  = document.getElementById('theme-label-dark');
-  if (toggle)      toggle.setAttribute('aria-checked', dark ? 'true' : 'false');
-  if (labelLight)  labelLight.classList.toggle('active', !dark);
-  if (labelDark)   labelDark.classList.toggle('active', dark);
+// ─── Theme Select ─────────────────────────────────────────────────────────────
+function syncThemeSelectUI() {
+  const select = document.getElementById('theme-select');
+  if (select) select.value = currentThemePref();
 }
 
-document.getElementById('theme-toggle').addEventListener('click', () => {
-  const dark = document.documentElement.dataset.theme === 'dark';
+document.getElementById('theme-select').addEventListener('change', (e) => {
   takeSnapshot();
-  applyTheme(dark ? 'light' : 'dark');
+  applyTheme(e.target.value);
   saveBranchColors(); // propagate theme change to Drive via colors file
 });
 
-// Sync toggle to whatever theme was applied by the pre-paint script
-syncThemeToggleUI();
+// An OS light/dark flip repaints only while the preference is System. It is
+// not the user's edit, so no undo step and no Drive push.
+if (systemDarkQuery) {
+  systemDarkQuery.addEventListener('change', () => {
+    if (currentThemePref() === 'system') applyTheme('system');
+  });
+}
+
+// Sync the select to whatever theme was applied by the pre-paint script
+syncThemeSelectUI();
 
 function syncAutoLayoutToggleUI() {
   const toggle = document.getElementById('autolayout-toggle');
@@ -26469,6 +26501,7 @@ window.addEventListener('load', async () => {
   await loadBranchColors();
   reloadBranchPalettes(); // re-derive light/text variants for current theme
   await bootstrapColorsSettings();
+  await migrateThemeToSystem();
   // Entries must be in memory before the first week opens, or that week would
   // be the one week of the session that never materialises.
   await loadSchedule();

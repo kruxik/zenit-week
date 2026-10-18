@@ -83,7 +83,7 @@ Dated work (Send to the Future, the `schedule` record, occurrences, the Later ta
 ## UI/UX Guidelines
 - **Visual Style**: Modern, clean interface with rounded corners, soft shadows, professional color palette
 - **Interactions**: Support both mouse (click/drag) and keyboard shortcuts. The keydown handler and the Help panel are the source of truth for hotkeys; check them for collisions before adding one.
-- **Dark mode**: Full light/dark theme with toggle in settings; respects `prefers-color-scheme` on first load; stored in `localStorage` as `zenit-week-theme`
+- **Dark mode**: Full light/dark theme. Settings offers a System / Light / Dark select; `zenit-week-theme` in `localStorage` (and the synced colors blob) stores that preference, default `system`, which follows `prefers-color-scheme` live. `data-theme` always holds the resolved `light`/`dark`; `applyTheme(pref)` is the only writer
 - **Feedback**: Provide visual cues for hover states and active operations (e.g., "panning" cursor, context menu with context-aware options)
 - **Context menus**: Hide options that don't apply to the current node type
 - **Agenda view**: One of the three top-level views (`M` / `A` / `S`), not a sidebar. A day-tab strip (`1`–`7`, plus an Overdue tab on `0`) over a list of that day's activities, grouped into `Scheduled`, `Done`, `Any day` and `Dropped` - in that render order. Rows drag to reorder, swipe right to toggle done/undone (undrop, in the Dropped group), swipe left for the context menu

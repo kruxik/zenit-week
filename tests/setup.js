@@ -71,6 +71,7 @@ function elementStub() {
 
 // Minimal sandbox - only what the pure functions need.
 // window.addEventListener is stubbed so the 'load' callback never fires.
+const sandboxMediaQueries = {};
 const sandbox = {
   crypto: globalThis.crypto,
   structuredClone: globalThis.structuredClone,
@@ -99,13 +100,20 @@ const sandbox = {
     fetch: null, // populated below
     innerWidth: 1280,
     innerHeight: 768,
-    matchMedia: () => ({
-      matches: false,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-    }),
+    // One object per query, so a test can flip `matches` and fire the
+    // `change` listeners the app registered (see _mediaQueries).
+    matchMedia: (query) => {
+      const mq = sandboxMediaQueries[query] ||= {
+        matches: false,
+        listeners: [],
+        addEventListener: (type, fn) => { if (type === 'change') mq.listeners.push(fn); },
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+      };
+      return mq;
+    },
+    _mediaQueries: null, // set below
   },
   BroadcastChannel: class {
     constructor() {}
@@ -209,6 +217,7 @@ const sandbox = {
   _state: {},
 };
 sandbox.window.fetch = sandbox.fetch;
+sandbox.window._mediaQueries = sandboxMediaQueries;
 
 vm.createContext(sandbox);
 
@@ -887,6 +896,9 @@ export const {
   showContextMenu,
   hideContextMenu,
   applyTheme,
+  currentThemePref,
+  resolveTheme,
+  migrateThemeToSystem,
   getThemeColors,
   deriveBranchPalette,
   t,

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 // A theme is applied one way: applyTheme(). The toggle, Drive sync, undo/redo
 // and import all route through it. A second, inline copy is how a Drive-synced
 // theme once changed the page but left the mobile status bar (the theme-color
-// meta) and the Settings switch on the old theme. The pre-paint script in
+// meta) and the Settings control on the old theme. The pre-paint script in
 // <head> is the one exception - it runs before the app script exists.
 
 describe('theme - one path, source guards', () => {
@@ -42,7 +42,7 @@ describe('theme - one path, source guards', () => {
     expect(body('updateThemeColor')).toMatch(/theme-color"\]'\)\.content\s*=/);
     expect(code.match(/updateThemeColor\(\)/g)).toHaveLength(2); // definition + applyTheme
     expect(body('applyTheme')).toContain('updateThemeColor()');
-    expect(body('applyTheme')).toContain('syncThemeToggleUI()');
+    expect(body('applyTheme')).toContain('syncThemeSelectUI()');
   });
 
   it('Drive sync, undo/redo and import apply a theme through applyTheme', () => {
