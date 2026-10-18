@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) - `vYYYY.MM.DD[.N]`.
 
+## [v2026.10.18] - 2026-10-18
+
+### Fixed
+
+- **theme:** Apply every theme change through applyTheme so Drive sync, undo and import update the status bar
+- **security:** Narrow avatar and Drive CSP hosts, gate the Umami relay to same-origin with a size cap, and use own-property language checks
+- **security:** Replace third-party analytics scripts in the app with a built-in first-party Umami sender
+- **auth:** Restart sync after a kept declined check, pause the poll while unverified and load cached file ids
+- **auth:** Fail closed on headerless token requests, compare full origin, record unknown identity before seeding and cap the identity check
+- **data:** Drop nodes with malformed ids on load and import and escape node ids in selectors
+- **auth:** Reject cross-site and non-JSON token requests and confirm silent Google account changes before syncing
+
 ## [v2026.10.17] - 2026-10-17
 
 ### Added
