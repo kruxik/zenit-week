@@ -6,8 +6,8 @@
 // week while the app sat open, so a tab open across Sunday night kept showing
 // last week - with a "today" that no longer existed in it - until the user
 // navigated, reset the view or reloaded.
-import { describe, test, expect, beforeEach } from 'vitest';
-import { _state, checkDateRollover } from './setup.js';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { _state, sandboxGlobal, checkDateRollover } from './setup.js';
 
 function reset() {
   _state.clearLocalStorage();
@@ -143,5 +143,163 @@ describe('week rollover - deferring to the user', () => {
     _state.set({ nodes: [{ id: 'n1', type: 'activity', branch: 'work', label: 'done typing', parent: null, children: [] }] });
     expect(checkDateRollover()).toBe(true);
     expect(nav).toEqual(['2026-31']);
+  });
+});
+
+// Pins `new Date()` (no arguments) to one instant; the sandbox reads the host
+// Date on every access, so the app sees the frozen clock too.
+function withFrozenDate(when, fn) {
+  const RealDate = global.Date;
+  global.Date = class extends RealDate {
+    constructor(...args) {
+      if (args.length === 0) return new RealDate(when.getTime());
+      return new RealDate(...args);
+    }
+    static now() { return when.getTime(); }
+  };
+  try { return fn(); } finally { global.Date = RealDate; }
+}
+
+// The strip carries the today dot and, on the current week only, the Overdue
+// tab and weekday faces. It is only rebuilt when its staleness key moves, and
+// the key once left out the two things it reads from the clock: today's
+// weekday and whether the open week is today's. A tab left open across
+// midnight with the new today's tab already selected kept the dot on yesterday
+// until the user clicked another tab.
+describe('date rollover - the agenda strip', () => {
+  const SATURDAY = new Date(2026, 9, 24, 12, 0);   // ISO week 2026-43
+  const SUNDAY   = new Date(2026, 9, 25, 21, 30);  // same week, the night DST ended
+  const MONDAY   = new Date(2026, 9, 26, 9, 0);    // ISO week 2026-44
+  const realStrip = sandboxGlobal.renderAgendaStrip;
+  const realContent = sandboxGlobal.renderAgendaTabContent;
+  const realLoadAndRender = sandboxGlobal.loadAndRender;
+  let stripBuilds;
+
+  beforeEach(() => {
+    reset();
+    _state.set({ nodes: [] });
+    stripBuilds = 0;
+    sandboxGlobal.renderAgendaStrip = () => { stripBuilds++; };
+    sandboxGlobal.renderAgendaTabContent = () => {};
+    sandboxGlobal.loadAndRender = () => Promise.resolve();
+  });
+  afterEach(() => {
+    sandboxGlobal.renderAgendaStrip = realStrip;
+    sandboxGlobal.renderAgendaTabContent = realContent;
+    sandboxGlobal.loadAndRender = realLoadAndRender;
+    _state.setCurrentView('mindmap');
+  });
+
+  // requestAnimationFrame is a no-op in the harness, so the frame the agenda
+  // render waits for is run by hand.
+  const flush = () => sandboxGlobal._renderAgendaFlush();
+
+  test('moves the today dot when the new today was already the selected tab', () => {
+    _state.setCurrentView('agenda');
+    _state.setWeekKey('2026-43');
+    _state.setTodayWeekKey('2026-43');
+    withFrozenDate(SATURDAY, () => {
+      _state.setLastKnownDate(6, '2026-43');
+      _state.setAgendaActiveTab(0);            // looked ahead to Sunday
+      flush();
+    });
+    stripBuilds = 0;
+    withFrozenDate(SUNDAY, () => {
+      checkDateRollover();
+      flush();
+    });
+    expect(_state.getAgendaActiveTab()).toBe(0);
+    expect(stripBuilds).toBe(1);
+  });
+
+  test('rebuilds when the browsed week becomes the current one', () => {
+    _state.setCurrentView('agenda');
+    _state.setWeekKey('2026-44');              // planning next week on Sunday
+    _state.setTodayWeekKey('2026-43');
+    withFrozenDate(SUNDAY, () => {
+      _state.setLastKnownDate(0, '2026-43');
+      _state.setAgendaActiveTab(1);
+      flush();
+    });
+    stripBuilds = 0;
+    withFrozenDate(MONDAY, () => {
+      _state.setTodayWeekKey('2026-44');
+      checkDateRollover();
+      flush();
+    });
+    expect(_state.getWeekKey()).toBe('2026-44');
+    expect(stripBuilds).toBe(1);
+  });
+
+  test('rebuilds on the first agenda render after a rollover seen from another view', () => {
+    _state.setWeekKey('2026-43');
+    _state.setTodayWeekKey('2026-43');
+    withFrozenDate(SATURDAY, () => {
+      _state.setCurrentView('agenda');
+      _state.setLastKnownDate(6, '2026-43');
+      _state.setAgendaActiveTab(0);
+      flush();
+      _state.setCurrentView('mindmap');
+    });
+    stripBuilds = 0;
+    withFrozenDate(SUNDAY, () => {
+      checkDateRollover();
+      _state.setCurrentView('agenda');
+      sandboxGlobal.renderAgenda();
+      flush();
+    });
+    expect(stripBuilds).toBe(1);
+  });
+});
+
+// A refused check (inline editor open) must keep retrying until it settles.
+// It used to retry once from the midnight timer and not at all from the
+// visibility handler - both fell back to waiting for the next midnight.
+describe('date rollover - retrying a refused check', () => {
+  const realSetTimeout = sandboxGlobal.setTimeout;
+  const realClearTimeout = sandboxGlobal.clearTimeout;
+  let armed;
+
+  const editing = () => _state.set({ nodes: [{ id: 'n1', type: 'activity', branch: 'work', label: '', parent: null, children: [], _editing: true }] });
+  const typed = () => _state.set({ nodes: [{ id: 'n1', type: 'activity', branch: 'work', label: 'done typing', parent: null, children: [] }] });
+  const fireArmed = () => { const { fn } = armed.pop(); fn(); };
+
+  beforeEach(() => {
+    reset();
+    armed = [];
+    sandboxGlobal.setTimeout = (fn, delay) => { armed.push({ fn, delay }); return armed.length; };
+    sandboxGlobal.clearTimeout = () => {};
+    captureNavigation();
+    _state.setWeekKey('2026-30');
+    _state.setLastKnownDate(1, '2026-30');
+    _state.setTodayWeekKey('2026-31');
+  });
+  afterEach(() => {
+    sandboxGlobal.setTimeout = realSetTimeout;
+    sandboxGlobal.clearTimeout = realClearTimeout;
+  });
+
+  test('a refused check re-arms in a minute, not at midnight', () => {
+    editing();
+    sandboxGlobal.runDateCheck();
+    expect(armed.at(-1).delay).toBe(60000);
+  });
+
+  test('keeps retrying every minute while the editor stays open', () => {
+    editing();
+    sandboxGlobal.runDateCheck();
+    fireArmed();
+    fireArmed();
+    expect(armed.at(-1).delay).toBe(60000);
+    expect(_state.getLastKnownDate().weekKey).toBe('2026-30');
+  });
+
+  test('settles once the editor closes and goes back to waiting for midnight', () => {
+    editing();
+    sandboxGlobal.runDateCheck();
+    typed();
+    fireArmed();
+    expect(_state.getLastKnownDate().weekKey).toBe('2026-31');
+    expect(armed.at(-1).delay).not.toBe(60000);
   });
 });

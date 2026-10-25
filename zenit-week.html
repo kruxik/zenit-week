@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-oTBjejat4MlCjzbTO83HDUc1wm537xMNCGDgbrBDje0=';
+               'sha256-h8Aw0WcPa1H7DwhrqFlxh2rRqHiZ/ZWy3CdnlDn86OA=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -21560,18 +21560,26 @@ function checkDateRollover() {
   return true;
 }
 
+// The one date-check timer. Every arm replaces the previous one, so a pending
+// retry and the midnight wait can never both be live.
+function armDateCheck(delay) {
+  if (_midnightTimer) clearTimeout(_midnightTimer);
+  _midnightTimer = setTimeout(runDateCheck, delay);
+}
+
+// Runs the rollover check and arms the next one. A refused check (editor open)
+// re-arms in a minute, as often as it takes, instead of waiting a day.
+function runDateCheck() {
+  if (checkDateRollover()) scheduleMidnightCheck();
+  else armDateCheck(60000);
+}
+
 // Fires shortly after the next local midnight. Recomputed each time rather than
 // set to a fixed 24h so DST transitions cannot drift it into the wrong day.
 function scheduleMidnightCheck() {
-  if (_midnightTimer) clearTimeout(_midnightTimer);
   const now = new Date();
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
-  _midnightTimer = setTimeout(() => {
-    // A refused check (editor open) re-arms in a minute instead of waiting a day.
-    const settled = checkDateRollover();
-    if (settled) scheduleMidnightCheck();
-    else _midnightTimer = setTimeout(() => { checkDateRollover(); scheduleMidnightCheck(); }, 60000);
-  }, Math.max(1000, next.getTime() - now.getTime()));
+  armDateCheck(Math.max(1000, next.getTime() - now.getTime()));
 }
 scheduleMidnightCheck();
 
@@ -21579,8 +21587,7 @@ scheduleMidnightCheck();
 // the tab is still the check that matters most.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
-  checkDateRollover();
-  scheduleMidnightCheck();
+  runDateCheck();
 });
 let hoveredAgendaNode = null;
 
@@ -23006,13 +23013,18 @@ function renderLaterTab(content) {
 
 // Coalesces rapid renderAgenda() calls (e.g. counter+1 fires renderAgenda,
 // status cascade fires another) into one render per frame. Also skips the
-// strip rebuild when its inputs (active tab, overdue count, week, language)
-// haven't changed - strip is otherwise rebuilt on every single tap.
+// strip rebuild when its inputs (active tab, overdue count, week, language,
+// today's weekday, whether the open week is today's) haven't changed - strip
+// is otherwise rebuilt on every single tap. The last two are what it reads
+// from the clock; without them a rollover that lands on the tab already
+// selected left the today dot on yesterday.
 let _agendaRenderScheduled = false;
 let _agendaLastTab = null;
 let _agendaLastOverdueCount = -1;
 let _agendaLastWeekKey = null;
 let _agendaLastLang = null;
+let _agendaLastToday = null;
+let _agendaLastOnCurrentWeek = null;
 
 // Frame-scoped cache for getOverdueItems(), populated by _renderAgendaFlush
 // and read by both renderAgendaStrip (for the badge count) and
@@ -23042,11 +23054,15 @@ function _renderAgendaFlush() {
   _agendaRenderScheduled = false;
   _overdueItemsCache = getOverdueItems();
   const overdueCount = _overdueItemsCache.length;
+  const today = new Date().getDay();
+  const onCurrentWeek = isCurrentWeekOpen();
   const stripStale = (
     agendaActiveTab        !== _agendaLastTab          ||
     overdueCount           !== _agendaLastOverdueCount ||
     currentWeekKey         !== _agendaLastWeekKey      ||
-    currentLang            !== _agendaLastLang
+    currentLang            !== _agendaLastLang         ||
+    today                  !== _agendaLastToday        ||
+    onCurrentWeek          !== _agendaLastOnCurrentWeek
   );
   try {
     if (stripStale) renderAgendaStrip();
@@ -23054,6 +23070,8 @@ function _renderAgendaFlush() {
     _agendaLastOverdueCount = overdueCount;
     _agendaLastWeekKey      = currentWeekKey;
     _agendaLastLang         = currentLang;
+    _agendaLastToday        = today;
+    _agendaLastOnCurrentWeek = onCurrentWeek;
     renderAgendaTabContent();
   } finally {
     _overdueItemsCache = null;
