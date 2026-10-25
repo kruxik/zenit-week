@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-h8Aw0WcPa1H7DwhrqFlxh2rRqHiZ/ZWy3CdnlDn86OA=';
+               'sha256-0W5BPmQWLiNcPgTE9Jr/k35ivzK/4/E/mfdozLc0U2M=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4367,7 +4367,7 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> <span data-i18n="menu.reset">Reset</span></div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
-  <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.nextWeek">Next week</span></div>
+  <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.nextWeek">Next week</span><span class="ctx-submenu-arrow">▶</span></div>
   <div class="ctx-item" id="ctx-reschedule"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.reschedule">Reschedule</span><span class="ctx-submenu-arrow">▶</span></div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
   <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> <span data-i18n="menu.prioNormal">Priority Normal</span></div>
@@ -11284,6 +11284,7 @@ const TRANSLATIONS = {
     'menu.reschedule':            'Reschedule',
     'menu.now':                   'Now',
     'menu.clearDay':              'Any',
+    'menu.keepDay':               'Keep day',
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
     'view.rocks':                 'Rocks',
@@ -11668,6 +11669,7 @@ const TRANSLATIONS = {
     'menu.reschedule':            'Přeplánovat',
     'menu.now':                   'Nyní',
     'menu.clearDay':              'Kdykoli',
+    'menu.keepDay':               'Ponechat den',
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
     'view.rocks':                 'Kameny',
@@ -13385,7 +13387,9 @@ function transferReusable() {
     });
 }
 
-async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
+// `day` picks the node's weekday in the destination week: omitted keeps the
+// day it already wears, null clears it to Any day, 0-6 sets that one day.
+async function moveNodeToNextWeek(nodeId, { takeSnap = true, day } = {}) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
 
@@ -13394,6 +13398,13 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
   // freshly-added node being relocated for a "tomorrow"-on-Sunday tag) pass
   // takeSnap:false so one undo reverses the whole add+move, not just the move.
   if (takeSnap) takeSnapshot();
+
+  // Retagged here, before the copy is built, so the day travels the way any
+  // existing day does - one undo reverses the retag together with the move.
+  if (day !== undefined) {
+    if (node.tickChild) setTickDay(nodeId, day);
+    else setActivityDays(nodeId, day === null ? new Set() : new Set([day]), false);
+  }
 
   const nextKey = offsetWeek(currentWeekKey, +1);
 
@@ -13582,8 +13593,13 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true } = {}) {
     return { subtreeIds, originalParentId: live.parent, tickChild: !!live.tickChild, addedIds };
   });
 
-  // Destination write never happened - leave the source week exactly as it was.
+  // Destination write never happened - the node stays in the source week. A
+  // retag already applied stands as an undoable reschedule, so persist it.
   if (!placed) {
+    if (day !== undefined) {
+      await saveWeek(currentWeekKey, weekData);
+      renderIfVisible();
+    }
     endAtomicOp();
     return;
   }
@@ -19882,12 +19898,6 @@ document.getElementById('ctx-transfer-reusable').addEventListener('click', () =>
   weekActionTransferReusable();
 });
 
-document.getElementById('ctx-move-next-week').addEventListener('click', async () => {
-  if (contextTarget) await moveNodeToNextWeek(_agendaTickRedirect(contextTarget, true));
-  if (currentView === 'agenda') renderAgenda();
-  hideContextMenu();
-});
-
 // Labels a menu row with its day text plus a small blue dot when that day is
 // today - the same indicator the agenda day-strip uses. Shared by the reschedule
 // submenu (abbreviations) and the day-filter menu (full names). A dayIdx outside
@@ -19909,11 +19919,14 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   const rescheduleSubmenu = document.getElementById('ctx-reschedule-submenu');
   let _hideSubTimer = null;
 
-  function positionRescheduleSubmenu() {
+  const nextWeekItem = document.getElementById('ctx-move-next-week');
+
+  // One submenu element serves both triggers, placed beside whichever opened it.
+  function positionRescheduleSubmenu(anchorItem = rescheduleItem) {
     rescheduleSubmenu.style.visibility = 'hidden';
     rescheduleSubmenu.classList.add('visible');
     const ctxRect  = ctxMenu.getBoundingClientRect();
-    const itemRect = rescheduleItem.getBoundingClientRect();
+    const itemRect = anchorItem.getBoundingClientRect();
     const subW = rescheduleSubmenu.offsetWidth;
     const subH = rescheduleSubmenu.offsetHeight;
     const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
@@ -19925,12 +19938,55 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     rescheduleSubmenu.style.visibility = '';
   }
 
+  // The seven weekday rows, Monday first. `onPick(dayIdx)` returns the row's
+  // click handler; `todayIdx` -1 leaves every row without the today dot.
+  function addWeekdayRows(onPick, todayIdx, classFor = () => '') {
+    AGENDA_DAY_ORDER.forEach(dayIdx => addCtxItem(rescheduleSubmenu,
+      btn => appendDayLabel(btn, dayAbbr(dayIdx), dayIdx, todayIdx), onPick(dayIdx), classFor(dayIdx)));
+  }
+
+  // The node a day choice acts on and the days it holds now, shared by
+  // Reschedule and Next week. In the agenda, a tick row's menu targets the
+  // parent but the schedule belongs to a single tick - act on that tick, not
+  // the parent (retagging the parent would purge its ticks via the "day wins"
+  // rule). A specific tick row carries its id; the Any-day aggregate resolves
+  // to the next unscheduled undone tick (the one its +1 button would advance).
+  // Null when there is no node, with the submenu hidden.
+  function resolveDayTarget() {
+    let ctxTickId = null;
+    if (currentView === 'agenda' && agendaTickCtx) {
+      if (agendaTickCtx.specificTickId) {
+        ctxTickId = agendaTickCtx.specificTickId;
+      } else {
+        const ti = getTickInfo(findNode(agendaTickCtx.parentId));
+        const next = ti && ti.ticks.find(t => !t.done && t.dayIndex == null);
+        if (next) ctxTickId = next.id;
+      }
+    }
+    const node = ctxTickId ? findNode(ctxTickId) : findNode(contextTarget);
+    const parent = node?.dayChild ? findNode(node.parent) : null;
+    if (!node || (node.dayChild && !parent)) {
+      rescheduleSubmenu.classList.remove('visible');
+      return null;
+    }
+    if (node.tickChild) {
+      // Per-tick schedule: single weekday stored in tick.dayIndex.
+      return { node, targetId: node.id, mode: 'tick',
+        assignedDays: node.dayIndex != null ? new Set([node.dayIndex]) : new Set() };
+    }
+    if (node.dayChild) {
+      return { node, targetId: parent.id, mode: 'leaf',
+        assignedDays: new Set(
+          (parent.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild).map(c => c.dayIndex)) };
+    }
+    return { node, targetId: node.id, mode: 'activity-radio', assignedDays: parseTodoDays(node.label || '') };
+  }
+
   // Same shape as the node submenu - Now, the seven weekdays, then Date - but
   // every weekday here means "bring this occurrence into the current week on
   // that day", and there is no Any: an occurrence is a date by definition.
   function buildEntryRescheduleSubmenu() {
     const { entryId, date } = agendaEntryCtx;
-    const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
     const todayIdx = new Date().getDay();
 
     const pull = dayIdx => async () => {
@@ -19943,8 +19999,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     addCtxItem(rescheduleSubmenu, t('menu.now') || 'Now', pull(todayIdx));
     addCtxSeparator(rescheduleSubmenu);
 
-    AGENDA_DAY_ORDER.forEach(dayIdx => addCtxItem(rescheduleSubmenu,
-      btn => appendDayLabel(btn, langLabels[dayIdx], dayIdx, todayIdx), pull(dayIdx)));
+    addWeekdayRows(pull, todayIdx);
 
     addCtxSeparator(rescheduleSubmenu);
     addCtxItem(rescheduleSubmenu, t('menu.sendToDate'), () => {
@@ -19956,22 +20011,6 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   function showRescheduleSubmenu() {
     clearTimeout(_hideSubTimer);
     rescheduleSubmenu.innerHTML = '';
-    const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
-    // In the agenda, a tick row's menu targets the parent but the schedule
-    // belongs to a single tick - reschedule that tick, not the parent
-    // (rescheduling the parent would purge its ticks via the "day wins" rule).
-    // A specific tick row carries its id; the Any-day aggregate resolves to the
-    // next unscheduled undone tick (the one its +1 button would advance).
-    let ctxTickId = null;
-    if (currentView === 'agenda' && agendaTickCtx) {
-      if (agendaTickCtx.specificTickId) {
-        ctxTickId = agendaTickCtx.specificTickId;
-      } else {
-        const ti = getTickInfo(findNode(agendaTickCtx.parentId));
-        const next = ti && ti.ticks.find(t => !t.done && t.dayIndex == null);
-        if (next) ctxTickId = next.id;
-      }
-    }
     // A Later row has no node: the same weekday choices mean "bring this
     // occurrence into the current week on that day", and Any is left off -
     // an occurrence with no date is not an occurrence. Date stays, because
@@ -19982,8 +20021,9 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       return;
     }
 
-    const node = ctxTickId ? findNode(ctxTickId) : findNode(contextTarget);
-    if (!node) return;
+    const resolved = resolveDayTarget();
+    if (!resolved) return;
+    const { node, targetId, mode, assignedDays } = resolved;
 
     const afterMutation = () => {
       saveWeek(currentWeekKey, weekData);
@@ -19993,27 +20033,6 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     };
 
     const todayIdx = new Date().getDay();
-    const setDayLabel = (btn, dayIdx) => appendDayLabel(btn, langLabels[dayIdx], dayIdx, todayIdx);
-
-    let assignedDays, targetId, mode;
-    if (node.tickChild) {
-      // Per-tick schedule: single weekday stored in tick.dayIndex.
-      targetId = node.id;
-      assignedDays = node.dayIndex != null ? new Set([node.dayIndex]) : new Set();
-      mode = 'tick';
-    } else if (node.dayChild) {
-      const parent = findNode(node.parent);
-      if (!parent) return;
-      targetId = parent.id;
-      assignedDays = new Set(
-        (parent.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild).map(c => c.dayIndex)
-      );
-      mode = 'leaf';
-    } else {
-      targetId = node.id;
-      assignedDays = parseTodoDays(node.label || '');
-      mode = 'activity-radio';
-    }
 
     // "Now" - set to today and pin to top of today's agenda (mirrors the
     // (now) magic-token effect). For leaf mode with a today-collision (another
@@ -20043,21 +20062,21 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     });
     addCtxSeparator(rescheduleSubmenu);
 
-    AGENDA_DAY_ORDER.forEach(dayIdx => {
+    addWeekdayRows(dayIdx => () => {
+      if (mode === 'tick') {
+        // Radio toggle: re-picking the assigned day clears it.
+        takeSnapshot();
+        if (setTickDay(targetId, assignedDays.has(dayIdx) ? null : dayIdx)) afterMutation();
+      } else if (applyDayReschedule(targetId, mode, {
+        currentDays: assignedDays,
+        ...(mode === 'leaf' ? { currentDayIndex: node.dayIndex } : {}),
+        newDayIndex: dayIdx,
+      })) afterMutation();
+    }, todayIdx, dayIdx => {
       const isAssigned = assignedDays.has(dayIdx);
       // A leaf cannot take a day a sibling leaf already owns.
       const isCollision = mode === 'leaf' && isAssigned && node.dayIndex !== dayIdx;
-      addCtxItem(rescheduleSubmenu, btn => setDayLabel(btn, dayIdx), () => {
-        if (mode === 'tick') {
-          // Radio toggle: re-picking the assigned day clears it.
-          takeSnapshot();
-          if (setTickDay(targetId, isAssigned ? null : dayIdx)) afterMutation();
-        } else if (applyDayReschedule(targetId, mode, {
-          currentDays: assignedDays,
-          ...(mode === 'leaf' ? { currentDayIndex: node.dayIndex } : {}),
-          newDayIndex: dayIdx,
-        })) afterMutation();
-      }, [isAssigned && 'ctx-item-selected', isCollision && 'ctx-item-disabled'].filter(Boolean).join(' '));
+      return [isAssigned && 'ctx-item-selected', isCollision && 'ctx-item-disabled'].filter(Boolean).join(' ');
     });
 
     // A date is the same choice as a weekday, one horizon further out: this
@@ -20087,16 +20106,50 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     positionRescheduleSubmenu();
   }
 
-  rescheduleItem.addEventListener('mouseenter', showRescheduleSubmenu);
-  rescheduleItem.addEventListener('click', showRescheduleSubmenu);
-  rescheduleItem.addEventListener('mouseleave', e => {
-    if (!rescheduleSubmenu.contains(e.relatedTarget)) {
-      _hideSubTimer = setTimeout(() => rescheduleSubmenu.classList.remove('visible'), 120);
+  // Next week, on which day: Keep day moves it as it stands (what `N` does),
+  // a weekday or Any retags it on the way. No today dot - none of these days
+  // is today - and no Now or Date, which belong to Reschedule. Only a tick or
+  // a plain task is retagged: a day leaf's day belongs to its parent, and a
+  // weekday on a task with ticks would purge them, so those offer Keep day.
+  function showNextWeekSubmenu() {
+    clearTimeout(_hideSubTimer);
+    rescheduleSubmenu.innerHTML = '';
+    const resolved = resolveDayTarget();
+    if (!resolved) return;
+    const { node, mode, assignedDays } = resolved;
+
+    const send = day => async () => {
+      hideContextMenu();
+      await moveNodeToNextWeek(node.id, { day });
+      if (currentView === 'agenda') renderAgenda();
+    };
+
+    addCtxItem(rescheduleSubmenu, t('menu.keepDay'), send());
+    const hasTicks = (node.children || []).some(cid => findNode(cid)?.tickChild);
+    if (mode === 'tick' || (mode === 'activity-radio' && !hasTicks)) {
+      addCtxSeparator(rescheduleSubmenu);
+      addWeekdayRows(send, -1, dayIdx => assignedDays.has(dayIdx) ? 'ctx-item-selected' : '');
+      if (assignedDays.size > 0) {
+        addCtxSeparator(rescheduleSubmenu);
+        addCtxItem(rescheduleSubmenu, t('menu.clearDay'), send(null));
+      }
     }
+
+    positionRescheduleSubmenu(nextWeekItem);
+  }
+
+  [[rescheduleItem, showRescheduleSubmenu], [nextWeekItem, showNextWeekSubmenu]].forEach(([item, show]) => {
+    item.addEventListener('mouseenter', show);
+    item.addEventListener('click', show);
+    item.addEventListener('mouseleave', e => {
+      if (!rescheduleSubmenu.contains(e.relatedTarget)) {
+        _hideSubTimer = setTimeout(() => rescheduleSubmenu.classList.remove('visible'), 120);
+      }
+    });
   });
   rescheduleSubmenu.addEventListener('mouseenter', () => clearTimeout(_hideSubTimer));
   rescheduleSubmenu.addEventListener('mouseleave', e => {
-    if (!rescheduleItem.contains(e.relatedTarget)) {
+    if (!rescheduleItem.contains(e.relatedTarget) && !nextWeekItem.contains(e.relatedTarget)) {
       _hideSubTimer = setTimeout(() => rescheduleSubmenu.classList.remove('visible'), 120);
     }
   });
