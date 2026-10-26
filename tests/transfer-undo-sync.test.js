@@ -4,7 +4,7 @@
 //   Bug B: undo of a cross-week move must tombstone the copy it placed in the
 //          next week, and force-push that week, or a Drive pull-merge resurrects it.
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { takeSnapshot, undo, redo, openDB, saveWeekIDB, loadWeekIDB, _state } from './setup.js';
+import { takeSnapshot, undo, redo, openDB, saveWeekIDB, loadWeekIDB, mergeWeekData, _state } from './setup.js';
 
 const mkBranch = (id, children = []) =>
   ({ id, type: 'branch', branch: id, label: id, children, side: 'left', _ts: 0 });
@@ -181,6 +181,38 @@ describe('Bug B - undo of a move un-resurrects the next-week copy', () => {
     await redo();
     expect((await loadWeekIDB(PREV)).nodes.some(n => n.id === movedId)).toBe(true);
     expect(_state.get().nodes.some(n => n.id === 'a1')).toBe(false);
+  });
+
+  test('moving again after an undo survives a sync merge (parent shell was tombstoned)', async () => {
+    _state.setWeekKey(WK);
+    const week = {
+      nodes: [mkBranch('work', ['p']),
+        { id: 'p', type: 'activity', parent: 'work', branch: 'work', label: 'Clients', children: ['x', 'y'], done: false, _ts: 100 },
+        { id: 'x', type: 'activity', parent: 'p', branch: 'work', label: 'Prep', children: [], done: false, _ts: 100 },
+        { id: 'y', type: 'activity', parent: 'p', branch: 'work', label: 'Call', children: [], done: false, _ts: 100 }],
+      tombstones: [],
+    };
+    _state.set(structuredClone(week));
+    await saveWeekIDB(WK, structuredClone(week));
+    await saveWeekIDB(NEXT, { nodes: [mkBranch('work')], tombstones: [] });
+    await _state.refreshNextWeekCache();
+
+    await _state.moveNodeToWeek('x');
+    await undo();
+    expect((await loadWeekIDB(NEXT)).tombstones).toContain('p');
+
+    await _state.moveNodeToWeek('x', { day: 2 });
+    const next = await loadWeekIDB(NEXT);
+    // No live node may wear an id the record has buried.
+    const buried = new Set(next.tombstones);
+    expect(next.nodes.filter(n => buried.has(n.id))).toEqual([]);
+
+    const merged = mergeWeekData(structuredClone(next), structuredClone(next), NEXT);
+    const copy = merged.nodes.find(n => n.prevId === 'x');
+    expect(copy).toBeTruthy();
+    const shell = merged.nodes.find(n => n.id === copy.parent);
+    expect(shell?.prevId).toBe('p');
+    expect(merged.nodes.find(n => n.type === 'branch' && n.id === 'work').children).toContain(shell.id);
   });
 
   test('an undo that never touched the next week leaves it alone', async () => {

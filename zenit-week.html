@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-6ghfOu8vst057maADQtFovE3bt4whefD5SZrRD/wIIA=';
+               'sha256-pFzgjCVxrnG62jrQu6NHHHxJln7NpOP8TDUqdymFNwo=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -13518,9 +13518,17 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
       } else {
         // A bridging shell only exists to hold the moved node in the new week - it
         // must not inherit the source week's completion/priority bookkeeping.
+        // The shell keeps the ancestor's id, unless the destination has buried
+        // that id - an undone earlier move, or a move back that pruned it there.
+        // A live node under a tombstoned id renders locally but is deleted by
+        // the next merge, taking the moved copy down with it, so it gets a fresh
+        // id linked back by `prevId` (findReuseTarget matches it that way).
+        const buried = (nextData.tombstones || []).includes(ancestor.id);
+        const shellId = buried ? genId() : ancestor.id;
         const shell = {
           ...ancestor,
-          id: ancestor.id,
+          id: shellId,
+          ...(buried && { prevId: ancestor.id }),
           children: [],
           parent: destParentId,
           done: false,
@@ -13534,15 +13542,16 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
         delete shell.unplannedAt;
         delete shell.droppedAt;
         delete shell.reusable;
+        delete shell._demo;
         nextData.nodes.push(shell);
-        nextById.set(ancestor.id, shell);
-        oldToNew.set(ancestor.id, ancestor.id);
-        addedIds.push(ancestor.id);
+        nextById.set(shellId, shell);
+        oldToNew.set(ancestor.id, shellId);
+        addedIds.push(shellId);
         const shellParentInNext = nextById.get(shell.parent);
-        if (shellParentInNext && !shellParentInNext.children.includes(ancestor.id)) {
+        if (shellParentInNext && !shellParentInNext.children.includes(shellId)) {
           const srcOrder = findNode(ancestor.parent)?.children || [];
           insertChildInSourceOrder(
-            shellParentInNext, ancestor.id, shell.prevOrd,
+            shellParentInNext, shellId, shell.prevOrd,
             ordLookup(ancestor.parent, srcOrder), nextLookup);
         }
       }
@@ -13580,6 +13589,9 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
       };
       delete newNode.unplannedAt;
       delete newNode.droppedAt;
+      // A moved example task is the user's own now - the demo cleanup on merge
+      // must not strip it from the destination.
+      delete newNode._demo;
       nextData.nodes.push(newNode);
       nextById.set(newId, newNode);
       addedIds.push(newId);
