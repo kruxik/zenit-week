@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-0W5BPmQWLiNcPgTE9Jr/k35ivzK/4/E/mfdozLc0U2M=';
+               'sha256-ORhSYMHaU0oNGaskjFsEqV0ywNGbjSNDz50feO2Zv6I=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -24626,9 +24626,23 @@ function renderWeekPickerFold() {
   // until one starts after the month has ended.
   const cursor = new Date(first);
   cursor.setDate(first.getDate() - ((first.getDay() || 7) - 1));
+  const mondays = [];
+  for (; cursor <= last; cursor.setDate(cursor.getDate() + 7)) mondays.push(new Date(cursor));
 
-  while (cursor <= last) {
-    const monday = new Date(cursor);
+  // When the open week sits on the grid's edge, its neighbour across the month
+  // boundary rides along as one extra row, so stepping a single week never
+  // needs a month page first. Only one, and only on the edge the open week
+  // touches - an inner week already has both neighbours drawn.
+  const isOpenMonday = (d) => { const i = getISOWeek(d); return weekKey(i.year, i.week) === currentWeekKey; };
+  if (isOpenMonday(mondays[0])) {
+    const m = mondays[0];
+    mondays.unshift(new Date(m.getFullYear(), m.getMonth(), m.getDate() - 7));
+  } else if (isOpenMonday(mondays[mondays.length - 1])) {
+    const m = mondays[mondays.length - 1];
+    mondays.push(new Date(m.getFullYear(), m.getMonth(), m.getDate() + 7));
+  }
+
+  for (const monday of mondays) {
     const iso = getISOWeek(monday);
     const wk  = weekKey(iso.year, iso.week);
     const isOpen = wk === currentWeekKey;
@@ -24659,7 +24673,6 @@ function renderWeekPickerFold() {
       if (wk !== currentWeekKey) loadAndRender(wk);
     });
     grid.appendChild(row);
-    cursor.setDate(cursor.getDate() + 7);
   }
 
   // The way back only means something away from the present; the day filter
