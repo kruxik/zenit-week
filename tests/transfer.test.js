@@ -1,5 +1,5 @@
 import { 
-  transferUnfinished, moveNodeToNextWeek, transferReusable,
+  transferUnfinished, moveNodeToWeek, transferReusable,
   findNode, _state, genId, offsetWeek
 } from './setup.js';
 
@@ -71,7 +71,7 @@ describe('Transfers - Week to Week', () => {
     });
   });
 
-  describe('moveNodeToNextWeek', () => {
+  describe('moveNodeToWeek', () => {
     test('moves node and subtree to next week and leaves tombstone', async () => {
       const currWeek = '2026-01';
       const nextWeek = '2026-02';
@@ -86,7 +86,7 @@ describe('Transfers - Week to Week', () => {
       // Mock empty next week
       _state.setLocalStorage(`zenit-week-${nextWeek}`, { nodes: [mkBranch('work')] });
 
-      await moveNodeToNextWeek('a1');
+      await moveNodeToWeek('a1');
 
       // Local state should be empty (except branch) and have tombstones
       const localData = _state.get();
@@ -112,7 +112,7 @@ describe('Transfers - Week to Week', () => {
       // Next week is completely empty (no branches)
       _state.setLocalStorage(`zenit-week-2026-02`, { nodes: [] });
 
-      await moveNodeToNextWeek('a1');
+      await moveNodeToWeek('a1');
 
       const nextWeekData = JSON.parse(_state.getLocalStorage('zenit-week-2026-02'));
       expect(nextWeekData.nodes.find(n => n.id === 'work')).toBeDefined();

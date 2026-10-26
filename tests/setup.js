@@ -419,7 +419,7 @@ _state.getUndoStack = function() { return undoStack; };
 _state.getNextWeekRawCache = function() { return _nextWeekRawCache; };
 _state.setNextWeekRawCache = function(v) { _nextWeekRawCache = v; };
 _state.refreshNextWeekCache = function() { return refreshNextWeekCache(); };
-_state.moveNodeToNextWeek = function(id) { return moveNodeToNextWeek(id); };
+_state.moveNodeToWeek = function(id, opts) { return moveNodeToWeek(id, opts); };
 _state.withWeekLock = function(wk, fn) { return withWeekLock(wk, fn); };
 _state.loadAndRender = function(wk) { return loadAndRender(wk); };
 _state.setLang   = function(l) { 
@@ -831,7 +831,8 @@ export const {
   handleNodeDrop,
   // Transfers
   transferUnfinished,
-  moveNodeToNextWeek,
+  moveNodeToWeek,
+  canMoveToPrevWeek,
   orderedInsertIndex,
   // Onboarding _demo drop-on-touch
   touchNode,

@@ -1,6 +1,6 @@
 import {
   setStatus, syncStatusUp, findNode, undo, showContextMenu, t,
-  transferUnfinished, transferReusable, moveNodeToNextWeek,
+  transferUnfinished, transferReusable, moveNodeToWeek,
   getOverdueItems, getAnyDayItems, getDroppedItems, localDateStr,
   computeWeekStats, _computeSummarySignature, deleteNode, sandboxGlobal,
   subtreeHasDropped, updateCounter, setActivityDays,
@@ -580,7 +580,7 @@ describe('T11 – transferReusable revives a dropped reusable node', () => {
   });
 });
 
-describe('T12 – moveNodeToNextWeek revives a dropped node', () => {
+describe('T12 – moveNodeToWeek revives a dropped node', () => {
   beforeEach(() => {
     _state.clearLocalStorage();
     _state.reset();
@@ -596,7 +596,7 @@ describe('T12 – moveNodeToNextWeek revives a dropped node', () => {
     _state.setWeekKey('2026-01');
     _state.setLocalStorage('zenit-week-2026-02', { nodes: [mkBranch('work')] });
 
-    await moveNodeToNextWeek('a1');
+    await moveNodeToWeek('a1');
 
     const next = JSON.parse(_state.getLocalStorage('zenit-week-2026-02'));
     const moved = next.nodes.find(n => n.label === 'a1');

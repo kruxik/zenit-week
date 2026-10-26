@@ -8,8 +8,8 @@ const key = wk => 'zenit-week-' + wk;
 const readNext = () => JSON.parse(_state.getLocalStorage(key(NEXT)));
 
 async function move(id) {
-  const { moveNodeToNextWeek } = await import('./setup.js');
-  await moveNodeToNextWeek(id);
+  const { moveNodeToWeek } = await import('./setup.js');
+  await moveNodeToWeek(id);
 }
 
 describe('orderedInsertIndex', () => {
@@ -45,7 +45,7 @@ describe('orderedInsertIndex', () => {
   });
 });
 
-describe('moveNodeToNextWeek - source-week ordering', () => {
+describe('moveNodeToWeek - source-week ordering', () => {
   beforeEach(() => {
     _state.clearLocalStorage();
     _state.reset();

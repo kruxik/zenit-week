@@ -86,7 +86,7 @@ describe('Bug B - undo of a move un-resurrects the next-week copy', () => {
     await saveWeekIDB(NEXT, { nodes: [mkBranch('work')], tombstones: [] });
     await _state.refreshNextWeekCache();
 
-    await _state.moveNodeToNextWeek('a1');
+    await _state.moveNodeToWeek('a1');
     const movedId = (await loadWeekIDB(NEXT)).nodes.find(n => n.label === 'a1').id;
 
     await undo();
@@ -122,7 +122,7 @@ describe('Bug B - undo of a move un-resurrects the next-week copy', () => {
     });
     await _state.refreshNextWeekCache();
 
-    await _state.moveNodeToNextWeek('a1');
+    await _state.moveNodeToWeek('a1');
     await undo();
 
     const next = await loadWeekIDB(NEXT);
@@ -142,7 +142,7 @@ describe('Bug B - undo of a move un-resurrects the next-week copy', () => {
     await saveWeekIDB(NEXT, { nodes: [mkBranch('work')], tombstones: [] });
     await _state.refreshNextWeekCache();
 
-    await _state.moveNodeToNextWeek('a1');
+    await _state.moveNodeToWeek('a1');
     await undo();
     await redo();
 
@@ -152,6 +152,35 @@ describe('Bug B - undo of a move un-resurrects the next-week copy', () => {
     // Its tombstone from the undo must be cleared, or the next merge kills it again.
     expect(next.tombstones).not.toContain(copy.id);
     expect(next.nodes.find(n => n.id === 'work').children).toContain(copy.id);
+  });
+
+  test('undo and redo of a move to the previous week touch only that week', async () => {
+    const PREV = '2025-52';
+    _state.setWeekKey(WK);
+    const week = {
+      nodes: [mkBranch('work', ['a1']),
+        { id: 'a1', type: 'activity', parent: 'work', branch: 'work', label: 'a1', children: [], done: false, _ts: 100 }],
+      tombstones: [],
+    };
+    _state.set(structuredClone(week));
+    await saveWeekIDB(WK, structuredClone(week));
+    await saveWeekIDB(PREV, { nodes: [mkBranch('work')], tombstones: [] });
+    await saveWeekIDB(NEXT, { nodes: [mkBranch('work')], tombstones: [] });
+    await _state.refreshNextWeekCache();
+
+    await _state.moveNodeToWeek('a1', { offset: -1 });
+    const movedId = (await loadWeekIDB(PREV)).nodes.find(n => n.label === 'a1').id;
+
+    await undo();
+    const afterUndo = await loadWeekIDB(PREV);
+    expect(afterUndo.nodes.some(n => n.id === movedId)).toBe(false);
+    expect(afterUndo.tombstones).toContain(movedId);
+    expect(_state.getUndoRedoForcePush().has(NEXT)).toBe(false);
+    expect(_state.get().nodes.some(n => n.id === 'a1')).toBe(true);
+
+    await redo();
+    expect((await loadWeekIDB(PREV)).nodes.some(n => n.id === movedId)).toBe(true);
+    expect(_state.get().nodes.some(n => n.id === 'a1')).toBe(false);
   });
 
   test('an undo that never touched the next week leaves it alone', async () => {

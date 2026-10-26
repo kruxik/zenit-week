@@ -1,6 +1,6 @@
 // Regression tests for concurrent writes to the next-week record.
 //
-// moveNodeToNextWeek reads the next-week record, mutates it, writes it back, and
+// moveNodeToWeek reads the next-week record, mutates it, writes it back, and
 // then tombstones the moved subtree in the source week. Without serialization,
 // anything else that writes that record between the read and the write (a second
 // transfer, a Drive pull-merge, a peer-tab merge) is silently overwritten - and
@@ -45,7 +45,7 @@ describe('concurrent transfers to the next week', () => {
 
   test('sequential transfers all land', async () => {
     const ids = seed(10);
-    for (const id of ids) await _state.moveNodeToNextWeek(id);
+    for (const id of ids) await _state.moveNodeToWeek(id);
 
     const moved = nextWeek().nodes.filter(n => n.type === 'activity');
     expect(moved).toHaveLength(10);
@@ -56,7 +56,7 @@ describe('concurrent transfers to the next week', () => {
     const ids = seed(10);
     // Fire every transfer without awaiting in between: each one suspends at its
     // own load of the next-week record, exactly as rapid clicks do in the app.
-    await Promise.all(ids.map(id => _state.moveNodeToNextWeek(id)));
+    await Promise.all(ids.map(id => _state.moveNodeToWeek(id)));
 
     const moved = nextWeek().nodes.filter(n => n.type === 'activity');
     expect(moved).toHaveLength(10);
@@ -65,7 +65,7 @@ describe('concurrent transfers to the next week', () => {
 
   test('a node is never tombstoned in the source week without a copy in the next', async () => {
     const ids = seed(10);
-    await Promise.all(ids.map(id => _state.moveNodeToNextWeek(id)));
+    await Promise.all(ids.map(id => _state.moveNodeToWeek(id)));
 
     const source = _state.get();
     const survivingLabels = new Set(
@@ -84,7 +84,7 @@ describe('concurrent transfers to the next week', () => {
 
     // A Drive/peer merge writes the next-week record through the same lock.
     // Queue it so it runs while the transfer is in flight.
-    const move = _state.moveNodeToNextWeek(ids[0]);
+    const move = _state.moveNodeToWeek(ids[0]);
     const merge = withWeekLock(NEXT, async () => {
       const cur = _state.getLocalStorage('zenit-week-' + NEXT);
       const data = cur ? JSON.parse(cur) : { nodes: [mkBranch('work')], tombstones: [] };

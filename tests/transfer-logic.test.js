@@ -200,8 +200,8 @@ describe('Data Transfer', () => {
       ]
     });
 
-    const { moveNodeToNextWeek } = await import('./setup.js');
-    await moveNodeToNextWeek('a1');
+    const { moveNodeToWeek } = await import('./setup.js');
+    await moveNodeToWeek('a1');
 
     const nextDataRaw = _state.getLocalStorage('zenit-week-' + nextWeek);
     const nextData = JSON.parse(nextDataRaw);

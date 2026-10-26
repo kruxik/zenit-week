@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ORhSYMHaU0oNGaskjFsEqV0ywNGbjSNDz50feO2Zv6I=';
+               'sha256-6ghfOu8vst057maADQtFovE3bt4whefD5SZrRD/wIIA=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4069,6 +4069,8 @@
   <symbol id="icon-sitemap" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1" /><path d="M12 9l0 3" /></symbol>
   <symbol id="icon-list-details" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M13 5h8" /><path d="M13 9h5" /><path d="M13 15h8" /><path d="M13 19h5" /><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" /><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" /></symbol>
   <symbol id="icon-arrow-back-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></symbol>
+  <symbol id="icon-calendar-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M19 22v-6"/><path d="M22 19l-3 -3l-3 3"/></symbol>
+  <symbol id="icon-calendar-down" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"/><path d="M19 16v6"/><path d="M22 19l-3 3l-3 -3"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/></symbol>
   <symbol id="icon-arrow-forward-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></symbol>
 </svg>
 
@@ -4367,7 +4369,8 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> <span data-i18n="menu.reset">Reset</span></div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
-  <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.nextWeek">Next week</span><span class="ctx-submenu-arrow">▶</span></div>
+  <div class="ctx-item" id="ctx-move-prev-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-up"/></svg> <span data-i18n="menu.prevWeek">Previous week</span><span class="ctx-submenu-arrow">▶</span></div>
+  <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-down"/></svg> <span data-i18n="menu.nextWeek">Next week</span><span class="ctx-submenu-arrow">▶</span></div>
   <div class="ctx-item" id="ctx-reschedule"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.reschedule">Reschedule</span><span class="ctx-submenu-arrow">▶</span></div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
   <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> <span data-i18n="menu.prioNormal">Priority Normal</span></div>
@@ -4723,6 +4726,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="menu.comment">Comment</span> <kbd>C</kbd></div>
         <div class="help-row"><span data-i18n="help.toggleReusable">Toggle Reusable</span> <kbd>R</kbd></div>
         <div class="help-row"><span data-i18n="help.moveNextWeek">Move to next week</span> <kbd>N</kbd></div>
+        <div class="help-row"><span data-i18n="help.movePrevWeek">Move to previous week</span> <kbd>B</kbd></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><span data-i18n="help.sendToDateHint">Right-click a task with no sub-tasks → Reschedule → Date.</span></div>
         <div class="help-row"><span data-i18n="help.quickOptions">Quick Options</span> <kbd>Right Click</kbd></div>
         <div class="help-row"><span data-i18n="help.clearWeek">Clear week (root node)</span> <span><kbd>Backspace</kbd> <kbd>Delete</kbd></span></div>
@@ -6589,7 +6593,7 @@ const MAX_UNDO = 100;
 let _nextWeekRawCache = null;
 // Set of week keys whose local state was just restored by undo/redo and must
 // reach Drive without first pulling (which would resurrect the undone change).
-// A single op can touch two weeks (e.g. moveNodeToNextWeek), so this is a Set.
+// A single op can touch two weeks (e.g. moveNodeToWeek), so this is a Set.
 let _undoRedoForcePush = new Set();
 
 // Tombstone every live node that is missing from `data` so a later Drive
@@ -6737,18 +6741,25 @@ function takeSnapshot() {
 // snapshot pushed it moments ago, and those running with takeSnap:false (an add
 // that relocates itself to next week) belong to the snapshot the add pushed.
 // Additions accumulate, so one undo reverses the whole add-then-move.
-function _noteNextWeekAdditions(nextWeekKey, addedIds) {
+// The snapshot's `nextWeekKey`/`nextWeekRaw` name the destination week; a move
+// to any other week (Previous week) repoints them at `destKey` and the record it
+// read before writing, unless the snapshot already scopes additions elsewhere.
+function _noteDestWeekAdditions(destKey, addedIds, destRawBefore) {
   if (!addedIds?.length || undoStack.length === 0) return;
   const i = undoStack.length - 1;
   let snap;
   try { snap = JSON.parse(undoStack[i]); } catch { return; }
-  if (snap.nextWeekKey !== nextWeekKey) return;
+  if (snap.nextWeekKey !== destKey) {
+    if (snap.nextWeekAdded?.length) return;
+    snap.nextWeekKey = destKey;
+    snap.nextWeekRaw = destRawBefore ?? null;
+  }
   snap.nextWeekAdded = [...new Set([...(snap.nextWeekAdded || []), ...addedIds])];
   undoStack[i] = JSON.stringify(snap);
 }
 
 // Record which schedule entries an operation just created, on the snapshot the
-// next undo will restore - the schedule half of _noteNextWeekAdditions, and for
+// next undo will restore - the schedule half of _noteDestWeekAdditions, and for
 // the same reason: takeSnapshot runs before the operation knows the entry id.
 function _noteScheduleAdditions(entryIds) {
   if (!entryIds?.length || undoStack.length === 0) return;
@@ -6969,8 +6980,8 @@ async function _applySnapshot(raw) {
   // snapshot predated the week existing at all, "roll back" meant "empty it":
   // one undo replaced a populated week with zero nodes and a list of tombstones.
   //
-  // moveNodeToNextWeek now records the ids it placed there (see
-  // _noteNextWeekAdditions), and only those ids are touched. The rule is
+  // moveNodeToWeek now records the ids it placed there (see
+  // _noteDestWeekAdditions), and only those ids are touched. The rule is
   // symmetric, so the same code serves undo and redo: for each recorded id, make
   // the live record agree with this snapshot - drop it if the snapshot lacks it,
   // re-insert it from the snapshot if the snapshot has it. Every other node in
@@ -7088,13 +7099,14 @@ async function _applySnapshot(raw) {
 
 // Build a snapshot of `wk`'s current state (for the redo/undo counter-stack).
 // Reads the displayed week from memory and any other week from IDB.
-async function _currentSnapshot(wk = currentWeekKey) {
-  const nextKey = offsetWeek(wk, +1);
+// `nextKey` is the destination week the snapshot scopes - the next week unless
+// the operation being reversed moved a task elsewhere.
+async function _currentSnapshot(wk = currentWeekKey, nextKey = offsetWeek(wk, +1)) {
   const data = (wk === currentWeekKey && weekData?.nodes)
     ? weekData
     : (await loadWeekIDB(wk)) || { nodes: [] };
   let nextRaw;
-  if (wk === currentWeekKey) {
+  if (wk === currentWeekKey && nextKey === offsetWeek(wk, +1)) {
     nextRaw = _nextWeekRawCache;
   } else {
     const nd = await loadWeekIDB(nextKey);
@@ -7119,7 +7131,7 @@ async function undo() {
   const raw = undoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
-  redoStack.push(_withUndoScope(await _currentSnapshot(wk), snap.nextWeekAdded, snap.scheduleTouched));
+  redoStack.push(_withUndoScope(await _currentSnapshot(wk, snap.nextWeekKey || undefined), snap.nextWeekAdded, snap.scheduleTouched));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -7130,7 +7142,7 @@ async function redo() {
   const raw = redoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
-  undoStack.push(_withUndoScope(await _currentSnapshot(wk), snap.nextWeekAdded, snap.scheduleTouched));
+  undoStack.push(_withUndoScope(await _currentSnapshot(wk, snap.nextWeekKey || undefined), snap.nextWeekAdded, snap.scheduleTouched));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -10274,7 +10286,7 @@ async function forcePushAllToDrive() {
 
 // Resets the 10-second debounce timer; called from saveWeek().
 // Timers are per-week - a single op can save more than one week (e.g.
-// moveNodeToNextWeek saves both the source and destination week), and a shared
+// moveNodeToWeek saves both the source and destination week), and a shared
 // timer would let the later schedule cancel the earlier week's upload.
 function scheduleDriveSync(wKey) {
   if (!googleAccessToken) return;
@@ -11307,6 +11319,7 @@ const TRANSLATIONS = {
     'menu.reusable':              'Reusable',
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
+    'menu.prevWeek':              'Previous week',
     'toast.movedToNextWeek':      'Added to next week',
     'menu.sendToDate':            'Date',
     'agenda.later':               'Later',
@@ -11455,6 +11468,7 @@ const TRANSLATIONS = {
     'help.cyclePriority':         'Cycle priority',
     'help.toggleReusable':        'Toggle Reusable',
     'help.moveNextWeek':          'Move to next week',
+    'help.movePrevWeek':          'Move to previous week',
     'help.clearWeek':             'Clear week (root node)',
     'help.agendaTitle':           'Agenda hotkeys',
     'help.agendaNavItems':        'Move between items',
@@ -11692,6 +11706,7 @@ const TRANSLATIONS = {
     'menu.reusable':              'Opakované',
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
+    'menu.prevWeek':              'Předchozí týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
     'menu.sendToDate':            'Datum',
     'agenda.later':               'Později',
@@ -11840,6 +11855,7 @@ const TRANSLATIONS = {
     'help.cyclePriority':         'Přepínat prioritu',
     'help.toggleReusable':        'Přepnout opakované',
     'help.moveNextWeek':          'Přesunout na příští týden',
+    'help.movePrevWeek':          'Přesunout na předchozí týden',
     'help.clearWeek':             'Vyprázdnit týden (kořenový uzel)',
     'help.agendaTitle':           'Klávesové zkratky Agendy',
     'help.agendaNavItems':        'Pohyb mezi položkami',
@@ -12064,6 +12080,12 @@ function todayWeekKey() {
   const today = new Date();
   const { year, week } = getISOWeek(today);
   return weekKey(year, week);
+}
+
+// Previous week is offered only from a week after this one, so a task is never
+// sent into the past. Week keys are zero-padded, so they compare as strings.
+function canMoveToPrevWeek() {
+  return currentWeekKey > todayWeekKey();
 }
 
 // True while the open week is the real-world current ISO week. "Overdue" is
@@ -12857,7 +12879,7 @@ function _isBridgeContainer(source, lookup) {
 // week.
 //
 // Anchoring on the live source order alone is not enough: sending items forward
-// one at a time erodes that order behind you (moveNodeToNextWeek prunes ancestors
+// one at a time erodes that order behind you (moveNodeToWeek prunes ancestors
 // it just emptied), so by the third weekend move the earlier siblings are gone
 // from the source. Every arriving node therefore records the position it left
 // from - `prevParent` + `prevOrd` - and later arrivals compare against that.
@@ -12882,7 +12904,7 @@ function orderedInsertIndex(destIds, srcOrd, ordOf) {
 
 // Splice `newId` into `destParent.children` at its source-week position.
 // Tick-children own the tail of a children array (validateAndRepair re-sorts
-// them there and moveNodeToNextWeek renumbers them), so an ordinary node never
+// them there and moveNodeToWeek renumbers them), so an ordinary node never
 // lands among them.
 function insertChildInSourceOrder(destParent, newId, srcOrd, ordOf, destLookup) {
   const children = destParent.children;
@@ -12912,7 +12934,10 @@ function orderTransferredDayAndTicks(parentIds) {
 }
 
 function findReuseTarget(source, destNodes, destParentId, lookup) {
-  let hit = destNodes.find(n => n.id === source.id || n.prevId === source.id);
+  // prevId links a copy to the node it came from, so match it either way: a
+  // forward copy of `source`, or the node `source` itself was copied from.
+  let hit = destNodes.find(n => n.id === source.id || n.prevId === source.id ||
+    (source.prevId != null && n.id === source.prevId));
   if (hit) return hit;
   if (destParentId != null && _isBridgeContainer(source, lookup)) {
     const key = _normLabel(source.label);
@@ -13387,9 +13412,10 @@ function transferReusable() {
     });
 }
 
+// Moves a task to the adjacent week: `offset` +1 is Next week, -1 Previous week.
 // `day` picks the node's weekday in the destination week: omitted keeps the
 // day it already wears, null clears it to Any day, 0-6 sets that one day.
-async function moveNodeToNextWeek(nodeId, { takeSnap = true, day } = {}) {
+async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {}) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
 
@@ -13406,9 +13432,9 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true, day } = {}) {
     else setActivityDays(nodeId, day === null ? new Set() : new Set([day]), false);
   }
 
-  const nextKey = offsetWeek(currentWeekKey, +1);
+  const nextKey = offsetWeek(currentWeekKey, offset);
 
-  // Steps 1–4 build the destination copy and run under the next-week lock, which
+  // Steps 1–4 build the destination copy and run under the destination lock, which
   // re-reads the record from storage *inside* the lock. Concurrent transfers,
   // Drive pull-merges and peer-tab merges write the same record; reading it
   // before them and writing after would drop everything they committed. The
@@ -13421,6 +13447,9 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true, day } = {}) {
     if (!live || live.type !== 'activity') return null;
 
     const nextData = await loadWeek(nextKey);
+    // The destination as it stood before this move, for the undo snapshot when
+    // it targets a week other than the one takeSnapshot cached (Previous week).
+    const destRawBefore = JSON.stringify(nextData);
     const nextById = new Map(nextData.nodes.map(n => [n.id, n]));
     const nextLookup = id => nextById.get(id);
     // Where a destination sibling sat in `srcOrder`. An earlier move's recorded
@@ -13434,7 +13463,10 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true, day } = {}) {
       const byId = srcOrder.indexOf(d.id);
       if (byId !== -1) return byId;
       const byPrev = d.prevId != null ? srcOrder.indexOf(d.prevId) : -1;
-      return byPrev === -1 ? null : byPrev;
+      if (byPrev !== -1) return byPrev;
+      // A move back: the source copy points at the destination node it came from.
+      const byOrigin = srcOrder.findIndex(sid => findNode(sid)?.prevId === d.id);
+      return byOrigin === -1 ? null : byOrigin;
     };
 
     // 1. Ensure the branch exists in next week (same id)
@@ -13562,7 +13594,7 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true, day } = {}) {
     // so committing it and then tombstoning the source would destroy the node.
     // Abort with the source week untouched instead.
     if (!parentInNext) {
-      console.error('[zenit-week] moveNodeToNextWeek: no destination parent for', nodeId, '- move aborted');
+      console.error('[zenit-week] moveNodeToWeek: no destination parent for', nodeId, '- move aborted');
       return null;
     }
     if (!parentInNext.children.includes(nodeNewId)) {
@@ -13590,7 +13622,7 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true, day } = {}) {
     }
 
     await saveWeek(nextKey, nextData);
-    return { subtreeIds, originalParentId: live.parent, tickChild: !!live.tickChild, addedIds };
+    return { subtreeIds, originalParentId: live.parent, tickChild: !!live.tickChild, addedIds, destRawBefore };
   });
 
   // Destination write never happened - the node stays in the source week. A
@@ -13604,8 +13636,8 @@ async function moveNodeToNextWeek(nodeId, { takeSnap = true, day } = {}) {
     return;
   }
 
-  const { subtreeIds, originalParentId, tickChild, addedIds } = placed;
-  _noteNextWeekAdditions(nextKey, addedIds);
+  const { subtreeIds, originalParentId, tickChild, addedIds, destRawBefore } = placed;
+  _noteDestWeekAdditions(nextKey, addedIds, destRawBefore);
 
   // 5. Remove subtree from current week. Safe only here: the destination copy is
   //    committed, so these tombstones can never outlive their replacement.
@@ -16261,7 +16293,7 @@ function commitEdit(followUp = 'auto') {
       // snapshot. Hold the atomic op (opened in _openInlineInput) open until the
       // async move + saves finish, then close it - and skip the follow-up
       // sibling/child chain, which the user didn't ask for when tagging tomorrow.
-      moveNodeToNextWeek(nodeId, { takeSnap: false }).finally(() => {
+      moveNodeToWeek(nodeId, { takeSnap: false }).finally(() => {
         showToast(t('toast.movedToNextWeek'));
         endAtomicOp();
       });
@@ -18726,7 +18758,12 @@ function _windowKeydownHandler(e) {
   } else if (e.key.toLowerCase() === 'n') {
     if (node.type === 'activity') {
       e.preventDefault();
-      moveNodeToNextWeek(id);
+      moveNodeToWeek(id);
+    }
+  } else if (e.key.toLowerCase() === 'b') {
+    if (node.type === 'activity' && canMoveToPrevWeek()) {
+      e.preventDefault();
+      moveNodeToWeek(id, { offset: -1 });
     }
   } else if (e.key.toLowerCase() === 'p') {
     if (id !== 'center' && node.type !== 'branch' && node.type !== 'counter') {
@@ -19573,6 +19610,8 @@ function showContextMenu(x, y, nodeId) {
     : `${iconSvg('repeat')} ${t('menu.reusable')}`;
   document.getElementById('ctx-reusable').style.display       = (isStdActivity || isTick) ? '' : 'none';
   document.getElementById('ctx-move-next-week').style.display = (isStdActivity || isTick) ? '' : 'none';
+  document.getElementById('ctx-move-prev-week').style.display =
+    ((isStdActivity || isTick) && canMoveToPrevWeek()) ? '' : 'none';
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
@@ -19920,6 +19959,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   let _hideSubTimer = null;
 
   const nextWeekItem = document.getElementById('ctx-move-next-week');
+  const prevWeekItem = document.getElementById('ctx-move-prev-week');
 
   // One submenu element serves both triggers, placed beside whichever opened it.
   function positionRescheduleSubmenu(anchorItem = rescheduleItem) {
@@ -19946,7 +19986,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   }
 
   // The node a day choice acts on and the days it holds now, shared by
-  // Reschedule and Next week. In the agenda, a tick row's menu targets the
+  // Reschedule, Next week and Previous week. In the agenda, a tick row's menu targets the
   // parent but the schedule belongs to a single tick - act on that tick, not
   // the parent (retagging the parent would purge its ticks via the "day wins"
   // rule). A specific tick row carries its id; the Any-day aggregate resolves
@@ -20106,12 +20146,13 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     positionRescheduleSubmenu();
   }
 
-  // Next week, on which day: Keep day moves it as it stands (what `N` does),
-  // a weekday or Any retags it on the way. No today dot - none of these days
-  // is today - and no Now or Date, which belong to Reschedule. Only a tick or
-  // a plain task is retagged: a day leaf's day belongs to its parent, and a
-  // weekday on a task with ticks would purge them, so those offer Keep day.
-  function showNextWeekSubmenu() {
+  // Next or Previous week, on which day: Keep day moves it as it stands (what
+  // `N` / `B` do), a weekday or Any retags it on the way. The today dot shows
+  // only when the destination is this week (Previous week from next week), and
+  // there is no Now or Date, which belong to Reschedule. Only a tick or a plain
+  // task is retagged: a day leaf's day belongs to its parent, and a weekday on
+  // a task with ticks would purge them, so those offer Keep day.
+  function showWeekMoveSubmenu(offset, anchorItem) {
     clearTimeout(_hideSubTimer);
     rescheduleSubmenu.innerHTML = '';
     const resolved = resolveDayTarget();
@@ -20120,7 +20161,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
 
     const send = day => async () => {
       hideContextMenu();
-      await moveNodeToNextWeek(node.id, { day });
+      await moveNodeToWeek(node.id, { offset, day });
       if (currentView === 'agenda') renderAgenda();
     };
 
@@ -20128,17 +20169,22 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     const hasTicks = (node.children || []).some(cid => findNode(cid)?.tickChild);
     if (mode === 'tick' || (mode === 'activity-radio' && !hasTicks)) {
       addCtxSeparator(rescheduleSubmenu);
-      addWeekdayRows(send, -1, dayIdx => assignedDays.has(dayIdx) ? 'ctx-item-selected' : '');
+      const todayIdx = offsetWeek(currentWeekKey, offset) === todayWeekKey() ? new Date().getDay() : -1;
+      addWeekdayRows(send, todayIdx, dayIdx => assignedDays.has(dayIdx) ? 'ctx-item-selected' : '');
       if (assignedDays.size > 0) {
         addCtxSeparator(rescheduleSubmenu);
         addCtxItem(rescheduleSubmenu, t('menu.clearDay'), send(null));
       }
     }
 
-    positionRescheduleSubmenu(nextWeekItem);
+    positionRescheduleSubmenu(anchorItem);
   }
 
-  [[rescheduleItem, showRescheduleSubmenu], [nextWeekItem, showNextWeekSubmenu]].forEach(([item, show]) => {
+  [
+    [rescheduleItem, showRescheduleSubmenu],
+    [nextWeekItem, () => showWeekMoveSubmenu(1, nextWeekItem)],
+    [prevWeekItem, () => showWeekMoveSubmenu(-1, prevWeekItem)],
+  ].forEach(([item, show]) => {
     item.addEventListener('mouseenter', show);
     item.addEventListener('click', show);
     item.addEventListener('mouseleave', e => {
@@ -20149,7 +20195,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   });
   rescheduleSubmenu.addEventListener('mouseenter', () => clearTimeout(_hideSubTimer));
   rescheduleSubmenu.addEventListener('mouseleave', e => {
-    if (!rescheduleItem.contains(e.relatedTarget) && !nextWeekItem.contains(e.relatedTarget)) {
+    if (![rescheduleItem, nextWeekItem, prevWeekItem].some(item => item.contains(e.relatedTarget))) {
       _hideSubTimer = setTimeout(() => rescheduleSubmenu.classList.remove('visible'), 120);
     }
   });
@@ -25632,7 +25678,7 @@ document.addEventListener('click', (e) => {
       // node to next week where that Monday actually lives. The snapshot above
       // already captured pre-add state, so skip move's own snapshot (one undo
       // reverses the add+move). move() saves both weeks and re-renders.
-      await moveNodeToNextWeek(node.id, { takeSnap: false });
+      await moveNodeToWeek(node.id, { takeSnap: false });
     } else {
       noteTaskCreated(node.id);
       saveWeek(currentWeekKey, weekData);

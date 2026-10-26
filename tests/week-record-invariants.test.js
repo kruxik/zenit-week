@@ -168,7 +168,7 @@ describe('week-record invariants - cross-week transfer over real IndexedDB', () 
 
   test('sequential transfers preserve every task and the invariant', async () => {
     const { ids, before } = await seed(10);
-    for (const id of ids) await _state.moveNodeToNextWeek(id);
+    for (const id of ids) await _state.moveNodeToWeek(id);
 
     const next = await loadWeekIDB(NEXT);
     const source = _state.get();
@@ -179,7 +179,7 @@ describe('week-record invariants - cross-week transfer over real IndexedDB', () 
 
   test('overlapping transfers preserve every task and the invariant', async () => {
     const { ids, before } = await seed(10);
-    await Promise.all(ids.map(id => _state.moveNodeToNextWeek(id)));
+    await Promise.all(ids.map(id => _state.moveNodeToWeek(id)));
 
     const next = await loadWeekIDB(NEXT);
     const source = _state.get();
@@ -191,7 +191,7 @@ describe('week-record invariants - cross-week transfer over real IndexedDB', () 
 
   test('every transferred node is reachable from a branch after reload', async () => {
     const { ids } = await seed(6);
-    await Promise.all(ids.map(id => _state.moveNodeToNextWeek(id)));
+    await Promise.all(ids.map(id => _state.moveNodeToWeek(id)));
 
     // loadWeek runs validateAndRepair, which garbage-collects anything not
     // reachable from a branch through children arrays - a copy wired up wrongly
@@ -203,7 +203,7 @@ describe('week-record invariants - cross-week transfer over real IndexedDB', () 
   test('a transfer and a concurrent write to the next week both survive', async () => {
     const { ids } = await seed(1);
 
-    const move = _state.moveNodeToNextWeek(ids[0]);
+    const move = _state.moveNodeToWeek(ids[0]);
     const peerWrite = _state.withWeekLock(NEXT, async () => {
       const cur = (await loadWeekIDB(NEXT)) || { nodes: [mkBranch('work')], tombstones: [] };
       cur.nodes.push(mkNode('remote1', 'work', 9000, { label: 'from-other-device' }));
