@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) - `vYYYY.MM.DD[.N]`.
 
+## [v2026.11.01] - 2026-11-01
+
+### Added
+
+- **menu:** Previous week moves a task back one week from future weeks, with day submenu, B hotkey and calendar icons
+- **week-picker:** Add the adjacent week across the month edge when the open week is the grid's first or last row
+- **menu:** Next week opens a day submenu - keep the day, pick a weekday or Any
+- **theme:** Add System option that follows the OS theme live, and move existing devices to it once
+
+### Fixed
+
+- **transfer:** Give a bridging parent a fresh id when the destination week has it tombstoned, so a sync merge no longer deletes the moved task
+- **agenda:** Rebuild the day strip when today changes, and keep retrying a date check refused by an open editor
+
 ## [v2026.10.18] - 2026-10-18
 
 ### Fixed
