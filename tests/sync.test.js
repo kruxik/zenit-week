@@ -234,26 +234,14 @@ describe('Google Drive Sync', () => {
 
     const flush = () => new Promise(r => setTimeout(r, 0));
 
-    test('purges an unmigrated token and revokes it via the proxy', async () => {
+    test('purges an unmigrated token without any network call', async () => {
       _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'legacy_rt', email: 'a@ex.com' });
 
       purgeLegacyRefreshToken();
       await flush();
 
       expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBeUndefined();
-      expect(bodies).toEqual([{ grant_type: 'revoke_legacy', refresh_token: 'legacy_rt' }]);
-    });
-
-    test('purges even when the revoke request fails', async () => {
-      server.use(
-        http.post('http://localhost/api/token', () => HttpResponse.error())
-      );
-      _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { refresh_token: 'legacy_rt' });
-
-      purgeLegacyRefreshToken();
-      await flush();
-
-      expect(_state.getLocalStorage(GOOGLE_AUTH_STORAGE_KEY)).toBeUndefined();
+      expect(bodies).toEqual([]);
     });
 
     test('keeps a live cookie session, dropping only the plaintext copy', async () => {

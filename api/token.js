@@ -2,9 +2,7 @@
 // Holds GOOGLE_CLIENT_SECRET server-side so it never appears in browser code.
 // The Google refresh token is kept in an HttpOnly cookie (never exposed to JS)
 // rather than returned to the client. Handles authorization_code and
-// refresh_token grants, a logout action that ends this browser's session, and
-// revoke_legacy for retiring plaintext tokens left in localStorage before the
-// cookie change.
+// refresh_token grants, and a logout action that ends this browser's session.
 //
 // Every POST must be a same-origin JSON request (isSameOriginRequest,
 // isJsonRequest). The refresh cookie is SameSite=Lax, which stops a cross-site
@@ -18,18 +16,9 @@ import { isLocalHost, isSameOriginRequest } from './_lib/same-origin.js';
 
 const GOOGLE_CLIENT_ID = '458902252486-kh8ptv2b2b2q1echn99soes191smr56p.apps.googleusercontent.com';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 
 const REFRESH_COOKIE = 'zw_rt';
 const COOKIE_MAX_AGE = 180 * 24 * 60 * 60; // 180 days
-
-// revoke_legacy is transitional: it relays a caller-supplied token to Google
-// with no session of its own, so it is an open (if harmless) relay. It stays
-// only long enough for stragglers to open the app once after the cookie
-// change (2026-07-28). Past this date it answers 410 and the whole action -
-// plus purgeLegacyRefreshToken()'s network call in zenit-week.html - should
-// be deleted outright.
-const LEGACY_REVOKE_SUNSET = Date.parse('2026-11-01T00:00:00Z');
 
 function readCookie(req, name) {
   const header = req.headers.cookie;
@@ -76,31 +65,14 @@ function clearRefreshCookie(req, res) {
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
-  // Before any action, logout and revoke_legacy included - see the header.
+  // Before any action, logout included - see the header.
   if (!isSameOriginRequest(req)) return res.status(403).json({ error: 'cross_site_request' });
   if (!isJsonRequest(req)) return res.status(415).json({ error: 'unsupported_media_type' });
 
   const secret = process.env.GOOGLE_CLIENT_SECRET;
   if (!secret) return res.status(500).json({ error: 'server_misconfigured' });
 
-  const { grant_type, code, code_verifier, redirect_uri, refresh_token } = req.body || {};
-
-  // Legacy cleanup: revoke a plaintext refresh token the client found left over
-  // in localStorage from before the cookie change. The cookie is untouched -
-  // this token is not a session here, just a credential to retire.
-  if (grant_type === 'revoke_legacy') {
-    if (Date.now() >= LEGACY_REVOKE_SUNSET) return res.status(410).json({ error: 'gone' });
-    if (typeof refresh_token === 'string' && refresh_token) {
-      try {
-        await fetch(GOOGLE_REVOKE_URL, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body:    new URLSearchParams({ token: refresh_token }),
-        });
-      } catch { /* best-effort */ }
-    }
-    return res.status(204).end();
-  }
+  const { grant_type, code, code_verifier, redirect_uri } = req.body || {};
 
   // Sign-out: drop this browser's session and nothing else. Google is not
   // told. Its revoke endpoint acts on the grant behind the token it is given,
