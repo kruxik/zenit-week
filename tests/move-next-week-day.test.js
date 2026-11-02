@@ -239,6 +239,23 @@ describe('moveNodeToWeek - day option', () => {
     expect(readNext().nodes.find(n => n.prevId === 'd0').schedId).toBeUndefined();
   });
 
+  it('a day leaf lands beside a destination task that counts repetitions, never inside it', async () => {
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    _state.setLocalStorage('zenit-week-' + NEXT, { nodes: [
+      branch(['a1']), task('a1', 'Water', { children: ['t1', 't2'] }),
+      task('t1', '1', { parent: 'a1', tickChild: true, tickIndex: 1 }),
+      task('t2', '2', { parent: 'a1', tickChild: true, tickIndex: 2 }),
+    ] });
+    await moveNodeToWeek('d0');
+    await moveNodeToWeek('d6');
+    const next = readNext().nodes;
+    expect(next.find(n => n.id === 'a1').children).toEqual(['t1', 't2']);
+    const twin = next.find(n => n.label === 'Water' && n.id !== 'a1');
+    expect(twin.prevId).toBe('a1');
+    expect(twin.children.map(id => next.find(n => n.id === id).dayIndex)).toEqual([6, 0]);
+    expect(next.find(n => n.id === 'work').children).toHaveLength(2);
+  });
+
   it('refuses Keep day when the destination parent already holds that day', async () => {
     seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
