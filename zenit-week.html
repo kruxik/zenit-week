@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ca3UYbaAfjjvitC0icpbEJIsoZw7h1BaKi5sqO8pbDo=';
+               'sha256-KJXAGRHPh95CHpoRI/wFCl2nA3CRj5SzIbOEgWZv+XU=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -13504,7 +13504,8 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
   // A day leaf's day belongs to its parent here, so it is not retagged in
   // place: the copy takes the chosen day on arrival instead (step 4).
   const leafDay = node.dayChild && typeof day === 'number' ? day : undefined;
-  const leafAny = !!node.dayChild && day === null;
+  // A leaf without a day (damaged data) has nothing to keep, so it is Any.
+  const leafAny = !!node.dayChild && (day === null || (day === undefined && node.dayIndex == null));
   if (day !== undefined && !node.dayChild) {
     if (node.tickChild) setTickDay(nodeId, day);
     else setActivityDays(nodeId, day === null ? new Set() : new Set([day]), false);
@@ -20335,7 +20336,8 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       if (currentView === 'agenda') renderAgenda();
     };
 
-    addCtxItem(rescheduleSubmenu, t('menu.keepDay'), send(), taken(node.dayIndex));
+    const keepTaken = mode === 'leaf' && node.dayIndex == null ? (anyTaken ? 'ctx-item-disabled' : '') : taken(node.dayIndex);
+    addCtxItem(rescheduleSubmenu, t('menu.keepDay'), send(), keepTaken);
     const hasTicks = (node.children || []).some(cid => findNode(cid)?.tickChild);
     if (mode === 'tick' || mode === 'leaf' || (mode === 'activity-radio' && !hasTicks)) {
       addCtxSeparator(rescheduleSubmenu);

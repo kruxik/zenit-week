@@ -207,6 +207,15 @@ describe('moveNodeToWeek - day option', () => {
     expect(p.done).toBe(false);
   });
 
+  it('Keep day on a leaf with no day lands it as Any', async () => {
+    seed('Water', ['d6', 'dx'], [dayLeaf('d6', 6), task('dx', '?', { parent: 'a1', dayChild: true })]);
+    await moveNodeToWeek('dx');
+    const moved = readNext().nodes.find(n => n.prevId === 'dx');
+    expect(moved.label).toBe('Water');
+    expect(moved.dayChild).toBeUndefined();
+    expect(moved.parent).toBe('work');
+  });
+
   it('refuses Keep day when the destination parent already holds that day', async () => {
     seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
