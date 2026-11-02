@@ -163,6 +163,23 @@ describe('moveNodeToWeek - day option', () => {
     expect(readNext().nodes.find(n => n.label === 'Water').reusable).toBeUndefined();
   });
 
+  it('a done day leaf joining done siblings closes the destination parent', async () => {
+    _state.set({ nodes: [
+      { id: 'center', type: 'center' }, branch(['a1']),
+      task('a1', 'Water', { children: ['d6', 'd0'] }),
+      task('d6', 'Sa', { parent: 'a1', dayChild: true, dayIndex: 6 }),
+      task('d0', 'Su', { parent: 'a1', dayChild: true, dayIndex: 0, done: true, doneAt: 'x' }),
+    ] });
+    _state.setLocalStorage('zenit-week-' + NEXT, { nodes: [
+      branch(['a1']), task('a1', 'Water', { children: ['n6'] }),
+      task('n6', 'Sa', { parent: 'a1', dayChild: true, dayIndex: 6, done: true, doneAt: 'y' }),
+    ] });
+    await moveNodeToWeek('d0');
+    const next = readNext().nodes;
+    expect(next.find(n => n.prevId === 'd0').done).toBe(true);
+    expect(next.find(n => n.id === 'a1').done).toBe(true);
+  });
+
   it('refuses Keep day when the destination parent already holds that day', async () => {
     seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
