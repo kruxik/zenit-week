@@ -216,6 +216,23 @@ describe('moveNodeToWeek - day option', () => {
     expect(moved.parent).toBe('work');
   });
 
+  it('strips the schedule link from a parent copy whose source stays behind', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    Object.assign(_state.get().nodes.find(n => n.id === 'a1'), { schedId: 's1', schedDate: '2026-05-02' });
+    await moveNodeToWeek('d0');
+    const shell = readNext().nodes.find(n => n.label === 'Water');
+    expect(shell.schedId).toBeUndefined();
+    expect(shell.schedDate).toBeUndefined();
+    expect(_state.get().nodes.find(n => n.id === 'a1').schedId).toBe('s1');
+  });
+
+  it('strips the schedule link from an Any copy whose parent stays behind', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    Object.assign(_state.get().nodes.find(n => n.id === 'a1'), { schedId: 's1', schedDate: '2026-05-02' });
+    await moveNodeToWeek('d0', { day: null });
+    expect(readNext().nodes.find(n => n.prevId === 'd0').schedId).toBeUndefined();
+  });
+
   it('refuses Keep day when the destination parent already holds that day', async () => {
     seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
