@@ -156,11 +156,11 @@ describe('moveNodeToWeek - day option', () => {
     expect(_state.get().nodes.some(n => n.id === 'a1')).toBe(false);
   });
 
-  it('a bridging shell for a parent with other days stays bare', async () => {
+  it('the copy of a reusable parent with other days stays reusable', async () => {
     seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     _state.get().nodes.find(n => n.id === 'a1').reusable = true;
     await moveNodeToWeek('d0');
-    expect(readNext().nodes.find(n => n.label === 'Water').reusable).toBeUndefined();
+    expect(readNext().nodes.find(n => n.label === 'Water').reusable).toBe(true);
   });
 
   it('a done day leaf joining done siblings closes the destination parent', async () => {
