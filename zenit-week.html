@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-qCwI2S604vrlmX1IiMj4vBbGZ67uvEr1/dT+WxIijmU=';
+               'sha256-zpewTLo6fm2MYwqcJzrhpS8rzm5HXo1FdBcr1oLRnQs=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -11315,6 +11315,7 @@ const TRANSLATIONS = {
     'menu.nextWeek':              'Next week',
     'menu.prevWeek':              'Previous week',
     'toast.movedToNextWeek':      'Added to next week',
+    'toast.dayTakenInWeek':       'That week already has this day',
     'menu.sendToDate':            'Date',
     'agenda.later':               'Later',
     'help.laterTab':              'Later (upcoming dates)',
@@ -11702,6 +11703,7 @@ const TRANSLATIONS = {
     'menu.nextWeek':              'Příští týden',
     'menu.prevWeek':              'Předchozí týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
+    'toast.dayTakenInWeek':       'Tento den už v tom týdnu je',
     'menu.sendToDate':            'Datum',
     'agenda.later':               'Později',
     'help.laterTab':              'Později (nadcházející data)',
@@ -13409,6 +13411,39 @@ function transferReusable() {
 // Moves a task to the adjacent week: `offset` +1 is Next week, -1 Previous week.
 // `day` picks the node's weekday in the destination week: omitted keeps the
 // day it already wears, null clears it to Any day, 0-6 sets that one day.
+// The days a day leaf's parent already holds in another week's nodes - the
+// destination counterpart is found the way moveNodeToWeek's step 3 reuses
+// ancestors. Empty when that week has no counterpart (a fresh shell would be
+// built). Both its day leaves and an inline single day count.
+function destDaysForLeaf(leaf, destNodes) {
+  const chain = [];
+  for (let cur = findNode(leaf.parent); cur && cur.type === 'activity'; cur = findNode(cur.parent)) {
+    chain.unshift(cur);
+  }
+  const oldToNew = new Map([[leaf.branch, leaf.branch]]);
+  let hit = null;
+  for (const ancestor of chain) {
+    hit = findReuseTarget(ancestor, destNodes, oldToNew.get(ancestor.parent) || ancestor.parent, findNode);
+    if (!hit) return new Set();
+    oldToNew.set(ancestor.id, hit.id);
+  }
+  if (!hit) return new Set();
+  const byId = new Map(destNodes.map(n => [n.id, n]));
+  const days = new Set(parseTodoDays(hit.label || ''));
+  (hit.children || []).forEach(cid => {
+    const c = byId.get(cid);
+    if (c?.dayChild && c.dayIndex != null) days.add(c.dayIndex);
+  });
+  return days;
+}
+
+// Whether a day leaf may land on `dayIdx` in a week whose parent holds
+// `destDays`: the same collision rule Reschedule applies within one week.
+function leafDayFree(destDays, dayIdx) {
+  return dayIdx == null ||
+    computeDayReschedule('leaf', { currentDays: destDays, currentDayIndex: null, newDayIndex: dayIdx }) !== null;
+}
+
 async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {}) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
@@ -13421,7 +13456,10 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
 
   // Retagged here, before the copy is built, so the day travels the way any
   // existing day does - one undo reverses the retag together with the move.
-  if (day !== undefined) {
+  // A day leaf's day belongs to its parent here, so it is not retagged in
+  // place: the copy takes the chosen day on arrival instead (step 4).
+  const leafDay = node.dayChild && typeof day === 'number' ? day : undefined;
+  if (day !== undefined && !node.dayChild) {
     if (node.tickChild) setTickDay(nodeId, day);
     else setActivityDays(nodeId, day === null ? new Set() : new Set([day]), false);
   }
@@ -13441,6 +13479,10 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
     if (!live || live.type !== 'activity') return null;
 
     const nextData = await loadWeek(nextKey);
+    // A day leaf never lands on a day its parent already holds there.
+    if (live.dayChild && !leafDayFree(destDaysForLeaf(live, nextData.nodes), leafDay ?? live.dayIndex)) {
+      return { collision: true };
+    }
     // The destination as it stood before this move, for the undo snapshot when
     // it targets a week other than the one takeSnapshot cached (Previous week).
     const destRawBefore = JSON.stringify(nextData);
@@ -13579,6 +13621,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
         // is a decision to re-plan, so a drop does not carry over either.
         unplanned: false,
         dropped: false,
+        ...(n.id === nodeId && leafDay !== undefined && { dayIndex: leafDay, label: dayAbbr(leafDay) }),
         _ts: Date.now(),
       };
       delete newNode.unplannedAt;
@@ -13633,6 +13676,11 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
 
   // Destination write never happened - the node stays in the source week. A
   // retag already applied stands as an undoable reschedule, so persist it.
+  if (placed?.collision) {
+    showToast(t('toast.dayTakenInWeek'));
+    endAtomicOp();
+    return;
+  }
   if (!placed) {
     if (day !== undefined) {
       await saveWeek(currentWeekKey, weekData);
@@ -20056,6 +20104,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
 
   function showRescheduleSubmenu() {
     clearTimeout(_hideSubTimer);
+    _weekMoveBuild++; // a pending Next/Previous week build must not overwrite this
     rescheduleSubmenu.innerHTML = '';
     // A Later row has no node: the same weekday choices mean "bring this
     // occurrence into the current week on that day", and Any is left off -
@@ -20156,14 +20205,24 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   // `N` / `B` do), a weekday or Any retags it on the way. The today dot shows
   // only when the destination is this week (Previous week from next week), and
   // there is no Now or Date, which belong to Reschedule. Only a tick or a plain
-  // task is retagged: a day leaf's day belongs to its parent, and a weekday on
-  // a task with ticks would purge them, so those offer Keep day.
-  function showWeekMoveSubmenu(offset, anchorItem) {
+  // task is retagged: a weekday on a task with ticks would purge them, so that
+  // offers Keep day. A day leaf takes the weekday on its copy in the
+  // destination; its source parent just loses that day.
+  let _weekMoveBuild = 0;
+  async function showWeekMoveSubmenu(offset, anchorItem) {
     clearTimeout(_hideSubTimer);
-    rescheduleSubmenu.innerHTML = '';
     const resolved = resolveDayTarget();
     if (!resolved) return;
     const { node, mode, assignedDays } = resolved;
+    // A day leaf greys out the days its parent already holds in the
+    // destination, as Reschedule does within one week.
+    const build = ++_weekMoveBuild;
+    const destDays = mode === 'leaf'
+      ? destDaysForLeaf(node, (await loadWeek(offsetWeek(currentWeekKey, offset))).nodes)
+      : new Set();
+    if (build !== _weekMoveBuild || !ctxMenu.classList.contains('visible')) return;
+    const taken = dayIdx => (leafDayFree(destDays, dayIdx) ? '' : 'ctx-item-disabled');
+    rescheduleSubmenu.innerHTML = '';
 
     const send = day => async () => {
       hideContextMenu();
@@ -20171,13 +20230,14 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       if (currentView === 'agenda') renderAgenda();
     };
 
-    addCtxItem(rescheduleSubmenu, t('menu.keepDay'), send());
+    addCtxItem(rescheduleSubmenu, t('menu.keepDay'), send(), taken(node.dayIndex));
     const hasTicks = (node.children || []).some(cid => findNode(cid)?.tickChild);
-    if (mode === 'tick' || (mode === 'activity-radio' && !hasTicks)) {
+    if (mode === 'tick' || mode === 'leaf' || (mode === 'activity-radio' && !hasTicks)) {
       addCtxSeparator(rescheduleSubmenu);
       const todayIdx = offsetWeek(currentWeekKey, offset) === todayWeekKey() ? new Date().getDay() : -1;
-      addWeekdayRows(send, todayIdx, dayIdx => assignedDays.has(dayIdx) ? 'ctx-item-selected' : '');
-      if (assignedDays.size > 0) {
+      addWeekdayRows(send, todayIdx, dayIdx =>
+        [assignedDays.has(dayIdx) && 'ctx-item-selected', taken(dayIdx)].filter(Boolean).join(' '));
+      if (assignedDays.size > 0 && mode !== 'leaf') {
         addCtxSeparator(rescheduleSubmenu);
         addCtxItem(rescheduleSubmenu, t('menu.clearDay'), send(null));
       }

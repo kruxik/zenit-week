@@ -89,6 +89,35 @@ describe('moveNodeToWeek - day option', () => {
     expect([...parseTodoDays(moved.label)]).toEqual([4]);
     expect(next.some(n => n.dayChild)).toBe(false);
   });
+
+  it('moves one day leaf to the chosen weekday, the parent keeps its other days', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    await moveNodeToWeek('d0', { day: 3 });
+    const moved = readNext().nodes.find(n => n.prevId === 'd0');
+    expect(moved.dayChild).toBe(true);
+    expect(moved.dayIndex).toBe(3);
+    const src = _state.get().nodes;
+    expect(src.some(n => n.id === 'd0')).toBe(false);
+    expect(src.find(n => n.id === 'a1').children).toEqual(['d6']);
+    expect(src.find(n => n.id === 'd6').dayIndex).toBe(6);
+  });
+
+  it('refuses a day leaf onto a day its parent already holds in the destination', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    await moveNodeToWeek('d0', { day: 6 });
+    await moveNodeToWeek('d6', { day: 6 });
+    const next = readNext().nodes;
+    expect(next.filter(n => n.dayChild && n.dayIndex === 6)).toHaveLength(1);
+    expect(_state.get().nodes.some(n => n.id === 'd6')).toBe(true);
+  });
+
+  it('refuses Keep day when the destination parent already holds that day', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    await moveNodeToWeek('d0', { day: 6 });
+    await moveNodeToWeek('d6');
+    expect(readNext().nodes.filter(n => n.dayChild && n.dayIndex === 6)).toHaveLength(1);
+    expect(_state.get().nodes.some(n => n.id === 'd6')).toBe(true);
+  });
 });
 
 describe('moveNodeToWeek - Previous week', () => {
