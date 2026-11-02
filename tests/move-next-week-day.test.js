@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { _state, moveNodeToWeek, canMoveToPrevWeek, undo, parseTodoDays } from './setup.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { _state, moveNodeToWeek, canMoveToPrevWeek, undo, redo, openDB, saveWeekIDB, loadWeekIDB, parseTodoDays } from './setup.js';
 
 const CURR = '2026-18';
 const NEXT = '2026-19';
@@ -256,5 +256,64 @@ describe('moveNodeToWeek - Previous week', () => {
     expect(prev.filter(n => n.label === 'Trip')).toHaveLength(1);
     const moved = prev.find(n => n.prevId === 'c2');
     expect(moved.parent).toBe('p1');
+  });
+});
+
+// Undo and redo read and write the IndexedDB record and the app's next-week
+// cache, so these run on the real IDB code (fake-indexeddb).
+describe('moveNodeToWeek - undo restores changed destination nodes', () => {
+  beforeEach(async () => {
+    _state.useRealIDB(true);
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['weeks', 'misc'], 'readwrite');
+      tx.objectStore('weeks').clear();
+      tx.objectStore('misc').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    _state.clearLocalStorage();
+    _state.reset();
+    _state.setWeekKey(CURR);
+  });
+  afterEach(() => _state.useRealIDB(false));
+
+  async function seedNext(nodes) {
+    _state.set({ nodes: [
+      { id: 'center', type: 'center' }, branch(['a1']), task('a1', 'Water', { children: ['d6', 'd0'] }),
+      dayLeaf('d6', 6), dayLeaf('d0', 0),
+    ] });
+    const data = { nodes };
+    await saveWeekIDB(NEXT, data);
+    _state.setNextWeekRawCache(JSON.stringify(data));
+  }
+  const nextNodes = async () => (await loadWeekIDB(NEXT)).nodes;
+
+  it('undo restores a task split from an inline day, redo splits it again', async () => {
+    await seedNext([branch(['a1']), task('a1', 'Water (fr)', { done: true, doneAt: 'y' })]);
+    await moveNodeToWeek('d0');
+    await undo();
+    let next = await nextNodes();
+    let p = next.find(n => n.id === 'a1');
+    expect(p.label).toBe('Water (fr)');
+    expect(p.done).toBe(true);
+    expect(p.children).toEqual([]);
+    expect(next.some(n => n.dayChild)).toBe(false);
+    await redo();
+    next = await nextNodes();
+    p = next.find(n => n.id === 'a1');
+    expect(p.label).toBe('Water');
+    expect(p.children.map(id => next.find(n => n.id === id).dayIndex)).toEqual([5, 0]);
+  });
+
+  it('undo restores the parent outcome a move re-derived', async () => {
+    await seedNext([
+      branch(['a1']), task('a1', 'Water', { children: ['n6'], done: true, doneAt: 'y' }),
+      task('n6', 'Sa', { parent: 'a1', dayChild: true, dayIndex: 6, done: true, doneAt: 'y' }),
+    ]);
+    await moveNodeToWeek('d0');
+    expect((await nextNodes()).find(n => n.id === 'a1').done).toBe(false);
+    await undo();
+    expect((await nextNodes()).find(n => n.id === 'a1').done).toBe(true);
   });
 });

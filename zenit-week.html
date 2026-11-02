@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ZVFP4UyqLRpLBHopJbISEykcTLNYD9eaNxUjQvPocMY=';
+               'sha256-ca3UYbaAfjjvitC0icpbEJIsoZw7h1BaKi5sqO8pbDo=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -6744,7 +6744,9 @@ function takeSnapshot() {
 // The snapshot's `nextWeekKey`/`nextWeekRaw` name the destination week; a move
 // to any other week (Previous week) repoints them at `destKey` and the record it
 // read before writing, unless the snapshot already scopes additions elsewhere.
-function _noteDestWeekAdditions(destKey, addedIds, destRawBefore) {
+// `touchedIds` are destination nodes that already existed and that the move
+// changed (a parent's label, outcome or day order); undo restores them whole.
+function _noteDestWeekAdditions(destKey, addedIds, destRawBefore, touchedIds = []) {
   if (!addedIds?.length || undoStack.length === 0) return;
   const i = undoStack.length - 1;
   let snap;
@@ -6755,6 +6757,7 @@ function _noteDestWeekAdditions(destKey, addedIds, destRawBefore) {
     snap.nextWeekRaw = destRawBefore ?? null;
   }
   snap.nextWeekAdded = [...new Set([...(snap.nextWeekAdded || []), ...addedIds])];
+  if (touchedIds.length) snap.nextWeekTouched = [...new Set([...(snap.nextWeekTouched || []), ...touchedIds])];
   undoStack[i] = JSON.stringify(snap);
 }
 
@@ -6881,11 +6884,12 @@ function pruneOccurrencePath(data, entry) {
 
 // Carry an operation's next-week additions onto the counter-snapshot pushed to
 // the opposite stack, so redo re-inserts exactly what undo removed (and back).
-function _withUndoScope(rawSnapshot, addedIds, scheduleTouched) {
+function _withUndoScope(rawSnapshot, addedIds, scheduleTouched, nextTouched) {
   if (!addedIds?.length && !scheduleTouched?.length) return rawSnapshot;
   try {
     const s = JSON.parse(rawSnapshot);
     if (addedIds?.length) s.nextWeekAdded = [...addedIds];
+    if (nextTouched?.length) s.nextWeekTouched = [...nextTouched];
     if (scheduleTouched?.length) s.scheduleTouched = [...scheduleTouched];
     return JSON.stringify(s);
   } catch { return rawSnapshot; }
@@ -6989,6 +6993,7 @@ async function _applySnapshot(raw) {
   let restoredNext = null;
   let nextWritten = false;
   const nextAdded = Array.isArray(snapshot.nextWeekAdded) ? snapshot.nextWeekAdded : [];
+  const nextTouched = Array.isArray(snapshot.nextWeekTouched) ? snapshot.nextWeekTouched : [];
   if (snapshot.nextWeekKey && nextAdded.length) {
     await withWeekLock(snapshot.nextWeekKey, async () => {
       const liveNext = (await loadWeekIDB(snapshot.nextWeekKey)) || { nodes: [], tombstones: [] };
@@ -7051,6 +7056,23 @@ async function _applySnapshot(raw) {
           progress = true;
         }
       }
+
+      // Existing nodes the operation changed take the snapshot's version back,
+      // keeping the children they hold now in the snapshot's order.
+      nextTouched.forEach(id => {
+        const live = liveById.get(id);
+        const was = snapById.get(id);
+        if (!live || !was) return;
+        const kids = live.children || [];
+        const order = was.children || [];
+        const restored = {
+          ...was,
+          children: [...order.filter(c => kids.includes(c)), ...kids.filter(c => !order.includes(c))],
+          _ts: tsNow,
+        };
+        liveNext.nodes[liveNext.nodes.indexOf(live)] = restored;
+        liveById.set(id, restored);
+      });
 
       if (_weekContentSig(liveNext) !== beforeSig) {
         liveNext.savedAt = Date.now();
@@ -7131,7 +7153,7 @@ async function undo() {
   const raw = undoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
-  redoStack.push(_withUndoScope(await _currentSnapshot(wk, snap.nextWeekKey || undefined), snap.nextWeekAdded, snap.scheduleTouched));
+  redoStack.push(_withUndoScope(await _currentSnapshot(wk, snap.nextWeekKey || undefined), snap.nextWeekAdded, snap.scheduleTouched, snap.nextWeekTouched));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -7142,7 +7164,7 @@ async function redo() {
   const raw = redoStack.pop();
   const snap = JSON.parse(raw);
   const wk = snap.weekKey || currentWeekKey;
-  undoStack.push(_withUndoScope(await _currentSnapshot(wk, snap.nextWeekKey || undefined), snap.nextWeekAdded, snap.scheduleTouched));
+  undoStack.push(_withUndoScope(await _currentSnapshot(wk, snap.nextWeekKey || undefined), snap.nextWeekAdded, snap.scheduleTouched, snap.nextWeekTouched));
   await _applySnapshot(raw);
   if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
 }
@@ -13709,7 +13731,11 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
       });
     }
 
+    // Destination nodes that existed before this move and that it changes.
+    const touchedIds = [];
+    const touchDest = n => { if (!addedIds.includes(n.id) && !touchedIds.includes(n.id)) touchedIds.push(n.id); };
     if (live.dayChild && !leafAny) {
+      touchDest(parentInNext);
       // A destination task that wore one inline day, "(Fr)", becomes a
       // day-split task: that day turns into a leaf beside the arriving one,
       // with the task's own outcome, as setActivityDays splits it here.
@@ -13740,12 +13766,13 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
     for (let p = parentInNext; p && p.type === 'activity'; p = nextById.get(p.parent)) {
       const kids = (p.children || []).map(cid => nextById.get(cid)).filter(Boolean);
       if (!kids.length || !rollUpOutcome(p, kids)) break;
+      touchDest(p);
       p._ts = Date.now();
       delete p._demo;
     }
 
     await saveWeek(nextKey, nextData);
-    return { subtreeIds, originalParentId: live.parent, tickChild: !!live.tickChild, addedIds, destRawBefore };
+    return { subtreeIds, originalParentId: live.parent, tickChild: !!live.tickChild, addedIds, touchedIds, destRawBefore };
   });
 
   // Destination write never happened - the node stays in the source week. A
@@ -13764,8 +13791,8 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
     return;
   }
 
-  const { subtreeIds, originalParentId, tickChild, addedIds, destRawBefore } = placed;
-  _noteDestWeekAdditions(nextKey, addedIds, destRawBefore);
+  const { subtreeIds, originalParentId, tickChild, addedIds, touchedIds, destRawBefore } = placed;
+  _noteDestWeekAdditions(nextKey, addedIds, destRawBefore, touchedIds);
 
   // 5. Remove subtree from current week. Safe only here: the destination copy is
   //    committed, so these tombstones can never outlive their replacement.
