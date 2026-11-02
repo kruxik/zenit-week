@@ -141,6 +141,28 @@ describe('moveNodeToWeek - day option', () => {
     expect(_state.get().nodes.some(n => n.id === 'd6')).toBe(true);
   });
 
+  it('moving the last day leaf keeps the parent reusable and done', async () => {
+    _state.set({ nodes: [
+      { id: 'center', type: 'center' }, branch(['a1']),
+      task('a1', 'Water', { children: ['d0'], reusable: true, done: true, doneAt: 'x', priority: 'high' }),
+      task('d0', 'Su', { parent: 'a1', dayChild: true, dayIndex: 0, done: true, doneAt: 'x' }),
+    ] });
+    _state.setLocalStorage('zenit-week-' + NEXT, { nodes: [branch()] });
+    await moveNodeToWeek('d0', { day: 2 });
+    const shell = readNext().nodes.find(n => n.label === 'Water');
+    expect(shell.reusable).toBe(true);
+    expect(shell.done).toBe(true);
+    expect(shell.priority).toBe('high');
+    expect(_state.get().nodes.some(n => n.id === 'a1')).toBe(false);
+  });
+
+  it('a bridging shell for a parent with other days stays bare', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    _state.get().nodes.find(n => n.id === 'a1').reusable = true;
+    await moveNodeToWeek('d0');
+    expect(readNext().nodes.find(n => n.label === 'Water').reusable).toBeUndefined();
+  });
+
   it('refuses Keep day when the destination parent already holds that day', async () => {
     seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
