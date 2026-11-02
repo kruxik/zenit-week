@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-zpewTLo6fm2MYwqcJzrhpS8rzm5HXo1FdBcr1oLRnQs=';
+               'sha256-aFQcG9vjDJ5X0KS6C6o5ba3rTe71cDqgz0dJf2tibbw=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -20235,8 +20235,10 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     if (mode === 'tick' || mode === 'leaf' || (mode === 'activity-radio' && !hasTicks)) {
       addCtxSeparator(rescheduleSubmenu);
       const todayIdx = offsetWeek(currentWeekKey, offset) === todayWeekKey() ? new Date().getDay() : -1;
+      // A leaf moves one occurrence, so only its own day reads as current.
+      const current = mode === 'leaf' ? new Set([node.dayIndex]) : assignedDays;
       addWeekdayRows(send, todayIdx, dayIdx =>
-        [assignedDays.has(dayIdx) && 'ctx-item-selected', taken(dayIdx)].filter(Boolean).join(' '));
+        [current.has(dayIdx) && 'ctx-item-selected', taken(dayIdx)].filter(Boolean).join(' '));
       if (assignedDays.size > 0 && mode !== 'leaf') {
         addCtxSeparator(rescheduleSubmenu);
         addCtxItem(rescheduleSubmenu, t('menu.clearDay'), send(null));
