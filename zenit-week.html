@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-aFQcG9vjDJ5X0KS6C6o5ba3rTe71cDqgz0dJf2tibbw=';
+               'sha256-c7UwXJFffzNAlXIkIPmul76mI8k70jZV0QOkdfsi7CU=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -13408,33 +13408,52 @@ function transferReusable() {
     });
 }
 
-// Moves a task to the adjacent week: `offset` +1 is Next week, -1 Previous week.
-// `day` picks the node's weekday in the destination week: omitted keeps the
-// day it already wears, null clears it to Any day, 0-6 sets that one day.
-// The days a day leaf's parent already holds in another week's nodes - the
-// destination counterpart is found the way moveNodeToWeek's step 3 reuses
-// ancestors. Empty when that week has no counterpart (a fresh shell would be
-// built). Both its day leaves and an inline single day count.
-function destDaysForLeaf(leaf, destNodes) {
+// Where a current-week node sits in another week's nodes, found the way
+// moveNodeToWeek's step 3 reuses ancestors: a branch by its id, an activity
+// through its chain of reused ancestors. Null when that week has none (the
+// move would build a fresh shell).
+function destCounterpart(src, destNodes) {
+  if (!src) return null;
+  if (src.type !== 'activity') return destNodes.find(n => n.id === src.id) || null;
   const chain = [];
-  for (let cur = findNode(leaf.parent); cur && cur.type === 'activity'; cur = findNode(cur.parent)) {
-    chain.unshift(cur);
-  }
-  const oldToNew = new Map([[leaf.branch, leaf.branch]]);
+  for (let cur = src; cur && cur.type === 'activity'; cur = findNode(cur.parent)) chain.unshift(cur);
+  const oldToNew = new Map([[src.branch, src.branch]]);
   let hit = null;
   for (const ancestor of chain) {
     hit = findReuseTarget(ancestor, destNodes, oldToNew.get(ancestor.parent) || ancestor.parent, findNode);
-    if (!hit) return new Set();
+    if (!hit) return null;
     oldToNew.set(ancestor.id, hit.id);
   }
-  if (!hit) return new Set();
+  return hit;
+}
+
+// The days a dest node holds: its day leaves and an inline single day.
+function destNodeDays(destNode, destNodes) {
+  if (!destNode) return new Set();
   const byId = new Map(destNodes.map(n => [n.id, n]));
-  const days = new Set(parseTodoDays(hit.label || ''));
-  (hit.children || []).forEach(cid => {
+  const days = new Set(parseTodoDays(destNode.label || ''));
+  (destNode.children || []).forEach(cid => {
     const c = byId.get(cid);
     if (c?.dayChild && c.dayIndex != null) days.add(c.dayIndex);
   });
   return days;
+}
+
+// The days a day leaf's parent already holds in another week's nodes. Empty
+// when that week has no counterpart.
+function destDaysForLeaf(leaf, destNodes) {
+  return destNodeDays(destCounterpart(findNode(leaf.parent), destNodes), destNodes);
+}
+
+// Any on a day leaf lands its parent's task with no day beside the parent's
+// counterpart. Taken when the destination already has that undated task.
+function destHasUndatedTwin(leaf, destNodes) {
+  const parent = findNode(leaf.parent);
+  const destGrand = destCounterpart(findNode(parent?.parent), destNodes);
+  if (!destGrand) return false;
+  const key = _normLabel(parent.label);
+  return destNodes.some(n => n.parent === destGrand.id && n.type === 'activity' && !n.dayChild &&
+    _normLabel(n.label) === key && destNodeDays(n, destNodes).size === 0);
 }
 
 // Whether a day leaf may land on `dayIdx` in a week whose parent holds
@@ -13444,6 +13463,10 @@ function leafDayFree(destDays, dayIdx) {
     computeDayReschedule('leaf', { currentDays: destDays, currentDayIndex: null, newDayIndex: dayIdx }) !== null;
 }
 
+// Moves a task to the adjacent week: `offset` +1 is Next week, -1 Previous week.
+// `day` picks the node's weekday in the destination week: omitted keeps the
+// day it already wears, null clears it to Any day, 0-6 sets that one day.
+// A day leaf moved with null lands as its parent's task with no day.
 async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {}) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
@@ -13459,6 +13482,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
   // A day leaf's day belongs to its parent here, so it is not retagged in
   // place: the copy takes the chosen day on arrival instead (step 4).
   const leafDay = node.dayChild && typeof day === 'number' ? day : undefined;
+  const leafAny = !!node.dayChild && day === null;
   if (day !== undefined && !node.dayChild) {
     if (node.tickChild) setTickDay(nodeId, day);
     else setActivityDays(nodeId, day === null ? new Set() : new Set([day]), false);
@@ -13480,9 +13504,14 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
 
     const nextData = await loadWeek(nextKey);
     // A day leaf never lands on a day its parent already holds there.
-    if (live.dayChild && !leafDayFree(destDaysForLeaf(live, nextData.nodes), leafDay ?? live.dayIndex)) {
+    if (live.dayChild && (leafAny
+      ? destHasUndatedTwin(live, nextData.nodes)
+      : !leafDayFree(destDaysForLeaf(live, nextData.nodes), leafDay ?? live.dayIndex))) {
       return { collision: true };
     }
+    // The node whose place the copy takes: a day leaf moved to Any day lands
+    // as its parent's task, one level up, with the leaf's own outcome.
+    const anchor = leafAny ? findNode(live.parent) : live;
     // The destination as it stood before this move, for the undo snapshot when
     // it targets a week other than the one takeSnapshot cached (Previous week).
     const destRawBefore = JSON.stringify(nextData);
@@ -13533,7 +13562,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
 
     // 2. Collect activity ancestors between branch and node (top-down order)
     const ancestorChain = [];
-    let cur = findNode(live.parent);
+    let cur = findNode(anchor.parent);
     while (cur && cur.type === 'activity') {
       ancestorChain.unshift(cur);
       cur = findNode(cur.parent);
@@ -13601,8 +13630,11 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
     // Copy subtree into nextData with wired parent/children
     subtreeNodes.forEach(n => {
       const newId = oldToNew.get(n.id);
+      const base = n.id === nodeId && leafAny
+        ? { ...anchor, done: n.done, doneAt: n.doneAt, children: [] }
+        : n;
       const newNode = {
-        ...n,
+        ...base,
         id: newId,
         // Where this copy came from, so a later move can anchor its position
         // against it - `prevId` is the same identity marker transferUnfinished
@@ -13611,11 +13643,11 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
         // inserted; its descendants ride along in copied children arrays.
         prevId: n.id,
         ...(n.id === nodeId && {
-          prevParent: live.parent,
-          prevOrd: (findNode(live.parent)?.children || []).indexOf(nodeId),
+          prevParent: anchor.parent,
+          prevOrd: (findNode(anchor.parent)?.children || []).indexOf(anchor.id),
         }),
-        parent: oldToNew.get(n.parent) || n.parent,
-        children: n.children.map(cid => oldToNew.get(cid)).filter(Boolean),
+        parent: n.id === nodeId ? (oldToNew.get(anchor.parent) || anchor.parent) : (oldToNew.get(n.parent) || n.parent),
+        children: base.children.map(cid => oldToNew.get(cid)).filter(Boolean),
         // Moving an unplanned task re-plans it: it was chosen for the new week,
         // so the badge and its arrival stamp don't carry over. An explicit move
         // is a decision to re-plan, so a drop does not carry over either.
@@ -13626,6 +13658,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
       };
       delete newNode.unplannedAt;
       delete newNode.droppedAt;
+      if (!newNode.done) delete newNode.doneAt;
       // A moved example task is the user's own now - the demo cleanup on merge
       // must not strip it from the destination.
       delete newNode._demo;
@@ -13635,7 +13668,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
     });
 
     // Wire node into its parent in next week
-    const nodeParentIdInNext = oldToNew.get(live.parent) || live.parent;
+    const nodeParentIdInNext = oldToNew.get(anchor.parent) || anchor.parent;
     const parentInNext = nextById.get(nodeParentIdInNext);
     const nodeNewId = oldToNew.get(nodeId);
     // No destination parent means the copy would sit outside every branch's
@@ -13647,10 +13680,10 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
       return null;
     }
     if (!parentInNext.children.includes(nodeNewId)) {
-      const srcOrder = findNode(live.parent)?.children || [];
+      const srcOrder = findNode(anchor.parent)?.children || [];
       insertChildInSourceOrder(
-        parentInNext, nodeNewId, srcOrder.indexOf(nodeId),
-        ordLookup(live.parent, srcOrder), nextLookup);
+        parentInNext, nodeNewId, srcOrder.indexOf(anchor.id),
+        ordLookup(anchor.parent, srcOrder), nextLookup);
     }
 
     // 4b. Renumber the destination's tick-children so indices stay contiguous
@@ -20217,9 +20250,9 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     // A day leaf greys out the days its parent already holds in the
     // destination, as Reschedule does within one week.
     const build = ++_weekMoveBuild;
-    const destDays = mode === 'leaf'
-      ? destDaysForLeaf(node, (await loadWeek(offsetWeek(currentWeekKey, offset))).nodes)
-      : new Set();
+    const destNodes = mode === 'leaf' ? (await loadWeek(offsetWeek(currentWeekKey, offset))).nodes : [];
+    const destDays = mode === 'leaf' ? destDaysForLeaf(node, destNodes) : new Set();
+    const anyTaken = mode === 'leaf' && destHasUndatedTwin(node, destNodes);
     if (build !== _weekMoveBuild || !ctxMenu.classList.contains('visible')) return;
     const taken = dayIdx => (leafDayFree(destDays, dayIdx) ? '' : 'ctx-item-disabled');
     rescheduleSubmenu.innerHTML = '';
@@ -20239,9 +20272,9 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       const current = mode === 'leaf' ? new Set([node.dayIndex]) : assignedDays;
       addWeekdayRows(send, todayIdx, dayIdx =>
         [current.has(dayIdx) && 'ctx-item-selected', taken(dayIdx)].filter(Boolean).join(' '));
-      if (assignedDays.size > 0 && mode !== 'leaf') {
+      if (mode === 'leaf' || assignedDays.size > 0) {
         addCtxSeparator(rescheduleSubmenu);
-        addCtxItem(rescheduleSubmenu, t('menu.clearDay'), send(null));
+        addCtxItem(rescheduleSubmenu, t('menu.clearDay'), send(null), anyTaken ? 'ctx-item-disabled' : '');
       }
     }
 

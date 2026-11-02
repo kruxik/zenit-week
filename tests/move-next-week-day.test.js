@@ -111,6 +111,36 @@ describe('moveNodeToWeek - day option', () => {
     expect(_state.get().nodes.some(n => n.id === 'd6')).toBe(true);
   });
 
+  it('Any lands a day leaf as its parent task with no day', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    await moveNodeToWeek('d0', { day: null });
+    const next = readNext().nodes;
+    const moved = next.find(n => n.prevId === 'd0');
+    expect(moved.label).toBe('Water');
+    expect(moved.dayChild).toBeUndefined();
+    expect(moved.parent).toBe('work');
+    expect(moved.children).toEqual([]);
+    expect(next.find(n => n.id === 'work').children).toEqual([moved.id]);
+    expect(_state.get().nodes.find(n => n.id === 'a1').children).toEqual(['d6']);
+  });
+
+  it('Any lands beside a destination parent that has days', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    await moveNodeToWeek('d6');
+    await moveNodeToWeek('d0', { day: null });
+    const next = readNext().nodes;
+    expect(next.filter(n => n.label === 'Water')).toHaveLength(2);
+    expect(next.find(n => n.id === 'work').children).toHaveLength(2);
+  });
+
+  it('refuses Any when the destination already has the undated task', async () => {
+    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    await moveNodeToWeek('d0', { day: null });
+    await moveNodeToWeek('d6', { day: null });
+    expect(readNext().nodes.filter(n => n.label === 'Water')).toHaveLength(1);
+    expect(_state.get().nodes.some(n => n.id === 'd6')).toBe(true);
+  });
+
   it('refuses Keep day when the destination parent already holds that day', async () => {
     seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
