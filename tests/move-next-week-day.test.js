@@ -180,6 +180,18 @@ describe('moveNodeToWeek - day option', () => {
     expect(next.find(n => n.id === 'a1').done).toBe(true);
   });
 
+  it('a moved day leaf joins the destination days in Mon-Sun order', async () => {
+    seed('Water', ['d0'], [dayLeaf('d0', 0)]);
+    _state.setLocalStorage('zenit-week-' + NEXT, { nodes: [
+      branch(['a1']), task('a1', 'Water', { children: ['n3'] }),
+      task('n3', 'We', { parent: 'a1', dayChild: true, dayIndex: 3 }),
+    ] });
+    await moveNodeToWeek('d0', { day: 1 });
+    const next = readNext().nodes;
+    const kids = next.find(n => n.id === 'a1').children.map(id => next.find(n => n.id === id).dayIndex);
+    expect(kids).toEqual([1, 3]);
+  });
+
   it('refuses Keep day when the destination parent already holds that day', async () => {
     seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
