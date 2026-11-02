@@ -91,19 +91,19 @@ describe('moveNodeToWeek - day option', () => {
   });
 
   it('moves one day leaf to the chosen weekday, the parent keeps its other days', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 3 });
     const moved = readNext().nodes.find(n => n.prevId === 'd0');
     expect(moved.dayChild).toBe(true);
     expect(moved.dayIndex).toBe(3);
     const src = _state.get().nodes;
     expect(src.some(n => n.id === 'd0')).toBe(false);
-    expect(src.find(n => n.id === 'a1').children).toEqual(['d6']);
+    expect(src.find(n => n.id === 'a1').children).toEqual(['d1', 'd6']);
     expect(src.find(n => n.id === 'd6').dayIndex).toBe(6);
   });
 
   it('refuses a day leaf onto a day its parent already holds in the destination', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
     await moveNodeToWeek('d6', { day: 6 });
     const next = readNext().nodes;
@@ -112,7 +112,7 @@ describe('moveNodeToWeek - day option', () => {
   });
 
   it('Any lands a day leaf as its parent task with no day', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: null });
     const next = readNext().nodes;
     const moved = next.find(n => n.prevId === 'd0');
@@ -121,11 +121,11 @@ describe('moveNodeToWeek - day option', () => {
     expect(moved.parent).toBe('work');
     expect(moved.children).toEqual([]);
     expect(next.find(n => n.id === 'work').children).toEqual([moved.id]);
-    expect(_state.get().nodes.find(n => n.id === 'a1').children).toEqual(['d6']);
+    expect(_state.get().nodes.find(n => n.id === 'a1').children).toEqual(['d1', 'd6']);
   });
 
   it('Any lands beside a destination parent that has days', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d6');
     await moveNodeToWeek('d0', { day: null });
     const next = readNext().nodes;
@@ -134,7 +134,7 @@ describe('moveNodeToWeek - day option', () => {
   });
 
   it('refuses Any when the destination already has the undated task', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: null });
     await moveNodeToWeek('d6', { day: null });
     expect(readNext().nodes.filter(n => n.label === 'Water')).toHaveLength(1);
@@ -157,7 +157,7 @@ describe('moveNodeToWeek - day option', () => {
   });
 
   it('the copy of a reusable parent with other days stays reusable', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     _state.get().nodes.find(n => n.id === 'a1').reusable = true;
     await moveNodeToWeek('d0');
     expect(readNext().nodes.find(n => n.label === 'Water').reusable).toBe(true);
@@ -193,7 +193,7 @@ describe('moveNodeToWeek - day option', () => {
   });
 
   it('splits a destination task with an inline day into day leaves', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     _state.setLocalStorage('zenit-week-' + NEXT, { nodes: [
       branch(['a1']), task('a1', 'Water (fr)', { done: true, doneAt: 'y' }),
     ] });
@@ -217,7 +217,7 @@ describe('moveNodeToWeek - day option', () => {
   });
 
   it('strips the schedule link from a parent copy whose source stays behind', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     Object.assign(_state.get().nodes.find(n => n.id === 'a1'), { schedId: 's1', schedDate: '2026-05-02' });
     await moveNodeToWeek('d0');
     const shell = readNext().nodes.find(n => n.label === 'Water');
@@ -227,14 +227,14 @@ describe('moveNodeToWeek - day option', () => {
   });
 
   it('strips the schedule link from an Any copy whose parent stays behind', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     Object.assign(_state.get().nodes.find(n => n.id === 'a1'), { schedId: 's1', schedDate: '2026-05-02' });
     await moveNodeToWeek('d0', { day: null });
     expect(readNext().nodes.find(n => n.prevId === 'd0').schedId).toBeUndefined();
   });
 
   it('refuses Keep day when the destination parent already holds that day', async () => {
-    seed('Water', ['d6', 'd0'], [dayLeaf('d6', 6), dayLeaf('d0', 0)]);
+    seed('Water', ['d1', 'd6', 'd0'], [dayLeaf('d1', 1), dayLeaf('d6', 6), dayLeaf('d0', 0)]);
     await moveNodeToWeek('d0', { day: 6 });
     await moveNodeToWeek('d6');
     expect(readNext().nodes.filter(n => n.dayChild && n.dayIndex === 6)).toHaveLength(1);

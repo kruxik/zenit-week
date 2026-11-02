@@ -813,6 +813,7 @@ export const {
   getDroppedItems,
   isAgendaRowNode,
   computeDayReschedule,
+  applyDayReschedule,
   localDateStr,
   tabDateString,
   // Agenda group ordering

@@ -23,7 +23,7 @@ describe('computeDayReschedule', () => {
         newDayIndex: 3,
       });
       expect([...r.newDays].sort()).toEqual([1, 5]);
-      expect(r.keepAsChildren).toBe(true);
+      expect(r.keepAsChildren).toBe(false);
     });
     it('toggles off the only assigned day → keepAsChildren=false', () => {
       const r = computeDayReschedule('leaf', {

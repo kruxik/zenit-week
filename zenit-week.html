@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-vBif4AducyoxY+Evto2kTGkFiLE7VrpCuLgYP44f6zA=';
+               'sha256-ASBl44qHQ783BpnZZttUjzjlhcloKlD58RIAcYt8xn0=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -13845,6 +13845,10 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
     syncStatusUp(pruneTarget.children[0], 'unplanned');
   }
 
+  // After the prune, which must not mistake the collapsed task for an emptied
+  // one: a task left with one day wears it in its label again.
+  if (node.dayChild) collapseLoneDayLeaf(originalParentId);
+
   // 7. If a tick-child was moved, renumber the surviving ticks on this side so
   //    indices stay contiguous (1..N). The destination side was renumbered in
   //    step 4b, inside the lock.
@@ -14122,6 +14126,7 @@ function _performDelete(id, { snapshot = true } = {}) {
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
   if (wasTick && origParentId) renumberTickChildren(origParentId);
+  if (node.dayChild && origParentId) collapseLoneDayLeaf(origParentId);
   saveWeek(currentWeekKey, weekData);
   renderIfVisible();
   applyAutoLayout();
@@ -15611,7 +15616,7 @@ function computeDayReschedule(mode, action) {
   if (mode === 'leaf') {
     if (action.currentDayIndex === newIdx) {
       const ns = new Set(cur); ns.delete(newIdx);
-      return { newDays: ns, keepAsChildren: ns.size > 0 };
+      return { newDays: ns, keepAsChildren: false };
     }
     if (cur.has(newIdx)) return null; // collision: another sibling owns this day
     const ns = new Set(cur);
@@ -15645,6 +15650,16 @@ function applyDayReschedule(targetId, mode, action) {
     : null;
   setActivityDays(targetId, result.newDays, result.keepAsChildren, remap);
   return true;
+}
+
+// A task left with one day leaf goes back to wearing that day in its label,
+// "Test (we)", the form a single day always takes. Shared by every path that
+// takes a day leaf away: Delete, unticking it in Reschedule, a week move.
+function collapseLoneDayLeaf(parentId) {
+  const parent = findNode(parentId);
+  if (!parent || parent.type !== 'activity') return;
+  const days = (parent.children || []).map(findNode).filter(c => c?.dayChild && c.dayIndex != null);
+  if (days.length === 1) setActivityDays(parentId, new Set([days[0].dayIndex]), false);
 }
 
 function setActivityDays(nodeId, newDays, keepAsChildren = false, remap = null) {
@@ -15698,6 +15713,16 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false, remap = null) 
     node.label = sortedDays.length === 1
       ? `${baseLabel} (${langLabels[sortedDays[0]]})`.trim()
       : baseLabel;
+    // The one day that was a leaf now lives on the task itself, so the task
+    // wears that leaf's outcome.
+    const prev = sortedDays.length === 1 ? prevState.get(sortedDays[0]) : null;
+    if (prev) {
+      node.done = !!prev.done;
+      if (prev.done && prev.doneAt) node.doneAt = prev.doneAt; else delete node.doneAt;
+      node.dropped = !!prev.dropped;
+      if (prev.dropped && prev.droppedAt) node.droppedAt = prev.droppedAt; else delete node.droppedAt;
+      syncStatusUp(nodeId, 'done');
+    }
   }
   touchNode(nodeId);
   // Reconcile Nx state with the new label (drops tick-children / legacy counter
