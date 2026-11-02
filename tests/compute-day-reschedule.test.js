@@ -11,7 +11,6 @@ describe('computeDayReschedule', () => {
     it('wipes all when at least one day assigned', () => {
       const r = computeDayReschedule('clear', { currentDays: days(1, 3, 5) });
       expect([...r.newDays].sort()).toEqual([]);
-      expect(r.keepAsChildren).toBe(false);
     });
   });
 
@@ -23,16 +22,14 @@ describe('computeDayReschedule', () => {
         newDayIndex: 3,
       });
       expect([...r.newDays].sort()).toEqual([1, 5]);
-      expect(r.keepAsChildren).toBe(false);
     });
-    it('toggles off the only assigned day → keepAsChildren=false', () => {
+    it('toggles off the only assigned day', () => {
       const r = computeDayReschedule('leaf', {
         currentDays: days(3),
         currentDayIndex: 3,
         newDayIndex: 3,
       });
       expect([...r.newDays]).toEqual([]);
-      expect(r.keepAsChildren).toBe(false);
     });
     it('reassigns to a new day → deletes old, adds new', () => {
       const r = computeDayReschedule('leaf', {
@@ -41,7 +38,6 @@ describe('computeDayReschedule', () => {
         newDayIndex: 6,
       });
       expect([...r.newDays].sort()).toEqual([1, 6]);
-      expect(r.keepAsChildren).toBe(true);
     });
     it('returns null on collision (target day held by sibling)', () => {
       const r = computeDayReschedule('leaf', {
@@ -60,7 +56,6 @@ describe('computeDayReschedule', () => {
         newDayIndex: 5,
       });
       expect([...r.newDays].sort()).toEqual([1, 3, 5]);
-      expect(r.keepAsChildren).toBe(true);
     });
     it('removes the day when already present', () => {
       const r = computeDayReschedule('activity-checkbox', {
@@ -68,7 +63,6 @@ describe('computeDayReschedule', () => {
         newDayIndex: 3,
       });
       expect([...r.newDays].sort()).toEqual([1, 5]);
-      expect(r.keepAsChildren).toBe(true);
     });
   });
 
@@ -79,7 +73,6 @@ describe('computeDayReschedule', () => {
         newDayIndex: 5,
       });
       expect([...r.newDays]).toEqual([5]);
-      expect(r.keepAsChildren).toBe(false);
     });
     it('toggles off when same day clicked', () => {
       const r = computeDayReschedule('activity-radio', {
@@ -87,7 +80,6 @@ describe('computeDayReschedule', () => {
         newDayIndex: 5,
       });
       expect([...r.newDays]).toEqual([]);
-      expect(r.keepAsChildren).toBe(false);
     });
     it('sets a day when none assigned', () => {
       const r = computeDayReschedule('activity-radio', {
@@ -95,7 +87,6 @@ describe('computeDayReschedule', () => {
         newDayIndex: 5,
       });
       expect([...r.newDays]).toEqual([5]);
-      expect(r.keepAsChildren).toBe(false);
     });
   });
 

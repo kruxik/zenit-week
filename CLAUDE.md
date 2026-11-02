@@ -29,6 +29,7 @@ Node hierarchy:
 - **branch**: User-managed categories (default: `work`, `family`, `me`). Can add/delete branches; minimum 1 must remain.
 - **activity**: User-created tasks (may have counter children)
 - **counter**: Auto-created child when activity label matches `Nx` pattern (e.g., "Pushups 10x"); tracks `val`/`max`
+- **day leaf** (`dayChild`, `dayIndex`): a task's weekdays are always day leaves, one per day, a single day included. The map draws a lone leaf on its task ("Run (Mo)", `nodeDisplayLabel` / `isHiddenDayLeaf`); the editor shows the days as text and the edited text replaces them. Leaf ids are derived (`dayLeafNodeId`: task + day + generation past tombstones) so devices converge. `setActivityDays` keeps the leaves of kept days and only buries removed ones. Exception: a single day on a task with ordinary sub-tasks stays in the label (they inherit it, `getEffectiveDays`). A label annotation elsewhere is the older form, converted the next time the task's days are written; `repairMixedDayForm` (in `validateAndRepair`) resolves a merge that left both forms on one task
 
 Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` (all customizable via color picker)
 

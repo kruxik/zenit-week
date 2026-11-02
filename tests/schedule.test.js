@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import {
+  nodeDisplayLabel,
   nextOccurrence,
   occurrencesInRange,
   occurrencesBefore,
@@ -942,7 +943,7 @@ describe('Send to date…', () => {
     // schedule's. Nothing leaves the week and no entry is written.
     expect(sendNodeToDate('a1', { date: '2026-05-12', unit: null })).toEqual([]);
     expect(_state.getSchedule().entries).toEqual([]);
-    expect(findNode('a1').label).toBe('Pay tax (Tu)');
+    expect(nodeDisplayLabel(findNode('a1'))).toBe('Pay tax (Tu)');
     expect(findNode('work').children).toContain('a1');
   });
 

@@ -205,20 +205,25 @@ describe('commitEdit - day-child creation', () => {
     expect(frNode.label).toBe('Fr');
   });
 
-  test('single day indicator (mo) alone: no day-children, no counter, label unchanged', () => {
+  test('single day indicator (mo) alone: one day leaf, label stripped', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Running (mo)', true);
     const node = findNode(id);
-    expect(node.label).toBe('Running (mo)');
-    expect(node.children).toHaveLength(0);
+    expect(node.label).toBe('Running');
+    const kids = node.children.map(findNode);
+    expect(kids).toHaveLength(1);
+    expect(kids[0].dayChild).toBe(true);
+    expect(kids[0].dayIndex).toBe(1);
   });
 
-  test('Nx + single day (mo): scheduled, no counter, label unchanged', () => {
+  test('Nx + single day (mo): one day leaf, no counter, Nx kept in label', () => {
     const id = setupWithActivity('');
     triggerCommitEdit(id, 'Pushups 10x (mo)', true);
     const node = findNode(id);
-    expect(node.label).toBe('Pushups 10x (mo)');
-    expect(node.children).toHaveLength(0);
+    expect(node.label).toBe('Pushups 10x');
+    const kids = node.children.map(findNode);
+    expect(kids).toHaveLength(1);
+    expect(kids[0].dayChild).toBe(true);
   });
 
   test('Nx + 2 day indicators: day-children created, counter removed, Nx kept in label', () => {

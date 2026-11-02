@@ -444,16 +444,16 @@ describe('day-filter layout pruning', () => {
     return computeLayout();
   }
 
-  test('no filter positions every node', () => {
+  test('no filter positions every node but the lone day leaves', () => {
     const pos = layoutWith(null);
-    ['work', 'play', 'aMon', 'aTue', 'aWed', 'dMon', 'dTue', 'dWed']
-      .forEach(id => expect(pos[id]).toBeDefined());
+    ['work', 'play', 'aMon', 'aTue', 'aWed'].forEach(id => expect(pos[id]).toBeDefined());
+    // A task's only day is drawn on the task itself, "Task (Mo)".
+    ['dMon', 'dTue', 'dWed'].forEach(id => expect(pos[id]).toBeUndefined());
   });
 
   test('Monday keeps only the Monday chain', () => {
     const pos = layoutWith(1);
     expect(pos['aMon']).toBeDefined();
-    expect(pos['dMon']).toBeDefined();
     expect(pos['aTue']).toBeUndefined();
     expect(pos['dTue']).toBeUndefined();
   });
@@ -524,9 +524,9 @@ describe('day-filter zigzag positioning', () => {
     return { dx: pos['d3'].x - pos['act'].x, dy: pos['d3'].y - pos['act'].y };
   }
 
-  test('the lone survivor of a 5-day block sits where a lone day leaf sits', () => {
+  test('the lone survivor of a 5-day block sits where the survivor of a 7-day block sits', () => {
     const filtered = offsetOfWednesdayLeaf([1, 2, 3, 4, 5], 3);
-    const control  = offsetOfWednesdayLeaf([3], null);
+    const control  = offsetOfWednesdayLeaf([1, 2, 3, 4, 5, 6, 0], 3);
     expect(filtered.dx).toBeCloseTo(control.dx, 5);
     expect(filtered.dy).toBeCloseTo(control.dy, 5);
   });

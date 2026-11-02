@@ -91,7 +91,7 @@ describe('week-record invariants - same-week edits', () => {
       tombstones: [],
     };
     _state.set(structuredClone(before));
-    setActivityDays('task', new Set([4]), true);
+    setActivityDays('task', new Set([4]));
     expectNoSilentLoss(before, _state.get(), 'setActivityDays');
   });
 

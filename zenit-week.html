@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ASBl44qHQ783BpnZZttUjzjlhcloKlD58RIAcYt8xn0=';
+               'sha256-rAdpa/AAXrzqQNRvv+QVYDdk+xh9GrpNEeT4FQNm1UQ=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -8092,6 +8092,9 @@ function localizeDayGroups(label) {
 function nodeDisplayLabel(node) {
   if (!node) return '';
   if (node.dayChild && node.dayIndex != null) return dayAbbr(node.dayIndex) || node.label || '';
+  // A task with one day leaf shows that day on itself; the leaf is not drawn.
+  const lone = node.type === 'activity' ? loneDayLeaf(node) : null;
+  if (lone) return (localizeDayGroups(node.label || '') + dayGroupText([lone.dayIndex])).trim();
   return localizeDayGroups(node.label || '');
 }
 
@@ -12243,6 +12246,8 @@ function validateAndRepair(data) {
   }
   data.nodes = data.nodes.filter(n => reachable.has(n.id));
 
+  repairMixedDayForm(data);
+
   // 5. Sort tick-children and day-children in their parent's children array
   data.nodes.forEach(n => {
     if (!Array.isArray(n.children) || n.children.length < 2) return;
@@ -12251,6 +12256,70 @@ function validateAndRepair(data) {
   });
 
   return data;
+}
+
+// A task holding its days both as a label annotation and as day leaves. No
+// writer makes that: it is what a merge makes when one device has turned
+// "Task (mo)" into "Task" + a Mo leaf while another, which had not, edited the
+// task as it was - an older version, or this one before the task's days were
+// next written. Whichever side wrote last speaks for the schedule: a newer task
+// node means its label's days are the schedule (leaves for other days go, a
+// missing day gets its leaf, and a lone leaf takes the task's outcome - a done
+// mark made on "Task (mo)"); newer leaves mean the annotation is stale. The
+// annotation is stripped either way. Every input is the merged record, ids are
+// derived and stamps are copied rather than minted, so every device repairs to
+// the same result. A single day on a task with ordinary sub-tasks is the one
+// annotation that is meant (the sub-tasks inherit it) and is left alone.
+function repairMixedDayForm(data) {
+  const byId = new Map(data.nodes.map(n => [n.id, n]));
+  const lookup = id => byId.get(id);
+  if (!Array.isArray(data.tombstones)) data.tombstones = [];
+  const buried = new Set(data.tombstones);
+  const added = [];
+  data.nodes.forEach(n => {
+    if (n.type !== 'activity' || n.dayChild || n.tickChild) return;
+    const days = parseTodoDays(n.label || '');
+    if (!days.size) return;
+    const leaves = dayLeavesOf(n, lookup);
+    if (!leaves.length) return;
+    if (days.size === 1 && hasOrdinaryChildren(n, lookup)) return;
+    n.label = stripDayGroups(n.label).trim();
+    const taskNewer = (n._ts || 0) >= Math.max(...leaves.map(c => c._ts || 0));
+    if (!taskNewer) return;
+    const gone = leaves.filter(c => !days.has(c.dayIndex));
+    gone.forEach(c => {
+      byId.delete(c.id);
+      buried.add(c.id);
+      if (!data.tombstones.includes(c.id)) data.tombstones.push(c.id);
+    });
+    n.children = n.children.filter(cid => !gone.some(c => c.id === cid));
+    const have = new Set(leaves.filter(c => !gone.includes(c)).map(c => c.dayIndex));
+    days.forEach(d => {
+      if (have.has(d)) return;
+      const id = dayLeafNodeId(n.id, d, x => byId.has(x) || buried.has(x));
+      const leaf = {
+        id, type: 'activity', branch: n.branch, parent: n.id,
+        done: false, unplanned: !!n.unplanned, priority: n.priority || null, reusable: !!n.reusable,
+        children: [], dayChild: true, dayIndex: d, label: dayAbbr(d), _ts: n._ts || 0,
+      };
+      byId.set(id, leaf);
+      added.push(leaf);
+      n.children.push(id);
+    });
+    const now = dayLeavesOf(n, lookup);
+    if (now.length === 1) {
+      const leaf = now[0];
+      leaf.done = !!n.done;
+      if (n.done && n.doneAt) leaf.doneAt = n.doneAt; else delete leaf.doneAt;
+      leaf.dropped = !!n.dropped;
+      if (n.dropped && n.droppedAt) leaf.droppedAt = n.droppedAt; else delete leaf.droppedAt;
+      leaf._ts = Math.max(leaf._ts || 0, n._ts || 0);
+    }
+    sortDayChildren(n, lookup);
+  });
+  if (added.length || data.nodes.length !== byId.size) {
+    data.nodes = data.nodes.filter(x => byId.has(x.id)).concat(added);
+  }
 }
 
 function migrateCrdt(data) {
@@ -12883,7 +12952,9 @@ async function importAllData(file) {
 // resolved parent, so a manually recreated container doesn't duplicate when its
 // children are transferred in. Leaves (and counter/tick/day children) never
 // name-merge: only identity matching applies to them.
-const _normLabel = s => (s || '').trim().toLowerCase();
+// Day groups are not part of a task's name: "Test (Mo)", written by an older
+// version, and "Test" holding a Mo leaf are the same task.
+const _normLabel = s => stripDayGroups(s || '').trim().toLowerCase();
 
 function _isBridgeContainer(source, lookup) {
   return source.type === 'activity' &&
@@ -13508,7 +13579,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
   const leafAny = !!node.dayChild && (day === null || (day === undefined && node.dayIndex == null));
   if (day !== undefined && !node.dayChild) {
     if (node.tickChild) setTickDay(nodeId, day);
-    else setActivityDays(nodeId, day === null ? new Set() : new Set([day]), false);
+    else setActivityDays(nodeId, day === null ? new Set() : new Set([day]));
   }
 
   const nextKey = offsetWeek(currentWeekKey, offset);
@@ -13750,8 +13821,10 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
       const inline = [...parseTodoDays(parentInNext.label || '')];
       if (inline.length) {
         inline.forEach(d => {
+          const leafId = dayLeafNodeId(parentInNext.id, d,
+            id => nextById.has(id) || (nextData.tombstones || []).includes(id));
           const leaf = childActivityOf(parentInNext, {
-            dayChild: true, dayIndex: d, label: dayAbbr(d),
+            id: leafId, dayChild: true, dayIndex: d, label: dayAbbr(d),
             done: !!parentInNext.done, unplanned: false,
             ...(parentInNext.done && parentInNext.doneAt && { doneAt: parentInNext.doneAt }),
             ...(parentInNext.dropped && { dropped: true, droppedAt: parentInNext.droppedAt }),
@@ -13844,10 +13917,6 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
     syncStatusUp(pruneTarget.children[0], 'done');
     syncStatusUp(pruneTarget.children[0], 'unplanned');
   }
-
-  // After the prune, which must not mistake the collapsed task for an emptied
-  // one: a task left with one day wears it in its label again.
-  if (node.dayChild) collapseLoneDayLeaf(originalParentId);
 
   // 7. If a tick-child was moved, renumber the surviving ticks on this side so
   //    indices stay contiguous (1..N). The destination side was renumbered in
@@ -14126,7 +14195,6 @@ function _performDelete(id, { snapshot = true } = {}) {
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
   if (wasTick && origParentId) renumberTickChildren(origParentId);
-  if (node.dayChild && origParentId) collapseLoneDayLeaf(origParentId);
   saveWeek(currentWeekKey, weekData);
   renderIfVisible();
   applyAutoLayout();
@@ -14439,7 +14507,8 @@ function computeLayout() {
   // pruned outright - no position, so render() skips it and the survivors pack
   // tight against each other.
   function isVisibleNode(nodeId) {
-    return getNodeDepth(nodeId) < hideDepth && dayFilterMatches(nodeId, dayMatch);
+    return getNodeDepth(nodeId) < hideDepth && dayFilterMatches(nodeId, dayMatch) &&
+      !isHiddenDayLeaf(findNode(nodeId));
   }
 
   // Children that take part in this layout pass: skip nodes being edited
@@ -15584,9 +15653,65 @@ function removeChildNodes(parent, ids) {
   rebuildNodeMap();
 }
 
+// A task's own days are always day leaves, one leaf per day, a single day
+// included; the map shows a lone leaf on the task itself, "A (Mo)". The one
+// exception is a task whose ordinary sub-tasks inherit its day
+// (getEffectiveDays): a single day there stays in the label, because no leaf
+// can say "every sub-task, on Monday". A label annotation on any other task is
+// the form older versions wrote; it turns into a leaf the next time the task's
+// days are written.
+
+// The id of a task's leaf for one weekday, derived from the task and the day,
+// so two devices that create the same day make the same node and a merge
+// keeps one. A generation counter steps past an id that is taken - buried by
+// an earlier removal of that day, or held by another node - and every device
+// sees the same tombstones, so they step to the same id.
+function dayLeafNodeId(parentId, dayIndex, isTaken) {
+  for (let gen = 0; ; gen++) {
+    const id = occurrenceNodeId('zw-day:' + parentId, dayIndex + ':' + gen);
+    if (!isTaken(id)) return id;
+  }
+}
+
+// Ordinary sub-tasks: children that are neither day leaves nor ticks.
+function hasOrdinaryChildren(node, lookup = findNode) {
+  return (node?.children || []).some(cid => {
+    const c = lookup(cid);
+    return c && c.type === 'activity' && !c.dayChild && !c.tickChild;
+  });
+}
+
+function dayLeavesOf(node, lookup = findNode) {
+  return (node?.children || []).map(cid => lookup(cid)).filter(c => c?.dayChild && c.dayIndex != null);
+}
+
+// The weekdays a task is scheduled on, whichever form holds them.
+function taskDays(node) {
+  return new Set([...dayLeavesOf(node).map(c => c.dayIndex), ...parseTodoDays(node?.label || '')]);
+}
+
+// The one day leaf the map draws on its task instead of as a child.
+function loneDayLeaf(node) {
+  const leaves = dayLeavesOf(node);
+  return leaves.length === 1 ? leaves[0] : null;
+}
+
+function isHiddenDayLeaf(node) {
+  return !!node?.dayChild && loneDayLeaf(findNode(node.parent)) === node;
+}
+
+// " (Mo, We)" for a set of weekdays, in the UI language, Monday first.
+function dayGroupText(days) {
+  const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
+  const sorted = [...days].sort((a, b) => isoWeekPos(a) - isoWeekPos(b));
+  return sorted.length ? ` (${sorted.map(d => langLabels[d]).join(', ')})` : '';
+}
+
 function createDayChild(parentId, dayIndex) {
   const parent = findNode(parentId);
-  const node = childActivityOf(parent, { dayChild: true, dayIndex, label: dayAbbr(dayIndex) });
+  const leafId = dayLeafNodeId(parentId, dayIndex,
+    id => !!findNode(id) || (weekData.tombstones || []).includes(id));
+  const node = childActivityOf(parent, { id: leafId, dayChild: true, dayIndex, label: dayAbbr(dayIndex) });
   const id = node.id;
   weekData.nodes.push(node);
   parent.children.push(id);
@@ -15610,32 +15735,37 @@ function createDayChild(parentId, dayIndex) {
 function computeDayReschedule(mode, action) {
   const cur = action.currentDays;
   if (mode === 'clear') {
-    return cur.size === 0 ? null : { newDays: new Set(), keepAsChildren: false };
+    return cur.size === 0 ? null : { newDays: new Set() };
   }
   const newIdx = action.newDayIndex;
   if (mode === 'leaf') {
     if (action.currentDayIndex === newIdx) {
       const ns = new Set(cur); ns.delete(newIdx);
-      return { newDays: ns, keepAsChildren: false };
+      return { newDays: ns };
     }
     if (cur.has(newIdx)) return null; // collision: another sibling owns this day
     const ns = new Set(cur);
     ns.delete(action.currentDayIndex);
     ns.add(newIdx);
-    return { newDays: ns, keepAsChildren: true };
+    return { newDays: ns };
   }
   if (mode === 'activity-checkbox') {
     const ns = new Set(cur);
     if (ns.has(newIdx)) ns.delete(newIdx); else ns.add(newIdx);
-    return { newDays: ns, keepAsChildren: true };
+    return { newDays: ns };
   }
   if (mode === 'activity-radio') {
     return {
       newDays: cur.has(newIdx) ? new Set() : new Set([newIdx]),
-      keepAsChildren: false,
     };
   }
   return null;
+}
+
+// How a weekday pick acts on a task: one that shows several days toggles the
+// picked one, one that shows a single day (or none) moves to the picked day.
+function taskDayMode(node) {
+  return dayLeavesOf(node).length >= 2 ? 'activity-checkbox' : 'activity-radio';
 }
 
 // Wrapper: compute → snapshot → mutate. Returns true if mutated.
@@ -15648,52 +15778,44 @@ function applyDayReschedule(targetId, mode, action) {
   const remap = (mode === 'leaf' && action.currentDayIndex !== action.newDayIndex)
     ? { from: action.currentDayIndex, to: action.newDayIndex }
     : null;
-  setActivityDays(targetId, result.newDays, result.keepAsChildren, remap);
+  setActivityDays(targetId, result.newDays, remap);
   return true;
 }
 
-// A task left with one day leaf goes back to wearing that day in its label,
-// "Test (we)", the form a single day always takes. Shared by every path that
-// takes a day leaf away: Delete, unticking it in Reschedule, a week move.
-function collapseLoneDayLeaf(parentId) {
-  const parent = findNode(parentId);
-  if (!parent || parent.type !== 'activity') return;
-  const days = (parent.children || []).map(findNode).filter(c => c?.dayChild && c.dayIndex != null);
-  if (days.length === 1) setActivityDays(parentId, new Set([days[0].dayIndex]), false);
-}
-
-function setActivityDays(nodeId, newDays, keepAsChildren = false, remap = null) {
+// Sets the weekdays of a task. Leaves for days that stay are kept as they are -
+// same id, same outcome - so a merge with another device's edit of one day
+// never meets a rebuilt sibling; only removed days are buried and only new
+// days are created. An outcome travels with a day: `remap` re-keys it (Fr to
+// Sa), a lone day moved to another day keeps it, and a task that wore its day
+// in the label hands its own outcome to the leaves it gets.
+// newDays is a Set of dayIndex values (0-6). Caller must takeSnapshot() first.
+function setActivityDays(nodeId, newDays, remap = null) {
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity' || node.dayChild) return;
 
-  const dayChildIds = (node.children || []).filter(id => findNode(id)?.dayChild);
-  // Day-children are torn down and rebuilt, so their outcome (done *and*
-  // dropped - two values on one axis) is carried across by dayIndex. Losing
-  // `dropped` here silently revived every dropped sibling, because the parent
-  // is then recomputed from all-open children.
-  const prevState = new Map();
-  dayChildIds.forEach(id => {
-    const c = findNode(id);
-    if (c) prevState.set(c.dayIndex, {
-      done: c.done, doneAt: c.doneAt,
-      dropped: c.dropped, droppedAt: c.droppedAt,
-    });
-  });
-  if (remap && prevState.has(remap.from)) {
-    prevState.set(remap.to, prevState.get(remap.from));
-    prevState.delete(remap.from);
-  }
-  removeChildNodes(node, dayChildIds);
-
+  const leaves = dayLeavesOf(node);
+  const byDay = new Map(leaves.map(c => [c.dayIndex, c]));
   const sortedDays = [...newDays].sort((a, b) => isoWeekPos(a) - isoWeekPos(b));
-  const useChildren = sortedDays.length >= 2 || (keepAsChildren && sortedDays.length === 1);
+  const outcomeOf = n => ({ done: n.done, doneAt: n.doneAt, dropped: n.dropped, droppedAt: n.droppedAt });
+  if (!remap && leaves.length === 1 && sortedDays.length === 1 && leaves[0].dayIndex !== sortedDays[0]) {
+    remap = { from: leaves[0].dayIndex, to: sortedDays[0] };
+  }
+  const carried = new Map();
+  if (remap && byDay.has(remap.from) && !byDay.has(remap.to)) carried.set(remap.to, outcomeOf(byDay.get(remap.from)));
+  const own = !leaves.length && parseTodoDays(node.label || '').size ? outcomeOf(node) : null;
 
-  if (useChildren) {
-    // Multi-day: strip day annotation from label, days live as children
-    node.label = stripDayGroups(node.label || '').trim();
+  // A single day on a task whose sub-tasks inherit it stays in the label.
+  const inline = sortedDays.length === 1 && !leaves.length && hasOrdinaryChildren(node);
+  const gone = leaves.filter(c => inline || !newDays.has(c.dayIndex));
+  if (gone.length) removeChildNodes(node, gone.map(c => c.id));
+
+  const baseLabel = stripDayGroups(node.label || '').trim();
+  node.label = inline ? (baseLabel + dayGroupText(sortedDays)).trim() : baseLabel;
+  if (!inline) {
     sortedDays.forEach(d => {
+      if (byDay.has(d) && !gone.includes(byDay.get(d))) return;
       const id = createDayChild(nodeId, d);
-      const prev = prevState.get(d);
+      const prev = carried.get(d) || own;
       if (prev?.done || prev?.dropped) {
         const child = findNode(id);
         if (prev.dropped) {
@@ -15701,33 +15823,21 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false, remap = null) 
           if (prev.droppedAt) child.droppedAt = prev.droppedAt;
         } else {
           child.done = true;
-          child.doneAt = prev.doneAt;
+          if (prev.doneAt) child.doneAt = prev.doneAt;
         }
         syncStatusUp(id, 'done');
       }
     });
-  } else {
-    // 0 or 1 day: annotation in label only, no children
-    const langLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
-    const baseLabel = stripDayGroups(node.label || '').trim();
-    node.label = sortedDays.length === 1
-      ? `${baseLabel} (${langLabels[sortedDays[0]]})`.trim()
-      : baseLabel;
-    // The one day that was a leaf now lives on the task itself, so the task
-    // wears that leaf's outcome.
-    const prev = sortedDays.length === 1 ? prevState.get(sortedDays[0]) : null;
-    if (prev) {
-      node.done = !!prev.done;
-      if (prev.done && prev.doneAt) node.doneAt = prev.doneAt; else delete node.doneAt;
-      node.dropped = !!prev.dropped;
-      if (prev.dropped && prev.droppedAt) node.droppedAt = prev.droppedAt; else delete node.droppedAt;
-      syncStatusUp(nodeId, 'done');
-    }
+    sortDayChildren(node);
+    const first = dayLeavesOf(node)[0];
+    if (first) syncStatusUp(first.id, 'done');
   }
   touchNode(nodeId);
-  // Reconcile Nx state with the new label (drops tick-children / legacy counter
-  // when a day annotation now claims the node).
-  applyMagicLabel(nodeId);
+  // Days win over an Nx count. With no leaf left, the label's own rules apply
+  // again (an "Nx" grows ticks back); applyMagicLabel is not run while leaves
+  // remain, because it would read the kept "Nx" as a switch to ticks.
+  if (dayLeavesOf(node).length) _purgeNxChildren(node);
+  else applyMagicLabel(nodeId);
 }
 
 // Applies "magic" label rules to an activity node based on its current label:
@@ -15741,12 +15851,17 @@ function setActivityDays(nodeId, newDays, keepAsChildren = false, remap = null) 
 // Caller must have already assigned node.label and called touchNode.
 // Shared by commitEdit and submitQuickAdd so both flows behave identically.
 function applyMagicLabel(nodeId) {
-  const node = findNode(nodeId);
-  if (!node || node.type !== 'activity' || node.dayChild || node.tickChild) return;
   // Detect "now"/"teď" *before* the freeze step overwrites it. now resolves to
   // today's abbr (like today) and additionally pins the node to the top of
-  // today's agenda group.
-  const wantsPin = hasNowToken(node.label || '');
+  // today's agenda group - once the day has become its leaf, whose row it is.
+  const wantsPin = hasNowToken(findNode(nodeId)?.label || '');
+  _applyMagicLabel(nodeId);
+  if (wantsPin) pinToTopOfAgenda(nodeId);
+}
+
+function _applyMagicLabel(nodeId) {
+  const node = findNode(nodeId);
+  if (!node || node.type !== 'activity' || node.dayChild || node.tickChild) return;
   // Freeze magic relative-day tokens (today/tomorrow/now and CS variants) to
   // concrete abbrs before any day-parsing logic reads the label.
   const resolved = resolveMagicDayTokens(node.label || '');
@@ -15754,7 +15869,6 @@ function applyMagicLabel(nodeId) {
     node.label = resolved;
     touchNode(nodeId);
   }
-  if (wantsPin) pinToTopOfAgenda(nodeId);
   const label = node.label || '';
   const parsedDays = parseTodoDays(label);
   // Existing day-children promote the node to multi-day mode regardless of
@@ -15775,20 +15889,15 @@ function applyMagicLabel(nodeId) {
     hasDayChildren = false;
   }
 
-  if (parsedDays.size >= 2 || hasDayChildren) {
-    // Day branch wins: strip day tokens, create missing day-children, and
-    // drop any Nx-managed children (legacy counter + new tick-children).
-    const cleanLabel = stripDayGroups(label).trim();
-    if (cleanLabel && cleanLabel !== node.label) {
-      node.label = cleanLabel;
-      touchNode(nodeId);
+  if (parsedDays.size >= 2 || hasDayChildren || (parsedDays.size === 1 && !hasOrdinaryChildren(node))) {
+    // Day branch wins: the label's days join the leaves (one leaf per day, a
+    // single day included) and any Nx-managed children go (legacy counter +
+    // tick-children). setActivityDays strips the label, so the call it makes
+    // back into here lands below and does not recurse again.
+    if (parsedDays.size) {
+      setActivityDays(nodeId, taskDays(node));
+      return;
     }
-    const existingDayIndices = new Set(
-      node.children.map(findNode).filter(n => n?.dayChild).map(n => n.dayIndex)
-    );
-    parsedDays.forEach(dayIndex => {
-      if (!existingDayIndices.has(dayIndex)) createDayChild(nodeId, dayIndex);
-    });
     sortDayChildren(node);
     _purgeNxChildren(node);
     return;
@@ -16369,9 +16478,12 @@ function _openInlineInput(nodeId, isNew) {
   const { bgColor, borderColor, textColor, fontWeight, sw, visualRx } = getNodeVisuals(nodeId);
   
   const initialNodeW = nodeW * zoom;
-  editState = { nodeId, isNew, originalLabel: node.label, initialNodeW };
+  // A task's day leaves are part of what the user reads as its name, so the
+  // editor shows them as text, and the edited text then names the schedule.
+  const shownDays = !isNew && node.type === 'activity' && !node.dayChild ? dayLeavesOf(node).map(c => c.dayIndex) : [];
+  editState = { nodeId, isNew, originalLabel: node.label, initialNodeW, daysShown: shownDays.length > 0 };
   inlineInput.maxLength = node.dayChild ? 2 : (node.tickChild ? 4 : 524288);
-  inlineInput.value = isNew ? '' : node.label;
+  inlineInput.value = isNew ? '' : ((stripDayGroups(node.label || '').trim() + dayGroupText(shownDays)).trim() || node.label);
 
   // One sizing pass for the whole open: the guard below and resizeInlineInput's
   // positioning both read it, and nothing between them touches a node.
@@ -16429,7 +16541,7 @@ function commitEdit(followUp = 'auto') {
   inlineInput.style.display = 'none';
 
   if (!editState) return;
-  const { nodeId, isNew, originalLabel } = editState;
+  const { nodeId, isNew, originalLabel, daysShown } = editState;
   editState = null;
 
   if (!label) {
@@ -16471,6 +16583,10 @@ function commitEdit(followUp = 'auto') {
       } else {
         node.label = originalLabel; // invalid token - silently revert
       }
+    } else if (node.type !== 'branch' && daysShown) {
+      // The edited text is the whole schedule: days removed from it go.
+      node.label = resolveMagicDayTokens(node.label);
+      setActivityDays(nodeId, parseTodoDays(node.label));
     } else if (node.type !== 'branch') {
       applyMagicLabel(nodeId);
     }
@@ -18979,15 +19095,8 @@ function _windowKeydownHandler(e) {
       }
     } else if (node.type === 'activity' && !node.dayChild) {
       e.preventDefault();
-      const dayChildrenList = (node.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild);
-      const hasDayChildren = dayChildrenList.length > 0;
-      const currentDays = new Set([
-        ...dayChildrenList.map(c => c.dayIndex),
-        ...parseTodoDays(node.label || ''),
-      ]);
-      const mode = e.key === '8'
-        ? 'clear'
-        : (hasDayChildren ? 'activity-checkbox' : 'activity-radio');
+      const currentDays = taskDays(node);
+      const mode = e.key === '8' ? 'clear' : taskDayMode(node);
       if (applyDayReschedule(id, mode, { currentDays, newDayIndex: KEY_TO_DAY[e.key] })) {
         saveWeek(currentWeekKey, weekData);
         render();
@@ -19333,7 +19442,7 @@ function sendNodeToDate(nodeId, options) {
   // even when its first occurrence falls this week.
   if (!unit && weekKeyForDayString(anchor) === currentWeekKey) {
     takeSnapshot();
-    setActivityDays(nodeId, new Set([weekdayOfDayString(anchor)]), false);
+    setActivityDays(nodeId, new Set([weekdayOfDayString(anchor)]));
     saveWeek(currentWeekKey, weekData);
     return [];
   }
@@ -20211,7 +20320,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
         assignedDays: new Set(
           (parent.children || []).map(cid => findNode(cid)).filter(c => c?.dayChild).map(c => c.dayIndex)) };
     }
-    return { node, targetId: node.id, mode: 'activity-radio', assignedDays: parseTodoDays(node.label || '') };
+    return { node, targetId: node.id, mode: taskDayMode(node), assignedDays: taskDays(node) };
   }
 
   // Same shape as the node submenu - Now, the seven weekdays, then Date - but
@@ -20287,7 +20396,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
       } else {
         if (!(assignedDays.size === 1 && assignedDays.has(todayIdx))) {
           takeSnapshot();
-          setActivityDays(targetId, new Set([todayIdx]), false);
+          setActivityDays(targetId, new Set([todayIdx]));
         }
       }
       pinToTopOfAgenda(targetId);
@@ -20371,7 +20480,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     const keepTaken = mode === 'leaf' && node.dayIndex == null ? (anyTaken ? 'ctx-item-disabled' : '') : taken(node.dayIndex);
     addCtxItem(rescheduleSubmenu, t('menu.keepDay'), send(), keepTaken);
     const hasTicks = (node.children || []).some(cid => findNode(cid)?.tickChild);
-    if (mode === 'tick' || mode === 'leaf' || (mode === 'activity-radio' && !hasTicks)) {
+    if (mode === 'tick' || mode === 'leaf' || (mode.startsWith('activity-') && !hasTicks)) {
       addCtxSeparator(rescheduleSubmenu);
       const todayIdx = offsetWeek(currentWeekKey, offset) === todayWeekKey() ? new Date().getDay() : -1;
       // A leaf moves one occurrence, so only its own day reads as current.

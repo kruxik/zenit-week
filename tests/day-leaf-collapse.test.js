@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { _state, deleteNode, applyDayReschedule, moveNodeToWeek } from './setup.js';
+import { _state, deleteNode, applyDayReschedule, moveNodeToWeek, nodeDisplayLabel } from './setup.js';
 
-// A task left with one day leaf goes back to wearing that day in its label,
-// whichever path took the other leaf away.
+// A task left with one day leaf keeps that leaf - same id, same outcome - and
+// the map shows the day on the task itself, whichever path took the other
+// leaf away.
 const branch = (children = []) => ({
   id: 'work', type: 'branch', parent: 'center', label: 'Work', branch: 'work',
   side: 'left', children, _ts: 0,
@@ -24,13 +25,13 @@ function seed(weExtra = {}) {
 const nodes = () => _state.get().nodes;
 const expectCollapsed = () => {
   const t = nodes().find(n => n.id === 't');
-  expect(t.label).toBe('Test (We)');
-  expect(t.children).toEqual([]);
-  expect(nodes().some(n => n.dayChild)).toBe(false);
+  expect(t.label).toBe('Test');
+  expect(t.children).toEqual(['we']);
+  expect(nodeDisplayLabel(t)).toBe('Test (We)');
   return t;
 };
 
-describe('a lone day leaf collapses into the label', () => {
+describe('a task left with one day leaf shows it on itself', () => {
   beforeEach(() => {
     _state.clearLocalStorage();
     _state.reset();
@@ -55,12 +56,12 @@ describe('a lone day leaf collapses into the label', () => {
     expectCollapsed();
   });
 
-  it('the task wears the remaining leaf outcome', () => {
+  it('the task rolls up the remaining leaf outcome', () => {
     seed({ done: true, doneAt: 'x' });
     deleteNode('mo');
     const t = expectCollapsed();
     expect(t.done).toBe(true);
-    expect(t.doneAt).toBe('x');
+    expect(nodes().find(n => n.id === 'we').doneAt).toBe('x');
   });
 
   it('keeps two remaining days as leaves', () => {

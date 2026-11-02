@@ -1,6 +1,6 @@
 import {
   resolveMagicDayTokens, parseTodoDays, hasNowToken,
-  commitEdit, defaultWeekData, findNode,
+  commitEdit, defaultWeekData, findNode, nodeDisplayLabel,
   _state,
 } from './setup.js';
 
@@ -182,8 +182,9 @@ describe('(now) pins to top of today\'s agenda group', () => {
 
     withFrozenDate(THURSDAY, () => triggerCommitEditT('a1', 'Workout (now)'));
 
+    // The day is the task's leaf now, so the pinned row is that leaf.
     const order = _state.get().agendaOrder['4-pending'];
-    expect(order.ids).toEqual(['a1', 'a2']);
+    expect(order.ids).toEqual([findNode('a1').children[0], 'a2']);
   });
 
   test('pin targets the scheduled-day pending group, never a done group', () => {
@@ -198,14 +199,14 @@ describe('(now) pins to top of today\'s agenda group', () => {
     // on the day's pending group - harmless for a done node, and it surfaces on
     // top once re-opened.
     const orders = _state.get().agendaOrder || {};
-    expect(orders['4-pending']?.ids).toEqual(['a1']);
+    expect(orders['4-pending']?.ids).toEqual([findNode('a1').children[0]]);
     expect(orders['4-done']).toBeUndefined();
   });
 
   test('label is also frozen to (Th) - same as (today)', () => {
     setUpT([mkBranchT('me', ['a1']), mkActivityT('a1', 'me', 'me')], CURRENT_WEEK);
     withFrozenDate(THURSDAY, () => triggerCommitEditT('a1', 'Workout (now)'));
-    expect(findNode('a1').label).toBe('Workout (Th)');
+    expect(nodeDisplayLabel(findNode('a1'))).toBe('Workout (Th)');
   });
 
   test('cross-week edit pins within that week, keyed to the scheduled day', () => {
@@ -220,9 +221,9 @@ describe('(now) pins to top of today\'s agenda group', () => {
     _state.setTodayWeekKey('2026-20');
     try {
       withFrozenDate(THURSDAY, () => triggerCommitEditT('a1', 'Workout (now)'));
-      expect(findNode('a1').label).toBe('Workout (Th)');
+      expect(nodeDisplayLabel(findNode('a1'))).toBe('Workout (Th)');
       const orders = _state.get().agendaOrder || {};
-      expect(orders['4-pending']?.ids).toEqual(['a1']);
+      expect(orders['4-pending']?.ids).toEqual([findNode('a1').children[0]]);
       expect(orders['overdue-pending-4']).toBeUndefined();
     } finally {
       _state.clearTodayWeekKeyOverride();
@@ -239,12 +240,12 @@ describe('(now) pins to top of today\'s agenda group', () => {
     const dayChildren = a1.children.map(findNode).filter(n => n?.dayChild);
     expect(dayChildren.map(n => n.dayIndex).sort()).toEqual([1, 4]);
     // Under option (b) the pin generalizes to every scheduled day (Mon=1 and
-    // Th=4), not just today. The pin runs before the day-children are split out,
-    // so it keys on the parent id - harmless: renderGroup ignores ids absent
-    // from a group, reproducing the priority default there.
+    // Th=4), not just today. It runs once the days are leaves, so each day's
+    // group gets that day's own row.
     const orders = _state.get().agendaOrder;
-    expect(orders['1-pending']?.ids).toEqual(['a1']);
-    expect(orders['4-pending']?.ids).toEqual(['a1']);
+    const leafOn = d => dayChildren.find(n => n.dayIndex === d).id;
+    expect(orders['1-pending']?.ids).toEqual([leafOn(1)]);
+    expect(orders['4-pending']?.ids).toEqual([leafOn(4)]);
   });
 
   test('re-edit moves node back to top, deduped', () => {
@@ -260,8 +261,10 @@ describe('(now) pins to top of today\'s agenda group', () => {
 
     withFrozenDate(THURSDAY, () => triggerCommitEditT('a1', 'Workout (now)'));
 
+    // The task's row is now its day leaf, on top; the old task-row id it
+    // replaced matches no row any more and is ignored.
     const order = _state.get().agendaOrder['4-pending'];
-    expect(order.ids).toEqual(['a1', 'a2']);
+    expect(order.ids.slice(0, 2)).toEqual([findNode('a1').children[0], 'a2']);
   });
 });
 
@@ -284,8 +287,8 @@ describe('commitEdit freezes magic relative-day tokens', () => {
       global.Date = RealDate;
     }
     const node = findNode('a1');
-    expect(node.label).toBe('Workout (Th)');
-    // Day annotation is parseable post-freeze
-    expect([...parseTodoDays(node.label)]).toEqual([4]);
+    expect(nodeDisplayLabel(node)).toBe('Workout (Th)');
+    // The frozen day is the task's one day leaf
+    expect(node.children.map(findNode).map(c => c.dayIndex)).toEqual([4]);
   });
 });

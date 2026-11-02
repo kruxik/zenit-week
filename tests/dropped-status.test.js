@@ -1114,7 +1114,7 @@ describe('T9 – setActivityDays preserves dropped day-children', () => {
   test('a sibling stays dropped when another day moves', () => {
     runningWithDroppedDays();
 
-    setActivityDays('a1', new Set([1, 4, 6, 0]), true, { from: 5, to: 6 });
+    setActivityDays('a1', new Set([1, 4, 6, 0]), { from: 5, to: 6 });
 
     const byDay = new Map(dayChildren().map(c => [c.dayIndex, c]));
     expect(byDay.get(4).dropped).toBe(true);
@@ -1126,7 +1126,7 @@ describe('T9 – setActivityDays preserves dropped day-children', () => {
   test('the moved day carries its dropped state to the new day', () => {
     runningWithDroppedDays();
 
-    setActivityDays('a1', new Set([1, 4, 6, 0]), true, { from: 5, to: 6 });
+    setActivityDays('a1', new Set([1, 4, 6, 0]), { from: 5, to: 6 });
 
     const byDay = new Map(dayChildren().map(c => [c.dayIndex, c]));
     expect(byDay.get(6).dropped).toBe(true);
@@ -1143,7 +1143,7 @@ describe('T9 – setActivityDays preserves dropped day-children', () => {
       mkActivity('d2', 'a1', 'work', { label: 'th', dayChild: true, dayIndex: 4, dropped: true }),
     ]);
 
-    setActivityDays('a1', new Set([1, 4, 3]), true);
+    setActivityDays('a1', new Set([1, 4, 3]));
 
     const byDay = new Map(dayChildren().map(c => [c.dayIndex, c]));
     expect(byDay.get(1).done).toBe(true);
@@ -1161,7 +1161,7 @@ describe('T9 – setActivityDays preserves dropped day-children', () => {
       mkActivity('d2', 'a1', 'work', { label: 'fr', dayChild: true, dayIndex: 5, dropped: true }),
     ]);
 
-    setActivityDays('a1', new Set([4, 6]), true, { from: 5, to: 6 });
+    setActivityDays('a1', new Set([4, 6]), { from: 5, to: 6 });
 
     expect(findNode('a1').dropped).toBe(true);
   });

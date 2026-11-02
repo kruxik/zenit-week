@@ -25,6 +25,11 @@ function seed(label, children = [], extra = []) {
 
 const tick = (id, tickIndex, extra = {}) =>
   task(id, String(tickIndex), { parent: 'a1', tickChild: true, tickIndex, ...extra });
+// A task's days in either stored form: its label annotation or its day leaves.
+const daysOf = (n, nodes) => [
+  ...parseTodoDays(n.label),
+  ...(n.children || []).map(id => nodes.find(x => x.id === id)).filter(c => c?.dayChild).map(c => c.dayIndex),
+];
 const dayLeaf = (id, dayIndex) =>
   task(id, id, { parent: 'a1', dayChild: true, dayIndex });
 
@@ -45,9 +50,10 @@ describe('moveNodeToWeek - day option', () => {
   it('lands on the chosen weekday', async () => {
     seed('Call mum (we)');
     await moveNodeToWeek('a1', { day: 5 });
-    const moved = readNext().nodes.find(n => n.prevId === 'a1');
-    expect([...parseTodoDays(moved.label)]).toEqual([5]);
-    expect(moved.label.startsWith('Call mum')).toBe(true);
+    const next = readNext().nodes;
+    const moved = next.find(n => n.prevId === 'a1');
+    expect(daysOf(moved, next)).toEqual([5]);
+    expect(moved.label).toBe('Call mum');
   });
 
   it('clears the day to Any day with null', async () => {
@@ -86,8 +92,8 @@ describe('moveNodeToWeek - day option', () => {
     await moveNodeToWeek('a1', { day: 4 });
     const next = readNext().nodes;
     const moved = next.find(n => n.prevId === 'a1');
-    expect([...parseTodoDays(moved.label)]).toEqual([4]);
-    expect(next.some(n => n.dayChild)).toBe(false);
+    expect(daysOf(moved, next)).toEqual([4]);
+    expect(next.filter(n => n.dayChild)).toHaveLength(1);
   });
 
   it('moves one day leaf to the chosen weekday, the parent keeps its other days', async () => {
@@ -263,8 +269,9 @@ describe('moveNodeToWeek - Previous week', () => {
   it('moves the task to the previous week on the chosen day', async () => {
     seed('Call mum (we)');
     await moveNodeToWeek('a1', { offset: -1, day: 2 });
-    const moved = readPrev().nodes.find(n => n.prevId === 'a1');
-    expect([...parseTodoDays(moved.label)]).toEqual([2]);
+    const prev = readPrev().nodes;
+    const moved = prev.find(n => n.prevId === 'a1');
+    expect(daysOf(moved, prev)).toEqual([2]);
     expect(_state.get().nodes.some(n => n.id === 'a1')).toBe(false);
   });
 

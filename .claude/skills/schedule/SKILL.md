@@ -32,8 +32,8 @@ schedule = {
 
 An **entry** is a standing intention; an **occurrence** is what a week receives. Entries never render
 on the map. A materialised occurrence is a plain `activity` node wearing its day the way any
-single-day activity does - as a `(mo)` annotation in the label, never a `dayChild` leaf, which is the
-rule `setActivityDays` has always applied - plus two extra fields, `schedId` and `schedDate` (the
+single-day activity did before day leaves - as a `(mo)` annotation in the label, not a `dayChild` leaf;
+it becomes a leaf the first time its days are written (`setActivityDays`), like any older label - plus two extra fields, `schedId` and `schedDate` (the
 real date, which for a swept occurrence is not the day the annotation names). Nothing else marks it - priority, comments, day tags, counters, dropped, transfer,
 stats and drag all work on it untouched, because it is not a special kind of node.
 
