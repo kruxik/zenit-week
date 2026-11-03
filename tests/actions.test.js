@@ -32,7 +32,7 @@ describe('Context Menu Logic', () => {
     expect(isVisible('ctx-done')).toBe(true);
     expect(isVisible('ctx-unplanned')).toBe(true);
     expect(isVisible('ctx-reusable')).toBe(true);
-    expect(isVisible('ctx-move-next-week')).toBe(true);
+    expect(isVisible('ctx-reschedule')).toBe(true);
   });
 
   test('counter node shows reset but hides done/unplanned', () => {

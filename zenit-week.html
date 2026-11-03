@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-CSTHu2CESvfWXpelrHWeQS14reAnxU/QPOiSwqqxP+E=';
+               'sha256-2nDpxWIhH0rCRucmQPYBCD7TdkG+BcTUblCZFujtRls=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -995,23 +995,27 @@
   }
   #week-picker-fold.visible { display: block; }
 
-  #week-picker-month {
+  #week-picker-month,
+  #date-picker-month {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 4px;
     padding: 0 8px 6px;
   }
-  #week-picker-month-label {
+  #week-picker-month-label,
+  #date-picker-month-label {
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
   }
-  #week-picker-month .undo-redo-btn { width: 30px; height: 30px; font-size: 20px; }
+  #week-picker-month .undo-redo-btn,
+  #date-picker-month .undo-redo-btn { width: 30px; height: 30px; font-size: 20px; }
 
-  #week-picker-grid { padding: 0 8px; }
+  #week-picker-grid,
+  #date-picker-grid { padding: 0 8px; }
 
-  .wp-head, .wp-week-row {
+  .wp-head, .wp-week-row, .dp-row {
     display: grid;
     grid-template-columns: 30px repeat(7, 1fr);
     align-items: center;
@@ -1062,10 +1066,12 @@
 
   /* The actions the Mindmap's week-bar gear used to hold, wearing the context menu's
      own row so there is one vocabulary for "do something to this week". */
-  #week-picker-actions { margin-top: 4px; }
+  #week-picker-actions,
+  #date-picker-actions { margin-top: 4px; }
   /* Real buttons, so Tab and Enter work without a roving-tabindex of our own;
      these four lines are only what it takes to make a <button> wear .ctx-item. */
-  #week-picker-actions .ctx-item {
+  #week-picker-actions .ctx-item,
+  #date-picker-actions .ctx-item {
     font-size: 13px;
     padding: 9px 16px;
     width: 100%;
@@ -1076,6 +1082,58 @@
   }
   .wp-today-item { color: var(--accent-warning-text); }
   .wp-today-item:hover { background: var(--accent-warning-bg); color: var(--accent-warning-text); }
+
+  /* ── The date picker ────────────────────────────────────────────────────── */
+  /* The fold's month grid with a button per day instead of per week: the one
+     calendar for choosing a day (Reschedule, Set a date). A popover in the
+     dialog vocabulary, one layer above the Set-a-date overlay it can open from. */
+  #date-picker-panel {
+    display: none;
+    position: fixed;
+    z-index: 3100;
+    width: min(300px, calc(100vw - 16px));
+    flex-direction: column;
+    box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
+    animation: fadeIn 0.1s ease-out;
+  }
+  #date-picker-panel.visible { display: flex; }
+  #date-picker-panel .dialog-body { padding: 8px 0; gap: 0; }
+
+  /* The open week: tinted, so "which week am I in" reads before any day does. */
+  .dp-row { padding: 1px 0; border-radius: 6px; }
+  .dp-row.open-week { background: var(--ctx-hover-bg); }
+  .dp-day {
+    position: relative;
+    height: 30px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    outline: none;
+    transition: background 0.15s, color 0.15s;
+  }
+  .dp-day:hover,
+  .dp-day:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-primary); color: var(--accent-primary); }
+  .dp-day.outside { color: var(--text-muted); }
+  .dp-day.today { font-weight: 700; color: var(--accent-primary); }
+  /* Today's dot, the same mark the agenda day strip uses. */
+  .dp-day.today::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 3px;
+    width: 4px;
+    height: 4px;
+    margin-left: -2px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .dp-day.selected,
+  .dp-day.selected:hover { background: var(--accent-primary); color: #fff; }
+  .dp-day:disabled { opacity: 0.35; cursor: default; box-shadow: none; color: var(--text-muted); }
 
   @media (max-width: 520px) {
     /* The control stops being centred on the viewport, because at this width
@@ -3088,8 +3146,7 @@
   .agenda-priority-icon.high     { color: var(--accent-warning-text); }
   .agenda-priority-icon.critical { color: var(--accent-danger); }
 
-  /* Reschedule submenu, and the day-filter menu that borrows its chrome */
-  #ctx-reschedule-submenu,
+  /* The day-filter menu */
   #day-filter-menu {
     position: fixed;
     z-index: 9001;
@@ -3102,16 +3159,7 @@
     display: none;
     animation: fadeIn 0.1s ease-out;
   }
-  #ctx-reschedule-submenu.visible,
   #day-filter-menu.visible { display: block; }
-
-  .ctx-submenu-arrow {
-    font-size: 9px;
-    margin-left: auto;
-    padding-left: 8px;
-    pointer-events: none;
-    color: var(--text-muted);
-  }
 
   /* Agenda inline rename input */
   .agenda-rename-input {
@@ -3575,29 +3623,26 @@
   #send-future-fields input[type="number"] {
     width: 64px;
   }
-  /* <input type="date"> renders in the browser's OS locale and cannot be told
-     otherwise, so the echo beside it says the date in the UI language - the
-     same form the Later tab uses. */
-  #send-future-date-echo {
-    font-size: 13px;
-    color: var(--text-secondary);
-    white-space: nowrap;
+  /* A date field is a button that opens the app's calendar (openDatePicker):
+     the native date input spoke the OS locale and drew a different calendar
+     on every platform. It says the date in the UI language, as Later does. */
+  .send-future-date {
+    min-width: 160px;
+    text-align: left;
+    cursor: pointer;
   }
+  .send-future-date[hidden] { display: none; }
   /* Native select arrow is painted inside the box: without room reserved for
      it, the arrow sits on top of the last character. */
   #send-future-fields select {
     padding-right: 28px;
   }
-  /* A date before `min` (or none at all - the field is required) is refused by
-     the writers anyway, so say so at the field and stand the Set button down.
-     Listed after the :focus rule so focusing the field does not paint over it. */
-  #send-future-date:invalid,
-  #send-future-date:invalid:focus,
-  #send-future-end-date:invalid,
-  #send-future-end-date:invalid:focus {
+  /* An end before the date is refused by the writers anyway, so say so at the
+     field and stand the Set button down. Listed after the :focus rule so
+     focusing the field does not paint over it. */
+  .send-future-date.invalid,
+  .send-future-date.invalid:focus {
     border-color: var(--accent-danger);
-  }
-  #send-future-date:invalid + #send-future-date-echo {
     color: var(--accent-danger);
   }
 
@@ -4069,7 +4114,6 @@
   <symbol id="icon-sitemap" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M15 17a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" /><path d="M6 15v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1" /><path d="M12 9l0 3" /></symbol>
   <symbol id="icon-list-details" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M13 5h8" /><path d="M13 9h5" /><path d="M13 15h8" /><path d="M13 19h5" /><path d="M3 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" /><path d="M3 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" /></symbol>
   <symbol id="icon-arrow-back-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></symbol>
-  <symbol id="icon-calendar-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M19 22v-6"/><path d="M22 19l-3 -3l-3 3"/></symbol>
   <symbol id="icon-calendar-down" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"/><path d="M19 16v6"/><path d="M22 19l-3 3l-3 -3"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/></symbol>
   <symbol id="icon-arrow-forward-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></symbol>
 </svg>
@@ -4369,9 +4413,7 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item" id="ctx-reset"><svg class="icon" aria-hidden="true"><use href="#icon-circle-number-0"/></svg> <span data-i18n="menu.reset">Reset</span></div>
   <div class="ctx-item" id="ctx-unplanned"><svg class="icon" aria-hidden="true"><use href="#icon-bolt"/></svg> Unplanned</div>
   <div class="ctx-item" id="ctx-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> Reusable</div>
-  <div class="ctx-item" id="ctx-reschedule"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.reschedule">Reschedule</span><span class="ctx-submenu-arrow">▶</span></div>
-  <div class="ctx-item" id="ctx-move-prev-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-up"/></svg> <span data-i18n="menu.prevWeek">Previous week</span><span class="ctx-submenu-arrow">▶</span></div>
-  <div class="ctx-item" id="ctx-move-next-week"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-down"/></svg> <span data-i18n="menu.nextWeek">Next week</span><span class="ctx-submenu-arrow">▶</span></div>
+  <div class="ctx-item" id="ctx-reschedule"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.reschedule">Reschedule</span></div>
   <div class="ctx-separator" id="ctx-sep-1"></div>
   <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> <span data-i18n="menu.prioNormal">Priority Normal</span></div>
   <div class="ctx-item" id="ctx-prio-high"><svg class="icon" aria-hidden="true"><use href="#icon-alert-circle"/></svg> <span data-i18n="menu.prioHigh">Priority High</span></div>
@@ -4386,8 +4428,34 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item danger" id="ctx-delete"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.delete">Delete</span></div>
 </div>
 
-<div id="ctx-reschedule-submenu"></div>
 <div id="day-filter-menu"></div>
+
+<!-- The app's one calendar for choosing a day. openDatePicker fills the title,
+     grid and actions for whoever opened it (Reschedule, Set a date). -->
+<div id="date-picker-panel" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="date-picker-title">
+  <div class="dialog-header">
+    <div class="dialog-title" id="date-picker-title"></div>
+    <button type="button" class="help-close-btn" id="date-picker-close"
+      data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+      <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    </button>
+  </div>
+  <div class="dialog-body">
+    <div id="date-picker-month">
+      <button type="button" class="undo-redo-btn" id="date-picker-month-prev"
+              data-i18n-aria="weekpicker.prevMonth" aria-label="Previous month">
+        <svg class="icon" aria-hidden="true"><use href="#icon-square-rounded-arrow-left"/></svg>
+      </button>
+      <div id="date-picker-month-label"></div>
+      <button type="button" class="undo-redo-btn" id="date-picker-month-next"
+              data-i18n-aria="weekpicker.nextMonth" aria-label="Next month">
+        <svg class="icon" aria-hidden="true"><use href="#icon-square-rounded-arrow-right"/></svg>
+      </button>
+    </div>
+    <div id="date-picker-grid"></div>
+    <div id="date-picker-actions"></div>
+  </div>
+</div>
 
 <textarea id="inline-input" autocomplete="off" spellcheck="false"></textarea>
 <span id="inline-sizer"></span>
@@ -4466,8 +4534,8 @@ Or remove them later in Settings → Help.</div>
     <div id="send-future-fields">
       <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
       <div class="send-future-row">
-        <input type="date" id="send-future-date" class="dialog-field" required>
-        <span id="send-future-date-echo"></span>
+        <!-- The date itself is written in on open; "Date" only stands in until then. -->
+        <button type="button" id="send-future-date" class="dialog-field send-future-date">Date</button>
       </div>
       <label for="send-future-unit" data-i18n="sendFuture.repeat">Repeat</label>
       <div class="send-future-row">
@@ -4488,7 +4556,7 @@ Or remove them later in Settings → Help.</div>
           <option value="until" data-i18n="sendFuture.endUntil">On date</option>
         </select>
         <input type="number" id="send-future-end-count" class="dialog-field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
-        <input type="date" id="send-future-end-date" class="dialog-field" aria-label="End date" required hidden>
+        <button type="button" id="send-future-end-date" class="dialog-field send-future-date" aria-label="End date" hidden></button>
       </div>
     </div>
     <div id="send-future-actions" class="dialog-actions">
@@ -5281,7 +5349,7 @@ const QUIESCENCE_PANEL_IDS = [
   'app-confirm-overlay',
   'send-future-overlay',
   'context-menu',
-  'ctx-reschedule-submenu',
+  'date-picker-panel',
   'day-filter-menu',
   'help-panel',
   'help-overlay',
@@ -11315,7 +11383,6 @@ const TRANSLATIONS = {
     'menu.reschedule':            'Reschedule',
     'menu.now':                   'Now',
     'menu.clearDay':              'Any',
-    'menu.keepDay':               'Keep day',
     'view.sand':                  'Sand',
     'view.pebbles':               'Pebbles',
     'view.rocks':                 'Rocks',
@@ -11338,10 +11405,8 @@ const TRANSLATIONS = {
     'menu.reusable':              'Reusable',
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
-    'menu.prevWeek':              'Previous week',
     'toast.movedToNextWeek':      'Added to next week',
     'toast.dayTakenInWeek':       'That week already has this day',
-    'menu.sendToDate':            'Date',
     'agenda.later':               'Later',
     'help.laterTab':              'Later (upcoming dates)',
     'help.featureSendFutureLead': 'Send to date',
@@ -11351,6 +11416,7 @@ const TRANSLATIONS = {
     'agenda.emptyLaterHint':      'Send a task to a date to plan past this week.',
     'agenda.laterContinues':      'Repeats - more dates appear here as they come closer.',
     'sendFuture.title':           'Set a date',
+    'datePicker.repeat':          'Repeat...',
     'sendFuture.date':            'Date',
     'sendFuture.repeat':          'Repeat',
     'sendFuture.noRepeat':        'No repeat',
@@ -11366,7 +11432,6 @@ const TRANSLATIONS = {
     'toast.sentToFuture':         'Set for {date}',
     'toast.pastDate':             'Pick today or later - the schedule only delivers forward',
     'toast.subtreeTooBig':        'Too big to send - one date carries at most 200 tasks',
-    'sendFuture.pickDate':        'Pick today or later',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
     'menu.prioCritical':          'Priority Critical',
@@ -11703,7 +11768,6 @@ const TRANSLATIONS = {
     'menu.reschedule':            'Přeplánovat',
     'menu.now':                   'Nyní',
     'menu.clearDay':              'Kdykoli',
-    'menu.keepDay':               'Ponechat den',
     'view.sand':                  'Písek',
     'view.pebbles':               'Oblázky',
     'view.rocks':                 'Kameny',
@@ -11726,10 +11790,8 @@ const TRANSLATIONS = {
     'menu.reusable':              'Opakované',
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
-    'menu.prevWeek':              'Předchozí týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
     'toast.dayTakenInWeek':       'Tento den už v tom týdnu je',
-    'menu.sendToDate':            'Datum',
     'agenda.later':               'Později',
     'help.laterTab':              'Později (nadcházející data)',
     'help.featureSendFutureLead': 'Odeslat na datum',
@@ -11739,6 +11801,7 @@ const TRANSLATIONS = {
     'agenda.emptyLaterHint':      'Pošli úkol na datum a naplánuješ ho za tento týden.',
     'agenda.laterContinues':      'Opakuje se - další termíny se tu objeví, až se přiblíží.',
     'sendFuture.title':           'Nastavit datum',
+    'datePicker.repeat':          'Opakovat...',
     'sendFuture.date':            'Datum',
     'sendFuture.repeat':          'Opakování',
     'sendFuture.noRepeat':        'Bez opakování',
@@ -11754,7 +11817,6 @@ const TRANSLATIONS = {
     'toast.sentToFuture':         'Nastaveno na {date}',
     'toast.pastDate':             'Vyber dnešek nebo pozdější den - plán doručuje jen dopředu',
     'toast.subtreeTooBig':        'Příliš velké - na jedno datum se vejde nejvýš 200 úkolů',
-    'sendFuture.pickDate':        'Vyber dnešek nebo pozdější den',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
     'menu.prioCritical':          'Priorita Kritická',
@@ -13578,8 +13640,9 @@ function leafDayFree(destDays, dayIdx) {
     computeDayReschedule('leaf', { currentDays: destDays, currentDayIndex: null, newDayIndex: dayIdx }) !== null;
 }
 
-// Moves a task to the adjacent week: `offset` +1 is Next week, -1 Previous week.
-// `day` picks the node's weekday in the destination week: omitted keeps the
+// Moves a task to another week, `offset` weeks from the open one: +1 is next
+// week (`N`), -1 the previous (`B`), and Reschedule's calendar passes any
+// distance it allows (see rescheduleTargetKind). `day` picks the node's weekday in the destination week: omitted keeps the
 // day it already wears, null clears it to Any day, 0-6 sets that one day.
 // A day leaf moved with null lands as its parent's task with no day.
 async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {}) {
@@ -13629,7 +13692,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
     // as its parent's task, one level up, with the leaf's own outcome.
     const anchor = leafAny ? findNode(live.parent) : live;
     // The destination as it stood before this move, for the undo snapshot when
-    // it targets a week other than the one takeSnapshot cached (Previous week).
+    // it targets a week other than the one takeSnapshot cached (any but next).
     const destRawBefore = JSON.stringify(nextData);
     const nextById = new Map(nextData.nodes.map(n => [n.id, n]));
     const nextLookup = id => nextById.get(id);
@@ -18750,6 +18813,9 @@ const ESC_DISMISSALS = [
   // has to be here rather than in its own listener: a second handler closing it
   // left this walk to fall straight through to the map state underneath, which
   // is how one press both shut the panel and reset Rocks to Sand.
+  // The calendar can open over Set a date, so it answers before that dialog.
+  { isOpen: () => isDatePickerOpen(),
+    dismiss: () => { closeDatePicker(); } },
   { isOpen: () => !!window.isSendFutureOpen && window.isSendFutureOpen(),
     dismiss: () => { window.closeSendFuture(); } },
   { isOpen: () => !!window.isQuickAddOpen && window.isQuickAddOpen(),
@@ -18817,10 +18883,10 @@ function closeSettingsDropdown() {
 function _windowKeydownHandler(e) {
   if (editState) return; // Don't interfere with inline editing
 
-  // The week picker's fold owns the keyboard while it is open: its rows take
-  // the arrows, and a bare letter must not switch view out from under it. Esc
-  // still runs the normal walk, which closes the fold first.
-  if (isWeekPickerOpen()) {
+  // The week picker's fold and the date picker own the keyboard while open:
+  // their cells take the arrows, and a bare letter must not switch view out
+  // from under them. Esc still runs the normal walk, which closes them first.
+  if (isWeekPickerOpen() || isDatePickerOpen()) {
     if (e.key === 'Escape') { e.preventDefault(); runEscDismiss(); }
     return;
   }
@@ -19728,6 +19794,23 @@ function updateScheduleEntry(entryId, options) {
   let _targetId  = null;   // node being sent
   let _entryId   = null;   // entry being edited from the Later tab
 
+  // The two dates. Each field is a button that opens the app's calendar; the
+  // value lives here, not in the button. `_dateMin` is the floor the calendar
+  // greys below: today, or a series' own past anchor (see openForEntry).
+  let _date = '', _dateMin = '', _until = '';
+  const dateOk  = () => !!parseDayString(_date) && _date >= _dateMin;
+  // The end date only has a say while it is the chosen end condition; hidden,
+  // it keeps whatever value it was left with and is none of Set's business.
+  const untilOk = () => untilEl.hidden || (!!parseDayString(_until) && _until >= _date);
+
+  function paintDates() {
+    dateEl.textContent  = _date ? formatDayLabel(_date) : '';
+    untilEl.textContent = _until ? formatDayLabel(_until) : '';
+    dateEl.classList.toggle('invalid', !dateOk());
+    untilEl.classList.toggle('invalid', !untilOk());
+    okEl.disabled = !dateOk() || !untilOk();
+  }
+
   // Repeat and end are one control in two halves: with no repeat there is
   // nothing for an end condition to end, so the whole row stands down.
   function syncFields() {
@@ -19736,43 +19819,48 @@ function updateScheduleEntry(entryId, options) {
     endEl.hidden = !repeats;
     countEl.hidden = !repeats || endEl.value !== 'count';
     untilEl.hidden = !repeats || endEl.value !== 'until';
-    syncUntilFloor();
-    syncOk();
+    paintDates();
+  }
+
+  function show() {
+    syncFields();
+    overlay.classList.add('visible');
+    dateEl.focus();
   }
 
   window.isSendFutureOpen = () => overlay.classList.contains('visible');
 
   window.closeSendFuture = function () {
+    closeDatePicker();
     overlay.classList.remove('visible');
     _targetId = null;
     _entryId = null;
   };
 
-  function openForEntry(entryId) {
+  // `date` prefills a new anchor picked on the calendar (Reschedule on a
+  // Later row of a series); the floor stays the entry's own.
+  function openForEntry(entryId, date) {
     const entry = scheduleData.entries.find(e => e.id === entryId);
     if (!entry) return;
     _targetId = null;
     _entryId = entryId;
     // A series anchored in the past keeps its anchor as the floor, so the value
     // on screen stays valid; anything else floors at today.
-    dateEl.min = entry.anchor < localDateStr() ? entry.anchor : localDateStr();
-    dateEl.value = entry.anchor;
+    _dateMin = entry.anchor < localDateStr() ? entry.anchor : localDateStr();
+    _date = date || entry.anchor;
     everyEl.value = String(entry.repeat ? entry.repeat.every : 1);
     unitEl.value = entry.repeat ? entry.repeat.unit : 'none';
     endEl.value = entry.end ? entry.end.type : 'never';
     countEl.value = String(entry.end && entry.end.type === 'count' ? entry.end.n : 10);
-    untilEl.value = (entry.end && entry.end.type === 'until') ? entry.end.date : entry.anchor;
-    syncFields();
-    syncEcho();
-    overlay.classList.add('visible');
-    dateEl.focus();
+    _until = (entry.end && entry.end.type === 'until') ? entry.end.date : _date;
+    show();
   }
 
   // Two callers, one dialog: a node being sent for the first time, and an
   // entry being edited from the Later tab. Editing changes future occurrences
   // only - nodes already materialised are ordinary nodes in their own weeks.
   window.openSendFuture = function (target) {
-    if (target && target.entryId) return openForEntry(target.entryId);
+    if (target && target.entryId) return openForEntry(target.entryId, target.date);
     const nodeId = target;
     const node = findNode(nodeId);
     if (!canSendToDate(node)) return;
@@ -19782,56 +19870,33 @@ function updateScheduleEntry(entryId, options) {
     _targetId = nodeId;
     _entryId = null;
     // A week out is the default because that is the shortest horizon this
-    // dialog is for; anything nearer is what N and the day tags already do.
+    // dialog is for; anything nearer is what the weekdays of Reschedule do.
     const start = dayStringFromNumber(dayNumber(parseDayString(localDateStr())) + 7);
-    dateEl.min = localDateStr();
-    dateEl.value = start;
+    _dateMin = localDateStr();
+    _date = start;
     everyEl.value = '1';
     unitEl.value = 'none';
     endEl.value = 'never';
     countEl.value = '10';
-    untilEl.value = start;
-    syncFields();
-    syncEcho();
-    overlay.classList.add('visible');
-    dateEl.focus();
+    _until = start;
+    show();
   };
 
-  const echoEl = document.getElementById('send-future-date-echo');
-  function syncEcho() {
-    echoEl.textContent = dateEl.value
-      ? formatDayLabel(dateEl.value)
-      : t('sendFuture.pickDate');
-    syncOk();
+  function pickInto(field, title, floor, current, assign) {
+    openDatePicker({
+      title,
+      anchorRect: field.getBoundingClientRect(),
+      focusDate: current,
+      selected: current ? [current] : [],
+      isDisabled: d => d < floor(),
+      onPick: d => { assign(d); paintDates(); field.focus(); },
+    });
   }
+  dateEl.addEventListener('click', () =>
+    pickInto(dateEl, t('sendFuture.date'), () => _dateMin, _date, d => { _date = d; }));
+  untilEl.addEventListener('click', () =>
+    pickInto(untilEl, t('sendFuture.end'), () => _date, _until, d => { _until = d; }));
 
-  // The picker honours `min`, but the field can also be typed into, and a date
-  // the writers would refuse must not look committable. checkValidity() covers
-  // both the floor and the empty field, so the button follows the same rule the
-  // red border does.
-  // Chrome keeps a per-segment typing buffer in a date input and throws it away
-  // when `min` is assigned. Writing the floor from the end field's own input
-  // handler therefore reset the field mid-keystroke - "1","1" landed as 01, and
-  // a leading "0" looked like the whole date had been wiped. The floor depends
-  // only on the anchor, so it is written when the anchor moves and never while
-  // the end field itself is being typed into. The guard covers the rest: an
-  // unchanged assignment still costs the buffer.
-  function syncUntilFloor() {
-    const floor = dateEl.value || '';
-    if (untilEl.min !== floor) untilEl.min = floor;
-  }
-
-  function syncOk() {
-    // The end date only has a say while it is the chosen end condition; hidden,
-    // it keeps whatever value it was left with and is none of Set's business.
-    const endOk = untilEl.hidden || untilEl.checkValidity();
-    okEl.disabled = !dateEl.checkValidity() || !endOk;
-  }
-
-  dateEl.addEventListener('input', () => { syncUntilFloor(); syncEcho(); });
-  dateEl.addEventListener('change', () => { syncUntilFloor(); syncEcho(); });
-  untilEl.addEventListener('input', syncOk);
-  untilEl.addEventListener('change', syncOk);
   unitEl.addEventListener('change', syncFields);
   endEl.addEventListener('change', syncFields);
   closeEl.addEventListener('click', () => window.closeSendFuture());
@@ -19841,33 +19906,26 @@ function updateScheduleEntry(entryId, options) {
     const id = _targetId;
     const editing = _entryId;
     const opts = {
-      date: dateEl.value,
+      date: _date,
       every: everyEl.value,
       unit: unitEl.value === 'none' ? null : unitEl.value,
       endType: endEl.value,
       endCount: countEl.value,
-      endDate: untilEl.value,
+      endDate: _until,
     };
     window.closeSendFuture();
     // Editing rewrites one entry; a send writes one per leaf. Either way the
     // dialog only needs to know it happened and on what date.
     const written = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
     if (!written) {
-      // The only refusal a user can provoke from the dialog: `min` keeps the
-      // picker honest, but a typed date still reaches here.
+      // The calendar greys past days, but a dialog left open across midnight
+      // still holds yesterday - the one refusal a user can provoke from here.
       if (opts.date && parseDayString(opts.date) && opts.date < localDateStr()) {
         showToast(t('toast.pastDate'));
       }
       return;
     }
-    // An empty list is a date inside this week: the node was retagged where it
-    // stands, which needs no announcing - the weekday buttons announce nothing
-    // either.
-    const entry = Array.isArray(written) ? written[0] : written;
-    if (!editing && entry) showToast(t('toast.sentToFuture', { date: formatDayLabel(entry.anchor) }));
-    // The entry may be due inside the week already on screen - deliver it now
-    // rather than leaving the task missing until the week is next opened.
-    await materialiseOpenWeek();
+    await afterScheduleWrite(written, { announce: !editing });
   });
 })();
 
@@ -19938,9 +19996,6 @@ function showContextMenu(x, y, nodeId) {
     ? `${iconSvg('repeat-off')} ${t('menu.disposable')}`
     : `${iconSvg('repeat')} ${t('menu.reusable')}`;
   document.getElementById('ctx-reusable').style.display       = (isStdActivity || isTick) ? '' : 'none';
-  document.getElementById('ctx-move-next-week').style.display = (isStdActivity || isTick) ? '' : 'none';
-  document.getElementById('ctx-move-prev-week').style.display =
-    ((isStdActivity || isTick) && canMoveToPrevWeek()) ? '' : 'none';
 
   const isHigh = node && node.priority === 'high';
   const isCritical = node && node.priority === 'critical';
@@ -20035,7 +20090,6 @@ function hideContextMenu() {
   contextTarget = null;
   agendaTickCtx = null;
   agendaEntryCtx = null;
-  document.getElementById('ctx-reschedule-submenu').classList.remove('visible');
   setAgendaFocus(null);
 }
 
@@ -20267,8 +20321,8 @@ document.getElementById('ctx-transfer-reusable').addEventListener('click', () =>
 });
 
 // Labels a menu row with its day text plus a small blue dot when that day is
-// today - the same indicator the agenda day-strip uses. Shared by the reschedule
-// submenu (abbreviations) and the day-filter menu (full names). A dayIdx outside
+// today - the same indicator the agenda day-strip uses. Used by the day-filter
+// menu (full names). A dayIdx outside
 // 0–6, e.g. the Overdue or Unscheduled rows, simply never gets a dot.
 function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   const labelSpan = document.createElement('span');
@@ -20282,45 +20336,222 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
   row.appendChild(labelSpan);
 }
 
-(function () {
-  const rescheduleItem   = document.getElementById('ctx-reschedule');
-  const rescheduleSubmenu = document.getElementById('ctx-reschedule-submenu');
-  let _hideSubTimer = null;
+// ─── Date picker ──────────────────────────────────────────────────────────────
+// The app's one calendar for choosing a day. Reschedule and the Set-a-date
+// dialog both open it; it draws the week picker fold's month grid with a button
+// per day instead of one per week. The caller decides everything a day means:
+// `isDisabled(date)` greys a cell, `onPick(date)` acts on a click, `actions`
+// are the footer rows. Dates are 'YYYY-MM-DD' strings throughout.
+const dpPanel = document.getElementById('date-picker-panel');
+let _dp = null;
 
-  const nextWeekItem = document.getElementById('ctx-move-next-week');
-  const prevWeekItem = document.getElementById('ctx-move-prev-week');
+function isDatePickerOpen() {
+  return dpPanel.classList.contains('visible');
+}
 
-  // One submenu element serves both triggers, placed beside whichever opened it.
-  function positionRescheduleSubmenu(anchorItem = rescheduleItem) {
-    rescheduleSubmenu.style.visibility = 'hidden';
-    rescheduleSubmenu.classList.add('visible');
-    const ctxRect  = ctxMenu.getBoundingClientRect();
-    const itemRect = anchorItem.getBoundingClientRect();
-    const subW = rescheduleSubmenu.offsetWidth;
-    const subH = rescheduleSubmenu.offsetHeight;
-    const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
-    let left = ctxRect.right + 4;
-    if (left + subW > vw - pad) left = ctxRect.left - subW - 4;
-    let top = Math.max(pad, Math.min(itemRect.top, vh - subH - pad));
-    rescheduleSubmenu.style.left = left + 'px';
-    rescheduleSubmenu.style.top  = top  + 'px';
-    rescheduleSubmenu.style.visibility = '';
+function closeDatePicker() {
+  dpPanel.classList.remove('visible');
+  _dp = null;
+}
+
+function monthOfDayString(date) {
+  const part = parseDayString(date);
+  return part ? { y: part.y, m: part.m - 1 } : null;
+}
+
+function openDatePicker({ title, anchorRect = null, focusDate, selected = [], weekMark = null,
+                          isDisabled = () => false, onPick, actions = [] }) {
+  _dp = {
+    month: monthOfDayString(focusDate) || monthOfDayString(localDateStr()),
+    selected: new Set(selected), weekMark, isDisabled, onPick, anchorRect,
+  };
+  document.getElementById('date-picker-title').textContent = title;
+
+  const bar = document.getElementById('date-picker-actions');
+  bar.textContent = '';
+  if (actions.length) {
+    const sep = document.createElement('div');
+    sep.className = 'ctx-separator';
+    bar.appendChild(sep);
+  }
+  for (const a of actions) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ctx-item' + (a.danger ? ' danger' : '');
+    btn.innerHTML = iconSvg(a.icon);   // static icon markup only
+    const label = document.createElement('span');
+    label.textContent = ' ' + a.label;
+    btn.appendChild(label);
+    btn.addEventListener('click', () => { closeDatePicker(); a.onClick(); });
+    bar.appendChild(btn);
   }
 
-  // The seven weekday rows, Monday first. `onPick(dayIdx)` returns the row's
-  // click handler; `todayIdx` -1 leaves every row without the today dot.
-  function addWeekdayRows(onPick, todayIdx, classFor = () => '') {
-    AGENDA_DAY_ORDER.forEach(dayIdx => addCtxItem(rescheduleSubmenu,
-      btn => appendDayLabel(btn, dayAbbr(dayIdx), dayIdx, todayIdx), onPick(dayIdx), classFor(dayIdx)));
-  }
+  renderDatePicker();
+  dpPanel.classList.add('visible');
+  positionDatePicker();
+  focusDatePickerDay(focusDate) || focusDatePickerDay(localDateStr())
+    || dpPanel.querySelector('.dp-day:not(:disabled)')?.focus();
+}
 
-  // The node a day choice acts on and the days it holds now, shared by
-  // Reschedule, Next week and Previous week. In the agenda, a tick row's menu targets the
-  // parent but the schedule belongs to a single tick - act on that tick, not
-  // the parent (retagging the parent would purge its ticks via the "day wins"
-  // rule). A specific tick row carries its id; the Any-day aggregate resolves
-  // to the next unscheduled undone tick (the one its +1 button would advance).
-  // Null when there is no node, with the submenu hidden.
+// Beside the anchor on a wide screen, flipping to its left when the right
+// edge has no room; centred on a phone, where a 300px card beside anything
+// would hang off the screen.
+function positionDatePicker() {
+  const w = dpPanel.offsetWidth, h = dpPanel.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
+  const r = _dp && _dp.anchorRect;
+  let left, top;
+  if (!r || vw <= 520) {
+    left = (vw - w) / 2;
+    top = Math.max(pad, (vh - h) / 2);
+  } else {
+    left = r.right + 4;
+    if (left + w > vw - pad) left = r.left - w - 4;
+    left = Math.max(pad, left);
+    top = Math.max(pad, Math.min(r.top, vh - h - pad));
+  }
+  dpPanel.style.left = left + 'px';
+  dpPanel.style.top = top + 'px';
+}
+
+function renderDatePicker() {
+  const grid = document.getElementById('date-picker-grid');
+  const { month, selected, weekMark, isDisabled } = _dp;
+  document.getElementById('date-picker-month-label').textContent = monthGridLabel(month);
+  grid.textContent = '';
+  appendMonthGridHead(grid);
+
+  const today = localDateStr();
+  for (const monday of monthGridMondays(month, weekMark)) {
+    const iso = getISOWeek(monday);
+    const wk = weekKey(iso.year, iso.week);
+    const row = document.createElement('div');
+    row.className = 'dp-row' + (wk === weekMark ? ' open-week' : '');
+
+    const no = document.createElement('span');
+    no.className = 'wp-weekno';
+    no.textContent = String(iso.week);
+    row.appendChild(no);
+
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const date = formatDayString(day.getFullYear(), day.getMonth() + 1, day.getDate());
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'dp-day'
+        + (day.getMonth() === month.m ? '' : ' outside')
+        + (date === today ? ' today' : '')
+        + (selected.has(date) ? ' selected' : '');
+      cell.textContent = String(day.getDate());
+      cell.dataset.date = date;
+      cell.setAttribute('aria-label', formatDayLabel(date));
+      if (selected.has(date)) cell.setAttribute('aria-pressed', 'true');
+      cell.disabled = !!isDisabled(date);
+      cell.addEventListener('click', () => {
+        const { onPick } = _dp;
+        closeDatePicker();
+        onPick(date);
+      });
+      row.appendChild(cell);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function focusDatePickerDay(date) {
+  const cell = date && dpPanel.querySelector(`.dp-day[data-date="${date}"]`);
+  if (!cell || cell.disabled) return false;
+  cell.focus();
+  return true;
+}
+
+(function wireDatePicker() {
+  function stepMonth(delta) {
+    const d = new Date(_dp.month.y, _dp.month.m + delta, 1);
+    _dp.month = { y: d.getFullYear(), m: d.getMonth() };
+    renderDatePicker();
+    positionDatePicker();
+  }
+  document.getElementById('date-picker-month-prev').addEventListener('click', () => stepMonth(-1));
+  document.getElementById('date-picker-month-next').addEventListener('click', () => stepMonth(+1));
+  document.getElementById('date-picker-close').addEventListener('click', closeDatePicker);
+
+  // Arrows walk the days, a week per Up/Down, paging the month when the walk
+  // leaves it and stepping over days that cannot be picked.
+  dpPanel.addEventListener('keydown', (e) => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    const from = document.activeElement?.dataset?.date;
+    if (!step || !from || !_dp) return;
+    e.preventDefault();
+    let n = dayNumber(parseDayString(from));
+    for (let tries = 0; tries < 60; tries++) {
+      n += step;
+      const date = dayStringFromNumber(n);
+      const month = monthOfDayString(date);
+      if (month.y !== _dp.month.y || month.m !== _dp.month.m) {
+        if (!dpPanel.querySelector(`.dp-day[data-date="${date}"]`)) {
+          _dp.month = month;
+          renderDatePicker();
+          positionDatePicker();
+        }
+      }
+      if (focusDatePickerDay(date)) return;
+    }
+  });
+
+  // A press anywhere else closes it - the colour picker's rule.
+  document.addEventListener('pointerdown', (e) => {
+    if (isDatePickerOpen() && !dpPanel.contains(e.target)) closeDatePicker();
+  });
+})();
+
+// ─── Reschedule ───────────────────────────────────────────────────────────────
+// What a click on `date` does to a task in week `openWeek`. One rule for every
+// cell the calendar draws, so how a cell looks and what its click does agree:
+//   retag    - a day of the open week: the task changes day where it stands
+//   move     - the next week, or back to any week from today's on: the task
+//              moves there with its ticks, outcome and sub-tasks
+//   later    - two weeks out or more: a one-off schedule entry (the Later tab)
+//   disabled - a week before today's, a past date, or Later for a node that
+//              cannot be sent (`canLater` false: a tick or a day leaf)
+// Week keys are zero-padded, so they compare as strings.
+function rescheduleTargetKind(date, { openWeek, todayWeek, today, canLater }) {
+  const wk = weekKeyForDayString(date);
+  if (!wk) return 'disabled';
+  if (wk === openWeek) return 'retag';
+  if (wk === offsetWeek(openWeek, 1)) return 'move';
+  if (wk < openWeek) return wk >= todayWeek ? 'move' : 'disabled';
+  return canLater && date >= today ? 'later' : 'disabled';
+}
+
+// Whole weeks from week key `from` to `to`, negative going back.
+function weekDistance(from, to) {
+  const a = parseWeekKey(from), b = parseWeekKey(to);
+  const ma = getWeekBounds(a.year, a.week).monday;
+  const mb = getWeekBounds(b.year, b.week).monday;
+  return Math.round((mb - ma) / (7 * 86400000));
+}
+
+// Both writes to the schedule - a send from a node and an edit from a Later
+// row - end the same way: say where a new send went, and deliver anything now
+// due inside the week on screen instead of leaving it missing until the week
+// is next opened. An empty send is a date inside this week, retagged in place,
+// which needs no announcing.
+async function afterScheduleWrite(written, { announce }) {
+  const entry = Array.isArray(written) ? written[0] : written;
+  if (announce && entry) showToast(t('toast.sentToFuture', { date: formatDayLabel(entry.anchor) }));
+  await materialiseOpenWeek();
+}
+
+(function wireReschedule() {
+  const rescheduleItem = document.getElementById('ctx-reschedule');
+
+  // The node a day choice acts on and the days it holds now. In the agenda, a
+  // tick row's menu targets the parent but the schedule belongs to a single
+  // tick - act on that tick, not the parent (retagging the parent would purge
+  // its ticks via the "day wins" rule). A specific tick row carries its id; the
+  // Any-day aggregate resolves to the next unscheduled undone tick (the one its
+  // +1 button would advance). Null when there is no node.
   function resolveDayTarget() {
     let ctxTickId = null;
     if (currentView === 'agenda' && agendaTickCtx) {
@@ -20334,10 +20565,7 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     }
     const node = ctxTickId ? findNode(ctxTickId) : findNode(contextTarget);
     const parent = node?.dayChild ? findNode(node.parent) : null;
-    if (!node || (node.dayChild && !parent)) {
-      rescheduleSubmenu.classList.remove('visible');
-      return null;
-    }
+    if (!node || (node.dayChild && !parent)) return null;
     if (node.tickChild) {
       // Per-tick schedule: single weekday stored in tick.dayIndex.
       return { node, targetId: node.id, mode: 'tick',
@@ -20351,88 +20579,35 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
     return { node, targetId: node.id, mode: taskDayMode(node), assignedDays: taskDays(node) };
   }
 
-  // Same shape as the node submenu - Now, the seven weekdays, then Date - but
-  // every weekday here means "bring this occurrence into the current week on
-  // that day", and there is no Any: an occurrence is a date by definition.
-  function buildEntryRescheduleSubmenu() {
-    const { entryId, date } = agendaEntryCtx;
-    const todayIdx = new Date().getDay();
+  const afterMutation = () => {
+    saveWeek(currentWeekKey, weekData);
+    renderIfVisible();
+    if (currentView === 'agenda') renderAgenda();
+  };
 
-    const pull = dayIdx => async () => {
-      hideContextMenu();
-      const moved = await pullOccurrenceIntoWeek(entryId, date, dayIdx);
-      if (moved && dayIdx === todayIdx) pinToTopOfAgenda(occurrenceNodeId(entryId, date));
-      renderAgenda();
-    };
-
-    addCtxItem(rescheduleSubmenu, t('menu.now') || 'Now', pull(todayIdx));
-    addCtxSeparator(rescheduleSubmenu);
-
-    addWeekdayRows(pull, todayIdx);
-
-    addCtxSeparator(rescheduleSubmenu);
-    addCtxItem(rescheduleSubmenu, t('menu.sendToDate'), () => {
-      hideContextMenu();
-      window.openSendFuture({ entryId });
-    });
+  // The open week's days for a set of weekday indexes.
+  function datesOfDays(wk, days) {
+    const week = weekDayStrings(wk) || [];
+    return [...days].map(d => week[isoWeekPos(d) - 1]).filter(Boolean);
   }
 
-  function showRescheduleSubmenu() {
-    clearTimeout(_hideSubTimer);
-    _weekMoveBuild++; // a pending Next/Previous week build must not overwrite this
-    rescheduleSubmenu.innerHTML = '';
-    // A Later row has no node: the same weekday choices mean "bring this
-    // occurrence into the current week on that day", and Any is left off -
-    // an occurrence with no date is not an occurrence. Date stays, because
-    // moving the series itself is still a thing to want.
-    if (agendaEntryCtx) {
-      buildEntryRescheduleSubmenu();
-      positionRescheduleSubmenu();
-      return;
-    }
-
-    const resolved = resolveDayTarget();
-    if (!resolved) return;
-    const { node, targetId, mode, assignedDays } = resolved;
-
-    const afterMutation = () => {
-      saveWeek(currentWeekKey, weekData);
-      renderIfVisible();
-      if (currentView === 'agenda') renderAgenda();
-      hideContextMenu();
-    };
-
+  // A task. The open week's days act as the weekday rows always did - a task
+  // on several days toggles the picked one, a day leaf cannot take a day a
+  // sibling already owns - and other weeks follow rescheduleTargetKind.
+  function openForNode({ node, targetId, mode, assignedDays }, anchorRect) {
+    const openWeek = currentWeekKey;
+    const ctx = { openWeek, todayWeek: todayWeekKey(), today: localDateStr(), canLater: canSendToDate(node) };
     const todayIdx = new Date().getDay();
+    // A leaf is one day of its task, so only that day reads as chosen; the
+    // days its siblings hold are taken instead.
+    const chosen = mode === 'leaf' ? new Set([node.dayIndex]) : assignedDays;
+    // A task on several days, or counting repetitions, moves to another week
+    // whole and keeps its days: a weekday there would collapse the days into
+    // one, or purge the ticks. The date only chooses the week.
+    const hasTicks = (node.children || []).some(cid => findNode(cid)?.tickChild);
+    const keepDays = mode === 'activity-checkbox' || (mode === 'activity-radio' && hasTicks);
 
-    // "Now" - set to today and pin to top of today's agenda (mirrors the
-    // (now) magic-token effect). For leaf mode with a today-collision (another
-    // sibling already owns today) we silently fall through to just pinning.
-    addCtxItem(rescheduleSubmenu, t('menu.now') || 'Now', () => {
-      if (mode === 'tick') {
-        if ((node.dayIndex ?? null) !== todayIdx) {
-          takeSnapshot();
-          setTickDay(targetId, todayIdx);
-        }
-      } else if (mode === 'leaf') {
-        if (node.dayIndex !== todayIdx && !assignedDays.has(todayIdx)) {
-          applyDayReschedule(targetId, mode, {
-            currentDays: assignedDays,
-            currentDayIndex: node.dayIndex,
-            newDayIndex: todayIdx,
-          });
-        }
-      } else {
-        if (!(assignedDays.size === 1 && assignedDays.has(todayIdx))) {
-          takeSnapshot();
-          setActivityDays(targetId, new Set([todayIdx]));
-        }
-      }
-      pinToTopOfAgenda(targetId);
-      afterMutation();
-    });
-    addCtxSeparator(rescheduleSubmenu);
-
-    addWeekdayRows(dayIdx => () => {
+    const retag = (dayIdx) => {
       if (mode === 'tick') {
         // Radio toggle: re-picking the assigned day clears it.
         takeSnapshot();
@@ -20442,106 +20617,142 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
         ...(mode === 'leaf' ? { currentDayIndex: node.dayIndex } : {}),
         newDayIndex: dayIdx,
       })) afterMutation();
-    }, todayIdx, dayIdx => {
-      const isAssigned = assignedDays.has(dayIdx);
-      // A leaf cannot take a day a sibling leaf already owns.
-      const isCollision = mode === 'leaf' && isAssigned && node.dayIndex !== dayIdx;
-      return [isAssigned && 'ctx-item-selected', isCollision && 'ctx-item-disabled'].filter(Boolean).join(' ');
-    });
+    };
 
-    // A date is the same choice as a weekday, one horizon further out: this
-    // week's Monday, or the 31st of March. The node's subtree travels with it,
-    // so only the mechanical leaves - ticks and day-children - are excluded.
-    if (canSendToDate(findNode(targetId))) {
-      addCtxSeparator(rescheduleSubmenu);
-      addCtxItem(rescheduleSubmenu, t('menu.sendToDate'), () => {
-        hideContextMenu();
-        window.openSendFuture(targetId);
-      });
-    }
-
-    // "Clear all" - only when any day is assigned
-    if (assignedDays.size > 0) {
-      addCtxSeparator(rescheduleSubmenu);
-      addCtxItem(rescheduleSubmenu, t('menu.clearDay') || 'Any', () => {
-        if (mode === 'tick') {
-          takeSnapshot();
-          if (setTickDay(targetId, null)) afterMutation();
-        } else if (applyDayReschedule(targetId, 'clear', { currentDays: assignedDays })) {
-          afterMutation();
-        }
-      }, 'danger');
-    }
-
-    positionRescheduleSubmenu();
-  }
-
-  // Next or Previous week, on which day: Keep day moves it as it stands (what
-  // `N` / `B` do), a weekday or Any retags it on the way. The today dot shows
-  // only when the destination is this week (Previous week from next week), and
-  // there is no Now or Date, which belong to Reschedule. Only a tick or a plain
-  // task is retagged: a weekday on a task with ticks would purge them, so that
-  // offers Keep day. A day leaf takes the weekday on its copy in the
-  // destination; its source parent just loses that day.
-  let _weekMoveBuild = 0;
-  async function showWeekMoveSubmenu(offset, anchorItem) {
-    clearTimeout(_hideSubTimer);
-    const resolved = resolveDayTarget();
-    if (!resolved) return;
-    const { node, mode, assignedDays } = resolved;
-    // A day leaf greys out the days its parent already holds in the
-    // destination, as Reschedule does within one week.
-    const build = ++_weekMoveBuild;
-    const destNodes = mode === 'leaf' ? (await loadWeek(offsetWeek(currentWeekKey, offset))).nodes : [];
-    const destDays = mode === 'leaf' ? destDaysForLeaf(node, destNodes) : new Set();
-    const anyTaken = mode === 'leaf' && destHasUndatedTwin(node, destNodes);
-    if (build !== _weekMoveBuild || !ctxMenu.classList.contains('visible')) return;
-    const taken = dayIdx => (leafDayFree(destDays, dayIdx) ? '' : 'ctx-item-disabled');
-    rescheduleSubmenu.innerHTML = '';
-
-    const send = day => async () => {
-      hideContextMenu();
-      await moveNodeToWeek(node.id, { offset, day });
+    const sendLater = async (date) => {
+      if (sendSubtreeOverCap(findNode(targetId))) { showToast(t('toast.subtreeTooBig')); return; }
+      const written = sendNodeToDate(targetId, { date });
+      if (!written) return;
+      await afterScheduleWrite(written, { announce: true });
       if (currentView === 'agenda') renderAgenda();
     };
 
-    const keepTaken = mode === 'leaf' && node.dayIndex == null ? (anyTaken ? 'ctx-item-disabled' : '') : taken(node.dayIndex);
-    addCtxItem(rescheduleSubmenu, t('menu.keepDay'), send(), keepTaken);
-    const hasTicks = (node.children || []).some(cid => findNode(cid)?.tickChild);
-    if (mode === 'tick' || mode === 'leaf' || (mode.startsWith('activity-') && !hasTicks)) {
-      addCtxSeparator(rescheduleSubmenu);
-      const todayIdx = offsetWeek(currentWeekKey, offset) === todayWeekKey() ? new Date().getDay() : -1;
-      // A leaf moves one occurrence, so only its own day reads as current.
-      const current = mode === 'leaf' ? new Set([node.dayIndex]) : assignedDays;
-      addWeekdayRows(send, todayIdx, dayIdx =>
-        [current.has(dayIdx) && 'ctx-item-selected', taken(dayIdx)].filter(Boolean).join(' '));
-      if (mode === 'leaf' || assignedDays.size > 0) {
-        addCtxSeparator(rescheduleSubmenu);
-        addCtxItem(rescheduleSubmenu, t('menu.clearDay'), send(null), anyTaken ? 'ctx-item-disabled' : '');
-      }
+    const onPick = async (date) => {
+      // The week changed under the calendar: its days no longer mean what
+      // they meant when it was drawn.
+      if (currentWeekKey !== openWeek || !findNode(node.id)) return;
+      const kind = rescheduleTargetKind(date, ctx);
+      const dayIdx = weekdayOfDayString(date);
+      if (kind === 'retag') retag(dayIdx);
+      else if (kind === 'move') {
+        const offset = weekDistance(openWeek, weekKeyForDayString(date));
+        await moveNodeToWeek(node.id, { offset, day: keepDays ? undefined : dayIdx });
+        if (currentView === 'agenda') renderAgenda();
+      } else if (kind === 'later') await sendLater(date);
+    };
+
+    const actions = [{
+      icon: 'calendar-down', label: t('menu.now'),
+      // Today, pinned to the top of today's agenda (the (now) token's effect).
+      // A leaf whose today a sibling owns just pins.
+      onClick: () => {
+        if (currentWeekKey !== openWeek || !findNode(node.id)) return;
+        if (mode === 'tick') {
+          if ((node.dayIndex ?? null) !== todayIdx) {
+            takeSnapshot();
+            setTickDay(targetId, todayIdx);
+          }
+        } else if (mode === 'leaf') {
+          if (node.dayIndex !== todayIdx && !assignedDays.has(todayIdx)) {
+            applyDayReschedule(targetId, mode, {
+              currentDays: assignedDays, currentDayIndex: node.dayIndex, newDayIndex: todayIdx,
+            });
+          }
+        } else if (!(assignedDays.size === 1 && assignedDays.has(todayIdx))) {
+          takeSnapshot();
+          setActivityDays(targetId, new Set([todayIdx]));
+        }
+        pinToTopOfAgenda(targetId);
+        afterMutation();
+      },
+    }];
+    if (assignedDays.size > 0) {
+      actions.push({
+        icon: 'circle-dashed', label: t('menu.clearDay'), danger: true,
+        onClick: () => {
+          if (currentWeekKey !== openWeek || !findNode(node.id)) return;
+          if (mode === 'tick') {
+            takeSnapshot();
+            if (setTickDay(targetId, null)) afterMutation();
+          } else if (applyDayReschedule(targetId, 'clear', { currentDays: assignedDays })) {
+            afterMutation();
+          }
+        },
+      });
+    }
+    if (canSendToDate(node)) {
+      actions.push({ icon: 'repeat', label: t('datePicker.repeat'), onClick: () => window.openSendFuture(targetId) });
     }
 
-    positionRescheduleSubmenu(anchorItem);
+    const selected = datesOfDays(openWeek, chosen);
+    openDatePicker({
+      title: t('menu.reschedule'),
+      anchorRect,
+      focusDate: selected[0] || (weekDayStrings(openWeek) || [])[3],
+      selected,
+      weekMark: openWeek,
+      isDisabled: (date) => {
+        const kind = rescheduleTargetKind(date, ctx);
+        if (kind === 'disabled') return true;
+        if (kind === 'retag' && mode === 'leaf') {
+          const d = weekdayOfDayString(date);
+          return assignedDays.has(d) && d !== node.dayIndex;
+        }
+        return false;
+      },
+      onPick,
+      actions,
+    });
   }
 
-  [
-    [rescheduleItem, showRescheduleSubmenu],
-    [nextWeekItem, () => showWeekMoveSubmenu(1, nextWeekItem)],
-    [prevWeekItem, () => showWeekMoveSubmenu(-1, prevWeekItem)],
-  ].forEach(([item, show]) => {
-    item.addEventListener('mouseenter', show);
-    item.addEventListener('click', show);
-    item.addEventListener('mouseleave', e => {
-      if (!rescheduleSubmenu.contains(e.relatedTarget)) {
-        _hideSubTimer = setTimeout(() => rescheduleSubmenu.classList.remove('visible'), 120);
-      }
+  // A Later row: there is no node yet. A day of the open week brings this
+  // occurrence in on that day; any later date moves a one-off, and opens Set a
+  // date for a series, because moving a series' anchor moves every occurrence
+  // and deserves to be seen doing it. No Any: an occurrence is a date.
+  function openForEntry({ entryId, date: occDate }, anchorRect) {
+    const entry = scheduleData.entries.find(e => e.id === entryId);
+    if (!entry) return;
+    const openWeek = currentWeekKey;
+    const today = localDateStr();
+
+    const pull = async (dayIdx) => {
+      if (currentWeekKey !== openWeek) return;
+      const moved = await pullOccurrenceIntoWeek(entryId, occDate, dayIdx);
+      if (moved && dayIdx === new Date().getDay()) pinToTopOfAgenda(occurrenceNodeId(entryId, occDate));
+      renderAgenda();
+    };
+
+    openDatePicker({
+      title: t('menu.reschedule'),
+      anchorRect,
+      focusDate: occDate,
+      selected: [occDate],
+      weekMark: openWeek,
+      isDisabled: (date) => weekKeyForDayString(date) !== openWeek && date < today,
+      onPick: async (date) => {
+        if (weekKeyForDayString(date) === openWeek) return pull(weekdayOfDayString(date));
+        if (isSeriesEntry(entry)) return window.openSendFuture({ entryId, date });
+        const written = updateScheduleEntry(entryId, { date, unit: null });
+        if (!written) return;
+        await afterScheduleWrite(written, { announce: false });
+        if (currentView === 'agenda') renderAgenda();
+      },
+      actions: [
+        { icon: 'calendar-down', label: t('menu.now'), onClick: () => pull(new Date().getDay()) },
+        { icon: 'repeat', label: t('datePicker.repeat'), onClick: () => window.openSendFuture({ entryId }) },
+      ],
     });
-  });
-  rescheduleSubmenu.addEventListener('mouseenter', () => clearTimeout(_hideSubTimer));
-  rescheduleSubmenu.addEventListener('mouseleave', e => {
-    if (![rescheduleItem, nextWeekItem, prevWeekItem].some(item => item.contains(e.relatedTarget))) {
-      _hideSubTimer = setTimeout(() => rescheduleSubmenu.classList.remove('visible'), 120);
-    }
+  }
+
+  // Everything the menu knew is read before it closes: hiding it clears the
+  // target and the agenda contexts the calendar is about to act on.
+  rescheduleItem.addEventListener('click', () => {
+    const anchorRect = rescheduleItem.getBoundingClientRect();
+    const entryCtx = agendaEntryCtx ? { ...agendaEntryCtx } : null;
+    const target = entryCtx ? null : resolveDayTarget();
+    hideContextMenu();
+    if (entryCtx) openForEntry(entryCtx, anchorRect);
+    else if (target) openForNode(target, anchorRect);
   });
 })();
 
@@ -21945,8 +22156,7 @@ document.getElementById('ctx-delete').addEventListener('click', () => {
 });
 
 document.addEventListener('click', (e) => {
-  const rescheduleSubmenu = document.getElementById('ctx-reschedule-submenu');
-  if (!ctxMenu.contains(e.target) && !rescheduleSubmenu.contains(e.target)) hideContextMenu();
+  if (!ctxMenu.contains(e.target)) hideContextMenu();
 });
 
 document.addEventListener('contextmenu', (e) => {
@@ -24972,46 +25182,46 @@ function closeWeekPicker() {
   document.getElementById('week-picker-label')?.setAttribute('aria-expanded', 'false');
 }
 
-// The month grid. A row is one button covering the whole ISO week, because a
-// week is what this app opens - the seven day numbers on it are a label, not
-// seven targets. Dates here are built as local midnights so getISOWeek, which
-// reads local components, agrees with what is drawn.
-function renderWeekPickerFold() {
-  const grid = document.getElementById('week-picker-grid');
-  if (!grid || !currentWeekKey) return;
+// ─── Month grid, shared by the week picker fold and the date picker ──────────
+// Dates here are built as local midnights so getISOWeek, which reads local
+// components, agrees with what is drawn. A month is { y, m } with a 0-based m.
 
-  const open = parseWeekKey(currentWeekKey);
-  if (!_wpMonth) {
-    const { monday } = getWeekBounds(open.year, open.week);
-    // A week belongs to the month holding its Thursday - the same rule ISO uses
-    // to decide which year it belongs to, so a week never opens the fold on a
-    // month it barely touches.
-    const thu = new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 3);
-    _wpMonth = { y: thu.getFullYear(), m: thu.getMonth() };
-  }
+// The month a week belongs to: the one holding its Thursday - the same rule ISO
+// uses to decide which year it belongs to, so a week never opens a grid on a
+// month it barely touches.
+function monthOfWeek(wk) {
+  const { year, week } = parseWeekKey(wk);
+  const { monday } = getWeekBounds(year, week);
+  const thu = new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 3);
+  return { y: thu.getFullYear(), m: thu.getMonth() };
+}
 
-  const months = MONTH_NAMES[currentLang] ?? MONTH_NAMES.en;
-  const name = months[_wpMonth.m];
-  document.getElementById('week-picker-month-label').textContent =
-    `${name.charAt(0).toUpperCase()}${name.slice(1)} ${_wpMonth.y}`;
+function monthGridLabel({ y, m }) {
+  const name = (MONTH_NAMES[currentLang] ?? MONTH_NAMES.en)[m];
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`;
+}
 
-  grid.textContent = '';
-
+// The weekday caption row, Monday first (ISO), after the week-number gutter.
+function appendMonthGridHead(grid) {
   const dayLabels = DAY_LABELS[currentLang] ?? DAY_LABELS.en;
   const head = document.createElement('div');
   head.className = 'wp-head';
-  head.appendChild(document.createElement('span'));   // the week-number gutter
+  head.appendChild(document.createElement('span'));
   for (let i = 1; i <= 7; i++) {
     const cell = document.createElement('span');
-    cell.textContent = dayLabels[i % 7];              // Monday-first, ISO
+    cell.textContent = dayLabels[i % 7];
     head.appendChild(cell);
   }
   grid.appendChild(head);
+}
 
-  const now = new Date();
-  const todayStamp = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
-  const first  = new Date(_wpMonth.y, _wpMonth.m, 1);
-  const last   = new Date(_wpMonth.y, _wpMonth.m + 1, 0);
+// The Mondays of the weeks the month touches. When `edgeWeek` sits on the
+// grid's edge, its neighbour across the month boundary rides along as one extra
+// row, so stepping a single week never needs a month page first. Only one, and
+// only on the edge it touches - an inner week already has both neighbours drawn.
+function monthGridMondays({ y, m }, edgeWeek = null) {
+  const first = new Date(y, m, 1);
+  const last  = new Date(y, m + 1, 0);
   // Back up to the Monday of the week the 1st falls in, then walk whole weeks
   // until one starts after the month has ended.
   const cursor = new Date(first);
@@ -25019,20 +25229,34 @@ function renderWeekPickerFold() {
   const mondays = [];
   for (; cursor <= last; cursor.setDate(cursor.getDate() + 7)) mondays.push(new Date(cursor));
 
-  // When the open week sits on the grid's edge, its neighbour across the month
-  // boundary rides along as one extra row, so stepping a single week never
-  // needs a month page first. Only one, and only on the edge the open week
-  // touches - an inner week already has both neighbours drawn.
-  const isOpenMonday = (d) => { const i = getISOWeek(d); return weekKey(i.year, i.week) === currentWeekKey; };
-  if (isOpenMonday(mondays[0])) {
-    const m = mondays[0];
-    mondays.unshift(new Date(m.getFullYear(), m.getMonth(), m.getDate() - 7));
-  } else if (isOpenMonday(mondays[mondays.length - 1])) {
-    const m = mondays[mondays.length - 1];
-    mondays.push(new Date(m.getFullYear(), m.getMonth(), m.getDate() + 7));
+  const isEdge = (d) => { const i = getISOWeek(d); return weekKey(i.year, i.week) === edgeWeek; };
+  if (edgeWeek && isEdge(mondays[0])) {
+    const d = mondays[0];
+    mondays.unshift(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7));
+  } else if (edgeWeek && isEdge(mondays[mondays.length - 1])) {
+    const d = mondays[mondays.length - 1];
+    mondays.push(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7));
   }
+  return mondays;
+}
 
-  for (const monday of mondays) {
+// The fold's grid. A row is one button covering the whole ISO week, because a
+// week is what this app opens - the seven day numbers on it are a label, not
+// seven targets.
+function renderWeekPickerFold() {
+  const grid = document.getElementById('week-picker-grid');
+  if (!grid || !currentWeekKey) return;
+
+  if (!_wpMonth) _wpMonth = monthOfWeek(currentWeekKey);
+  document.getElementById('week-picker-month-label').textContent = monthGridLabel(_wpMonth);
+
+  grid.textContent = '';
+  appendMonthGridHead(grid);
+
+  const now = new Date();
+  const todayStamp = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+
+  for (const monday of monthGridMondays(_wpMonth, currentWeekKey)) {
     const iso = getISOWeek(monday);
     const wk  = weekKey(iso.year, iso.week);
     const isOpen = wk === currentWeekKey;

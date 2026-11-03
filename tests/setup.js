@@ -818,6 +818,8 @@ export const {
   isAgendaRowNode,
   computeDayReschedule,
   applyDayReschedule,
+  rescheduleTargetKind,
+  weekDistance,
   localDateStr,
   tabDateString,
   // Agenda group ordering
