@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-2nDpxWIhH0rCRucmQPYBCD7TdkG+BcTUblCZFujtRls=';
+               'sha256-Vb3mM2HSmYVhBD5yJZWM4DeZFu8xy7n7DE+DSSKcxQI=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1097,7 +1097,8 @@
     animation: fadeIn 0.1s ease-out;
   }
   #date-picker-panel.visible { display: flex; }
-  #date-picker-panel .dialog-body { padding: 8px 0; gap: 0; }
+  #date-picker-panel { max-height: calc(100vh - 16px); }
+  #date-picker-panel .dialog-body { padding: 8px 0; gap: 0; overflow-y: auto; }
 
   /* The open week: tinted, so "which week am I in" reads before any day does. */
   .dp-row { padding: 1px 0; border-radius: 6px; }
@@ -2609,7 +2610,7 @@
   }
 
   .undo-redo-btn:disabled,
-  #send-future-ok:disabled {
+  #date-picker-set:disabled {
     opacity: 0.35;
     cursor: default;
     pointer-events: none;
@@ -3534,8 +3535,7 @@
   }
 
   /* Generic confirm dialog - reuses overlay/dialog/actions pattern */
-  #app-confirm-overlay,
-  #send-future-overlay {
+  #app-confirm-overlay {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
@@ -3548,13 +3548,11 @@
     opacity: 0;
     transition: opacity 0.15s ease;
   }
-  #app-confirm-overlay.visible,
-  #send-future-overlay.visible {
+  #app-confirm-overlay.visible {
     display: flex;
     opacity: 1;
   }
-  #app-confirm-dialog,
-  #send-future-dialog {
+  #app-confirm-dialog {
     box-shadow: 0 20px 60px var(--shadow-xl);
     width: auto;
     min-width: 360px;
@@ -3598,53 +3596,38 @@
     line-height: 1.5;
   }
 
-  /* Send to date… - the only app dialog that asks for values rather than a
-     yes/no, so it borrows the confirm dialog's shell and adds a field grid. */
-  #send-future-fields {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: center;
-    gap: 10px 12px;
-    margin-top: 4px;
+  /* The calendar's repeat rows: a repeat is a date plus a rule, so the rule
+     sits under the grid that picks the date instead of in a dialog of its own. */
+  #date-picker-repeat {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 16px 0;
   }
-  #send-future-fields label {
-    font-size: 13px;
-    color: var(--text-secondary);
-  }
-  #send-future-fields .send-future-row {
+  /* Its rows and action bar set their own display, which would beat [hidden]. */
+  #date-picker-repeat[hidden],
+  #date-picker-repeat [hidden] { display: none; }
+  .dp-field-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    /* Ends holds nothing while there is no repeat to end. Without a floor the
-       row collapses to its label's line height and the three rows stop sharing
-       a rhythm, even though every gap between them is the same. */
     min-height: 32px;
   }
-  #send-future-fields input[type="number"] {
-    width: 64px;
+  .dp-field-row label {
+    width: 56px;
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
   }
-  /* A date field is a button that opens the app's calendar (openDatePicker):
-     the native date input spoke the OS locale and drew a different calendar
-     on every platform. It says the date in the UI language, as Later does. */
-  .send-future-date {
-    min-width: 160px;
-    text-align: left;
-    cursor: pointer;
-  }
-  .send-future-date[hidden] { display: none; }
+  .dp-field-row input[type="number"] { width: 64px; }
   /* Native select arrow is painted inside the box: without room reserved for
      it, the arrow sits on top of the last character. */
-  #send-future-fields select {
-    padding-right: 28px;
+  .dp-field-row select { padding-right: 28px; }
+  #date-picker-hint {
+    font-size: 12px;
+    color: var(--text-muted);
   }
-  /* An end before the date is refused by the writers anyway, so say so at the
-     field and stand the Set button down. Listed after the :focus rule so
-     focusing the field does not paint over it. */
-  .send-future-date.invalid,
-  .send-future-date.invalid:focus {
-    border-color: var(--accent-danger);
-    color: var(--accent-danger);
-  }
+  #date-picker-repeat .dialog-actions { margin-top: 0; }
 
   .help-section {
     margin-bottom: 24px;
@@ -4453,6 +4436,35 @@ Or remove them later in Settings → Help.</div>
       </button>
     </div>
     <div id="date-picker-grid"></div>
+    <!-- Shown for whatever can become a schedule entry. With No repeat a day
+         click acts at once; with a repeat it picks the first (and, for On date,
+         the last) day, and Set commits. -->
+    <div id="date-picker-repeat" hidden>
+      <div class="dp-field-row">
+        <label for="date-picker-unit" data-i18n="sendFuture.repeat">Repeat</label>
+        <input type="number" id="date-picker-every" class="dialog-field" min="1" max="999" value="1" aria-label="Interval">
+        <select id="date-picker-unit" class="dialog-field">
+          <option value="none" data-i18n="sendFuture.noRepeat">No repeat</option>
+          <option value="day" data-i18n="sendFuture.unitDay">days</option>
+          <option value="week" data-i18n="sendFuture.unitWeek">weeks</option>
+          <option value="month" data-i18n="sendFuture.unitMonth">months</option>
+          <option value="year" data-i18n="sendFuture.unitYear">years</option>
+        </select>
+      </div>
+      <div class="dp-field-row" id="date-picker-end-row">
+        <label for="date-picker-end-type" data-i18n="sendFuture.end">Ends</label>
+        <select id="date-picker-end-type" class="dialog-field">
+          <option value="never" data-i18n="sendFuture.endNever">Never</option>
+          <option value="count" data-i18n="sendFuture.endCount">After</option>
+          <option value="until" data-i18n="sendFuture.endUntil">On date</option>
+        </select>
+        <input type="number" id="date-picker-end-count" class="dialog-field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
+      </div>
+      <div id="date-picker-hint"></div>
+      <div class="dialog-actions">
+        <button type="button" class="agenda-action-btn" id="date-picker-set" data-i18n="sendFuture.ok">Set</button>
+      </div>
+    </div>
     <div id="date-picker-actions"></div>
   </div>
 </div>
@@ -4517,51 +4529,6 @@ Or remove them later in Settings → Help.</div>
         <button type="button" class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
         <button type="button" class="agenda-action-btn" id="app-confirm-ok">OK</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<div id="send-future-overlay">
-  <div id="send-future-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="send-future-title">
-    <div class="dialog-header">
-      <div class="dialog-title" id="send-future-title" data-i18n="sendFuture.title">Set a date</div>
-      <button type="button" class="help-close-btn" id="send-future-close"
-        data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
-        <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
-      </button>
-    </div>
-    <div class="dialog-body">
-    <div id="send-future-fields">
-      <label for="send-future-date" data-i18n="sendFuture.date">Date</label>
-      <div class="send-future-row">
-        <!-- The date itself is written in on open; "Date" only stands in until then. -->
-        <button type="button" id="send-future-date" class="dialog-field send-future-date">Date</button>
-      </div>
-      <label for="send-future-unit" data-i18n="sendFuture.repeat">Repeat</label>
-      <div class="send-future-row">
-        <input type="number" id="send-future-every" class="dialog-field" min="1" max="999" value="1" aria-label="Interval">
-        <select id="send-future-unit" class="dialog-field">
-          <option value="none" data-i18n="sendFuture.noRepeat">No repeat</option>
-          <option value="day" data-i18n="sendFuture.unitDay">days</option>
-          <option value="week" data-i18n="sendFuture.unitWeek">weeks</option>
-          <option value="month" data-i18n="sendFuture.unitMonth">months</option>
-          <option value="year" data-i18n="sendFuture.unitYear">years</option>
-        </select>
-      </div>
-      <label for="send-future-end-type" data-i18n="sendFuture.end">Ends</label>
-      <div class="send-future-row">
-        <select id="send-future-end-type" class="dialog-field">
-          <option value="never" data-i18n="sendFuture.endNever">Never</option>
-          <option value="count" data-i18n="sendFuture.endCount">After</option>
-          <option value="until" data-i18n="sendFuture.endUntil">On date</option>
-        </select>
-        <input type="number" id="send-future-end-count" class="dialog-field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
-        <button type="button" id="send-future-end-date" class="dialog-field send-future-date" aria-label="End date" hidden></button>
-      </div>
-    </div>
-    <div id="send-future-actions" class="dialog-actions">
-      <button type="button" class="agenda-action-btn" id="send-future-ok" data-i18n="sendFuture.ok">Set</button>
-    </div>
     </div>
   </div>
 </div>
@@ -5347,7 +5314,6 @@ window.__quietRefreshReloadNow = function() {
 // asset probe itself - any of these may transition the app into quiescence.
 const QUIESCENCE_PANEL_IDS = [
   'app-confirm-overlay',
-  'send-future-overlay',
   'context-menu',
   'date-picker-panel',
   'day-filter-menu',
@@ -11415,10 +11381,11 @@ const TRANSLATIONS = {
     'agenda.emptyLater':          'Nothing scheduled beyond this week.',
     'agenda.emptyLaterHint':      'Send a task to a date to plan past this week.',
     'agenda.laterContinues':      'Repeats - more dates appear here as they come closer.',
-    'sendFuture.title':           'Set a date',
-    'datePicker.repeat':          'Repeat...',
-    'sendFuture.date':            'Date',
     'sendFuture.repeat':          'Repeat',
+    'datePicker.startsEnds':      'Starts {start}, ends {end}',
+    'datePicker.starts':          'Starts {date}',
+    'datePicker.pickEnd':         'Pick the last day',
+    'datePicker.pickStart':       'Pick the first day',
     'sendFuture.noRepeat':        'No repeat',
     'sendFuture.unitDay':         'days',
     'sendFuture.unitWeek':        'weeks',
@@ -11430,7 +11397,6 @@ const TRANSLATIONS = {
     'sendFuture.endUntil':        'On date',
     'sendFuture.ok':              'Set',
     'toast.sentToFuture':         'Set for {date}',
-    'toast.pastDate':             'Pick today or later - the schedule only delivers forward',
     'toast.subtreeTooBig':        'Too big to send - one date carries at most 200 tasks',
     'menu.prioNormal':            'Priority Normal',
     'menu.prioHigh':              'Priority High',
@@ -11800,10 +11766,11 @@ const TRANSLATIONS = {
     'agenda.emptyLater':          'Za tímto týdnem nic naplánováno není.',
     'agenda.emptyLaterHint':      'Pošli úkol na datum a naplánuješ ho za tento týden.',
     'agenda.laterContinues':      'Opakuje se - další termíny se tu objeví, až se přiblíží.',
-    'sendFuture.title':           'Nastavit datum',
-    'datePicker.repeat':          'Opakovat...',
-    'sendFuture.date':            'Datum',
     'sendFuture.repeat':          'Opakování',
+    'datePicker.startsEnds':      'Začíná {start}, končí {end}',
+    'datePicker.starts':          'Začíná {date}',
+    'datePicker.pickEnd':         'Vyber poslední den',
+    'datePicker.pickStart':       'Vyber první den',
     'sendFuture.noRepeat':        'Bez opakování',
     'sendFuture.unitDay':         'dní',
     'sendFuture.unitWeek':        'týdnů',
@@ -11815,7 +11782,6 @@ const TRANSLATIONS = {
     'sendFuture.endUntil':        'K datu',
     'sendFuture.ok':              'Nastavit',
     'toast.sentToFuture':         'Nastaveno na {date}',
-    'toast.pastDate':             'Vyber dnešek nebo pozdější den - plán doručuje jen dopředu',
     'toast.subtreeTooBig':        'Příliš velké - na jedno datum se vejde nejvýš 200 úkolů',
     'menu.prioNormal':            'Priorita Normální',
     'menu.prioHigh':              'Priorita Vysoká',
@@ -18813,11 +18779,8 @@ const ESC_DISMISSALS = [
   // has to be here rather than in its own listener: a second handler closing it
   // left this walk to fall straight through to the map state underneath, which
   // is how one press both shut the panel and reset Rocks to Sand.
-  // The calendar can open over Set a date, so it answers before that dialog.
   { isOpen: () => isDatePickerOpen(),
     dismiss: () => { closeDatePicker(); } },
-  { isOpen: () => !!window.isSendFutureOpen && window.isSendFutureOpen(),
-    dismiss: () => { window.closeSendFuture(); } },
   { isOpen: () => !!window.isQuickAddOpen && window.isQuickAddOpen(),
     dismiss: () => { window.closeQuickAdd(); } },
   // Both popovers close on their X, on a click outside and here - one path
@@ -19779,155 +19742,6 @@ function updateScheduleEntry(entryId, options) {
   return entry;
 }
 
-(function () {
-  'use strict';
-
-  const overlay  = document.getElementById('send-future-overlay');
-  const dateEl   = document.getElementById('send-future-date');
-  const everyEl  = document.getElementById('send-future-every');
-  const unitEl   = document.getElementById('send-future-unit');
-  const endEl    = document.getElementById('send-future-end-type');
-  const countEl  = document.getElementById('send-future-end-count');
-  const untilEl  = document.getElementById('send-future-end-date');
-  const closeEl  = document.getElementById('send-future-close');
-  const okEl     = document.getElementById('send-future-ok');
-  let _targetId  = null;   // node being sent
-  let _entryId   = null;   // entry being edited from the Later tab
-
-  // The two dates. Each field is a button that opens the app's calendar; the
-  // value lives here, not in the button. `_dateMin` is the floor the calendar
-  // greys below: today, or a series' own past anchor (see openForEntry).
-  let _date = '', _dateMin = '', _until = '';
-  const dateOk  = () => !!parseDayString(_date) && _date >= _dateMin;
-  // The end date only has a say while it is the chosen end condition; hidden,
-  // it keeps whatever value it was left with and is none of Set's business.
-  const untilOk = () => untilEl.hidden || (!!parseDayString(_until) && _until >= _date);
-
-  function paintDates() {
-    dateEl.textContent  = _date ? formatDayLabel(_date) : '';
-    untilEl.textContent = _until ? formatDayLabel(_until) : '';
-    dateEl.classList.toggle('invalid', !dateOk());
-    untilEl.classList.toggle('invalid', !untilOk());
-    okEl.disabled = !dateOk() || !untilOk();
-  }
-
-  // Repeat and end are one control in two halves: with no repeat there is
-  // nothing for an end condition to end, so the whole row stands down.
-  function syncFields() {
-    const repeats = unitEl.value !== 'none';
-    everyEl.hidden = !repeats;
-    endEl.hidden = !repeats;
-    countEl.hidden = !repeats || endEl.value !== 'count';
-    untilEl.hidden = !repeats || endEl.value !== 'until';
-    paintDates();
-  }
-
-  function show() {
-    syncFields();
-    overlay.classList.add('visible');
-    dateEl.focus();
-  }
-
-  window.isSendFutureOpen = () => overlay.classList.contains('visible');
-
-  window.closeSendFuture = function () {
-    closeDatePicker();
-    overlay.classList.remove('visible');
-    _targetId = null;
-    _entryId = null;
-  };
-
-  // `date` prefills a new anchor picked on the calendar (Reschedule on a
-  // Later row of a series); the floor stays the entry's own.
-  function openForEntry(entryId, date) {
-    const entry = scheduleData.entries.find(e => e.id === entryId);
-    if (!entry) return;
-    _targetId = null;
-    _entryId = entryId;
-    // A series anchored in the past keeps its anchor as the floor, so the value
-    // on screen stays valid; anything else floors at today.
-    _dateMin = entry.anchor < localDateStr() ? entry.anchor : localDateStr();
-    _date = date || entry.anchor;
-    everyEl.value = String(entry.repeat ? entry.repeat.every : 1);
-    unitEl.value = entry.repeat ? entry.repeat.unit : 'none';
-    endEl.value = entry.end ? entry.end.type : 'never';
-    countEl.value = String(entry.end && entry.end.type === 'count' ? entry.end.n : 10);
-    _until = (entry.end && entry.end.type === 'until') ? entry.end.date : _date;
-    show();
-  }
-
-  // Two callers, one dialog: a node being sent for the first time, and an
-  // entry being edited from the Later tab. Editing changes future occurrences
-  // only - nodes already materialised are ordinary nodes in their own weeks.
-  window.openSendFuture = function (target) {
-    if (target && target.entryId) return openForEntry(target.entryId, target.date);
-    const nodeId = target;
-    const node = findNode(nodeId);
-    if (!canSendToDate(node)) return;
-    // Refused for size before the dialog opens, so the user is never asked for
-    // a date the send is going to turn down.
-    if (sendSubtreeOverCap(node)) { showToast(t('toast.subtreeTooBig')); return; }
-    _targetId = nodeId;
-    _entryId = null;
-    // A week out is the default because that is the shortest horizon this
-    // dialog is for; anything nearer is what the weekdays of Reschedule do.
-    const start = dayStringFromNumber(dayNumber(parseDayString(localDateStr())) + 7);
-    _dateMin = localDateStr();
-    _date = start;
-    everyEl.value = '1';
-    unitEl.value = 'none';
-    endEl.value = 'never';
-    countEl.value = '10';
-    _until = start;
-    show();
-  };
-
-  function pickInto(field, title, floor, current, assign) {
-    openDatePicker({
-      title,
-      anchorRect: field.getBoundingClientRect(),
-      focusDate: current,
-      selected: current ? [current] : [],
-      isDisabled: d => d < floor(),
-      onPick: d => { assign(d); paintDates(); field.focus(); },
-    });
-  }
-  dateEl.addEventListener('click', () =>
-    pickInto(dateEl, t('sendFuture.date'), () => _dateMin, _date, d => { _date = d; }));
-  untilEl.addEventListener('click', () =>
-    pickInto(untilEl, t('sendFuture.end'), () => _date, _until, d => { _until = d; }));
-
-  unitEl.addEventListener('change', syncFields);
-  endEl.addEventListener('change', syncFields);
-  closeEl.addEventListener('click', () => window.closeSendFuture());
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) window.closeSendFuture(); });
-
-  okEl.addEventListener('click', async () => {
-    const id = _targetId;
-    const editing = _entryId;
-    const opts = {
-      date: _date,
-      every: everyEl.value,
-      unit: unitEl.value === 'none' ? null : unitEl.value,
-      endType: endEl.value,
-      endCount: countEl.value,
-      endDate: _until,
-    };
-    window.closeSendFuture();
-    // Editing rewrites one entry; a send writes one per leaf. Either way the
-    // dialog only needs to know it happened and on what date.
-    const written = editing ? updateScheduleEntry(editing, opts) : sendNodeToDate(id, opts);
-    if (!written) {
-      // The calendar greys past days, but a dialog left open across midnight
-      // still holds yesterday - the one refusal a user can provoke from here.
-      if (opts.date && parseDayString(opts.date) && opts.date < localDateStr()) {
-        showToast(t('toast.pastDate'));
-      }
-      return;
-    }
-    await afterScheduleWrite(written, { announce: !editing });
-  });
-})();
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
 const ctxMenu = document.getElementById('context-menu');
@@ -20337,11 +20151,18 @@ function appendDayLabel(row, text, dayIdx, todayIdx = new Date().getDay()) {
 }
 
 // ─── Date picker ──────────────────────────────────────────────────────────────
-// The app's one calendar for choosing a day. Reschedule and the Set-a-date
-// dialog both open it; it draws the week picker fold's month grid with a button
-// per day instead of one per week. The caller decides everything a day means:
-// `isDisabled(date)` greys a cell, `onPick(date)` acts on a click, `actions`
-// are the footer rows. Dates are 'YYYY-MM-DD' strings throughout.
+// The app's one calendar for choosing a day, opened by Reschedule (from the
+// context menu or a Later row). It draws the week picker fold's month grid with
+// a button per day instead of one per week. The caller decides what a day
+// means: `isDisabled(date)` greys a cell, `onPick(date)` acts on a click,
+// `actions` are the footer rows. Dates are 'YYYY-MM-DD' strings throughout.
+//
+// `repeat`, when given, shows the repeat rows under the grid. With No repeat
+// nothing changes. With a repeat a click no longer acts: it picks the series'
+// first day - and, when it ends On date, the next click picks the last - and
+// Set hands the whole rule to `repeat.onSet`. `repeat.passThrough(date)` keeps
+// the plain click for dates that mean something else (a Later row's open week
+// still pulls the occurrence in). `repeat.initial` prefills an existing series.
 const dpPanel = document.getElementById('date-picker-panel');
 let _dp = null;
 
@@ -20354,17 +20175,80 @@ function closeDatePicker() {
   _dp = null;
 }
 
+const dpEl = (id) => document.getElementById('date-picker-' + id);
+
+// The repeat rows in play: a rule is being written, so clicks pick its days.
+function dpRepeatOn() {
+  return !!(_dp && _dp.repeat) && dpEl('unit').value !== 'none';
+}
+function dpPicksDay(date) {
+  return dpRepeatOn() && !(_dp.repeat.passThrough && _dp.repeat.passThrough(date));
+}
+
+// Shows the fields the rule needs, says which day the next click picks, and
+// lets Set commit only a complete rule.
+function syncDatePickerRepeat() {
+  const r = _dp && _dp.repeat;
+  dpEl('repeat').hidden = !r;
+  if (!r) return;
+  const on = dpRepeatOn();
+  const until = dpEl('end-type').value === 'until';
+  dpEl('every').hidden = !on;
+  dpEl('end-row').hidden = !on;
+  dpEl('end-count').hidden = !on || dpEl('end-type').value !== 'count';
+  dpEl('hint').hidden = !on;
+  dpEl('set').parentElement.hidden = !on;
+  if (!on) return;
+  if (!until) { r.stage = 'start'; r.end = null; }
+  else if (r.start && !r.end) r.stage = 'end';
+  dpEl('hint').textContent =
+    !r.start ? t('datePicker.pickStart')
+    : until && r.stage === 'end' ? t('datePicker.pickEnd')
+    : until ? t('datePicker.startsEnds', { start: formatDayLabel(r.start), end: formatDayLabel(r.end) })
+    : t('datePicker.starts', { date: formatDayLabel(r.start) });
+  dpEl('set').disabled = !r.start || (until && !r.end);
+}
+
+// A click while a rule is being written: the first day, or with On date the
+// last one next. A last day before the first starts the pick over.
+function pickRepeatDay(date) {
+  const r = _dp.repeat;
+  const until = dpEl('end-type').value === 'until';
+  if (until && r.stage === 'end' && r.start && date >= r.start) {
+    r.end = date;
+    r.stage = 'start';
+  } else {
+    r.start = date;
+    if (r.end && r.end < date) r.end = null;
+    r.stage = until ? 'end' : 'start';
+  }
+  renderDatePicker();
+  syncDatePickerRepeat();
+  focusDatePickerDay(date);
+}
+
 function monthOfDayString(date) {
   const part = parseDayString(date);
   return part ? { y: part.y, m: part.m - 1 } : null;
 }
 
 function openDatePicker({ title, anchorRect = null, focusDate, selected = [], weekMark = null,
-                          isDisabled = () => false, onPick, actions = [] }) {
+                          isDisabled = () => false, onPick, actions = [], repeat = null }) {
   _dp = {
     month: monthOfDayString(focusDate) || monthOfDayString(localDateStr()),
     selected: new Set(selected), weekMark, isDisabled, onPick, anchorRect,
+    repeat: repeat && { ...repeat, start: null, end: null, stage: 'start' },
   };
+  if (repeat) {
+    const init = repeat.initial || {};
+    dpEl('unit').value = init.unit || 'none';
+    dpEl('every').value = String(init.every || 1);
+    dpEl('end-type').value = init.endType || 'never';
+    dpEl('end-count').value = String(init.endCount || 10);
+    _dp.repeat.start = init.start || null;
+    _dp.repeat.end = init.endDate || null;
+  }
+  syncDatePickerRepeat();
   document.getElementById('date-picker-title').textContent = title;
 
   const bar = document.getElementById('date-picker-actions');
@@ -20416,12 +20300,16 @@ function positionDatePicker() {
 
 function renderDatePicker() {
   const grid = document.getElementById('date-picker-grid');
-  const { month, selected, weekMark, isDisabled } = _dp;
+  const { month, selected, weekMark, isDisabled, repeat } = _dp;
   document.getElementById('date-picker-month-label').textContent = monthGridLabel(month);
   grid.textContent = '';
   appendMonthGridHead(grid);
 
   const today = localDateStr();
+  // While a rule is written, its first and last day are what is chosen.
+  const isChosen = (date) => (dpRepeatOn()
+    ? date === repeat.start || date === repeat.end
+    : selected.has(date));
   for (const monday of monthGridMondays(month, weekMark)) {
     const iso = getISOWeek(monday);
     const wk = weekKey(iso.year, iso.week);
@@ -20441,13 +20329,16 @@ function renderDatePicker() {
       cell.className = 'dp-day'
         + (day.getMonth() === month.m ? '' : ' outside')
         + (date === today ? ' today' : '')
-        + (selected.has(date) ? ' selected' : '');
+        + (isChosen(date) ? ' selected' : '');
       cell.textContent = String(day.getDate());
       cell.dataset.date = date;
       cell.setAttribute('aria-label', formatDayLabel(date));
-      if (selected.has(date)) cell.setAttribute('aria-pressed', 'true');
-      cell.disabled = !!isDisabled(date);
+      if (isChosen(date)) cell.setAttribute('aria-pressed', 'true');
+      cell.disabled = dpPicksDay(date)
+        ? date < (repeat.stage === 'end' && repeat.start ? repeat.start : repeat.floor)
+        : !!isDisabled(date);
       cell.addEventListener('click', () => {
+        if (dpPicksDay(date)) return pickRepeatDay(date);
         const { onPick } = _dp;
         closeDatePicker();
         onPick(date);
@@ -20475,6 +20366,26 @@ function focusDatePickerDay(date) {
   document.getElementById('date-picker-month-prev').addEventListener('click', () => stepMonth(-1));
   document.getElementById('date-picker-month-next').addEventListener('click', () => stepMonth(+1));
   document.getElementById('date-picker-close').addEventListener('click', closeDatePicker);
+
+  // The rule decides which days can be picked, so a change redraws the grid.
+  const ruleChanged = () => { if (!_dp) return; syncDatePickerRepeat(); renderDatePicker(); positionDatePicker(); };
+  dpEl('unit').addEventListener('change', ruleChanged);
+  dpEl('end-type').addEventListener('change', ruleChanged);
+  dpEl('set').addEventListener('click', () => {
+    const r = _dp && _dp.repeat;
+    if (!r || dpEl('set').disabled) return;
+    const opts = {
+      date: r.start,
+      every: dpEl('every').value,
+      unit: dpEl('unit').value,
+      endType: dpEl('end-type').value,
+      endCount: dpEl('end-count').value,
+      endDate: r.end,
+    };
+    const { onSet } = r;
+    closeDatePicker();
+    onSet(opts);
+  });
 
   // Arrows walk the days, a week per Up/Down, paging the month when the walk
   // leaves it and stepping over days that cannot be picked.
@@ -20680,9 +20591,6 @@ async function afterScheduleWrite(written, { announce }) {
         },
       });
     }
-    if (canSendToDate(node)) {
-      actions.push({ icon: 'repeat', label: t('datePicker.repeat'), onClick: () => window.openSendFuture(targetId) });
-    }
 
     const selected = datesOfDays(openWeek, chosen);
     openDatePicker({
@@ -20702,18 +20610,40 @@ async function afterScheduleWrite(written, { announce }) {
       },
       onPick,
       actions,
+      // A repeat is a standing intention, so it leaves the week even when its
+      // first day falls in it (see sendNodeToDate). Ticks and day leaves repeat
+      // through Reusable instead, and get no rows.
+      repeat: canSendToDate(node) ? {
+        floor: ctx.today,
+        onSet: async (opts) => {
+          if (currentWeekKey !== openWeek || !findNode(targetId)) return;
+          if (sendSubtreeOverCap(findNode(targetId))) { showToast(t('toast.subtreeTooBig')); return; }
+          const written = sendNodeToDate(targetId, opts);
+          if (!written) return;
+          await afterScheduleWrite(written, { announce: true });
+          if (currentView === 'agenda') renderAgenda();
+        },
+      } : null,
     });
   }
 
   // A Later row: there is no node yet. A day of the open week brings this
-  // occurrence in on that day; any later date moves a one-off, and opens Set a
-  // date for a series, because moving a series' anchor moves every occurrence
-  // and deserves to be seen doing it. No Any: an occurrence is a date.
+  // occurrence in on that day. The repeat rows open on the entry's own rule:
+  // with a repeat, other days pick the series' first (and last) day and Set
+  // rewrites it; with No repeat a later day moves the one-off there. No Any:
+  // an occurrence is a date.
   function openForEntry({ entryId, date: occDate }, anchorRect) {
     const entry = scheduleData.entries.find(e => e.id === entryId);
     if (!entry) return;
     const openWeek = currentWeekKey;
     const today = localDateStr();
+
+    const rewrite = async (opts) => {
+      const written = updateScheduleEntry(entryId, opts);
+      if (!written) return;
+      await afterScheduleWrite(written, { announce: false });
+      if (currentView === 'agenda') renderAgenda();
+    };
 
     const pull = async (dayIdx) => {
       if (currentWeekKey !== openWeek) return;
@@ -20729,20 +20659,30 @@ async function afterScheduleWrite(written, { announce }) {
       selected: [occDate],
       weekMark: openWeek,
       isDisabled: (date) => weekKeyForDayString(date) !== openWeek && date < today,
-      onPick: async (date) => {
-        if (weekKeyForDayString(date) === openWeek) return pull(weekdayOfDayString(date));
-        if (isSeriesEntry(entry)) return window.openSendFuture({ entryId, date });
-        const written = updateScheduleEntry(entryId, { date, unit: null });
-        if (!written) return;
-        await afterScheduleWrite(written, { announce: false });
-        if (currentView === 'agenda') renderAgenda();
-      },
+      onPick: (date) => (weekKeyForDayString(date) === openWeek
+        ? pull(weekdayOfDayString(date))
+        : rewrite({ date, unit: null })),
       actions: [
         { icon: 'calendar-down', label: t('menu.now'), onClick: () => pull(new Date().getDay()) },
-        { icon: 'repeat', label: t('datePicker.repeat'), onClick: () => window.openSendFuture({ entryId }) },
       ],
+      repeat: {
+        // A series that started in the past keeps that first day as it is;
+        // it just cannot be moved further back (see updateScheduleEntry).
+        floor: today,
+        passThrough: (date) => weekKeyForDayString(date) === openWeek,
+        initial: {
+          unit: entry.repeat ? entry.repeat.unit : 'none',
+          every: entry.repeat ? entry.repeat.every : 1,
+          endType: entry.end ? entry.end.type : 'never',
+          endCount: entry.end && entry.end.type === 'count' ? entry.end.n : 10,
+          endDate: entry.end && entry.end.type === 'until' ? entry.end.date : null,
+          start: entry.anchor,
+        },
+        onSet: rewrite,
+      },
     });
   }
+  window.openEntryReschedule = openForEntry;
 
   // Everything the menu knew is read before it closes: hiding it clears the
   // target and the agenda contexts the calendar is about to act on.
@@ -22998,7 +22938,7 @@ function buildAgendaItem(node, label, opts = {}) {
       // one is still here afterwards, so it restores itself.
       item.style.transition = '';
       item.style.transform = '';
-      window.openSendFuture({ entryId: entryRow.id });
+      window.openEntryReschedule({ entryId: entryRow.id, date: opts.date }, item.getBoundingClientRect());
     };
     // Mouse only. On touch the row is a swipe target, and a tap that opens a
     // dialog turns every mis-aimed scroll into one.
