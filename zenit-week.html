@@ -178,6 +178,14 @@
     --accent-primary: #1a73e8;
     --accent-danger: #d93025;
     --accent-danger-dark: #b9261a;
+    /* Filled commit buttons (.agenda-action-btn.commit). Separate from the
+       accents because those are tuned as text and link colours: the dark
+       theme's light blue and red read well as text but glare as a fill and
+       fail contrast under white. Each fill holds 4.5:1 against white. */
+    --accent-fill: #1a73e8;
+    --accent-fill-hover: #1765cc;
+    --accent-danger-fill: #d93025;
+    --accent-danger-fill-hover: #b9261a;
     --accent-danger-bg: #fdeaea;
     --accent-danger-border: #fce8e6;
     --accent-warning-bg: #FFF9DB;
@@ -298,6 +306,10 @@
     --accent-primary: #4da3ff;
     --accent-danger: #ff6b5b;
     --accent-danger-dark: #ff4030;
+    --accent-fill: #1f6feb;
+    --accent-fill-hover: #1158c7;
+    --accent-danger-fill: #c93c37;
+    --accent-danger-fill-hover: #b62324;
     --accent-danger-bg: #3a1a1a;
     --accent-danger-border: #4a2020;
     --accent-warning-bg: #332600;
@@ -3593,19 +3605,23 @@
      plain pill too, fully legible, because its label may be the instruction
      (the calendar's "Pick the first day"). */
   .agenda-action-btn.commit:not(:disabled) {
-    background: var(--accent-primary);
-    border-color: var(--accent-primary);
+    background: var(--accent-fill);
+    border-color: var(--accent-fill);
     color: #fff;
     font-weight: 600;
   }
   .agenda-action-btn.commit.danger:not(:disabled) {
-    background: var(--accent-danger);
-    border-color: var(--accent-danger);
+    background: var(--accent-danger-fill);
+    border-color: var(--accent-danger-fill);
   }
-  .agenda-action-btn.commit:not(:disabled):hover { color: #fff; }
+  .agenda-action-btn.commit:not(:disabled):hover {
+    color: #fff;
+    background: var(--accent-fill-hover);
+    border-color: var(--accent-fill-hover);
+  }
   .agenda-action-btn.commit.danger:not(:disabled):hover {
-    background: var(--accent-danger-dark);
-    border-color: var(--accent-danger-dark);
+    background: var(--accent-danger-fill-hover);
+    border-color: var(--accent-danger-fill-hover);
   }
   .agenda-action-btn.commit::before { content: none; }
   .agenda-action-btn.commit:disabled { cursor: default; box-shadow: none; }
