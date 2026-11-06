@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-anNfZGPPRVTnYkQP8uqFM+2RMIXyGSzbNstKw2Sv9lQ=';
+               'sha256-LakOJ13XvW/wAbcpqKz9Ojy4w+mw5GYwAx6QGgsjwi8=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -2609,8 +2609,7 @@
     color: var(--text-dim);
   }
 
-  .undo-redo-btn:disabled,
-  #date-picker-set:disabled {
+  .undo-redo-btn:disabled {
     opacity: 0.35;
     cursor: default;
     pointer-events: none;
@@ -3623,11 +3622,19 @@
   /* Native select arrow is painted inside the box: without room reserved for
      it, the arrow sits on top of the last character. */
   .dp-field-row select { padding-right: 28px; }
-  #date-picker-hint {
-    font-size: 12px;
-    color: var(--text-muted);
-  }
   #date-picker-repeat .dialog-actions { margin-top: 0; }
+  /* Set is the one control that commits a repeat, so it spans the panel and
+     its label is the whole action ("Repeat from Mon 9 Nov"). Until the rule is
+     complete it stays the plain button, saying which day to pick next - fully
+     legible, because that text is the instruction. Complete, it fills. */
+  #date-picker-set { flex: 1; height: 34px; font-size: 13px; }
+  #date-picker-set:disabled { cursor: default; box-shadow: none; }
+  #date-picker-set:disabled::before { content: none; }
+  #date-picker-set:not(:disabled) {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+  }
 
   .help-section {
     margin-bottom: 24px;
@@ -4460,9 +4467,8 @@ Or remove them later in Settings → Help.</div>
         </select>
         <input type="number" id="date-picker-end-count" class="dialog-field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
       </div>
-      <div id="date-picker-hint"></div>
       <div class="dialog-actions">
-        <button type="button" class="agenda-action-btn" id="date-picker-set" data-i18n="sendFuture.ok">Set</button>
+        <button type="button" class="agenda-action-btn" id="date-picker-set"></button>
       </div>
     </div>
     <div id="date-picker-actions"></div>
@@ -11382,8 +11388,8 @@ const TRANSLATIONS = {
     'agenda.emptyLaterHint':      'Send a task to a date to plan past this week.',
     'agenda.laterContinues':      'Repeats - more dates appear here as they come closer.',
     'sendFuture.repeat':          'Repeat',
-    'datePicker.startsEnds':      'Starts {start}, ends {end}',
-    'datePicker.starts':          'Starts {date}',
+    'datePicker.setRange':        'Repeat {start} - {end}',
+    'datePicker.setFrom':         'Repeat from {date}',
     'datePicker.pickEnd':         'Pick the last day',
     'datePicker.pickStart':       'Pick the first day',
     'sendFuture.noRepeat':        'No repeat',
@@ -11395,7 +11401,6 @@ const TRANSLATIONS = {
     'sendFuture.endNever':        'Never',
     'sendFuture.endCount':        'After',
     'sendFuture.endUntil':        'On date',
-    'sendFuture.ok':              'Set',
     'toast.sentToFuture':         'Set for {date}',
     'toast.subtreeTooBig':        'Too big to send - one date carries at most 200 tasks',
     'menu.prioNormal':            'Priority Normal',
@@ -11767,8 +11772,8 @@ const TRANSLATIONS = {
     'agenda.emptyLaterHint':      'Pošli úkol na datum a naplánuješ ho za tento týden.',
     'agenda.laterContinues':      'Opakuje se - další termíny se tu objeví, až se přiblíží.',
     'sendFuture.repeat':          'Opakování',
-    'datePicker.startsEnds':      'Začíná {start}, končí {end}',
-    'datePicker.starts':          'Začíná {date}',
+    'datePicker.setRange':        'Opakovat {start} - {end}',
+    'datePicker.setFrom':         'Opakovat od {date}',
     'datePicker.pickEnd':         'Vyber poslední den',
     'datePicker.pickStart':       'Vyber první den',
     'sendFuture.noRepeat':        'Bez opakování',
@@ -11780,7 +11785,6 @@ const TRANSLATIONS = {
     'sendFuture.endNever':        'Nikdy',
     'sendFuture.endCount':        'Po',
     'sendFuture.endUntil':        'K datu',
-    'sendFuture.ok':              'Nastavit',
     'toast.sentToFuture':         'Nastaveno na {date}',
     'toast.subtreeTooBig':        'Příliš velké - na jedno datum se vejde nejvýš 200 úkolů',
     'menu.prioNormal':            'Priorita Normální',
@@ -20185,8 +20189,8 @@ function dpPicksDay(date) {
   return dpRepeatOn() && !(_dp.repeat.passThrough && _dp.repeat.passThrough(date));
 }
 
-// Shows the fields the rule needs, says which day the next click picks, and
-// lets Set commit only a complete rule.
+// Shows the fields the rule needs, and labels Set with the action: which day
+// the next click picks, then what Set will do once the rule is complete.
 function syncDatePickerRepeat() {
   const r = _dp && _dp.repeat;
   dpEl('repeat').hidden = !r;
@@ -20196,16 +20200,15 @@ function syncDatePickerRepeat() {
   dpEl('every').hidden = !on;
   dpEl('end-row').hidden = !on;
   dpEl('end-count').hidden = !on || dpEl('end-type').value !== 'count';
-  dpEl('hint').hidden = !on;
   dpEl('set').parentElement.hidden = !on;
   if (!on) return;
   if (!until) { r.stage = 'start'; r.end = null; }
   else if (r.start && !r.end) r.stage = 'end';
-  dpEl('hint').textContent =
+  dpEl('set').textContent =
     !r.start ? t('datePicker.pickStart')
     : until && r.stage === 'end' ? t('datePicker.pickEnd')
-    : until ? t('datePicker.startsEnds', { start: formatDayLabel(r.start), end: formatDayLabel(r.end) })
-    : t('datePicker.starts', { date: formatDayLabel(r.start) });
+    : until ? t('datePicker.setRange', { start: formatDayLabel(r.start), end: formatDayLabel(r.end) })
+    : t('datePicker.setFrom', { date: formatDayLabel(r.start) });
   dpEl('set').disabled = !r.start || (until && !r.end);
 }
 
