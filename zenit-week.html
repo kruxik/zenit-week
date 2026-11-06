@@ -3587,6 +3587,28 @@
   .agenda-action-btn.danger:hover::before {
     background: var(--accent-danger-bg);
   }
+  /* The one button in a dialog that commits wears a fill, so the eye lands on
+     it: accent blue for a safe commit, danger red for a destructive one. Every
+     other button in the dialog stays the plain pill. Disabled, it stays the
+     plain pill too, fully legible, because its label may be the instruction
+     (the calendar's "Pick the first day"). */
+  .agenda-action-btn.commit:not(:disabled) {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+    font-weight: 600;
+  }
+  .agenda-action-btn.commit.danger:not(:disabled) {
+    background: var(--accent-danger);
+    border-color: var(--accent-danger);
+  }
+  .agenda-action-btn.commit:not(:disabled):hover { color: #fff; }
+  .agenda-action-btn.commit.danger:not(:disabled):hover {
+    background: var(--accent-danger-dark);
+    border-color: var(--accent-danger-dark);
+  }
+  .agenda-action-btn.commit::before { content: none; }
+  .agenda-action-btn.commit:disabled { cursor: default; box-shadow: none; }
   #app-confirm-body {
     max-width: 360px;
     white-space: pre-line;
@@ -3628,13 +3650,6 @@
      complete it stays the plain button, saying which day to pick next - fully
      legible, because that text is the instruction. Complete, it fills. */
   #date-picker-set { flex: 1; height: 34px; font-size: 13px; }
-  #date-picker-set:disabled { cursor: default; box-shadow: none; }
-  #date-picker-set:disabled::before { content: none; }
-  #date-picker-set:not(:disabled) {
-    background: var(--accent-primary);
-    border-color: var(--accent-primary);
-    color: #fff;
-  }
 
   .help-section {
     margin-bottom: 24px;
@@ -4468,7 +4483,7 @@ Or remove them later in Settings → Help.</div>
         <input type="number" id="date-picker-end-count" class="dialog-field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
       </div>
       <div class="dialog-actions">
-        <button type="button" class="agenda-action-btn" id="date-picker-set"></button>
+        <button type="button" class="agenda-action-btn commit" id="date-picker-set"></button>
       </div>
     </div>
     <div id="date-picker-actions"></div>
@@ -4492,7 +4507,7 @@ Or remove them later in Settings → Help.</div>
     </div>
     <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
     <div id="bp-buttons" class="dialog-actions">
-      <button type="button" id="bp-apply" class="agenda-action-btn" data-i18n="baseline.apply">Apply</button>
+      <button type="button" id="bp-apply" class="agenda-action-btn commit" data-i18n="baseline.apply">Apply</button>
     </div>
   </div>
 </div>
@@ -4513,7 +4528,7 @@ Or remove them later in Settings → Help.</div>
       <input type="text" id="cp-hex" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
     </div>
     <div id="cp-buttons" class="dialog-actions">
-      <button type="button" id="cp-apply" class="agenda-action-btn" data-i18n="colorPicker.apply">Apply</button>
+      <button type="button" id="cp-apply" class="agenda-action-btn commit" data-i18n="colorPicker.apply">Apply</button>
     </div>
   </div>
 </div>
@@ -4533,7 +4548,7 @@ Or remove them later in Settings → Help.</div>
       <div id="app-confirm-actions" class="dialog-actions">
         <button type="button" class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
         <button type="button" class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
-        <button type="button" class="agenda-action-btn" id="app-confirm-ok">OK</button>
+        <button type="button" class="agenda-action-btn commit" id="app-confirm-ok">OK</button>
       </div>
     </div>
   </div>
