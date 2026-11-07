@@ -12,8 +12,10 @@ weekData = {
     { id, type, branch, label, parent, children,
       done, unplanned, dropped, priority, reusable, offX, offY, side, _editing,
       comments,              // activity only: one Markdown string in the fixed comment grammar
-      // counter nodes only:
-      val, max, ticks,       // ticks: ISO timestamp per increment (drives daily log)
+      // tick leaves only:
+      tickChild, tickIndex,  // one leaf per repetition of an `Nx` task, labelled 1..N; optional dayIndex
+      // legacy counter nodes only (older weeks):
+      val, max, ticks,       // ticks: ISO timestamp per increment
       // timestamps:
       doneAt,                // set when marked done
       unplannedAt,           // set when marked unplanned
@@ -27,8 +29,9 @@ weekData = {
 Node hierarchy:
 - **center**: Virtual root (week label)
 - **branch**: User-managed categories (default: `work`, `family`, `me`). Can add/delete branches; minimum 1 must remain.
-- **activity**: User-created tasks (may have counter children)
-- **counter**: Auto-created child when activity label matches `Nx` pattern (e.g., "Pushups 10x"); tracks `val`/`max`
+- **activity**: User-created tasks (may have sub-tasks, day leaves or tick leaves)
+- **tick leaf** (`tickChild`, `tickIndex`): an activity whose label matches `Nx` (e.g. "Pushups 3x") gets N child activities labelled 1..N; each is done on its own and the parent rolls up via `syncStatusUp` (`createTickChild`, `_applyMagicLabel`). Days win over `Nx`: a task with day leaves has no ticks (`setActivityDays` purges them)
+- **counter** (legacy): the older form of `Nx`, one child with `val`/`max`. No code creates it any more; older weeks may still hold one, it is still rendered and transferred, and label magic replaces it with tick leaves
 - **day leaf** (`dayChild`, `dayIndex`): a task's weekdays are always day leaves, one per day, a single day included. The map draws a lone leaf on its task ("Run (Mo)", `nodeDisplayLabel` / `isHiddenDayLeaf`); the editor shows the days as text and the edited text replaces them. Leaf ids are derived (`dayLeafNodeId`: task + day + generation past tombstones) so devices converge. `setActivityDays` keeps the leaves of kept days and only buries removed ones. Exception: a single day on a task with ordinary sub-tasks stays in the label (they inherit it, `getEffectiveDays`). A label annotation elsewhere is the older form, converted the next time the task's days are written; `repairMixedDayForm` (in `validateAndRepair`) resolves a merge that left both forms on one task
 
 Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` (all customizable via color picker)
@@ -70,9 +73,9 @@ Dated work (Send to the Future, the `schedule` record, occurrences, the Later ta
   - Keep all styles in the `<style>` tag in `<head>`
 - **Cascading behavior**:
   - Done, dropped and priority changes cascade to all descendants
-  - Counter nodes auto-mark done when reaching max value
+  - A task with tick leaves is done when all its ticks are closed (the ordinary roll-up); a legacy counter auto-marks done at `max`
   - `done` and `dropped` are mutually exclusive - setting either clears the other and its timestamps, at **every** write site, not just `setStatus`
-  - Dropping a counter freezes `val` where it stands; it is not zeroed and not filled to `max`
+  - Dropping a legacy counter freezes `val` where it stands; it is not zeroed and not filled to `max`
 
 ## Workflows
 - **Testing**: Manual verification in browser - check drag-and-drop, zoom/pan, undo/redo, and localStorage persistence across refreshes. For data-logic changes also run the automated suite:
