@@ -65,24 +65,23 @@ Why it is a narrow exception and not a precedent:
 
 ---
 
-## 4. Browser support and the local-network permission (to verify before implementation)
+## 4. Browser support and the local-network permission (verified 2026-11-07)
 
-Two browser mechanisms decide whether an `https://zenitweek.com` page may open `ws://127.0.0.1` at all. Both are tested in Chrome, Firefox and Safari **before** the bridge client is written, and the findings replace the "expected" column below.
+Two browser mechanisms decide whether an `https://zenitweek.com` page may open `ws://127.0.0.1`: mixed-content blocking and a local-network permission prompt. Both were probed on macOS on 2026-11-07: a page on a public `https` origin (`https://example.com`; the production origin cannot be used until its CSP gains the loopback entry from section 3) opened a socket to a throwaway echo server on `127.0.0.1:47831`, which logged every attempt with its `Origin` header.
 
-| # | Mechanism | What it is | Expected (unverified) |
-|---|---|---|---|
-| 1 | Mixed content | An `https` page opening a plain `ws://` socket. Loopback is a "potentially trustworthy" origin in the spec, so it should be allowed. | Chrome and Firefox allow. Safari has historically blocked it. |
-| 2 | Local network access permission | Recent Chrome versions ask the user before a public site may reach the user's own machine ("zenitweek.com wants to access other apps and services on this device"). Whether WebSocket is covered, and from which version, must be confirmed. Firefox is moving toward a similar prompt. | Chrome may prompt once per site. Firefox and Safari unknown. |
+| # | Browser | Result |
+|---|---|---|
+| 1 | Chrome 157 | Prompt "example.com wants to - Access other apps and services on this device", Block / Allow. Until answered the socket hangs silently (no error, nothing reaches the server). After Allow: connected in 3 ms, `Origin` header present. |
+| 2 | Firefox 159 | Same kind of prompt, "wants to access other apps and services on this device", with a "Remember my choice for this site" checkbox. After Allow: connected, `Origin` header present. |
+| 3 | Safari 27.2 | Blocked as mixed content ("requested insecure content from ws://127.0.0.1:47831/. This content was blocked"). Error after 0 ms, no prompt, no way for the user to allow it. |
 
-**Probe.** A throwaway test page (not shipped, lives in the scratchpad) served from the production origin opens a socket to a tiny local echo server and records: connected / prompted / blocked, plus the browser's console message. Run it in current stable Chrome, Firefox and Safari on macOS, and on the `localhost` dev origin for comparison.
-
-**What the findings drive:**
+**Consequences:**
 
 | # | Finding | Consequence for the spec |
 |---|---|---|
-| 1 | A permission prompt appears | Pairing (section 5) gets an explicit step: "your browser will ask to let Zenit Week reach apps on this computer - choose Allow". The status line gains `Blocked by browser` with a one-line hint on how to re-allow in site settings. |
-| 2 | Safari blocks plain `ws://` from `https` | v1 ships for Chrome and Firefox; the status line says `Not supported in this browser yet`. A follow-up adds `wss://` with a certificate the server generates and the user trusts once (section 11). Safari support is a goal, not a v1 promise. |
-| 3 | All three allow without a prompt | No change. |
+| 1 | Chrome and Firefox prompt once | Pairing (section 5) gets an explicit step: "your browser will ask to let Zenit Week reach apps on this computer - choose Allow" (in Firefox, also tick "Remember my choice"). Because Chrome hangs silently while the prompt is open, the client treats "socket not open after 10 s" as `Waiting for permission` with that hint, not as `Waiting for server`. If the user chose Block the socket fails at once: status `Blocked by browser`, with a one-line hint on how to re-allow in the site settings. |
+| 2 | Safari blocks plain `ws://` from `https` | v1 ships for Chrome and Firefox. In Safari the Settings section shows `Not supported in this browser yet` and the toggle is disabled. Safari support follows with `wss://` and a certificate the server generates and the user trusts once (section 11, row 1). |
+| 3 | `Origin` is sent by both working browsers | The server's origin allowlist (section 6, row 1) works as designed. |
 
 ---
 
@@ -93,9 +92,9 @@ Off by default on every device. Nothing connects anywhere until the user turns i
 | # | Element | Behaviour |
 |---|---|---|
 | 1 | Settings section "Agent bridge" | Below Theme. A toggle, a pairing-code field, a status line, a "Disconnect and forget" button. Reuses `.settings-section`, `.settings-label`, `.dialog-field`, `.agenda-action-btn`. Hidden when `(pointer: fine)` does not match - on a phone it can only confuse. |
-| 2 | Pairing code | The server prints a one-line code on first start (`port.token`, token 32 random bytes base64url) and copies it to the clipboard. The user pastes it into the field. The page stores it and connects. This is the single pairing mechanism; no URL-hash variant. If section 4 finds a browser prompt, the browser asks here, once. |
+| 2 | Pairing code | The server prints a one-line code on first start (`port.token`, token 32 random bytes base64url) and copies it to the clipboard. The user pastes it into the field. The page stores it and connects. This is the single pairing mechanism; no URL-hash variant. Chrome and Firefox ask for permission here, once (section 4). |
 | 3 | Storage | `zenit-week-bridge` in `localStorage`: `{ enabled, port, token }`. **Device-local, never in the synced colors/settings blob.** A phone must never learn the desktop's token or try to connect. |
-| 4 | Status line | `Off` / `Waiting for server` / `Connected - <client name>` / `Refused (wrong code)` / `Blocked by browser` / `Not supported in this browser yet`. Driven by socket state and the handshake: `Connected` once the page has verified `proof` and sent `hello`; the client name comes from `proof.client`. `Refused` when the server closes with code `refused` after `hello`. |
+| 4 | Status line | `Off` / `Waiting for server` / `Waiting for permission` / `Connected - <client name>` / `Refused (wrong code)` / `Blocked by browser` / `Not supported in this browser yet`. Driven by socket state and the handshake: `Connected` once the page has verified `proof` and sent `hello`; the client name comes from `proof.client`. `Refused` when the server closes with code `refused` after `hello`. |
 | 5 | Forget | "Disconnect and forget" clears the record and closes the socket. Sign-out and reset (`reloadAppFresh`) also clear it: sign-out means "this browser stops being my workspace", and a paired agent must not keep access to whoever signs in next. |
 
 The server keeps its token in `~/.config/zenit-week-mcp/token` (0600). `zenit-week-mcp pair` prints the code again; `zenit-week-mcp rotate` makes a new one, which invalidates every paired tab.
@@ -264,7 +263,7 @@ Net: for the mobile user the bridge is "the desktop is where the agent works; th
 
 | # | Option | Unlocks | Cost |
 |---|---|---|---|
-| 1 | `wss://` with a locally generated certificate | Safari, if section 4 finds it blocks plain `ws://` | Certificate generation, a one-time trust step in the OS keychain, renewal. |
+| 1 | `wss://` with a locally generated certificate | Safari, which blocks plain `ws://` from `https` (section 4) | Certificate generation, a one-time trust step in the OS keychain, renewal. |
 | 2 | Headless host mode (`zenit-week-mcp --headless`) | Agent works with no browser window open | A persistent Playwright profile signed in to Drive; sign-in UX in headless; keeping the profile alive. |
 | 3 | Door 1, Drive as the bus | Phone-only users, cloud agents | Reuse the app's OAuth client and `/api/token`; run `mergeWeekData` in Node via the test harness loader. |
 | 4 | Close the merge window for the user's own clicks too (section 7.2) | The same in-memory overwrite can, rarely, hit a person | Decide whether clicks also take the week lock or the merge re-reads memory after its awaits. A sync fix of its own, not bridge work. |
@@ -293,7 +292,8 @@ Client configuration for the user (Claude Code example): one `claude mcp add zen
 
 - [x] Owner has approved the network-policy exception (section 3) and it is recorded.
 - [ ] Privacy text carries the agent-provider line required by section 3.
-- [ ] Browser probe (section 4) run in Chrome, Firefox and Safari; findings written into section 4 and the status-line states adjusted.
+- [x] Browser probe (section 4) run in Chrome, Firefox and Safari; findings written into section 4 and the status-line states adjusted.
+- [ ] Chrome: with the permission prompt open, status shows `Waiting for permission`; after Block, `Blocked by browser`. Safari shows `Not supported in this browser yet` with the toggle disabled.
 - [ ] Bridge off: no socket is created, no timer runs, boot timing unchanged.
 - [ ] Pairing: wrong code shows `Refused`, right code shows `Connected` within 1 s (after any one-time browser prompt); forgetting, sign-out and reset clear the record.
 - [ ] Origin check: a page served from any origin outside the allowlist is closed before `hello`.
@@ -317,4 +317,4 @@ Client configuration for the user (Claude Code example): one `claude mcp add zen
 
 | # | Question | Leaning |
 |---|---|---|
-| 1 | Browser behaviour | Decided by the probe in section 4, not by guessing. |
+| 1 | Safari | Out of v1 (section 4). When to build the `wss://` path is the owner's call. |
