@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-P2uM8rWnXN/GAKd0SqiFWaaaOi4IoOika/P6Lf176Zw=';
+               'sha256-oVvrWPLrhY81+n3x2lLGQV915MBT7Mrd+/mYvrGehes=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -7618,10 +7618,15 @@ function updateSvgFilters() {
 
 function applyBranchColor(branch, hex) {
   takeSnapshot();
-  BRANCH_COLORS[branch] = deriveBranchPalette(hex);
+  setBranchColor(branch, hex);
   saveBranchColors();
   updateColorDots();
   renderIfVisible();
+}
+
+// The body of a colour change: no snapshot, no save, no repaint.
+function setBranchColor(branch, hex) {
+  BRANCH_COLORS[branch] = deriveBranchPalette(hex);
 }
 
 function updateThemeColor() {
@@ -14204,26 +14209,34 @@ function syncBranchConfig() {
 
 function addBranch(side) {
   takeSnapshot();
-  const id = genId();
-  const hex = pickBranchColor();
-  BRANCH_COLORS[id] = deriveBranchPalette(hex);
-  BRANCH_CONFIG[id] = { side };
-  const node = {
-    id, type: 'branch', branch: id,
-    label: 'New Branch',
-    side,
-    children: [],
-    _editing: true,
-    _ts: Date.now(),
-  };
-  // Insert among branches, at the end of the branch list
-  const lastBranchIdx = weekData.nodes.reduce((last, n, i) => n.type === 'branch' ? i : last, -1);
-  weekData.nodes.splice(lastBranchIdx + 1, 0, node);
-  rebuildNodeMap();
+  const { id } = createBranch({ side, label: 'New Branch', editing: true });
   saveBranchColors();
   saveWeek(currentWeekKey, weekData);
   _openInlineInput(id, true);
   revealNewlyEditedNode(id);
+}
+
+// The body of adding a branch: the node, its side and a fresh colour, inserted
+// at the end of the branch list. No snapshot and no save. `editing` marks it
+// for the inline editor; a branch created with its name already known (the
+// agent bridge) must not carry the flag, since takeSnapshot and saveWeek drop
+// an `_editing` node.
+function createBranch({ side, label, editing = false }) {
+  const id = genId();
+  BRANCH_COLORS[id] = deriveBranchPalette(pickBranchColor());
+  BRANCH_CONFIG[id] = { side };
+  const node = {
+    id, type: 'branch', branch: id,
+    label,
+    side,
+    children: [],
+    _ts: Date.now(),
+  };
+  if (editing) node._editing = true;
+  const lastBranchIdx = weekData.nodes.reduce((last, n, i) => n.type === 'branch' ? i : last, -1);
+  weekData.nodes.splice(lastBranchIdx + 1, 0, node);
+  rebuildNodeMap();
+  return node;
 }
 
 function deleteBranch(id) {
@@ -14252,11 +14265,17 @@ function deleteNode(id) {
   // An occurrence is one date of a standing intention, and deleting it silently
   // would answer for the user which of the two they meant. Only while the entry
   // is still live - once the series is gone the node is an ordinary task.
-  const entry = node.schedId && node.schedDate && Array.isArray(scheduleData?.entries)
-    ? scheduleData.entries.find(e => e.id === node.schedId)
-    : null;
+  const entry = liveOccurrenceEntry(node);
   if (entry) return confirmDeleteOccurrence(entry.id, node.schedDate, id);
   _performDelete(id);
+}
+
+// The live schedule entry an occurrence node belongs to, or null for an
+// ordinary task (or an occurrence whose series is gone).
+function liveOccurrenceEntry(node) {
+  return node && node.schedId && node.schedDate && Array.isArray(scheduleData?.entries)
+    ? scheduleData.entries.find(e => e.id === node.schedId) || null
+    : null;
 }
 
 // `snapshot: false` for callers that already took one and want the whole
@@ -14365,10 +14384,73 @@ function clearDropped(n) {
   delete n.droppedAt;
 }
 
+// The one priority write: absolute, cascading to the subtree, pinning a raised
+// task to the top of its agenda group. 'normal' is stored as null, as it always
+// has been. Takes no snapshot and saves nothing - setStatus, cyclePriority and
+// the agent bridge each wrap it in their own single undo step. Returns false
+// when the node already has that priority, so a caller can skip the write.
+function setPriority(id, value) {
+  const node = findNode(id);
+  if (!node) return false;
+  const norm = v => (v === 'high' || v === 'critical' ? v : null);
+  const newVal = norm(value);
+  // Quick add stores 'normal' as a string; it is the same priority as null.
+  if (norm(node.priority) === newVal) return false;
+  node.priority = newVal;
+  touchNode(id);
+  (function cascade(nid) {
+    (findNode(nid)?.children || []).forEach(cid => {
+      const child = findNode(cid);
+      if (!child) return;
+      child.priority = newVal;
+      touchNode(cid);
+      cascade(cid);
+    });
+  })(id);
+  if (newVal) pinToTopOfAgenda(id);
+  return true;
+}
+
+// Saves the week and repaints after a status-style write on `id`. Shared by
+// every snapshot-taking wrapper of applyStatus / setPriority, so the UI and the
+// bridge leave the screen in the same state.
+function commitStatusWrite(id, fullRenderNeeded) {
+  saveWeek(currentWeekKey, weekData);
+  if (fullRenderNeeded) {
+    renderIfVisible();
+  } else {
+    updateNodeUI(id);
+    getDescendantIds(id).forEach(updateNodeUI);
+    updateSummary();
+  }
+  if (currentView === 'agenda') renderAgenda();
+}
+
 function setStatus(id, status) {
   const node = findNode(id);
   if (!node) return;
   takeSnapshot();
+  let fullRenderNeeded;
+  if (status === 'prio-high' || status === 'prio-critical') {
+    // The menu items toggle: choosing the priority a task already has clears it.
+    const want = status.slice(5);
+    setPriority(id, node.priority === want ? null : want);
+    fullRenderNeeded = true;
+  } else if (status === 'prio-normal') {
+    setPriority(id, null);
+    fullRenderNeeded = true;
+  } else {
+    fullRenderNeeded = applyStatus(id, status);
+  }
+  commitStatusWrite(id, fullRenderNeeded);
+}
+
+// The outcome / plan-axis body of setStatus: cascades, timestamps, mutual
+// exclusion and the roll-up, with no snapshot and no save. Returns whether the
+// change needs a full render (true) or a surgical repaint will do (false).
+function applyStatus(id, status) {
+  const node = findNode(id);
+  if (!node) return false;
 
   function setDescendants(nid, newStatus) {
     const n = findNode(nid);
@@ -14403,19 +14485,6 @@ function setStatus(id, status) {
       } else if (newStatus === 'undropped') {
         clearDropped(child);
         setDescendants(cid, 'undropped');
-      }
-    });
-  }
-
-  function setPriorityDescendants(nid, prio) {
-    const n = findNode(nid);
-    if (!n) return;
-    (n.children || []).forEach(cid => {
-      const child = findNode(cid);
-      if (child) {
-        child.priority = prio;
-        touchNode(cid);
-        setPriorityDescendants(cid, prio);
       }
     });
   }
@@ -14466,37 +14535,8 @@ function setStatus(id, status) {
     setDescendants(id, 'undropped');
     syncStatusUp(id, 'dropped');
     fullRenderNeeded = true;
-  } else if (status === 'prio-high') {
-    const newVal = (node.priority === 'high') ? null : 'high';
-    node.priority = newVal;
-    touchNode(id);
-    setPriorityDescendants(id, newVal);
-    if (newVal) pinToTopOfAgenda(id);
-    fullRenderNeeded = true;
-  } else if (status === 'prio-critical') {
-    const newVal = (node.priority === 'critical') ? null : 'critical';
-    node.priority = newVal;
-    touchNode(id);
-    setPriorityDescendants(id, newVal);
-    if (newVal) pinToTopOfAgenda(id);
-    fullRenderNeeded = true;
-  } else if (status === 'prio-normal') {
-    node.priority = null;
-    touchNode(id);
-    setPriorityDescendants(id, null);
-    fullRenderNeeded = true;
   }
-
-  saveWeek(currentWeekKey, weekData);
-
-  if (fullRenderNeeded) {
-    renderIfVisible();
-  } else {
-    updateNodeUI(id);
-    getDescendantIds(id).forEach(updateNodeUI);
-    updateSummary();
-  }
-  if (currentView === 'agenda') renderAgenda();
+  return fullRenderNeeded;
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -16434,6 +16474,44 @@ function tabDateString(dayIndex) {
   return localDateStr(d);
 }
 
+// First half of creating a task: the node, inserted under `parent`, with no
+// label logic yet. The map editor inserts it empty and fills it on commit; the
+// agent bridge goes through createTask, which runs both halves at once.
+function insertChildTask(parent, fields) {
+  // A branch is its own branch: its children carry its id.
+  const node = childActivityOf(parent, { branch: parent.branch || parent.id, ...fields });
+  weekData.nodes.push(node);
+  rebuildNodeMap();
+  parent.children.push(node.id);
+  return node;
+}
+
+// Second half for a new task, after its label is in: the parent's outcome
+// roll-up (deferred from the insert so a discarded edit leaves no trace) and
+// the first-task event.
+function finishNewTask(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
+  if (node.type !== 'branch' && node.parent && node.parent !== 'center') {
+    syncStatusUp(nodeId, 'done');
+  }
+  noteTaskCreated(nodeId);
+}
+
+// A whole task creation in one call, for callers that know the label up front
+// (the agent bridge). The same two halves the map editor runs around its input
+// box. No snapshot and no save: the caller owns both. Returns the new node, or
+// null when `parentId` cannot take a child.
+function createTask(parentId, label, { stampFilterDay = false } = {}) {
+  const parent = findNode(parentId);
+  if (!parent || parent.type === 'center' || parent.type === 'counter') return null;
+  if (parent.dayChild || parent.tickChild) return null; // managed leaves - no children allowed
+  const node = insertChildTask(parent, { label: '' });
+  applyLabelEdit(node.id, label, { isNew: true, stampFilterDay });
+  finishNewTask(node.id);
+  return findNode(node.id);
+}
+
 function startAddNode(parentId) {
   const parent = findNode(parentId);
   if (!parent) return;
@@ -16441,12 +16519,7 @@ function startAddNode(parentId) {
   probeMark('add:start');
   takeSnapshot();
   probeMark('add:snapshot');
-  // A branch is its own branch: its children carry its id.
-  const node = childActivityOf(parent, { branch: parent.branch || parent.id, label: '', _editing: true });
-  const id = node.id;
-  weekData.nodes.push(node);
-  rebuildNodeMap();
-  parent.children.push(id);
+  const { id } = insertChildTask(parent, { label: '', _editing: true });
   probeMark('add:data');
   // Defer status propagation until commit: a discard (cancel/empty label)
   // would otherwise leave a done parent stuck in the not-done state.
@@ -16631,6 +16704,58 @@ function _openInlineInput(nodeId, isNew) {
   setTimeout(_panEditNodeToVisibleArea, 500);
 }
 
+// What a committed label does to its node - the editor's commit and the agent
+// bridge's create / rename both come through here, so label magic (day leaves,
+// `Nx` ticks, frozen relative days) has one implementation. No snapshot, no
+// save, no render: the caller owns those.
+//   isNew          - the node was just inserted (stamps the filtered day, keeps
+//                    it visible under the filter)
+//   originalLabel  - what a day leaf reverts to on an invalid token
+//   replaceDays    - the text is the task's whole schedule: days missing from
+//                    it are removed (the editor shows the days as text)
+//   stampFilterDay - a new task added while the map shows one weekday gets
+//                    that day. The editor passes true; the bridge passes false,
+//                    because a filter is a view, not an instruction
+function applyLabelEdit(nodeId, label, { isNew = false, originalLabel = null, replaceDays = false, stampFilterDay = false } = {}) {
+  const node = findNode(nodeId);
+  if (!node) return;
+  // Added while the map shows one day: that day is the one the user meant, so
+  // the label carries it and the new task stays where it was created. Only a
+  // weekday filter stamps - "overdue" and "unscheduled" name no day - and only
+  // a task takes a day; a branch is a category, not something scheduled.
+  const stampDay = isNew
+    && stampFilterDay
+    && node.type === 'activity'
+    && typeof activeDayFilter === 'number'
+    && !parseTodoDays(label).size
+    && !/\(([^)]*)\)/.test(label);
+  node.label = stampDay
+    ? `${label} (${(DAY_LABELS[currentLang] ?? DAY_LABELS.en)[activeDayFilter]})`
+    : label;
+  // Not every new node can carry the filtered day - a branch never does - so
+  // whatever the filter would now hide stays visible until the filter moves.
+  if (isNew && activeDayFilter !== null) _dayFilterFresh.add(nodeId);
+  delete node._editing;
+  touchNode(nodeId);
+
+  // Day-child rename: accept only valid canonical day tokens; revert otherwise
+  if (node.dayChild) {
+    const tok = label.toLowerCase();
+    if (tok in SCHED_TOKEN_MAP) {
+      node.dayIndex = SCHED_TOKEN_MAP[tok];
+      node.label = dayAbbr(node.dayIndex);
+    } else {
+      node.label = originalLabel; // invalid token - silently revert
+    }
+  } else if (node.type !== 'branch' && replaceDays) {
+    // The edited text is the whole schedule: days removed from it go.
+    node.label = resolveMagicDayTokens(node.label);
+    setActivityDays(nodeId, parseTodoDays(node.label));
+  } else if (node.type !== 'branch') {
+    applyMagicLabel(nodeId);
+  }
+}
+
 function commitEdit(followUp = 'auto') {
   const label = inlineInput.value.trim();
   inlineInput.style.display = 'none';
@@ -16651,40 +16776,7 @@ function commitEdit(followUp = 'auto') {
 
   const node = findNode(nodeId);
   if (node) {
-    // Added while the map shows one day: that day is the one the user meant, so
-    // the label carries it and the new task stays where it was created. Only a
-    // weekday filter stamps - "overdue" and "unscheduled" name no day - and only
-    // a task takes a day; a branch is a category, not something scheduled.
-    const stampDay = isNew
-      && node.type === 'activity'
-      && typeof activeDayFilter === 'number'
-      && !parseTodoDays(label).size
-      && !/\(([^)]*)\)/.test(label);
-    node.label = stampDay
-      ? `${label} (${(DAY_LABELS[currentLang] ?? DAY_LABELS.en)[activeDayFilter]})`
-      : label;
-    // Not every new node can carry the filtered day - a branch never does - so
-    // whatever the filter would now hide stays visible until the filter moves.
-    if (isNew && activeDayFilter !== null) _dayFilterFresh.add(nodeId);
-    delete node._editing;
-    touchNode(nodeId);
-
-    // Day-child rename: accept only valid canonical day tokens; revert otherwise
-    if (node.dayChild) {
-      const tok = label.toLowerCase();
-      if (tok in SCHED_TOKEN_MAP) {
-        node.dayIndex = SCHED_TOKEN_MAP[tok];
-        node.label = dayAbbr(node.dayIndex);
-      } else {
-        node.label = originalLabel; // invalid token - silently revert
-      }
-    } else if (node.type !== 'branch' && daysShown) {
-      // The edited text is the whole schedule: days removed from it go.
-      node.label = resolveMagicDayTokens(node.label);
-      setActivityDays(nodeId, parseTodoDays(node.label));
-    } else if (node.type !== 'branch') {
-      applyMagicLabel(nodeId);
-    }
+    applyLabelEdit(nodeId, label, { isNew, originalLabel, replaceDays: daysShown, stampFilterDay: true });
 
     if (crossesNextWeek && node.type === 'activity') {
       // "tomorrow" on a Sunday froze to "(Mo)" - relocate to next week. The
@@ -16701,10 +16793,7 @@ function commitEdit(followUp = 'auto') {
 
     // Done status propagation for newly added children was deferred from
     // startAddNode so a discard doesn't un-done the parent. Apply it now.
-    if (isNew && node.type !== 'branch' && node.parent && node.parent !== 'center') {
-      syncStatusUp(nodeId, 'done');
-    }
-    if (isNew) noteTaskCreated(nodeId);
+    if (isNew) finishNewTask(nodeId);
 
     saveWeek(currentWeekKey, weekData);
     // Deferred: this commit is usually triggered by a blur from a pointerdown
@@ -18769,17 +18858,25 @@ function toggleReusableNode(nodeId) {
   const n = findNode(nodeId);
   if (!n) return;
   takeSnapshot();
-  const newVal = !n.reusable;
-  (function setReusable(id) {
-    const node = findNode(id);
-    if (!node || node.type === 'counter') return;
-    node.reusable = newVal;
-    touchNode(id);
-    (node.children || []).forEach(setReusable);
-  })(nodeId);
+  setReusable(nodeId, !n.reusable);
   saveWeek(currentWeekKey, weekData);
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
+}
+
+// The body of the reusable toggle, as an absolute setter: no snapshot, no save.
+// Returns false when the node is already in the wanted state.
+function setReusable(nodeId, on) {
+  const n = findNode(nodeId);
+  if (!n || !!n.reusable === !!on) return false;
+  (function cascade(id) {
+    const node = findNode(id);
+    if (!node || node.type === 'counter') return;
+    node.reusable = !!on;
+    touchNode(id);
+    (node.children || []).forEach(cascade);
+  })(nodeId);
+  return true;
 }
 
 // One key has to reach three priorities, so it cycles them.
@@ -18787,9 +18884,11 @@ const PRIORITY_CYCLE = ['normal', 'high', 'critical'];
 function cyclePriority(nodeId) {
   const n = findNode(nodeId);
   if (!n) return;
-  const cur = n.priority || 'normal';
+  const cur = PRIORITY_CYCLE.includes(n.priority) ? n.priority : 'normal';
   const next = PRIORITY_CYCLE[(PRIORITY_CYCLE.indexOf(cur) + 1) % PRIORITY_CYCLE.length];
-  setStatus(nodeId, `prio-${next}`);
+  takeSnapshot();
+  setPriority(nodeId, next);
+  commitStatusWrite(nodeId, true);
 }
 
 // ─── What Esc dismisses ───────────────────────────────────────────────────────
@@ -19740,15 +19839,17 @@ function confirmDeleteOccurrence(entryId, date, nodeId = null) {
     danger:          true,
     onConfirm:       async () => { await deleteEntryWithNode(entryId, nodeId); done(); },
     secondaryLabel:  t('confirm.deleteEntryOccurrence'),
-    onSecondary:     async () => {
-      // Both halves. The node is deleted where it stands, because a swept or
-      // pulled occurrence sits in a different week from the date it names, and
-      // the date's own week is buried so no reopen plants it again.
-      if (nodeId && findNode(nodeId)) _performDelete(nodeId);
-      await deleteOccurrence(entryId, date);
-      done();
-    },
+    onSecondary:     async () => { await deleteOccurrenceWithNode(entryId, date, nodeId); done(); },
   });
+}
+
+// "This occurrence": both halves. The node is deleted where it stands, because
+// a swept or pulled occurrence sits in a different week from the date it
+// names, and the date's own week is buried so no reopen plants it again.
+// Shared by the dialog above and the agent bridge.
+async function deleteOccurrenceWithNode(entryId, date, nodeId = null) {
+  if (nodeId && findNode(nodeId)) _performDelete(nodeId);
+  await deleteOccurrence(entryId, date);
 }
 
 // Rewrites an entry's dates. Label, branch and priority each have their own
@@ -21907,6 +22008,17 @@ function planCommentWrite(node, rawValue) {
   return rawValue;
 }
 
+// The one write of a week node's comment: stored byte for byte, an empty string
+// clears the field, `_ts` bumped for the Drive merge. No snapshot, no save.
+function writeComment(nodeId, text) {
+  const node = findNode(nodeId);
+  if (!node) return false;
+  if (text) node.comments = text;
+  else delete node.comments;
+  touchNode(nodeId);
+  return true;
+}
+
 // Writes the open dialog's text to its node. Safe to call any number of times:
 // an unchanged draft is a no-op, and only the first real write of a dialog
 // session takes the undo snapshot.
@@ -21933,15 +22045,15 @@ function persistCommentDraft() {
     takeSnapshot();           // capture pre-edit state for undo
     commentSnapshotTaken = true;
   }
-  if (write) node.comments = write;
-  else delete node.comments;  // empty clears the field
   if (commentEntryId) {
+    if (write) node.comments = write;
+    else delete node.comments;
     node._ts = Date.now();    // the entry's own LWW stamp, as for any entry edit
     saveSchedule();
     if (currentView === 'agenda') renderAgenda();
     return;
   }
-  touchNode(id);              // bump _ts for Drive LWW merge
+  writeComment(id, write);
   saveWeek(currentWeekKey, weekData);
 
   // The map badge appears, disappears or changes its checklist count - none of
@@ -23109,62 +23221,9 @@ function renderAgendaTabContent() {
   }
 
   const isOverdue = agendaActiveTab === 'overdue';
-  const tabDate = isOverdue ? null : tabDateString(agendaActiveTab);
+  const { groups, empty } = computeAgendaGroups(agendaActiveTab);
 
-  const tickedOnTab = n => {
-    if (isOverdue || !tabDate) return false;
-    const cc = getCounterChild(n);
-    if (cc && cc.ticks && cc.ticks.some(t => localDateStr(new Date(t)) === tabDate)) return true;
-    const ticks = (n.children || []).map(findNode).filter(c => c?.tickChild && c?.doneAt);
-    return ticks.some(t => localDateStr(new Date(t.doneAt)) === tabDate);
-  };
-
-  let items;
-  if (isOverdue) {
-    items = _getOverdueItemsForRender();
-  } else {
-    items = getAgendaItems(agendaActiveTab);
-  }
-
-  // Pending: scheduled for this tab and not yet done. Counter / tick-children
-  // parents stay here even after a tick-today so the user can keep ticking
-  // (the same activity also appears in Done as a record of today's progress).
-  const pending = items.filter(n => !n.done && !n.dropped);
-
-
-  // Done section (non-overdue tabs only).
-  let scheduledDone = [];
-  let crossDayDone = [];
-  if (!isOverdue) {
-    const scheduledIds = new Set(items.map(n => n.id));
-    const logOnTab = n => {
-      if (n.donedOn === tabDate) return true;
-      if (n.doneAt && localDateStr(new Date(n.doneAt)) === tabDate) return true;
-      return tickedOnTab(n);
-    };
-    
-    scheduledDone = items.filter(logOnTab);
-    crossDayDone = weekData.nodes.filter(n =>
-      logOnTab(n) && !scheduledIds.has(n.id) && isAgendaRowNode(n));
-  }
-  const done = [...scheduledDone, ...crossDayDone];
-
-  // Any-day rows mirror the same rule: counter / tick-children parents keep
-  // their +1 row visible until the parent is fully done, even when a tick
-  // already fired today.
-  const anyDayItems = isOverdue ? [] : getAnyDayItems().filter(n => !n.done);
-
-  // Pending rows for ticks pinned to this weekday. Their parent never surfaces
-  // via getAgendaItems/getAnyDayItems once every tick is scheduled, so they
-  // must be counted here or a day whose only content is scheduled ticks would
-  // render as empty.
-  const scheduledTickRows = isOverdue ? [] : getScheduledTickRows(agendaActiveTab);
-
-  // Never on the Overdue tab - dropped work is not outstanding work.
-  const droppedItems = isOverdue ? [] : getDroppedItems(tabDate);
-
-  if (pending.length === 0 && done.length === 0 && anyDayItems.length === 0
-      && scheduledTickRows.length === 0 && droppedItems.length === 0) {
+  if (empty) {
     content.appendChild(isOverdue
       ? buildEmptyState('circle-check', 'agenda.emptyOverdue', 'agenda.emptyOverdueHint')
       : buildEmptyState('list-details', 'agenda.emptyDay', 'agenda.emptyDayHint'));
@@ -23176,7 +23235,6 @@ function renderAgendaTabContent() {
   const list = document.createElement('div');
   list.className = 'agenda-item-list';
   content.appendChild(list);
-
   // Enable native HTML5 DnD only when the primary pointer is a mouse - on
   // touch-primary devices, leaving the wrapper non-draggable keeps long-press
   // from engaging the broken native drag (the touch path handles those cases).
@@ -23480,37 +23538,9 @@ function renderAgendaTabContent() {
     });
   }
 
-  // Per-tick log rendering for the Done section. Each tick-child completed
-  // today becomes one row "Pushups n/total" (cumulative position). Legacy
-  // counters and plain done activities each contribute one row. Sorted by
-  // doneAt - chronological log, no drag-reorder.
-  function renderDoneSection(doneNodes) {
-    if (doneNodes.length === 0) return;
-    const rows = [];
-    doneNodes.forEach(n => {
-      const tickInfo = getTickInfo(n);
-      if (tickInfo) {
-        const todayTicks = tickInfo.ticks.filter(t =>
-          t.done && t.doneAt && localDateStr(new Date(t.doneAt)) === tabDate
-        );
-        if (todayTicks.length > 0) {
-          // X is the leaf's own number (tickIndex), stable across the whole
-          // lifecycle - pending/scheduled rows use tickIndex too, so a leaf
-          // ticked Done keeps its "2/3" rather than collapsing to "1/3".
-          todayTicks.forEach(t => {
-            rows.push({
-              node: n,
-              sortKey: new Date(t.doneAt).getTime(),
-              tickRecord: { tick: t, position: t.tickIndex, total: tickInfo.total },
-            });
-          });
-          return;
-        }
-      }
-      const sortAt = n.doneAt || (n.donedOn ? `${n.donedOn}T00:00:00` : null);
-      rows.push({ node: n, sortKey: sortAt ? new Date(sortAt).getTime() : 0 });
-    });
-    rows.sort((a, b) => a.sortKey - b.sortKey);
+  // Done rows arrive built and sorted (computeAgendaGroups); one row per tick
+  // recorded on the tab, chronological, no drag-reorder.
+  function renderDoneSection(rows) {
     if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
     list.appendChild(makeSectionDivider(t('todo.done'), rows.length));
     rows.forEach(rec => {
@@ -23526,44 +23556,18 @@ function renderAgendaTabContent() {
   }
 
   // Fourth group, after Any day: everything above it is actionable, this one is
-  // not. Chronological by droppedAt, no drag-reorder - the same contract the
-  // Done log has. Hidden entirely when empty.
-  function renderDroppedSection(nodes) {
-    if (nodes.length === 0) return;
-    const rows = [...nodes].sort((a, b) =>
-      new Date(a.droppedAt).getTime() - new Date(b.droppedAt).getTime());
+  // not. Rows arrive sorted by droppedAt, no drag-reorder.
+  function renderDroppedSection(rows) {
     if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
     list.appendChild(makeSectionDivider(t('agenda.dropped'), rows.length));
-    rows.forEach(n => {
+    rows.forEach(({ node: n }) => {
       const item = buildAgendaItem(n, getAgendaNodeLabel(n), { dropped: true });
       list.appendChild(wrapAgendaRowForSwipe(item, n.id, iconSvg('circle-dashed-check'), 'undone'));
       addSwipeGesture(item, n);
     });
   }
 
-  function renderGroup(nodes, groupKey, dividerLabel, buildFn) {
-    const saved = loadAgendaGroupOrder(tabKey, groupKey);
-    let ordered;
-    if (saved.length === 0) {
-      // No manual order yet → priority-first is the default arrangement.
-      ordered = [...nodes].sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
-    } else {
-      // User has ordered this group: placed items keep their saved slots
-      // verbatim - priority no longer reshuffles them. Items not in the saved
-      // order (new tasks, or ones that rejoined without a pin) are appended
-      // below, priority-sorted among themselves. The explicit top cases -
-      // priority bump and undone-return - are handled by pinToTopOfAgenda /
-      // restoreToAgendaOrder, which seed the saved order directly.
-      const set = new Set(saved);
-      const placed = applyAgendaOrder(nodes.filter(n => set.has(n.id)), saved);
-      const fresh = nodes.filter(n => !set.has(n.id))
-        .sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
-      ordered = [...placed, ...fresh];
-    }
-    // No write-back here - saving on every render bumps the order's timestamp
-    // without user intent, which lets later renders on other devices clobber
-    // a fresh reorder via LWW. The drag-drop handlers are the only writers.
-    if (ordered.length === 0) return;
+  function renderGroup(ordered, groupKey, dividerLabel, buildFn) {
     if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
     list.appendChild(makeSectionDivider(dividerLabel, ordered.length));
     makeDragZone(ordered, groupKey, buildFn);
@@ -23574,6 +23578,85 @@ function renderAgendaTabContent() {
     tickRecord: row.tickRecord,
     anyDay: row.anyDay,
   });
+  const langFull = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
+  const titles = { pending: t('agenda.scheduled'), anyday: t('agenda.anyDay') };
+  groups.forEach(g => {
+    if (g.rows.length === 0) return;
+    if (g.kind === 'done') renderDoneSection(g.rows);
+    else if (g.kind === 'dropped') renderDroppedSection(g.rows);
+    else renderGroup(g.rows, g.key, g.dayIndex != null ? langFull[g.dayIndex] : titles[g.kind], buildRow);
+  });
+}
+
+// The agenda of the open week for one tab (a weekday 0-6 or 'overdue') as data,
+// in render order: Scheduled, Done, Any day, Dropped (Overdue: one Scheduled
+// group per past weekday). renderAgendaTabContent draws exactly this, and the
+// agent bridge returns it, so the two can never disagree about what a day
+// holds or in which order.
+//   groups: [{ key, kind: 'pending'|'done'|'anyday'|'dropped', dayIndex?, rows }]
+//   rows:   [{ id, node, tickRecord?, anyDay? }] - `id` keys the row (a tick's
+//           id for a tick row), `node` is what the row shows
+//   empty:  true when the tab has nothing at all to show
+function computeAgendaGroups(tab) {
+  const isOverdue = tab === 'overdue';
+  const tabDate = isOverdue ? null : tabDateString(tab);
+  const tabKey = isOverdue ? 'overdue' : tab;
+
+  const tickedOnTab = n => {
+    if (isOverdue || !tabDate) return false;
+    const cc = getCounterChild(n);
+    if (cc && cc.ticks && cc.ticks.some(t => localDateStr(new Date(t)) === tabDate)) return true;
+    const ticks = (n.children || []).map(findNode).filter(c => c?.tickChild && c?.doneAt);
+    return ticks.some(t => localDateStr(new Date(t.doneAt)) === tabDate);
+  };
+
+  let items;
+  if (isOverdue) {
+    items = _getOverdueItemsForRender();
+  } else {
+    items = getAgendaItems(tab);
+  }
+
+  // Pending: scheduled for this tab and not yet done. Counter / tick-children
+  // parents stay here even after a tick-today so the user can keep ticking
+  // (the same activity also appears in Done as a record of today's progress).
+  const pending = items.filter(n => !n.done && !n.dropped);
+
+
+  // Done section (non-overdue tabs only).
+  let scheduledDone = [];
+  let crossDayDone = [];
+  if (!isOverdue) {
+    const scheduledIds = new Set(items.map(n => n.id));
+    const logOnTab = n => {
+      if (n.donedOn === tabDate) return true;
+      if (n.doneAt && localDateStr(new Date(n.doneAt)) === tabDate) return true;
+      return tickedOnTab(n);
+    };
+    
+    scheduledDone = items.filter(logOnTab);
+    crossDayDone = weekData.nodes.filter(n =>
+      logOnTab(n) && !scheduledIds.has(n.id) && isAgendaRowNode(n));
+  }
+  const done = [...scheduledDone, ...crossDayDone];
+
+  // Any-day rows mirror the same rule: counter / tick-children parents keep
+  // their +1 row visible until the parent is fully done, even when a tick
+  // already fired today.
+  const anyDayItems = isOverdue ? [] : getAnyDayItems().filter(n => !n.done);
+
+  // Pending rows for ticks pinned to this weekday. Their parent never surfaces
+  // via getAgendaItems/getAnyDayItems once every tick is scheduled, so they
+  // must be counted here or a day whose only content is scheduled ticks would
+  // render as empty.
+  const scheduledTickRows = isOverdue ? [] : getScheduledTickRows(tab);
+
+  // Never on the Overdue tab - dropped work is not outstanding work.
+  const droppedItems = isOverdue ? [] : getDroppedItems(tabDate);
+
+  const empty = pending.length === 0 && done.length === 0 && anyDayItems.length === 0
+    && scheduledTickRows.length === 0 && droppedItems.length === 0;
+
   // Wraps a raw node as a row descriptor; tick nodes resolve to a tick-record
   // row whose label is the parent and whose id keys on the tick.
   const toRow = n => {
@@ -23585,9 +23668,9 @@ function renderAgendaTabContent() {
     return { id: n.id, node: n };
   };
 
+  const groups = [];
   if (isOverdue) {
     const todayPos = isoWeekPos(new Date().getDay());
-    const langFull = DAY_FULL_NAMES[currentLang] ?? DAY_FULL_NAMES.en;
     const overdueDaysOf = n => {
       if (n.tickChild || n.dayChild) return n.dayIndex != null ? [n.dayIndex] : [];
       return [...getEffectiveDays(n)].filter(d => isoWeekPos(d) < todayPos);
@@ -23602,16 +23685,78 @@ function renderAgendaTabContent() {
     [...groupsByDay.keys()]
       .sort((a, b) => isoWeekPos(a) - isoWeekPos(b))
       .forEach(dayIdx => {
-        renderGroup(groupsByDay.get(dayIdx), `pending-${dayIdx}`, langFull[dayIdx], buildRow);
+        const key = `pending-${dayIdx}`;
+        groups.push({ key, kind: 'pending', dayIndex: dayIdx, rows: orderAgendaRows(groupsByDay.get(dayIdx), tabKey, key) });
       });
   } else {
     const pendingRows = [...pending.map(toRow), ...scheduledTickRows];
+    groups.push({ key: 'pending', kind: 'pending', rows: orderAgendaRows(pendingRows, tabKey, 'pending') });
+
+    // Per-tick log for the Done section. Each tick-child completed on the tab
+    // becomes one row "Pushups n/total" (cumulative position). Legacy counters
+    // and plain done activities each contribute one row. Sorted by doneAt.
+    const doneRows = [];
+    done.forEach(n => {
+      const tickInfo = getTickInfo(n);
+      if (tickInfo) {
+        const todayTicks = tickInfo.ticks.filter(t =>
+          t.done && t.doneAt && localDateStr(new Date(t.doneAt)) === tabDate
+        );
+        if (todayTicks.length > 0) {
+          // X is the leaf's own number (tickIndex), stable across the whole
+          // lifecycle - pending/scheduled rows use tickIndex too, so a leaf
+          // ticked Done keeps its "2/3" rather than collapsing to "1/3".
+          todayTicks.forEach(t => {
+            doneRows.push({
+              node: n,
+              sortKey: new Date(t.doneAt).getTime(),
+              tickRecord: { tick: t, position: t.tickIndex, total: tickInfo.total },
+            });
+          });
+          return;
+        }
+      }
+      const sortAt = n.doneAt || (n.donedOn ? `${n.donedOn}T00:00:00` : null);
+      doneRows.push({ node: n, sortKey: sortAt ? new Date(sortAt).getTime() : 0 });
+    });
+    doneRows.sort((a, b) => a.sortKey - b.sortKey);
+    groups.push({ key: 'done', kind: 'done', rows: doneRows.map(({ node, tickRecord }) => (
+      tickRecord ? { id: tickRecord.tick.id, node, tickRecord } : { id: node.id, node })) });
+
     const anyRows = anyDayItems.map(n => ({ id: n.id, node: n, anyDay: true }));
-    renderGroup(pendingRows, 'pending', t('agenda.scheduled'), buildRow);
-    renderDoneSection(done);
-    renderGroup(anyRows, 'anyday', t('agenda.anyDay'), buildRow);
-    renderDroppedSection(droppedItems);
+    groups.push({ key: 'anyday', kind: 'anyday', rows: orderAgendaRows(anyRows, tabKey, 'anyday') });
+
+    const droppedRows = [...droppedItems]
+      .sort((a, b) => new Date(a.droppedAt).getTime() - new Date(b.droppedAt).getTime())
+      .map(n => ({ id: n.id, node: n }));
+    groups.push({ key: 'dropped', kind: 'dropped', rows: droppedRows });
   }
+  return { groups, empty };
+}
+
+// A drag-ordered agenda group in display order. No saved order yet: priority
+// first. Otherwise placed rows keep their saved slots verbatim - priority no
+// longer reshuffles them - and rows not in the saved order (new tasks, or ones
+// that rejoined without a pin) follow, priority-sorted among themselves. The
+// explicit top cases - priority bump and undone-return - are handled by
+// pinToTopOfAgenda / restoreToAgendaOrder, which seed the saved order directly.
+function orderAgendaRows(nodes, tabKey, groupKey) {
+  const saved = loadAgendaGroupOrder(tabKey, groupKey);
+  let ordered;
+  if (saved.length === 0) {
+    // No manual order yet → priority-first is the default arrangement.
+    ordered = [...nodes].sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
+  } else {
+    const set = new Set(saved);
+    const placed = applyAgendaOrder(nodes.filter(n => set.has(n.id)), saved);
+    const fresh = nodes.filter(n => !set.has(n.id))
+      .sort((a, b) => getPriorityWeight(b.id) - getPriorityWeight(a.id));
+    ordered = [...placed, ...fresh];
+  }
+  // No write-back here - saving on every render bumps the order's timestamp
+  // without user intent, which lets later renders on other devices clobber
+  // a fresh reorder via LWW. The drag-drop handlers are the only writers.
+  return ordered;
 }
 
 // Month-grouped list of what the schedule is holding. Rows reuse the shared
