@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-LakOJ13XvW/wAbcpqKz9Ojy4w+mw5GYwAx6QGgsjwi8=';
+               'sha256-P2uM8rWnXN/GAKd0SqiFWaaaOi4IoOika/P6Lf176Zw=';
   connect-src  'self' https://www.googleapis.com;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -6001,6 +6001,7 @@ function validateAndRepairSchedule(raw, branchIds) {
       // before they existed keeps its content hash and is not re-uploaded.
       ...(typeof e.comments === 'string' && e.comments !== '' ? { comments: e.comments } : {}),
       ...(e.reusable === true ? { reusable: true } : {}),
+      ...(e.inbox === true ? { inbox: true } : {}),
       anchor: e.anchor,
       repeat: repairScheduleRepeat(e.repeat),
       end: repairScheduleEnd(e.end),
@@ -13318,6 +13319,8 @@ function plantOccurrence(ctx, entry, date, dayIndex) {
     done: false, unplanned: false,
     priority, reusable: entry.reusable === true,
     ...(entry.comments ? { comments: entry.comments } : {}),
+    // Back into the tray: a date never decided where the task belongs.
+    ...(entry.inbox === true ? { inbox: true } : {}),
     children: [],
     schedId: entry.id, schedDate: date,
     _ts: stamp,
@@ -19440,9 +19443,11 @@ function scheduleEntryLabel(raw) {
   return (stripped || text.trim()).slice(0, 200);
 }
 
+// An Inbox item is sendable like any task: the date says when, the tray still
+// says it has no place yet, so the flag travels on the entry (see sendNodeToDate).
 function canSendToDate(node) {
   if (!node || node.type !== 'activity') return false;
-  return !(node.dayChild || node.tickChild || node.inbox);
+  return !(node.dayChild || node.tickChild);
 }
 
 // Whether the node is a task in its own right rather than a stop on the way to
@@ -19509,8 +19514,8 @@ function sendSubtreeOverCap(node) {
   return canSendToDate(node) && captureSendLeaves(node) === null;
 }
 
-// The node's own state becomes the entry's: label, branch, priority, comment and
-// the reusable flag travel, and every occurrence gets a copy of them. Everything
+// The node's own state becomes the entry's: label, branch, priority, comment, the
+// reusable flag and the inbox flag travel, and every occurrence gets a copy of them. Everything
 // a week gives a node - done, dropped, day tags, ticks - is a property of that
 // week's copy, not of the standing intention.
 function sendNodeToDate(nodeId, options) {
@@ -19570,6 +19575,7 @@ function sendNodeToDate(nodeId, options) {
     path: leaf.path,
     ...(typeof leaf.node.comments === 'string' && leaf.node.comments !== '' ? { comments: leaf.node.comments } : {}),
     ...(leaf.node.reusable ? { reusable: true } : {}),
+    ...(leaf.node.inbox ? { inbox: true } : {}),
     anchor,
     repeat: unit ? { every, unit } : null,
     end,
@@ -22577,6 +22583,7 @@ function laterRowNode(entry, date) {
     priority: entry.priority && entry.priority !== 'normal' ? entry.priority : null,
     ...(entry.comments ? { comments: entry.comments } : {}),
     reusable: entry.reusable === true,
+    ...(entry.inbox === true ? { inbox: true } : {}),
     children: [],
     done: false,
     schedId: entry.id,

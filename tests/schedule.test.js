@@ -274,13 +274,15 @@ describe('Schedule store - validate and repair', () => {
     expect(out.crdtVersion).toBe(3);
   });
 
-  it('keeps a comment and the reusable flag, and drops junk ones', () => {
-    const kept = validateAndRepairSchedule({ entries: [{ ...good(), comments: '- [ ] call', reusable: true }] }, ['work']);
+  it('keeps a comment, the reusable flag and the inbox flag, and drops junk ones', () => {
+    const kept = validateAndRepairSchedule({ entries: [{ ...good(), comments: '- [ ] call', reusable: true, inbox: true }] }, ['work']);
     expect(kept.entries[0].comments).toBe('- [ ] call');
     expect(kept.entries[0].reusable).toBe(true);
-    const junk = validateAndRepairSchedule({ entries: [{ ...good(), comments: 42, reusable: 'yes' }] }, ['work']);
+    expect(kept.entries[0].inbox).toBe(true);
+    const junk = validateAndRepairSchedule({ entries: [{ ...good(), comments: 42, reusable: 'yes', inbox: 1 }] }, ['work']);
     expect('comments' in junk.entries[0]).toBe(false);
     expect('reusable' in junk.entries[0]).toBe(false);
+    expect('inbox' in junk.entries[0]).toBe(false);
   });
 
   it('heals a stored weekday tag without touching _ts', () => {
@@ -593,6 +595,15 @@ describe('Materialisation on week open', () => {
     expect(nodes.every(n => n.comments === 'Bring receipts' && n.reusable === true)).toBe(true);
   });
 
+  it('plants an inbox entry back into the tray', () => {
+    seed(entry({ anchor: '2026-05-11', inbox: true }));
+    const data = week();
+    materialiseWeek(WK, data);
+    const node = occurrences(data)[0];
+    expect(node.inbox).toBe(true);
+    expect(node.parent).toBe('work');
+  });
+
   it('plants no comment when the entry has none', () => {
     seed(entry());
     const data = week();
@@ -600,6 +611,7 @@ describe('Materialisation on week open', () => {
     const node = occurrences(data)[0];
     expect('comments' in node).toBe(false);
     expect(node.reusable).toBe(false);
+    expect('inbox' in node).toBe(false);
   });
 
   it('carries the entry priority onto the occurrence', () => {
@@ -879,7 +891,7 @@ describe('Send to date…', () => {
     expect(canSendToDate({ type: 'counter' })).toBe(false);
     expect(canSendToDate({ type: 'activity', tickChild: true, children: [] })).toBe(false);
     expect(canSendToDate({ type: 'activity', dayChild: true, children: [] })).toBe(false);
-    expect(canSendToDate({ type: 'activity', inbox: true, children: [] })).toBe(false);
+    expect(canSendToDate({ type: 'activity', inbox: true, children: [] })).toBe(true);
   });
 
   it('moves the node out of the week and creates an entry carrying its state', () => {
@@ -911,6 +923,15 @@ describe('Send to date…', () => {
     const entry = sendEntry('a1', { date: '2026-09-14', unit: null });
     expect('comments' in entry).toBe(false);
     expect('reusable' in entry).toBe(false);
+    expect('inbox' in entry).toBe(false);
+  });
+
+  it('sends an inbox item and keeps the flag on the entry', () => {
+    findNode('a1').inbox = true;
+    const entry = sendEntry('a1', { date: '2026-09-14', unit: null });
+    expect(entry.inbox).toBe(true);
+    expect(entry.path).toEqual([]);
+    expect(findNode('a1')).toBeUndefined();
   });
 
   it('refuses an end date before the anchor', () => {
@@ -1469,10 +1490,12 @@ describe('Later tab', () => {
     expect(row.schedDate).toBe('2026-09-14');
   });
 
-  it('shows the entry comment and reusable flag on the row', () => {
-    const row = laterRowNode(entry({ comments: 'Bring receipts', reusable: true }), '2026-09-14');
+  it('shows the entry comment, reusable flag and inbox flag on the row', () => {
+    const row = laterRowNode(entry({ comments: 'Bring receipts', reusable: true, inbox: true }), '2026-09-14');
     expect(row.comments).toBe('Bring receipts');
     expect(row.reusable).toBe(true);
+    expect(row.inbox).toBe(true);
+    expect('inbox' in laterRowNode(entry(), '2026-09-14')).toBe(false);
   });
 
   it('carries priority onto the row but normalises normal away', () => {

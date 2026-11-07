@@ -65,7 +65,7 @@ Order: **S1 → S2 → S3 → S4**, then S5 and S6 in either order, then S7 → 
 
 ## S4 - Send to date…
 
-- [x] T4.1 - Context-menu entry, placed with the other `ctx-*` entries and following their hide rules: `activity` nodes only - hidden for center, branch, counter, tick, day-leaf and inbox nodes.
+- [x] T4.1 - Context-menu entry, placed with the other `ctx-*` entries and following their hide rules: `activity` nodes only - hidden for center, branch, counter, tick and day-leaf nodes (inbox items are sendable since 2026-11 and return to the tray).
 - [x] T4.2 - **Hidden for any node that has children.** One activity per entry; there is no partial or lossy variant.
 - [x] T4.3 - App-styled dialog following the `#app-confirm-overlay` pattern - never a browser dialog. Fields: date, repeat interval + unit, end condition. Defaults: today + 1 week, no repeat, end never.
 - [x] T4.4 - On confirm the node **moves**: removed from the current week, entry created carrying label, branch and priority. No copy, no stub left behind.
