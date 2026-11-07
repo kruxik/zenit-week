@@ -188,6 +188,9 @@ const sandbox = {
   navigator: { userAgentData: null, userAgent: '' },
   performance: { now: () => 0 },
   requestAnimationFrame: () => {},
+  // Agent bridge: HMAC and base64url. WebSocket is installed per test.
+  TextEncoder: globalThis.TextEncoder,
+  btoa: globalThis.btoa,
   setTimeout,
   clearTimeout,
   // Unref'd so a top-level interval in the app (the foreground update check)
@@ -416,6 +419,9 @@ _state.setWeekKey = function(k) { currentWeekKey = k; };
 _state.getWeekKey = function() { return currentWeekKey; };
 _state.reset     = function() { undoStack = []; redoStack = []; };
 _state.getUndoStack = function() { return undoStack; };
+_state.getRedoStack = function() { return redoStack; };
+_state.getBridgeStatus = function() { return bridgeStatus; };
+_state.getBridgeQueueBusy = function() { return _bridgeBusy; };
 _state.getNextWeekRawCache = function() { return _nextWeekRawCache; };
 _state.setNextWeekRawCache = function(v) { _nextWeekRawCache = v; };
 _state.refreshNextWeekCache = function() { return refreshNextWeekCache(); };
@@ -751,6 +757,20 @@ export const {
   animatePanTo,
   // Status-propagation functions
   startAddNode,
+  // Agent bridge (phase b)
+  bridgeRunTool,
+  bridgeHandleCall,
+  bridgeConnect,
+  bridgeDisconnect,
+  bridgeHmac,
+  bridgeSocketUrl,
+  parseBridgePairingCode,
+  loadBridgeRecord,
+  saveBridgeRecord,
+  forgetBridge,
+  projectWeek,
+  commentHasUnsafeLink,
+  bridgeNotifyWeekSaved,
   // Shared action bodies (agent bridge phase a)
   createTask,
   insertChildTask,

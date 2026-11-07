@@ -10,8 +10,8 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-oVvrWPLrhY81+n3x2lLGQV915MBT7Mrd+/mYvrGehes=';
-  connect-src  'self' https://www.googleapis.com;
+               'sha256-JPzr1KdsVtO3LAaS7V/NqMTFggf/KGohbY6xzkqmIk0=';
+  connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
   style-src    'unsafe-inline';
@@ -5534,6 +5534,8 @@ async function reloadApp() {
 // Sign-out and reset: a clean start, not a return to where the person was.
 function reloadAppFresh() {
   _reloadFresh = true;
+  // A paired agent must not keep access to whoever uses this browser next.
+  try { localStorage.removeItem('zenit-week-bridge'); } catch (_) { /* storage unavailable */ }
   try { localStorage.removeItem(RESTORE_KEY); } catch (_) { /* storage unavailable */ }
   location.reload();
 }
@@ -8541,6 +8543,9 @@ function showSignedInState(user) {
   // wrong trade: reading the bytes needs fetch(), which would mean adding
   // googleusercontent.com to connect-src. Widening what the app may talk to, to
   // save one HTTP-cached image, moves in the wrong direction.
+  // The one widening there is, the agent bridge's ws://127.0.0.1 and
+  // ws://localhost, is an owner-approved exception (2026-11-07): loopback
+  // cannot leave this machine, and it is off unless the user pairs an agent.
   //
   // The service worker does keep a copy, which needs no such widening - its own
   // fetches are not governed by this document's CSP. So where a worker is in
@@ -9537,6 +9542,9 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
   if (scheduleUpload) {
     tabChannel.postMessage({ type: 'week-saved', wk: wKey, sig: _weekContentSig(mergedData), origin: TAB_ID });
   }
+  // The agent's resource feed hears every origin: deduplicated by signature,
+  // so a clean pull that changed nothing stays silent.
+  bridgeNotifyWeekSaved(wKey, mergedData);
   if (wKey === currentWeekKey) {
     // Re-render only when the merge actually altered visible content.
     // Skipping no-op renders kills the drift once seen after repeated
@@ -11415,6 +11423,30 @@ const TRANSLATIONS = {
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
     'toast.movedToNextWeek':      'Added to next week',
+    'bridge.toast.add_task':      'Agent: added {label}',
+    'bridge.toast.rename_task':   'Agent: renamed to {label}',
+    'bridge.toast.set_status':    'Agent: {label} {status}',
+    'bridge.toast.set_priority':  'Agent: {label} set to {priority} priority',
+    'bridge.toast.set_days':      'Agent: changed the days of {label}',
+    'bridge.toast.tick_task':     'Agent: {label} {n} tick(s)',
+    'bridge.toast.set_comment':   'Agent: updated the comment on {label}',
+    'bridge.toast.set_reusable':  'Agent: changed reusable on {label}',
+    'bridge.toast.delete_task':   'Agent: deleted {label}',
+    'bridge.toast.send_to_date':  'Agent: {label} set for {date}',
+    'bridge.toast.transfer_unfinished': 'Agent: transferred unfinished tasks',
+    'bridge.toast.transfer_reusable': 'Agent: transferred reusable tasks',
+    'bridge.toast.add_branch':    'Agent: added branch {label}',
+    'bridge.toast.undo':          'Agent: undid {what}',
+    'bridge.toast.redo':          'Agent: redid {what}',
+    'bridge.status.done':         'marked done',
+    'bridge.status.undone':       'reopened',
+    'bridge.status.dropped':      'dropped',
+    'bridge.status.unplanned':    'marked unplanned',
+    'bridge.status.planned':      'marked planned',
+    'bridge.priority.normal':     'normal',
+    'bridge.priority.high':       'high',
+    'bridge.priority.critical':   'critical',
+    'bridge.userAction':          'a user action',
     'toast.dayTakenInWeek':       'That week already has this day',
     'agenda.later':               'Later',
     'help.laterTab':              'Later (upcoming dates)',
@@ -11799,6 +11831,30 @@ const TRANSLATIONS = {
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
+    'bridge.toast.add_task':      'Agent: přidal {label}',
+    'bridge.toast.rename_task':   'Agent: přejmenoval na {label}',
+    'bridge.toast.set_status':    'Agent: {label} {status}',
+    'bridge.toast.set_priority':  'Agent: {label} má prioritu {priority}',
+    'bridge.toast.set_days':      'Agent: změnil dny u {label}',
+    'bridge.toast.tick_task':     'Agent: {label} {n} opakování',
+    'bridge.toast.set_comment':   'Agent: upravil komentář u {label}',
+    'bridge.toast.set_reusable':  'Agent: změnil opakovatelnost u {label}',
+    'bridge.toast.delete_task':   'Agent: smazal {label}',
+    'bridge.toast.send_to_date':  'Agent: {label} naplánováno na {date}',
+    'bridge.toast.transfer_unfinished': 'Agent: přenesl nedokončené úkoly',
+    'bridge.toast.transfer_reusable': 'Agent: přenesl opakovatelné úkoly',
+    'bridge.toast.add_branch':    'Agent: přidal větev {label}',
+    'bridge.toast.undo':          'Agent: vrátil zpět {what}',
+    'bridge.toast.redo':          'Agent: zopakoval {what}',
+    'bridge.status.done':         'hotovo',
+    'bridge.status.undone':       'znovu otevřeno',
+    'bridge.status.dropped':      'zrušeno',
+    'bridge.status.unplanned':    'neplánováno',
+    'bridge.status.planned':      'naplánováno',
+    'bridge.priority.normal':     'normální',
+    'bridge.priority.high':       'vysokou',
+    'bridge.priority.critical':   'kritickou',
+    'bridge.userAction':          'akci uživatele',
     'toast.dayTakenInWeek':       'Tento den už v tom týdnu je',
     'agenda.later':               'Později',
     'help.laterTab':              'Později (nadcházející data)',
@@ -12756,6 +12812,7 @@ async function saveWeek(wk, data) {
   // reload + merge (T3). Carries a content signature for cheap convergence dedup
   // and our origin so we ignore the echo of our own save.
   tabChannel.postMessage({ type: 'week-saved', wk, sig: _weekContentSig(persisted), origin: TAB_ID });
+  bridgeNotifyWeekSaved(wk, persisted);
 
   // Update cache if this is the next week
   if (wk === offsetWeek(currentWeekKey, 1)) {
@@ -13500,6 +13557,7 @@ async function openWeekIntoView(wk) {
   // Keep the next-week cache aligned with the week we just navigated to, or a
   // later move/undo snapshot restores the wrong next-week record.
   await refreshNextWeekCache();
+  bridgeNotifyView();
 }
 
 // Materialisation normally runs only when a week is opened, which leaves the
@@ -15985,6 +16043,14 @@ function setActivityDays(nodeId, newDays, remap = null) {
 //   • Plain label → drop any stale counter or tick-children.
 // Caller must have already assigned node.label and called touchNode.
 // Shared by commitEdit and submitQuickAdd so both flows behave identically.
+// The N of an `Nx` label ("Pushups 10x" -> 10), 0 when there is none. Values
+// below 2 make no ticks; callers apply that rule. The one reader of the token,
+// shared by label magic and the agent bridge's refusal of `days` with `Nx`.
+function parseNxCount(label) {
+  const m = String(label || '').match(/(\d+)x/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
 function applyMagicLabel(nodeId) {
   // Detect "now"/"teď" *before* the freeze step overwrites it. now resolves to
   // today's abbr (like today) and additionally pins the node to the top of
@@ -16015,8 +16081,7 @@ function _applyMagicLabel(nodeId) {
   // already exist, the user is switching back to tick mode - drop the
   // day-children so the Nx branch below creates fresh ticks. Without this
   // the day branch would absorb the rename, ignoring the new Nx token.
-  const _nxMatch = label.match(/(\d+)x/);
-  const _nxVal = _nxMatch ? parseInt(_nxMatch[1], 10) : 0;
+  const _nxVal = parseNxCount(label);
   const _wantsTicks = _nxVal >= 2 && parsedDays.size === 0;
   if (hasDayChildren && _wantsTicks) {
     removeChildNodes(node, node.children.map(findNode).filter(n => n?.dayChild).map(n => n.id));
@@ -16042,8 +16107,7 @@ function _applyMagicLabel(nodeId) {
   // Single-day annotation (size === 1) disables Nx expansion but otherwise
   // behaves like the no-day branch. N is capped at MAX_TICK_COUNT so a
   // careless "Pushups 9999x" doesn't generate thousands of leaves.
-  const nxMatch = label.match(/(\d+)x/);
-  const nxVal = nxMatch ? parseInt(nxMatch[1], 10) : 0;
+  const nxVal = parseNxCount(label);
   const tickCount = (nxVal >= 2 && parsedDays.size === 0) ? Math.min(nxVal, MAX_TICK_COUNT) : 0;
 
   if (tickCount > 0) {
@@ -26506,6 +26570,860 @@ document.getElementById('lang-select').addEventListener('change', e => {
   setLanguage(e.target.value);
 });
 
+// ─── Agent bridge ─────────────────────────────────────────────────────────────
+// A device-local channel to an MCP server on this computer
+// (docs/specs/agent-bridge.md). The page is the WebSocket client and the only
+// thing that ever touches weekData: the agent calls named verbs, and each verb
+// runs through the same functions the UI runs, inside one undo snapshot, under
+// the week lock, saved and synced like a click.
+//
+// Network-policy exception, approved 2026-11-07: loopback only, off by default,
+// never on the boot path. With the record off nothing below creates a socket or
+// a timer.
+const BRIDGE_KEY = 'zenit-week-bridge';
+const BRIDGE_DEFAULT_PORT = 47831;
+const BRIDGE_HOST = '127.0.0.1';
+const BRIDGE_PERMISSION_HINT_MS = 10000;
+const BRIDGE_BACKOFF_MIN_MS = 1000;
+const BRIDGE_BACKOFF_MAX_MS = 30000;
+const BRIDGE_USER_BUSY_MS = 30000;
+const BRIDGE_COMMENT_MAX = 20000;
+const BRIDGE_LABEL_MAX = 500;
+
+// ── Record: device-local, never synced ──
+function loadBridgeRecord() {
+  try {
+    const rec = JSON.parse(localStorage.getItem(BRIDGE_KEY) || 'null');
+    if (!rec || typeof rec !== 'object') return { enabled: false, port: BRIDGE_DEFAULT_PORT, token: '' };
+    const port = Number.isInteger(rec.port) && rec.port > 0 && rec.port < 65536 ? rec.port : BRIDGE_DEFAULT_PORT;
+    const token = typeof rec.token === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(rec.token) ? rec.token : '';
+    return { enabled: rec.enabled === true && !!token, port, token };
+  } catch (_) {
+    return { enabled: false, port: BRIDGE_DEFAULT_PORT, token: '' };
+  }
+}
+
+function saveBridgeRecord(rec) {
+  try { localStorage.setItem(BRIDGE_KEY, JSON.stringify({ enabled: !!rec.enabled, port: rec.port, token: rec.token })); } catch (_) { /* storage unavailable */ }
+}
+
+// "Disconnect and forget", sign-out and reset: the record goes and the socket closes.
+function forgetBridge() {
+  try { localStorage.removeItem(BRIDGE_KEY); } catch (_) { /* storage unavailable */ }
+  bridgeDisconnect();
+}
+
+// The pairing code the server prints: `<port>.<token>`.
+function parseBridgePairingCode(code) {
+  const m = /^\s*(\d{1,5})\.([A-Za-z0-9_-]{16,128})\s*$/.exec(String(code || ''));
+  if (!m) return null;
+  const port = parseInt(m[1], 10);
+  if (port < 1 || port > 65535) return null;
+  return { port, token: m[2] };
+}
+
+function isLoopbackHost(host) {
+  return host === '127.0.0.1' || host === 'localhost';
+}
+
+// The only URL the bridge ever opens. The host is a constant, not stored, and is
+// checked again here so no edit to this file or to the record can point the
+// socket anywhere but this machine.
+function bridgeSocketUrl(port) {
+  const url = new URL(`ws://${BRIDGE_HOST}:${port}/`);
+  if (url.protocol !== 'ws:' || !isLoopbackHost(url.hostname)) throw new Error('bridge: non-loopback host refused');
+  return url.href;
+}
+
+// Safari blocks ws:// from an https page as mixed content, with no prompt
+// (spec section 4). Chrome and Firefox ask once.
+function bridgeSupported() {
+  if (typeof WebSocket !== 'function' || typeof crypto === 'undefined' || !crypto.subtle) return false;
+  const ua = navigator.userAgent || '';
+  return !(/Safari\//.test(ua) && !/(Chrome|Chromium|CriOS|FxiOS|Edg|Firefox)\//.test(ua));
+}
+
+// ── Status ──
+// off | waiting-server | waiting-permission | connected | refused | blocked | unsupported
+let bridgeStatus = { state: 'off', client: null };
+const _bridgeStatusListeners = new Set();
+function onBridgeStatus(fn) { _bridgeStatusListeners.add(fn); return () => _bridgeStatusListeners.delete(fn); }
+function _setBridgeStatus(state, client = null) {
+  if (bridgeStatus.state === state && bridgeStatus.client === client) return;
+  bridgeStatus = { state, client };
+  _bridgeStatusListeners.forEach(fn => { try { fn(bridgeStatus); } catch (_) { /* a listener never breaks the bridge */ } });
+}
+
+// ── Connection ──
+let _bridgeSocket = null;
+let _bridgeReady = false;      // proof verified and hello sent
+let _bridgeAttempts = 0;
+let _bridgeRetryTimer = null;
+let _bridgePermTimer = null;
+let _bridgeStopped = true;
+let _bridgeLastSig = new Map();
+let _bridgeWindowHooked = false;
+
+function _b64url(bytes) {
+  let s = '';
+  bytes.forEach(b => { s += String.fromCharCode(b); });
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// HMAC-SHA256 over the nonce, keyed with the UTF-8 bytes of the token string.
+// The server proves it holds the token before the page sends anything else.
+async function bridgeHmac(token, nonce) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(token), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return _b64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(nonce))));
+}
+
+function startBridgeWhenIdle() {
+  if (!loadBridgeRecord().enabled) return; // off is off: no timer, no listener
+  const go = () => {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(bridgeConnect, { timeout: 5000 });
+    else setTimeout(bridgeConnect, 2000);
+  };
+  if (document.readyState === 'complete') go();
+  else window.addEventListener('load', go, { once: true });
+}
+
+function bridgeConnect() {
+  const rec = loadBridgeRecord();
+  if (!rec.enabled) { _setBridgeStatus('off'); return; }
+  if (!bridgeSupported()) { _setBridgeStatus('unsupported'); return; }
+  if (_bridgeSocket) return;
+  _bridgeStopped = false;
+  _hookBridgeWindowEvents();
+
+  let ws;
+  try {
+    ws = new WebSocket(bridgeSocketUrl(rec.port));
+  } catch (_) {
+    _scheduleBridgeRetry();
+    return;
+  }
+  _bridgeSocket = ws;
+  _bridgeReady = false;
+  let opened = false;
+  let refused = false;
+  const nonce = _b64url(crypto.getRandomValues(new Uint8Array(32)));
+  if (bridgeStatus.state !== 'waiting-permission') _setBridgeStatus('waiting-server');
+  // Chrome holds the socket silently while its permission prompt is open.
+  _bridgePermTimer = setTimeout(() => { if (!opened) _setBridgeStatus('waiting-permission'); }, BRIDGE_PERMISSION_HINT_MS);
+
+  ws.onopen = () => {
+    opened = true;
+    clearTimeout(_bridgePermTimer);
+    ws.send(JSON.stringify({ type: 'challenge', nonce }));
+  };
+  ws.onmessage = async ev => {
+    let frame;
+    try { frame = JSON.parse(ev.data); } catch (_) { return; }
+    if (!frame || typeof frame !== 'object') return;
+    if (!_bridgeReady) {
+      if (frame.type !== 'proof') return;
+      const want = await bridgeHmac(rec.token, nonce);
+      if (frame.hmac !== want) {
+        // Wrong code, or something else on the port: the token is never sent.
+        refused = true;
+        _setBridgeStatus('refused');
+        try { ws.close(4001, 'refused'); } catch (_) { /* already closing */ }
+        return;
+      }
+      _bridgeReady = true;
+      _bridgeAttempts = 0;
+      ws.send(JSON.stringify({
+        type: 'hello', token: rec.token, tabId: TAB_ID, appVersion: APP_VERSION,
+        week: currentWeekKey, lang: currentLang, visible: document.visibilityState === 'visible',
+      }));
+      _setBridgeStatus('connected', typeof frame.client === 'string' ? frame.client.slice(0, 80) : null);
+      return;
+    }
+    if (frame.type === 'call') bridgeHandleCall(frame);
+  };
+  ws.onclose = async ev => {
+    clearTimeout(_bridgePermTimer);
+    if (_bridgeSocket === ws) { _bridgeSocket = null; _bridgeReady = false; }
+    if (_bridgeStopped) return;
+    if (refused || ev.reason === 'refused') { _setBridgeStatus('refused'); return; }
+    if (!opened && await _bridgePermissionDenied()) _setBridgeStatus('blocked');
+    else _setBridgeStatus('waiting-server');
+    _scheduleBridgeRetry();
+  };
+  ws.onerror = () => { /* onclose follows and decides */ };
+}
+
+// Best effort: a refused loopback connection and a blocked one both fail at
+// once, so ask the Permissions API when it knows the name.
+async function _bridgePermissionDenied() {
+  if (!navigator.permissions?.query) return false;
+  for (const name of ['loopback-network', 'local-network-access', 'local-network']) {
+    try {
+      const st = await navigator.permissions.query({ name });
+      if (st) return st.state === 'denied';
+    } catch (_) { /* name unknown to this browser */ }
+  }
+  return false;
+}
+
+function _scheduleBridgeRetry() {
+  clearTimeout(_bridgeRetryTimer);
+  const delay = Math.min(BRIDGE_BACKOFF_MAX_MS, BRIDGE_BACKOFF_MIN_MS * 2 ** _bridgeAttempts);
+  _bridgeAttempts++;
+  _bridgeRetryTimer = setTimeout(bridgeConnect, delay);
+}
+
+function bridgeDisconnect() {
+  _bridgeStopped = true;
+  clearTimeout(_bridgeRetryTimer);
+  clearTimeout(_bridgePermTimer);
+  _bridgeRetryTimer = _bridgePermTimer = null;
+  _bridgeAttempts = 0;
+  const ws = _bridgeSocket;
+  _bridgeSocket = null;
+  _bridgeReady = false;
+  if (ws) { try { ws.close(1000, 'forget'); } catch (_) { /* already closed */ } }
+  _setBridgeStatus('off');
+}
+
+function _bridgeSend(frame) {
+  if (!_bridgeSocket || !_bridgeReady) return;
+  try { _bridgeSocket.send(JSON.stringify(frame)); } catch (_) { /* socket closing */ }
+}
+
+// Called from every place a week's content can change (saveWeek, a Drive or
+// peer-tab merge). Deduplicated by content signature, so each distinct change
+// yields one event whichever path wrote it.
+function bridgeNotifyWeekSaved(wk, data) {
+  if (!_bridgeReady) return; // nothing is hashed while no agent listens
+  const sig = weekContentHash(data);
+  if (_bridgeLastSig.get(wk) === sig) return;
+  _bridgeLastSig.set(wk, sig);
+  _bridgeSend({ type: 'event', event: 'week-saved', wk, sig });
+}
+
+function bridgeNotifyView() {
+  _bridgeSend({ type: 'event', event: 'view', wk: currentWeekKey });
+}
+
+function _hookBridgeWindowEvents() {
+  if (_bridgeWindowHooked) return;
+  _bridgeWindowHooked = true;
+  window.addEventListener('focus', () => _bridgeSend({ type: 'event', event: 'focus', wk: currentWeekKey }));
+  document.addEventListener('visibilitychange', () => {
+    _bridgeSend({ type: 'event', event: document.visibilityState === 'visible' ? 'focus' : 'pause', wk: currentWeekKey });
+  });
+}
+
+// ── Calls ──
+class BridgeError extends Error {
+  constructor(code, message) { super(message || code); this.code = code; }
+}
+const _bridgeBad = msg => new BridgeError('bad_args', msg);
+
+const _bridgeQueue = [];
+let _bridgeBusy = false;
+
+// Writes run strictly one at a time, in arrival order. Reads never wait.
+function bridgeHandleCall(frame) {
+  const { id, tool } = frame;
+  const def = Object.prototype.hasOwnProperty.call(BRIDGE_TOOLS, tool) ? BRIDGE_TOOLS[tool] : null;
+  if (!def) { _bridgeSend({ type: 'result', id, ok: false, error: { code: 'unknown_tool', message: String(tool) } }); return Promise.resolve(); }
+  const run = () => bridgeRunTool(tool, frame.args)
+    .then(data => _bridgeSend({ type: 'result', id, ok: true, data }))
+    .catch(err => _bridgeSend({ type: 'result', id, ok: false, error: {
+      code: err instanceof BridgeError ? err.code : 'internal',
+      message: String(err && err.message || err),
+    } }));
+  if (def.read) return run();
+  return new Promise(resolve => { _bridgeQueue.push(() => run().then(resolve)); _pumpBridgeQueue(); });
+}
+
+async function _pumpBridgeQueue() {
+  if (_bridgeBusy) return;
+  _bridgeBusy = true;
+  try {
+    while (_bridgeQueue.length) await _bridgeQueue.shift()();
+  } finally {
+    _bridgeBusy = false;
+  }
+}
+
+// Runs one tool to completion. Exported for tests; the socket path goes through
+// bridgeHandleCall.
+async function bridgeRunTool(tool, rawArgs) {
+  const def = BRIDGE_TOOLS[tool];
+  if (!def) throw new BridgeError('unknown_tool', tool);
+  const args = rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs) ? rawArgs : {};
+  const allowed = new Set(def.args || []);
+  for (const k of Object.keys(args)) if (!allowed.has(k)) throw _bridgeBad(`unknown argument "${k}"`);
+  if (def.read) return def.run(args);
+  await _bridgeWaitForUser();
+  if (def.async) return def.run(args);
+  // A synchronous write: inside the week lock, so no Drive or peer-tab merge
+  // can land between its read of weekData and its write.
+  const wk = currentWeekKey;
+  return withWeekLock(wk, () => _bridgeSyncWrite(tool, def, args));
+}
+
+// The user typing in the map editor or the comment panel holds writes back, so
+// the agent never rewrites a node under the cursor.
+async function _bridgeWaitForUser() {
+  const start = Date.now();
+  while (editState || hasEditingNode() || isCommentDialogOpen()) {
+    if (Date.now() - start >= BRIDGE_USER_BUSY_MS) throw new BridgeError('user_busy', 'the user is editing; retry later');
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
+// One call, one undo entry. Validation runs before the snapshot, so a refused
+// call leaves nothing behind; a failure after it is rolled back in memory,
+// never through undo() (which would push a redo entry and force a Drive push).
+function _bridgeSyncWrite(tool, def, args) {
+  const ctx = def.check(args);
+  if (ctx.noop) return ctx.result;
+  const redoBefore = redoStack.slice();
+  takeSnapshot();
+  const summary = t(`bridge.toast.${tool}`, ctx.toast || {});
+  _labelTopSnapshot(summary);
+  let out;
+  try {
+    out = def.apply(ctx);
+  } catch (err) {
+    _bridgeRollback(redoBefore);
+    throw err;
+  }
+  saveWeek(currentWeekKey, weekData);
+  renderIfVisible();
+  if (currentView === 'agenda') renderAgenda();
+  _bridgeAnnounce(summary, out && out.pulse);
+  return out ? out.result : null;
+}
+
+function _bridgeRollback(redoBefore) {
+  const raw = undoStack.pop();
+  redoStack = redoBefore;
+  if (!raw) return;
+  const snap = JSON.parse(raw);
+  if (snap.weekKey === currentWeekKey && snap.weekData) {
+    weekData = snap.weekData;
+    rebuildNodeMap();
+  }
+  if (snap.branchColors) {
+    Object.keys(BRANCH_COLORS).forEach(k => { if (!snap.branchColors[k]) delete BRANCH_COLORS[k]; });
+    Object.assign(BRANCH_COLORS, snap.branchColors);
+  }
+  if (snap.branchConfig) {
+    Object.keys(BRANCH_CONFIG).forEach(k => { if (!snap.branchConfig[k]) delete BRANCH_CONFIG[k]; });
+    Object.assign(BRANCH_CONFIG, snap.branchConfig);
+  }
+  if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
+  renderIfVisible();
+}
+
+// The name of the action an undo entry reverses, so `undo` can tell the agent.
+function _labelTopSnapshot(label) {
+  if (!undoStack.length) return;
+  try {
+    const snap = JSON.parse(undoStack[undoStack.length - 1]);
+    snap.actionLabel = label;
+    undoStack[undoStack.length - 1] = JSON.stringify(snap);
+  } catch (_) { /* unreadable entry - leave it */ }
+}
+function _snapshotLabel(raw) {
+  try { return JSON.parse(raw).actionLabel || null; } catch (_) { return null; }
+}
+
+function _bridgeAnnounce(summary, ids) {
+  showToast(summary, 3000);
+  (ids || []).forEach(id => {
+    requestAnimationFrame(() => {
+      const el = nodeGroupEl(id);
+      if (!el) return;
+      el.classList.add('drag-target');
+      setTimeout(() => el.classList.remove('drag-target'), 1200);
+    });
+  });
+}
+
+// ── Argument helpers ──
+function _bridgeNode(id, ...types) {
+  if (typeof id !== 'string' || !id) throw _bridgeBad('id is required');
+  const node = findNode(id);
+  if (!node || node.type === 'center') throw new BridgeError('not_found', `no node ${id} in week ${currentWeekKey}`);
+  if (types.length && !types.includes(node.type)) throw new BridgeError('wrong_type', `${id} is a ${node.type}`);
+  return node;
+}
+
+// A task the agent may act on: an activity that is not a day or tick leaf.
+function _bridgeTask(id) {
+  const node = _bridgeNode(id, 'activity');
+  if (node.dayChild || node.tickChild) throw new BridgeError('wrong_type', `${id} is a ${node.dayChild ? 'day' : 'tick'} leaf; use its task`);
+  return node;
+}
+
+function _bridgeLabel(label) {
+  if (typeof label !== 'string' || !label.trim()) throw _bridgeBad('label must be a non-empty string');
+  const s = label.trim();
+  if (s.length > BRIDGE_LABEL_MAX) throw _bridgeBad(`label longer than ${BRIDGE_LABEL_MAX} characters`);
+  // A relative day resolves against today, so "tomorrow" on a Sunday would
+  // quietly move the task to next week. The agent passes `days` instead.
+  if (resolveMagicDayTokens(s) !== s || hasNowToken(s)) throw _bridgeBad('relative day words (today, tomorrow, now) are refused; pass days instead');
+  return s;
+}
+
+// ISO weekdays 1-7 (Monday = 1) at the edge, dayIndex (0 = Sunday) inside.
+function _bridgeDays(days) {
+  if (!Array.isArray(days)) throw _bridgeBad('days must be an array of ISO weekdays 1-7');
+  const out = new Set();
+  for (const d of days) {
+    if (!Number.isInteger(d) || d < 1 || d > 7) throw _bridgeBad('days must be ISO weekdays 1-7');
+    out.add(d % 7);
+  }
+  return out;
+}
+const bridgeIsoDay = dayIndex => (dayIndex === 0 ? 7 : dayIndex);
+
+const BRIDGE_PRIORITIES = ['normal', 'high', 'critical'];
+function _bridgePriority(p) {
+  if (!BRIDGE_PRIORITIES.includes(p)) throw _bridgeBad('priority must be normal, high or critical');
+  return p;
+}
+
+function commentHasUnsafeLink(text) {
+  for (const line of text.split('\n')) {
+    for (const m of line.matchAll(COMMENT_INLINE_RE)) {
+      if (m.groups.linkText !== undefined && !isSafeCommentUrl(m.groups.linkHref)) return true;
+    }
+  }
+  return false;
+}
+function _bridgeComment(text) {
+  if (typeof text !== 'string') throw _bridgeBad('markdown must be a string');
+  if (text.length > BRIDGE_COMMENT_MAX) throw _bridgeBad(`comment longer than ${BRIDGE_COMMENT_MAX} characters`);
+  if (commentHasUnsafeLink(text)) throw _bridgeBad('a link target must be http:, https: or mailto:');
+  return text;
+}
+
+function _bridgeWeekKey(week) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(week || ''));
+  if (!m) throw _bridgeBad('week must be YYYY-WW');
+  const y = +m[1], w = +m[2];
+  if (w < 1 || w > weeksInYear(y)) throw _bridgeBad(`week ${week} does not exist`);
+  return `${m[1]}-${m[2]}`;
+}
+
+// ── Projection (spec section 8.3) ──
+// Pure over a week record: the same code serves the week in view and any
+// stored week. Internal stamps and layout never leave the page.
+function projectWeek(record, wk) {
+  const nodes = (record && Array.isArray(record.nodes)) ? record.nodes : [];
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const { year, week } = parseWeekKey(wk);
+  const { monday, sunday } = getWeekBounds(year, week);
+  const branches = nodes.filter(n => n.type === 'branch').map(b => ({
+    id: b.id,
+    label: b.label,
+    color: BRANCH_COLORS[b.id]?.main || null,
+    tasks: (b.children || []).map(id => byId.get(id)).filter(isProjectedTask).map(n => projectTask(n, byId)),
+  }));
+  return {
+    week: wk,
+    label: formatWeekLabel(year, week),
+    range: `${monday.toISOString().slice(0, 10)}/${sunday.toISOString().slice(0, 10)}`,
+    branches,
+  };
+}
+
+function isProjectedTask(n) {
+  return !!n && n.type === 'activity' && !n.dayChild && !n.tickChild && !n._editing;
+}
+
+function projectTask(n, byId = nodeMap) {
+  const kids = (n.children || []).map(id => byId.get(id)).filter(Boolean);
+  const leafDays = kids.filter(c => c.dayChild).map(c => c.dayIndex);
+  const days = [...new Set([...leafDays, ...parseTodoDays(n.label || '')])].map(bridgeIsoDay).sort((a, b) => a - b);
+  const tickLeaves = kids.filter(c => c.tickChild);
+  const counter = kids.find(c => c.type === 'counter');
+  let ticks = null;
+  if (tickLeaves.length) ticks = { done: tickLeaves.filter(c => c.done).length, total: tickLeaves.length };
+  else if (counter) ticks = { done: counter.val || 0, total: counter.max || 0, legacy: true };
+  return {
+    id: n.id,
+    label: stripDayGroups(n.label || '').trim() || n.label || '',
+    days,
+    priority: n.priority === 'high' || n.priority === 'critical' ? n.priority : 'normal',
+    done: !!n.done,
+    dropped: !!n.dropped,
+    unplanned: !!n.unplanned,
+    reusable: !!n.reusable,
+    doneAt: n.doneAt || null,
+    droppedAt: n.droppedAt || null,
+    comments: n.comments || '',
+    ticks,
+    children: kids.filter(isProjectedTask).map(c => projectTask(c, byId)),
+  };
+}
+
+const _bridgeProjected = id => projectTask(findNode(id));
+
+async function _bridgeWeekRecord(wk) {
+  if (wk === currentWeekKey) return weekData; // memory, never the lagging IDB copy
+  return loadWeekIDB(wk);
+}
+
+// ── Tool table ──
+// read:  runs at once, never queued or held
+// async: owns its snapshot and lock (or takes none); not wrapped
+// else:  check(args) validates and returns a context before any snapshot;
+//        apply(ctx) mutates through the shared bodies and returns { result, pulse }
+const BRIDGE_TOOLS = {
+  read_weeks: {
+    read: true, args: [],
+    async run() {
+      const keys = (await listWeekKeysIDB()).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+      const out = [];
+      for (const wk of keys) {
+        const rec = await _bridgeWeekRecord(wk);
+        const tasks = (rec?.nodes || []).filter(isProjectedTask);
+        out.push({ week: wk, tasks: tasks.length, done: tasks.filter(n => n.done).length });
+      }
+      return { current: currentWeekKey, weeks: out };
+    },
+  },
+  read_week: {
+    read: true, args: ['week'],
+    async run({ week }) {
+      const wk = week === undefined || week === 'current' ? currentWeekKey : _bridgeWeekKey(week);
+      const rec = await _bridgeWeekRecord(wk);
+      if (!rec) throw new BridgeError('not_found', `week ${wk} is not stored on this device`);
+      return projectWeek(rec, wk);
+    },
+  },
+  read_schedule: {
+    read: true, args: [],
+    run: async () => JSON.parse(JSON.stringify(scheduleData)),
+  },
+  read_agenda: {
+    read: true, args: ['day'],
+    async run({ day }) {
+      if (!Number.isInteger(day) || day < 1 || day > 7) throw _bridgeBad('day must be an ISO weekday 1-7');
+      const { groups } = computeAgendaGroups(day % 7);
+      return {
+        week: currentWeekKey, day, date: tabDateString(day % 7),
+        groups: groups.map(g => ({
+          group: g.kind,
+          rows: g.rows.map(r => ({
+            id: r.id,
+            // A day leaf's row is its task on that day.
+            task: projectTask(r.node.dayChild ? findNode(r.node.parent) || r.node : r.node),
+            tick: r.tickRecord ? { position: r.tickRecord.position, total: r.tickRecord.total } : null,
+          })),
+        })),
+      };
+    },
+  },
+  get_stats: {
+    read: true, args: [],
+    run: async () => ({ week: currentWeekKey, ...JSON.parse(JSON.stringify(computeWeekStats())) }),
+  },
+
+  open_week: {
+    async: true, args: ['week'],
+    async run({ week }) {
+      const wk = _bridgeWeekKey(week);
+      if (wk !== currentWeekKey) await loadAndRender(wk);
+      return projectWeek(weekData, currentWeekKey);
+    },
+  },
+
+  add_task: {
+    args: ['branch', 'label', 'parent', 'days', 'priority', 'comment'],
+    check(a) {
+      const label = _bridgeLabel(a.label);
+      const branch = _bridgeBranch(a.branch);
+      let parentId = branch.id;
+      if (a.parent !== undefined) {
+        const p = _bridgeTask(a.parent);
+        if (p.branch !== branch.id) throw _bridgeBad('parent is not in that branch');
+        parentId = p.id;
+      }
+      const days = a.days !== undefined ? _bridgeDays(a.days) : null;
+      if (days && days.size && parseNxCount(label) >= 2) throw _bridgeBad('days and an Nx count cannot be combined: days win and the count would be lost');
+      if (days && parseTodoDays(label).size) throw _bridgeBad('give the days either in the label or in days, not both');
+      const priority = a.priority !== undefined ? _bridgePriority(a.priority) : null;
+      const comment = a.comment !== undefined ? _bridgeComment(a.comment) : null;
+      return { label, parentId, days, priority, comment, toast: { label: stripDayGroups(label).replace(/\s*\d+x\b/gi, '').trim() || label } };
+    },
+    apply({ label, parentId, days, priority, comment }) {
+      const node = createTask(parentId, label, { stampFilterDay: false });
+      if (!node) throw new BridgeError('wrong_type', 'that parent cannot take a task');
+      if (days && days.size) setActivityDays(node.id, days);
+      if (priority) setPriority(node.id, priority);
+      if (comment) writeComment(node.id, comment);
+      return { result: _bridgeProjected(node.id), pulse: [node.id] };
+    },
+  },
+
+  rename_task: {
+    args: ['id', 'label'],
+    check(a) {
+      const node = _bridgeTask(a.id);
+      const label = _bridgeLabel(a.label);
+      return { id: node.id, label, toast: { label: stripDayGroups(label).trim() || label } };
+    },
+    apply({ id, label }) {
+      applyLabelEdit(id, label, { replaceDays: parseTodoDays(label).size > 0 });
+      return { result: _bridgeProjected(id), pulse: [id] };
+    },
+  },
+
+  set_status: {
+    args: ['id', 'status'],
+    check(a) {
+      const node = _bridgeTask(a.id);
+      const allowed = ['done', 'undone', 'dropped', 'unplanned', 'planned'];
+      if (!allowed.includes(a.status)) throw _bridgeBad(`status must be one of ${allowed.join(', ')}`);
+      // Undone reopens from either closed state - the context menu's redirect.
+      const status = a.status === 'undone' && node.dropped ? 'undropped' : a.status;
+      return { id: node.id, status, toast: { label: node.label, status: t(`bridge.status.${a.status}`) } };
+    },
+    apply({ id, status }) {
+      applyStatus(id, status);
+      return { result: _bridgeProjected(id), pulse: [id] };
+    },
+  },
+
+  set_priority: {
+    args: ['id', 'priority'],
+    check(a) {
+      const node = _bridgeTask(a.id);
+      const priority = _bridgePriority(a.priority);
+      const cur = node.priority === 'high' || node.priority === 'critical' ? node.priority : 'normal';
+      if (cur === priority) return { noop: true, result: _bridgeProjected(node.id) };
+      return { id: node.id, priority, toast: { label: node.label, priority: t(`bridge.priority.${priority}`) } };
+    },
+    apply({ id, priority }) {
+      setPriority(id, priority);
+      return { result: _bridgeProjected(id), pulse: [id] };
+    },
+  },
+
+  set_days: {
+    args: ['id', 'days'],
+    check(a) {
+      const node = _bridgeTask(a.id);
+      return { id: node.id, days: _bridgeDays(a.days), hadTicks: !!getTickInfo(node), toast: { label: node.label } };
+    },
+    apply({ id, days, hadTicks }) {
+      setActivityDays(id, days);
+      const result = _bridgeProjected(id);
+      if (hadTicks && days.size) result.ticksRemoved = true;
+      return { result, pulse: [id] };
+    },
+  },
+
+  tick_task: {
+    args: ['id', 'n'],
+    check(a) {
+      const node = _bridgeTask(a.id);
+      const info = getTickInfo(node);
+      if (!info) throw new BridgeError('wrong_type', getCounterChild(node) ? 'legacy counters are read-only' : 'this task has no Nx ticks');
+      const n = a.n === undefined ? 1 : a.n;
+      if (!Number.isInteger(n) || n === 0) throw _bridgeBad('n must be a non-zero integer');
+      const available = n > 0 ? info.total - info.done : info.done;
+      if (Math.abs(n) > available) throw _bridgeBad(`only ${available} tick(s) can be ${n > 0 ? 'closed' : 'reopened'}`);
+      return { id: node.id, n, toast: { label: node.label, n: String(n) } };
+    },
+    apply({ id, n }) {
+      // Picked the way the agenda picks: next pending forward, last done back.
+      for (let i = 0; i < Math.abs(n); i++) {
+        const tickId = pickRepresentativeTick(id, n > 0);
+        applyStatus(tickId, n > 0 ? 'done' : 'undone');
+      }
+      return { result: _bridgeProjected(id), pulse: [id] };
+    },
+  },
+
+  set_comment: {
+    args: ['id', 'markdown'],
+    check(a) {
+      const node = _bridgeTask(a.id);
+      const text = _bridgeComment(a.markdown);
+      if ((node.comments || '') === text) return { noop: true, result: _bridgeProjected(node.id) };
+      return { id: node.id, text, toast: { label: node.label } };
+    },
+    apply({ id, text }) {
+      writeComment(id, text);
+      return { result: _bridgeProjected(id), pulse: [id] };
+    },
+  },
+
+  set_reusable: {
+    args: ['id', 'on'],
+    check(a) {
+      const node = _bridgeTask(a.id);
+      if (typeof a.on !== 'boolean') throw _bridgeBad('on must be true or false');
+      if (!!node.reusable === a.on) return { noop: true, result: _bridgeProjected(node.id) };
+      return { id: node.id, on: a.on, toast: { label: node.label } };
+    },
+    apply({ id, on }) {
+      setReusable(id, on);
+      return { result: _bridgeProjected(id), pulse: [id] };
+    },
+  },
+
+  delete_task: {
+    async: true, args: ['id', 'scope'],
+    async run(a) {
+      const node = _bridgeTask(a.id);
+      if (a.scope !== undefined && a.scope !== 'occurrence' && a.scope !== 'series') throw _bridgeBad('scope must be occurrence or series');
+      const entry = liveOccurrenceEntry(node);
+      const summary = t('bridge.toast.delete_task', { label: node.label });
+      if (entry && isSeriesEntry(entry)) {
+        // deleteNode would open a dialog the agent cannot answer.
+        if (!a.scope) throw new BridgeError('needs_choice', 'this is one date of a repeating entry: pass scope "occurrence" or "series"');
+        if (a.scope === 'series') await deleteEntryWithNode(entry.id, node.id);
+        else await deleteOccurrenceWithNode(entry.id, node.schedDate, node.id);
+      } else if (entry) {
+        await deleteEntryWithNode(entry.id, node.id); // a one-off: both answers are the same act
+      } else {
+        await withWeekLock(currentWeekKey, () => {
+          takeSnapshot();
+          _labelTopSnapshot(summary);
+          _performDelete(node.id, { snapshot: false });
+        });
+      }
+      if (currentView === 'agenda') renderAgenda();
+      _bridgeAnnounce(summary);
+      return { deleted: node.id };
+    },
+  },
+
+  send_to_date: {
+    async: true, args: ['id', 'date', 'repeat'],
+    async run(a) {
+      const node = _bridgeTask(a.id);
+      if (!canSendToDate(node)) throw new BridgeError('wrong_type', 'this node cannot be sent to a date');
+      if (!parseDayString(a.date)) throw _bridgeBad('date must be YYYY-MM-DD');
+      if (a.date < localDateStr()) throw _bridgeBad('date is in the past');
+      const opts = { date: a.date };
+      if (a.repeat !== undefined && a.repeat !== null) {
+        const r = a.repeat;
+        if (typeof r !== 'object' || !SCHEDULE_UNITS.includes(r.unit)) throw _bridgeBad(`repeat.unit must be one of ${SCHEDULE_UNITS.join(', ')}`);
+        opts.unit = r.unit;
+        opts.every = r.every === undefined ? 1 : r.every;
+        if (!Number.isInteger(opts.every) || opts.every < 1) throw _bridgeBad('repeat.every must be a positive integer');
+        const end = r.end || { type: 'never' };
+        if (end.type === 'count') {
+          if (!Number.isInteger(end.n) || end.n < 1) throw _bridgeBad('repeat.end.n must be a positive integer');
+          opts.endType = 'count'; opts.endCount = end.n;
+        } else if (end.type === 'until') {
+          if (!parseDayString(end.date) || end.date < a.date) throw _bridgeBad('repeat.end.date must be a date on or after date');
+          opts.endType = 'until'; opts.endDate = end.date;
+        } else if (end.type !== 'never') {
+          throw _bridgeBad('repeat.end.type must be never, count or until');
+        }
+      }
+      const summary = t('bridge.toast.send_to_date', { label: node.label, date: a.date });
+      const entries = sendNodeToDate(node.id, opts);
+      if (entries === null) throw _bridgeBad('the schedule refused that date');
+      _labelTopSnapshot(summary);
+      renderIfVisible();
+      if (currentView === 'agenda') renderAgenda();
+      _bridgeAnnounce(summary);
+      return { entries: entries.map(e => ({ id: e.id, label: e.label, anchor: e.anchor, repeat: e.repeat, end: e.end })), retagged: entries.length === 0 };
+    },
+  },
+
+  transfer_unfinished: {
+    async: true, args: [],
+    async run() { return _bridgeTransfer('transfer_unfinished', transferUnfinished); },
+  },
+  transfer_reusable: {
+    async: true, args: [],
+    async run() { return _bridgeTransfer('transfer_reusable', transferReusable); },
+  },
+
+  add_branch: {
+    args: ['label', 'side', 'color'],
+    check(a) {
+      if (typeof a.label !== 'string' || !a.label.trim()) throw _bridgeBad('label must be a non-empty string');
+      const label = a.label.trim().slice(0, BRIDGE_LABEL_MAX);
+      let side = a.side;
+      if (side === undefined) {
+        const count = s => weekData.nodes.filter(n => n.type === 'branch' && (BRANCH_CONFIG[n.id]?.side || 'right') === s).length;
+        side = count('left') < count('right') ? 'left' : 'right';
+      } else if (side !== 'left' && side !== 'right') {
+        throw _bridgeBad('side must be left or right');
+      }
+      if (a.color !== undefined && !/^#[0-9a-f]{6}$/i.test(a.color)) throw _bridgeBad('color must be #rrggbb');
+      return { label, side, color: a.color, toast: { label } };
+    },
+    apply({ label, side, color }) {
+      const node = createBranch({ side, label });
+      if (color) setBranchColor(node.id, color);
+      saveBranchColors();
+      return { result: { id: node.id, label: node.label, side, color: BRANCH_COLORS[node.id]?.main || null, tasks: [] }, pulse: [node.id] };
+    },
+  },
+
+  undo: {
+    async: true, args: [],
+    async run() {
+      if (!undoStack.length) return { undone: null };
+      const label = _snapshotLabel(undoStack[undoStack.length - 1]);
+      await undo();
+      _labelRedoTop(label);
+      const what = label || t('bridge.userAction');
+      _bridgeAnnounce(t('bridge.toast.undo', { what }));
+      return { undone: what };
+    },
+  },
+  redo: {
+    async: true, args: [],
+    async run() {
+      if (!redoStack.length) return { redone: null };
+      const label = _snapshotLabel(redoStack[redoStack.length - 1]);
+      await redo();
+      _labelTopSnapshot(label);
+      const what = label || t('bridge.userAction');
+      _bridgeAnnounce(t('bridge.toast.redo', { what }));
+      return { redone: what };
+    },
+  },
+};
+
+function _labelRedoTop(label) {
+  if (!label || !redoStack.length) return;
+  try {
+    const snap = JSON.parse(redoStack[redoStack.length - 1]);
+    snap.actionLabel = label;
+    redoStack[redoStack.length - 1] = JSON.stringify(snap);
+  } catch (_) { /* unreadable entry - leave it */ }
+}
+
+// A branch by id, or by its label (case-insensitive) when the label is unique.
+function _bridgeBranch(ref) {
+  if (typeof ref !== 'string' || !ref) throw _bridgeBad('branch is required');
+  const branches = weekData.nodes.filter(n => n.type === 'branch');
+  const byId = branches.find(b => b.id === ref);
+  if (byId) return byId;
+  const byLabel = branches.filter(b => (b.label || '').toLowerCase() === ref.toLowerCase());
+  if (byLabel.length === 1) return byLabel[0];
+  throw new BridgeError('not_found', byLabel.length ? `branch name "${ref}" is ambiguous; pass its id` : `no branch "${ref}"`);
+}
+
+async function _bridgeTransfer(tool, fn) {
+  const topBefore = undoStack[undoStack.length - 1];
+  await fn();
+  const summary = t(`bridge.toast.${tool}`);
+  if (undoStack[undoStack.length - 1] !== topBefore) _labelTopSnapshot(summary);
+  _bridgeAnnounce(summary);
+  return projectWeek(weekData, currentWeekKey);
+}
+
 // ─── Export / Import ──────────────────────────────────────────────────────────
 document.getElementById('export-data-btn').addEventListener('click', () => {
   exportAllData();
@@ -27369,6 +28287,7 @@ window.addEventListener('load', async () => {
   traceMilestone('local week painted');
   endBoot();
   scheduleCommentEditorPrefetch();
+  startBridgeWhenIdle();
 
   if (_quietRestore && _quietRestore.hoveredNodeId && findNode(_quietRestore.hoveredNodeId)) {
     hoveredNodeId = _quietRestore.hoveredNodeId;

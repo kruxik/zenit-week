@@ -6,6 +6,10 @@ import {
   checkForAssetUpdate,
   requestPersistentStorage,
   _state,
+  saveBridgeRecord,
+  bridgeConnect,
+  bridgeDisconnect,
+  bridgeSocketUrl,
 } from './setup.js';
 
 const sandbox = _state.sandbox;
@@ -196,5 +200,31 @@ describe('requestPersistentStorage', () => {
       persist: async () => true,
     };
     await expect(requestPersistentStorage()).resolves.toBeUndefined();
+  });
+});
+
+// The agent bridge is the one approved widening of what the page talks to, and
+// only to this machine (docs/specs/agent-bridge.md, section 3).
+describe('agent bridge socket', () => {
+  it('never targets a non-loopback host, whatever the record holds', () => {
+    const urls = [];
+    sandbox.WebSocket = class { constructor(u) { urls.push(u); } send() {} close() {} };
+    try {
+      for (const port of [47831, 'evil.com', '1@evil.com', -1, 99999]) {
+        saveBridgeRecord({ enabled: true, port, token: 'abcdefghijklmnopqrstuvwxyz012345' });
+        bridgeConnect();
+        bridgeDisconnect();
+      }
+      expect(urls.length).toBe(5);
+      for (const u of urls) {
+        const url = new URL(u);
+        expect(url.protocol).toBe('ws:');
+        expect(url.hostname).toBe('127.0.0.1');
+      }
+      expect(() => bridgeSocketUrl('1@evil.com')).toThrow();
+    } finally {
+      delete sandbox.WebSocket;
+      _state.clearLocalStorage();
+    }
   });
 });
