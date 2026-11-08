@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ZoxT3lYQNTCszSMmKXosu7xsWt7CUqgEx00vmlEx9zg=';
+               'sha256-b2yelW1YRxkL6ksXLGlPrk8Gg1jtRkmWHF3TbIxsgf0=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -5693,8 +5693,23 @@ tabChannel.onmessage = (e) => {
   const msg = e.data;
   if (!msg || typeof msg !== 'object') return;
   if (msg.origin === TAB_ID) return;          // ignore our own echoes
-  if (msg.type === 'week-saved') onPeerWeekSaved(msg);
+  if (msg.type === 'week-saved') {
+    if (msg.wk === VISION_STORAGE_KEY) onPeerVisionSaved(msg);
+    else onPeerWeekSaved(msg);
+  }
 };
+
+// A peer tab saved the vision. The shared IndexedDB already holds its write, so
+// a tab that is not drawing the Vision has nothing to reconcile; a tab that is
+// merges it into the map it shows, through the same path as a Drive pull.
+async function onPeerVisionSaved(msg) {
+  if (!isVisionInView()) return;
+  if (msg.sig && msg.sig === _weekContentSig(weekData)) return;
+  let remote = null;
+  try { remote = await loadValueIDB(VISION_STORAGE_KEY); } catch { remote = null; }
+  if (!remote) return;
+  await mergeRemoteVision(remote);
+}
 
 // Reconcile a peer tab's save of `wk` into this tab. Mirrors the Drive poll/flush
 // path (loadWeekIDB → mergeWeekData → applyRemoteMerge): a peer tab is just
@@ -6114,6 +6129,199 @@ async function saveSchedule(data) {
     console.warn('[zenit-week] Failed to save schedule to IndexedDB:', e);
     return false;
   }
+}
+
+// ─── Vision store ─────────────────────────────────────────────────────────────
+// The Vision Canvas is one more record in the `misc` store, beside the schedule,
+// and it is shaped like a week record so that every function which reads a week
+// (merge, layout, render, undo snapshots) reads it unchanged. It holds
+// intentions, not tasks: no days, no repetitions, no done. Writing the vision
+// never writes a week, and writing a week never touches the vision.
+const VISION_STORAGE_KEY = 'vision';
+const VISION_HORIZONS = new Set(['year', 'years', 'someday']);
+// The only fields a vision node may carry. Anything else is the week's own
+// machinery (done, days, ticks, reusable, schedule links, demo flags) and is
+// stripped, never refused: a record from an older build or a node moved in by
+// hand through an import must land as a usable vision, not as a failed load.
+// `_editing` is the transient in-place editor flag; it lives in memory only and
+// is filtered out of what is persisted, exactly as saveWeek does.
+const VISION_NODE_FIELDS = new Set([
+  'id', 'type', 'branch', 'label', 'parent', 'children',
+  'priority', 'comments', 'dropped', 'droppedAt', 'horizon', 'collapsed',
+  'offX', 'offY', 'side', '_ts', '_posTs', '_editing',
+]);
+
+function emptyVision() {
+  return { nodes: [], tombstones: [], crdtVersion: 0 };
+}
+
+// Strip one node down to the vision vocabulary, in place. `horizon` keeps only
+// its three values and `collapsed` only `true`; neither is ever invented.
+// Whether a collapsed node still has children to hide is a tree question, so
+// validateAndRepairVision settles it after the tree is repaired.
+function stripVisionNode(n) {
+  for (const k of Object.keys(n)) if (!VISION_NODE_FIELDS.has(k)) delete n[k];
+  if (n.horizon !== undefined && !VISION_HORIZONS.has(n.horizon)) delete n.horizon;
+  if (n.collapsed !== undefined && n.collapsed !== true) delete n.collapsed;
+  if (n.dropped !== undefined && n.dropped !== true) { delete n.dropped; delete n.droppedAt; }
+  if (!n.dropped) delete n.droppedAt;
+  return n;
+}
+
+// The week validator gives the vision its tombstones, parent/child symmetry and
+// unreachable-node collection. Two week habits must not reach it: a record
+// with no branch at all comes back holding the default branches (`work`,
+// `family`, ...), and a node whose parent names a default id gets that branch
+// back. Vision branch ids are genId() UUIDs that never equal a week's (V4), so
+// such a record is handled before the week validator sees it, and any default
+// branch it reconstructs anyway is taken out again with everything under it.
+function validateAndRepairVision(raw) {
+  const out = emptyVision();
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.nodes)) return out;
+
+  const tombstones = (Array.isArray(raw.tombstones) ? raw.tombstones : [])
+    .filter(id => typeof id === 'string' && isValidNodeId(id));
+  let nodes = raw.nodes
+    .filter(n => n && typeof n === 'object')
+    .map(n => structuredClone(n));
+
+  // The week's machinery leaves go first, whole: a day leaf, a tick leaf or a
+  // legacy counter has no meaning here, and a node under one has nothing to
+  // hang from once it is gone. The center is virtual on the Vision (V5).
+  const isMachinery = n => n.dayChild || n.tickChild || n.type === 'counter' || n.type === 'center';
+  const removed = new Set(nodes.filter(isMachinery).map(n => n.id));
+  let grew = removed.size > 0;
+  while (grew) {
+    grew = false;
+    for (const n of nodes) {
+      if (!removed.has(n.id) && removed.has(n.parent)) { removed.add(n.id); grew = true; }
+    }
+  }
+  nodes = nodes.filter(n => !removed.has(n.id));
+  for (const n of nodes) {
+    if (Array.isArray(n.children)) n.children = n.children.filter(cid => !removed.has(cid));
+  }
+
+  if (!nodes.some(n => n.type === 'branch')) {
+    out.tombstones = tombstones;
+    out.crdtVersion = Number.isFinite(raw.crdtVersion) ? raw.crdtVersion : 0;
+    if (Number.isFinite(raw.savedAt)) out.savedAt = raw.savedAt;
+    return out;
+  }
+
+  const inputIds = new Set(nodes.map(n => n.id));
+  const repaired = validateAndRepair({ ...raw, nodes, tombstones: [...tombstones] });
+  const injected = new Set(repaired.nodes
+    .filter(n => n.type === 'branch' && !inputIds.has(n.id)).map(n => n.id));
+  if (injected.size) {
+    let more = true;
+    while (more) {
+      more = false;
+      for (const n of repaired.nodes) {
+        if (!injected.has(n.id) && injected.has(n.parent)) { injected.add(n.id); more = true; }
+      }
+    }
+    repaired.nodes = repaired.nodes.filter(n => !injected.has(n.id));
+  }
+
+  repaired.nodes.forEach(stripVisionNode);
+  repaired.nodes.forEach(n => {
+    if (n.collapsed && !(Array.isArray(n.children) && n.children.length)) delete n.collapsed;
+  });
+
+  out.nodes = repaired.nodes;
+  out.tombstones = Array.isArray(repaired.tombstones) ? repaired.tombstones : tombstones;
+  out.crdtVersion = Number.isFinite(repaired.crdtVersion) ? repaired.crdtVersion : 0;
+  if (Number.isFinite(repaired.savedAt)) out.savedAt = repaired.savedAt;
+  return out;
+}
+
+// A missing record is an empty vision, never an error: most devices have never
+// opened the Vision. Seeding the first areas is the view's job, not the store's,
+// because it has to wait for Drive's answer first.
+async function loadVision() {
+  let raw = null;
+  try {
+    raw = await loadValueIDB(VISION_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[zenit-week] Failed to load vision from IndexedDB:', e);
+  }
+  return validateAndRepairVision(raw);
+}
+
+// The vision twin of saveWeek. Strips week fields from the record in place
+// (createTask and friends write `done: false` and the like on every node they
+// make, and none of it may reach a vision node), stamps it, writes it, schedules
+// the Drive push and tells peer tabs. Returns whether the write landed; a
+// failure is logged and never taken for a week failure.
+async function saveVision(data) {
+  data.nodes.forEach(stripVisionNode);
+  data.savedAt = Date.now();
+  data.crdtVersion = (data.crdtVersion || 0) + 1;
+  if (!Array.isArray(data.tombstones)) data.tombstones = [];
+  // Before any await, as in saveWeek: an editing placeholder is not yet a node.
+  const persisted = { ...data, nodes: data.nodes.filter(n => !n._editing) };
+  try {
+    await saveValueIDB(VISION_STORAGE_KEY, persisted);
+  } catch (e) {
+    console.warn('[zenit-week] Failed to save vision to IndexedDB:', e);
+    return false;
+  }
+  tabChannel.postMessage({ type: 'week-saved', wk: VISION_STORAGE_KEY, sig: _weekContentSig(persisted), origin: TAB_ID });
+  scheduleVisionSync();
+  return true;
+}
+
+// Whether the map is drawing the vision record right now.
+function isVisionInView() {
+  return currentView === 'vision';
+}
+
+// The one way a remote vision (another device via Drive, or a peer tab via the
+// shared IndexedDB) reaches this device. Merges with what this device holds -
+// the record in memory when the Vision is on screen, the stored one otherwise -
+// writes the result, and redraws only when the Vision is in view and the merge
+// changed what it shows. An open editor defers it through the week's own
+// pendingRemoteMerge slot, which _flushPendingMerge hands back here. Returns
+// 'deferred', 'unchanged' or 'merged', plus the merged record for the caller's
+// sync bookkeeping.
+async function mergeRemoteVision(remoteRaw) {
+  const remote = validateAndRepairVision(remoteRaw);
+  if (isVisionInView() && (isAtomicOpActive() || hasEditingNode())) {
+    pendingRemoteMerge = { wKey: VISION_STORAGE_KEY, remoteData: remote };
+    return { outcome: 'deferred', merged: null };
+  }
+  return withWeekLock(VISION_STORAGE_KEY, async () => {
+    const inView = isVisionInView();
+    let local;
+    if (inView) local = structuredClone(weekData);
+    else {
+      try { local = await loadValueIDB(VISION_STORAGE_KEY); } catch { local = null; }
+      local = validateAndRepairVision(local);
+    }
+    const merged = validateAndRepairVision(mergeWeekData(structuredClone(local), remote, VISION_STORAGE_KEY));
+    const changed = weekContentHash(merged) !== weekContentHash(local);
+    if (!changed) return { outcome: 'unchanged', merged };
+    merged.crdtVersion = Math.max(local.crdtVersion || 0, remote.crdtVersion || 0) + 1;
+    try {
+      await saveValueIDB(VISION_STORAGE_KEY, merged);
+    } catch (e) {
+      console.error('[zenit-week] Failed to write merged vision to IndexedDB:', e);
+    }
+    // The merge holds something the remote lacks: peers and Drive must learn it.
+    if (weekContentHash(merged) !== weekContentHash(remote)) {
+      tabChannel.postMessage({ type: 'week-saved', wk: VISION_STORAGE_KEY, sig: _weekContentSig(merged), origin: TAB_ID });
+      scheduleVisionSync();
+    }
+    if (isVisionInView() && _weekContentSig(merged) !== _weekContentSig(weekData)) {
+      weekData = merged;
+      rebuildNodeMap();
+      refreshOpenComment();
+      syncBranchConfig();
+      render();
+    }
+    return { outcome: 'merged', merged };
+  });
 }
 
 // ─── Dev-only reset ───────────────────────────────────────────────────────────
@@ -7331,6 +7539,18 @@ const DATA_RECORDS = [
     push: async () => { await syncScheduleToDrive(); return true; },
   },
   {
+    idbKey: VISION_STORAGE_KEY,
+    exportKey: 'zenit-week-vision',
+    sanitize: raw => validateAndRepairVision(raw),
+    importDefault: null,
+    // An export from before the Vision existed says nothing about it, so an
+    // import of one leaves this device's vision exactly where it was.
+    keepWhenAbsentOnImport: true,
+    // Same policy as the schedule: a vision that will retry on its next change
+    // must not make a healthy week sync look broken.
+    push: async () => { await syncVisionToDrive(); return true; },
+  },
+  {
     idbKey: COLORS_STORAGE_KEY,
     exportKey: COLORS_STORAGE_KEY,
     sanitize: raw => sanitizeColorsData(raw),
@@ -8344,6 +8564,9 @@ let colorsSyncedHash = null;
 let scheduleSyncDebounceTimer = null;
 let scheduleSyncedHash = null;
 let lastSeenRemoteScheduleHash = null; // Drive appProperty contentHash the poll last reconciled for the schedule
+let visionSyncDebounceTimer = null;
+let visionSyncedHash = null;
+let lastSeenRemoteVisionHash = null; // Drive appProperty contentHash the poll last reconciled for the vision
 let lastSeenRemoteColorsHash = null; // Drive appProperty contentHash the poll last reconciled for colors (may be a legacy raw-JSON hash; same decoupling as lastSeenRemoteHash for weeks)
 let tokenRenewalTimer = null;
 let _tokenReceivedAt = 0;         // epoch ms when current access token was obtained
@@ -9096,6 +9319,7 @@ async function signOut() {
   clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer)  { clearTimeout(colorsSyncDebounceTimer);   colorsSyncDebounceTimer = null; }
   if (scheduleSyncDebounceTimer) { clearTimeout(scheduleSyncDebounceTimer); scheduleSyncDebounceTimer = null; }
+  if (visionSyncDebounceTimer)   { clearTimeout(visionSyncDebounceTimer);   visionSyncDebounceTimer = null; }
 
   // Flush pending uploads BEFORE tearing down auth so no edits are lost
   if (googleAccessToken) {
@@ -9135,6 +9359,8 @@ function _forgetDriveAccountCaches() {
   lastSeenRemoteColorsHash = null;
   scheduleSyncedHash = null;
   lastSeenRemoteScheduleHash = null;
+  visionSyncedHash = null;
+  lastSeenRemoteVisionHash = null;
   clearDriveFileIds();
   lastSyncedHash.clear();
   lastSeenRemoteHash.clear();
@@ -9405,7 +9631,8 @@ function mergeWeekData(local, remote, wk = null) {
       if (!existing || (n._ts||0) >= (existing._ts||0)) byId.set(n.id, { ...n });
     }
 
-    // 2b. Position LWW: offX / offY / side are stamped by _posTs, not _ts, so a
+    // 2b. Position LWW: offX / offY / side (and `collapsed`, a Vision layout
+    //     fact that week nodes never carry) are stamped by _posTs, not _ts, so a
     //     device that only moved a node cannot promote its stale content - and a
     //     device that only edited content cannot drag the node back. Same tie
     //     convention as above (remote wins). Ids on one side only keep theirs.
@@ -9419,10 +9646,12 @@ function mergeWeekData(local, remote, wk = null) {
       merged.offX   = winner.offX;
       merged.offY   = winner.offY;
       merged.side   = winner.side;
+      merged.collapsed = winner.collapsed;
       merged._posTs = winner._posTs;
       if (merged.offX === undefined) delete merged.offX;
       if (merged.offY === undefined) delete merged.offY;
       if (merged.side === undefined) delete merged.side;
+      if (merged.collapsed === undefined) delete merged.collapsed;
       if (merged._posTs === undefined) delete merged._posTs;
     }
 
@@ -9605,6 +9834,8 @@ async function _flushPendingMerge() {
   if (!pendingRemoteMerge) return;
   const { wKey, remoteData } = pendingRemoteMerge;
   pendingRemoteMerge = null;
+  // A merge deferred while the Vision was being edited has its own path.
+  if (wKey === VISION_STORAGE_KEY) { await mergeRemoteVision(remoteData); return; }
   await withWeekLock(wKey, async () => {
     // For the displayed week, weekData is freshest - saveWeek writes IDB async
     // and is not awaited by all callers, so the disk can lag in-memory state.
@@ -10062,6 +10293,7 @@ async function initDriveSync(onShownWeekReady = () => {}) {
     // Started here and never awaited on the critical path: nothing on screen
     // waits for it, and a schedule that fails to pull must not delay the week.
     syncScheduleFromDrive().then(() => syncScheduleToDrive(), () => {});
+    syncVisionFromDrive().then(() => syncVisionToDrive(), () => {});
     const endColors = traceSpan('drive:colors-pull');
     colorsPull.then(() => endColors(), () => endColors('failed'));
     const endList = traceSpan('drive:list-weeks');
@@ -10352,6 +10584,8 @@ async function forcePushAllToDrive() {
   lastSeenRemoteColorsHash = null;
   scheduleSyncedHash = null;
   lastSeenRemoteScheduleHash = null;
+  visionSyncedHash = null;
+  lastSeenRemoteVisionHash = null;
 
   setSyncStatus('syncing', 'sync.msg.uploadingImport');
 
@@ -10769,6 +11003,66 @@ async function syncScheduleFromDrive() {
   }
 }
 
+// The vision's Drive file, line for line the schedule's: one file in
+// appDataFolder, the content hash and savedAt in appProperties, the self-echo
+// guard on visionSyncedHash, and failures logged by the helper rather than
+// shown as a week sync failure.
+async function syncVisionToDrive() {
+  if (!googleAccessToken) return;
+  const stored = await loadValueIDB(VISION_STORAGE_KEY);
+  if (!stored) return;
+  const json = JSON.stringify(stored);
+  const hash = weekContentHash(stored);
+  if (visionSyncedHash === hash) return;
+  const savedAt = stored.savedAt ?? 0;
+  const result = await driveUploadMultipart(VISION_STORAGE_KEY, json,
+    { savedAt: String(savedAt), contentHash: String(hash) },
+    { maxRetries: 3, forgetOn404: true, label: 'syncVisionToDrive' });
+  if (result === 'ok') visionSyncedHash = hash;
+}
+
+// Pulls the vision file and merges it in. Resolves to what Drive answered:
+// 'absent' (no file, or an empty placeholder), 'unchanged', 'merged',
+// 'deferred' (an open editor holds the merge back) or 'error'. Seeding the
+// first areas waits on this answer, so it is reported rather than swallowed.
+async function syncVisionFromDrive() {
+  if (!googleAccessToken) return 'error';
+  try {
+    const fileId = await getDriveFileId(VISION_STORAGE_KEY);
+    const resp = await authFetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+    );
+    if (resp.status === 401) return 'error';
+    if (resp.status === 404) { forgetDriveFileId(VISION_STORAGE_KEY); return 'absent'; }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const remoteJson = await resp.text();
+    if (!remoteJson.trim()) return 'absent';
+
+    const rawRemote = JSON.parse(remoteJson);
+    const remoteHash = weekContentHash(validateAndRepairVision(rawRemote));
+    const { outcome, merged } = await mergeRemoteVision(rawRemote);
+    if (outcome === 'deferred') return outcome;
+    // Same bookkeeping as the schedule: a merge that added nothing the file
+    // lacks is synced; one that taught us something leaves the hash for the
+    // next upload to carry back.
+    if (merged && weekContentHash(merged) === remoteHash) visionSyncedHash = remoteHash;
+    else visionSyncedHash = null;
+    return outcome;
+  } catch (err) {
+    console.error('[Drive] syncVisionFromDrive error:', err);
+    return 'error';
+  }
+}
+
+function scheduleVisionSync() {
+  if (!googleAccessToken) return;
+  if (visionSyncDebounceTimer) clearTimeout(visionSyncDebounceTimer);
+  visionSyncDebounceTimer = setTimeout(() => {
+    visionSyncDebounceTimer = null;
+    syncVisionToDrive();
+  }, 10000);
+}
+
 function scheduleScheduleSync() {
   if (!googleAccessToken) return;
   if (scheduleSyncDebounceTimer) clearTimeout(scheduleSyncDebounceTimer);
@@ -10836,6 +11130,27 @@ async function pollDriveMeta(wKey) {
       console.error('[Drive] schedule poll error:', err);
     }
 
+    // The vision, contained the same way and for the same reason.
+    try {
+      const visionId = driveFileIdCache.get(VISION_STORAGE_KEY);
+      if (visionId) {
+        const vResp = await authFetch(
+          `https://www.googleapis.com/drive/v3/files/${visionId}?fields=appProperties`
+        );
+        if (vResp.ok) {
+          const { appProperties: vProps } = await vResp.json();
+          const remoteVisionHash = vProps?.contentHash;
+          if (remoteVisionHash &&
+              remoteVisionHash !== visionSyncedHash &&
+              remoteVisionHash !== lastSeenRemoteVisionHash) {
+            if (await syncVisionFromDrive() !== 'deferred') lastSeenRemoteVisionHash = remoteVisionHash;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Drive] vision poll error:', err);
+    }
+
     // Week file hash check for the current week ±1. At week boundaries the user
     // works with two weeks intensively (prev+current early week, current+next
     // late week); keeping the neighbours fresh in IDB means switching weeks shows
@@ -10880,7 +11195,7 @@ function _wKeyForDriveFileName(name) {
   const m = /^zenit-week-(.+)\.json$/.exec(name || '');
   if (!m) return null;
   const key = m[1];
-  if (key === 'colors' || key === 'schedule') return key;
+  if (key === 'colors' || key === 'schedule' || key === VISION_STORAGE_KEY) return key;
   return /^\d{4}-\d{2}$/.test(key) ? key : null;
 }
 
@@ -10952,6 +11267,10 @@ async function pollDriveChanges(_wKey) {
             await syncScheduleFromDrive();
             lastSeenRemoteScheduleHash = remoteHash;
           }
+        } else if (k === VISION_STORAGE_KEY) {
+          if (remoteHash !== visionSyncedHash && remoteHash !== lastSeenRemoteVisionHash) {
+            if (await syncVisionFromDrive() !== 'deferred') lastSeenRemoteVisionHash = remoteHash;
+          }
         } else if (remoteHash !== String(lastSyncedHash.get(k)) &&
                    remoteHash !== lastSeenRemoteHash.get(k)) {
           // The change payload already carries the file id - seed the cache so
@@ -11008,6 +11327,8 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   lastSeenRemoteColorsHash = null;
   scheduleSyncedHash = null;
   lastSeenRemoteScheduleHash = null;
+  visionSyncedHash = null;
+  lastSeenRemoteVisionHash = null;
   _remoteOriginIds.clear();
   // The undo stack describes data that no longer exists; replaying it would
   // write the discarded content straight back.
@@ -12889,9 +13210,9 @@ async function exportAllData() {
     if (value) data[rec.exportKey] = JSON.stringify(value);
   }
 
-  // version 2 adds the schedule record. A version 1 file still imports - the
-  // missing record simply reads as an empty schedule.
-  const payload = JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), data }, null, 2);
+  // version 2 adds the schedule record, version 3 the vision. Older files still
+  // import - a missing schedule reads as empty, a missing vision is left alone.
+  const payload = JSON.stringify({ version: 3, exportedAt: new Date().toISOString(), data }, null, 2);
   const blob = new Blob([payload], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -12963,6 +13284,13 @@ async function importWeekOnDemand(weekKey) {
   return true;
 }
 
+// Whether an import bundle holds a record under either key prefix the
+// importer understands (normalizeImportKey).
+function importCarriesRecord(data, exportKey) {
+  if (!data || typeof data !== 'object') return false;
+  return Object.keys(data).some(k => normalizeImportKey(k) === exportKey);
+}
+
 async function importAllData(file) {
   const reader = new FileReader();
   reader.onload = async (e) => {
@@ -12988,7 +13316,10 @@ async function importAllData(file) {
     const endWipe = traceSpan('import:wipe');
     const weekKeys = await listWeekKeysIDB();
     for (const wk of weekKeys) await deleteWeekIDB(wk);
-    for (const rec of DATA_RECORDS) await deleteValueIDB(rec.idbKey);
+    for (const rec of DATA_RECORDS) {
+      if (rec.keepWhenAbsentOnImport && !importCarriesRecord(parsed.data, rec.exportKey)) continue;
+      await deleteValueIDB(rec.idbKey);
+    }
     endWipe(weekKeys.length + ' weeks');
 
     // Partition weeks: current week vs rest
@@ -26053,6 +26384,7 @@ function _takePendingSyncWeeks() {
   clearAllSyncDebounceTimers();
   if (colorsSyncDebounceTimer) { clearTimeout(colorsSyncDebounceTimer); colorsSyncDebounceTimer = null; }
   if (scheduleSyncDebounceTimer) { clearTimeout(scheduleSyncDebounceTimer); scheduleSyncDebounceTimer = null; }
+  if (visionSyncDebounceTimer)   { clearTimeout(visionSyncDebounceTimer);   visionSyncDebounceTimer = null; }
   return pendingWeeks;
 }
 
@@ -26076,6 +26408,7 @@ function flushAllPendingSyncToDrive() {
   pendingWeeks.forEach(wk => syncWeekToDrive(wk));
   syncColorsToDrive();
   syncScheduleToDrive();
+  syncVisionToDrive();
 }
 
 // Flush pending sync when tab hides; pull + restart poll on tab restore

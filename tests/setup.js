@@ -117,7 +117,8 @@ const sandbox = {
   },
   BroadcastChannel: class {
     constructor() {}
-    postMessage() {}
+    // Recorded so a test can read what a save told peer tabs.
+    postMessage(m) { (sandbox._tabPosts ||= []).push(m); }
     close() {}
   },
   document: {
@@ -511,6 +512,8 @@ _state.resetSyncState = function() {
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  visionSyncedHash = null;
+  lastSeenRemoteVisionHash = null;
   _changesPageToken = null;
   _undoRedoForcePush = new Set();
   _remoteOriginIds.clear();
@@ -574,6 +577,15 @@ _state.useRealIDB = function(v) {
   updateIDBMethods();
 };
 _state.getScheduleSyncedHash = function() { return scheduleSyncedHash; };
+_state.getVisionSyncedHash = function() { return visionSyncedHash; };
+_state.setVisionSyncedHash = function(v) { visionSyncedHash = v; };
+_state.getLastSeenRemoteVisionHash = function() { return lastSeenRemoteVisionHash; };
+_state.getDataRecords = function() { return DATA_RECORDS; };
+_state.getVisionSyncTimer = function() { return visionSyncDebounceTimer; };
+_state.clearVisionSyncTimer = function() {
+  if (visionSyncDebounceTimer) clearTimeout(visionSyncDebounceTimer);
+  visionSyncDebounceTimer = null;
+};
 _state.wKeyForDriveFileName = function(name) { return _wKeyForDriveFileName(name); };
 _state.getAgendaTabOrder = function() { return AGENDA_TAB_ORDER; };
 _state.getVisibleAgendaTabOrder = function() { return agendaTabOrder(); };
@@ -728,6 +740,17 @@ export const {
   mergeSchedule,
   syncScheduleToDrive,
   syncScheduleFromDrive,
+  // Vision record
+  emptyVision,
+  stripVisionNode,
+  validateAndRepairVision,
+  loadVision,
+  saveVision,
+  mergeRemoteVision,
+  onPeerVisionSaved,
+  syncVisionToDrive,
+  syncVisionFromDrive,
+  importCarriesRecord,
   // Delete semantics
   weekKeyForDayString,
   deleteOccurrence,
