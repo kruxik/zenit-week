@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-/NDH65Jfy+cfqgFvMmVDkkRYvaBA19YTL7TGrEXzUqE=';
+               'sha256-qgJlvE9FGxXLFUsZa37yJ4vlh4uYllkYG0BSDzUeCiE=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -20133,14 +20133,19 @@ function render() {
 }
 
 // Set when a render was asked for and skipped, so the map on screen no longer
-// matches weekData. Only the mobile agenda skips (it hides the canvas), and only
-// switchView reads this - see the mindmap branch there.
+// matches weekData. The mobile agenda skips (it hides the canvas), and so does a
+// boot into the Vision until its record is in; only switchView reads this - see
+// the mindmap branch there.
 let _mapDirty = false;
 
 // Skip mindmap render when canvas is display:none (mobile + agenda view).
 // Caller must invoke renderAgenda() separately when the agenda needs refreshing.
 function renderIfVisible() {
   if (currentView === 'agenda' && window.innerWidth < 768) { _mapDirty = true; return; }
+  // The page shows the Vision (the pre-paint script set it on a reload into it)
+  // while a week is still the record in memory: drawing that week would flash
+  // it. The swap draws the Vision when it lands.
+  if (document.documentElement.dataset.view === 'vision' && !isVisionInView()) { _mapDirty = true; return; }
   render();
 }
 
@@ -30685,9 +30690,11 @@ window.addEventListener('load', async () => {
       armTouchHintGate(dayFilterBtn, 'dayfilter');
     }
   }
-  switchView(currentView); // apply persisted view (mindmap / agenda / stats)
-  // A persisted Vision opens once the week is in place, through the one swap.
+  // Apply the persisted view. A persisted Vision opens once the week is in
+  // place, through the one swap, and straight from the boot: passing through
+  // the Mindmap would paint the week first.
   if (_bootIntoVision) { _bootIntoVision = false; switchView('vision'); }
+  else switchView(currentView); // mindmap / agenda / stats
 
   positionZoomDefaultMarker();
 
