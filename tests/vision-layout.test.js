@@ -98,6 +98,16 @@ describe('focus', () => {
     expect(focusedNodeIds()).toBeNull();
   });
 
+  it('F fits the whole map: it ends the focus', () => {
+    focusBranch('nva');
+    _state.setHoveredNode(null);
+    _state.triggerKeydown({
+      key: 'f', preventDefault: () => {}, stopPropagation: () => {}, target: { tagName: 'DIV' },
+      metaKey: false, ctrlKey: false, altKey: false, shiftKey: false,
+    });
+    expect(focusedNodeIds()).toBeNull();
+  });
+
   it('an intention cannot be focused, only a branch', () => {
     focusBranch('a1');
     expect(focusedNodeIds()).toBeNull();

@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-TP94jNVxbxvcI+gZHEsgqFerIXllCZOK09y9Fy26Qvw=';
+               'sha256-qQCoVi8zb8HxeHx5kAYYWtkmtIDcGGSNmJ8OuBexuBc=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -20655,6 +20655,7 @@ function _windowKeydownHandler(e) {
       if (isMapView() && !e.shiftKey) {
         if (k === 'f') {
           e.preventDefault();
+          clearBranchFocus(); // fit to the viewport means the whole map, not the focus
           fitMindmapView();
           return;
         }
@@ -25895,7 +25896,8 @@ function fitMindmapView() {
   const bandH = band.bottom - band.top;
   const bandMidY = (band.top + band.bottom) / 2;
 
-  // Inside a focus, F and the focus itself fit the focused branch only.
+  // Inside a focus, the fit is the focused branch only; F and the logo clear the
+  // focus first, so they fit the whole map.
   const bounds = mindmapNodeBounds(computeLayout(), focusedNodeIds());
   if (bounds) {
     const { minX, maxX, minY, maxY } = bounds;
@@ -25968,6 +25970,7 @@ async function resetView() {
     renderIfVisible(); // un-prune what the filters were hiding
   }
 
+  clearBranchFocus(); // the whole map, so a branch focus goes too
   fitMindmapView();
 }
 
