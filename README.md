@@ -102,15 +102,44 @@ Drag the background to pan. Scroll or pinch to zoom. Click the logo to fit every
 
 ## AI agent bridge (desktop)
 
-Let an AI agent on your computer (Claude Code, Claude Desktop or any MCP client) read and change your week through the app's own actions: each change shows a toast and is one undo step, and your phone follows through Drive sync. It is off by default and talks only to `127.0.0.1`. Desktop Chrome and Firefox; Safari is not supported yet.
+Let an AI agent on your computer - Claude Code, Claude Desktop or any MCP client - plan your week with you. Ask it to add tasks, set days or carry over what you didn't finish, and it does it in the app as if you clicked.
 
-```sh
-cd mcp && npm install
-claude mcp add zenit-week -- node "$PWD/server.js"
-node server.js pair    # prints the pairing code and copies it
-```
+- Every change shows a toast and is one undo step.
+- Your phone follows through Drive sync.
+- It is off by default and talks only to `127.0.0.1`, never to us.
+- Works in desktop Chrome and Firefox. Safari is not supported yet.
 
-Paste the code in **Settings > Agent bridge** and choose **Allow** when the browser asks to reach apps on this computer (in Firefox, also tick "Remember my choice"). `node server.js rotate` makes a new code and unpairs every tab; **Disconnect and forget**, signing out or resetting removes the pairing in the app. Add `--open` to the server command to have it open the app when no tab is connected. For a dev tunnel (ngrok), add `--allow-origin https://<your-tunnel-host>`.
+### For everyone: planned
+
+A one-click install for Claude Desktop is planned, so you won't need a terminal. Until then, setting up the bridge takes the developer steps below.
+
+### For developers: set it up from the repository
+
+You need [Node.js](https://nodejs.org/) 20 or newer and a clone of this repository.
+
+1. Install the server:
+   ```sh
+   cd mcp && npm install
+   ```
+2. Register it with your agent. For Claude Code:
+   ```sh
+   claude mcp add zenit-week -- node "$PWD/server.js"
+   ```
+   For Claude Desktop or another MCP client, add a server that runs `node /path/to/zenit-week/mcp/server.js`.
+3. Get the pairing code (it is also copied to your clipboard):
+   ```sh
+   node server.js pair
+   ```
+4. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > Agent bridge** and paste the code.
+5. When the browser asks to let Zenit Week reach apps on this computer, choose **Allow**. In Firefox, also tick **Remember my choice**.
+6. Settings now shows **Connected**. Ask your agent to look at your week.
+
+### Managing the connection
+
+- **Disconnect:** **Disconnect and forget** in Settings, signing out or resetting the app removes the pairing.
+- **New code:** `node server.js rotate` makes a new code and unpairs every tab.
+- **Open the app automatically:** add `--open` to the server command and it opens the app when no tab is connected.
+- **Dev tunnel (ngrok):** add `--allow-origin https://<your-tunnel-host>`.
 
 ## Privacy
 
