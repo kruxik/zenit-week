@@ -1439,7 +1439,7 @@
     position: absolute;
     right: 12px;
     bottom: 58px;
-    width: 480px;
+    width: 380px;
     max-width: calc(100vw - 24px);
     height: 460px;
     max-height: calc(100vh - 130px);
@@ -1457,7 +1457,7 @@
   /* A sidebar of tabs on desktop; a segmented control on phones. */
   .settings-tabs {
     flex-shrink: 0;
-    width: 132px;
+    width: 116px;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -1484,6 +1484,14 @@
     background: var(--ctx-hover-bg);
   }
   .settings-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+
+  /* Buttons keep their own width and stand one per line, left-aligned. */
+  /* The pane is a fixed-height scrolling column, so its children must not
+     shrink to fit: an empty separator would collapse to 0px and vanish. */
+  .settings-pane > * { flex-shrink: 0; }
+
+  .settings-section > .agenda-action-btn,
+  .bridge-list > .agenda-action-btn { align-self: flex-start; }
 
   .settings-pane {
     flex: 1;
@@ -4811,10 +4819,11 @@ Or remove them later in Settings → Help.</div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
-        <div style="display:flex;gap:6px;">
-          <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay" style="flex:1;">Replay tips</button>
-          <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab" style="flex:1;">Help &amp; Hotkeys</button>
-        </div>
+        <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay">Replay tips</button>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab">Help &amp; Hotkeys</button>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-ai" role="tabpanel" aria-labelledby="settings-tab-ai" hidden>
@@ -4839,26 +4848,24 @@ Or remove them later in Settings → Help.</div>
         </div>
         <div id="bridge-paired" class="bridge-list" hidden>
           <div id="bridge-paired-date" class="bridge-note"></div>
-          <button type="button" class="agenda-action-btn" id="bridge-unpair-btn" data-i18n="bridge.unpair" style="width:100%;">Unpair</button>
+          <button type="button" class="agenda-action-btn" id="bridge-unpair-btn" data-i18n="bridge.unpair">Unpair</button>
         </div>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-data" role="tabpanel" aria-labelledby="settings-tab-data" hidden>
       <div class="settings-section">
         <div class="settings-label" data-i18n="settings.data">Data</div>
-        <div style="display:flex;gap:6px;">
-          <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
-          <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
-          <input type="file" id="import-file-input" accept=".json" style="display:none;">
-        </div>
+        <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData">Import</button>
+        <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData">Export</button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none;">
         <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file - could not import.</div>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-dev" role="tabpanel" aria-labelledby="settings-tab-dev" hidden>
       <div class="settings-section" id="settings-dev-section">
         <div class="settings-label">Development</div>
-        <button type="button" class="agenda-action-btn" id="dev-probe-btn" title="Record the next tap: phase marks, delivered frames, long animation frames" style="width:100%;">Record perf trace</button>
-        <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor" style="width:100%;">Reset to first visit</button>
+        <button type="button" class="agenda-action-btn" id="dev-probe-btn" title="Record the next tap: phase marks, delivered frames, long animation frames">Record perf trace</button>
+        <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor">Reset to first visit</button>
       </div>
     </div>
     </div>
