@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-w7lnIv8TcDhatXOEYA3ARTAvioR23gpsDu3dXP5SnoY=';
+               'sha256-xdPUPvXkH0y7vAryBIKSqheJJX27kXemz6hp8laneLc=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4451,6 +4451,11 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item" id="ctx-prio-normal"><svg class="icon" aria-hidden="true"><use href="#icon-circle"/></svg> <span data-i18n="menu.prioNormal">Priority Normal</span></div>
   <div class="ctx-item" id="ctx-prio-high"><svg class="icon" aria-hidden="true"><use href="#icon-alert-circle"/></svg> <span data-i18n="menu.prioHigh">Priority High</span></div>
   <div class="ctx-item" id="ctx-prio-critical"><svg class="icon" aria-hidden="true"><use href="#icon-flame"/></svg> <span data-i18n="menu.prioCritical">Priority Critical</span></div>
+  <div class="ctx-separator" id="ctx-sep-horizon"></div>
+  <div class="ctx-item" id="ctx-horizon-year"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-week"/></svg> <span data-i18n="menu.horizon.year">This year</span></div>
+  <div class="ctx-item" id="ctx-horizon-years"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-down"/></svg> <span data-i18n="menu.horizon.years">In a few years</span></div>
+  <div class="ctx-item" id="ctx-horizon-someday"><svg class="icon" aria-hidden="true"><use href="#icon-telescope"/></svg> <span data-i18n="menu.horizon.someday">Someday</span></div>
+  <div class="ctx-item" id="ctx-horizon-none"><svg class="icon" aria-hidden="true"><use href="#icon-circle-dashed"/></svg> <span data-i18n="menu.horizon.none">No horizon</span></div>
   <div class="ctx-separator" id="ctx-sep-2"></div>
   <div class="ctx-item" id="ctx-rename"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"/></svg> <span data-i18n="menu.rename">Rename</span></div>
   <div class="ctx-item" id="ctx-comment"><svg class="icon" aria-hidden="true"><use href="#icon-message"/></svg> <span data-i18n="menu.comment">Comment</span></div>
@@ -8662,6 +8667,8 @@ function localizeDayGroups(label) {
 // other node gets its day annotation localized.
 function nodeDisplayLabel(node) {
   if (!node) return '';
+  // Literal on the Vision: "(mo)" is text there, not a day to localise.
+  if (isVisionInView()) return node.label || '';
   if (node.dayChild && node.dayIndex != null) return dayAbbr(node.dayIndex) || node.label || '';
   // A task with one day leaf shows that day on itself; the leaf is not drawn.
   const lone = node.type === 'activity' ? loneDayLeaf(node) : null;
@@ -12005,6 +12012,14 @@ const TRANSLATIONS = {
     'view.agenda':                'Agenda',
     'view.stats':                 'Stats',
     'view.vision':                'Vision',
+    'menu.letGo':                 'Let go',
+    'menu.takeBack':              'Take back',
+    'menu.horizon.year':          'This year',
+    'menu.horizon.years':         'In a few years',
+    'menu.horizon.someday':       'Someday',
+    'menu.horizon.none':          'No horizon',
+    'toast.letGo':                'Let go',
+    'toast.takenBack':            'Taken back',
     'vision.center':              'My vision',
     'agenda.overdue':             'Overdue',
     'agenda.emptyDay':            'No tasks for this day.',
@@ -12432,6 +12447,14 @@ const TRANSLATIONS = {
     'view.agenda':                'Agenda',
     'view.stats':                 'Statistika',
     'view.vision':                'Vize',
+    'menu.letGo':                 'Nechat být',
+    'menu.takeBack':              'Vzít zpět',
+    'menu.horizon.year':          'Letos',
+    'menu.horizon.years':         'Za pár let',
+    'menu.horizon.someday':       'Jednou',
+    'menu.horizon.none':          'Bez horizontu',
+    'toast.letGo':                'Necháno být',
+    'toast.takenBack':            'Vzato zpět',
     'vision.center':              'Moje vize',
     'agenda.overdue':             'Zpožděné',
     'agenda.emptyDay':            'Pro tento den žádné úkoly.',
@@ -13925,6 +13948,9 @@ async function transferFromPrevWeek(pickIds, prepareCopy) {
 }
 
 function transferUnfinished() {
+  // Week-only: the Vision has no previous week. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return Promise.resolve();
   return transferFromPrevWeek(
     // A dropped task is closed, not unfinished - declining to carry it forward is
     // precisely what dropping it meant.
@@ -14242,6 +14268,9 @@ async function materialiseOpenWeek() {
 }
 
 function transferReusable() {
+  // Week-only: the Vision has no previous week. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return Promise.resolve();
   let ancestorIds;
   return transferFromPrevWeek(
     (prevData, prevById, branches) => {
@@ -14371,6 +14400,9 @@ function leafDayFree(destDays, dayIdx) {
 // day it already wears, null clears it to Any day, 0-6 sets that one day.
 // A day leaf moved with null lands as its parent's task with no day.
 async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {}) {
+  // Week-only: the Vision has no weeks to move to. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return;
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity') return;
 
@@ -15142,9 +15174,17 @@ function commitStatusWrite(id, fullRenderNeeded) {
   if (currentView === 'agenda') renderAgenda();
 }
 
+// The statuses that mean something on the Vision: Let go and Take back (the
+// outcome axis's dropped / undropped) and priority. Done and the plan axis do
+// not exist there.
+const VISION_STATUSES = new Set(['dropped', 'undropped', 'prio-normal', 'prio-high', 'prio-critical']);
+
 function setStatus(id, status) {
   const node = findNode(id);
   if (!node) return;
+  // Week-only statuses are refused at the function on the Vision: no snapshot,
+  // no toast, whichever way the request came in.
+  if (isVisionInView() && !VISION_STATUSES.has(status)) return;
   takeSnapshot();
   let fullRenderNeeded;
   if (status === 'prio-high' || status === 'prio-critical') {
@@ -15159,6 +15199,36 @@ function setStatus(id, status) {
     fullRenderNeeded = applyStatus(id, status);
   }
   commitStatusWrite(id, fullRenderNeeded);
+  // On the Vision the outcome axis speaks its own words.
+  if (isVisionInView() && status === 'dropped') showToast(t('toast.letGo'));
+  else if (isVisionInView() && status === 'undropped') showToast(t('toast.takenBack'));
+}
+
+// Horizon: when an intention is meant to happen. A time tag, not a status -
+// independent of Let go (V2), inherited by nothing, and content (touchNode).
+// Setting the value it already has is a no-op: no snapshot, no save. Vision
+// only; a week node never carries it.
+function setHorizon(id, horizon) {
+  if (!isVisionInView()) return false;
+  const node = findNode(id);
+  if (!node || node.type !== 'activity') return false;
+  const next = VISION_HORIZONS.has(horizon) ? horizon : null;
+  if ((node.horizon || null) === next) return false;
+  takeSnapshot();
+  applyHorizon(id, next);
+  saveMapRecord();
+  renderIfVisible();
+  return true;
+}
+
+// The body of setHorizon, with no snapshot and no save (the bridge's one-call,
+// one-snapshot rule).
+function applyHorizon(id, horizon) {
+  const node = findNode(id);
+  if (!node) return;
+  if (horizon) node.horizon = horizon;
+  else delete node.horizon;
+  touchNode(id);
 }
 
 // The outcome / plan-axis body of setStatus: cascades, timestamps, mutual
@@ -16623,6 +16693,9 @@ function taskDayMode(node) {
 
 // Wrapper: compute → snapshot → mutate. Returns true if mutated.
 function applyDayReschedule(targetId, mode, action) {
+  // Week-only: the Vision has no days. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return false;
   const result = computeDayReschedule(mode, action);
   if (!result) return false;
   takeSnapshot();
@@ -16643,6 +16716,9 @@ function applyDayReschedule(targetId, mode, action) {
 // in the label hands its own outcome to the leaves it gets.
 // newDays is a Set of dayIndex values (0-6). Caller must takeSnapshot() first.
 function setActivityDays(nodeId, newDays, remap = null) {
+  // Week-only: the Vision has no days. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return;
   const node = findNode(nodeId);
   if (!node || node.type !== 'activity' || node.dayChild) return;
 
@@ -16889,6 +16965,9 @@ function sortTickChildren(node, lookup = findNode) {
 // the label freely without dropping the schedule. Caller takes the snapshot.
 // Returns true if the value changed.
 function setTickDay(tickId, dayIndex) {
+  // Week-only: the Vision has no ticks. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return false;
   const tick = findNode(tickId);
   if (!tick || !tick.tickChild) return false;
   const next = dayIndex == null ? null : dayIndex;
@@ -17373,10 +17452,13 @@ function _openInlineInput(nodeId, isNew) {
   const initialNodeW = nodeW * zoom;
   // A task's day leaves are part of what the user reads as its name, so the
   // editor shows them as text, and the edited text then names the schedule.
-  const shownDays = !isNew && node.type === 'activity' && !node.dayChild ? dayLeavesOf(node).map(c => c.dayIndex) : [];
+  // The Vision has no days: its label is edited exactly as it reads.
+  const literal = isVisionInView();
+  const shownDays = !literal && !isNew && node.type === 'activity' && !node.dayChild ? dayLeavesOf(node).map(c => c.dayIndex) : [];
   editState = { nodeId, isNew, originalLabel: node.label, initialNodeW, daysShown: shownDays.length > 0 };
   inlineInput.maxLength = node.dayChild ? 2 : (node.tickChild ? 4 : 524288);
-  inlineInput.value = isNew ? '' : ((stripDayGroups(node.label || '').trim() + dayGroupText(shownDays)).trim() || node.label);
+  inlineInput.value = isNew ? '' : literal ? (node.label || '')
+    : ((stripDayGroups(node.label || '').trim() + dayGroupText(shownDays)).trim() || node.label);
 
   // One sizing pass for the whole open: the guard below and resizeInlineInput's
   // positioning both read it, and nothing between them touches a node.
@@ -17444,6 +17526,14 @@ function _openInlineInput(nodeId, isNew) {
 function applyLabelEdit(nodeId, label, { isNew = false, originalLabel = null, replaceDays = false, stampFilterDay = false } = {}) {
   const node = findNode(nodeId);
   if (!node) return;
+  // A vision label is literal: no Nx ticks, no day tokens, no filter stamp.
+  // "Run 3x a week" stays a sentence.
+  if (isVisionInView()) {
+    node.label = label;
+    delete node._editing;
+    touchNode(nodeId);
+    return;
+  }
   // Added while the map shows one day: that day is the one the user meant, so
   // the label carries it and the new task stays where it was created. Only a
   // weekday filter stamps - "overdue" and "unscheduled" name no day - and only
@@ -17497,7 +17587,7 @@ function commitEdit(followUp = 'auto') {
 
   // Detect before applyMagicLabel freezes the token away: a new node tagged
   // "tomorrow" on a Sunday belongs to next week, not this week's past Monday.
-  const crossesNextWeek = isNew && magicTokenResolvesToNextWeek(label);
+  const crossesNextWeek = isNew && !isVisionInView() && magicTokenResolvesToNextWeek(label);
 
   const node = findNode(nodeId);
   if (node) {
@@ -19593,6 +19683,9 @@ const ARROW_DIRS = {
 // ─── Node actions shared by the context menu and the hotkeys ──────────────────
 // Reusable cascades to the subtree: a repeating task repeats with its steps.
 function toggleReusableNode(nodeId) {
+  // Week-only: the Vision has no reusable tasks. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return;
   const n = findNode(nodeId);
   if (!n) return;
   takeSnapshot();
@@ -19984,7 +20077,9 @@ function _windowKeydownHandler(e) {
   } else if (e.key.toLowerCase() === 'u') {
     if (id !== 'center' && node.type !== 'branch') {
       e.preventDefault();
-      setStatus(id, node.unplanned ? 'planned' : 'unplanned');
+      // On the Vision U is ctx-undone's path: Take back, and only from Let go.
+      if (isVisionInView()) { if (node.dropped) setStatus(id, 'undropped'); }
+      else setStatus(id, node.unplanned ? 'planned' : 'unplanned');
     }
   } else if (e.key.toLowerCase() === 'x') {
     if (id !== 'center' && node.type !== 'branch') {
@@ -20064,6 +20159,9 @@ function _windowKeydownHandler(e) {
 window.addEventListener('keydown', _windowKeydownHandler);
 
 function updateCounter(id, dir) {
+  // Week-only: the Vision has no counters. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return;
   const node = findNode(id);
   if (!node || node.type !== 'counter') return;
   const newVal = (node.val || 0) + dir;
@@ -20363,6 +20461,9 @@ function sendSubtreeOverCap(node) {
 // a week gives a node - done, dropped, day tags, ticks - is a property of that
 // week's copy, not of the standing intention.
 function sendNodeToDate(nodeId, options) {
+  // Week-only: the Vision has no dates. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return null;
   const node = findNode(nodeId);
   if (!canSendToDate(node)) return null;
   const anchor = options && options.date;
@@ -20665,6 +20766,33 @@ function showContextMenu(x, y, nodeId) {
     return;
   }
 
+  // Vision mode: answered before the node-type rules, the way entry mode is.
+  // Everything is hidden first and only what an intention or an area can mean
+  // comes back, so a week item added later cannot leak onto the Vision.
+  _relabelOutcomeItems();
+  if (isVisionInView()) {
+    ctxMenu.querySelectorAll('.ctx-item, .ctx-separator').forEach(el => { el.style.display = 'none'; });
+    // The centre has nothing of its own on the Vision in v1.
+    if (isCenter || !node) { contextTarget = null; return; }
+    const show = (...ids) => ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
+    show('ctx-rename');
+    if (canAddChildAt(contextTarget)) show('ctx-add-child');
+    if (isBranch) {
+      show('ctx-sep-color', 'ctx-change-color');
+      document.getElementById('ctx-color-swatch').style.background = BRANCH_COLORS[node.branch || nodeId]?.main || '#888';
+      if (weekData.nodes.filter(n => n.type === 'branch').length > 1) show('ctx-sep-3', 'ctx-delete');
+    } else if (isActivity) {
+      show(node.dropped ? 'ctx-undone' : 'ctx-dropped', 'ctx-sep-1', 'ctx-sep-horizon', 'ctx-sep-2', 'ctx-comment', 'ctx-sep-3', 'ctx-delete');
+      const prio = node.priority || 'normal';
+      ['normal', 'high', 'critical'].forEach(p => { if (p !== prio) show('ctx-prio-' + p); });
+      const horizon = node.horizon || 'none';
+      ['year', 'years', 'someday', 'none'].forEach(h => { if (h !== horizon) show('ctx-horizon-' + h); });
+    }
+    positionContextMenu(x, y);
+    return;
+  }
+  document.getElementById('ctx-sep-horizon').style.display = 'none';
+  ['year', 'years', 'someday', 'none'].forEach(h => { document.getElementById('ctx-horizon-' + h).style.display = 'none'; });
 
   // Transfer items (Center only)
   document.getElementById('ctx-transfer-unfinished').style.display = isCenter ? '' : 'none';
@@ -20768,6 +20896,17 @@ function showContextMenu(x, y, nodeId) {
 // Measure actual menu size, then position by quadrant so it always opens
 // toward the center of the screen - never clips any edge. Shared by the node
 // menu and the Later-row menu, which differ only in what they show.
+// Dropped and Undone are Let go and Take back on the Vision: the same elements
+// and the same paths, relabelled on every open so the week gets its own words
+// back.
+function _relabelOutcomeItems() {
+  const vision = isVisionInView();
+  const dropped = document.querySelector('#ctx-dropped span');
+  const undone = document.querySelector('#ctx-undone span');
+  if (dropped) dropped.textContent = t(vision ? 'menu.letGo' : 'menu.dropped');
+  if (undone) undone.textContent = t(vision ? 'menu.takeBack' : 'menu.undone');
+}
+
 function positionContextMenu(x, y) {
   ctxMenu.style.visibility = 'hidden';
   ctxMenu.style.left = '0';
@@ -20941,6 +21080,9 @@ const bpPanel = document.getElementById('baseline-panel');
 const bpInput = document.getElementById('bp-input');
 
 function openBaselinePanel(x, y) {
+  // Week-only: the Vision has no effort baseline. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return;
   beginAtomicOp();
   bpInput.value = weekData.baseline || 105;
   bpPanel.classList.add('visible');
@@ -21588,6 +21730,9 @@ async function afterScheduleWrite(written, { announce }) {
 // Every Clear the Week entry point asks first: a blank canvas, or the
 // playground's example tasks to explore with.
 function weekActionClearWeek() {
+  // Week-only: the Vision has no week to clear. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return;
   showAppConfirm({
     title: t('menu.clearWeek'),
     body: t('confirm.clearWeek'),
@@ -21606,6 +21751,9 @@ function weekActionClearWeek() {
 // scaffolding. A seed branch the week already has is reused, label and color
 // included.
 async function clearWeek(withPlayground) {
+  // Week-only: the Vision has no week to clear. Refused here, at the function, so the
+  // menu, the keyboard and the bridge all meet the same wall - no snapshot, no toast.
+  if (isVisionInView()) return;
   takeSnapshot();
   const clearIds = weekData.nodes
     .filter(n => n.type !== 'branch' && n.type !== 'center')
@@ -21654,6 +21802,13 @@ document.getElementById('ctx-undone').addEventListener('click', () => {
   }
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
+});
+
+['year', 'years', 'someday', 'none'].forEach(h => {
+  document.getElementById('ctx-horizon-' + h).addEventListener('click', () => {
+    if (contextTarget) setHorizon(contextTarget, h === 'none' ? null : h);
+    hideContextMenu();
+  });
 });
 
 document.getElementById('ctx-dropped').addEventListener('click', () => {

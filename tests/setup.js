@@ -57,6 +57,10 @@ function elementStub() {
       if (selector === '[data-i18n-title]') {
         return all.filter(el => el.dataset.i18nTitle);
       }
+      // The context menu's rows: every element looked up under a ctx- id.
+      if (selector === '.ctx-item, .ctx-separator') {
+        return Object.entries(sandbox._elCache || {}).filter(([k]) => k.startsWith('ctx-')).map(([, el]) => el);
+      }
       return [];
     },
     focus: () => {},
@@ -420,6 +424,8 @@ _state.setWeekKey = function(k) { currentWeekKey = k; };
 _state.getWeekKey = function() { return currentWeekKey; };
 _state.reset     = function() { undoStack = []; redoStack = []; visionUndoStack = []; visionRedoStack = []; };
 _state.getVisionUndoStack = function() { return visionUndoStack; };
+_state.getToastText = function() { return _toast.textContent; };
+_state.clearToast = function() { _toast.textContent = ''; };
 _state.getVisionRedoStack = function() { return visionRedoStack; };
 _state.getUndoStack = function() { return undoStack; };
 _state.getRedoStack = function() { return redoStack; };
@@ -769,6 +775,10 @@ export const {
   openVisionIntoView,
   swapMapRecordFor,
   onPeerWeekSaved,
+  weekActionClearWeek,
+  openBaselinePanel,
+  setHorizon,
+  applyHorizon,
   // Delete semantics
   weekKeyForDayString,
   deleteOccurrence,
