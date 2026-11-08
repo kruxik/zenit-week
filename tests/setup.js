@@ -482,6 +482,7 @@ _state.closeViewLevels = function() { closeViewLevels(); };
 _state.getViewLevel = function() { return currentViewLevel; };
 _state.getZoom = function() { return zoom; };
 _state.setZoom = function(v) { zoom = v; };
+_state.applyTransform = function() { applyTransform(); };
 _state.getPan = function() { return { x: panX, y: panY }; };
 _state.setPan = function(x, y) { panX = x; panY = y; };
 _state.getZoomBounds = function() { return { ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT }; };

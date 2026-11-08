@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-+089VNBzzVjwDd2QXgG4GO5N0ydpTb7uTZSCR88UbnY=';
+               'sha256-4h0oYkEsahtmSMytnIIdds/buWhSpnpUFobu89yh82A=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -24390,7 +24390,12 @@ function applyTransform() {
     if (mapRoot.style.transform) mapRoot.style.transform = '';
   }
   document.getElementById('zoom-label').textContent = Math.round(zoom / ZOOM_DEFAULT * 100) + '%';
-  const pct = (Math.log(zoom) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
+  // Clamped: zoom can sit outside the slider's range (the bounds follow the
+  // fit zoom, so a re-fit can leave the current zoom below the new minimum).
+  // Unclamped, the thumb is placed off the track, where the Settings pane
+  // clips it and the slider looks empty. The label still shows the real value.
+  const rawPct = (Math.log(zoom) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
+  const pct = Math.max(0, Math.min(100, rawPct));
   const fill  = document.getElementById('zoom-fill');
   const thumb = document.getElementById('zoom-thumb');
   if (fill)  fill.style.width = pct + '%';
