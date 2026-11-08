@@ -5,7 +5,7 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   _state, genId, defaultWeekData, findNode, rebuildNodeMap, getTickInfo,
   bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeUnpair, bridgeUpdateHintKey,
-  bridgeSocketUrl, bridgeClaudeCodeCmd, loadBridgeRecord, saveBridgeRecord, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
+  bridgeSocketUrl, bridgeAddCmd, loadBridgeRecord, saveBridgeRecord, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
   mergeWeekData, applyRemoteMerge, weekContentHash, reloadAppFresh,
 } from './setup.js';
@@ -831,15 +831,20 @@ describe('merge window and week-saved events (real IDB)', () => {
   });
 });
 
-describe('Claude Code command follows the site', () => {
+describe('agent add commands follow the site', () => {
   const base = 'claude mcp add --scope user zenit-week -- npx -y zenit-week-mcp@1';
   test.each(['https://zenitweek.com', 'https://www.zenitweek.com', 'http://localhost:8080', 'http://127.0.0.1:5000'])(
-    'built-in site %s copies the plain command', o => expect(bridgeClaudeCodeCmd(o)).toBe(base));
+    'built-in site %s copies the plain command', o => expect(bridgeAddCmd('claude-code', o)).toBe(base));
   test('a tunnel adds its own site first', () => {
-    expect(bridgeClaudeCodeCmd('https://abc.ngrok-free.dev'))
+    expect(bridgeAddCmd('claude-code', 'https://abc.ngrok-free.dev'))
       .toBe(`npx -y zenit-week-mcp@1 origins add https://abc.ngrok-free.dev && ${base}`);
   });
   test('a site the server cannot add (not https) copies the plain command', () => {
-    expect(bridgeClaudeCodeCmd('http://192.168.1.5:8080')).toBe(base);
+    expect(bridgeAddCmd('claude-code', 'http://192.168.1.5:8080')).toBe(base);
+  });
+  test('Codex and Gemini CLI get their own commands', () => {
+    expect(bridgeAddCmd('codex', 'https://zenitweek.com')).toBe('codex mcp add zenit-week -- npx -y zenit-week-mcp@1');
+    expect(bridgeAddCmd('gemini', 'https://abc.ngrok-free.dev'))
+      .toBe('npx -y zenit-week-mcp@1 origins add https://abc.ngrok-free.dev && gemini mcp add --scope user zenit-week npx zenit-week-mcp@1');
   });
 });

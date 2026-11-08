@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-bCjCFn5IsrcT5eCiDImM//0k+GIbaScVCUNW7/06R0s=';
+               'sha256-bLTn+p8NO0nVSYKBBUyYDxuJJBRIBlq0Z9MM8OEM0vI=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4983,10 +4983,13 @@ Or remove them later in Settings → Help.</div>
           <div class="settings-separator"></div>
           <div class="settings-label" id="bridge-guide-label" data-i18n="bridge.guide.title">Connect an agent</div>
           <select id="bridge-guide-app" aria-labelledby="bridge-guide-label">
-            <option value="claude-desktop">Claude Desktop</option>
             <option value="claude-code">Claude Code</option>
+            <option value="claude-desktop">Claude Desktop</option>
+            <option value="codex">Codex</option>
             <option value="cursor">Cursor</option>
-            <option value="vscode">VS Code</option>
+            <option value="gemini">Gemini CLI</option>
+            <option value="vscode">VS Code (Copilot)</option>
+            <option value="devin">Devin Desktop (Windsurf)</option>
             <option value="other" data-i18n="bridge.guide.other">Other MCP app</option>
           </select>
           <div id="bridge-guide-note" class="bridge-note"></div>
@@ -11786,6 +11789,9 @@ const TRANSLATIONS = {
     'bridge.guide.copyConfig':    'Copy config',
     'bridge.guide.codeNote':      'Paste the command in a terminal, then restart Claude Code. Needs Node.js 20 or newer.',
     'bridge.guide.cursorNote':    'Cursor opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
+    'bridge.guide.codexNote':     'Paste the command in a terminal, then restart Codex. Needs Node.js 20 or newer.',
+    'bridge.guide.geminiNote':    'Paste the command in a terminal, then restart Gemini CLI. Needs Node.js 20 or newer.',
+    'bridge.guide.devinNote':     "Paste it into Devin Desktop's MCP config file (Settings, MCP servers), then restart it. Needs Node.js 20 or newer.",
     'bridge.guide.vscodeNote':    'VS Code opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
     'bridge.guide.otherNote':     "Paste it into your app's MCP settings, then restart the app. Needs Node.js 20 or newer.",
     'bridge.copied':              'Copied',
@@ -12259,6 +12265,9 @@ const TRANSLATIONS = {
     'bridge.guide.copyConfig':    'Kopírovat nastavení',
     'bridge.guide.codeNote':      'Vlož příkaz do terminálu a restartuj Claude Code. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.cursorNote':    'Otevře se Cursor a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.codexNote':     'Vlož příkaz do terminálu a restartuj Codex. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.geminiNote':    'Vlož příkaz do terminálu a restartuj Gemini CLI. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.devinNote':     'Vlož ho do MCP nastavení Devin Desktop (Settings, MCP servers) a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.vscodeNote':    'Otevře se VS Code a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.otherNote':     'Vlož ho do MCP nastavení své aplikace a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
     'bridge.copied':              'Zkopírováno',
@@ -27119,14 +27128,22 @@ syncAutoLayoutToggleUI();
 const BRIDGE_NPX_ARGS = ['-y', 'zenit-week-mcp@1'];
 // The latest Claude Desktop extension, attached to each mcp-v<version> release.
 const BRIDGE_DESKTOP_EXTENSION_URL = 'https://github.com/kruxik/zenit-week/releases/latest/download/zenit-week.mcpb';
-const BRIDGE_CLAUDE_CODE_CMD = `claude mcp add --scope user zenit-week -- npx ${BRIDGE_NPX_ARGS.join(' ')}`;
+const BRIDGE_NPX = `npx ${BRIDGE_NPX_ARGS.join(' ')}`;
+// The one-line add command of each agent app with its own CLI. Gemini CLI takes
+// no `-y`: it would read it as its own --yolo, and npx needs none without a terminal.
+const BRIDGE_ADD_CMDS = {
+  'claude-code': `claude mcp add --scope user zenit-week -- ${BRIDGE_NPX}`,
+  codex: `codex mcp add zenit-week -- ${BRIDGE_NPX}`,
+  gemini: 'gemini mcp add --scope user zenit-week npx zenit-week-mcp@1',
+};
 // The sites the server accepts without `origins add` (mcp/core.js isAllowedOrigin).
 const BRIDGE_BUILT_IN_ORIGIN = /^(https:\/\/(www\.)?zenitweek\.com|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
-// The Claude Code command for the site this page runs on: on any other site
+// An agent app's add command for the site this page runs on: on any other site
 // (an ngrok dev tunnel) it first adds that site, so the server lets it connect.
-function bridgeClaudeCodeCmd(origin = location.origin) {
-  if (BRIDGE_BUILT_IN_ORIGIN.test(origin) || !/^https:\/\//.test(origin)) return BRIDGE_CLAUDE_CODE_CMD;
-  return `npx ${BRIDGE_NPX_ARGS.join(' ')} origins add ${origin} && ${BRIDGE_CLAUDE_CODE_CMD}`;
+function bridgeAddCmd(agent, origin = location.origin) {
+  const cmd = BRIDGE_ADD_CMDS[agent];
+  if (BRIDGE_BUILT_IN_ORIGIN.test(origin) || !/^https:\/\//.test(origin)) return cmd;
+  return `${BRIDGE_NPX} origins add ${origin} && ${cmd}`;
 }
 const BRIDGE_SERVER_JSON = { command: 'npx', args: BRIDGE_NPX_ARGS };
 const BRIDGE_OTHER_CONFIG = JSON.stringify({ mcpServers: { 'zenit-week': BRIDGE_SERVER_JSON } }, null, 2);
@@ -27224,14 +27241,17 @@ function _bridgeFollow(href) {
 // picker and the one button follow the choice.
 const BRIDGE_GUIDE = {
   'claude-desktop': { note: 'bridge.guide.desktopNote', label: 'bridge.guide.download', run: () => _bridgeFollow(BRIDGE_DESKTOP_EXTENSION_URL) },
-  'claude-code': { note: 'bridge.guide.codeNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeClaudeCodeCmd()) },
+  'claude-code': { note: 'bridge.guide.codeNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('claude-code')) },
+  codex: { note: 'bridge.guide.codexNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('codex')) },
+  gemini: { note: 'bridge.guide.geminiNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('gemini')) },
   cursor: { note: 'bridge.guide.cursorNote', label: 'bridge.guide.addCursor', run: () => _bridgeFollow(BRIDGE_CURSOR_LINK) },
+  devin: { note: 'bridge.guide.devinNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
   vscode: { note: 'bridge.guide.vscodeNote', label: 'bridge.guide.addVscode', run: () => window.open(BRIDGE_VSCODE_LINK, '_blank', 'noopener') },
   other: { note: 'bridge.guide.otherNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
 };
 
 function renderBridgeGuide() {
-  const entry = BRIDGE_GUIDE[document.getElementById('bridge-guide-app').value] || BRIDGE_GUIDE['claude-desktop'];
+  const entry = BRIDGE_GUIDE[document.getElementById('bridge-guide-app').value] || BRIDGE_GUIDE['claude-code'];
   document.getElementById('bridge-guide-note').textContent = t(entry.note);
   document.getElementById('bridge-guide-action').textContent = t(entry.label);
 }
