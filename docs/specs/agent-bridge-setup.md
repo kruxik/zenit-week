@@ -1,6 +1,6 @@
 # SPEC - Agent Bridge setup: install, pairing, production and dev
 
-> Status: Draft for review, revision 2 (2026-11-08). Revision 2 works in a two-persona review (a regular user who knows MCP, and the developer-owner). Phases 1 (npm), 2 (several agent apps), 3 (pairing v2), 4 (production and dev) and 5 (Claude Desktop extension: manifest, `npm run mcp:bundle`, Download in Settings) of section 9 implemented 2026-11-08; the first bundle and release, and 6 (documentation), not yet.
+> Status: Draft for review, revision 2 (2026-11-08). Revision 2 works in a two-persona review (a regular user who knows MCP, and the developer-owner). Phases 1 (npm), 2 (several agent apps), 3 (pairing v2), 4 (production and dev), 5 (Claude Desktop extension: manifest, `npm run mcp:bundle`, Download in Settings; bundle tested in Claude Desktop on macOS) and 6 (documentation) of section 9 implemented 2026-11-08. Not yet: the first npm and GitHub release of protocol 2, and the Windows install test.
 > Scope: how a user installs `zenit-week-mcp`, pairs it with the app, and how a developer uses the production app and a dev tunnel side by side. Replaces sections 5 (opt-in and pairing), 6 rows 1-2 (origin and server proof), 9 rows 1-3 (handshake frames) and 12 row 2 (distribution) of [agent-bridge.md](agent-bridge.md), and changes 7.5 (which tab executes). Everything else there - execution model, tools, resources, mobile, network-policy exception - stays as it is.
 
 ---
@@ -111,7 +111,7 @@ The code must reach the user even if the model does not pass on an error, and ev
 
 | # | Agent app supports | Behaviour |
 |---|---|---|
-| 1 | MCP elicitation | The server holds the request (up to 120 s) and asks the user through the agent app: "Zenit Week is asking you to approve this agent. The code there should be 482 913. Click Allow in Zenit Week." Accept just closes the message; Decline cancels the pairing in the app. When the app's Allow arrives first, the server cancels the open elicitation and runs the request. Verified for Claude Code and VS Code; unverified for Claude Desktop and Cursor, which fall back to row 2. |
+| 1 | MCP elicitation | The server holds the request (up to 120 s) and asks the user through the agent app: "Zenit Week is asking you to approve this agent. The code there should be 482 913. Click Allow in Zenit Week." Accept just closes the message; Decline cancels the pairing in the app. When the app's Allow arrives first, the server cancels the open elicitation and runs the request. Verified for Claude Code and VS Code, and for Claude Desktop on 2026-11-08 (the held request ran right after Allow); unverified for Cursor, which falls back to row 2 if it lacks it. |
 | 2 | No elicitation | The tool call returns a **successful** result (not an error) whose text and structured content say: "Not connected yet. Zenit Week shows a request with the code 482 913. Ask the user to check that the code matches and click Allow there, then call again. Do not retry before the user confirms." A resource read returns content with the same text, not an error. |
 
 **Retries keep the code.** While a pairing is open for a site, every further request gets the same code and the same message, and the dialog is not reopened or reset. A new code appears only after Deny, X or the 120 s timeout. This answers revision 1's open question 1: hold where the agent app can show the code during the hold, return at once where it cannot.
@@ -292,7 +292,7 @@ Each phase ships on its own and leaves the bridge working.
 | # | Question | Leaning |
 |---|---|---|
 | 1 | Sign the `.mcpb` bundle? | Ship unsigned first, after testing the install screen on macOS and Windows; sign once a certificate is available. |
-| 2 | Does Claude Desktop support MCP elicitation now? | Unverified. Check at implementation time; the fallback (section 4.2, row 2) works either way. |
+| 2 | Does Claude Desktop support MCP elicitation now? | Yes, verified 2026-11-08 with the `.mcpb` extension: the first request was held and answered right after Allow. |
 | 3 | Is a range of eight ports enough? | Yes for one person's agent apps. Raise it if a real setup ever runs out. |
 | 4 | npm package name | `zenit-week-mcp` was free on npm on 2026-11-08; reserve it with phase 1. |
 | 5 | Dev sites through the Claude Desktop extension's settings, so a developer who uses only Claude Desktop needs no terminal? | Not now: it would be a second way to add a site. Revisit if such a developer appears. |

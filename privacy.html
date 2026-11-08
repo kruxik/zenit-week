@@ -87,8 +87,8 @@
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.2 In your own Google Drive (only if you sign in)</h3>
     <p>If you choose to sign in with Google, the app stores a copy of your planning data inside <em>your own</em> Google Drive, in a private app-specific folder, using the <code>drive.appdata</code> scope. This folder is invisible to other apps and to us. We never read, copy, or process your Drive data on any server.</p>
 
-    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.3 AI agent bridge (only if you turn it on)</h3>
-    <p>On a desktop computer you can pair the app with an AI agent running on that same computer (for example Claude Code or Claude Desktop) through the optional agent bridge. It is off by default and connects only to <code>127.0.0.1</code> on your own machine, never to another device or to us. With the bridge on, the week is read by the AI agent you connected and goes to that agent's provider under its terms. Zenit Week itself still runs no servers for this and stores nothing. "Disconnect and forget" in Settings, signing out or resetting the app removes the pairing.</p>
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.3 AI agents (only if you turn them on)</h3>
+    <p>On a desktop computer you can connect the app to an AI agent running on that same computer (for example Claude Desktop or Claude Code) by turning on "AI agents" in Settings and approving the agent once. It is off by default and connects only to <code>127.0.0.1</code> on your own machine, never to another device or to us. With it on, the week is read by the AI agent you connected and goes to that agent's provider under its terms. Zenit Week itself still runs no servers for this and stores nothing: the pairing key is kept only in your browser and in the agent's settings folder on your computer. "Unpair" in Settings, signing out or resetting the app removes the pairing.</p>
 
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.4 Transient network data (during page loads)</h3>
     <p>When you open the website, our hosting provider Vercel processes your IP address and standard HTTP request metadata (user agent, referrer, timestamps) for the time strictly necessary to serve the page and operate our two serverless functions: the OAuth token-exchange endpoint at <code>/api/token</code> and the Umami relay at <code>/api/umami-send</code>. Vercel does not share this with us in identifiable form. See §4 (Service providers) for details.</p>
@@ -160,7 +160,7 @@
     </ul>
 
     <h2>9. Data sharing</h2>
-    <p>We do not sell, rent, share, or disclose your data to any third party for any purpose. The only external services involved are the sub-processors listed in §4, and the only data that ever touches them is described in §2. If you turn on the agent bridge (§2.3), what the AI agent you connected reads goes to that agent's provider at your direction, not ours.</p>
+    <p>We do not sell, rent, share, or disclose your data to any third party for any purpose. The only external services involved are the sub-processors listed in §4, and the only data that ever touches them is described in §2. If you turn on AI agents (§2.3), what the AI agent you connected reads goes to that agent's provider at your direction, not ours.</p>
 
     <h2>10. Your rights under GDPR</h2>
     <p>As an EU/EEA resident you have the right to:</p>
@@ -188,7 +188,7 @@
 
     <h2>13. Security</h2>
     <p>The website is served over HTTPS only. The OAuth flow uses PKCE and a CSRF state parameter. The Google client secret is held server-side in the Vercel Edge Function and never reaches the browser. The OAuth refresh token stored in your browser grants access only to the app-specific Drive folder (§5) and can be revoked at any time.</p>
-    <p>The optional agent bridge (§2.3) listens only on <code>127.0.0.1</code>, so it cannot be reached from another device. It accepts connections only from the Zenit Week site, and a tab must prove it knows your pairing code before an agent can read or change anything. The code is stored only on your computer and can be replaced at any time. Every change an agent makes goes through the app's own actions, is shown to you and can be undone.</p>
+    <p>The optional AI agents connection (§2.3) listens only on <code>127.0.0.1</code>, so it cannot be reached from another device. It accepts connections only from the Zenit Week site and from development sites you add yourself on your computer. You approve each agent once in the app by comparing a code with the one your agent shows; after that, the app and the agent prove a shared key to each other on every connection, and the key itself never crosses the connection. Before you approve, the app tells the agent nothing about your plans. Every change an agent makes goes through the app's own actions, is shown to you and can be undone.</p>
 
     <h2>14. Changes to this policy</h2>
     <p>Material changes will be reflected by an updated "Last updated" date above and, when warranted, by a notice in the app. Continued use of the app after changes constitutes acceptance.</p>
