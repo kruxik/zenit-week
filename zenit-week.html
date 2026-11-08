@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ufoPJa6o9VDxHK2nabTfOGzVnU/rSoOhCS+pT31ejkU=';
+               'sha256-N5m27PRUqC031wcKyPBKkxAbIRkxDekDd2Q2EOzfsfw=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1129,8 +1129,10 @@
     outline: none;
     transition: background 0.15s, color 0.15s;
   }
+  /* The focus the picker places on open draws no ring - it would read as a
+     chosen day. The first key press inside the panel brings it back. */
   .dp-day:hover,
-  .dp-day:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-primary); color: var(--accent-primary); }
+  :where(#date-picker-panel:not(.dp-quiet-focus)) .dp-day:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-primary); color: var(--accent-primary); }
   .dp-day.outside { color: var(--text-muted); }
   .dp-day.today { font-weight: 700; color: var(--accent-primary); }
   /* Today's dot, the same mark the agenda day strip uses. */
@@ -20984,7 +20986,7 @@ function openDatePicker({ title, anchorRect = null, focusDate, selected = [], we
   }
 
   renderDatePicker();
-  dpPanel.classList.add('visible');
+  dpPanel.classList.add('visible', 'dp-quiet-focus');
   positionDatePicker();
   focusDatePickerDay(focusDate) || focusDatePickerDay(localDateStr())
     || dpPanel.querySelector('.dp-day:not(:disabled)')?.focus();
@@ -21103,6 +21105,7 @@ function focusDatePickerDay(date) {
   // Arrows walk the days, a week per Up/Down, paging the month when the walk
   // leaves it and stepping over days that cannot be picked.
   dpPanel.addEventListener('keydown', (e) => {
+    dpPanel.classList.remove('dp-quiet-focus');
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
     const from = document.activeElement?.dataset?.date;
     if (!step || !from || !_dp) return;
@@ -21306,10 +21309,13 @@ async function afterScheduleWrite(written, { announce }) {
     }
 
     const selected = datesOfDays(openWeek, chosen);
+    // No day yet: the keyboard starts on today when the open week holds it,
+    // else on its Monday.
+    const openWeekDays = weekDayStrings(openWeek) || [];
     openDatePicker({
       title: t('menu.reschedule'),
       anchorRect,
-      focusDate: selected[0] || (weekDayStrings(openWeek) || [])[3],
+      focusDate: selected[0] || (openWeekDays.includes(ctx.today) ? ctx.today : openWeekDays[0]),
       selected,
       weekMark: openWeek,
       isDisabled: (date) => {
