@@ -81,7 +81,7 @@ The section is renamed from "Agent bridge" to **"AI agents"** in Settings and He
 | 1 | Switch "Allow AI agents on this computer" | Off by default. The first time it is turned on, a short explainer opens first (row 2); after that it connects at once (section 4.1). Replaces the pairing-code field. |
 | 2 | Permission explainer | One dialog in the standard vocabulary, shown once per browser: "Your browser will now ask to let Zenit Week access other apps and services on this device. That is how it reaches your AI agent, on this computer only. Choose Allow." In Firefox it adds "and tick Remember my choice". Continue opens the connection; the X turns the switch back off. |
 | 3 | Status line | The states in section 4.6. |
-| 4 | "Connect an agent" guide | Shown while no agent is connected, and opened from the `Waiting for the agent app` status. Claude Desktop first ("no setup needed"), then Claude Code, Cursor, VS Code, Other. Each shows one action - Download, Copy command, Install link, Copy config - plus "Needs Node.js 20 or newer" for all but Claude Desktop, and "If your agent does not see Zenit Week, restart it" under each. |
+| 4 | "Connect an agent" guide | Always shown (but where the browser cannot run the bridge), connected or not, so another agent can be added at any time and the panel does not shift as the state changes. Claude Desktop first ("no setup needed"), then Claude Code, Cursor, VS Code, Other. Each shows one action - Download, Copy command, Install link, Copy config - plus "Needs Node.js 20 or newer" for all but Claude Desktop, and "If your agent does not see Zenit Week, restart it" under each. |
 | 5 | Connected agents | One row per agent app connected now (section 5): its name and "Connected". Below them the pairing date and **Unpair**. Replaces "Disconnect and forget". |
 | 6 | Blocked by browser | The status carries the way back: "Click the icon left of the address, open the site settings, set 'Apps on this device' (Chrome) or 'Local network' (Firefox) to Allow, then reload." Exact wording checked against both browsers at implementation time. |
 | 7 | Safari | Switch disabled, "Not supported in this browser yet", as today. |
@@ -97,7 +97,7 @@ The section is renamed from "Agent bridge" to **"AI agents"** in Settings and He
 | 1 | User turns the switch on | Explainer (first time only), then the browser prompt, then connects to every listening server in the port range (section 5). | - |
 | 2 | Server running, site not paired | Status `Waiting for an agent`. The socket stays open; the page sends only its protocol number and whether it is visible and focused. No week key, tab id or data before pairing. | - |
 | 3 | User asks the agent something about the week | The server starts pairing with the tab that would run the call, but only a **visible** one (section 4.3). The app shows the pairing dialog. | The agent gets the code (section 4.2). |
-| 4 | User compares and clicks Allow | Stores the pairing key; status `Connected - <agent>`; toast "Paired with <agent>. Unpair in Settings if this was not you." Other open tabs of the same site pick up the key and connect. | With elicitation: the held call runs at once. Without: the user tells the agent to try again, and it runs. |
+| 4 | User compares and clicks Allow | Stores the pairing key; status `Connected - <agent>`; toast "Paired with <agent>. Unpair in Settings if this was not you." Other open tabs of the same site pick up the key and connect. | The user tells the agent to try again, and it runs. |
 | 5 | Deny, X, or no answer in 120 s | Dialog closes; status `Waiting for an agent`; no key stored on either side. | The next request starts a new pairing with a new code. |
 | 6 | Later sessions | Connects silently with the stored key. | Requests run at once. |
 
@@ -109,12 +109,11 @@ Pairing starts on the agent's first request, not when the server starts, so the 
 
 The code must reach the user even if the model does not pass on an error, and even when the first request is a resource read, which some agent apps show only as a raw error.
 
-| # | Agent app supports | Behaviour |
+| # | Agent app | Behaviour |
 |---|---|---|
-| 1 | MCP elicitation | The server holds the request (up to 120 s) and asks the user through the agent app: "Zenit Week is asking you to approve this agent. The code there should be 482 913. Click Allow in Zenit Week." Accept just closes the message; Decline cancels the pairing in the app. When the app's Allow arrives first, the server cancels the open elicitation and runs the request. Verified for Claude Code and VS Code, and for Claude Desktop on 2026-11-08 (the held request ran right after Allow); unverified for Cursor, which falls back to row 2 if it lacks it. |
-| 2 | No elicitation | The tool call returns a **successful** result (not an error) whose text and structured content say: "Not connected yet. Zenit Week shows a request with the code 482 913. Ask the user to check that the code matches and click Allow there, then call again. Do not retry before the user confirms." A resource read returns content with the same text, not an error. |
+| 1 | Any | The tool call returns a **successful** result (not an error) at once, whose text and structured content say: "Not connected yet. Zenit Week shows a request with the code 482 913. Ask the user to check that the code matches and click Allow there, then call again. Do not retry before the user confirms." The agent repeats the code in its own reply, so the user always sees it next to the dialog. A resource read returns content with the same text, not an error. Elicitation is not used: a held request kept the code out of the agent's reply, and Claude Code did not show the elicitation message (2026-11-08). |
 
-**Retries keep the code.** While a pairing is open for a site, every further request gets the same code and the same message, and the dialog is not reopened or reset. A new code appears only after Deny, X or the 120 s timeout. This answers revision 1's open question 1: hold where the agent app can show the code during the hold, return at once where it cannot.
+**Retries keep the code.** While a pairing is open for a site, every further request gets the same code and the same message, and the dialog is not reopened or reset. A new code appears only after Deny, X or the 120 s timeout. This answers revision 1's open question 1: return at once, never hold.
 
 ### 4.3 Which tab shows the dialog
 
@@ -162,7 +161,7 @@ The page's first frame carries `protocol: 2`.
 | # | State | Meaning |
 |---|---|---|
 | 1 | `Off` | Switch off |
-| 2 | `Waiting for the agent app` | No server listening. Opens the "Connect an agent" guide. Replaces `Waiting for server - run zenit-week-mcp`. |
+| 2 | `Waiting for the agent app` | No server listening. The "Connect an agent" guide below says how to start one. Replaces `Waiting for server - run zenit-week-mcp`. |
 | 3 | `Waiting for permission` | Browser prompt open, as today |
 | 4 | `Blocked by browser` | As today, with the way back (section 3.4, row 6) |
 | 5 | `Waiting for an agent` | Connected to a server, site not paired yet |
@@ -270,7 +269,7 @@ Each phase ships on its own and leaves the bridge working.
 - [ ] The Claude Code command registers the server for every folder (`--scope user`).
 - [ ] With Claude Desktop and Claude Code both running, both servers listen, the page connects to both, Settings lists both, and calls from both run.
 - [ ] Turning the switch on the first time shows the explainer before the browser prompt; the X turns the switch back off.
-- [ ] With the switch on and no pairing, the first request from Claude Code shows the code through elicitation; from an agent app without elicitation it returns a successful result carrying the code; a first resource read also carries it.
+- [ ] With the switch on and no pairing, the first request from any agent app returns a successful result carrying the code, which the agent repeats; a first resource read also carries it.
 - [ ] Repeated requests during an open pairing return the same code and do not reset the dialog.
 - [ ] With only hidden tabs, no dialog opens and the request says to bring Zenit Week to the front; with the label editor open, the dialog waits.
 - [ ] Allow: the request runs (held) or the retry runs (fallback); other tabs of the site connect without a dialog; a site paired through one agent app is paired for the other; after a browser restart requests run with no dialog.

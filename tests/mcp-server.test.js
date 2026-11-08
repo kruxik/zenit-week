@@ -399,7 +399,7 @@ describe('production and dev side by side (setup spec section 6)', () => {
     expect(devTab.ws.sent.at(-1).type).toBe('pair-start');
     expect(prodTab.ws.sent.at(-1).type).toBe('welcome');
     expect((await relay.requestPairing('Zenit Week')).kind).toBe('busy');
-    relay.cancelPairing();
+    relay.onMessage(devTab, JSON.stringify({ type: 'pair-deny' }));
     await p;
   });
 

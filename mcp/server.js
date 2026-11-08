@@ -23,7 +23,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import {
-  BUILT_IN_SITES, OPEN_WAIT_MS, PAIR_TIMEOUT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError,
+  BUILT_IN_SITES, OPEN_WAIT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError,
   addOrigin, appMatches, appName, filePairings, formatPairCode, isAllowedOrigin, lastUsedSite,
   listenOnFirstFreePort, matchSite, pairingsPath, readOrigins, removeOrigin, routeWarning, urisForWeekSaved,
 } from './core.js';
@@ -147,28 +147,15 @@ const PAIR_NOTICES = {
   closed: 'The Zenit Week tab closed during pairing. Ask again once it is open.',
 };
 
-const canElicit = () => !!mcp.server.getClientCapabilities()?.elicitation;
-
-// Pairing on the agent's first request (setup spec 4.1, step 3). Where the agent
-// app can show a message during the wait, the request is held and runs once
-// the user clicks Allow; otherwise the code comes back as a normal result.
+// Pairing on the agent's first request (setup spec 4.1, step 3). The code comes
+// back as a normal result at once, so the agent says it in its own reply and the
+// user can compare it with the one in Zenit Week; the pairing itself completes
+// in the app, and the agent calls again once the user confirms.
 async function pairFirst(app) {
   const p = await relay.requestPairing(app);
   if (p.kind === 'no_tab') return null;
   if (p.kind !== 'pairing') return new Notice(PAIR_NOTICES[p.kind] || PAIR_NOTICES.failed);
-  if (!canElicit()) return new Notice(NOT_PAIRED(p.code, p.app));
-  const abort = new AbortController();
-  mcp.server.elicitInput({
-    message: `${p.app} is asking you to approve this agent. The code there should be ${formatPairCode(p.code)}. Click Allow in ${p.app}.`,
-    requestedSchema: { type: 'object', properties: {} },
-  }, { signal: abort.signal, timeout: PAIR_TIMEOUT_MS * 5 }).then(r => {
-    if (r?.action === 'decline') relay.cancelPairing();
-  }).catch(() => { /* aborted after Allow, or the app has no prompt after all */ });
-  const outcome = await p.settled;
-  abort.abort();
-  if (outcome !== 'paired') return new Notice(PAIR_NOTICES[outcome] || PAIR_NOTICES.failed);
-  await relay.waitForTab(5000, { paired: true });
-  return null;
+  return new Notice(NOT_PAIRED(p.code, p.app));
 }
 
 // Runs a call on the app the agent named, or the focused tab, and says which

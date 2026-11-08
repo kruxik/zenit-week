@@ -490,14 +490,6 @@ export class Relay {
     return p.view;
   }
 
-  // Decline in the agent app's own prompt cancels the dialog in the app.
-  cancelPairing() {
-    const p = this.pairing;
-    if (!p) return;
-    this._send(p.tab, { type: 'pair-cancel' });
-    this._settlePairing(p, 'denied');
-  }
-
   _onPairKey(p, f) {
     if (p.key || !PUBLIC_KEY.test(f.pub || '') || !NONCE.test(f.nonce || '')) { this._settlePairing(p, 'failed'); return; }
     const pubP = unb64(f.pub);

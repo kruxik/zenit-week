@@ -778,6 +778,7 @@ export const {
   bridgePairCode,
   bridgeUnpair,
   bridgeUpdateHintKey,
+  bridgeClaudeCodeCmd,
   loadBridgeRecord,
   saveBridgeRecord,
   forgetBridge,

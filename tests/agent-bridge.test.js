@@ -5,7 +5,7 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   _state, genId, defaultWeekData, findNode, rebuildNodeMap, getTickInfo,
   bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeUnpair, bridgeUpdateHintKey,
-  bridgeSocketUrl, loadBridgeRecord, saveBridgeRecord, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
+  bridgeSocketUrl, bridgeClaudeCodeCmd, loadBridgeRecord, saveBridgeRecord, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
   mergeWeekData, applyRemoteMerge, weekContentHash, reloadAppFresh,
 } from './setup.js';
@@ -315,17 +315,6 @@ describe('pairing (setup spec section 4)', () => {
     expect(dialog).toBeNull();
     _state.setEditState(null);
     await until(() => dialog?.open);
-  });
-
-  test('a cancel from the agent side closes the dialog', async () => {
-    const srv = serve(47831);
-    turnOn();
-    await until(() => srv.relay.hasAnyTab());
-    const p = await srv.relay.requestPairing();
-    await until(() => dialog?.open);
-    srv.relay.cancelPairing();
-    expect(await p.settled).toBe('denied');
-    await until(() => !dialog.open);
   });
 
   test('later sessions connect silently with the stored key', async () => {
@@ -839,5 +828,18 @@ describe('merge window and week-saved events (real IDB)', () => {
     const same = JSON.parse(JSON.stringify(_state.get()));
     await applyRemoteMerge(WK, same, JSON.stringify(same), weekContentHash(same), false, same);
     expect(events()).toBe(4);
+  });
+});
+
+describe('Claude Code command follows the site', () => {
+  const base = 'claude mcp add --scope user zenit-week -- npx -y zenit-week-mcp@1';
+  test.each(['https://zenitweek.com', 'https://www.zenitweek.com', 'http://localhost:8080', 'http://127.0.0.1:5000'])(
+    'built-in site %s copies the plain command', o => expect(bridgeClaudeCodeCmd(o)).toBe(base));
+  test('a tunnel adds its own site first', () => {
+    expect(bridgeClaudeCodeCmd('https://abc.ngrok-free.dev'))
+      .toBe(`npx -y zenit-week-mcp@1 origins add https://abc.ngrok-free.dev && ${base}`);
+  });
+  test('a site the server cannot add (not https) copies the plain command', () => {
+    expect(bridgeClaudeCodeCmd('http://192.168.1.5:8080')).toBe(base);
   });
 });
