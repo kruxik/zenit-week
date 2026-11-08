@@ -154,7 +154,7 @@ While `currentView === 'vision'`:
 | 3 | Quick add (`Q`, the "+" FAB) | Works, adding to the Vision: the panel's branch list shows the Vision's branches. Its day row is hidden. |
 | 4 | Stats `S`, Agenda `A`, Later `L` | Switch view normally; `switchView` swaps the week back first (R1). |
 | 5 | Center node | Label `t('vision.center')`, no completion ring (`updateCenterRing` is skipped), the avatar as today. Its context menu offers nothing in v1 beyond what the center offers on a week minus the week items (section 5). |
-| 6 | Onboarding coachmarks, playground week | Not shown on the Vision. The empty Vision (seeded branches, no intentions) shows one inline hint under the center, i18n `vision.emptyHint`, built from the `.dialog-*` vocabulary like the onboarding nudge, dismissed by the first add. |
+| 6 | Onboarding coachmarks, playground week | Not shown on the Vision yet. The empty-state hint was removed after review (2026-11-08); a Vision playground is to be specified. |
 | 7 | Reload restore | `zenit-week-view` may hold `'vision'`. `readReloadRestore` restores it: boot opens the week as today, then `switchView('vision')`. |
 
 ---
@@ -218,7 +218,7 @@ Toasts: *Let go* / *Taken back* replace *Dropped* / *Undone* when the record is 
 
 ### i18n keys
 
-`view.vision`, `vision.center`, `vision.emptyHint`, `menu.letGo`, `menu.takeBack`, `menu.horizon.year`, `menu.horizon.years`, `menu.horizon.someday`, `menu.horizon.none`, `menu.collapse`, `menu.expand`, `menu.focusBranch`, `horizon.year`, `horizon.years`, `horizon.someday`, `toast.letGo`, `toast.takenBack`, `help.visionView`, `help.vision.*` (section rows). Both languages, no key without both.
+`view.vision`, `vision.center`, `menu.letGo`, `menu.takeBack`, `menu.horizon.year`, `menu.horizon.years`, `menu.horizon.someday`, `menu.horizon.none`, `menu.collapse`, `menu.expand`, `menu.focusBranch`, `horizon.year`, `horizon.years`, `horizon.someday`, `toast.letGo`, `toast.takenBack`, `help.visionView`, `help.vision.*` (section rows). Both languages, no key without both.
 
 ---
 
@@ -288,7 +288,6 @@ No `recommend` tool. The recommendation is the agent's reasoning over `zenit://v
 - `'use strict'`, `const` / `let`, camelCase, `createElementNS` for SVG, `textContent` for every user string (labels, comments, branch names are user data and may arrive via Drive).
 - The Vision never gets a second copy of a map function. Where behaviour differs, the existing function reads `mapRecord.kind`; where a function has no meaning on the Vision, it returns early. One way per action.
 - `touchNode` for content (`label`, `comments`, `priority`, `horizon`, `dropped`), `touchLayout` for `collapsed`, `offX`, `offY`, `side`.
-- Dialog vocabulary (`.dialog-*`) for the empty-state hint.
 - No em dash anywhere.
 
 ---
@@ -358,4 +357,4 @@ Manual: drag, zoom, pan, collapse badge, focus and Esc, comment editor round tri
 | 1 | Let go: reuse the Dropped drawing and the ⊘ badge, or a glyph of its own? | Reuse. One visual language for "will not happen"; only the words differ. |
 | 2 | Reading pane on the week map too? | Superseded: the pane was removed from the Vision as well (non-goal 6). |
 | 3 | Deleting a Vision branch with intentions below | As a week: at once, undoable, minimum one branch remains. |
-| 4 | Own onboarding coachmark set for the Vision? | No. One empty-state hint. |
+| 4 | Own onboarding coachmark set for the Vision? | Reopened (2026-11-08): the empty-state hint was removed; a Vision playground (sample intentions, tips) is to be specified. |

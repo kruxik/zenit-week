@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-qgJlvE9FGxXLFUsZa37yJ4vlh4uYllkYG0BSDzUeCiE=';
+               'sha256-p/GziThy+Ft1ub6ay4b+AvLA05wp7aoSDUR00FeOQzg=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -660,8 +660,7 @@
      tasks, and the update-ready hint. One component, so they cannot drift
      apart; only one is ever visible at a time. */
   #playground-nudge,
-  #update-banner,
-  #vision-empty-hint {
+  #update-banner {
     position: fixed;
     bottom: 68px;
     /* Span the same gutters as the bottom bars (#undo-redo-bar, #fab-pill),
@@ -683,8 +682,7 @@
     transition: opacity 0.2s ease, transform 0.2s ease;
   }
   #playground-nudge.visible,
-  #update-banner.visible,
-  #vision-empty-hint.visible {
+  #update-banner.visible {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);
@@ -4015,7 +4013,6 @@
   .collapse-badge { cursor: pointer; }
   /* Focus branch: the rest of the Vision at the Dropped opacity. */
   #main-svg .focus-dim { opacity: 0.45; }
-  #vision-empty-hint .dialog-body { padding: 12px 14px; }
 
   .add-btn {
     opacity: 0;
@@ -4589,17 +4586,6 @@
 </div>
 
 <div id="view-level-toast"></div>
-
-<!-- The empty Vision's one hint: seeded areas, no intention yet. Gone with the
-     first add; the Vision has no coachmark set of its own. -->
-<div id="vision-empty-hint" class="dialog-shell" role="status" aria-live="polite">
-  <div class="dialog-header">
-    <div class="dialog-title" data-i18n="view.vision">Vision</div>
-  </div>
-  <div class="dialog-body">
-    <div data-i18n="vision.emptyHint">Add an intention to an area with its "+": where you want to go, and why.</div>
-  </div>
-</div>
 
 <div id="playground-nudge" class="dialog-shell" role="status" aria-live="polite">
   <div class="dialog-header">
@@ -12502,7 +12488,6 @@ const TRANSLATIONS = {
     'horizon.year':               'this year',
     'horizon.years':              'in a few years',
     'horizon.someday':            'someday',
-    'vision.emptyHint':           'Add an intention to an area with its "+": where you want to go, and why.',
     'menu.takeBack':              'Take back',
     'menu.horizon.year':          'This year',
     'menu.horizon.years':         'In a few years',
@@ -13017,7 +13002,6 @@ const TRANSLATIONS = {
     'horizon.year':               'letos',
     'horizon.years':              'za pár let',
     'horizon.someday':            'jednou',
-    'vision.emptyHint':           'Přidejte záměr k oblasti jejím „+“: kam chcete dojít a proč.',
     'menu.takeBack':              'Vzít zpět',
     'menu.horizon.year':          'Letos',
     'menu.horizon.years':         'Za pár let',
@@ -20122,7 +20106,6 @@ function render() {
   applyFilters();
   updateSummary();
   applyFocusDim();
-  updateVisionEmptyHint();
 
   markMapGeometryChanged();
   _mapDirty = false;
@@ -21569,13 +21552,6 @@ function positionContextMenu(x, y) {
   ctxMenu.style.left = Math.max(pad, Math.min(mx, vw - menuW - pad)) + 'px';
   ctxMenu.style.top  = Math.max(pad, Math.min(my, vh - menuH - pad)) + 'px';
   ctxMenu.style.visibility = '';
-}
-
-function updateVisionEmptyHint() {
-  const el = document.getElementById('vision-empty-hint');
-  if (!el) return;
-  const empty = isVisionInView() && !weekData.nodes.some(n => n.type === 'activity');
-  el.classList.toggle('visible', empty);
 }
 
 function hideContextMenu() {
