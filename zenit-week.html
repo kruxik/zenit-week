@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-BAMpsLjuAHLoEyLkRN7i4fIHCG23m9nE+zrgEP065g0=';
+               'sha256-3QK7ma8xunm3AZtjWLeXGBD9cbr7DhVQuZTo7B5uOIs=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -2866,7 +2866,7 @@
     .view-toggle-btn span { display: none; }
   }
 
-  /* Caret under the Mindmap tab: the only hint that the active tab is also a
+  /* Caret under the active map tab (Mindmap or Vision): the only hint that it is also a
      disclosure for the view-level row. Absolutely placed so it never shifts the
      icon, and doubling as the collapsed state light - it goes accent whenever a
      level or day filter is pruning the map, which is the one thing the user must
@@ -2887,12 +2887,16 @@
   }
 
   .view-toggle-btn { position: relative; }
-  html[data-view="mindmap"] #vtb-mindmap .vtb-caret { display: block; }
-  html.view-levels-open #vtb-mindmap .vtb-caret {
+  /* The Vision is a map too: same row, same caret, on its own tab. */
+  html[data-view="mindmap"] #vtb-mindmap .vtb-caret,
+  html[data-view="vision"] #vtb-vision .vtb-caret { display: block; }
+  html.view-levels-open #vtb-mindmap .vtb-caret,
+  html.view-levels-open #vtb-vision .vtb-caret {
     transform: rotate(180deg);
     opacity: 0.8;
   }
-  html.view-filtered #vtb-mindmap .vtb-caret {
+  html.view-filtered #vtb-mindmap .vtb-caret,
+  html.view-filtered #vtb-vision .vtb-caret {
     border-bottom-color: var(--accent-primary);
     opacity: 1;
   }
@@ -4803,6 +4807,7 @@ Or remove them later in Settings → Help.</div>
   <button type="button" class="view-toggle-btn" id="vtb-vision">
     <svg class="icon" aria-hidden="true"><use href="#icon-telescope"/></svg>
     <span data-i18n="view.vision">Vision</span>
+    <span class="vtb-caret" aria-hidden="true"></span>
   </button>
   <div class="view-toggle-separator"></div>
   <button type="button" class="view-toggle-btn active" id="vtb-mindmap">
@@ -16002,9 +16007,17 @@ function applyStatus(id, status) {
 // pruned from the layout entirely (no position, no reserved height), so visible
 // parents pack tightly together. Shared with applyFilters so both agree.
 // Depths: center=0, branch=1, activity=2, sub-task/counter=3, …
+// Rocks keeps the rings that matter and Pebbles adds one ring per press. On a
+// week the rocks are the tasks; the Vision is one ring shallower (its branches
+// are the life areas, intentions hang straight off them), so its Rocks is the
+// branches alone and Pebbles starts at the intentions.
+function rocksHideDepth() {
+  return isVisionInView() ? 2 : 3;
+}
+
 function viewLevelHideDepth(level = currentViewLevel) {
-  if (level === 'pebbles') return 4 + pebblesExtraDepth; // keep 4 in step with pebblesHidesAt // first sub-task level, plus any steps deeper
-  if (level === 'rocks')   return 3; // show branches and their activities
+  if (level === 'pebbles') return rocksHideDepth() + 1 + pebblesExtraDepth; // one ring past Rocks, plus any steps deeper
+  if (level === 'rocks')   return rocksHideDepth();
   return Infinity;                   // 'full' (Sand) - show everything
 }
 
@@ -16018,7 +16031,7 @@ function canAddChildAt(id) {
 // Whether Pebbles, `extra` levels past its base depth, still prunes something
 // the day filter would show. When it does not, that Pebbles step is just Sand.
 function pebblesHidesAt(extra) {
-  const hideDepth = 4 + extra; // viewLevelHideDepth('pebbles') at that step
+  const hideDepth = rocksHideDepth() + 1 + extra; // viewLevelHideDepth('pebbles') at that step
   const dayMatch = dayFilterMatchSet();
   return weekData.nodes.some(n =>
     getNodeDepth(n.id) >= hideDepth && dayFilterMatches(n.id, dayMatch));
@@ -26552,14 +26565,20 @@ document.getElementById('view-level-bar').addEventListener('pointerdown', e => e
 
 // ─── Disclosure for the view-level row ────────────────────────────────────────
 // The row is docked above the view-toggle bar and hidden until the already-active
-// Mindmap tab is clicked, on every pointer type.
+// map tab (Mindmap or Vision) is clicked, on every pointer type.
 function areViewLevelsOpen() {
   return document.documentElement.classList.contains('view-levels-open');
 }
 
+// Both map tabs (Mindmap and Vision) disclose the same row.
+function setMapTabsExpanded(open) {
+  ['vtb-mindmap', 'vtb-vision'].forEach(id =>
+    document.getElementById(id).setAttribute('aria-expanded', String(open)));
+}
+
 function openViewLevels() {
   document.documentElement.classList.add('view-levels-open');
-  document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'true');
+  setMapTabsExpanded(true);
 }
 
 // True while the map is pruned by either control in the row.
@@ -26577,7 +26596,7 @@ function closeViewLevels({ force = false } = {}) {
   if (!areViewLevelsOpen()) return false;
   if (!force && viewFiltersActive()) return false;
   document.documentElement.classList.remove('view-levels-open');
-  document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'false');
+  setMapTabsExpanded(false);
   closeDayFilterMenu(); // the day menu hangs off the row; it can't outlive it
   return true;
 }
@@ -30687,7 +30706,7 @@ window.addEventListener('load', async () => {
     if (currentView === 'mindmap') toggleViewLevels();
     else switchView('mindmap');
   });
-  document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'false');
+  setMapTabsExpanded(false);
   document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
   document.getElementById('vtb-vision').addEventListener('click', () => {
     if (currentView === 'vision') toggleViewLevels();
