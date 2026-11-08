@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-j8xNET031LA9PustGDEZ0fx0NLsGylcPerGcUL7iQFY=';
+               'sha256-U8sCmMHdu4cMfxZURAwHQk60t0D/8TGryjwFHVG/U9k=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -27326,7 +27326,12 @@ const BRIDGE_TOOLS = {
   },
   get_stats: {
     read: true, args: [],
-    run: async () => ({ week: currentWeekKey, ...JSON.parse(JSON.stringify(computeWeekStats())) }),
+    // The counts only: `leaves` is the raw node list the Stats view draws from,
+    // internal stamps included, and the week read already carries every task.
+    run: async () => {
+      const { global, perBranch } = computeWeekStats();
+      return { week: currentWeekKey, ...JSON.parse(JSON.stringify({ global, perBranch })) };
+    },
   },
 
   open_week: {

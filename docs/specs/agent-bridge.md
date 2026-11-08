@@ -206,7 +206,7 @@ Day numbers: the agent uses ISO weekdays `1`-`7` (Monday = 1, Sunday = 7). The p
 | 12 | `transfer_unfinished` / `transfer_reusable` | none | `transferUnfinished` / `transferReusable` | Act on the week in view exactly as the context menu does. Async; they load the other week and lock internally. |
 | 13 | `add_branch` | `label`, `side?`, `color?` | body of `addBranch(side)` without the editor: created with the given label and **no** `_editing` flag, never calls `_openInlineInput` (an `_editing` node is dropped by `takeSnapshot` and `saveWeek`); then the body of `applyBranchColor` | Side defaults to the side with fewer branches. One snapshot for all three steps. |
 | 14 | `undo` / `redo` | none | `undo` / `redo` | The shared stack: it undoes the last action whoever made it, as `Ctrl+Z` does. The result says which action was undone so the agent can tell. |
-| 15 | `get_stats` | none | `computeWeekStats` | The week in view. Read-only, no snapshot. |
+| 15 | `get_stats` | none | `computeWeekStats` | The week in view: `week`, `global` and `perBranch` counts only, never the raw `leaves` list (the week read carries the tasks). Read-only, no snapshot. |
 
 Not offered in v1: moving or reordering nodes (layout only), colour changes beyond `add_branch`, language or theme, Drive sign-in, import/export.
 

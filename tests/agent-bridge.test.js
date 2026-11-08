@@ -484,6 +484,17 @@ describe('tool rules', () => {
   });
 });
 
+describe('get_stats', () => {
+  test('counts only: no raw leaves, no internal stamps', async () => {
+    addActivity('Gym', { done: true, doneAt: '2026-11-03T08:00:00.000Z' });
+    addActivity('Read');
+    const stats = await call('get_stats', {});
+    expect(Object.keys(stats).sort()).toEqual(['global', 'perBranch', 'week']);
+    expect(stats.global).toMatchObject({ total: 2, done: 1 });
+    expect(JSON.stringify(stats)).not.toMatch(/_ts|_posTs|leaves/);
+  });
+});
+
 describe('projection', () => {
   test('omits internal stamps and folds day and tick leaves', () => {
     const run = addActivity('Run', { offX: 5, _posTs: 9 });
