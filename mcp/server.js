@@ -6,8 +6,9 @@
 //   zenit-week-mcp                  run the server (what the MCP client launches)
 //   zenit-week-mcp unpair <site>    forget a site's pairing (an origin or a host name)
 //   zenit-week-mcp unpair --all     forget every pairing
-//   options: --open (launch the app when no tab is connected)
-//            --allow-origin <https-url> (also accept that page origin, e.g. an ngrok dev tunnel)
+//   zenit-week-mcp origins list | add <https-url> | remove <site>
+//                                   the sites besides the built-in ones, e.g. an ngrok dev tunnel
+//   options: --open (launch the last used site when no tab is connected)
 //
 // Each copy listens on the first free port of 47831-47838, so every agent app
 // can run its own; the page connects to all of them.
@@ -22,25 +23,20 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import {
-  OPEN_WAIT_MS, PAIR_TIMEOUT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError, filePairings,
-  formatPairCode, isAllowedOrigin, listenOnFirstFreePort, matchSite, pairingsPath, parseExtraOrigin,
-  urisForWeekSaved,
+  BUILT_IN_SITES, OPEN_WAIT_MS, PAIR_TIMEOUT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError,
+  addOrigin, appMatches, appName, filePairings, formatPairCode, isAllowedOrigin, lastUsedSite,
+  listenOnFirstFreePort, matchSite, pairingsPath, readOrigins, removeOrigin, routeWarning, urisForWeekSaved,
 } from './core.js';
 
-const APP_URL = 'https://zenitweek.com/app';
 const { version: VERSION } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 const argv = process.argv.slice(2);
 const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'serve';
 const OPEN = argv.includes('--open');
 const err = (...a) => process.stderr.write(a.join(' ') + '\n');
-// --allow-origin https://<host> (repeatable): an extra page origin, for a dev tunnel.
-const EXTRA_ORIGINS = [];
-argv.forEach((a, i) => {
-  if (a !== '--allow-origin') return;
-  const o = parseExtraOrigin(argv[i + 1]);
-  if (!o) { err('zenit-week-mcp: --allow-origin needs an https URL'); process.exit(2); }
-  EXTRA_ORIGINS.push(o);
-});
+if (argv.includes('--allow-origin')) {
+  err('zenit-week-mcp: --allow-origin is gone. Add the site once with: zenit-week-mcp origins add <https-url>');
+  process.exit(2);
+}
 
 const pairings = filePairings(pairingsPath());
 
@@ -51,6 +47,27 @@ if (cmd === 'unpair') {
   const gone = site === '--all' ? all : all.filter(e => matchSite(site, e.origin));
   gone.forEach(e => pairings.delete(e.origin));
   console.log(gone.length ? `Unpaired: ${gone.map(e => e.origin).join(', ')}` : `No pairing for ${site}.`);
+  process.exit(0);
+}
+if (cmd === 'origins') {
+  const [sub, value] = argv.slice(1);
+  if (sub === 'list' || !sub) {
+    console.log('Built in:');
+    BUILT_IN_SITES.forEach(o => console.log(`  ${o}`));
+    const added = readOrigins();
+    console.log(added.length ? 'Added:' : 'Added: none');
+    added.forEach(o => console.log(`  ${o}`));
+  } else if (sub === 'add') {
+    const o = addOrigin(value);
+    if (!o) { err('zenit-week-mcp: origins add needs an https URL, for example https://abc.ngrok-free.app'); process.exit(2); }
+    console.log(`Added ${o}. Every Zenit Week server on this computer accepts it now. Open it, turn on AI agents and approve your agent once.`);
+  } else if (sub === 'remove') {
+    if (!value) { err('zenit-week-mcp: origins remove needs a site'); process.exit(2); }
+    console.log(removeOrigin(value) ? `Removed ${value}.` : `${value} was not added.`);
+  } else {
+    err(`zenit-week-mcp: unknown origins command "${sub}" (list, add, remove)`);
+    process.exit(2);
+  }
   process.exit(0);
 }
 if (cmd !== 'serve') { err(`zenit-week-mcp: unknown command "${cmd}"`); process.exit(2); }
@@ -70,6 +87,8 @@ const mcp = new McpServer(
       'Days are ISO weekdays: 1 = Monday ... 7 = Sunday. A label ending in "Nx" (e.g. "Pushups 10x") makes N ticks recorded with tick_task; days and Nx do not combine.',
       'Never put relative days (today, tomorrow) in labels: pass days instead.',
       'The first request may answer that Zenit Week is not connected yet and give a code: tell the user that code, ask them to check it matches the one shown in Zenit Week and click Allow there, and call again only after they confirm.',
+      'Every result names the app that ran it in "app": "Zenit Week" for the production site, a host name such as abc.ngrok-free.app for a development copy.',
+      'When zenit://apps lists more than one app, pass "app" on every call and say which app you changed.',
     ].join(' '),
   },
 );
@@ -83,17 +102,29 @@ const relay = new Relay({
   install: INSTALL,
   clientName: () => mcp.server.getClientVersion()?.name || null,
   log: s => err(`zenit-week-mcp: ${s}`),
+  // A subscription may name its app (`?app=`); it hears only that app's saves.
   onWeekSaved: (wk, tab) => {
-    for (const uri of urisForWeekSaved(wk, tab.week)) {
-      if (subscriptions.has(uri)) mcp.server.sendResourceUpdated({ uri }).catch(() => {});
+    const touched = new Set(urisForWeekSaved(wk, tab.week));
+    for (const uri of subscriptions) {
+      const { base, app } = splitAppQuery(uri);
+      if (touched.has(base) && appMatches(app, tab.origin)) mcp.server.sendResourceUpdated({ uri }).catch(() => {});
     }
   },
 });
 
+// `zenit://week/current?app=x` -> base URI and app name.
+function splitAppQuery(uri) {
+  const i = String(uri).indexOf('?');
+  if (i < 0) return { base: String(uri), app: null };
+  return { base: uri.slice(0, i), app: new URLSearchParams(uri.slice(i + 1)).get('app') };
+}
+
+// --open launches the site of the pairing used last, else production.
 function openApp() {
-  const [c, a] = process.platform === 'darwin' ? ['open', [APP_URL]]
-    : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', APP_URL]]
-    : ['xdg-open', [APP_URL]];
+  const url = `${lastUsedSite(pairings.list())}/app`;
+  const [c, a] = process.platform === 'darwin' ? ['open', [url]]
+    : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
+    : ['xdg-open', [url]];
   try { spawn(c, a, { stdio: 'ignore', detached: true }).on('error', () => {}).unref(); } catch (_) { /* no opener */ }
 }
 
@@ -103,7 +134,7 @@ const STARTED_AT = Date.now();
 // pairing code, or what the user has to do first (setup spec 4.2, row 2).
 class Notice { constructor(text) { this.text = text; } }
 
-const NOT_PAIRED = code => `Not connected yet. Zenit Week shows a request with the code ${formatPairCode(code)}. `
+const NOT_PAIRED = (code, app) => `Not connected yet. ${app} shows a request with the code ${formatPairCode(code)}. `
   + 'Ask the user to check that the code matches and click Allow there, then call again. Do not retry before the user confirms.';
 const PAIR_NOTICES = {
   hidden: 'Zenit Week is open but not in front. Ask the user to bring the Zenit Week tab to the front, then ask again.',
@@ -119,14 +150,14 @@ const canElicit = () => !!mcp.server.getClientCapabilities()?.elicitation;
 // Pairing on the agent's first request (setup spec 4.1, step 3). Where the agent
 // app can show a message during the wait, the request is held and runs once
 // the user clicks Allow; otherwise the code comes back as a normal result.
-async function pairFirst() {
-  const p = await relay.requestPairing();
+async function pairFirst(app) {
+  const p = await relay.requestPairing(app);
   if (p.kind === 'no_tab') return null;
   if (p.kind !== 'pairing') return new Notice(PAIR_NOTICES[p.kind] || PAIR_NOTICES.failed);
-  if (!canElicit()) return new Notice(NOT_PAIRED(p.code));
+  if (!canElicit()) return new Notice(NOT_PAIRED(p.code, p.app));
   const abort = new AbortController();
   mcp.server.elicitInput({
-    message: `Zenit Week is asking you to approve this agent. The code there should be ${formatPairCode(p.code)}. Click Allow in Zenit Week.`,
+    message: `${p.app} is asking you to approve this agent. The code there should be ${formatPairCode(p.code)}. Click Allow in ${p.app}.`,
     requestedSchema: { type: 'object', properties: {} },
   }, { signal: abort.signal, timeout: PAIR_TIMEOUT_MS * 5 }).then(r => {
     if (r?.action === 'decline') relay.cancelPairing();
@@ -138,20 +169,32 @@ async function pairFirst() {
   return null;
 }
 
-async function forward(tool, args) {
-  if (!relay.pickTab()) {
+// Runs a call on the app the agent named, or the focused tab, and says which
+// app that was: `{ app, warning, data }`, or a Notice.
+async function forward(tool, args, app = null) {
+  if (!relay.pickTab(app)) {
     if (!relay.hasAnyTab()) {
       if (OPEN) openApp();
       const grace = STARTUP_GRACE_MS - (Date.now() - STARTED_AT);
       const wait = Math.max(OPEN ? OPEN_WAIT_MS : 0, grace);
       if (wait > 0) await relay.waitForTab(wait);
     }
-    if (!relay.pickTab()) {
-      const notice = await pairFirst();
+    if (!relay.pickTab(app)) {
+      const notice = await pairFirst(app);
       if (notice) return notice;
     }
   }
-  return relay.call(tool, args);
+  const tab = relay.pickTab(app);
+  const data = await relay.call(tool, args, { app });
+  const name = tab ? appName(tab.origin) : null;
+  return { app: name, warning: app ? null : routeWarning(relay.openApps(), name), data };
+}
+
+// Every result carries `app` (setup spec section 6, row 6), plus the warning
+// when the agent named no app and several are open.
+function labelled({ app, warning, data }) {
+  const head = warning ? { app, warning } : { app };
+  return data && typeof data === 'object' && !Array.isArray(data) ? { ...head, ...data } : { ...head, result: data };
 }
 
 const asText = data => ({ content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] });
@@ -160,11 +203,15 @@ const asError = e => ({
   content: [{ type: 'text', text: `${e instanceof RelayError ? e.code : 'internal'}: ${e.message}` }],
 });
 
+const appArg = z.string().optional()
+  .describe('Which app: "Zenit Week" or a host name such as abc.ngrok-free.app (see zenit://apps). Default: the focused tab.');
+
 function tool(name, description, shape, annotations = {}) {
-  mcp.registerTool(name, { description, inputSchema: shape, annotations }, async args => {
+  mcp.registerTool(name, { description, inputSchema: { ...shape, app: appArg }, annotations }, async args => {
     try {
-      const out = await forward(name, args || {});
-      return out instanceof Notice ? { content: [{ type: 'text', text: out.text }] } : asText(out);
+      const { app, ...rest } = args || {};
+      const out = await forward(name, rest, app || null);
+      return out instanceof Notice ? { content: [{ type: 'text', text: out.text }] } : asText(labelled(out));
     } catch (e) { return asError(e); }
   });
 }
@@ -212,20 +259,35 @@ tool('undo', 'Undo the last action in the app, whoever made it. Says which actio
 tool('redo', 'Redo the last undone action.', {});
 tool('get_stats', 'Completion statistics of the week in view.', {}, readOnly);
 
+// Every resource takes `?app=<name>` (setup spec section 6, row 5). The SDK's
+// templates either require the query or swallow it into a path variable, so
+// the query is read from the URI here and stripped from the variables.
 function resource(name, uri, description, args) {
   mcp.registerResource(name, uri, { description, mimeType: 'application/json' }, async (u, vars) => {
-    const data = await forward(args.tool, args.map ? args.map(vars) : {});
-    if (data instanceof Notice) return { contents: [{ uri: u.href, mimeType: 'text/plain', text: data.text }] };
-    return { contents: [{ uri: u.href, mimeType: 'application/json', text: JSON.stringify(data, null, 2) }] };
+    const { app } = splitAppQuery(u.href);
+    const clean = Object.fromEntries(Object.entries(vars || {}).map(([k, v]) => [k, String(v).split('?')[0]]));
+    const out = await forward(args.tool, args.map ? args.map(clean) : {}, app);
+    if (out instanceof Notice) return { contents: [{ uri: u.href, mimeType: 'text/plain', text: out.text }] };
+    return { contents: [{ uri: u.href, mimeType: 'application/json', text: JSON.stringify(labelled(out), null, 2) }] };
   });
 }
+const withApp = tpl => new ResourceTemplate(tpl, { list: undefined });
 resource('weeks', 'zenit://weeks', 'Weeks stored on this device with task counts.', { tool: 'read_weeks' });
+resource('weeks-app', withApp('zenit://weeks{?app}'), 'zenit://weeks of one app.', { tool: 'read_weeks' });
 resource('week-current', 'zenit://week/current', 'The week in view: branches, tasks, days, ticks, status, ids.', { tool: 'read_week' });
-resource('week', new ResourceTemplate('zenit://week/{week}', { list: undefined }), 'Any stored week (YYYY-WW).',
-  { tool: 'read_week', map: v => ({ week: String(v.week) }) });
+// Also serves zenit://week/current?app=..., which no static URI matches.
+resource('week', withApp('zenit://week/{week}'), 'Any stored week (YYYY-WW).',
+  { tool: 'read_week', map: v => (v.week === 'current' ? {} : { week: v.week }) });
 resource('schedule', 'zenit://schedule', 'Dated and repeating entries (the Later tab).', { tool: 'read_schedule' });
-resource('agenda', new ResourceTemplate('zenit://agenda/{day}', { list: undefined }), 'Agenda of the week in view for ISO day 1-7.',
+resource('schedule-app', withApp('zenit://schedule{?app}'), 'zenit://schedule of one app.', { tool: 'read_schedule' });
+resource('agenda', withApp('zenit://agenda/{day}'), 'Agenda of the week in view for ISO day 1-7.',
   { tool: 'read_agenda', map: v => ({ day: parseInt(v.day, 10) }) });
+
+// zenit://apps: the app tabs connected to this server, answered by the server.
+mcp.registerResource('apps', 'zenit://apps', {
+  description: 'The Zenit Week apps (production, dev copies) with a tab connected now: app name, paired, week in view, visible, focused. Pass one of the names as "app".',
+  mimeType: 'application/json',
+}, async u => ({ contents: [{ uri: u.href, mimeType: 'application/json', text: JSON.stringify(relay.listApps(), null, 2) }] }));
 
 // ── Page side: loopback only ──
 // Resolves to the listening server, or null when the port is taken.
@@ -235,7 +297,8 @@ function tryListen(port) {
       host: '127.0.0.1',
       port,
       maxPayload: 4 * 1024 * 1024,
-      verifyClient: ({ origin }) => isAllowedOrigin(origin, EXTRA_ORIGINS),
+      // The added sites are read on every connection: `origins add` needs no restart.
+      verifyClient: ({ origin }) => isAllowedOrigin(origin, readOrigins()),
     });
     const failed = e => { wss.close(); if (e.code === 'EADDRINUSE') resolve(null); else reject(e); };
     wss.once('error', failed);

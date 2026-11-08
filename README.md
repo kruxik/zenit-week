@@ -126,8 +126,8 @@ You need [Node.js](https://nodejs.org/) 20 or newer. A one-click install for Cla
 
 - **Unpair:** **Unpair** in Settings, signing out or resetting the app removes the pairing. From the terminal: `npx -y zenit-week-mcp@1 unpair zenitweek.com`.
 - **Several agent apps:** each runs its own server and the app connects to all of them. Pairing once covers them all.
-- **Open the app automatically:** add `--open` after `zenit-week-mcp@1` in the server command and it opens the app when no tab is connected.
-- **Dev tunnel (ngrok):** add `--allow-origin https://<your-tunnel-host>`.
+- **Open the app automatically:** add `--open` after `zenit-week-mcp@1` in the server command and it opens the site you used last when no tab is connected.
+- **Dev tunnel (ngrok):** run `npx -y zenit-week-mcp@1 origins add https://<your-tunnel-host>` once. The agent can then work with production and the tunnel side by side; see the [server README](mcp/README.md).
 
 ### For developers: run it from the repository
 

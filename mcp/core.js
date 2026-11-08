@@ -29,14 +29,42 @@ export const READ_TOOLS = new Set(['read_weeks', 'read_week', 'read_schedule', '
 const ALLOWED_EXACT = new Set(['https://zenitweek.com', 'https://www.zenitweek.com']);
 const ALLOWED_DEV = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
 
-// `extra` holds origins added with --allow-origin (a dev tunnel such as ngrok).
-// Only https origins are accepted there, compared exactly.
+// The built-in sites, shown by `origins list` (setup spec section 6, row 1).
+export const BUILT_IN_SITES = ['https://zenitweek.com', 'https://www.zenitweek.com', 'http://localhost:*', 'http://127.0.0.1:*'];
+
+// `extra` holds the sites added with `origins add` (a dev tunnel such as
+// ngrok). Only https origins are accepted there, compared exactly.
 export function isAllowedOrigin(origin, extra = []) {
   if (typeof origin !== 'string') return false;
   return ALLOWED_EXACT.has(origin) || ALLOWED_DEV.test(origin) || extra.includes(origin);
 }
 
-// Normalises an --allow-origin value to a bare https origin, or null.
+// How an app is named to the agent: "Zenit Week" for production, the host
+// name (with port) for any other site (setup spec section 6, row 6).
+export const PRODUCTION_APP = 'Zenit Week';
+export function appName(origin) {
+  if (ALLOWED_EXACT.has(origin)) return PRODUCTION_APP;
+  try { return new URL(origin).host; } catch (_) { return String(origin); }
+}
+
+// Whether the agent's `app` argument names this site: the app name, the
+// origin or the host, case-insensitive.
+export function appMatches(app, origin) {
+  const a = String(app || '').trim().toLowerCase().replace(/\/+$/, '');
+  if (!a) return true;
+  if (a === appName(origin).toLowerCase() || a === String(origin).toLowerCase()) return true;
+  try { return new URL(origin).host.toLowerCase() === a || new URL(origin).hostname.toLowerCase() === a; } catch (_) { return false; }
+}
+
+// "Two apps are open (Zenit Week, abc.ngrok-free.app); this went to Zenit Week."
+// Only when more than one site is connected and the agent named none.
+export function routeWarning(apps, chosen) {
+  if (apps.length < 2) return null;
+  const n = apps.length === 2 ? 'Two' : String(apps.length);
+  return `${n} apps are open (${apps.join(', ')}); this went to ${chosen}. Pass "app" to choose.`;
+}
+
+// Normalises an `origins add` value to a bare https origin, or null.
 export function parseExtraOrigin(value) {
   try {
     const u = new URL(String(value));
@@ -90,6 +118,43 @@ export function configDir(home = os.homedir()) {
   return path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'zenit-week-mcp');
 }
 export const pairingsPath = (home) => path.join(configDir(home), 'pairings.json');
+export const configPath = (home) => path.join(configDir(home), 'config.json');
+
+// ~/.config/zenit-week-mcp/config.json, owner-only: the added sites. Read on
+// every new connection, so `origins add` needs no restart.
+export function readOrigins(file = configPath()) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return (Array.isArray(raw?.origins) ? raw.origins : []).map(parseExtraOrigin).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+function writeConfig(origins, file) {
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify({ origins }, null, 2) + '\n', { mode: 0o600 });
+  fs.chmodSync(tmp, 0o600);
+  fs.renameSync(tmp, file);
+}
+
+// Returns the normalised origin, or null when `value` is not an https URL.
+export function addOrigin(value, file = configPath()) {
+  const o = parseExtraOrigin(value);
+  if (!o) return null;
+  const list = readOrigins(file);
+  if (!list.includes(o)) writeConfig([...list, o], file);
+  return o;
+}
+
+// Returns whether a site was removed; matched like `unpair` (origin or host).
+export function removeOrigin(value, file = configPath()) {
+  const list = readOrigins(file);
+  const kept = list.filter(o => !matchSite(value, o));
+  if (kept.length !== list.length) writeConfig(kept, file);
+  return kept.length !== list.length;
+}
 
 const PAIRING_ID = /^[A-Za-z0-9_-]{16,64}$/;
 const PAIRING_KEY = /^[A-Za-z0-9_-]{43}$/;
@@ -125,6 +190,12 @@ export function filePairings(file = pairingsPath()) {
       return list.length - kept.length;
     },
     list: () => readPairings(file),
+    // Last use per site, for `--open` (setup spec section 6, row 8).
+    touch: (origin, at) => {
+      const list = readPairings(file);
+      const e = list.find(x => x.origin === origin);
+      if (e) { e.lastUsedAt = at; writePairings(list, file); }
+    },
   };
 }
 
@@ -135,7 +206,14 @@ export function memoryPairings(initial = []) {
     set: entry => { list = [...list.filter(e => e.origin !== entry.origin), entry]; },
     delete: origin => { const n = list.length; list = list.filter(e => e.origin !== origin); return n - list.length; },
     list: () => [...list],
+    touch: (origin, at) => { const e = list.find(x => x.origin === origin); if (e) e.lastUsedAt = at; },
   };
+}
+
+// The site `--open` launches: the pairing used last, else production.
+export function lastUsedSite(list) {
+  const used = list.filter(e => typeof e.lastUsedAt === 'string').sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt));
+  return used.length ? used[0].origin : 'https://zenitweek.com';
 }
 
 // `unpair <site>`: an origin, or a bare host name, matched against stored sites.
@@ -264,6 +342,7 @@ export class Relay {
     }
     tab.state = 'ready';
     tab.pairingId = entry.pairingId;
+    this.pairings.touch?.(tab.origin, new Date(this.now()).toISOString());
     tab.id = String(f.tabId || '');
     tab.week = f.week || null;
     this._seen(tab, !!f.visible, !!f.visible);
@@ -320,8 +399,26 @@ export class Relay {
 
   // The tab that executes: the most recently focused visible one, else the
   // most recently visible one (a hidden tab still writes fine). Paired only.
-  pickTab() {
-    return this._pick([...this.tabs].filter(t => t.ready));
+  // With `app`, only tabs of that site count.
+  pickTab(app = null) {
+    return this._pick([...this.tabs].filter(t => t.ready && appMatches(app, t.origin)));
+  }
+
+  // The sites with a tab here, paired or not, by name, in a stable order.
+  openApps() {
+    return [...new Set([...this.tabs].filter(t => t.state !== 'new').map(t => appName(t.origin)))].sort();
+  }
+
+  // zenit://apps: every connected app tab of this server.
+  listApps() {
+    const chosen = this.pickTab();
+    return [...this.tabs].filter(t => t.state !== 'new').map(t => ({
+      app: appName(t.origin),
+      paired: t.ready,
+      week: t.ready ? t.week : null,
+      visible: t.visible,
+      focused: t === chosen,
+    }));
   }
 
   _pick(tabs) {
@@ -363,9 +460,9 @@ export class Relay {
   //   { kind: 'busy' }     the tab is showing another server's request
   //   { kind: 'failed' }   the key exchange broke off
   // A promise either way; with no tab it resolves at once.
-  requestPairing() {
-    if (this.pairing) return this.pairing.view;
-    const open = [...this.tabs].filter(t => t.state === 'open');
+  requestPairing(app = null) {
+    if (this.pairing) return appMatches(app, this.pairing.tab.origin) ? this.pairing.view : Promise.resolve({ kind: 'busy' });
+    const open = [...this.tabs].filter(t => t.state === 'open' && appMatches(app, t.origin));
     if (!open.length) return Promise.resolve({ kind: 'no_tab' });
     const visible = open.filter(t => t.visible).sort((a, b) => b.lastFocus - a.lastFocus);
     if (!visible.length) return Promise.resolve({ kind: 'hidden' });
@@ -382,7 +479,7 @@ export class Relay {
     this._armPairTimer(p, PAIR_UNSHOWN_MAX_MS);
     // Every request during this pairing gets this same promise, so the same code.
     p.view = Promise.race([p.codeReady, p.settled.then(() => null)])
-      .then(code => (code ? { kind: 'pairing', code, settled: p.settled } : { kind: p.outcome === 'busy' ? 'busy' : 'failed' }));
+      .then(code => (code ? { kind: 'pairing', code, settled: p.settled, app: appName(tab.origin) } : { kind: p.outcome === 'busy' ? 'busy' : 'failed' }));
     this._send(tab, { type: 'pair-start', commit: b64(sha256(p.pub, p.nonce)), client: this.clientName() || null });
     return p.view;
   }
@@ -441,9 +538,14 @@ export class Relay {
     return true;
   }
 
-  call(tool, args = {}) {
-    const tab = this.pickTab();
-    if (!tab) return Promise.reject(new RelayError('no_app_tab', 'no Zenit Week tab is connected: open the app in Chrome or Firefox with AI agents on'));
+  call(tool, args = {}, { app = null } = {}) {
+    const tab = this.pickTab(app);
+    if (!tab) {
+      const open = this.openApps();
+      return Promise.reject(new RelayError('no_app_tab', app
+        ? `no paired tab of "${app}" is connected${open.length ? `; open apps: ${open.join(', ')}` : ''}`
+        : 'no Zenit Week tab is connected: open the app in Chrome or Firefox with AI agents on'));
+    }
     if (!READ_TOOLS.has(tool) && !this._spendWrite()) {
       return Promise.reject(new RelayError('rate_limited', `more than ${WRITE_BUDGET_PER_MIN} writes in a minute`));
     }

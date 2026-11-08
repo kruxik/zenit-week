@@ -5,6 +5,7 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   Relay, isAllowedOrigin, parseExtraOrigin, urisForWeekSaved, hmacB64, memoryPairings, filePairings,
   matchSite, listenOnFirstFreePort, formatPairCode, PORTS, PORT_MIN, PORT_MAX, PROTOCOL,
+  appName, appMatches, routeWarning, readOrigins, addOrigin, removeOrigin, lastUsedSite,
   HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN, PAIR_TIMEOUT_MS,
 } from '../mcp/core.js';
 import fs from 'node:fs';
@@ -24,9 +25,9 @@ class Sock {
 let relay, saved, pairings;
 const open = (tab, extra = {}) => relay.onMessage(tab, JSON.stringify({ type: 'open', protocol: PROTOCOL, visible: true, focused: true, ...extra }));
 // A paired page: open with its pairing, then prove the key.
-function connect({ tabId = 't1', visible = true, week = '2026-45', key = KEY } = {}) {
+function connect({ tabId = 't1', visible = true, week = '2026-45', key = KEY, origin = ORIGIN } = {}) {
   const ws = new Sock();
-  const tab = relay.onOpen(ws, ORIGIN);
+  const tab = relay.onOpen(ws, origin);
   open(tab, { visible, focused: visible, pairingId: PAIRING_ID, nonce: 'n'.repeat(43) });
   const { nonce } = ws.sent[0];
   relay.onMessage(tab, JSON.stringify({ type: 'ready', proof: hmacB64(key, `page|${nonce}`), tabId, week, visible }));
@@ -58,7 +59,7 @@ describe('origin allowlist', () => {
   });
 });
 
-describe('--allow-origin', () => {
+describe('added sites (origins add)', () => {
   test('accepts exactly the https origin it names', () => {
     const extra = [parseExtraOrigin('https://dev-x.ngrok.app/app')];
     expect(extra).toEqual(['https://dev-x.ngrok.app']);
@@ -325,5 +326,102 @@ describe('port range (setup spec section 5)', () => {
   test('another bind failure is not mistaken for a taken port', async () => {
     const e = Object.assign(new Error('denied'), { code: 'EACCES' });
     await expect(listenOnFirstFreePort(async () => { throw e; })).rejects.toBe(e);
+  });
+});
+
+describe('production and dev side by side (setup spec section 6)', () => {
+  const DEV = 'https://abc.ngrok-free.app';
+  beforeEach(() => { pairings.set({ pairingId: 'd'.repeat(22), origin: DEV, key: KEY, pairedAt: 'x' }); });
+  const devConnect = opts => {
+    const ws = new Sock();
+    const tab = relay.onOpen(ws, DEV);
+    open(tab, { pairingId: 'd'.repeat(22), nonce: 'n'.repeat(43) });
+    relay.onMessage(tab, JSON.stringify({ type: 'ready', proof: hmacB64(KEY, `page|${ws.sent[0].nonce}`), tabId: 'dev', week: '2026-46', visible: true, ...opts }));
+    return { ws, tab };
+  };
+
+  test('apps are named "Zenit Week" or by host', () => {
+    expect(appName('https://zenitweek.com')).toBe('Zenit Week');
+    expect(appName('https://www.zenitweek.com')).toBe('Zenit Week');
+    expect(appName(DEV)).toBe('abc.ngrok-free.app');
+    expect(appName('http://localhost:3000')).toBe('localhost:3000');
+    expect(appMatches('zenit week', ORIGIN)).toBe(true);
+    expect(appMatches('abc.ngrok-free.app', DEV)).toBe(true);
+    expect(appMatches(DEV, DEV)).toBe(true);
+    expect(appMatches('Zenit Week', DEV)).toBe(false);
+    expect(appMatches(null, DEV)).toBe(true);
+  });
+
+  test('app picks the site; without it the focused tab runs, with a warning', async () => {
+    let now = 1000;
+    relay.now = () => now;
+    const prod = connect({ tabId: 'prod' });
+    now = 2000;
+    const dev = devConnect();
+    expect(relay.pickTab().id).toBe('dev');
+    expect(relay.pickTab('Zenit Week').id).toBe('prod');
+    expect(relay.openApps()).toEqual(['Zenit Week', 'abc.ngrok-free.app']);
+    expect(routeWarning(relay.openApps(), 'abc.ngrok-free.app'))
+      .toBe('Two apps are open (Zenit Week, abc.ngrok-free.app); this went to abc.ngrok-free.app. Pass "app" to choose.');
+    expect(routeWarning(['Zenit Week'], 'Zenit Week')).toBeNull();
+    const p = relay.call('get_stats', {}, { app: 'Zenit Week' });
+    expect(prod.ws.sent.at(-1)).toMatchObject({ type: 'call', tool: 'get_stats' });
+    expect(dev.ws.sent.some(f => f.type === 'call')).toBe(false);
+    answer(prod);
+    await p;
+    await expect(relay.call('get_stats', {}, { app: 'other.dev' })).rejects.toMatchObject({ code: 'no_app_tab', message: expect.stringContaining('open apps: Zenit Week, abc.ngrok-free.app') });
+  });
+
+  test('zenit://apps lists every app tab of this server', () => {
+    let now = 1000;
+    relay.now = () => now;
+    connect({ tabId: 'prod' });
+    now = 2000;
+    devConnect();
+    const unpaired = relay.onOpen(new Sock(), 'http://localhost:3000');
+    open(unpaired, { visible: false, focused: false });
+    expect(relay.listApps()).toEqual([
+      { app: 'Zenit Week', paired: true, week: '2026-45', visible: true, focused: false },
+      { app: 'abc.ngrok-free.app', paired: true, week: '2026-46', visible: true, focused: true },
+      { app: 'localhost:3000', paired: false, week: null, visible: false, focused: false },
+    ]);
+  });
+
+  test('a pairing request can be aimed at one app', async () => {
+    const devTab = relay.onOpen(new Sock(), DEV);
+    open(devTab);
+    const prodTab = relay.onOpen(new Sock(), ORIGIN);
+    open(prodTab);
+    pairings.delete(DEV);
+    const p = relay.requestPairing('abc.ngrok-free.app');
+    expect(devTab.ws.sent.at(-1).type).toBe('pair-start');
+    expect(prodTab.ws.sent.at(-1).type).toBe('welcome');
+    expect((await relay.requestPairing('Zenit Week')).kind).toBe('busy');
+    relay.cancelPairing();
+    await p;
+  });
+
+  test('--open goes to the pairing used last', () => {
+    expect(lastUsedSite([])).toBe('https://zenitweek.com');
+    connect();
+    devConnect();
+    expect(pairings.get(DEV).lastUsedAt).toBeTruthy();
+    expect(lastUsedSite([{ origin: ORIGIN, lastUsedAt: '2026-11-08T10:00:00Z' }, { origin: DEV, lastUsedAt: '2026-11-08T11:00:00Z' }])).toBe(DEV);
+  });
+
+  test('origins add, list and remove: https only, exact, owner-only file', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zwmcp-'));
+    const file = path.join(dir, 'config.json');
+    expect(addOrigin('http://abc.ngrok-free.app', file)).toBeNull();
+    expect(addOrigin('https://abc.ngrok-free.app/app', file)).toBe(DEV);
+    expect(addOrigin(DEV, file)).toBe(DEV);
+    expect(readOrigins(file)).toEqual([DEV]);
+    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    expect(isAllowedOrigin(DEV, readOrigins(file))).toBe(true);
+    expect(isAllowedOrigin('https://abd.ngrok-free.app', readOrigins(file))).toBe(false);
+    expect(removeOrigin('abc.ngrok-free.app', file)).toBe(true);
+    expect(readOrigins(file)).toEqual([]);
+    expect(removeOrigin('abc.ngrok-free.app', file)).toBe(false);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -69,17 +69,37 @@ For working on the server itself, run it from a clone instead of npm:
 | `zenit-week-mcp` | Runs the server. This is what the MCP client launches. |
 | `zenit-week-mcp unpair <site>` | Forgets a site's pairing, for example `unpair zenitweek.com`. The app then shows "Unpaired on the agent side" and pairs again on the next request. |
 | `zenit-week-mcp unpair --all` | Forgets every pairing. |
+| `zenit-week-mcp origins add <https-url>` | Lets another site connect, for example an ngrok dev tunnel. `https` only, compared exactly, stored in `~/.config/zenit-week-mcp/config.json`. Every server on the computer accepts it at once, no restart. |
+| `zenit-week-mcp origins remove <site>` | Removes an added site. |
+| `zenit-week-mcp origins list` | Lists the built-in sites (`https://zenitweek.com`, `https://www.zenitweek.com`, `http://localhost:*`, `http://127.0.0.1:*`) and the added ones. |
 
 | Option | What it does |
 |---|---|
-| `--open` | Opens the app in your browser when a request arrives and no tab is connected. |
-| `--allow-origin <https-url>` | Also accepts that page origin, for example an ngrok dev tunnel. Repeatable. |
+| `--open` | Opens the site you used last (production or a dev copy) when a request arrives and no tab is connected. |
 
 Options go after the package name, for example `npx -y zenit-week-mcp@1 --open`.
 
 ### Several agent apps at once
 
 Every agent app starts its own copy of the server: Claude Desktop at launch, Claude Code per session, Cursor per window. Each copy listens on the first free port from `47831` to `47838`, and the app connects to all of them, so they can run side by side. Pairings are shared through one file, so approving one agent app pairs the site for all of them. Settings lists every connected agent app. A copy that finds all eight ports taken says "Too many Zenit Week servers running" and exits. Calls from two agents never interleave: the app runs them one at a time.
+
+### Production and a dev copy side by side
+
+The agent can talk to several Zenit Week sites at once, for example production and an ngrok tunnel to a development copy. Each site pairs once on its own.
+
+- `zenit://apps` lists the connected app tabs: the app name (`Zenit Week` for production, the host name for any other site), whether it is paired, the week in view, and which tab is in front.
+- Every tool and resource takes an optional `app`: a tool argument, or `?app=` on a resource URI such as `zenit://week/current?app=abc.ngrok-free.app`. Without it, the most recently focused visible tab runs the call, as before.
+- Every result says which app ran it in `app`. When more than one app is open and the call named none, the result also carries a warning: "Two apps are open (Zenit Week, abc.ngrok-free.app); this went to Zenit Week."
+
+### Working on the server itself
+
+A development copy of the app may speak a newer protocol than the published server. Register a second server from your clone, scoped to that folder only:
+
+```sh
+cd /path/to/zenit-week && claude mcp add zenit-week-dev -- node mcp/server.js
+```
+
+It takes its own port next to the published one. Your dev tab connects to both: a published server that speaks another protocol is listed in Settings as needing an update, for that server only, and the dev server pairs normally. Pairings are per site, so your production pairing is untouched.
 
 ## What the agent can do
 
@@ -113,10 +133,13 @@ Read-only resources:
 | `zenit://weeks` | Weeks stored on this device, with task counts. |
 | `zenit://schedule` | Dated and repeating entries (the Later tab). |
 | `zenit://agenda/{1-7}` | The agenda of one day of the week in view. |
+| `zenit://apps` | The connected app tabs, answered by the server itself. |
+
+Every tool and resource above also takes `app` (see "Production and a dev copy side by side").
 
 ## Security
 
-- **Your computer only.** The server listens on `127.0.0.1` and accepts connections only from `https://zenitweek.com`, local development origins and any origin you add with `--allow-origin`.
+- **Your computer only.** The server listens on `127.0.0.1` and accepts connections only from `https://zenitweek.com`, local development origins and any site you add with `origins add`. A website cannot add itself: only that command on your computer changes the list.
 - **Approve once, by code.** On the agent's first request the app and the server agree a key (ECDH P-256 with a commitment) and both show a 6-digit code derived from it; you compare them and click Allow. A program sitting in between cannot make the two codes match. Afterwards both sides prove the key on every connection; it never crosses the socket again. Before pairing the app sends only its protocol version and whether it is in front. Pairings live in `~/.config/zenit-week-mcp/pairings.json` (owner-only, or under `$XDG_CONFIG_HOME`), one per site.
 - **What pairing protects against.** On a computer shared by several user accounts, another account's programs can reach `127.0.0.1` but not your browser profile or `~/.config`. A program running as you can already read both; no local scheme stops it.
 - **The app stays in charge.** The server never reads or changes week data itself. The app applies every change through its own actions, and each one can be undone.
