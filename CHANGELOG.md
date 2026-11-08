@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) - `vYYYY.MM.DD[.N]`.
 
+## [v2026.11.08] - 2026-11-08
+
+### Added
+
+- **settings:** Connect an agent offers Codex, Gemini CLI and Devin Desktop in a new order, and names VS Code (Copilot)
+- **settings:** Connect an agent is one app picker, with a note and button that follow the choice
+- **settings:** The window follows the open tab's height, eased in 180ms, the new tab fades in, and no scrollbar flashes while it grows
+- **account:** Merge sync and Settings into one top-right account button with a sync badge; Quick add alone bottom-right; root shows the done percentage
+- **settings:** Tabbed Settings - sidebar window pinned above the gear on desktop, full-screen sheet with pinned segmented tabs on mobile; General / AI / Data / Development
+- **release:** One release ships app, agent server and extension - npm run release raises the server version when it changed, the deploy builds the .mcpb, publishes to npm by trusted publishing before going live, and attaches the extension to every release
+- **bridge:** Claude Desktop extension - mcp/manifest.json, npm run mcp:bundle (official mcpb pack), Download in the Settings guide, update hints by install path from a mismatch frame
+- **bridge:** Production and dev side by side - origins add/remove/list replace --allow-origin, zenit://apps, app argument on every tool and resource, app and warning on every result, --open follows the last used pairing
+- **bridge:** Pairing v2 - AI agents switch with explainer and connect guide, approve-in-app with a matching 6-digit code (ECDH + commitment), shared pairings.json, unpair in Settings and CLI, protocol 2; pair, rotate and the pasted code removed
+- **bridge:** Several agent apps - servers take a free port in 47831-47838, page connects to all and lists them, --port removed, exit when stdin closes, log listening only after bind
+- **mcp:** Publishable zenit-week-mcp 1.0.0 npm package, npm run mcp:publish, README installs via npx -y zenit-week-mcp@1
+- **landing-cs:** AI agent section and featureList in Czech
+- **landing:** AI agent section with example prompt, three promises and setup link; featureList in structured data
+- **mcp:** --allow-origin for a dev tunnel origin
+- **bridge:** Settings pairing section, Help and privacy text, README setup
+- **mcp:** Zenit-week-mcp server - stdio MCP, loopback WebSocket relay, origin and token checks, tab routing
+- **bridge:** In-page agent bridge - handshake, call queue, tool dispatch, projection, loopback CSP
+
+### Changed
+
+- **quick-add:** Create tasks through the shared insertChildTask / applyLabelEdit / finishNewTask path
+- **actions:** Snapshot-free shared bodies for status, priority, reusable, branch, comment, task create and agenda grouping
+
+### Fixed
+
+- **settings:** Switching language keeps the signed-in name and email in Account
+- **settings:** The Dev tab speaks Czech too
+- **settings:** Connect an agent opens web links in a new tab, so the app stays open
+- **bridge:** The pair code comes back in the agent's reply, and "Connect an agent" stays visible in Settings
+- **pull-refresh:** The pull-down reload works from the toolbar band while Settings is open; the browser's own pull-to-refresh is off
+- **settings:** AI toggle no longer makes the window jump - height held while open, setup guide shown only after 1.5s of waiting
+- **zoom:** Keep the slider thumb on the track when zoom sits outside the slider range
+- **bridge:** Get_stats returns counts only - drop the raw leaves list (112 KB on a 230-task week)
+
 ## [v2026.11.07] - 2026-11-07
 
 ### Added

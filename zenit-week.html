@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-IubM42+8PYgxgcvsVAm1Ur3TAClDBOdGCDsw8qTjqxA=';
+               'sha256-VEdvmOJ0qya1rq9Y0sFWN52jXrvfTARkEsvddgUP6FE=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -404,6 +404,13 @@
     touch-action: pan-x pan-y;
   }
 
+  /* The browser's own pull-to-refresh is off: the app runs its own (see
+     initPullToRefresh), and the native one would otherwise reload the page
+     from any surface that lets a vertical pan through - a popup's backdrop,
+     a dialog - with no say from the app. overflow:hidden alone does not stop
+     it on Android Chrome. Not inherited, so inner lists keep their bounce. */
+  html, body { overscroll-behavior-y: none; }
+
   #app {
     display: flex;
     flex-direction: column;
@@ -438,10 +445,6 @@
     align-items: center;
     user-select: none;
     cursor: pointer;
-  }
-
-  #sync-btn .icon {
-    vertical-align: middle;
   }
 
   #zoom-slider-header {
@@ -907,8 +910,8 @@
      there could only ever name the week for the Mindmap. The toolbar already
      paints above every panel, so nothing per-view keeps this visible.
      Absolutely centred instead of a flex child, so neither the logo's two
-     widths nor the sync button's changing label can shove it sideways. One
-     button, dressed as #sync-btn so the toolbar speaks one button style;
+     widths nor the account button can shove it sideways. One button, in the
+     toolbar's glass button style;
      stepping a week at a time is the [ / ] hotkeys' job. */
   #week-picker {
     position: absolute;
@@ -954,7 +957,7 @@
     box-shadow: 0 4px 12px var(--shadow-md);
   }
   #week-picker-label:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
-  /* Grey and regular like #sync-btn; only the week number itself is bold. */
+  /* Grey and regular; only the week number itself is bold. */
   #week-picker-week,
   #week-picker-week-short { font-weight: 700; }
   #week-picker-week,
@@ -975,12 +978,10 @@
   #week-picker.off-current #week-picker-label { color: var(--accent-warning-text); }
 
   /* ── The fold ───────────────────────────────────────────────────────────── */
-  /* Same glass surface as the toolbar's other dropdowns (#sync-dropdown,
-     #settings-dropdown) because it drops out of the same bar. Centred on the
+  /* The toolbar's glass dropdown surface, because it drops out of the bar. Centred on the
      label; on phones it is centred on the viewport instead (see the 520px query),
      which is what keeps it from hanging off a 360px screen. */
-  #week-picker-fold,
-  #settings-dropdown {
+  #week-picker-fold {
     background: var(--settings-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -996,7 +997,7 @@
     width: 300px;
     padding: 8px 0;
     /* Above the toolbar's own 2600 so no panel header clips it, below
-       #settings-dropdown's 2700, which can open over it. */
+       #settings-overlay's 2700, which can open over it. */
     z-index: 2650;
     display: none;
     /* Its own copy of the shared fadeIn: that keyframe animates transform, which
@@ -1210,149 +1211,56 @@
     text-rendering: geometricPrecision;
   }
 
-  /* Google Drive Sync UI */
-  #sync-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  /* No backdrop-filter on small controls. Each one is its own compositor render
-     surface that re-blurs whatever sits behind it, and behind these is the full
-     SVG mindmap. At button size the blur is not legible anyway - --glass-bg
-     carries the look on its own. */
-  #sync-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    height: 36px;
-    padding: 0 16px;
-    background: var(--glass-bg);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-subtle);
-    box-shadow: 0 2px 8px var(--shadow-md);
-    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-    white-space: nowrap;
-    position: relative;
-    z-index: 1;
-  }
-
-  #sync-btn { display: none; }
-
-  #sync-btn:hover {
-    color: var(--text-dim);
-    box-shadow: 0 4px 12px var(--shadow-md);
-  }
-
-  #sync-btn:hover::before {
-    content: '';
-    position: absolute;
-    top: 3px; left: 3px; right: 3px; bottom: 3px;
-    background: var(--bg-hover);
-    border-radius: 5px;
-    z-index: -1;
-  }
-
+  /* Account button: the top-right door to Settings. Round, like the face it
+     wears. No backdrop-filter on small controls - each one is its own
+     compositor render surface re-blurring the full SVG mindmap behind it, and
+     at button size the blur is not legible anyway; --glass-bg carries the look. */
   @keyframes sync-pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.35; }
   }
 
-  #sync-state-btn {
+  #account-btn {
+    position: relative;
     width: 36px;
     height: 36px;
-    border-radius: 8px;
-    border: 1px solid var(--border-subtle);
     padding: 0;
-    cursor: pointer;
-    background: var(--glass-bg);
     flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
+    background: var(--glass-bg);
     box-shadow: 0 2px 8px var(--shadow-md);
-    transition: transform 0.15s, box-shadow 0.15s, color 0.3s;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
+    cursor: pointer;
+    color: var(--text-subtle);
+    transition: transform 0.15s, box-shadow 0.15s, color 0.15s;
   }
-
-  html:not(.zw-has-session) #sync-btn { display: inline-flex; }
-  html.zw-has-session #sync-state-btn { display: flex; }
-
-  #sync-state-btn:hover {
+  #account-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 4px 12px var(--shadow-md);
+    color: var(--text-dim);
   }
-
-  /* The status dot the avatar used to carry now lives in the glyph itself, so
-     exactly one variant is visible at a time. */
-  .sync-glyph { display: none; }
-  #sync-state-btn[data-status="connected"]    .sync-glyph-connected    { display: block; }
-  #sync-state-btn[data-status="syncing"]      .sync-glyph-syncing      { display: block; }
-  #sync-state-btn[data-status="error"]        .sync-glyph-error        { display: block; }
-  #sync-state-btn[data-status="disconnected"] .sync-glyph-disconnected { display: block; }
-
-  /* Syncing is a healthy state, so it wears the OK green; the glyph and its
-     animation say "in progress". Warning and danger colours stay reserved for
-     states that want attention. */
-  #sync-state-btn[data-status="connected"],
-  #sync-state-btn[data-status="syncing"]   { color: var(--accent-success-text); }
-  #sync-state-btn[data-status="error"]     { color: var(--accent-danger); }
-
-  #sync-state-btn[data-status="syncing"] .sync-glyph-syncing {
-    animation: sync-pulse 1s ease-in-out infinite;
+  #account-btn.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--view-btn-active-bg), 0 2px 8px var(--shadow-md);
   }
+  #account-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 
-  @media (prefers-reduced-motion: reduce) {
-    #sync-state-btn[data-status="syncing"] .sync-glyph-syncing { animation: none; }
-  }
-
-  /* A popup dialog hung under the cloud: the shared .dialog-shell surface and
-     caption bar, positioned like the toolbar's other dropdowns. */
-  #sync-dropdown {
+  /* The face: a person while signed out; signed in, the initials disc with the
+     photo laid over it, so a photo that fails reveals the initials. */
+  #account-btn-face {
     position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
-    z-index: 1001;
-    min-width: 264px;
-    max-width: 320px;
-    display: none;
-    flex-direction: column;
-    animation: fadeIn 0.12s ease-out;
-  }
-
-  #sync-dropdown.visible { display: flex; }
-
-  /* Account, sync status and Sign out are short lines that belong together;
-     the dialog's default 12px gap would scatter them. */
-  #sync-dropdown .dialog-body {
-    gap: 6px;
-    padding: 14px;
-  }
-
-  /* Read top to bottom: who you are, the sync status, then what you can do. Everything is left-aligned against one edge - the
-     centred text and the two full-size glass buttons this replaced gave four
-     competing alignments in a 264px box. */
-  #sync-dropdown-account {
+    inset: 2px;
+    border-radius: 50%;
+    overflow: hidden;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 2px 0 4px;
-    min-width: 0;
+    justify-content: center;
   }
-
-  #sync-dropdown-avatar {
-    flex-shrink: 0;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    display: flex;
+  .account-btn-placeholder { width: 20px; height: 20px; }
+  #account-btn-initials {
+    position: absolute;
+    inset: 0;
+    display: none;
     align-items: center;
     justify-content: center;
     font-size: 12px;
@@ -1361,44 +1269,55 @@
     color: #fff;
     background: var(--text-muted);
   }
+  #account-btn-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  #account-btn-photo[hidden] { display: none; }
+  #account-btn.signed-in .account-btn-placeholder { display: none; }
+  #account-btn.signed-in #account-btn-initials { display: flex; }
 
-  /* min-width:0 on both, or the ellipsis below never triggers: a flex item's
-     default min-width is its content, so a long address widens the menu. */
-  #sync-dropdown-identity {
+  /* The sync badge on the face's lower-right edge, ringed in the toolbar's
+     surface so it reads as a status chip and not as part of the photo. Exactly
+     one glyph is visible at a time. */
+  #account-btn-badge {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
     display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-  }
-
-  #sync-dropdown-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  #sync-dropdown-name:empty { display: none; }
-
-  #sync-dropdown-email {
-    font-size: 12px;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-surface);
+    box-shadow: 0 0 0 1px var(--border-subtle), 0 1px 3px var(--shadow-md);
     color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  }
+  .sync-glyph { display: none; }
+  #account-btn[data-status="connected"]    .sync-glyph-connected    { display: block; }
+  #account-btn[data-status="syncing"]      .sync-glyph-syncing      { display: block; }
+  #account-btn[data-status="error"]        .sync-glyph-error        { display: block; }
+  #account-btn[data-status="disconnected"] .sync-glyph-disconnected { display: block; }
+  /* A returning session, before Drive has answered: no "not connected" flash. */
+  html.zw-has-session #account-btn:not(.signed-in) #account-btn-badge { visibility: hidden; }
+
+  /* Syncing is a healthy state, so it wears the OK green; the glyph and its
+     animation say "in progress". Warning and danger colours stay reserved for
+     states that want attention. */
+  #account-btn[data-status="connected"] #account-btn-badge,
+  #account-btn[data-status="syncing"]   #account-btn-badge { color: var(--accent-success-text); }
+  #account-btn[data-status="error"]     #account-btn-badge { color: var(--accent-danger); }
+
+  #account-btn[data-status="syncing"] .sync-glyph-syncing {
+    animation: sync-pulse 1s ease-in-out infinite;
   }
 
-  /* The tip reads as a second status line under Last sync: what the red cloud
-     means and what, if anything, to do. Empty - and so gone - unless in error. */
-  #sync-dropdown-tip:empty { display: none; }
-
-  #sync-dropdown-last-sync,
-  #sync-dropdown-tip {
-    font-size: 11px;
-    color: var(--text-secondary);
-    padding: 0 0 2px;
+  @media (prefers-reduced-motion: reduce) {
+    #account-btn[data-status="syncing"] .sync-glyph-syncing { animation: none; }
   }
 
   /* Settings & Toolbar Right */
@@ -1423,26 +1342,143 @@
     #toolbar { padding: 8px 12px; }
     .logo-full    { display: none; }
     .logo-compact { display: block; }
-    #sync-btn { padding: 0 10px; }
-    #sync-btn-label { display: none; }
   }
 
-  #settings-dropdown {
+  /* Settings: a window hung under the account button in the top-right corner,
+     the one control it opens from. The overlay is transparent on desktop - it only catches the
+     click outside that closes it, and leaves the map visible for the zoom
+     slider. It hangs from its top edge, so its height follows the open tab's
+     content, eased by animateSettingsHeight; it scrolls only when the
+     viewport is shorter than that. */
+  #settings-overlay {
     position: fixed;
-    bottom: 58px;
-    right: 12px;
-    top: auto;
-    padding: 10px;
-    z-index: 2700; /* Above Agenda mobile panel (2000) and toolbar (2600) */
-    min-width: 200px;
+    inset: 0;
     display: none;
+    z-index: 2700; /* Above Agenda mobile panel (2000) and toolbar (2600), below the confirm (3000) */
+  }
+  #settings-overlay.visible { display: block; }
+  #settings-dialog {
+    position: absolute;
+    right: 12px;
+    /* Level with #week-picker-fold: its top edge is the week label's bottom
+       (toolbar 56, label 36 centred in it) plus the fold's own 8px gap. */
+    top: 54px;
+    width: 380px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 70px);
+    display: flex;
     flex-direction: column;
-    gap: 4px;
+    box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
     animation: fadeIn 0.12s ease-out;
   }
-
-  #settings-dropdown.visible {
+  .settings-body {
+    flex: 1;
+    min-height: 0;
     display: flex;
+    flex-direction: column;
+  }
+
+  /* On phones the tabs are the Agenda day strip's: .agenda-tab buttons with
+     .agenda-tab-separator rules between them, one row under the caption that
+     scrolls sideways when the window is narrower than the run. Only the strip
+     itself is Settings-specific. A separator before a tab this device hides
+     goes with it. */
+  .settings-tabs {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .settings-tabs::-webkit-scrollbar { display: none; }
+  .settings-tabs .agenda-tab-separator:has(+ .agenda-tab[hidden]) { display: none; }
+  .settings-tabs .agenda-tab[hidden] { display: none; }
+  /* Icons lead the names in the desktop sidebar only; the phone's strip has no
+     room for them. */
+  .settings-tabs .settings-tab-icon { display: none; }
+  .settings-tabs .agenda-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+
+  /* Desktop keeps a sidebar of tabs beside the panes: the same buttons, stacked
+     and left-aligned, with no separators. The selected tab wears the accent on
+     the menu-hover tint, and hover only darkens the text. Phones keep the strip
+     above. */
+  @media (min-width: 521px) {
+    .settings-body { flex-direction: row; }
+    .settings-tabs {
+      width: 116px;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 10px 8px;
+      overflow-x: visible;
+      border-bottom: none;
+      border-right: 1px solid var(--border-soft);
+    }
+    .settings-tabs .agenda-tab-separator { display: none; }
+    .settings-tabs .agenda-tab { gap: 8px; }
+    .settings-tabs .settings-tab-icon { display: inline-block; width: 16px; height: 16px; flex-shrink: 0; }
+    .settings-tabs .agenda-tab {
+      height: auto;
+      padding: 7px 10px;
+      border-radius: 6px;
+    }
+    .settings-tabs .agenda-tab:hover { background: none; color: var(--text-dim); }
+    .settings-tabs .agenda-tab.active {
+      color: var(--accent-primary);
+      background: var(--ctx-hover-bg);
+    }
+  }
+
+  /* Buttons keep their own width and stand one per line, right-aligned like
+     the toggles above them. */
+  /* The pane is a fixed-height scrolling column, so its children must not
+     shrink to fit: an empty separator would collapse to 0px and vanish. */
+  .settings-pane > * { flex-shrink: 0; }
+
+  .settings-section > .agenda-action-btn,
+  #bridge-paired > .agenda-action-btn,
+  #bridge-guide > .agenda-action-btn { align-self: flex-end; }
+
+  /* Only the open tab's pane is shown, so the window is as tall as its
+     content. This wrapper is the one that scrolls. */
+  .settings-panes {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* While the window eases to a taller height it is briefly shorter than its
+     content; that is not overflow, so no scrollbar flashes. Once settled, a
+     window taller than the viewport scrolls as usual. */
+  #settings-dialog.settings-height-moving .settings-panes { overflow-y: hidden; }
+  /* A tab switch fades the new pane in while the window eases to its height. */
+  .settings-pane:not([hidden]) { animation: settingsPaneIn 0.18s ease-out; }
+  @keyframes settingsPaneIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .settings-pane:not([hidden]) { animation: none; }
+  }
+
+  .settings-pane {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px 16px;
+  }
+
+  /* Phones: the same window under the account button, narrower so it reads as
+     a popup and not a sheet. Caption and tabs sit outside the scrolling pane,
+     so they stay pinned. dvh, so the window clears the browser's own bars as
+     they slide in and out. */
+  @media (max-width: 520px) {
+    /* Level with #week-picker-fold, which drops 4px below the toolbar here. */
+    #settings-dialog { width: 261px; top: calc(var(--toolbar-h) + 4px); max-height: calc(100dvh - 72px); }
   }
 
   .settings-section {
@@ -1468,7 +1504,8 @@
   }
 
   #lang-select,
-  #theme-select {
+  #theme-select,
+  #bridge-guide-app {
     width: 100%;
     padding: 5px 8px;
     border-radius: 8px;
@@ -1480,7 +1517,8 @@
     outline: none;
   }
   #lang-select:focus,
-  #theme-select:focus { border-color: var(--border-hover); }
+  #theme-select:focus,
+  #bridge-guide-app:focus { border-color: var(--border-hover); }
 
   /* Theme toggle pill */
   .theme-toggle-row {
@@ -1533,7 +1571,7 @@
 
   .agenda-item .agenda-action-btn { font-weight: 400; }
 
-  /* Blur-free for the same reason as #sync-btn - and this class is worn by every
+  /* Blur-free for the same reason as #account-btn - and this class is worn by every
      agenda row action and quick-add pill, so it was the densest cluster of
      render surfaces in the app. */
   .agenda-action-btn {
@@ -1933,7 +1971,7 @@
     right: 12px;
     z-index: 1000;
   }
-  #fab-settings, #fab-add {
+  #fab-add {
     width: 36px;
     height: 36px;
     display: flex;
@@ -1947,19 +1985,9 @@
     transition: background 0.15s, color 0.15s;
     outline: none;
   }
-  #fab-settings:hover, #fab-add:hover {
+  #fab-add:hover {
     background: var(--bg-hover);
     color: var(--text-dim);
-  }
-  #fab-settings.active {
-    background: var(--view-btn-active-bg);
-    color: var(--view-btn-active-text);
-  }
-  .fab-divider {
-    width: 1px;
-    height: 22px;
-    background: var(--view-separator);
-    flex-shrink: 0;
   }
 
   /* ─── Unified panel window (.app-panel) ─────────────────────────────────────
@@ -2133,17 +2161,19 @@
   .stats-donut { width: 234px; height: 234px; overflow: visible; }
   /* Sized in the chart's user units: "100%" and "HOTOVO" both keep clear of
      the plate's opaque middle (r 83.75). */
-  .stats-donut-center-num {
+  .pie-center-num {
     font-size: 44px;
     font-weight: 700;
     fill: var(--text-primary);
+    pointer-events: none;
   }
-  .stats-donut-center-sub {
+  .pie-center-sub {
     font-size: 16px;
     font-weight: 600;
     letter-spacing: 2px;
     text-transform: uppercase;
     fill: var(--text-placeholder);
+    pointer-events: none;
   }
   .stats-legend {
     display: grid;
@@ -2694,8 +2724,9 @@
   /* ─── Pull to refresh ────────────────────────────────────────────────────
      One layer for the whole app, pinned under the toolbar and clipping its own
      content, so the puck slides out from beneath the toolbar in every view and
-     is hidden the rest of the time. It lives in the toolbar's z-band (2600) so
-     it is drawn over the panels the same way the toolbar is. */
+     is hidden the rest of the time. It sits just over #settings-overlay (2700)
+     and under the confirm (3000): a pull started while Settings is open must
+     show its puck over the Settings window. */
   #ptr-layer {
     position: fixed;
     top: var(--toolbar-h);
@@ -2704,7 +2735,7 @@
     height: 160px;
     overflow: hidden;
     pointer-events: none;
-    z-index: 2600;
+    z-index: 2750;
   }
   #ptr-indicator {
     position: absolute;
@@ -3588,8 +3619,7 @@
     animation: fadeIn 0.12s ease-out;
   }
   .dialog-actions .agenda-action-btn,
-  #settings-dropdown .agenda-action-btn,
-  #sync-dropdown .agenda-action-btn {
+  #settings-dialog .agenda-action-btn {
     white-space: nowrap;
     height: 36px;
     padding: 0 16px;
@@ -3638,6 +3668,197 @@
   }
   .agenda-action-btn.commit::before { content: none; }
   .agenda-action-btn.commit:disabled { cursor: default; box-shadow: none; }
+  /* Settings > AI, read like the Drive account card: a round badge coloured by
+     the connection state, a name and a muted line beside it, the switch on the
+     right; then a Status caption, one row per agent and the setup guide. The
+     state colour lives on #bridge-section[data-state], set by
+     renderBridgeStatus, so the badge and the status dot never disagree. */
+  #bridge-section { --bridge-state: var(--text-muted); }
+  #bridge-section[data-state="connected"] { --bridge-state: var(--accent-success-text); }
+  #bridge-section[data-state^="waiting"],
+  #bridge-section[data-state="approve"] { --bridge-state: var(--accent-warning-text); }
+  #bridge-section[data-state="blocked"],
+  #bridge-section[data-state="unpaired-remote"],
+  #bridge-section[data-state^="update"] { --bridge-state: var(--accent-danger); }
+
+  .settings-hero {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 2px 4px;
+    min-width: 0;
+  }
+  .settings-badge {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #fff;
+    background: var(--text-muted);
+  }
+  #bridge-avatar {
+    background: var(--bridge-state);
+    transition: background 0.25s;
+  }
+  #bridge-avatar .icon { width: 18px; height: 18px; }
+  /* Something is pending: the badge breathes, like the syncing cloud. */
+  #bridge-section[data-state^="waiting"] #bridge-avatar,
+  #bridge-section[data-state="approve"] #bridge-avatar { animation: sync-pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    #bridge-avatar { animation: none !important; }
+  }
+  .settings-identity {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .settings-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The tab's description sentence under its caption row: the ordinary
+     .settings-sub text, set in the section's own column. */
+  .settings-section > .settings-sub { padding: 0 2px 2px; }
+  .settings-section > .settings-sub:empty { display: none; }
+  .settings-sub {
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text-muted);
+  }
+  /* The status sentence with a dot in the state colour in front of it. */
+  .bridge-status {
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    padding: 0 2px;
+  }
+  .bridge-status::before {
+    content: '';
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: var(--bridge-state);
+  }
+  .bridge-status-line { font-size: 12px; line-height: 1.4; color: var(--text-secondary); padding: 0 2px; }
+  .bridge-note { font-size: 11px; line-height: 1.4; color: var(--text-muted); padding: 0 2px; }
+  .bridge-list { display: flex; flex-direction: column; gap: 6px; }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .settings-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Settings > Account: the badge is a grey person while signed out and the
+     initials on green once signed in - it states the account, so it wears the
+     state's colour, not the account's own; the status
+     dot wears the sync state's colour, as the account button's badge does. */
+  #account-section { --bridge-state: var(--text-muted); }
+  #account-section[data-state="drive"][data-status="connected"],
+  #account-section[data-state="drive"][data-status="syncing"] { --bridge-state: var(--accent-success-text); }
+  #account-section[data-state="drive"][data-status="error"] { --bridge-state: var(--accent-danger); }
+  #account-avatar .icon { width: 18px; height: 18px; }
+  #account-avatar { background: var(--text-muted); transition: background 0.25s; }
+  #account-section[data-state="drive"] #account-avatar { background: var(--accent-success-text); }
+  #account-section[data-state="drive"] .account-avatar-placeholder { display: none; }
+  #account-section[data-state="local"] #account-avatar-initials { display: none; }
+  #account-section .bridge-list > .agenda-action-btn { align-self: flex-end; }
+  #account-sync-tip:empty { display: none; }
+  #account-section[data-state="drive"][data-status="syncing"] .bridge-status::before { animation: sync-pulse 1s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    #account-section .bridge-status::before { animation: none !important; }
+  }
+  .settings-tiles { display: flex; gap: 8px; }
+  .settings-tile {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-soft);
+  }
+  .settings-tile .settings-label { padding: 0; }
+  .settings-tile-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .settings-badge-app .icon { width: 14px; height: 14px; }
+  /* A described action: badge and text get the full width, the button sits
+     under them on the right, so no title or description is cut short. */
+  .settings-block { display: flex; flex-direction: column; gap: 4px; }
+  .settings-block > .settings-row { align-items: flex-start; min-height: 0; }
+  .settings-block .settings-badge { margin-top: 2px; }
+  .settings-block .settings-name { white-space: normal; }
+  .settings-block > .agenda-action-btn { align-self: flex-end; }
+  .settings-badge.settings-badge-warn { color: var(--accent-warning-text); }
+  .settings-badge.settings-badge-danger { color: var(--accent-danger); }
+  /* An informative hero badge (General, Data, Development): the accent blue,
+     whatever the state. Status badges (Account, AI) colour by state instead. */
+  .settings-badge.settings-badge-info { background: var(--accent-primary); }
+  .settings-badge-info .icon { width: 18px; height: 18px; }
+  /* A read-only value under its caption, shown whole: a long host wraps. */
+  .settings-value {
+    font-size: 13px;
+    color: var(--text-primary);
+    padding: 0 2px;
+    overflow-wrap: anywhere;
+  }
+  /* App badges in the guide: the same badge, squared off and quiet. */
+  .settings-badge.settings-badge-app {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    background: var(--bg-muted);
+    border: 1px solid var(--border-soft);
+  }
+  /* A connected agent: the badge in the state colour, name over its state. */
+  .bridge-agent .settings-badge { width: 24px; height: 24px; font-size: 10px; }
+  .bridge-agent[data-agent-state="connected"] .settings-badge { background: var(--accent-success-text); }
+  .bridge-agent[data-agent-state="old"] .settings-badge { background: var(--accent-warning-text); }
+  /* A pairing code: the visual centre of its dialog, digits in groups of three. */
+  #app-confirm-highlight {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--text-primary);
+    padding: 4px 0 12px;
+  }
   #app-confirm-body {
     max-width: 360px;
     white-space: pre-line;
@@ -4150,6 +4371,7 @@
   THIRD_PARTY_NOTICES.md (https://github.com/kruxik/zenit-week/blob/main/THIRD_PARTY_NOTICES.md).
 -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="icon-user" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></symbol>
   <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
   <symbol id="icon-telescope" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 21l6 -5l6 5"/><path d="M12 13v8"/><path d="M3.294 13.678l.166 .281c.52 .88 1.624 1.265 2.605 .91l14.242 -5.165a1.023 1.023 0 0 0 .565 -1.456l-2.62 -4.705a1.087 1.087 0 0 0 -1.447 -.42l-.056 .032l-12.694 7.618c-1.02 .613 -1.357 1.897 -.76 2.905z"/><path d="M14 5l3 5.5"/></symbol>
   <symbol id="icon-chart-donut" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></symbol>
@@ -4161,6 +4383,11 @@
   <symbol id="icon-circle-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></symbol>
   <symbol id="icon-circle-dashed" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/></symbol>
   <symbol id="icon-circle-dashed-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/><path d="M9 12l2 2l4 -4"/></symbol>
+  <symbol id="icon-sparkles" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z"/></symbol>
+  <symbol id="icon-database" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0 -16 0"/><path d="M4 6v6a8 3 0 0 0 16 0v-6"/><path d="M4 12v6a8 3 0 0 0 16 0v-6"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/></symbol>
+  <symbol id="icon-code" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 8l-4 4l4 4"/><path d="M17 8l4 4l-4 4"/><path d="M14 4l-4 16"/></symbol>
+  <symbol id="icon-activity" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12h4l3 8l4 -16l3 8h4"/></symbol>
   <symbol id="icon-bolt" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></symbol>
   <symbol id="icon-ban" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></symbol>
   <symbol id="icon-bolt-off" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 3l18 18"/><path d="M15.212 15.21l-4.212 5.79v-7h-6l3.79 -5.21m1.685 -2.32l2.525 -3.47v6m1 1h5l-2.104 2.893"/></symbol>
@@ -4265,81 +4492,54 @@
       </div>
     </div>
     <div id="toolbar-right">
-      <div id="sync-container">
-        <button type="button" id="sync-btn">
-          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
-            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-            <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-            <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
-            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-          </svg>
-          <span id="sync-btn-label">Sign in</span>
-        </button>
-        <!--
-          Signed in, this replaces the sign-in button. It deliberately does NOT
-          wear the profile photo: the root node already carries the user's face,
-          and the menu behind this button is about Drive sync (account, last
-          sync, sign out), not about identity. So the glyph states what sync is
-          doing. All four variants ship in the DOM and CSS picks one off
-          [data-status] - no runtime markup building, no innerHTML.
-          Glyphs: Tabler Icons (MIT) cloud-check / cloud-up / cloud-exclamation
-          / cloud-off.
-        -->
-        <button type="button" id="sync-state-btn" data-status="disconnected"
-                data-i18n-aria="sync.stateAria" aria-label="Sync options"
-                data-i18n-title="sync.badge.disconnected" title="Not connected to Google Drive"
-                aria-haspopup="true">
-          <svg class="sync-glyph sync-glyph-connected" viewBox="0 0 24 24" width="20" height="20"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-               stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M11 18.004h-4.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.388 0 2.585 .82 3.138 2.007"/>
-            <path d="M15 19l2 2l4 -4"/>
-          </svg>
-          <svg class="sync-glyph sync-glyph-syncing" viewBox="0 0 24 24" width="20" height="20"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-               stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M12 18.004h-5.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.38 0 2.57 .811 3.128 1.986"/>
-            <path d="M19 22v-6"/>
-            <path d="M22 19l-3 -3l-3 3"/>
-          </svg>
-          <svg class="sync-glyph sync-glyph-error" viewBox="0 0 24 24" width="20" height="20"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-               stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M15 18.004h-8.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.374 0 2.562 .805 3.121 1.972"/>
-            <path d="M19 16v3"/>
-            <path d="M19 22v.01"/>
-          </svg>
-          <svg class="sync-glyph sync-glyph-disconnected" viewBox="0 0 24 24" width="20" height="20"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-               stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M9.58 5.548c.24 -.11 .492 -.207 .752 -.286c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 .957 -.383 1.824 -1.003 2.454m-2.997 1.033h-11.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.13 -.582 .37 -1.128 .7 -1.62"/>
-            <path d="M3 3l18 18"/>
-          </svg>
-        </button>
-        <div id="sync-dropdown" class="dialog-shell" role="dialog" aria-labelledby="sync-dropdown-title">
-          <div class="dialog-header">
-            <div class="dialog-title" id="sync-dropdown-title" data-i18n="sync.dialogTitle">Google Drive sync</div>
-            <button type="button" class="help-close-btn" id="sync-dropdown-close"
-              data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
-              <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
-            </button>
-          </div>
-          <div class="dialog-body">
-            <div id="sync-dropdown-account">
-              <div id="sync-dropdown-avatar" aria-hidden="true"></div>
-              <div id="sync-dropdown-identity">
-                <div id="sync-dropdown-name"></div>
-                <div id="sync-dropdown-email"></div>
-              </div>
-            </div>
-            <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
-            <div id="sync-dropdown-last-sync">Last sync: -</div>
-            <div id="sync-dropdown-tip" role="status"></div>
-            <div class="settings-separator"></div>
-            <button type="button" class="agenda-action-btn" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out</button>
-          </div>
-        </div>
-      </div>
+      <!--
+        The one top-right control: who you are and how sync is doing, and the
+        door to Settings, where the Account tab holds sign-in and sync. Signed
+        out it is a neutral person; signed in, the profile photo over an
+        initials disc (a photo that fails or is skipped reveals the initials).
+        The badge on its edge states what sync is doing: all four glyphs ship
+        in the DOM and CSS picks one off [data-status] - no runtime markup
+        building, no innerHTML. Glyphs: Tabler Icons (MIT) cloud-check /
+        cloud-up / cloud-exclamation / cloud-off.
+      -->
+      <button type="button" id="account-btn" data-status="disconnected"
+              data-i18n-aria="account.btnAria" aria-label="Account and settings"
+              data-i18n-title="sync.badge.disconnected" title="Not connected to Google Drive"
+              aria-haspopup="dialog">
+        <span id="account-btn-face" aria-hidden="true">
+          <svg class="icon account-btn-placeholder"><use href="#icon-user"/></svg>
+          <span id="account-btn-initials"></span>
+          <img id="account-btn-photo" src="data:," alt="" hidden>
+        </span>
+        <span id="account-btn-badge" aria-hidden="true">
+            <svg class="sync-glyph sync-glyph-connected" viewBox="0 0 24 24" width="12" height="12"
+                 fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M11 18.004h-4.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.388 0 2.585 .82 3.138 2.007"/>
+              <path d="M15 19l2 2l4 -4"/>
+            </svg>
+            <svg class="sync-glyph sync-glyph-syncing" viewBox="0 0 24 24" width="12" height="12"
+                 fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M12 18.004h-5.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.38 0 2.57 .811 3.128 1.986"/>
+              <path d="M19 22v-6"/>
+              <path d="M22 19l-3 -3l-3 3"/>
+            </svg>
+            <svg class="sync-glyph sync-glyph-error" viewBox="0 0 24 24" width="12" height="12"
+                 fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M15 18.004h-8.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.374 0 2.562 .805 3.121 1.972"/>
+              <path d="M19 16v3"/>
+              <path d="M19 22v.01"/>
+            </svg>
+            <svg class="sync-glyph sync-glyph-disconnected" viewBox="0 0 24 24" width="12" height="12"
+                 fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M9.58 5.548c.24 -.11 .492 -.207 .752 -.286c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 .957 -.383 1.824 -1.003 2.454m-2.997 1.033h-11.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.13 -.582 .37 -1.128 .7 -1.62"/>
+              <path d="M3 3l18 18"/>
+            </svg>
+        </span>
+      </button>
     </div>
   </div>
 
@@ -4644,6 +4844,7 @@ Or remove them later in Settings → Help.</div>
       </button>
     </div>
     <div class="dialog-body">
+      <div id="app-confirm-highlight" hidden></div>
       <div id="app-confirm-body"></div>
       <div id="app-confirm-actions" class="dialog-actions">
         <button type="button" class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
@@ -4694,10 +4895,6 @@ Or remove them later in Settings → Help.</div>
 </div>
 
 <div id="fab-pill">
-  <button type="button" id="fab-settings" data-i18n-aria="toolbar.settings" aria-label="Settings" aria-haspopup="true">
-    <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
-  </button>
-  <div class="fab-divider" aria-hidden="true"></div>
   <button type="button" id="fab-add" aria-label="Quick add">
     <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
   </button>
@@ -4722,87 +4919,275 @@ Or remove them later in Settings → Help.</div>
   </div>
 </div>
 
-<div id="settings-dropdown">
-  <div class="settings-section">
-    <div id="zoom-slider-header">
-      <div class="settings-label" data-i18n="settings.zoom">Zoom</div>
-      <div id="zoom-label" data-i18n-title="settings.resetView" title="Click to reset view">100%</div>
-    </div>
-    <div id="zoom-track">
-      <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
-      <div id="zoom-default-marker"></div>
-      <div id="zoom-thumb"></div>
-    </div>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="settings-label" data-i18n="settings.language">Language</div>
-    <select id="lang-select">
-      <option value="en">English</option>
-      <option value="cs">Čeština</option>
-    </select>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="settings-label" id="theme-select-label" data-i18n="settings.appearance">Theme</div>
-    <select id="theme-select" aria-labelledby="theme-select-label">
-      <option value="system" data-i18n="settings.system">System</option>
-      <option value="light" data-i18n="settings.light">Light</option>
-      <option value="dark" data-i18n="settings.dark">Dark</option>
-    </select>
-  </div>
-  <!-- Agent bridge: desktop only, unhidden by initBridgeSettings on a fine pointer. -->
-  <div class="settings-separator" id="bridge-separator" hidden></div>
-  <div class="settings-section" id="bridge-section" hidden>
-    <div class="theme-toggle-row">
-      <span class="settings-label" id="bridge-label" data-i18n="settings.bridge">Agent bridge</span>
-      <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Let an AI agent on this computer read and change your week">
-        <span class="theme-toggle-thumb"></span>
+<!-- Settings: a window hung under the account button, with a tab sidebar on
+     desktop and the Agenda's tab strip under its caption on phones. The AI and Development tabs ship hidden:
+     initBridgeSettings reveals AI on a fine pointer, the devResetEnabled()
+     guard reveals Development. -->
+<div id="settings-overlay">
+  <div id="settings-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="dialog-header">
+      <div class="dialog-title" id="settings-title" data-i18n="toolbar.settings">Settings</div>
+      <button type="button" class="help-close-btn" id="settings-close"
+        data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
       </button>
     </div>
-    <input type="text" id="bridge-code" class="dialog-field" autocomplete="off" spellcheck="false" data-i18n-placeholder="settings.bridgeCode" placeholder="Paste the pairing code" data-i18n-aria="settings.bridgeCode" aria-label="Paste the pairing code">
-    <div id="bridge-status" role="status" aria-live="polite" style="font-size:11px;line-height:1.4;color:var(--text-muted);padding:0 2px;"></div>
-    <button type="button" class="agenda-action-btn" id="bridge-forget-btn" data-i18n="settings.bridgeForget" style="width:100%;">Disconnect and forget</button>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="theme-toggle-row">
-      <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
-      <button type="button" class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change" data-i18n-aria="settings.autoLayoutTitle" aria-label="Automatically reset layout after each change">
-        <span class="theme-toggle-thumb"></span>
-      </button>
+    <div class="settings-body">
+    <div class="settings-tabs" id="settings-tabs" role="tablist" aria-labelledby="settings-title">
+      <button type="button" class="agenda-tab active" id="settings-tab-account" role="tab" aria-controls="settings-pane-account" aria-selected="true"><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-user"/></svg><span data-i18n="settings.tabAccount">Account</span></button>
+      <div class="agenda-tab-separator" aria-hidden="true"></div>
+      <button type="button" class="agenda-tab" id="settings-tab-general" role="tab" aria-controls="settings-pane-general" aria-selected="false" tabindex="-1"><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-settings"/></svg><span data-i18n="settings.tabGeneral">General</span></button>
+      <div class="agenda-tab-separator" aria-hidden="true"></div>
+      <button type="button" class="agenda-tab" id="settings-tab-ai" role="tab" aria-controls="settings-pane-ai" aria-selected="false" tabindex="-1" hidden><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-sparkles"/></svg><span data-i18n="settings.tabAi">AI</span></button>
+      <div class="agenda-tab-separator" aria-hidden="true"></div>
+      <button type="button" class="agenda-tab" id="settings-tab-data" role="tab" aria-controls="settings-pane-data" aria-selected="false" tabindex="-1"><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-database"/></svg><span data-i18n="settings.tabData">Data</span></button>
+      <!-- Dev-only: shown on development hosts alone. -->
+      <div class="agenda-tab-separator" aria-hidden="true"></div>
+      <button type="button" class="agenda-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-code"/></svg><span data-i18n="dev.tab">Dev</span></button>
     </div>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="theme-toggle-row">
-      <span class="settings-label" data-i18n="settings.tips">Show tips</span>
-      <button type="button" class="theme-toggle" id="tips-toggle" role="switch" aria-checked="true" data-i18n-title="settings.tipsTitle" title="Show just-in-time tips for first-time actions" data-i18n-aria="settings.tipsTitle" aria-label="Show just-in-time tips for first-time actions">
-        <span class="theme-toggle-thumb"></span>
-      </button>
+    <div class="settings-panes">
+    <div class="settings-pane" id="settings-pane-account" role="tabpanel" aria-labelledby="settings-tab-account">
+      <!-- Who is signed in and how Google Drive sync is doing, read like the AI
+           tab: the badge carries the initials (a person while signed out), the
+           status line a dot in the state colour. data-state and data-status
+           are set by showSignedInState / showSignedOutState / setSyncStatus. -->
+      <div class="settings-section" id="account-section" data-state="local" data-status="disconnected">
+        <div class="settings-hero">
+          <div class="settings-badge" id="account-avatar" aria-hidden="true">
+            <svg class="icon account-avatar-placeholder"><use href="#icon-user"/></svg>
+            <span id="account-avatar-initials"></span>
+          </div>
+          <div class="settings-identity">
+            <div class="settings-name" id="account-name">Not signed in</div>
+          </div>
+        </div>
+        <div class="settings-sub" id="account-email">Your weeks are only in this browser.</div>
+        <div class="settings-separator"></div>
+        <div id="account-signed-out" class="bridge-list">
+          <div class="bridge-note" data-i18n="sync.btnTitle">Sign in with Google to sync across devices.</div>
+          <!-- Google's own "G" in front of the label, as the toolbar's sign-in
+               button had it, so the button reads as Google sign-in at a glance. -->
+          <button type="button" class="agenda-action-btn" id="account-signin-btn">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+              <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </svg>
+            <span id="account-signin-label" data-i18n="account.signIn">Sign in</span>
+          </button>
+        </div>
+        <div id="account-signed-in" class="bridge-list" hidden>
+          <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
+          <div id="account-sync-status" class="bridge-status" role="status" aria-live="polite"></div>
+          <div id="account-last-sync" class="bridge-status-line"></div>
+          <div id="account-sync-tip" class="bridge-status-line"></div>
+          <div class="settings-separator"></div>
+          <button type="button" class="agenda-action-btn" id="account-signout-btn" data-i18n="sync.signOut">Sign out</button>
+        </div>
+      </div>
     </div>
-    <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay" style="width:100%;margin-top:8px;">Replay tips</button>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab" style="width:100%;">Help &amp; Hotkeys</button>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="settings-label" data-i18n="settings.data">Data</div>
-    <div style="display:flex;gap:6px;">
-      <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
-      <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
-      <input type="file" id="import-file-input" accept=".json" style="display:none;">
+    <div class="settings-pane" id="settings-pane-general" role="tabpanel" aria-labelledby="settings-tab-general">
+      <div class="settings-section">
+        <div class="settings-hero">
+          <div class="settings-badge settings-badge-info" aria-hidden="true"><svg class="icon"><use href="#icon-settings"/></svg></div>
+          <div class="settings-identity">
+            <div class="settings-name" data-i18n="settings.generalHero">Look and feel</div>
+          </div>
+        </div>
+        <div class="settings-sub" data-i18n="settings.generalSub">Zoom, language, theme and tips for this device.</div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div id="zoom-slider-header">
+          <div class="settings-label" data-i18n="settings.zoom">Zoom</div>
+          <div id="zoom-label" data-i18n-title="settings.resetView" title="Click to reset view">100%</div>
+        </div>
+        <div id="zoom-track">
+          <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
+          <div id="zoom-default-marker"></div>
+          <div id="zoom-thumb"></div>
+        </div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label" data-i18n="settings.language">Language</div>
+        <select id="lang-select">
+          <option value="en">English</option>
+          <option value="cs">Čeština</option>
+        </select>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label" id="theme-select-label" data-i18n="settings.appearance">Theme</div>
+        <select id="theme-select" aria-labelledby="theme-select-label">
+          <option value="system" data-i18n="settings.system">System</option>
+          <option value="light" data-i18n="settings.light">Light</option>
+          <option value="dark" data-i18n="settings.dark">Dark</option>
+        </select>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="theme-toggle-row">
+          <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
+          <button type="button" class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change" data-i18n-aria="settings.autoLayoutTitle" aria-label="Automatically reset layout after each change">
+            <span class="theme-toggle-thumb"></span>
+          </button>
+        </div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="theme-toggle-row">
+          <span class="settings-label" data-i18n="settings.tips">Show tips</span>
+          <button type="button" class="theme-toggle" id="tips-toggle" role="switch" aria-checked="true" data-i18n-title="settings.tipsTitle" title="Show just-in-time tips for first-time actions" data-i18n-aria="settings.tipsTitle" aria-label="Show just-in-time tips for first-time actions">
+            <span class="theme-toggle-thumb"></span>
+          </button>
+        </div>
+        <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay">Replay tips</button>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab">Help &amp; Hotkeys</button>
+      </div>
     </div>
-    <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file - could not import.</div>
-  </div>
-  <!-- Dev-only; unhidden by init on a development host. Never translated. -->
-  <div class="settings-separator" id="settings-dev-separator" hidden></div>
-  <div class="settings-section" id="settings-dev-section" hidden>
-    <div class="settings-label">Development</div>
-    <button type="button" class="agenda-action-btn" id="dev-probe-btn" title="Record the next tap: phase marks, delivered frames, long animation frames" style="width:100%;">Record perf trace</button>
-    <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor" style="width:100%;">Reset to first visit</button>
+    <div class="settings-pane" id="settings-pane-ai" role="tabpanel" aria-labelledby="settings-tab-ai" hidden>
+      <div class="settings-section" id="bridge-section" data-state="off">
+        <!-- Read like the Drive account card: who (the badge, coloured by state),
+             what, and the switch. -->
+        <div class="settings-hero">
+          <div class="settings-badge" id="bridge-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-sparkles"/></svg></div>
+          <div class="settings-identity">
+            <div class="settings-name" id="bridge-label" data-i18n="settings.bridge">AI agents</div>
+          </div>
+          <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Allow AI agents on this computer">
+            <span class="theme-toggle-thumb"></span>
+          </button>
+        </div>
+        <div class="settings-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer.</div>
+        <div class="settings-separator"></div>
+        <div class="settings-label" data-i18n="bridge.statusCaption">Status</div>
+        <div id="bridge-status" class="bridge-status" role="status" aria-live="polite"></div>
+        <div id="bridge-agents" class="bridge-list" hidden></div>
+        <div id="bridge-guide" class="bridge-list" hidden>
+          <div class="settings-separator"></div>
+          <div class="settings-label" id="bridge-guide-label" data-i18n="bridge.guide.title">Connect an agent</div>
+          <select id="bridge-guide-app" aria-labelledby="bridge-guide-label">
+            <option value="claude-code">Claude Code</option>
+            <option value="claude-desktop">Claude Desktop</option>
+            <option value="codex">Codex</option>
+            <option value="cursor">Cursor</option>
+            <option value="gemini">Gemini CLI</option>
+            <option value="vscode">VS Code (Copilot)</option>
+            <option value="devin">Devin Desktop (Windsurf)</option>
+            <option value="other" data-i18n="bridge.guide.other">Other MCP app</option>
+          </select>
+          <div id="bridge-guide-note" class="bridge-note"></div>
+          <button type="button" class="agenda-action-btn commit" id="bridge-guide-action"></button>
+        </div>
+        <div id="bridge-paired" class="bridge-list" hidden>
+          <div class="settings-separator"></div>
+          <div id="bridge-paired-date" class="bridge-status-line"></div>
+          <button type="button" class="agenda-action-btn" id="bridge-unpair-btn" data-i18n="bridge.unpair">Unpair</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-pane" id="settings-pane-data" role="tabpanel" aria-labelledby="settings-tab-data" hidden>
+      <!-- Where the data lives, read like the AI tab under an informative
+           badge. Filled by refreshDataSummary whenever the tab is shown. -->
+      <div class="settings-section" id="data-section" data-state="local">
+        <div class="settings-hero">
+          <div class="settings-badge settings-badge-info" id="data-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-database"/></svg></div>
+          <div class="settings-identity">
+            <div class="settings-name" data-i18n="settings.dataHero">Your weeks</div>
+          </div>
+        </div>
+        <div class="settings-sub" id="data-where"></div>
+        <div class="settings-separator"></div>
+        <div class="settings-tiles">
+          <div class="settings-tile">
+            <div class="settings-label" data-i18n="settings.dataWeeks">Weeks</div>
+            <div class="settings-tile-value" id="data-weeks-count">-</div>
+          </div>
+          <div class="settings-tile">
+            <div class="settings-label" data-i18n="settings.dataFirstWeek">First week</div>
+            <div class="settings-tile-value" id="data-first-week">-</div>
+          </div>
+        </div>
+        <div class="settings-separator"></div>
+        <div class="settings-label" data-i18n="settings.backupCaption">Backup</div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-badge settings-badge-app" aria-hidden="true"><svg class="icon"><use href="#icon-download"/></svg></span>
+            <div class="settings-identity">
+              <div class="settings-name" data-i18n="settings.exportTitle">Download a backup</div>
+              <div class="settings-sub" data-i18n="settings.exportSub">Every week and setting in one file</div>
+            </div>
+          </div>
+          <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData">Export</button>
+        </div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-badge settings-badge-app settings-badge-warn" aria-hidden="true"><svg class="icon"><use href="#icon-upload"/></svg></span>
+            <div class="settings-identity">
+              <div class="settings-name" data-i18n="settings.importTitle">Restore a backup</div>
+              <div class="settings-sub" data-i18n="settings.importSub">Replaces everything here</div>
+            </div>
+          </div>
+          <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData">Import</button>
+        </div>
+        <input type="file" id="import-file-input" accept=".json" style="display:none;">
+        <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file - could not import.</div>
+      </div>
+    </div>
+    <div class="settings-pane" id="settings-pane-dev" role="tabpanel" aria-labelledby="settings-tab-dev" hidden>
+      <!-- What this is, where it runs, then one block per tool. Host and
+           Version are filled behind the devResetEnabled() guard. -->
+      <div class="settings-section" id="settings-dev-section">
+        <div class="settings-hero">
+          <div class="settings-badge settings-badge-info" id="dev-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-code"/></svg></div>
+          <div class="settings-identity">
+            <div class="settings-name" data-i18n="dev.title">Development</div>
+          </div>
+        </div>
+        <div class="settings-sub" data-i18n="dev.desc">Tools for this development host. Never shown in production.</div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label" data-i18n="dev.host">Host</div>
+        <div class="settings-value" id="dev-host">-</div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label" data-i18n="dev.version">Version</div>
+        <div class="settings-value" id="dev-version">-</div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label" data-i18n="dev.tools">Tools</div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-badge settings-badge-app" aria-hidden="true"><svg class="icon"><use href="#icon-activity"/></svg></span>
+            <div class="settings-identity">
+              <div class="settings-name" data-i18n="dev.probe">Record perf trace</div>
+              <div class="settings-sub" data-i18n="dev.probeDesc">The next tap: phase marks, delivered frames, long animation frames.</div>
+            </div>
+          </div>
+          <button type="button" class="agenda-action-btn" id="dev-probe-btn" data-i18n="dev.probeBtn">Record</button>
+        </div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-badge settings-badge-app settings-badge-danger" aria-hidden="true"><svg class="icon"><use href="#icon-arrow-back-up"/></svg></span>
+            <div class="settings-identity">
+              <div class="settings-name" data-i18n="dev.reset">Reset to first visit</div>
+              <div class="settings-sub" data-i18n="dev.resetDesc">Wipe all local data and reload as a first-time visitor.</div>
+            </div>
+          </div>
+          <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" data-i18n="dev.resetBtn">Reset</button>
+        </div>
+      </div>
+    </div>
+    </div>
+    </div>
   </div>
 </div>
 
@@ -4994,8 +5379,8 @@ Or remove them later in Settings → Help.</div>
       </div>
 
       <div class="help-section">
-        <div class="help-section-title" data-i18n="help.bridgeTitle">AI agent bridge</div>
-        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.bridgeDesc">Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP client) read and change your week, as if you clicked: each change shows a toast and is one undo step. Run zenit-week-mcp, paste its pairing code in Settings &gt; Agent bridge and allow the browser prompt. Desktop Chrome and Firefox only; your phone follows through Drive sync. Disconnect and forget, signing out or resetting removes the pairing.</div>
+        <div class="help-section-title" data-i18n="help.bridgeTitle">AI agents</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.bridgeDesc">Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP app) read and change your week, as if you clicked: each change shows a toast and is one undo step. Install the zenit-week-mcp server in your agent app (Settings &gt; AI shows how), turn on AI agents and, the first time your agent asks, check that the code matches and click Allow. Desktop Chrome and Firefox only; your phone follows through Drive sync. Unpair in Settings, signing out or resetting removes the pairing.</div>
       </div>
 
       <div class="help-section">
@@ -5059,7 +5444,7 @@ const _displayVersion = APP_VERSION.startsWith('__') ? 'dev' : APP_VERSION;
 // inline, so it ships as one lazy-loaded, content-hashed vendor file. The
 // object between the markers is written by scripts/build-editor.mjs from the
 // same bytes as the file name - never edit it by hand; run `npm run editor:build`.
-const COMMENT_EDITOR_BUNDLE = /* editor-bundle:start */ { src: '/vendor/editor.51b3e1abc8eda7d3.js', integrity: 'sha384-0hDsIpwlrKwo/x0/MoWVY8GLxF8ntdmGQiTBVogIK19jAlx+OMXy6cEHyPUrRVpy' } /* editor-bundle:end */;
+const COMMENT_EDITOR_BUNDLE = /* editor-bundle:start */ { src: '/vendor/editor.1d54fe5b8ed79ea1.js', integrity: 'sha384-AafeGn8BSx3AlOs+ufvCiob2dl61yH5E7ojTh8IshWjySC/lP9y7l1fJwEz39MOP' } /* editor-bundle:end */;
 
 // ─── Network: every request carries a deadline ───────────────────────────────
 // Nothing this app does over the wire is worth waiting on forever. A request
@@ -5366,7 +5751,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       _offlineUploadQueue.delete(data.weekKey);
       if (data.contentHash) lastSyncedHash.set(data.weekKey, data.contentHash);
       lastSyncedAt = Date.now();
-      updateDropdownSyncTime();
+      updateAccountSyncTime();
       if (syncStatus === 'error') setSyncStatus('connected', 'sync.msg.synced');
     }
   });
@@ -5475,8 +5860,7 @@ const QUIESCENCE_PANEL_IDS = [
   'help-overlay',
   'comment-panel',
   'comment-overlay',
-  'settings-dropdown',
-  'sync-dropdown',
+  'settings-overlay',
   'color-picker-panel',
   'baseline-panel',
 ];
@@ -8330,9 +8714,9 @@ const CENTER_H = NODE_STYLE.center.minH;
 // in size, as in the infographic, and the size still says something. The radii
 // carry the root's 1.25× growth (312.5 node). The part of each wedge the plate
 // leaves visible was then grown 30%, so the largest now reaches past the node edge.
-const CENTER_AVATAR_R = 83.75;
+const CENTER_PLATE_CORE_R = 83.75;
 const CENTER_PLATE_R = 101.25;
-const CENTER_WEDGE_INNER_R = CENTER_AVATAR_R;
+const CENTER_WEDGE_INNER_R = CENTER_PLATE_CORE_R;
 // How much of the chart the plate's rim, between photo and wedges, lets through.
 const CENTER_PLATE_RIM_OPACITY = 0.3;
 // Outer radius and label size by rank, largest share first.
@@ -8345,12 +8729,6 @@ const CENTER_TRACK_R = CENTER_WEDGE_OUTER_R[0];
 const CENTER_RING_LABEL_MIN_SHARE = 0.06;
 // Clearance a label keeps from the plate's edge and from its wedge's outer edge.
 const CENTER_LABEL_PAD = 3;
-
-// Initials fill the avatar disc, so they are sized off it rather than off the
-// node's label font - that one only ever paints the signed-out wording, which
-// is a word and not a monogram. Scaled with the disc, so the monogram keeps the
-// same clearance inside it that it had at r 110.
-const CENTER_INITIALS_FONT = 50;
 
 // Hit radius of the root's two "+ branch" discs, which are drawn at r 22.5. The
 // root opens Stats on click, so every pixel that is not the + belongs to a
@@ -8785,7 +9163,8 @@ function getNodeSize(nodeId) {
 }
 
 function _computeNodeSize(nodeId) {
-  const node = (nodeId === 'center') ? { type: 'center', label: centerDisplayName() } : findNode(nodeId);
+  // The root is a fixed circle whose plate shows the done percentage, not a label.
+  const node = (nodeId === 'center') ? { type: 'center', label: '' } : findNode(nodeId);
   if (!node) return { w: 0, h: 0 };
 
   const type = node.type || 'activity';
@@ -8893,7 +9272,7 @@ const PKCE_SESSION_KEY        = 'zenit-week-pkce-pending'; // sessionStorage: { 
 // Sync status: 'disconnected' | 'connected' | 'syncing' | 'error'
 let syncStatus = 'disconnected';
 let lastSyncMessageKey = null;
-let lastSignedOutLabelKey = 'sync.btnLabel';
+let lastSignedOutLabelKey = 'account.signIn';
 let googleAccessToken = null;   // current OAuth access token string
 let driveFileIdCache = new Map(); // weekKey → Drive file ID
 // Drive has no get-by-name: turning 'zenit-week-2026-34.json' into a file id
@@ -8966,43 +9345,13 @@ function getInitials(name) {
     : name.slice(0, 2).toUpperCase();
 }
 
-// Longest name the root node shows. A first name past this is pathological
-// (a pasted display name, not a name), so it is cut with an ellipsis rather
-// than silently - a hard cut would read as a real, odd-looking name.
-const MAX_CENTER_NAME_LEN = 16;
-
-// First name for the root node, derived - never stored. Google's displayName
-// first, its email local-part as the fallback for accounts that have no
-// display name, and '' when neither is available (the caller supplies the
-// signed-out wording). Deliberately does not capitalize the local-part: a
-// handle is shown as the handle it is rather than dressed up as a name.
-function firstNameFrom(displayName, email) {
-  const token = String(displayName || '').trim().split(/\s+/)[0] || '';
-  const local = String(email || '').split('@')[0] || '';
-  const name = token || local;
-  if (!name) return '';
-  return name.length > MAX_CENTER_NAME_LEN
-    ? name.slice(0, MAX_CENTER_NAME_LEN - 1) + '…'
-    : name;
-}
-
-// The root's accessible name and hover title. Not painted - the circle shows an
-// avatar - so without this an image-only node would be a blank to a screen reader.
-function centerDisplayName() {
-  if (isVisionInView()) return t('vision.center');
-  return firstNameFrom(googleUserName, googleUserEmail) || t('center.me');
-}
-
 // Drive's `about.user.photoLink` comes back at a fixed, tiny size (`=s64`), and
 // for an account with no uploaded picture that URL is a server-drawn monogram
-// bitmap - not an absence of a photo. The root circle paints it 220 units wide,
-// so the letter arrives upscaled ~3x and looks blurred next to the rest of the
-// SVG. Google honours any `=sN` on these URLs, so ask for one that survives the
-// biggest place we show it: ~2× the painted size, which holds up on a hidpi
-// screen and through the upper half of the zoom range. Idempotent, so re-sizing
-// an already-sized link (an auth blob cached before this existed, say) is
-// harmless.
-const AVATAR_PHOTO_PX = 400;
+// bitmap - not an absence of a photo. Google honours any `=sN` on these URLs,
+// so ask for 3x the account button's 32px face, which stays sharp on a hidpi
+// screen. Idempotent, so re-sizing an already-sized link (an auth blob cached
+// at another size, say) is harmless.
+const AVATAR_PHOTO_PX = 96;
 function sizedAvatarUrl(url) {
   if (!url) return '';
   // `=s64`, `=s64-c`, `=s64-c-k-no`: keep any modifiers, swap only the number.
@@ -9016,20 +9365,12 @@ function sizedAvatarUrl(url) {
 // Whether the profile photo is worth requesting right now. Offline the request
 // usually only fails and, under Data Saver, spends bytes the user asked us not
 // to - unless a service worker is in control, in which case Cache Storage may
-// answer it without any CSP widening. The root node is the only place the photo
-// is shown - the toolbar reports sync state, not identity.
+// answer it without any CSP widening. The account button is the only place the
+// photo is shown.
 function canShowAvatarPhoto() {
   if (!googleUserPhoto) return false;
   const swControlled = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
   return !isDefinitelyOffline() || swControlled;
-}
-
-// What the root circle paints, in descending order of what the account offers.
-// The photo is not a text tier: it is layered over the initials, so a failed or
-// skipped image reveals them with no error handling (see plan AD8).
-function centerNodeText() {
-  if (!googleUserEmail && !googleUserName) return t('center.me');  // signed out
-  return googleUserInitials || getInitials(googleUserEmail || '?');
 }
 
 function formatSyncTime(ts) {
@@ -9040,13 +9381,13 @@ function formatSyncTime(ts) {
   });
 }
 
-function updateDropdownSyncTime() {
-  const el = document.getElementById('sync-dropdown-last-sync');
+function updateAccountSyncTime() {
+  const el = document.getElementById('account-last-sync');
   if (el) el.textContent = `${t('sync.lastSyncLabel')}: ${formatSyncTime(lastSyncedAt)}`;
 }
 
-// Fallback tooltip per sync state, used whenever a call site has no more
-// specific message of its own.
+// Fallback tooltip and status line per sync state, used whenever a call site
+// has no more specific message of its own.
 const SYNC_STATE_TITLE_KEYS = {
   disconnected: 'sync.badge.disconnected',
   connected:    'sync.badge.connected',
@@ -9054,8 +9395,8 @@ const SYNC_STATE_TITLE_KEYS = {
   error:        'sync.badge.error',
 };
 
-// The one-line tip the dropdown shows for each error message: either that the
-// app is already recovering, or the single step the user has to take.
+// The one-line tip the Account tab shows for each error message: either that
+// the app is already recovering, or the single step the user has to take.
 const SYNC_ERROR_TIP_KEYS = {
   'sync.msg.reconnecting':         'sync.tip.reconnecting',
   'sync.msg.failedSavedLocal':     'sync.tip.failedSavedLocal',
@@ -9076,37 +9417,70 @@ function syncErrorTipKey() {
   return SYNC_ERROR_TIP_KEYS[lastSyncMessageKey] || null;
 }
 
-function updateDropdownTip() {
-  const el = document.getElementById('sync-dropdown-tip');
-  if (!el) return;
-  const key = syncErrorTipKey();
-  el.textContent = key ? `${t('sync.issueLabel')}: ${t(key)}` : '';
+// The status sentence and the tip in Settings > Account, and the account
+// button's tooltip: all three say what sync is doing, from one place.
+function updateAccountSyncStatus() {
+  const key = lastSyncMessageKey || SYNC_STATE_TITLE_KEYS[syncStatus];
+  const btn = document.getElementById('account-btn');
+  if (btn) btn.title = key ? t(key) : '';
+  const section = document.getElementById('account-section');
+  if (section) section.dataset.status = syncStatus;
+  const status = document.getElementById('account-sync-status');
+  if (status) status.textContent = key ? t(key) : '';
+  const tip = document.getElementById('account-sync-tip');
+  if (tip) {
+    const tipKey = syncErrorTipKey();
+    tip.textContent = tipKey ? `${t('sync.issueLabel')}: ${t(tipKey)}` : '';
+  }
 }
 
 // Re-render any sync UI text that's set imperatively, so language switches
-// (and first paint) display localized strings.
+// (and first paint) display localized strings. The account name and email are
+// written here and in showSignedInState only, never by data-i18n: that would
+// put "Not signed in" over a signed-in account on every language switch.
 function refreshSyncUiText() {
-  const labelEl = document.getElementById('sync-btn-label');
-  if (labelEl) labelEl.textContent = t(lastSignedOutLabelKey);
-  const stateBtn = document.getElementById('sync-state-btn');
-  if (stateBtn) {
-    const key = lastSyncMessageKey || SYNC_STATE_TITLE_KEYS[syncStatus];
-    if (key) stateBtn.title = t(key);
+  const signin = document.getElementById('account-signin-label');
+  if (signin) signin.textContent = t(lastSignedOutLabelKey);
+  if (!googleUserEmail && !googleUserName) {
+    const name = document.getElementById('account-name');
+    if (name) name.textContent = t('account.signedOut');
+    const sub = document.getElementById('account-email');
+    if (sub) sub.textContent = t('account.signedOutSub');
   }
-  updateDropdownSyncTime();
-  updateDropdownTip();
+  updateAccountSyncStatus();
+  updateAccountSyncTime();
 }
 
 // Set when a photo exists but was skipped because the device had no link, so
-// the 'online' listener knows there is something to go back for. The root node
-// is the only place the photo is painted, so getting it back is a re-render.
+// the 'online' listener knows there is something to go back for.
 let _avatarPhotoDeferred = false;
 
 window.addEventListener('online', () => {
   if (!_avatarPhotoDeferred) return;
   _avatarPhotoDeferred = false;
-  scheduleRender();   // the root node wears the photo
+  updateAccountPhoto();
 });
+
+// The photo is laid over the initials disc and shown only once it has loaded,
+// so a photo that 404s, is blocked or was never requested simply leaves the
+// initials visible.
+function updateAccountPhoto() {
+  const img = document.getElementById('account-btn-photo');
+  if (!img) return;
+  const want = canShowAvatarPhoto() ? googleUserPhoto : '';
+  if (img.dataset.src === want) return;
+  img.dataset.src = want;
+  img.hidden = true;
+  if (want) img.src = want;
+  else img.removeAttribute?.('src');
+}
+
+(function initAccountPhoto() {
+  const img = document.getElementById('account-btn-photo');
+  if (!img) return;
+  img.addEventListener('load', () => { img.hidden = !img.dataset.src; });
+  img.addEventListener('error', () => { img.hidden = true; });
+})();
 
 function showSignedInState(user) {
   googleUserEmail = user?.emailAddress || '';
@@ -9114,18 +9488,9 @@ function showSignedInState(user) {
   googleUserPhoto = sizedAvatarUrl(user?.photoLink || '');
   googleUserInitials = getInitials(user?.displayName || googleUserEmail || '?');
   googleUserInitialsColor = hashColor(googleUserEmail || googleUserInitials);
-  // Signing in renames the root node from the signed-out wording to a first
-  // name, and the node's width follows its label - so redraw, don't patch text.
-  scheduleRender();
-
-  const btn      = document.getElementById('sync-btn');
-  const stateBtn = document.getElementById('sync-state-btn');
-  const emailEl  = document.getElementById('sync-dropdown-email');
-
-  if (btn) btn.style.display = 'none';
 
   // The profile photo is the one image the app loads from the network, and it
-  // is decoration - the root node's initials disc says exactly as much. Offline,
+  // is decoration - the initials disc under it says exactly as much. Offline,
   // skip the request entirely rather than spending it on a load that can only
   // fail into those initials a moment later.
   //
@@ -9143,34 +9508,36 @@ function showSignedInState(user) {
   // from Cache Storage, and if it is not, it fails into the same initials disc.
   _avatarPhotoDeferred = canShowAvatarPhoto() ? false : !!googleUserPhoto;
 
-  if (emailEl) emailEl.textContent = googleUserEmail;
-
-  // Initials, never the photo: the disc needs no network and no widening of
-  // connect-src, and it is the same identity mark the root node already wears.
-  const nameEl   = document.getElementById('sync-dropdown-name');
-  const avatarEl = document.getElementById('sync-dropdown-avatar');
-  if (nameEl) nameEl.textContent = googleUserName || '';
-  if (avatarEl) {
-    avatarEl.textContent = googleUserInitials || getInitials(googleUserEmail || '?');
-    avatarEl.style.background = googleUserInitialsColor || '';
+  const initials = googleUserInitials || getInitials(googleUserEmail || '?');
+  const btn = document.getElementById('account-btn');
+  if (btn) btn.classList.add('signed-in');
+  const btnInitials = document.getElementById('account-btn-initials');
+  if (btnInitials) {
+    btnInitials.textContent = initials;
+    btnInitials.style.background = googleUserInitialsColor || '';
   }
+  updateAccountPhoto();
 
-  if (stateBtn) stateBtn.style.display = 'flex';
-  updateDropdownSyncTime();
+  // Settings > Account: initials, never the photo - one network image is enough.
+  const section = document.getElementById('account-section');
+  if (section) section.dataset.state = 'drive';
+  const avatarInitials = document.getElementById('account-avatar-initials');
+  if (avatarInitials) avatarInitials.textContent = initials;
+  const nameEl = document.getElementById('account-name');
+  if (nameEl) nameEl.textContent = googleUserName || googleUserEmail;
+  const emailEl = document.getElementById('account-email');
+  if (emailEl) emailEl.textContent = googleUserName ? googleUserEmail : '';
+  const signedIn = document.getElementById('account-signed-in');
+  if (signedIn) signedIn.hidden = false;
+  const signedOut = document.getElementById('account-signed-out');
+  if (signedOut) signedOut.hidden = true;
+
+  updateAccountSyncTime();
 }
 
-function showSignedOutButton(labelKey = 'sync.btnLabel') {
-  const btn       = document.getElementById('sync-btn');
-  const stateBtn  = document.getElementById('sync-state-btn');
-  const dropdown  = document.getElementById('sync-dropdown');
-
-  if (dropdown) dropdown.classList.remove('visible');
-  if (stateBtn) stateBtn.style.display = 'none';
+function showSignedOutState(labelKey = 'account.signIn') {
   document.documentElement.classList.remove('zw-has-session');
-  if (btn) { btn.style.display = ''; }
   lastSignedOutLabelKey = labelKey;
-  const labelEl = document.getElementById('sync-btn-label');
-  if (labelEl) labelEl.textContent = t(labelKey);
 
   googleUserEmail = '';
   googleUserName = '';
@@ -9178,10 +9545,20 @@ function showSignedOutButton(labelKey = 'sync.btnLabel') {
   googleUserInitials = '';
   googleUserInitialsColor = '';
   lastSyncedAt = null;
-  // The root node is labelled with the signed-in first name, so losing the
-  // identity changes the map. Its width follows the label, so this is a
-  // re-render rather than a text patch.
-  scheduleRender();
+
+  const btn = document.getElementById('account-btn');
+  if (btn) btn.classList.remove('signed-in');
+  updateAccountPhoto();
+
+  const section = document.getElementById('account-section');
+  if (section) section.dataset.state = 'local';
+  const avatarInitials = document.getElementById('account-avatar-initials');
+  if (avatarInitials) avatarInitials.textContent = '';
+  const signedIn = document.getElementById('account-signed-in');
+  if (signedIn) signedIn.hidden = true;
+  const signedOut = document.getElementById('account-signed-out');
+  if (signedOut) signedOut.hidden = false;
+  refreshSyncUiText();
 }
 
 // Legacy cleanup: before the HttpOnly-cookie change the refresh token was kept
@@ -9371,7 +9748,7 @@ function _handleAuthExpiry() {
   googleAccessToken = null;
   _driveSessionStarted = false;
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
-  showSignedOutButton('sync.reconnect');
+  showSignedOutState('sync.reconnect');
   setSyncStatus('disconnected', 'sync.msg.sessionExpired');
 }
 
@@ -9694,7 +10071,7 @@ async function signOut() {
   _isFirstConnection = false;
   _forgetDriveAccountCaches();
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
-  showSignedOutButton('sync.btnLabel');
+  showSignedOutState();
   setSyncStatus('disconnected');
   // Clear the HttpOnly refresh cookie server-side (JS can't read it). Google
   // keeps the grant, so the other devices stay signed in.
@@ -9753,12 +10130,9 @@ function setSyncStatus(status, messageKey) {
   if (status === 'error' && syncStatus === 'disconnected') return;
   syncStatus = status;
   lastSyncMessageKey = messageKey || null;
-  const stateBtn = document.getElementById('sync-state-btn');
-  if (!stateBtn) return;
-  stateBtn.dataset.status = status;   // CSS swaps the cloud glyph off this
-  const key = messageKey || SYNC_STATE_TITLE_KEYS[status];
-  stateBtn.title = key ? t(key) : '';
-  updateDropdownTip();
+  const btn = document.getElementById('account-btn');
+  if (btn) btn.dataset.status = status;   // CSS swaps the badge glyph off this
+  updateAccountSyncStatus();
 }
 
 // Cache user info so the avatar renders instantly on the next page load.
@@ -10172,7 +10546,7 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
   // syncWeekToDrive sees hash(localStorage) != lastSyncedHash and uploads.
   if (!scheduleUpload) lastSyncedHash.set(wKey, mergedHash);
   lastSyncedAt = Date.now();
-  updateDropdownSyncTime();
+  updateAccountSyncTime();
   // A merge that produced content Drive lacks has to be pushed - but when the
   // pull was syncWeekToDrive's own (callerWillPush), that push is the next
   // thing to happen, and arming the debounce here only buys a second, empty
@@ -10824,7 +11198,7 @@ async function _uploadWeekToDrive(wKey, json) {
   if (result !== 'ok') return false;
   lastSyncedHash.set(wKey, hash);
   lastSyncedAt = Date.now();
-  updateDropdownSyncTime();
+  updateAccountSyncTime();
   return true;
 }
 
@@ -11143,7 +11517,7 @@ async function syncColorsToDrive() {
   if (result !== 'ok') return;
   colorsSyncedHash = hash;
   lastSyncedAt = Date.now();
-  updateDropdownSyncTime();
+  updateAccountSyncTime();
   setSyncStatus('connected', 'sync.msg.synced');
 }
 
@@ -11233,7 +11607,7 @@ async function syncColorsFromDrive() {
       if (currentView === 'agenda') renderAgenda();
       colorsSyncedHash = remoteHash;
       lastSyncedAt = Date.now();
-      updateDropdownSyncTime();
+      updateAccountSyncTime();
     } else if (colorsContentHash(localData || {}) === remoteHash) {
       // Remote is not newer but content is identical - mark synced so the 10s
       // poll stops re-downloading an unchanged colors file every cycle.
@@ -12014,7 +12388,6 @@ const TRANSLATIONS = {
     'quick_add.placeholder':      'Add a task…',
     'quick_add.title':            'Quick add',
     'week.word':                  'Week',
-    'center.me':                  'Me',
     'weekbar.today':              'Jump to current week',
     'weekpicker.title':           'Choose week',
     'weekpicker.prevMonth':       'Previous month',
@@ -12027,7 +12400,26 @@ const TRANSLATIONS = {
     'settings.zoom':              'Zoom',
     'settings.resetView':         'Click to reset view',
     'settings.language':          'Language',
-    'settings.data':              'Data',
+    'settings.tabAccount':        'Account',
+    'settings.tabGeneral':        'General',
+    'account.btnAria':            'Account and settings',
+    'account.signIn':             'Sign in',
+    'account.signedOut':          'Not signed in',
+    'account.signedOutSub':       'Your weeks are only in this browser.',
+    'settings.dataHero':          'Your weeks',
+    'settings.generalHero':       'Look and feel',
+    'settings.generalSub':        'Zoom, language, theme and tips for this device.',
+    'settings.dataWhereDrive':    'Your weeks are stored in this browser and in your Google Drive.',
+    'settings.dataWhereLocal':    'Your weeks are stored only in this browser - keep a backup.',
+    'settings.dataWeeks':         'Weeks',
+    'settings.dataFirstWeek':     'First week',
+    'settings.backupCaption':     'Backup',
+    'settings.exportTitle':       'Download a backup',
+    'settings.exportSub':         'Every week and setting in one file.',
+    'settings.importTitle':       'Restore a backup',
+    'settings.importSub':         'Replaces everything here.',
+    'settings.tabAi':             'AI',
+    'settings.tabData':           'Data',
     'settings.exportData':        'Export',
     'settings.importData':        'Import',
     'settings.importConfirmTitle':'Overwrite all data?',
@@ -12042,22 +12434,73 @@ const TRANSLATIONS = {
     'settings.tips':              'Show tips',
     'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
     'settings.tipsReplay':        'Replay tips',
-    'settings.bridge':            'Agent bridge',
-    'settings.bridgeTitle':       'Let an AI agent on this computer read and change your week',
-    'settings.bridgeCode':        'Paste the pairing code',
-    'settings.bridgeForget':      'Disconnect and forget',
+    'settings.bridge':            'AI agents',
+    'settings.bridgeTitle':       'Allow AI agents on this computer.',
     'bridge.state.off':           'Off',
-    'bridge.state.waiting-server': 'Waiting for server - run zenit-week-mcp',
-    'bridge.state.waiting-permission': 'Waiting for permission - your browser asks to let Zenit Week reach apps on this computer: choose Allow',
-    'bridge.state.connected':     'Connected - {client}',
-    'bridge.state.connectedNoName': 'Connected',
-    'bridge.state.refused':       'Refused (wrong code) - paste the code again',
-    'bridge.state.blocked':       'Blocked by browser - allow apps on this device in the site settings',
-    'bridge.state.unsupported':   'Not supported in this browser yet',
-    'bridge.state.needCode':      'Paste the pairing code first',
-    'bridge.state.badCode':       'That is not a pairing code',
-    'help.bridgeTitle':           'AI agent bridge',
-    'help.bridgeDesc':            'Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP client) read and change your week, as if you clicked: each change shows a toast and is one undo step. Run zenit-week-mcp, paste its pairing code in Settings > Agent bridge and allow the browser prompt. Desktop Chrome and Firefox only; your phone follows through Drive sync. Disconnect and forget, signing out or resetting removes the pairing.',
+    'bridge.state.waiting-server': 'Waiting for the agent app',
+    'bridge.state.waiting-permission': 'Waiting for permission - your browser asks to let Zenit Week reach apps on this computer: choose Allow.',
+    'bridge.state.blocked':       'Blocked by browser - click the icon left of the address, open the site settings, set "Apps on this device" (Chrome) or "Local network" (Firefox) to Allow, then reload.',
+    'bridge.state.waiting-agent': 'Waiting for an agent - ask your agent something about your week.',
+    'bridge.state.approve':       'Approve the request',
+    'bridge.state.connected':     'Connected',
+    'bridge.state.unpaired-remote': 'Unpaired on the agent side - ask your agent something to pair again.',
+    'bridge.state.update-server': "Update your agent's Zenit Week server - restart your agent app, or download the new Zenit Week extension for Claude Desktop below.",
+    'bridge.state.update-server-npx': "Update your agent's Zenit Week server - restart your agent app.",
+    'bridge.state.update-server-mcpb': 'Update your Zenit Week extension - download the new one below and open it.',
+    'bridge.state.update-server-repo': "Update your agent's Zenit Week server - pull the repository and restart your agent app.",
+    'bridge.agent.oldServer':     'Older Zenit Week server',
+    'bridge.guide.download':      'Download',
+    'bridge.guide.desktopNote':   'No setup needed: open the file and confirm in Claude Desktop.',
+    'bridge.state.reload-app':    'Reload Zenit Week - your agent has a newer Zenit Week server.',
+    'bridge.state.unsupported':   'Not supported in this browser yet.',
+    'bridge.unnamedAgent':        'agent',
+    'bridge.agent.connected':     'Connected',
+    'bridge.agent.old':           "Update its Zenit Week server",
+    'bridge.guide.title':         'Connect an agent',
+    'bridge.statusCaption':       'Status',
+    'bridge.guide.copyCommand':   'Copy command',
+    'bridge.guide.addCursor':     'Add to Cursor',
+    'bridge.guide.addVscode':     'Add to VS Code',
+    'bridge.guide.other':         'Other MCP app',
+    'bridge.guide.copyConfig':    'Copy config',
+    'bridge.guide.codeNote':      'Paste the command in a terminal, then restart Claude Code. Needs Node.js 20 or newer.',
+    'bridge.guide.cursorNote':    'Cursor opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
+    'bridge.guide.codexNote':     'Paste the command in a terminal, then restart Codex. Needs Node.js 20 or newer.',
+    'bridge.guide.geminiNote':    'Paste the command in a terminal, then restart Gemini CLI. Needs Node.js 20 or newer.',
+    'bridge.guide.devinNote':     "Paste it into Devin Desktop's MCP config file (Settings, MCP servers), then restart it. Needs Node.js 20 or newer.",
+    'dev.tab':                    'Dev',
+    'dev.title':                  'Development',
+    'dev.desc':                   'Tools for this development host. Never shown in production.',
+    'dev.host':                   'Host',
+    'dev.version':                'Version',
+    'dev.tools':                  'Tools',
+    'dev.probe':                  'Record perf trace',
+    'dev.probeDesc':              'The next tap: phase marks, delivered frames, long animation frames.',
+    'dev.probeBtn':               'Record',
+    'dev.reset':                  'Reset to first visit',
+    'dev.resetDesc':              'Wipe all local data and reload as a first-time visitor.',
+    'dev.resetBtn':               'Reset',
+    'dev.resetTitle':             'Reset to first visit?',
+    'dev.resetBody':              'Deletes every week, setting and sync link stored in this browser, then reloads as a brand-new visitor. Data already synced to Google Drive is not touched.',
+    'bridge.guide.vscodeNote':    'VS Code opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
+    'bridge.guide.otherNote':     "Paste it into your app's MCP settings, then restart the app. Needs Node.js 20 or newer.",
+    'bridge.copied':              'Copied',
+    'bridge.paired':              'Paired',
+    'bridge.pairedOn':            'Paired on {date}',
+    'bridge.unpair':              'Unpair',
+    'bridge.explain.title':       'Allow AI agents',
+    'bridge.explain.body':        'Your browser will now ask to let Zenit Week access other apps and services on this device. That is how it reaches your AI agent, on this computer only. Choose Allow.',
+    'bridge.explain.firefox':     'In Firefox, also tick Remember my choice.',
+    'bridge.explain.continue':    'Continue',
+    'bridge.pair.title':          'Connect an AI agent?',
+    'bridge.pair.body':           'Check that your agent shows the same code.\nIt says it is {client}. For {site}.',
+    'bridge.pair.bodyNoName':     'Check that your agent shows the same code.\nFor {site}.',
+    'bridge.pair.allow':          'Allow',
+    'bridge.pair.deny':           'Deny',
+    'bridge.pair.toast':          'Paired with {client}. Unpair in Settings if this was not you.',
+    'bridge.pair.toastNoName':    'Agent paired. Unpair in Settings if this was not you.',
+    'help.bridgeTitle':           'AI agents',
+    'help.bridgeDesc':            'Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP app) read and change your week, as if you clicked: each change shows a toast and is one undo step. Install the zenit-week-mcp server in your agent app (Settings > AI shows how), turn on AI agents and, the first time your agent asks, check that the code matches and click Allow. Desktop Chrome and Firefox only; your phone follows through Drive sync. Unpair in Settings, signing out or resetting removes the pairing.',
     'settings.tipsReplayDone':    'Tips reset - they’ll show again.',
     'tips.doneCaption':           'Done',
     'tips.unplannedCaption':      'Unplanned',
@@ -12409,11 +12852,8 @@ const TRANSLATIONS = {
     'filter.none':                'None',
     'menu.clearDayFilter':        'Clear Day Filter',
     'error.quotaExceeded':        'Storage quota exceeded - changes might not be saved',
-    'sync.btnLabel':              'Sign in',
     'sync.btnTitle':              'Sign in with Google to sync across devices. Your data is stored only in your own Google Drive - Zenit Week never sees or stores it.',
-    'sync.stateAria':             'Sync options',
     'sync.lastSyncLabel':         'Last sync',
-    'sync.dialogTitle':           'Google Drive sync',
     'sync.statusCaption':         'Sync status',
     'sync.issueLabel':            'Issue',
     'sync.signOut':               'Sign out',
@@ -12466,7 +12906,6 @@ const TRANSLATIONS = {
     'quick_add.placeholder':      'Přidat úkol…',
     'quick_add.title':            'Rychlé přidání',
     'week.word':                  'Týden',
-    'center.me':                  'Já',
     'weekbar.today':              'Přejít na aktuální týden',
     'weekpicker.title':           'Vybrat týden',
     'weekpicker.prevMonth':       'Předchozí měsíc',
@@ -12479,7 +12918,26 @@ const TRANSLATIONS = {
     'settings.zoom':              'Přiblížení',
     'settings.resetView':         'Kliknutím resetovat pohled',
     'settings.language':          'Jazyk',
-    'settings.data':              'Data',
+    'settings.tabAccount':        'Účet',
+    'settings.tabGeneral':        'Obecné',
+    'account.btnAria':            'Účet a nastavení',
+    'account.signIn':             'Přihlásit se',
+    'account.signedOut':          'Nepřihlášeno',
+    'account.signedOutSub':       'Tvoje týdny jsou jen v tomto prohlížeči.',
+    'settings.dataHero':          'Tvoje týdny',
+    'settings.generalHero':       'Vzhled a chování',
+    'settings.generalSub':        'Přiblížení, jazyk, téma a tipy pro toto zařízení.',
+    'settings.dataWhereDrive':    'Tvoje týdny jsou uložené v tomto prohlížeči a na tvém Google Disku.',
+    'settings.dataWhereLocal':    'Tvoje týdny jsou uložené jen v tomto prohlížeči - měj zálohu.',
+    'settings.dataWeeks':         'Týdny',
+    'settings.dataFirstWeek':     'První týden',
+    'settings.backupCaption':     'Záloha',
+    'settings.exportTitle':       'Stáhnout zálohu',
+    'settings.exportSub':         'Všechny týdny a nastavení v jednom souboru.',
+    'settings.importTitle':       'Obnovit ze zálohy',
+    'settings.importSub':         'Nahradí vše, co tu je.',
+    'settings.tabAi':             'AI',
+    'settings.tabData':           'Data',
     'settings.exportData':        'Exportovat',
     'settings.importData':        'Importovat',
     'settings.importConfirmTitle':'Přepsat všechna data?',
@@ -12494,22 +12952,73 @@ const TRANSLATIONS = {
     'settings.tips':              'Zobrazovat tipy',
     'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
     'settings.tipsReplay':        'Přehrát tipy znovu',
-    'settings.bridge':            'Propojení s agentem',
-    'settings.bridgeTitle':       'Dovol AI agentovi na tomto počítači číst a měnit tvůj týden',
-    'settings.bridgeCode':        'Vlož párovací kód',
-    'settings.bridgeForget':      'Odpojit a zapomenout',
+    'settings.bridge':            'AI agenti',
+    'settings.bridgeTitle':       'Povolit AI agenty na tomto počítači.',
     'bridge.state.off':           'Vypnuto',
-    'bridge.state.waiting-server': 'Čekám na server - spusť zenit-week-mcp',
-    'bridge.state.waiting-permission': 'Čekám na povolení - prohlížeč se ptá, zda smí Zenit Week přistupovat k aplikacím na tomto počítači: zvol Povolit',
-    'bridge.state.connected':     'Připojeno - {client}',
-    'bridge.state.connectedNoName': 'Připojeno',
-    'bridge.state.refused':       'Odmítnuto (špatný kód) - vlož kód znovu',
-    'bridge.state.blocked':       'Zablokováno prohlížečem - povol přístup k aplikacím na tomto zařízení v nastavení webu',
-    'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje',
-    'bridge.state.needCode':      'Nejdřív vlož párovací kód',
-    'bridge.state.badCode':       'Tohle není párovací kód',
-    'help.bridgeTitle':           'Propojení s AI agentem',
-    'help.bridgeDesc':            'Dovol AI agentovi na tomto počítači (Claude Code, Claude Desktop nebo jakýkoli MCP klient) číst a měnit tvůj týden, jako by šlo o tvé kliknutí: každá změna ukáže oznámení a jde vrátit jedním krokem zpět. Spusť zenit-week-mcp, vlož jeho párovací kód do Nastavení > Propojení s agentem a povol dotaz prohlížeče. Jen v Chrome a Firefoxu na počítači; telefon se přizpůsobí přes synchronizaci s Diskem. Odpojení, odhlášení nebo reset párování smaže.',
+    'bridge.state.waiting-server': 'Čekám na aplikaci agenta',
+    'bridge.state.waiting-permission': 'Čekám na povolení - prohlížeč se ptá, zda smí Zenit Week přistupovat k aplikacím na tomto počítači: zvol Povolit.',
+    'bridge.state.blocked':       'Zablokováno prohlížečem - klikni na ikonu vlevo od adresy, otevři nastavení webu, nastav "Aplikace na tomto zařízení" (Chrome) nebo "Místní síť" (Firefox) na Povolit a stránku obnov.',
+    'bridge.state.waiting-agent': 'Čekám na agenta - zeptej se svého agenta na něco o týdnu.',
+    'bridge.state.approve':       'Schval žádost',
+    'bridge.state.connected':     'Připojeno',
+    'bridge.state.unpaired-remote': 'Spárování zrušeno na straně agenta - zeptej se agenta na něco a spáruj znovu.',
+    'bridge.state.update-server': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta, nebo níže stáhni nové rozšíření Zenit Week pro Claude Desktop.',
+    'bridge.state.update-server-npx': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta.',
+    'bridge.state.update-server-mcpb': 'Aktualizuj rozšíření Zenit Week - níže stáhni nové a otevři ho.',
+    'bridge.state.update-server-repo': 'Aktualizuj Zenit Week server svého agenta - stáhni změny repozitáře a restartuj aplikaci agenta.',
+    'bridge.agent.oldServer':     'Starší Zenit Week server',
+    'bridge.guide.download':      'Stáhnout',
+    'bridge.guide.desktopNote':   'Bez nastavování: otevři soubor a potvrď v Claude Desktop.',
+    'bridge.state.reload-app':    'Obnov Zenit Week - tvůj agent má novější Zenit Week server.',
+    'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje.',
+    'bridge.unnamedAgent':        'agent',
+    'bridge.agent.connected':     'Připojeno',
+    'bridge.agent.old':           'Aktualizuj jeho Zenit Week server',
+    'bridge.guide.title':         'Připoj agenta',
+    'bridge.statusCaption':       'Stav',
+    'bridge.guide.copyCommand':   'Kopírovat příkaz',
+    'bridge.guide.addCursor':     'Přidat do Cursoru',
+    'bridge.guide.addVscode':     'Přidat do VS Code',
+    'bridge.guide.other':         'Jiná MCP aplikace',
+    'bridge.guide.copyConfig':    'Kopírovat nastavení',
+    'bridge.guide.codeNote':      'Vlož příkaz do terminálu a restartuj Claude Code. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.cursorNote':    'Otevře se Cursor a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.codexNote':     'Vlož příkaz do terminálu a restartuj Codex. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.geminiNote':    'Vlož příkaz do terminálu a restartuj Gemini CLI. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.devinNote':     'Vlož ho do MCP nastavení Devin Desktop (Settings, MCP servers) a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
+    'dev.tab':                    'Vývoj',
+    'dev.title':                  'Vývoj',
+    'dev.desc':                   'Nástroje pro tento vývojový server. V produkci se nikdy nezobrazují.',
+    'dev.host':                   'Server',
+    'dev.version':                'Verze',
+    'dev.tools':                  'Nástroje',
+    'dev.probe':                  'Nahrát výkonnostní záznam',
+    'dev.probeDesc':              'Další klepnutí: značky fází, vykreslené snímky, dlouhé animační snímky.',
+    'dev.probeBtn':               'Nahrát',
+    'dev.reset':                  'Obnovit do první návštěvy',
+    'dev.resetDesc':              'Smaže všechna místní data a načte aplikaci jako pro nového návštěvníka.',
+    'dev.resetBtn':               'Obnovit',
+    'dev.resetTitle':             'Obnovit do první návštěvy?',
+    'dev.resetBody':              'Smaže všechny týdny, nastavení a propojení synchronizace uložené v tomto prohlížeči a načte aplikaci jako pro úplně nového návštěvníka. Data už synchronizovaná na Google Drive zůstanou beze změny.',
+    'bridge.guide.vscodeNote':    'Otevře se VS Code a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.otherNote':     'Vlož ho do MCP nastavení své aplikace a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
+    'bridge.copied':              'Zkopírováno',
+    'bridge.paired':              'Spárováno',
+    'bridge.pairedOn':            'Spárováno {date}',
+    'bridge.unpair':              'Zrušit spárování',
+    'bridge.explain.title':       'Povolit AI agenty',
+    'bridge.explain.body':        'Prohlížeč se teď zeptá, zda smí Zenit Week přistupovat k jiným aplikacím a službám na tomto zařízení. Tak se spojí s tvým AI agentem, jen na tomto počítači. Zvol Povolit.',
+    'bridge.explain.firefox':     'Ve Firefoxu zaškrtni i Zapamatovat si rozhodnutí.',
+    'bridge.explain.continue':    'Pokračovat',
+    'bridge.pair.title':          'Připojit AI agenta?',
+    'bridge.pair.body':           'Zkontroluj, že tvůj agent ukazuje stejný kód.\nUvádí, že je {client}. Pro {site}.',
+    'bridge.pair.bodyNoName':     'Zkontroluj, že tvůj agent ukazuje stejný kód.\nPro {site}.',
+    'bridge.pair.allow':          'Povolit',
+    'bridge.pair.deny':           'Zamítnout',
+    'bridge.pair.toast':          'Spárováno s {client}. Pokud to nebyla tvoje žádost, zruš spárování v Nastavení.',
+    'bridge.pair.toastNoName':    'Agent spárován. Pokud to nebyla tvoje žádost, zruš spárování v Nastavení.',
+    'help.bridgeTitle':           'AI agenti',
+    'help.bridgeDesc':            'Dovol AI agentovi na tomto počítači (Claude Code, Claude Desktop nebo jakákoli MCP aplikace) číst a měnit tvůj týden, jako by šlo o tvé kliknutí: každá změna ukáže oznámení a jde vrátit jedním krokem zpět. Nainstaluj do aplikace agenta server zenit-week-mcp (jak, ukazuje Nastavení > AI), zapni AI agenty a když se agent poprvé zeptá, zkontroluj, že kód sedí, a klikni na Povolit. Jen v Chrome a Firefoxu na počítači; telefon se přizpůsobí přes synchronizaci s Diskem. Zrušení spárování v Nastavení, odhlášení nebo reset párování smaže.',
     'settings.tipsReplayDone':    'Tipy resetovány - zobrazí se znovu.',
     'tips.doneCaption':           'Hotovo',
     'tips.unplannedCaption':      'Neplánované',
@@ -12861,11 +13370,8 @@ const TRANSLATIONS = {
     'filter.none':                'Žádný',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena - změny nemusí být uloženy',
-    'sync.btnLabel':              'Přihlásit se',
     'sync.btnTitle':              'Přihlas se přes Google a synchronizuj data mezi zařízeními. Data se ukládají pouze na tvém Disku Google - Zenit Week k nim nemá přístup.',
-    'sync.stateAria':             'Možnosti synchronizace',
     'sync.lastSyncLabel':         'Aktualizace',
-    'sync.dialogTitle':           'Synchronizace s Diskem Google',
     'sync.statusCaption':         'Stav synchronizace',
     'sync.issueLabel':            'Problém',
     'sync.signOut':               'Odhlásit se',
@@ -15990,51 +16496,15 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   }
 
   if (isCenter) {
-    // Named, so a screen reader and a hover both get something better than an
-    // unlabelled image.
-    g.appendChild(svgText('title', {}, centerDisplayName()));
+    // Named, so a screen reader and a hover both get the figure the plate
+    // shows. setPieChart keeps it current.
+    g.appendChild(svgText('title', { class: 'pie-title' }, ''));
 
-    // The week's split as the infographic Stats shows too; the photo goes on
-    // its plate and the percentages over everything (see buildPieChart).
+    // The week's split as the infographic Stats shows too, with the done
+    // percentage on its plate and the wedge percentages over everything (see
+    // buildPieChart).
     const pie = buildPieChart('center');
     g.appendChild(pie.chart);
-
-    // Initials disc first, photo clipped over it. If the photo 404s, is blocked,
-    // or was never requested, the initials are simply what remains visible - no
-    // error handling inside a subtree that gets rebuilt on every render.
-    if (googleUserInitials) {
-      g.appendChild(svgDisc(CENTER_AVATAR_R, {
-        fill: googleUserInitialsColor || '#888888',
-      }));
-    }
-    g.appendChild(svgText('text', {
-      x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-      'font-family': 'inherit', 'font-size': googleUserInitials ? CENTER_INITIALS_FONT : fontSize,
-      'font-weight': '700', fill: googleUserInitials ? textColor : (isDarkTheme ? '#f2f2f2' : '#2b2b33'),
-      'pointer-events': 'none',
-    }, centerNodeText()));
-
-    if (canShowAvatarPhoto()) {
-      g.appendChild(svgEl('image', {
-        class: 'center-avatar-img',
-        href: googleUserPhoto,
-        x: -CENTER_AVATAR_R, y: -CENTER_AVATAR_R,
-        width: CENTER_AVATAR_R * 2, height: CENTER_AVATAR_R * 2,
-        preserveAspectRatio: 'xMidYMid slice',
-        'clip-path': 'url(#center-avatar-clip)',
-        'pointer-events': 'none',
-      }));
-    }
-
-    // The photo's dished face, over it: the disc paints only the filter's inner
-    // light and shade, never its own fill.
-    g.appendChild(svgDisc(CENTER_AVATAR_R, {
-      class: 'center-avatar-bevel', fill: '#000', filter: 'url(#center-avatar-bevel)',
-      'pointer-events': 'none',
-    }));
-
-    // Percentages last, so nothing on the root - plate, its shadow, the photo -
-    // can ever cover them.
     g.appendChild(pie.labels);
   }
 
@@ -18519,13 +18989,6 @@ function _statsDonut(c) {
   });
   const pie = buildPieChart('stats-pie');
   svg.appendChild(pie.chart);
-  svg.appendChild(svgText('text', {
-    x: 0, y: -6, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-    class: 'stats-donut-center-num',
-  }, `${c.percent}%`));
-  svg.appendChild(svgText('text', {
-    x: 0, y: 30, 'text-anchor': 'middle', class: 'stats-donut-center-sub',
-  }, t('todo.done')));
   svg.appendChild(pie.labels);
   setPieChart(svg, c, STATS_PIE_FONT_SCALE);
   return svg;
@@ -19442,12 +19905,20 @@ function buildPieChart(prefix) {
   // Opaque in the middle, frosted glass in the rim around it, so the wedges
   // show through dimmed; the rim's shadow is as light as its fill.
   const plate = svgEl('g', { class: 'pie-plate', filter: `url(#${prefix}-plate-shadow)`, 'pointer-events': 'none' });
-  plate.appendChild(svgDisc(CENTER_AVATAR_R, { fill: `url(#${prefix}-plate-grad)` }));
+  plate.appendChild(svgDisc(CENTER_PLATE_CORE_R, { fill: `url(#${prefix}-plate-grad)` }));
   plate.appendChild(svgEl('path', {
-    d: `${discPathD(CENTER_PLATE_R)} ${discPathD(CENTER_AVATAR_R)}`, 'fill-rule': 'evenodd',
+    d: `${discPathD(CENTER_PLATE_R)} ${discPathD(CENTER_PLATE_CORE_R)}`, 'fill-rule': 'evenodd',
     fill: `url(#${prefix}-plate-grad)`, 'fill-opacity': CENTER_PLATE_RIM_OPACITY,
   }));
   chart.appendChild(plate);
+
+  // The done percentage on the plate, in both charts. Filled by setPieChart.
+  chart.appendChild(svgEl('text', {
+    x: 0, y: -6, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'pie-center-num',
+  }));
+  chart.appendChild(svgEl('text', {
+    x: 0, y: 30, 'text-anchor': 'middle', class: 'pie-center-sub',
+  }));
 
   const labels = svgEl('g', { class: 'pie-labels' });
   STATS_SPLIT_BANDS.forEach((band, i) => {
@@ -19504,12 +19975,19 @@ function pieLabelFit(text, font, a, rOut) {
 // charts. Bands are laid clockwise from 12 o'clock in STATS_SPLIT_BANDS order.
 // Size comes from rank: largest share first, ties in band order. `fontScale`
 // lets a chart drawn small keep its percentages readable; the fit still holds.
-// The plate with no ring at all: no wedges, no labels and no empty-week track.
+// The Vision's plate: no ring at all (no wedges, labels or empty-week track),
+// and its name in place of a done percentage, since the Vision has no done.
 // The add buttons are still placed, since they sit where the ring would.
 function clearPieChart(root) {
   setPieChart(root, { total: 0 });
   const track = root.querySelector('.pie-track');
   if (track) track.setAttribute('display', 'none');
+  const num = root.querySelector('.pie-center-num');
+  if (num) num.textContent = '';
+  const sub = root.querySelector('.pie-center-sub');
+  if (sub) { sub.textContent = t('vision.center'); sub.setAttribute('y', 0); sub.setAttribute('dominant-baseline', 'central'); }
+  const title = root.querySelector(':scope > .pie-title');
+  if (title) title.textContent = t('vision.center');
 }
 
 function setPieChart(root, stats, fontScale = 1) {
@@ -19519,6 +19997,12 @@ function setPieChart(root, stats, fontScale = 1) {
   const rank = new Array(shares.length);
   shares.map((v, i) => i).sort((a, b) => shares[b] - shares[a] || a - b).forEach((i, r) => { rank[i] = r; });
   const avoid = placePieAddBtns(root, shares, rank);
+  const num = root.querySelector('.pie-center-num');
+  if (num) num.textContent = `${stats.percent}%`;
+  const sub = root.querySelector('.pie-center-sub');
+  if (sub) sub.textContent = t('todo.done');
+  const title = root.querySelector(':scope > .pie-title');
+  if (title) title.textContent = `${stats.percent}% ${t('todo.done')}`;
   // The track stands in for the chart on an empty week only: at full size it
   // would show behind every shorter wedge.
   const track = root.querySelector('.pie-track');
@@ -19602,39 +20086,6 @@ function render() {
   centerGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#444444' : '#252525' }));
   defsEl.appendChild(centerGrad);
 
-  // The photo as a concave dish, lit from the same top left: a thin white lip
-  // where the top-left rim catches the light, a broad soft shade the lip casts
-  // into the dish below it, and a soft glow where the light lands on the far,
-  // bottom-right slope. Each layer is the disc's own outside, offset, blurred
-  // and clipped back to the disc, so it paints only inward from the side the
-  // offset pushes it in from. Merged in order, so the lip sits on the shade.
-  const bevel = svgEl('filter', {
-    id: 'center-avatar-bevel', filterUnits: 'userSpaceOnUse',
-    x: -CENTER_AVATAR_R - 24, y: -CENTER_AVATAR_R - 24,
-    width: 2 * CENTER_AVATAR_R + 48, height: 2 * CENTER_AVATAR_R + 48,
-  });
-  const bevelMerge = svgEl('feMerge', {});
-  [
-    ['shade', '#000', isDark ? 0.35 : 0.22, 6, 8, 10],
-    ['glow', '#fff', isDark ? 0.15 : 0.35, -4, -5, 8],
-    ['light', '#fff', isDark ? 0.45 : 0.9, 2.5, 3, 1.5],
-  ].forEach(([name, color, opacity, dx, dy, blur]) => {
-    bevel.appendChild(svgEl('feFlood', { 'flood-color': color, 'flood-opacity': opacity, result: `${name}-flood` }));
-    bevel.appendChild(svgEl('feComposite', { in: `${name}-flood`, in2: 'SourceAlpha', operator: 'out', result: `${name}-outside` }));
-    bevel.appendChild(svgEl('feOffset', { in: `${name}-outside`, dx, dy, result: `${name}-offset` }));
-    bevel.appendChild(svgEl('feGaussianBlur', { in: `${name}-offset`, stdDeviation: blur, result: `${name}-blur` }));
-    bevel.appendChild(svgEl('feComposite', { in: `${name}-blur`, in2: 'SourceAlpha', operator: 'in', result: name }));
-    bevelMerge.appendChild(svgEl('feMergeNode', { in: name }));
-  });
-  bevel.appendChild(bevelMerge);
-  defsEl.appendChild(bevel);
-
-  // Rounds off the root's profile photo. A clipPath rather than a CSS
-  // basic-shape so the geometry is plain SVG in every engine.
-  const avatarClip = svgEl('clipPath', { id: 'center-avatar-clip' });
-  avatarClip.appendChild(svgEl('circle', { cx: 0, cy: 0, r: CENTER_AVATAR_R }));
-  defsEl.appendChild(avatarClip);
-
   const linesG = svgEl('g', { id: 'lines-layer' });
   root.appendChild(linesG);
 
@@ -19687,9 +20138,9 @@ function render() {
     drawEdges(bid, 0);
   });
 
-  // Draw center node. Its label is the user, not the week - the week and its
-  // navigation live in #week-picker.
-  const centerG = makeNodeGroup('center', 0, 0, centerDisplayName(), 'center', null, null, null);
+  // Draw center node. It carries no label: its plate shows the week's done
+  // percentage, and the week and its navigation live in #week-picker.
+  const centerG = makeNodeGroup('center', 0, 0, '', 'center', null, null, null);
   nodesG.appendChild(centerG);
 
   // Draw all other nodes, pruned ones included but hidden. SVG paints in DOM
@@ -19990,8 +20441,8 @@ const ESC_DISMISSALS = [
     dismiss: () => { closeCommentDialog(); } },
   { isOpen: () => isWeekPickerOpen(),
     dismiss: () => { closeWeekPicker(); } },
-  { isOpen: () => isSettingsDropdownOpen(),
-    dismiss: () => { closeSettingsDropdown(); } },
+  { isOpen: () => isSettingsOpen(),
+    dismiss: () => { closeSettings(); } },
   // Mindmap-only from here down, and gated on it: the ring and the level row
   // are invisible from Agenda or Stats, and Esc must never spend itself on
   // something the user cannot see - that is what made leaving Agenda reset the
@@ -20028,24 +20479,32 @@ function runEscDismiss() {
   return false;
 }
 
-function isSettingsDropdownOpen() {
-  const d = document.getElementById('settings-dropdown');
+function isSettingsOpen() {
+  const d = document.getElementById('settings-overlay');
   return !!d && d.classList.contains('visible');
 }
 
-function closeSettingsDropdown() {
-  document.getElementById('settings-dropdown')?.classList.remove('visible');
-  document.getElementById('fab-settings')?.classList.remove('active');
+function closeSettings() {
+  const overlay = document.getElementById('settings-overlay');
+  if (!overlay || !overlay.classList.contains('visible')) return;
+  overlay.classList.remove('visible');
+  resetSettingsHeight();
+  const btn = document.getElementById('account-btn');
+  btn?.classList.remove('active');
+  // Back to the button it was opened from, unless focus already moved on.
+  const active = document.activeElement;
+  if (btn && (!active || active === document.body || overlay.contains(active))) btn.focus?.();
 }
 
 // Global keyboard shortcuts for hovered node
 function _windowKeydownHandler(e) {
   if (editState) return; // Don't interfere with inline editing
 
-  // The week picker's fold and the date picker own the keyboard while open:
-  // their cells take the arrows, and a bare letter must not switch view out
-  // from under them. Esc still runs the normal walk, which closes them first.
-  if (isWeekPickerOpen() || isDatePickerOpen()) {
+  // The week picker's fold, the date picker and the Settings modal own the
+  // keyboard while open: their cells and tabs take the arrows, and a bare
+  // letter must not switch view out from under them. Esc still runs the normal
+  // walk, which closes them first.
+  if (isWeekPickerOpen() || isDatePickerOpen() || isSettingsOpen()) {
     if (e.key === 'Escape') { e.preventDefault(); runEscDismiss(); }
     return;
   }
@@ -25318,7 +25777,12 @@ function applyTransform() {
     if (mapRoot.style.transform) mapRoot.style.transform = '';
   }
   document.getElementById('zoom-label').textContent = Math.round(zoom / ZOOM_DEFAULT * 100) + '%';
-  const pct = (Math.log(zoom) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
+  // Clamped: zoom can sit outside the slider's range (the bounds follow the
+  // fit zoom, so a re-fit can leave the current zoom below the new minimum).
+  // Unclamped, the thumb is placed off the track, where the Settings pane
+  // clips it and the slider looks empty. The label still shows the real value.
+  const rawPct = (Math.log(zoom) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN) * 100;
+  const pct = Math.max(0, Math.min(100, rawPct));
   const fill  = document.getElementById('zoom-fill');
   const thumb = document.getElementById('zoom-thumb');
   if (fill)  fill.style.width = pct + '%';
@@ -26776,7 +27240,7 @@ function renderWeekPickerFold() {
     rows[i + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
   });
 
-  // One outside-click dismissal, the same one #sync-dropdown uses.
+  // One outside-click dismissal.
   document.addEventListener('click', () => closeWeekPicker());
 })();
 
@@ -26981,8 +27445,9 @@ window.addEventListener('pointerup', (e) => {
 //     the top bar is the handle instead.
 //   · the Agenda and Stats lists, at scroll top, where the gesture is expected.
 //
-// Nothing native is being duplicated: <body> is overflow:hidden, so the
-// browser's own pull-to-refresh never arms in this app and cannot double-fire.
+// Nothing native is being duplicated: html and body carry
+// overscroll-behavior-y: none, so the browser's own pull-to-refresh never arms
+// in this app and cannot double-fire.
 const PTR_TRIGGER_PX = 64;   // pulled distance (after resistance) that commits
 const PTR_MAX_PX     = 96;   // travel cap, so the indicator can't be dragged away
 const PTR_RESISTANCE = 0.5;  // finger travel → indicator travel
@@ -27050,7 +27515,8 @@ async function performPullRefresh() {
 
 // atTop: a scrolling source only owns the gesture while its list is at the top.
 // The toolbar passes null - it never scrolls, so it is always at the top.
-function initPullToRefresh(source, atTop = null) {
+// startsHere: a source that is only partly a handle says which touches it owns.
+function initPullToRefresh(source, atTop = null, startsHere = null) {
   let startY = 0, startX = 0, dist = 0;
   let armed = false, pulling = false;
   const isAtTop = () => (atTop ? atTop() : true);
@@ -27058,6 +27524,7 @@ function initPullToRefresh(source, atTop = null) {
   source.addEventListener('touchstart', e => {
     armed = false; pulling = false; dist = 0;
     if (_ptrBusy || e.touches.length !== 1 || !isAtTop()) return;
+    if (startsHere && !startsHere(e.touches[0])) return;
     // An in-flight edit or write owns the record; re-opening the week under it
     // would read a half-written state back over the screen.
     if (_atomicOpsDepth > 0) return;
@@ -27099,6 +27566,13 @@ function initPullToRefresh(source, atTop = null) {
 if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
   const toolbar = document.getElementById('toolbar');
   if (toolbar) initPullToRefresh(toolbar);
+  // Settings' backdrop covers the toolbar while it is open, so the band of it
+  // lying over the toolbar takes the toolbar's gesture.
+  const settingsOverlay = document.getElementById('settings-overlay');
+  if (settingsOverlay) {
+    initPullToRefresh(settingsOverlay, null, (touch) =>
+      touch.clientY <= (document.getElementById('toolbar')?.getBoundingClientRect().bottom || 0));
+  }
   // A pinned caption has taken the app bar's place, so it takes its gesture too.
   ['comment-header', 'help-header'].forEach(id => {
     const el = document.getElementById(id);
@@ -27174,49 +27648,21 @@ window.addEventListener('hashchange', async () => {
 });
 
 
-// ─── Google Drive Sync Button (signed-out state only) ────────────────────────
-document.getElementById('sync-btn').addEventListener('click', () => { startSignIn(); });
+// ─── Settings > Account: sign in and sign out ─────────────────────────────────
+document.getElementById('account-signin-btn').addEventListener('click', () => { startSignIn(); });
 
-// ─── Sync state button + sync dropdown ───────────────────────────────────────
-(function () {
-  const stateBtn   = document.getElementById('sync-state-btn');
-  const dropdown   = document.getElementById('sync-dropdown');
-  const signoutBtn = document.getElementById('sync-dropdown-signout');
-  const closeBtn   = document.getElementById('sync-dropdown-close');
-
-  // A click inside the dialog keeps it open; only the X, Escape, Sign out or
-  // a click elsewhere closes it.
-  dropdown.addEventListener('click', (e) => e.stopPropagation());
-  closeBtn.addEventListener('click', () => dropdown.classList.remove('visible'));
-
-  stateBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    dropdown.classList.toggle('visible');
-    if (dropdown.classList.contains('visible')) {
-      updateDropdownSyncTime();
-      updateDropdownTip();   // offline-ness can change without a status change
-    }
+document.getElementById('account-signout-btn').addEventListener('click', () => {
+  closeSettings();
+  showAppConfirm({
+    title:           t('sync.signOutConfirm.title'),
+    body:            t('sync.signOutConfirm.body'),
+    okLabel:         t('sync.signOutConfirm.keepLocal'),
+    onConfirm:       signOut,
+    secondaryLabel:  t('sync.signOutConfirm.clearLocal'),
+    secondaryDanger: true,
+    onSecondary:     signOutAndClear,
   });
-
-  signoutBtn.addEventListener('click', () => {
-    dropdown.classList.remove('visible');
-    showAppConfirm({
-      title:           t('sync.signOutConfirm.title'),
-      body:            t('sync.signOutConfirm.body'),
-      okLabel:         t('sync.signOutConfirm.keepLocal'),
-      onConfirm:       signOut,
-      secondaryLabel:  t('sync.signOutConfirm.clearLocal'),
-      secondaryDanger: true,
-      onSecondary:     signOutAndClear,
-    });
-  });
-
-  // Close dropdown on outside click or Escape
-  document.addEventListener('click', () => dropdown.classList.remove('visible'));
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') dropdown.classList.remove('visible');
-  });
-})();
+});
 
 // Upload every week with a pending debounce, not just the displayed one. A
 // transfer queues the *next* week too, and nothing else ever uploads a week the
@@ -27315,6 +27761,7 @@ window.addEventListener('pagehide', _flushOnTeardown);
   const overlay      = document.getElementById('app-confirm-overlay');
   const titleEl      = document.getElementById('app-confirm-title');
   const bodyEl       = document.getElementById('app-confirm-body');
+  const highlightEl  = document.getElementById('app-confirm-highlight');
   const cancelBtn    = document.getElementById('app-confirm-cancel');
   const closeBtn     = document.getElementById('app-confirm-close');
   const secondaryBtn = document.getElementById('app-confirm-secondary');
@@ -27322,6 +27769,7 @@ window.addEventListener('pagehide', _flushOnTeardown);
   let _onConfirm     = null;
   let _onSecondary   = null;
   let _onCancel      = null;
+  let _openId        = null;
 
   // Hides without an outcome - the OK and secondary paths, which have their own.
   function hideAppConfirm() {
@@ -27337,16 +27785,22 @@ window.addEventListener('pagehide', _flushOnTeardown);
   // The X and Cancel are one outcome, and Esc reaches them through the shared
   // dismissal walk rather than a listener of this dialog's own.
   window.closeAppConfirm = closeAppConfirm;
-  window.isAppConfirmOpen = () => overlay.classList.contains('visible');
+  // With an id: whether that particular dialog is the one open.
+  window.isAppConfirmOpen = (id = null) => overlay.classList.contains('visible') && (!id || id === _openId);
 
+  // `highlight` is one short line shown large above the body (a pairing code);
+  // `id` lets the caller ask later whether its own dialog is still the one open.
   window.showAppConfirm = function({
-    title, body,
+    id = null, title, body, highlight = null,
     okLabel = 'OK', danger = false, onConfirm,
     secondaryLabel = null, secondaryDanger = false, onSecondary = null,
     cancelLabel = null, onCancel = null,
   }) {
     titleEl.textContent  = title;
     bodyEl.textContent   = body;
+    highlightEl.textContent = highlight || '';
+    highlightEl.hidden = !highlight;
+    _openId = id;
     okBtn.textContent    = okLabel;
     okBtn.classList.toggle('danger', danger);
     cancelBtn.textContent = cancelLabel || t('app-confirm.cancel');
@@ -27380,22 +27834,157 @@ window.addEventListener('pagehide', _flushOnTeardown);
   });
 })();
 
-// ─── Settings Dropdown ────────────────────────────────────────────────────────
-const settingsFab = document.getElementById('fab-settings');
-const settingsDropdown = document.getElementById('settings-dropdown');
+// ─── Settings ─────────────────────────────────────────────────────────────────
+// One modal, five tabs, opened from the account button. AI and Development ship
+// hidden and are revealed at boot (initBridgeSettings, the devResetEnabled()
+// guard); a hidden tab is never selected, so the last-used tab falls back to
+// Account on a device without it.
+const SETTINGS_TABS = ['account', 'general', 'ai', 'data', 'dev'];
+let settingsActiveTab = 'account';
 
-settingsFab.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const isVisible = settingsDropdown.classList.toggle('visible');
-  settingsFab.classList.toggle('active', isVisible);
-});
+function isSettingsTabShown(name) {
+  const tab = document.getElementById('settings-tab-' + name);
+  return !!tab && !tab.hidden;
+}
 
-document.addEventListener('click', (e) => {
-  const fabPill = document.getElementById('fab-pill');
-  if (!settingsDropdown.contains(e.target) && !fabPill.contains(e.target)) {
-    closeSettingsDropdown();
+function selectSettingsTab(name, { focus = false } = {}) {
+  if (!SETTINGS_TABS.includes(name) || !isSettingsTabShown(name)) name = 'account';
+  settingsActiveTab = name;
+  for (const id of SETTINGS_TABS) {
+    const tab = document.getElementById('settings-tab-' + id);
+    const pane = document.getElementById('settings-pane-' + id);
+    const on = id === name;
+    if (tab) {
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.classList.toggle('active', on);
+      tab.tabIndex = on ? 0 : -1;
+    }
+    if (pane) pane.hidden = !on;
   }
-});
+  if (name === 'data') refreshDataSummary();
+  // Offline-ness can change without a status change, so re-read on show.
+  if (name === 'account') { updateAccountSyncStatus(); updateAccountSyncTime(); }
+  if (focus) document.getElementById('settings-tab-' + name)?.focus?.();
+}
+
+// The window's height follows the open tab's content, eased rather than
+// jumped: a tab switch, the AI tab's status moving (Off -> waiting ->
+// Connected), a sign-in filling the Account tab. Each pane is watched, and on a
+// change the window is pinned at the height it had, then let run to its new
+// natural height. One already under way starts from where it has got to.
+const SETTINGS_HEIGHT_MS = 180;
+let _settingsHeight = null;   // the window's settled height, null while closed
+let _settingsHeightTimer = null;
+
+function animateSettingsHeight() {
+  const dialog = document.getElementById('settings-dialog');
+  if (!dialog || !isSettingsOpen()) { _settingsHeight = null; return; }
+  const moving = !!dialog.style.height;
+  const from = moving ? dialog.getBoundingClientRect().height : _settingsHeight;
+  dialog.style.transition = '';
+  dialog.style.height = '';
+  const to = dialog.getBoundingClientRect().height;
+  _settingsHeight = to;
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (from == null || Math.abs(from - to) < 1 || reduce) return;
+  dialog.classList.add('settings-height-moving');
+  dialog.style.height = `${from}px`;
+  void dialog.offsetHeight;   // commit the start height before easing off it
+  dialog.style.transition = `height ${SETTINGS_HEIGHT_MS}ms ease-out`;
+  dialog.style.height = `${to}px`;
+  clearTimeout(_settingsHeightTimer);
+  _settingsHeightTimer = setTimeout(() => {
+    dialog.style.transition = '';
+    dialog.style.height = '';
+    dialog.classList.remove('settings-height-moving');
+  }, SETTINGS_HEIGHT_MS + 20);
+}
+
+function resetSettingsHeight() {
+  const dialog = document.getElementById('settings-dialog');
+  clearTimeout(_settingsHeightTimer);
+  _settingsHeight = null;
+  if (dialog) {
+    dialog.style.transition = '';
+    dialog.style.height = '';
+    dialog.classList.remove('settings-height-moving');
+  }
+}
+
+// Data tab: where the data lives, how many weeks and since when. Re-read each
+// time the tab is shown - a sign-in, a new week or a language switch since the
+// last look must show.
+async function refreshDataSummary() {
+  const drive = !!googleUserEmail;
+  const section = document.getElementById('data-section');
+  if (section) section.dataset.state = drive ? 'drive' : 'local';
+  const where = document.getElementById('data-where');
+  if (where) where.textContent = t(drive ? 'settings.dataWhereDrive' : 'settings.dataWhereLocal');
+  let keys = [];
+  try { keys = (await listWeekKeysIDB()) || []; } catch { /* IDB unavailable: show what we can */ }
+  const weeks = keys.filter(k => /^\d{4}-\d{1,2}$/.test(k)).map(parseWeekKey)
+    .sort((a, b) => a.year - b.year || a.week - b.week);
+  const count = document.getElementById('data-weeks-count');
+  if (count) count.textContent = String(weeks.length);
+  const first = document.getElementById('data-first-week');
+  if (first) first.textContent = weeks.length ? `${weeks[0].week} / ${weeks[0].year}` : '-';
+}
+
+function openSettings() {
+  resetSettingsHeight();
+  // A sync problem is the first thing to see: the badge that brought the user
+  // here was red.
+  selectSettingsTab(syncStatus === 'error' ? 'account' : settingsActiveTab);
+  document.getElementById('settings-overlay').classList.add('visible');
+  document.getElementById('account-btn').classList.add('active');
+  // Opening is the popup's own fade; the height eases only from here on.
+  _settingsHeight = document.getElementById('settings-dialog').getBoundingClientRect?.().height ?? null;
+  document.getElementById('settings-tab-' + settingsActiveTab)?.focus?.();
+}
+
+(function initSettingsDialog() {
+  const overlay = document.getElementById('settings-overlay');
+  const tablist = document.getElementById('settings-tabs');
+
+  document.getElementById('account-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isSettingsOpen()) closeSettings();
+    else openSettings();
+  });
+  document.getElementById('settings-close').addEventListener('click', () => closeSettings());
+  // A rotation or window resize re-wraps the panes: take the new height as settled.
+  window.addEventListener('resize', () => {
+    const dialog = document.getElementById('settings-dialog');
+    if (isSettingsOpen() && !dialog.style.height) _settingsHeight = dialog.getBoundingClientRect().height;
+  });
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(() => animateSettingsHeight());
+    overlay.querySelectorAll('.settings-pane').forEach(p => ro.observe(p));
+  }
+  // The backdrop itself, never a click that started inside the dialog.
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSettings();
+  });
+
+  tablist.addEventListener('click', (e) => {
+    const tab = e.target.closest?.('.agenda-tab');
+    if (tab) selectSettingsTab(tab.id.replace('settings-tab-', ''));
+  });
+  // Roving focus across the shown tabs: arrows wrap (left/right, and up/down
+  // the same way), Home and End jump.
+  tablist.addEventListener('keydown', (e) => {
+    const shown = SETTINGS_TABS.filter(isSettingsTabShown);
+    const at = shown.indexOf(settingsActiveTab);
+    let next = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = shown[(at + 1) % shown.length];
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = shown[(at - 1 + shown.length) % shown.length];
+    else if (e.key === 'Home') next = shown[0];
+    else if (e.key === 'End') next = shown[shown.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    selectSettingsTab(next, { focus: true });
+  });
+})();
 
 
 // ─── Quick-Add Panel ──────────────────────────────────────────────────────────
@@ -27668,8 +28257,8 @@ document.addEventListener('click', (e) => {
   // ── Event listeners ──
   // Shared by the FAB and the global Q hotkey, so both routes behave the same.
   function toggleQuickAdd() {
-    // Close settings dropdown if open
-    closeSettingsDropdown();
+    // Close settings if open
+    closeSettings();
     if (panel.classList.contains('is-open')) {
       closeQuickAdd();
     } else {
@@ -27745,38 +28334,170 @@ document.getElementById('autolayout-toggle').addEventListener('click', () => {
 
 syncAutoLayoutToggleUI();
 
-// ─── Agent bridge settings ────────────────────────────────────────────────────
+// ─── AI agents settings ───────────────────────────────────────────────────────
 // Desktop only: on a phone the loopback has nothing to reach. The record is
 // device-local (zenit-week-bridge), never in the synced settings blob.
+// Setup spec docs/specs/agent-bridge-setup.md section 3.4.
+const BRIDGE_NPX_ARGS = ['-y', 'zenit-week-mcp@1'];
+// The latest Claude Desktop extension, attached to each mcp-v<version> release.
+const BRIDGE_DESKTOP_EXTENSION_URL = 'https://github.com/kruxik/zenit-week/releases/latest/download/zenit-week.mcpb';
+const BRIDGE_NPX = `npx ${BRIDGE_NPX_ARGS.join(' ')}`;
+// The one-line add command of each agent app with its own CLI. Gemini CLI takes
+// no `-y`: it would read it as its own --yolo, and npx needs none without a terminal.
+const BRIDGE_ADD_CMDS = {
+  'claude-code': `claude mcp add --scope user zenit-week -- ${BRIDGE_NPX}`,
+  codex: `codex mcp add zenit-week -- ${BRIDGE_NPX}`,
+  gemini: 'gemini mcp add --scope user zenit-week npx zenit-week-mcp@1',
+};
+// The sites the server accepts without `origins add` (mcp/core.js isAllowedOrigin).
+const BRIDGE_BUILT_IN_ORIGIN = /^(https:\/\/(www\.)?zenitweek\.com|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
+// An agent app's add command for the site this page runs on: on any other site
+// (an ngrok dev tunnel) it first adds that site, so the server lets it connect.
+function bridgeAddCmd(agent, origin = location.origin) {
+  const cmd = BRIDGE_ADD_CMDS[agent];
+  if (BRIDGE_BUILT_IN_ORIGIN.test(origin) || !/^https:\/\//.test(origin)) return cmd;
+  return `${BRIDGE_NPX} origins add ${origin} && ${cmd}`;
+}
+const BRIDGE_SERVER_JSON = { command: 'npx', args: BRIDGE_NPX_ARGS };
+const BRIDGE_OTHER_CONFIG = JSON.stringify({ mcpServers: { 'zenit-week': BRIDGE_SERVER_JSON } }, null, 2);
+const BRIDGE_CURSOR_LINK = `cursor://anysphere.cursor-deeplink/mcp/install?name=zenit-week&config=${btoa(JSON.stringify(BRIDGE_SERVER_JSON))}`;
+const BRIDGE_VSCODE_LINK = `https://vscode.dev/redirect?url=${encodeURIComponent(`vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'zenit-week', ...BRIDGE_SERVER_JSON }))}`)}`;
+
+// Up to two letters for an agent's badge: "claude-code" -> "CC", "cursor" -> "C".
+function bridgeInitials(name) {
+  const words = String(name || '').split(/[\s_.-]+/).filter(Boolean);
+  return words.slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+}
+
 function renderBridgeStatus() {
   const el = document.getElementById('bridge-status');
   const toggle = document.getElementById('bridge-toggle');
   // Shown only by initBridgeSettings at boot, after every bridge binding exists.
-  if (!el || !toggle || document.getElementById('bridge-section').hidden) return;
+  if (!el || !toggle || document.getElementById('settings-tab-ai').hidden) return;
   const rec = loadBridgeRecord();
   const supported = bridgeSupported();
   toggle.disabled = !supported;
   toggle.setAttribute('aria-checked', supported && rec.enabled ? 'true' : 'false');
-  const { state, client } = supported ? bridgeStatus : { state: 'unsupported', client: null };
-  const shown = rec.enabled || state === 'unsupported' || state === 'refused' ? state : 'off';
-  el.textContent = shown === 'connected'
-    ? (client ? t('bridge.state.connected', { client }) : t('bridge.state.connectedNoName'))
+  const { state, agents } = supported ? bridgeStatus : { state: 'unsupported', agents: [] };
+  const shown = rec.enabled || state === 'unsupported' ? state : 'off';
+  // One state colour for the badge and the status dot (see #bridge-section CSS).
+  document.getElementById('bridge-section').dataset.state = shown;
+  // The state alone: the agents are named in their own rows right below.
+  el.textContent = shown === 'update-server' ? t(bridgeUpdateHintKey(agents))
     : t(`bridge.state.${shown}`);
-  document.getElementById('bridge-forget-btn').hidden = !rec.token;
+
+  // One row per agent app the page knows: connected, or speaking an old protocol.
+  const list = document.getElementById('bridge-agents');
+  list.textContent = '';
+  // Each reads like the Drive account row: an initials badge in the agent's
+  // state colour, the name, and its state underneath.
+  const rows = (shown === 'off' ? [] : agents).map(a => {
+    const row = document.createElement('div');
+    row.className = 'settings-row bridge-agent';
+    row.dataset.agentState = a.state;
+    const label = a.state === 'old' && !a.client ? t('bridge.agent.oldServer') : (a.client || t('bridge.unnamedAgent'));
+    const badge = document.createElement('span');
+    badge.className = 'settings-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    badge.textContent = bridgeInitials(label);
+    const identity = document.createElement('div');
+    identity.className = 'settings-identity';
+    const name = document.createElement('div');
+    name.className = 'settings-name';
+    name.textContent = label;
+    const st = document.createElement('div');
+    st.className = 'settings-sub';
+    st.textContent = t(a.state === 'connected' ? 'bridge.agent.connected' : 'bridge.agent.old');
+    identity.append(name, st);
+    row.append(badge, identity);
+    return row;
+  });
+  rows.forEach(r => list.appendChild(r));
+  list.hidden = !rows.length;
+
+  // Always there (but where the browser cannot run the bridge), so another agent
+  // can be connected at any time and the panel never shifts as the state changes.
+  document.getElementById('bridge-guide').hidden = shown === 'unsupported';
+  renderBridgeGuide();
+  const paired = document.getElementById('bridge-paired');
+  paired.hidden = !rec.key;
+  if (rec.key) {
+    const when = rec.pairedAt ? new Date(rec.pairedAt) : null;
+    document.getElementById('bridge-paired-date').textContent = when && !isNaN(when)
+      ? t('bridge.pairedOn', { date: when.toLocaleDateString(currentLang === 'cs' ? 'cs-CZ' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) })
+      : t('bridge.paired');
+  }
 }
 
-function bridgeSettingsHint(key) {
-  const el = document.getElementById('bridge-status');
-  if (el) el.textContent = t(key);
+// How to update the servers that are behind: one hint when they share an
+// install path, both common ones when any cannot say (a v1 server).
+function bridgeUpdateHintKey(agents) {
+  const installs = new Set(agents.filter(a => a.state === 'old').map(a => a.install || 'unknown'));
+  if (installs.size === 1 && !installs.has('unknown')) return `bridge.state.update-server-${[...installs][0]}`;
+  return 'bridge.state.update-server';
+}
+
+function _bridgeCopy(text) {
+  const done = () => showToast(t('bridge.copied'));
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, () => {});
+}
+
+// Opens a guide link without leaving Zenit Week: a web link (the extension
+// download, the VS Code redirect) in a new tab, as comment links do; an app
+// link (cursor:) in place, where the browser hands it to the app and stays.
+function _bridgeFollow(href) {
+  if (/^https:\/\//.test(href)) { window.open(href, '_blank', 'noopener,noreferrer'); return; }
+  const link = document.createElement('a');
+  link.href = href;
+  link.rel = 'noopener';
+  link.click();
+}
+
+// One entry per agent app in the Connect an agent picker: the note under the
+// picker and the one button follow the choice.
+const BRIDGE_GUIDE = {
+  'claude-desktop': { note: 'bridge.guide.desktopNote', label: 'bridge.guide.download', run: () => _bridgeFollow(BRIDGE_DESKTOP_EXTENSION_URL) },
+  'claude-code': { note: 'bridge.guide.codeNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('claude-code')) },
+  codex: { note: 'bridge.guide.codexNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('codex')) },
+  gemini: { note: 'bridge.guide.geminiNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('gemini')) },
+  cursor: { note: 'bridge.guide.cursorNote', label: 'bridge.guide.addCursor', run: () => _bridgeFollow(BRIDGE_CURSOR_LINK) },
+  devin: { note: 'bridge.guide.devinNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
+  vscode: { note: 'bridge.guide.vscodeNote', label: 'bridge.guide.addVscode', run: () => _bridgeFollow(BRIDGE_VSCODE_LINK) },
+  other: { note: 'bridge.guide.otherNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
+};
+
+function renderBridgeGuide() {
+  const entry = BRIDGE_GUIDE[document.getElementById('bridge-guide-app').value] || BRIDGE_GUIDE['claude-code'];
+  document.getElementById('bridge-guide-note').textContent = t(entry.note);
+  document.getElementById('bridge-guide-action').textContent = t(entry.label);
+}
+
+// The first switch-on explains the browser prompt that follows (setup spec
+// 3.4, row 2). Continue connects; the X leaves the switch off.
+function _bridgeTurnOn() {
+  const rec = loadBridgeRecord();
+  const on = () => {
+    saveBridgeRecord({ ...loadBridgeRecord(), enabled: true, explained: true });
+    bridgeConnect();
+    renderBridgeStatus();
+  };
+  if (rec.explained) { on(); return; }
+  const firefox = /Firefox\//.test(navigator.userAgent || '');
+  closeSettings();
+  showAppConfirm({
+    title: t('bridge.explain.title'),
+    body: t('bridge.explain.body') + (firefox ? ` ${t('bridge.explain.firefox')}` : ''),
+    okLabel: t('bridge.explain.continue'),
+    onConfirm: on,
+    onCancel: renderBridgeStatus,
+  });
 }
 
 function initBridgeSettings() {
   if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
-  const section = document.getElementById('bridge-section');
-  const separator = document.getElementById('bridge-separator');
-  if (!section) return;
-  section.hidden = false;
-  if (separator) separator.hidden = false;
+  const tab = document.getElementById('settings-tab-ai');
+  if (!tab) return;
+  tab.hidden = false;
   onBridgeStatus(renderBridgeStatus);
 
   document.getElementById('bridge-toggle').addEventListener('click', () => {
@@ -27784,36 +28505,17 @@ function initBridgeSettings() {
     if (rec.enabled) {
       saveBridgeRecord({ ...rec, enabled: false });
       bridgeDisconnect();
-    } else if (rec.token) {
-      saveBridgeRecord({ ...rec, enabled: true });
-      bridgeConnect();
+      renderBridgeStatus();
     } else {
-      document.getElementById('bridge-code').focus();
-      bridgeSettingsHint('bridge.state.needCode');
-      return;
+      _bridgeTurnOn();
     }
-    renderBridgeStatus();
   });
-
-  // Pasting a code is the one pairing step: it stores the code, turns the
-  // bridge on and connects. The field is cleared so the token is not on screen.
-  const code = document.getElementById('bridge-code');
-  code.addEventListener('input', () => {
-    const value = code.value.trim();
-    if (!value) { renderBridgeStatus(); return; }
-    const parsed = parseBridgePairingCode(value);
-    if (!parsed) { bridgeSettingsHint('bridge.state.badCode'); return; }
-    code.value = '';
-    bridgeDisconnect();
-    saveBridgeRecord({ enabled: true, port: parsed.port, token: parsed.token });
-    bridgeConnect();
-    renderBridgeStatus();
+  document.getElementById('bridge-guide-app').addEventListener('change', renderBridgeGuide);
+  document.getElementById('bridge-guide-action').addEventListener('click', () => {
+    BRIDGE_GUIDE[document.getElementById('bridge-guide-app').value]?.run();
   });
-  // Typing in the field must not reach the global hotkeys.
-  code.addEventListener('keydown', e => e.stopPropagation());
-
-  document.getElementById('bridge-forget-btn').addEventListener('click', () => {
-    forgetBridge();
+  document.getElementById('bridge-unpair-btn').addEventListener('click', () => {
+    bridgeUnpair();
     renderBridgeStatus();
   });
   renderBridgeStatus();
@@ -27837,7 +28539,7 @@ if (tipsReplayBtn) {
     replayTips();
     syncTipsToggleUI();
     // Close settings so the next first-time action can surface a tip.
-    closeSettingsDropdown();
+    closeSettings();
     if (typeof showToast === 'function') showToast(t('settings.tipsReplayDone'));
   });
 }
@@ -27866,55 +28568,76 @@ document.getElementById('lang-select').addEventListener('change', e => {
 // never on the boot path. With the record off nothing below creates a socket or
 // a timer.
 const BRIDGE_KEY = 'zenit-week-bridge';
-const BRIDGE_DEFAULT_PORT = 47831;
+// Every agent app starts its own server, which takes the first free port of
+// this range (docs/specs/agent-bridge-setup.md section 5); the page talks to
+// all of them. Keep in step with PORT_MIN / PORT_MAX in mcp/core.js.
+const BRIDGE_PORT_MIN = 47831;
+const BRIDGE_PORT_MAX = 47838;
+const BRIDGE_PROTOCOL = 2; // mcp/core.js PROTOCOL
 const BRIDGE_HOST = '127.0.0.1';
 const BRIDGE_PERMISSION_HINT_MS = 10000;
 const BRIDGE_BACKOFF_MIN_MS = 1000;
 const BRIDGE_BACKOFF_MAX_MS = 30000;
+const BRIDGE_FOCUS_SCAN_MS = 2000;
+const BRIDGE_PAIR_TIMEOUT_MS = 120000;
 const BRIDGE_USER_BUSY_MS = 30000;
 const BRIDGE_COMMENT_MAX = 20000;
 const BRIDGE_LABEL_MAX = 500;
+const BRIDGE_PAIR_INFO = 'zenit-week pairing v2';
+
+function bridgePorts() {
+  const ports = [];
+  for (let p = BRIDGE_PORT_MIN; p <= BRIDGE_PORT_MAX; p++) ports.push(p);
+  return ports;
+}
 
 // ── Record: device-local, never synced ──
+// { enabled, explained, pairingId, key, pairedAt }. A v1 record (`port`,
+// `token`) keeps only its switch: the site pairs once more (setup spec 4.5).
+const BRIDGE_EMPTY_RECORD = { enabled: false, explained: false, pairingId: '', key: '', pairedAt: '' };
 function loadBridgeRecord() {
   try {
     const rec = JSON.parse(localStorage.getItem(BRIDGE_KEY) || 'null');
-    if (!rec || typeof rec !== 'object') return { enabled: false, port: BRIDGE_DEFAULT_PORT, token: '' };
-    const port = Number.isInteger(rec.port) && rec.port > 0 && rec.port < 65536 ? rec.port : BRIDGE_DEFAULT_PORT;
-    const token = typeof rec.token === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(rec.token) ? rec.token : '';
-    return { enabled: rec.enabled === true && !!token, port, token };
+    if (!rec || typeof rec !== 'object') return { ...BRIDGE_EMPTY_RECORD };
+    const v1 = typeof rec.token === 'string';
+    const paired = !v1 && typeof rec.pairingId === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(rec.pairingId)
+      && typeof rec.key === 'string' && /^[A-Za-z0-9_-]{43}$/.test(rec.key);
+    return {
+      enabled: rec.enabled === true,
+      explained: rec.explained === true || (v1 && rec.enabled === true),
+      pairingId: paired ? rec.pairingId : '',
+      key: paired ? rec.key : '',
+      pairedAt: paired && typeof rec.pairedAt === 'string' ? rec.pairedAt.slice(0, 40) : '',
+    };
   } catch (_) {
-    return { enabled: false, port: BRIDGE_DEFAULT_PORT, token: '' };
+    return { ...BRIDGE_EMPTY_RECORD };
   }
 }
 
 function saveBridgeRecord(rec) {
-  try { localStorage.setItem(BRIDGE_KEY, JSON.stringify({ enabled: !!rec.enabled, port: rec.port, token: rec.token })); } catch (_) { /* storage unavailable */ }
+  const r = { ...BRIDGE_EMPTY_RECORD, ...rec };
+  try {
+    localStorage.setItem(BRIDGE_KEY, JSON.stringify({
+      enabled: !!r.enabled, explained: !!r.explained, pairingId: r.pairingId, key: r.key, pairedAt: r.pairedAt,
+    }));
+  } catch (_) { /* storage unavailable */ }
 }
 
-// "Disconnect and forget", sign-out and reset: the record goes and the socket closes.
+// Sign-out and reset: the record goes and every socket closes.
 function forgetBridge() {
   try { localStorage.removeItem(BRIDGE_KEY); } catch (_) { /* storage unavailable */ }
   bridgeDisconnect();
-}
-
-// The pairing code the server prints: `<port>.<token>`.
-function parseBridgePairingCode(code) {
-  const m = /^\s*(\d{1,5})\.([A-Za-z0-9_-]{16,128})\s*$/.exec(String(code || ''));
-  if (!m) return null;
-  const port = parseInt(m[1], 10);
-  if (port < 1 || port > 65535) return null;
-  return { port, token: m[2] };
 }
 
 function isLoopbackHost(host) {
   return host === '127.0.0.1' || host === 'localhost';
 }
 
-// The only URL the bridge ever opens. The host is a constant, not stored, and is
-// checked again here so no edit to this file or to the record can point the
-// socket anywhere but this machine.
+// The only URL the bridge ever opens. The host is a constant and the port one
+// of the range, both checked again here so no edit to this file or to the
+// record can point a socket anywhere but this machine's Zenit Week servers.
 function bridgeSocketUrl(port) {
+  if (!Number.isInteger(port) || port < BRIDGE_PORT_MIN || port > BRIDGE_PORT_MAX) throw new Error('bridge: port outside the range refused');
   const url = new URL(`ws://${BRIDGE_HOST}:${port}/`);
   if (url.protocol !== 'ws:' || !isLoopbackHost(url.hostname)) throw new Error('bridge: non-loopback host refused');
   return url.href;
@@ -27928,39 +28651,104 @@ function bridgeSupported() {
   return !(/Safari\//.test(ua) && !/(Chrome|Chromium|CriOS|FxiOS|Edg|Firefox)\//.test(ua));
 }
 
-// ── Status ──
-// off | waiting-server | waiting-permission | connected | refused | blocked | unsupported
-let bridgeStatus = { state: 'off', client: null };
-const _bridgeStatusListeners = new Set();
-function onBridgeStatus(fn) { _bridgeStatusListeners.add(fn); return () => _bridgeStatusListeners.delete(fn); }
-function _setBridgeStatus(state, client = null) {
-  if (bridgeStatus.state === state && bridgeStatus.client === client) return;
-  bridgeStatus = { state, client };
-  _bridgeStatusListeners.forEach(fn => { try { fn(bridgeStatus); } catch (_) { /* a listener never breaks the bridge */ } });
-}
-
-// ── Connection ──
-let _bridgeSocket = null;
-let _bridgeReady = false;      // proof verified and hello sent
-let _bridgeAttempts = 0;
-let _bridgeRetryTimer = null;
-let _bridgePermTimer = null;
-let _bridgeStopped = true;
-let _bridgeLastSig = new Map();
-let _bridgeWindowHooked = false;
-
+// ── Crypto (setup spec 4.4); mcp/core.js does the same in node:crypto ──
 function _b64url(bytes) {
   let s = '';
   bytes.forEach(b => { s += String.fromCharCode(b); });
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+function _unb64url(s) {
+  const bin = atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4));
+  return Uint8Array.from(bin, c => c.charCodeAt(0));
+}
+function _concatBytes(...parts) {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let i = 0;
+  parts.forEach(p => { out.set(p, i); i += p.length; });
+  return out;
+}
+const _randomB64 = n => _b64url(crypto.getRandomValues(new Uint8Array(n)));
+async function _sha256(...parts) {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', _concatBytes(...parts)));
+}
 
-// HMAC-SHA256 over the nonce, keyed with the UTF-8 bytes of the token string.
-// The server proves it holds the token before the page sends anything else.
-async function bridgeHmac(token, nonce) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey('raw', enc.encode(token), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  return _b64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(nonce))));
+// HMAC-SHA256 of `message`, keyed with the pairing key's raw bytes.
+async function bridgeHmac(keyB64, message) {
+  const key = await crypto.subtle.importKey('raw', _unb64url(keyB64), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return _b64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message))));
+}
+
+// Six digits from both public keys and nonces, the server's first.
+async function bridgePairCode(pubS, pubP, nonceS, nonceP) {
+  const h = await _sha256(pubS, pubP, nonceS, nonceP);
+  return String(new DataView(h.buffer).getUint32(0) % 1000000).padStart(6, '0');
+}
+const formatBridgePairCode = code => `${code.slice(0, 3)} ${code.slice(3)}`;
+
+// ── Status ──
+// off | waiting-server | waiting-permission | blocked | waiting-agent | approve
+// | connected | unpaired-remote | update-server | reload-app | unsupported
+// `clients` names the agent app of every paired server, in port order;
+// `agents` is one row per server the page knows, for Settings.
+let bridgeStatus = { state: 'off', clients: [], agents: [] };
+const _bridgeStatusListeners = new Set();
+function onBridgeStatus(fn) { _bridgeStatusListeners.add(fn); return () => _bridgeStatusListeners.delete(fn); }
+function _setBridgeStatus(state, clients = [], agents = []) {
+  const same = bridgeStatus.state === state && JSON.stringify([bridgeStatus.clients, bridgeStatus.agents]) === JSON.stringify([clients, agents]);
+  if (same) return;
+  bridgeStatus = { state, clients, agents };
+  _bridgeStatusListeners.forEach(fn => { try { fn(bridgeStatus); } catch (_) { /* a listener never breaks the bridge */ } });
+}
+
+// ── Connections: one per listening server ──
+// port -> { port, ws, opened, welcomed, ready, unknown, client, install, serverNonce, pageNonce }
+const _bridgeConns = new Map();
+const _bridgeRefusedPorts = new Set(); // proved the wrong key: not retried until the switch is cycled
+// port -> { kind: 'old', install } for a server on an older protocol (install
+// 'npx' | 'mcpb' | 'repo', or null for a v1 server, which cannot say), or
+// { kind: 'reload' } for a newer one.
+const _bridgePortNotes = new Map();
+const BRIDGE_INSTALLS = new Set(['npx', 'mcpb', 'repo']);
+let _bridgeBlocked = false;
+let _bridgePermWaiting = false;
+let _bridgeAttempts = 0;
+let _bridgeRetryTimer = null;
+let _bridgePermTimer = null;
+let _bridgeLastScan = 0;
+let _bridgeStopped = true;
+let _bridgeLastSig = new Map();
+let _bridgeWindowHooked = false;
+let _bridgePair = null; // the one pairing this tab is in, whichever server started it
+
+const _bridgeConnList = () => [..._bridgeConns.values()].sort((a, b) => a.port - b.port);
+function _readyBridgeConns() {
+  return _bridgeConnList().filter(c => c.ready);
+}
+
+// One status for all sockets, most useful first.
+function _refreshBridgeStatus() {
+  if (_bridgeStopped) { _setBridgeStatus('off'); return; }
+  const conns = _bridgeConnList();
+  const ready = conns.filter(c => c.ready);
+  const notes = [..._bridgePortNotes.values()];
+  const old = [..._bridgePortNotes].filter(([, n]) => n.kind === 'old');
+  const agents = [
+    ...ready.map(c => ({ port: c.port, client: c.client || '', state: 'connected' })),
+    ...old.map(([port, n]) => ({ port, client: '', state: 'old', install: n.install })),
+  ].sort((a, b) => a.port - b.port);
+  const clients = ready.map(c => c.client || '');
+  // A server on another protocol is named in its own row; it decides the line
+  // only when no server of this protocol answers (setup spec 6.1).
+  const state = _bridgePair && _bridgePair.shown ? 'approve'
+    : ready.length ? 'connected'
+    : conns.some(c => c.unknown) ? 'unpaired-remote'
+    : conns.some(c => c.welcomed) ? 'waiting-agent'
+    : notes.some(n => n.kind === 'reload') ? 'reload-app'
+    : old.length ? 'update-server'
+    : _bridgeBlocked ? 'blocked'
+    : _bridgePermWaiting ? 'waiting-permission'
+    : 'waiting-server';
+  _setBridgeStatus(state, clients, agents);
 }
 
 function startBridgeWhenIdle() {
@@ -27973,70 +28761,273 @@ function startBridgeWhenIdle() {
   else window.addEventListener('load', go, { once: true });
 }
 
+// One scan: a socket to every port of the range that has none yet. Servers
+// already connected keep theirs. The next scan follows with the backoff, so a
+// server started later (a second agent app) is found within 30 s, or at once
+// when the tab gains focus.
 function bridgeConnect() {
   const rec = loadBridgeRecord();
   if (!rec.enabled) { _setBridgeStatus('off'); return; }
   if (!bridgeSupported()) { _setBridgeStatus('unsupported'); return; }
-  if (_bridgeSocket) return;
   _bridgeStopped = false;
   _hookBridgeWindowEvents();
+  clearTimeout(_bridgeRetryTimer);
+  _bridgeLastScan = Date.now();
+  const opening = bridgePorts().filter(p => !_bridgeConns.has(p) && !_bridgeRefusedPorts.has(p));
+  opening.forEach(port => _openBridgeSocket(port));
+  // Chrome holds the sockets silently while its permission prompt is open.
+  if (!_bridgePermTimer && opening.length && !_bridgeConnList().some(c => c.opened)) {
+    _bridgePermTimer = setTimeout(() => {
+      _bridgePermTimer = null;
+      if (!_bridgeConnList().some(c => c.opened)) { _bridgePermWaiting = true; _refreshBridgeStatus(); }
+    }, BRIDGE_PERMISSION_HINT_MS);
+  }
+  _refreshBridgeStatus();
+  _scheduleBridgeRetry();
+}
 
+const _bridgeVisible = () => document.visibilityState === 'visible';
+const _bridgeFocused = () => _bridgeVisible() && (typeof document.hasFocus !== 'function' || document.hasFocus());
+
+function _openBridgeSocket(port) {
   let ws;
   try {
-    ws = new WebSocket(bridgeSocketUrl(rec.port));
+    ws = new WebSocket(bridgeSocketUrl(port));
   } catch (_) {
-    _scheduleBridgeRetry();
-    return;
+    return; // the next scan tries again
   }
-  _bridgeSocket = ws;
-  _bridgeReady = false;
-  let opened = false;
-  let refused = false;
-  const nonce = _b64url(crypto.getRandomValues(new Uint8Array(32)));
-  if (bridgeStatus.state !== 'waiting-permission') _setBridgeStatus('waiting-server');
-  // Chrome holds the socket silently while its permission prompt is open.
-  _bridgePermTimer = setTimeout(() => { if (!opened) _setBridgeStatus('waiting-permission'); }, BRIDGE_PERMISSION_HINT_MS);
+  const conn = {
+    port, ws, opened: false, welcomed: false, ready: false, unknown: false,
+    client: null, install: null, serverNonce: null, pageNonce: _randomB64(32),
+  };
+  _bridgeConns.set(port, conn);
 
   ws.onopen = () => {
-    opened = true;
-    clearTimeout(_bridgePermTimer);
-    ws.send(JSON.stringify({ type: 'challenge', nonce }));
+    conn.opened = true;
+    _bridgePermWaiting = false;
+    _bridgeBlocked = false;
+    // Before pairing the page says only which protocol it speaks and whether
+    // it is in front: no week, no tab id, no data (setup spec 7, row 6).
+    const { pairingId } = loadBridgeRecord();
+    ws.send(JSON.stringify({
+      type: 'open', protocol: BRIDGE_PROTOCOL, visible: _bridgeVisible(), focused: _bridgeFocused(),
+      ...(pairingId ? { pairingId, nonce: conn.pageNonce } : {}),
+    }));
   };
   ws.onmessage = async ev => {
     let frame;
     try { frame = JSON.parse(ev.data); } catch (_) { return; }
-    if (!frame || typeof frame !== 'object') return;
-    if (!_bridgeReady) {
-      if (frame.type !== 'proof') return;
-      const want = await bridgeHmac(rec.token, nonce);
-      if (frame.hmac !== want) {
-        // Wrong code, or something else on the port: the token is never sent.
-        refused = true;
-        _setBridgeStatus('refused');
-        try { ws.close(4001, 'refused'); } catch (_) { /* already closing */ }
-        return;
-      }
-      _bridgeReady = true;
-      _bridgeAttempts = 0;
-      ws.send(JSON.stringify({
-        type: 'hello', token: rec.token, tabId: TAB_ID, appVersion: APP_VERSION,
-        week: currentWeekKey, lang: currentLang, visible: document.visibilityState === 'visible',
-      }));
-      _setBridgeStatus('connected', typeof frame.client === 'string' ? frame.client.slice(0, 80) : null);
+    if (!frame || typeof frame !== 'object' || _bridgeConns.get(port) !== conn) return;
+    if (!conn.welcomed) {
+      if (frame.type === 'welcome') await _onBridgeWelcome(conn, frame);
+      else if (frame.type === 'mismatch') _onBridgeMismatch(conn, frame);
       return;
     }
-    if (frame.type === 'call') bridgeHandleCall(frame);
+    if (conn.ready) { if (frame.type === 'call') return bridgeHandleCall(frame, conn); return; }
+    if (frame.type === 'pair-start') await _onBridgePairStart(conn, frame);
+    else if (frame.type === 'pair-reveal') await _onBridgePairReveal(conn, frame);
+    else if (frame.type === 'pair-cancel') _endBridgePair(conn, { tellServer: false });
   };
   ws.onclose = async ev => {
-    clearTimeout(_bridgePermTimer);
-    if (_bridgeSocket === ws) { _bridgeSocket = null; _bridgeReady = false; }
+    if (_bridgeConns.get(port) === conn) _bridgeConns.delete(port);
+    const wasReady = conn.ready;
+    conn.ready = false;
+    _endBridgePair(conn, { tellServer: false });
     if (_bridgeStopped) return;
-    if (refused || ev.reason === 'refused') { _setBridgeStatus('refused'); return; }
-    if (!opened && await _bridgePermissionDenied()) _setBridgeStatus('blocked');
-    else _setBridgeStatus('waiting-server');
-    _scheduleBridgeRetry();
+    // A mismatch frame already said which side is behind; without one, a
+    // protocol close means this page is the older side.
+    if (ev.reason === 'protocol') { if (!conn.mismatch) _bridgePortNotes.set(port, { kind: 'reload' }); }
+    // A v1 server ignores `open` and closes the handshake after 2 s (4002).
+    else if (conn.opened && !conn.welcomed && ev.code === 4002) _bridgePortNotes.set(port, { kind: 'old', install: null });
+    if (wasReady || ev.reason === 'unpaired') {
+      // A server went away (its agent app quit, or it restarted and may come
+      // back on another port): look again soon.
+      _bridgeAttempts = 0;
+      _scheduleBridgeRetry();
+    } else if (!conn.opened) {
+      _bridgePermWaiting = false;
+      if (!_readyBridgeConns().length) _bridgeBlocked = await _bridgePermissionDenied();
+    }
+    _refreshBridgeStatus();
   };
   ws.onerror = () => { /* onclose follows and decides */ };
+}
+
+// The server speaks another protocol and says which, and how it was installed,
+// so the status can name the side to update and how (setup spec 4.5).
+function _onBridgeMismatch(conn, frame) {
+  if (typeof frame.protocol !== 'number') return;
+  conn.mismatch = true;
+  _bridgePortNotes.set(conn.port, frame.protocol < BRIDGE_PROTOCOL
+    ? { kind: 'old', install: BRIDGE_INSTALLS.has(frame.install) ? frame.install : null }
+    : { kind: 'reload' });
+}
+
+async function _onBridgeWelcome(conn, frame) {
+  if (typeof frame.protocol !== 'number' || frame.protocol !== BRIDGE_PROTOCOL || typeof frame.nonce !== 'string') {
+    if (frame.protocol > BRIDGE_PROTOCOL) _bridgePortNotes.set(conn.port, { kind: 'reload' });
+    try { conn.ws.close(1000, 'protocol'); } catch (_) { /* already closing */ }
+    return;
+  }
+  _bridgePortNotes.delete(conn.port);
+  conn.welcomed = true;
+  conn.client = typeof frame.client === 'string' ? frame.client.slice(0, 80) : null;
+  conn.install = frame.install === 'mcpb' || frame.install === 'npx' ? frame.install : 'repo';
+  conn.serverNonce = frame.nonce.slice(0, 64);
+  const rec = loadBridgeRecord();
+  if (frame.paired && rec.key) {
+    if (frame.proof !== await bridgeHmac(rec.key, `server|${conn.pageNonce}`)) {
+      // Something on the port claims the pairing without the key: it hears nothing more.
+      _bridgeRefusedPorts.add(conn.port);
+      try { conn.ws.close(4001, 'refused'); } catch (_) { /* already closing */ }
+      return;
+    }
+    await _sendBridgeReady(conn, rec.key);
+  } else {
+    // Unknown on the agent side: the key stays until the user approves a new
+    // pairing, so a program on the port cannot make the page drop it (4.7).
+    conn.unknown = !!frame.unknown && !!rec.key;
+  }
+  _refreshBridgeStatus();
+}
+
+// The page's half of the proof; only now does it name its tab and week.
+async function _sendBridgeReady(conn, keyB64) {
+  const proof = await bridgeHmac(keyB64, `page|${conn.serverNonce}`);
+  try {
+    conn.ws.send(JSON.stringify({
+      type: 'ready', proof, tabId: TAB_ID, appVersion: APP_VERSION,
+      week: currentWeekKey, lang: currentLang, visible: _bridgeVisible(),
+    }));
+  } catch (_) { return; }
+  conn.ready = true;
+  conn.unknown = false;
+  _bridgeAttempts = 0;
+  _refreshBridgeStatus();
+}
+
+// ── Pairing (setup spec 4.1, 4.4) ──
+async function _onBridgePairStart(conn, frame) {
+  if (_bridgePair || typeof frame.commit !== 'string') {
+    // Another server's request is already on screen: one dialog at a time.
+    try { conn.ws.send(JSON.stringify({ type: 'pair-deny', reason: 'busy' })); } catch (_) { /* closing */ }
+    return;
+  }
+  const pair = { conn, commit: frame.commit, client: typeof frame.client === 'string' ? frame.client.slice(0, 80) : null,
+    keys: null, pubP: null, nonceP: null, code: null, key: null, shown: false, timer: null, done: false };
+  _bridgePair = pair;
+  pair.keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+  pair.pubP = new Uint8Array(await crypto.subtle.exportKey('raw', pair.keys.publicKey));
+  pair.nonceP = crypto.getRandomValues(new Uint8Array(32));
+  if (pair.done) return;
+  try { conn.ws.send(JSON.stringify({ type: 'pair-key', pub: _b64url(pair.pubP), nonce: _b64url(pair.nonceP) })); } catch (_) { /* closing */ }
+}
+
+async function _onBridgePairReveal(conn, frame) {
+  const pair = _bridgePair;
+  if (!pair || pair.conn !== conn || pair.code) return;
+  try {
+    const pubS = _unb64url(frame.pub);
+    const nonceS = _unb64url(frame.nonce);
+    // The commitment fixed the server's key before it saw ours (7, row 3).
+    if (pubS.length !== 65 || nonceS.length !== 32 || _b64url(await _sha256(pubS, nonceS)) !== pair.commit) throw new Error('commit');
+    const peer = await crypto.subtle.importKey('raw', pubS, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+    const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: peer }, pair.keys.privateKey, 256);
+    const hkdf = await crypto.subtle.importKey('raw', shared, 'HKDF', false, ['deriveBits']);
+    const key = await crypto.subtle.deriveBits({
+      name: 'HKDF', hash: 'SHA-256', salt: _concatBytes(nonceS, pair.nonceP), info: new TextEncoder().encode(BRIDGE_PAIR_INFO),
+    }, hkdf, 256);
+    pair.key = _b64url(new Uint8Array(key));
+    pair.code = await bridgePairCode(pubS, pair.pubP, nonceS, pair.nonceP);
+  } catch (_) {
+    _endBridgePair(conn, { tellServer: true });
+    return;
+  }
+  _showBridgePairWhenFree(pair);
+}
+
+// The dialog waits behind the user's editing, another dialog or Help, and for
+// the tab to be in front (setup spec 4.3, row 3); the 120 s start when shown.
+function _bridgeUserOccupied() {
+  return !!(editState || hasEditingNode() || isCommentDialogOpen()
+    || (window.isAppConfirmOpen && window.isAppConfirmOpen()) || isHelpOpen() || !_bridgeVisible());
+}
+
+async function _showBridgePairWhenFree(pair) {
+  while (!pair.done && _bridgeUserOccupied()) await new Promise(r => setTimeout(r, 250));
+  if (pair.done) return;
+  pair.shown = true;
+  const site = BRIDGE_PRODUCTION_HOSTS.has(location.host) ? 'zenitweek.com' : location.host;
+  showAppConfirm({
+    id: 'bridge-pair',
+    title: t('bridge.pair.title'),
+    highlight: formatBridgePairCode(pair.code),
+    body: pair.client ? t('bridge.pair.body', { client: pair.client, site }) : t('bridge.pair.bodyNoName', { site }),
+    okLabel: t('bridge.pair.allow'),
+    cancelLabel: t('bridge.pair.deny'),
+    onConfirm: () => _allowBridgePair(pair),
+    onCancel: () => _endBridgePair(pair.conn, { tellServer: true }),
+  });
+  try { pair.conn.ws.send(JSON.stringify({ type: 'pair-shown' })); } catch (_) { /* closing */ }
+  pair.timer = setTimeout(() => {
+    if (!pair.done && window.isAppConfirmOpen('bridge-pair')) window.closeAppConfirm();
+  }, BRIDGE_PAIR_TIMEOUT_MS);
+  _refreshBridgeStatus();
+}
+const BRIDGE_PRODUCTION_HOSTS = new Set(['zenitweek.com', 'www.zenitweek.com']);
+
+async function _allowBridgePair(pair) {
+  if (pair.done) return;
+  pair.done = true;
+  clearTimeout(pair.timer);
+  _bridgePair = null;
+  const { conn } = pair;
+  const pairingId = _randomB64(18);
+  const proof = await bridgeHmac(pair.key, `ok|${pairingId}`);
+  try { conn.ws.send(JSON.stringify({ type: 'pair-ok', pairingId, proof })); } catch (_) { return; }
+  const rec = loadBridgeRecord();
+  saveBridgeRecord({ ...rec, pairingId, key: pair.key, pairedAt: new Date().toISOString() });
+  await _sendBridgeReady(conn, pair.key);
+  showToast(pair.client ? t('bridge.pair.toast', { client: pair.client }) : t('bridge.pair.toastNoName'), 5000);
+  // The other servers share the pairing file: reconnect them with the new key.
+  _bridgeConnList().filter(c => !c.ready).forEach(c => { try { c.ws.close(1000, 'paired'); } catch (_) { /* closed */ } });
+  _bridgeAttempts = 0;
+  _scheduleBridgeRetry();
+  _refreshBridgeStatus();
+}
+
+// Deny, X, the 120 s, a cancel from the agent side or a closed socket. No key
+// is stored on either side.
+function _endBridgePair(conn, { tellServer }) {
+  const pair = _bridgePair;
+  if (!pair || pair.conn !== conn || pair.done) return;
+  pair.done = true;
+  clearTimeout(pair.timer);
+  _bridgePair = null;
+  if (tellServer) { try { conn.ws.send(JSON.stringify({ type: 'pair-deny' })); } catch (_) { /* closing */ } }
+  if (pair.shown && window.isAppConfirmOpen && window.isAppConfirmOpen('bridge-pair')) window.closeAppConfirm();
+  _refreshBridgeStatus();
+}
+
+// Settings "Unpair": every connected server forgets the site, then the page
+// forgets its key. The only way the page drops its key (setup spec 4.7).
+function bridgeUnpair() {
+  _readyBridgeConns().forEach(c => _bridgeSendTo(c, { type: 'unpair' }));
+  const rec = loadBridgeRecord();
+  saveBridgeRecord({ enabled: rec.enabled, explained: rec.explained });
+  _bridgeRestart();
+}
+
+// Every socket closed and the range scanned again, e.g. after another tab of
+// this site paired or unpaired.
+function _bridgeRestart() {
+  const conns = _bridgeConnList();
+  _bridgeConns.clear();
+  conns.forEach(c => { c.ready = false; _endBridgePair(c, { tellServer: true }); try { c.ws.close(1000, 'restart'); } catch (_) { /* closed */ } });
+  _bridgeRefusedPorts.clear();
+  _bridgeAttempts = 0;
+  if (loadBridgeRecord().enabled) bridgeConnect();
+  else bridgeDisconnect();
 }
 
 // Best effort: a refused loopback connection and a blocked one both fail at
@@ -28065,23 +29056,39 @@ function bridgeDisconnect() {
   clearTimeout(_bridgePermTimer);
   _bridgeRetryTimer = _bridgePermTimer = null;
   _bridgeAttempts = 0;
-  const ws = _bridgeSocket;
-  _bridgeSocket = null;
-  _bridgeReady = false;
-  if (ws) { try { ws.close(1000, 'forget'); } catch (_) { /* already closed */ } }
+  _bridgeBlocked = _bridgePermWaiting = false;
+  _bridgeRefusedPorts.clear();
+  _bridgePortNotes.clear();
+  const conns = _bridgeConnList();
+  _bridgeConns.clear();
+  conns.forEach(c => { _endBridgePair(c, { tellServer: true }); c.ready = false; try { c.ws.close(1000, 'forget'); } catch (_) { /* already closed */ } });
   _setBridgeStatus('off');
 }
 
+function _bridgeSendTo(conn, frame) {
+  if (!conn.ready || _bridgeConns.get(conn.port) !== conn) return; // that server is gone
+  try { conn.ws.send(JSON.stringify(frame)); } catch (_) { /* socket closing */ }
+}
+
+// Events go to every paired server: each one tells its own agent.
 function _bridgeSend(frame) {
-  if (!_bridgeSocket || !_bridgeReady) return;
-  try { _bridgeSocket.send(JSON.stringify(frame)); } catch (_) { /* socket closing */ }
+  _readyBridgeConns().forEach(c => _bridgeSendTo(c, frame));
+}
+
+// Focus and hide reach unpaired servers too, without the week: they decide
+// which tab shows a pairing request.
+function _bridgeSendPresence(event) {
+  _bridgeSend({ type: 'event', event, wk: currentWeekKey });
+  _bridgeConnList().filter(c => c.welcomed && !c.ready).forEach(c => {
+    try { c.ws.send(JSON.stringify({ type: 'event', event })); } catch (_) { /* closing */ }
+  });
 }
 
 // Called from every place a week's content can change (saveWeek, a Drive or
 // peer-tab merge). Deduplicated by content signature, so each distinct change
 // yields one event whichever path wrote it.
 function bridgeNotifyWeekSaved(wk, data) {
-  if (!_bridgeReady) return; // nothing is hashed while no agent listens
+  if (!_readyBridgeConns().length) return; // nothing is hashed while no agent listens
   const sig = weekContentHash(data);
   if (_bridgeLastSig.get(wk) === sig) return;
   _bridgeLastSig.set(wk, sig);
@@ -28099,12 +29106,29 @@ function bridgeNotifyView() {
   _bridgeSend({ type: 'event', event: 'view', wk: currentWeekKey });
 }
 
+// Coming back to the tab looks for new servers at once (a just-started agent
+// app), throttled so focus churn does not open sockets in a burst.
+function _bridgeScanOnFocus() {
+  if (_bridgeStopped || Date.now() - _bridgeLastScan < BRIDGE_FOCUS_SCAN_MS) return;
+  bridgeConnect();
+}
+
 function _hookBridgeWindowEvents() {
   if (_bridgeWindowHooked) return;
   _bridgeWindowHooked = true;
-  window.addEventListener('focus', () => _bridgeSend({ type: 'event', event: 'focus', wk: currentWeekKey }));
+  window.addEventListener('focus', () => {
+    _bridgeSendPresence('focus');
+    _bridgeScanOnFocus();
+  });
   document.addEventListener('visibilitychange', () => {
-    _bridgeSend({ type: 'event', event: document.visibilityState === 'visible' ? 'focus' : 'pause', wk: currentWeekKey });
+    const visible = _bridgeVisible();
+    _bridgeSendPresence(visible ? 'focus' : 'pause');
+    if (visible) _bridgeScanOnFocus();
+  });
+  // Another tab of this site paired, unpaired or turned the switch: follow it.
+  window.addEventListener('storage', e => {
+    if (e.key !== BRIDGE_KEY && e.key !== null) return;
+    if (!_bridgeStopped || loadBridgeRecord().enabled) _bridgeRestart();
   });
 }
 
@@ -28117,14 +29141,17 @@ const _bridgeBad = msg => new BridgeError('bad_args', msg);
 const _bridgeQueue = [];
 let _bridgeBusy = false;
 
-// Writes run strictly one at a time, in arrival order. Reads never wait.
-function bridgeHandleCall(frame) {
+// Writes run strictly one at a time, in arrival order, whichever server sent
+// them: calls from two agent apps queue, they never interleave. Reads never
+// wait. The result goes back only to the server that asked.
+function bridgeHandleCall(frame, conn) {
   const { id, tool } = frame;
+  const reply = f => _bridgeSendTo(conn, f);
   const def = Object.prototype.hasOwnProperty.call(BRIDGE_TOOLS, tool) ? BRIDGE_TOOLS[tool] : null;
-  if (!def) { _bridgeSend({ type: 'result', id, ok: false, error: { code: 'unknown_tool', message: String(tool) } }); return Promise.resolve(); }
+  if (!def) { reply({ type: 'result', id, ok: false, error: { code: 'unknown_tool', message: String(tool) } }); return Promise.resolve(); }
   const run = () => bridgeRunTool(tool, frame.args)
-    .then(data => _bridgeSend({ type: 'result', id, ok: true, data }))
-    .catch(err => _bridgeSend({ type: 'result', id, ok: false, error: {
+    .then(data => reply({ type: 'result', id, ok: true, data }))
+    .catch(err => reply({ type: 'result', id, ok: false, error: {
       code: err instanceof BridgeError ? err.code : 'internal',
       message: String(err && err.message || err),
     } }));
@@ -28507,9 +29534,12 @@ const BRIDGE_TOOLS = {
   },
   get_stats: {
     read: true, args: [],
+    // The counts only: `leaves` is the raw node list the Stats view draws from,
+    // internal stamps included, and the week read already carries every task.
     run: async () => {
       _bridgeWeekViewOnly('get_stats');
-      return { week: currentWeekKey, ...JSON.parse(JSON.stringify(computeWeekStats())) };
+      const { global, perBranch } = computeWeekStats();
+      return { week: currentWeekKey, ...JSON.parse(JSON.stringify({ global, perBranch })) };
     },
   },
 
@@ -29593,13 +30623,16 @@ const _touchHintGates = [];
 // el is what the user taps; anchorEl is what the bubble points at, which for
 // the level buttons is the bar they sit in. pulseTarget may be a function, as
 // the ring around those buttons is measured when it is drawn.
-function armTouchHintGate(el, id, pulseTarget, anchorEl) {
+// `when`, if given, says whether the hint applies right now; a tap that finds it
+// false passes through to the control untouched.
+function armTouchHintGate(el, id, pulseTarget, anchorEl, when) {
   if (!el) return;
   if (!_touchHintGates.length) {
     document.addEventListener('click', (e) => {
       if (coachmarkKeysApply()) return; // a pointer device hovered it already
       const gate = _touchHintGates.find(g => g.el.contains(e.target));
       if (!gate || !_tipsEnabled || isHintSeen(gate.id)) return;
+      if (gate.when && !gate.when()) return;
       const pulse = (typeof gate.pulseTarget === 'function') ? gate.pulseTarget() : gate.pulseTarget;
       maybeShowHint(gate.id, gate.anchorEl, pulse);
       markHintSeen(gate.id);
@@ -29607,7 +30640,7 @@ function armTouchHintGate(el, id, pulseTarget, anchorEl) {
       e.stopPropagation();
     }, true);
   }
-  _touchHintGates.push({ el, id, pulseTarget, anchorEl: anchorEl || el });
+  _touchHintGates.push({ el, id, pulseTarget, anchorEl: anchorEl || el, when });
 }
 
 // Nodes are rebuilt on every render, so they gate through one delegated
@@ -29761,10 +30794,12 @@ window.addEventListener('load', async () => {
     _viewToggleBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewToggleBar));
     armTouchHintGate(_viewToggleBar, 'views');
   }
-  const _syncBtn = document.getElementById('sync-btn');
-  if (_syncBtn) {
-    _syncBtn.addEventListener('mouseenter', () => maybeShowHint('signin', _syncBtn));
-    armTouchHintGate(_syncBtn, 'signin');
+  // The sign-in tip teaches what the account button offers a signed-out user.
+  const _accountBtn = document.getElementById('account-btn');
+  if (_accountBtn) {
+    const signedOut = () => !googleUserEmail && !googleUserName;
+    _accountBtn.addEventListener('mouseenter', () => { if (signedOut()) maybeShowHint('signin', _accountBtn); });
+    armTouchHintGate(_accountBtn, 'signin', undefined, undefined, signedOut);
   }
   const _weekPicker = document.getElementById('week-picker-label');
   if (_weekPicker) {
@@ -29880,17 +30915,19 @@ window.addEventListener('load', async () => {
   }
 
   if (devResetEnabled()) {
-    const devSection = document.getElementById('settings-dev-section');
-    const devSeparator = document.getElementById('settings-dev-separator');
-    if (devSection) devSection.hidden = false;
-    if (devSeparator) devSeparator.hidden = false;
+    const devTab = document.getElementById('settings-tab-dev');
+    if (devTab) devTab.hidden = false;
+    const devHost = document.getElementById('dev-host');
+    if (devHost) devHost.textContent = location.host || location.protocol;
+    const devVersion = document.getElementById('dev-version');
+    if (devVersion) devVersion.textContent = _displayVersion;
 
     const devProbeBtn = document.getElementById('dev-probe-btn');
     if (devProbeBtn) {
       devProbeBtn.addEventListener('click', () => {
         // Close settings first, then arm on a fresh task: the trace must start
         // from an idle main thread, not from inside this click.
-        closeSettingsDropdown();
+        closeSettings();
         deferFromInput(startPerfProbe);
       });
     }
@@ -29898,9 +30935,9 @@ window.addEventListener('load', async () => {
     if (devResetBtn) {
       devResetBtn.addEventListener('click', () => {
         showAppConfirm({
-          title: 'Reset to first visit?',
-          body: 'Deletes every week, setting and sync link stored in this browser, then reloads as a brand-new visitor. Data already synced to Google Drive is not touched.',
-          okLabel: 'Reset',
+          title: t('dev.resetTitle'),
+          body: t('dev.resetBody'),
+          okLabel: t('dev.resetBtn'),
           danger: true,
           onConfirm: () => { devResetApp(); },
         });
@@ -29911,7 +30948,7 @@ window.addEventListener('load', async () => {
   const settingsHelpBtn = document.getElementById('settings-help-btn');
   if (settingsHelpBtn) {
     settingsHelpBtn.addEventListener('click', () => {
-      closeSettingsDropdown();
+      closeSettings();
       openHelp();
     });
   }

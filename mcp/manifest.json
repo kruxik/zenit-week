@@ -1,0 +1,130 @@
+{
+  "manifest_version": "0.3",
+  "name": "zenit-week",
+  "display_name": "Zenit Week",
+  "version": "1.1.0",
+  "description": "Plan your week in Zenit Week: your agent adds and changes tasks in the open app, as if you clicked.",
+  "long_description": "Lets Claude read and change your week in [Zenit Week](https://zenitweek.com), the visual weekly planner. Your plans stay in your browser: the extension passes each request to the Zenit Week tab open in Chrome or Firefox on this computer, over 127.0.0.1 only, and the app does the work. Every change shows a toast and is one undo step.\n\nAfter installing, open Zenit Week, turn on Settings > AI agents, and the first time Claude asks, check that the code matches and click Allow.",
+  "author": {
+    "name": "Petr Burian",
+    "email": "petr@petrburian.com",
+    "url": "https://www.petrburian.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kruxik/zenit-week"
+  },
+  "homepage": "https://zenitweek.com",
+  "documentation": "https://github.com/kruxik/zenit-week/tree/main/mcp#readme",
+  "support": "https://github.com/kruxik/zenit-week/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server.js"
+      ],
+      "env": {
+        "ZENIT_WEEK_MCP_INSTALL": "mcpb"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "open_week",
+      "description": "Show a week in the app (navigation, not an undo step)."
+    },
+    {
+      "name": "open_vision",
+      "description": "Show the Vision, the long-view mind map (navigation, not an undo step)."
+    },
+    {
+      "name": "add_task",
+      "description": "Add a task to the week in view."
+    },
+    {
+      "name": "rename_task",
+      "description": "Rename a task."
+    },
+    {
+      "name": "set_status",
+      "description": "Mark a task done, undone (reopens done or dropped), dropped (will not happen), unplanned or planned."
+    },
+    {
+      "name": "set_priority",
+      "description": "Set a task priority (cascades to sub-tasks)."
+    },
+    {
+      "name": "set_horizon",
+      "description": "Set when an intention on the Vision is meant to happen: this year, in a few years, someday or none."
+    },
+    {
+      "name": "set_days",
+      "description": "Replace the weekdays of a task."
+    },
+    {
+      "name": "tick_task",
+      "description": "Record n repetitions of an Nx task (negative n reopens the last ones)."
+    },
+    {
+      "name": "set_comment",
+      "description": "Replace the comment of a task with Markdown (max 20000 chars; links http, https or mailto only)."
+    },
+    {
+      "name": "set_reusable",
+      "description": "Mark a task reusable (copied by transfer_reusable to the next week) or not."
+    },
+    {
+      "name": "delete_task",
+      "description": "Delete a task at once."
+    },
+    {
+      "name": "send_to_date",
+      "description": "Move a task out of this week to a date (YYYY-MM-DD), optionally repeating."
+    },
+    {
+      "name": "transfer_unfinished",
+      "description": "Copy the previous week\\."
+    },
+    {
+      "name": "transfer_reusable",
+      "description": "Copy the previous week\\."
+    },
+    {
+      "name": "add_branch",
+      "description": "Add a branch (category) to the week in view."
+    },
+    {
+      "name": "undo",
+      "description": "Undo the last action in the app, whoever made it."
+    },
+    {
+      "name": "redo",
+      "description": "Redo the last undone action."
+    },
+    {
+      "name": "get_stats",
+      "description": "Completion statistics of the week in view."
+    }
+  ],
+  "keywords": [
+    "planner",
+    "weekly planner",
+    "tasks",
+    "mind map",
+    "zenit week"
+  ],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  }
+}

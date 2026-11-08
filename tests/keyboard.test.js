@@ -20,7 +20,7 @@ describe('ESC key - closes Agenda on desktop', () => {
     _state.setEditState(null);
     // ensure no overlay panels are open
     _state.getElement('context-menu').classList.remove('visible');
-    _state.getElement('settings-dropdown').classList.remove('visible');
+    _state.getElement('settings-overlay').classList.remove('visible');
     _state.getElement('help-panel').classList.remove('visible');
     closeStatsPanel();
   });
@@ -44,9 +44,9 @@ describe('ESC key - closes Agenda on desktop', () => {
     expect(_state.getCurrentView()).toBe('mindmap');
   });
 
-  test('ESC closes settings dropdown before acting on agenda', () => {
+  test('ESC closes settings before acting on agenda', () => {
     _state.setCurrentView('agenda');
-    const settings = _state.getElement('settings-dropdown');
+    const settings = _state.getElement('settings-overlay');
     settings.classList.add('visible');
     esc();
     expect(settings.classList.contains('visible')).toBe(false);

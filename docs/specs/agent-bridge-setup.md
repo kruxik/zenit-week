@@ -1,6 +1,6 @@
 # SPEC - Agent Bridge setup: install, pairing, production and dev
 
-> Status: Draft for review, revision 2 (2026-11-08). Revision 2 works in a two-persona review (a regular user who knows MCP, and the developer-owner). Not implemented.
+> Status: Draft for review, revision 2 (2026-11-08). Revision 2 works in a two-persona review (a regular user who knows MCP, and the developer-owner). Phases 1 (npm), 2 (several agent apps), 3 (pairing v2), 4 (production and dev), 5 (Claude Desktop extension: manifest, `npm run mcp:bundle`, Download in Settings; bundle tested in Claude Desktop on macOS) and 6 (documentation) of section 9 implemented 2026-11-08. The release ships app, npm package and extension together (section 3.1). Not yet: the first release of protocol 2, and the Windows install test.
 > Scope: how a user installs `zenit-week-mcp`, pairs it with the app, and how a developer uses the production app and a dev tunnel side by side. Replaces sections 5 (opt-in and pairing), 6 rows 1-2 (origin and server proof), 9 rows 1-3 (handshake frames) and 12 row 2 (distribution) of [agent-bridge.md](agent-bridge.md), and changes 7.5 (which tab executes). Everything else there - execution model, tools, resources, mobile, network-policy exception - stays as it is.
 
 ---
@@ -43,7 +43,7 @@ Turn on the bridge without a terminal, a repository or a pasted secret, the way 
 
 `zenit-week-mcp` is published to npm from `mcp/`. Every command-based install runs `npx -y zenit-week-mcp@1`: the major version is pinned, so a new major never arrives silently against a page that speaks the old protocol, and minor updates still arrive on the next start of the agent app. The package version is independent of the app version; compatibility is checked by a protocol number (section 4.5).
 
-Release: `npm run mcp:publish` from the repository root runs the server tests, checks that the version in `mcp/package.json` is new, and runs `npm publish` in `mcp/`. Separate from the app's `npm run release`.
+Release: together with the app, with no separate step. `npm run release` raises the package's minor version when a server file (`server.js`, `core.js`, `package.json`, `manifest.json`) changed since the previous tag and the current version is already on npm. The production deploy (`deploy-production.yml`) then builds the extension, runs `npm run mcp:publish -- --if-new` (server tests, publish only a version not yet on npm; trusted publishing through GitHub OIDC, no stored token) and only then deploys the app, so a page never meets an older server for longer than the job takes. `npm run mcp:publish` still works by hand.
 
 ### 3.2 Claude Desktop extension (`.mcpb`)
 
@@ -52,7 +52,7 @@ A Desktop Extension bundle: `manifest.json`, `server.js`, `core.js` and the prod
 | # | Decision | Detail |
 |---|---|---|
 | 1 | Built by | `npm run mcp:bundle` (the official `mcpb pack` tool) from `mcp/`. Output is not committed. |
-| 2 | Hosted on | GitHub Releases of this repository, as `zenit-week.mcpb`, attached to an `mcp-v<version>` tag. Anthropic's extension directory no longer takes submissions, and zenitweek.com stays the app only (single-file policy). |
+| 2 | Hosted on | GitHub Releases of this repository, as `zenit-week.mcpb`, attached to every app release by the production deploy, so `releases/latest/download/zenit-week.mcpb` always resolves (a separate `mcp-v<version>` tag would be buried by the next app release). Anthropic's extension directory no longer takes submissions, and zenitweek.com stays the app only (single-file policy). |
 | 3 | Linked from | Settings (section 3.4), the README and the landing page's "How to connect an agent" link, always to the latest release asset. |
 | 4 | Updates | An extension installed from a file does not update itself. The update hint for this path is "Download the new Zenit Week extension" with the link (section 4.5). |
 | 5 | User config in the manifest | None. Dev sites are added with the `origins` command (section 6), the one way for every install path. |
@@ -81,7 +81,7 @@ The section is renamed from "Agent bridge" to **"AI agents"** in Settings and He
 | 1 | Switch "Allow AI agents on this computer" | Off by default. The first time it is turned on, a short explainer opens first (row 2); after that it connects at once (section 4.1). Replaces the pairing-code field. |
 | 2 | Permission explainer | One dialog in the standard vocabulary, shown once per browser: "Your browser will now ask to let Zenit Week access other apps and services on this device. That is how it reaches your AI agent, on this computer only. Choose Allow." In Firefox it adds "and tick Remember my choice". Continue opens the connection; the X turns the switch back off. |
 | 3 | Status line | The states in section 4.6. |
-| 4 | "Connect an agent" guide | Shown while no agent is connected, and opened from the `Waiting for the agent app` status. Claude Desktop first ("no setup needed"), then Claude Code, Cursor, VS Code, Other. Each shows one action - Download, Copy command, Install link, Copy config - plus "Needs Node.js 20 or newer" for all but Claude Desktop, and "If your agent does not see Zenit Week, restart it" under each. |
+| 4 | "Connect an agent" guide | Always shown (but where the browser cannot run the bridge), connected or not, so another agent can be added at any time and the panel does not shift as the state changes. In this order: Claude Code, Claude Desktop ("no setup needed"), Codex, Cursor, Gemini CLI, VS Code (Copilot), Devin Desktop (Windsurf), Other. Each shows one action - Download, Copy command (Claude Code, Codex, Gemini CLI), Install link (Cursor, VS Code), Copy config (Devin Desktop, Other) - plus "Needs Node.js 20 or newer" for all but Claude Desktop, and "If your agent does not see Zenit Week, restart it" under each. |
 | 5 | Connected agents | One row per agent app connected now (section 5): its name and "Connected". Below them the pairing date and **Unpair**. Replaces "Disconnect and forget". |
 | 6 | Blocked by browser | The status carries the way back: "Click the icon left of the address, open the site settings, set 'Apps on this device' (Chrome) or 'Local network' (Firefox) to Allow, then reload." Exact wording checked against both browsers at implementation time. |
 | 7 | Safari | Switch disabled, "Not supported in this browser yet", as today. |
@@ -97,7 +97,7 @@ The section is renamed from "Agent bridge" to **"AI agents"** in Settings and He
 | 1 | User turns the switch on | Explainer (first time only), then the browser prompt, then connects to every listening server in the port range (section 5). | - |
 | 2 | Server running, site not paired | Status `Waiting for an agent`. The socket stays open; the page sends only its protocol number and whether it is visible and focused. No week key, tab id or data before pairing. | - |
 | 3 | User asks the agent something about the week | The server starts pairing with the tab that would run the call, but only a **visible** one (section 4.3). The app shows the pairing dialog. | The agent gets the code (section 4.2). |
-| 4 | User compares and clicks Allow | Stores the pairing key; status `Connected - <agent>`; toast "Paired with <agent>. Unpair in Settings if this was not you." Other open tabs of the same site pick up the key and connect. | With elicitation: the held call runs at once. Without: the user tells the agent to try again, and it runs. |
+| 4 | User compares and clicks Allow | Stores the pairing key; status `Connected - <agent>`; toast "Paired with <agent>. Unpair in Settings if this was not you." Other open tabs of the same site pick up the key and connect. | The user tells the agent to try again, and it runs. |
 | 5 | Deny, X, or no answer in 120 s | Dialog closes; status `Waiting for an agent`; no key stored on either side. | The next request starts a new pairing with a new code. |
 | 6 | Later sessions | Connects silently with the stored key. | Requests run at once. |
 
@@ -109,12 +109,11 @@ Pairing starts on the agent's first request, not when the server starts, so the 
 
 The code must reach the user even if the model does not pass on an error, and even when the first request is a resource read, which some agent apps show only as a raw error.
 
-| # | Agent app supports | Behaviour |
+| # | Agent app | Behaviour |
 |---|---|---|
-| 1 | MCP elicitation | The server holds the request (up to 120 s) and asks the user through the agent app: "Zenit Week is asking you to approve this agent. The code there should be 482 913. Click Allow in Zenit Week." Accept just closes the message; Decline cancels the pairing in the app. When the app's Allow arrives first, the server cancels the open elicitation and runs the request. Verified for Claude Code and VS Code; unverified for Claude Desktop and Cursor, which fall back to row 2. |
-| 2 | No elicitation | The tool call returns a **successful** result (not an error) whose text and structured content say: "Not connected yet. Zenit Week shows a request with the code 482 913. Ask the user to check that the code matches and click Allow there, then call again. Do not retry before the user confirms." A resource read returns content with the same text, not an error. |
+| 1 | Any | The tool call returns a **successful** result (not an error) at once, whose text and structured content say: "Not connected yet. Zenit Week shows a request with the code 482 913. Ask the user to check that the code matches and click Allow there, then call again. Do not retry before the user confirms." The agent repeats the code in its own reply, so the user always sees it next to the dialog. A resource read returns content with the same text, not an error. Elicitation is not used: a held request kept the code out of the agent's reply, and Claude Code did not show the elicitation message (2026-11-08). |
 
-**Retries keep the code.** While a pairing is open for a site, every further request gets the same code and the same message, and the dialog is not reopened or reset. A new code appears only after Deny, X or the 120 s timeout. This answers revision 1's open question 1: hold where the agent app can show the code during the hold, return at once where it cannot.
+**Retries keep the code.** While a pairing is open for a site, every further request gets the same code and the same message, and the dialog is not reopened or reset. A new code appears only after Deny, X or the 120 s timeout. This answers revision 1's open question 1: return at once, never hold.
 
 ### 4.3 Which tab shows the dialog
 
@@ -162,7 +161,7 @@ The page's first frame carries `protocol: 2`.
 | # | State | Meaning |
 |---|---|---|
 | 1 | `Off` | Switch off |
-| 2 | `Waiting for the agent app` | No server listening. Opens the "Connect an agent" guide. Replaces `Waiting for server - run zenit-week-mcp`. |
+| 2 | `Waiting for the agent app` | No server listening. The "Connect an agent" guide below says how to start one. Replaces `Waiting for server - run zenit-week-mcp`. |
 | 3 | `Waiting for permission` | Browser prompt open, as today |
 | 4 | `Blocked by browser` | As today, with the way back (section 3.4, row 6) |
 | 5 | `Waiting for an agent` | Connected to a server, site not paired yet |
@@ -270,7 +269,7 @@ Each phase ships on its own and leaves the bridge working.
 - [ ] The Claude Code command registers the server for every folder (`--scope user`).
 - [ ] With Claude Desktop and Claude Code both running, both servers listen, the page connects to both, Settings lists both, and calls from both run.
 - [ ] Turning the switch on the first time shows the explainer before the browser prompt; the X turns the switch back off.
-- [ ] With the switch on and no pairing, the first request from Claude Code shows the code through elicitation; from an agent app without elicitation it returns a successful result carrying the code; a first resource read also carries it.
+- [ ] With the switch on and no pairing, the first request from any agent app returns a successful result carrying the code, which the agent repeats; a first resource read also carries it.
 - [ ] Repeated requests during an open pairing return the same code and do not reset the dialog.
 - [ ] With only hidden tabs, no dialog opens and the request says to bring Zenit Week to the front; with the label editor open, the dialog waits.
 - [ ] Allow: the request runs (held) or the retry runs (fallback); other tabs of the site connect without a dialog; a site paired through one agent app is paired for the other; after a browser restart requests run with no dialog.
@@ -292,7 +291,7 @@ Each phase ships on its own and leaves the bridge working.
 | # | Question | Leaning |
 |---|---|---|
 | 1 | Sign the `.mcpb` bundle? | Ship unsigned first, after testing the install screen on macOS and Windows; sign once a certificate is available. |
-| 2 | Does Claude Desktop support MCP elicitation now? | Unverified. Check at implementation time; the fallback (section 4.2, row 2) works either way. |
+| 2 | Does Claude Desktop support MCP elicitation now? | Yes, verified 2026-11-08 with the `.mcpb` extension: the first request was held and answered right after Allow. |
 | 3 | Is a range of eight ports enough? | Yes for one person's agent apps. Raise it if a real setup ever runs out. |
 | 4 | npm package name | `zenit-week-mcp` was free on npm on 2026-11-08; reserve it with phase 1. |
 | 5 | Dev sites through the Claude Desktop extension's settings, so a developer who uses only Claude Desktop needs no terminal? | Not now: it would be a second way to add a site. Revisit if such a developer appears. |

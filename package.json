@@ -41,7 +41,8 @@
     "editor:build": "node scripts/build-editor.mjs",
     "release": "node scripts/release.mjs",
     "release:notes": "node scripts/extract-release-notes.mjs",
-    "mcp:publish": "node scripts/mcp-publish.mjs"
+    "mcp:publish": "node scripts/mcp-publish.mjs",
+    "mcp:bundle": "node scripts/mcp-bundle.mjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.5",
@@ -56,7 +57,7 @@
     "prosemirror-history": "1.5.1",
     "prosemirror-inputrules": "1.5.1",
     "prosemirror-keymap": "1.2.3",
-    "prosemirror-model": "1.25.12",
+    "prosemirror-model": "1.25.13",
     "prosemirror-schema-list": "1.6.0",
     "prosemirror-state": "1.4.4",
     "prosemirror-transform": "1.12.5",

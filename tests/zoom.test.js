@@ -89,3 +89,23 @@ describe('zoomAt', () => {
     expect(_state.getZoom()).toBeCloseTo(before, 10);
   });
 });
+
+describe('zoom slider thumb', () => {
+  // A re-fit moves the bounds under the current zoom, which can leave it outside
+  // the slider's range. The thumb must stay on the track, not off its end where
+  // the Settings pane clips it and the slider reads as empty.
+  test('stays on the track when zoom is below the slider minimum', () => {
+    recomputeZoomBounds(0.5);
+    _state.setZoom(_state.getZoomBounds().ZOOM_MIN / 2);
+    _state.applyTransform();
+    expect(_state.getElement('zoom-thumb').style.left).toBe('0%');
+    expect(_state.getElement('zoom-fill').style.width).toBe('0%');
+  });
+
+  test('stays on the track when zoom is above the slider maximum', () => {
+    recomputeZoomBounds(0.5);
+    _state.setZoom(_state.getZoomBounds().ZOOM_MAX * 2);
+    _state.applyTransform();
+    expect(_state.getElement('zoom-thumb').style.left).toBe('100%');
+  });
+});

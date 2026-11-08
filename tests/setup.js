@@ -197,8 +197,10 @@ const sandbox = {
   // Agent bridge: HMAC and base64url. WebSocket is installed per test.
   TextEncoder: globalThis.TextEncoder,
   btoa: globalThis.btoa,
-  setTimeout,
-  clearTimeout,
+  atob: globalThis.atob,
+  // Read at call time, so vi.useFakeTimers() reaches the app's timers too.
+  setTimeout: (...a) => globalThis.setTimeout(...a),
+  clearTimeout: (...a) => globalThis.clearTimeout(...a),
   // Unref'd so a top-level interval in the app (the foreground update check)
   // never keeps the test worker alive.
   setInterval: (fn, ms) => { const t = setInterval(fn, ms); if (t.unref) t.unref(); return t; },
@@ -487,12 +489,20 @@ _state.getKbFocus = function() { return kbFocusId; };
 _state.setKbFocusId = function(id) { kbFocusId = id; };
 _state.getDayFilter = function() { return activeDayFilter; };
 _state.getElement = function(id) { return document.getElementById(id); };
+_state.openSettings = function() { openSettings(); };
+_state.closeSettings = function() { closeSettings(); };
+_state.isSettingsOpen = function() { return isSettingsOpen(); };
+_state.selectSettingsTab = function(name) { selectSettingsTab(name); };
+_state.getSettingsTab = function() { return settingsActiveTab; };
+_state.animateSettingsHeight = function() { animateSettingsHeight(); };
+_state.refreshDataSummary = function() { return refreshDataSummary(); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 _state.setViewLevel = function(v) { currentViewLevel = v; pebblesExtraDepth = 0; };
 _state.closeViewLevels = function() { closeViewLevels(); };
 _state.getViewLevel = function() { return currentViewLevel; };
 _state.getZoom = function() { return zoom; };
 _state.setZoom = function(v) { zoom = v; };
+_state.applyTransform = function() { applyTransform(); };
 _state.getPan = function() { return { x: panX, y: panY }; };
 _state.setPan = function(x, y) { panX = x; panY = y; };
 _state.getZoomBounds = function() { return { ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT }; };
@@ -823,7 +833,10 @@ export const {
   bridgeDisconnect,
   bridgeHmac,
   bridgeSocketUrl,
-  parseBridgePairingCode,
+  bridgePairCode,
+  bridgeUnpair,
+  bridgeUpdateHintKey,
+  bridgeAddCmd,
   loadBridgeRecord,
   saveBridgeRecord,
   forgetBridge,
@@ -1004,9 +1017,6 @@ export const {
   deriveBranchPalette,
   t,
   // Center node + week bar
-  firstNameFrom,
-  centerDisplayName,
-  centerNodeText,
   canShowAvatarPhoto,
   formatWeekParts,
   formatWeekLabel,

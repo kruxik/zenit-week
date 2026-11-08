@@ -63,23 +63,22 @@ describe('hidden attribute', () => {
   });
 });
 
-describe('dev-only Settings block', () => {
+describe('dev-only Settings tab', () => {
   it('ships hidden in the markup', () => {
-    expect(SRC).toMatch(/<div class="settings-section" id="settings-dev-section" hidden>/);
-    expect(SRC).toMatch(/<div class="settings-separator" id="settings-dev-separator" hidden><\/div>/);
+    expect(SRC).toMatch(/<button type="button" class="agenda-tab" id="settings-tab-dev"[^>]* hidden>/);
+    expect(SRC).toMatch(/<div class="settings-pane" id="settings-pane-dev"[^>]* hidden>/);
   });
 
   it('is revealed only behind the development-host guard', () => {
     const body = ifBody('devResetEnabled()');
     expect(body, 'no `if (devResetEnabled())` block found').not.toBeNull();
-    expect(body).toContain("getElementById('settings-dev-section')");
-    expect(body).toContain("getElementById('settings-dev-separator')");
+    expect(body).toContain("getElementById('settings-tab-dev')");
 
-    // And nowhere else: one reveal path, one guard in front of it.
-    const reveals = SRC.split(/devSection\.hidden = false|devSeparator\.hidden = false/).length - 1;
-    expect(reveals).toBe(2);
+    // And nowhere else: one reveal path, one guard in front of it. The pane is
+    // shown only by selecting its tab, and a hidden tab is never selected.
+    const reveals = SRC.split(/devTab\.hidden = false/).length - 1;
+    expect(reveals).toBe(1);
     const outside = SRC.replace(body, '');
-    expect(outside).not.toContain("getElementById('settings-dev-section')");
-    expect(outside).not.toContain("getElementById('settings-dev-separator')");
+    expect(outside).not.toContain("getElementById('settings-tab-dev')");
   });
 });

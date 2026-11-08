@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   deployments: write
+  id-token: write   # npm trusted publishing of zenit-week-mcp (OIDC, no stored token)
 
 jobs:
   deploy:
@@ -22,9 +23,21 @@ jobs:
         with:
           node-version: '26'
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Run tests
         run: npm ci && npm test
+
+      # The agent server ships with the app: one release carries the app, the
+      # npm package and the Claude Desktop extension (agent-bridge-setup.md
+      # section 3). The extension is built first because it has no side effects;
+      # the package is published before the app goes live, so a page never
+      # meets a server older than itself for longer than this job takes.
+      - name: Build the Claude Desktop extension
+        run: npm run mcp:bundle
+
+      - name: Publish zenit-week-mcp to npm (only when its version is new)
+        run: node scripts/mcp-publish.mjs --if-new
 
       - name: Create GitHub deployment
         id: deployment
@@ -76,15 +89,17 @@ jobs:
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           if node scripts/extract-release-notes.mjs "${{ github.ref_name }}" > "$NOTES_FILE" 2>/dev/null && [ -s "$NOTES_FILE" ]; then
             echo "Using CHANGELOG.md section for ${{ github.ref_name }}"
-            gh release create "${{ github.ref_name }}" \
+            gh release create "${{ github.ref_name }}" mcp/dist/zenit-week.mcpb \
               --title "${{ github.ref_name }}" \
               --notes-file "$NOTES_FILE"
           else
             echo "No CHANGELOG.md section for ${{ github.ref_name }} - falling back to auto-generated notes"
-            gh release create "${{ github.ref_name }}" \
+            gh release create "${{ github.ref_name }}" mcp/dist/zenit-week.mcpb \
               --title "${{ github.ref_name }}" \
               --generate-notes
           fi
+          # Every app release carries the extension, so Settings' Download link
+          # (releases/latest/download/zenit-week.mcpb) always finds it.
 
       - name: Mark deployment failure
         if: failure() && steps.deployment.outputs.id != ''
