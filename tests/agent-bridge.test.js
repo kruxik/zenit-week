@@ -842,6 +842,9 @@ describe('agent add commands follow the site', () => {
   test('a site the server cannot add (not https) copies the plain command', () => {
     expect(bridgeAddCmd('claude-code', 'http://192.168.1.5:8080')).toBe(base);
   });
+  test('Grok Build gets its own command', () => {
+    expect(bridgeAddCmd('grok', 'https://zenitweek.com')).toBe('grok mcp add zenit-week -- npx -y zenit-week-mcp@1');
+  });
   test('Codex and Gemini CLI get their own commands', () => {
     expect(bridgeAddCmd('codex', 'https://zenitweek.com')).toBe('codex mcp add zenit-week -- npx -y zenit-week-mcp@1');
     expect(bridgeAddCmd('gemini', 'https://abc.ngrok-free.dev'))

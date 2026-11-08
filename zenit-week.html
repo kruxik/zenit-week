@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-B95e3BXLpOUY1dslOXtodQMGbOvfiJ99N8IY/BGId8Q=';
+               'sha256-ufoPJa6o9VDxHK2nabTfOGzVnU/rSoOhCS+pT31ejkU=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4988,6 +4988,7 @@ Or remove them later in Settings → Help.</div>
             <option value="codex">Codex</option>
             <option value="cursor">Cursor</option>
             <option value="gemini">Gemini CLI</option>
+            <option value="grok">Grok Build</option>
             <option value="vscode">VS Code (Copilot)</option>
             <option value="devin">Devin Desktop (Windsurf)</option>
             <option value="other" data-i18n="bridge.guide.other">Other MCP app</option>
@@ -11793,6 +11794,7 @@ const TRANSLATIONS = {
     'bridge.guide.cursorNote':    'Cursor opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
     'bridge.guide.codexNote':     'Paste the command in a terminal, then restart Codex. Needs Node.js 20 or newer.',
     'bridge.guide.geminiNote':    'Paste the command in a terminal, then restart Gemini CLI. Needs Node.js 20 or newer.',
+    'bridge.guide.grokNote':      'Paste the command in a terminal, then restart Grok Build. Already set up in Claude Code or Cursor? Grok Build reads that too. Needs Node.js 20 or newer.',
     'bridge.guide.devinNote':     "Paste it into Devin Desktop's MCP config file (Settings, MCP servers), then restart it. Needs Node.js 20 or newer.",
     'dev.tab':                    'Dev',
     'dev.title':                  'Development',
@@ -12283,6 +12285,7 @@ const TRANSLATIONS = {
     'bridge.guide.cursorNote':    'Otevře se Cursor a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.codexNote':     'Vlož příkaz do terminálu a restartuj Codex. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.geminiNote':    'Vlož příkaz do terminálu a restartuj Gemini CLI. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.grokNote':      'Vlož příkaz do terminálu a restartuj Grok Build. Máš už Zenit Week v Claude Code nebo Cursoru? Grok Build si ho načte i odtud. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.devinNote':     'Vlož ho do MCP nastavení Devin Desktop (Settings, MCP servers) a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
     'dev.tab':                    'Vývoj',
     'dev.title':                  'Vývoj',
@@ -27165,6 +27168,7 @@ const BRIDGE_ADD_CMDS = {
   'claude-code': `claude mcp add --scope user zenit-week -- ${BRIDGE_NPX}`,
   codex: `codex mcp add zenit-week -- ${BRIDGE_NPX}`,
   gemini: 'gemini mcp add --scope user zenit-week npx zenit-week-mcp@1',
+  grok: `grok mcp add zenit-week -- ${BRIDGE_NPX}`,
 };
 // The sites the server accepts without `origins add` (mcp/core.js isAllowedOrigin).
 const BRIDGE_BUILT_IN_ORIGIN = /^(https:\/\/(www\.)?zenitweek\.com|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
@@ -27277,6 +27281,7 @@ const BRIDGE_GUIDE = {
   'claude-code': { note: 'bridge.guide.codeNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('claude-code')) },
   codex: { note: 'bridge.guide.codexNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('codex')) },
   gemini: { note: 'bridge.guide.geminiNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('gemini')) },
+  grok: { note: 'bridge.guide.grokNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('grok')) },
   cursor: { note: 'bridge.guide.cursorNote', label: 'bridge.guide.addCursor', run: () => _bridgeFollow(BRIDGE_CURSOR_LINK) },
   devin: { note: 'bridge.guide.devinNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
   vscode: { note: 'bridge.guide.vscodeNote', label: 'bridge.guide.addVscode', run: () => _bridgeFollow(BRIDGE_VSCODE_LINK) },
