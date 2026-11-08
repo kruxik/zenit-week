@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) - `vYYYY.MM.DD[.N]`.
 
+## [v2026.11.07] - 2026-11-07
+
+### Added
+
+- **schedule:** An Inbox item can be sent to a date and returns to the tray
+- **dialogs:** The committing button in every dialog wears a fill - blue, or red when destructive
+- **reschedule:** Repeat Set becomes a wide filled button labelled with the action
+- **reschedule:** A reusable task opens the calendar with a weekly repeat prefilled
+- **reschedule:** Repeat rows under the calendar replace the Set-a-date dialog
+- **reschedule:** One Reschedule opens the app calendar; drop Previous/Next week items and native date inputs
+- **menu:** Any on a day leaf moves it to the adjacent week as its own undated task, refused when one exists
+
+### Changed
+
+- **days:** A task's days are always day leaves with derived ids, a lone leaf shown inline; repair mixed form after merge
+
+### Fixed
+
+- **dialogs:** Dark theme commit buttons use deeper fill tokens instead of the glaring link accents
+- **transfer:** A day leaf moved to a week whose task counts repetitions lands beside it as its own task
+- **days:** A task left with one day leaf collapses back to its inline day, on Delete, Reschedule untick and week move
+- **transfer:** A day leaf's parent copy drops the schedule link when the parent stays behind
+- **transfer:** A day leaf without a day moves as Any
+- **undo:** Undo and redo of a week move restore the destination nodes it changed, not only the ones it added
+- **transfer:** A day leaf landing on a task with an inline day splits it into day leaves
+- **transfer:** A day leaf moved to another week joins its siblings in Mon-Sun order
+- **transfer:** A day leaf's parent copy keeps its reusable flag
+- **transfer:** A moved task re-derives its destination parents' done/dropped status
+- **transfer:** Moving a parent's last day leaf carries the whole task, reusable and done included
+- **menu:** A day leaf's week-move menu highlights only its own day
+- **menu:** A day leaf moved to Next/Previous week offers weekdays, lands on the chosen day and never duplicates a day the destination holds
+
 ## [v2026.11.01] - 2026-11-01
 
 ### Added
