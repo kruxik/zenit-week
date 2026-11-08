@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-3QK7ma8xunm3AZtjWLeXGBD9cbr7DhVQuZTo7B5uOIs=';
+               'sha256-ZlS6zCvQ75MbFy+EQj5ah7xyFERf+K5p5VVQEvggap4=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -25525,11 +25525,13 @@ function switchView(view, opts) {
   // Help is a modal floating over whichever view is beneath it; navigating to
   // any view dismisses it first so the destination is actually visible.
   if (window.doCloseHelp) window.doCloseHelp();
-  // The mobile level row belongs to the mindmap; leaving it takes the row along.
-  // So does the keyboard focus ring - hoveredNodeId must not follow the user
-  // into a view where nothing can clear it.
+  // The level row belongs to the map in view; leaving it - for Agenda or Stats,
+  // or for the other map (Mindmap <-> Vision swaps the record) - takes the row
+  // along, unless a filter keeps it up to name itself. So does the keyboard
+  // focus ring - hoveredNodeId must not follow the user into a view where
+  // nothing can clear it.
   if (!isMapView || swapped) {
-    if (!isMapView) closeViewLevels();
+    closeViewLevels();
     clearKbFocus();
   }
   localStorage.setItem('zenit-week-view', view);
