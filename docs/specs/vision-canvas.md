@@ -247,6 +247,7 @@ The bridge spec (`docs/specs/agent-bridge.md`, section 8) gains one resource and
 | 7 | `set_days`, `tick_task`, `set_reusable`, `send_to_date`, `transfer_*` | `wrong_type` on a vision node or while the Vision is in view. |
 | 8 | `undo` / `redo` | Act on the stack pair of the record in view (section 3.3). The result names the record. |
 | 9 | `add_branch` | Adds to the record in view. |
+| 10 | `rename_branch`, `delete_branch` (new) | `branch` (id or exact name) on the record in view, a week or the Vision. Rename is literal. Delete takes the branch's subtree with it, as the context menu does, and refuses the last branch with `wrong_type`. An id from the other record answers `not_in_view`. |
 
 No `recommend` tool. The recommendation is the agent's reasoning over `zenit://vision` and `zenit://week/*`; the app offers the material and the write tools, nothing in between. `mcp/README.md` and the server's instruction string point the agent at `zenit://vision` as the thing to read before proposing a week.
 

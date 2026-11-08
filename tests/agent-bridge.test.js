@@ -916,6 +916,31 @@ describe('vision', () => {
     expect(node('nv1').children).toEqual([]);
   });
 
+  test('rename_branch is literal, one vision undo entry; the same label is a no-op', async () => {
+    await expect(codeOf(call('rename_branch', { branch: 'nvb1', label: 'x' }))).resolves.toBe('not_in_view');
+    await call('open_vision', {});
+    expect(await call('rename_branch', { branch: 'nvb1', label: 'Sea 3x (mo)' })).toEqual({ id: 'nvb1', label: 'Sea 3x (mo)' });
+    expect(node('nvb1').label).toBe('Sea 3x (mo)');
+    expect(visionUndo()).toBe(1);
+    await call('rename_branch', { branch: 'nvb1', label: 'Sea 3x (mo)' });
+    expect(visionUndo()).toBe(1);
+  });
+
+  test('delete_branch takes the subtree, refuses the last branch, and one undo restores it', async () => {
+    await call('open_vision', {});
+    await expect(codeOf(call('delete_branch', { branch: 'nvb1' }))).resolves.toBe('wrong_type');
+    expect(visionUndo()).toBe(0);
+    const other = await call('add_branch', { label: 'Health' });
+    expect(await call('delete_branch', { branch: 'nvb1' })).toEqual({ deleted: 'nvb1' });
+    expect(node('nvb1')).toBeFalsy();
+    expect(node('nv1')).toBeFalsy();
+    expect(visionUndo()).toBe(2);
+    await call('undo', {});
+    expect(node('nvb1')).toBeTruthy();
+    expect(node('nv1')).toBeTruthy();
+    expect(node(other.id)).toBeTruthy();
+  });
+
   test('set_status: dropped lets go, undone takes back, done is wrong_type', async () => {
     await call('open_vision', {});
     expect((await call('set_status', { id: 'nv1', status: 'dropped' })).letGo).toBe(true);

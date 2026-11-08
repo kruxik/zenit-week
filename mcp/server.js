@@ -249,6 +249,10 @@ tool('transfer_unfinished', 'Copy the previous week\'s unfinished tasks into the
 tool('transfer_reusable', 'Copy the previous week\'s reusable tasks into the week in view.', {});
 tool('add_branch', 'Add a branch (category) to the week in view.',
   { label: z.string(), side: z.enum(['left', 'right']).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() });
+tool('rename_branch', 'Rename a branch (category) of the record in view: a week, or the Vision. The label is literal.',
+  { branch: z.string().describe('Branch id or its exact name'), label: z.string() });
+tool('delete_branch', 'Delete a branch of the record in view with everything under it. The last branch cannot be deleted.',
+  { branch: z.string().describe('Branch id or its exact name') });
 tool('undo', 'Undo the last action in the app, whoever made it. Says which action it undid.', {});
 tool('redo', 'Redo the last undone action.', {});
 tool('get_stats', 'Completion statistics of the week in view.', {}, readOnly);

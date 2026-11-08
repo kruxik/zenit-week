@@ -127,6 +127,8 @@ The Vision is the user's long view: a mind map of intentions, with life areas as
 | `transfer_unfinished` | Copies last week's unfinished tasks into this week. |
 | `transfer_reusable` | Copies last week's reusable tasks into this week. |
 | `add_branch` | Adds a branch (category) to the record in view. |
+| `rename_branch` | Renames a branch of the record in view. |
+| `delete_branch` | Deletes a branch of the record in view with everything under it; the last branch stays. |
 | `undo` / `redo` | Undoes or redoes the last action on the record in view, whoever made it. The result names the record. |
 | `get_stats` | Completion statistics of the week in view. |
 

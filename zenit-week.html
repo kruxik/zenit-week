@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-p/GziThy+Ft1ub6ay4b+AvLA05wp7aoSDUR00FeOQzg=';
+               'sha256-pQIFhyrkyZTy2bNbt/RDoiCbMnwaZ/msiQp6zJy+eGo=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -12543,6 +12543,8 @@ const TRANSLATIONS = {
     'bridge.toast.transfer_unfinished': 'Agent: transferred unfinished tasks',
     'bridge.toast.transfer_reusable': 'Agent: transferred reusable tasks',
     'bridge.toast.add_branch':    'Agent: added branch {label}',
+    'bridge.toast.rename_branch': 'Agent: renamed branch to {label}',
+    'bridge.toast.delete_branch': 'Agent: deleted branch {label}',
     'bridge.toast.set_horizon':   'Agent: {label} set to {horizon}',
     'bridge.toast.undo':          'Agent: undid {what}',
     'bridge.toast.redo':          'Agent: redid {what}',
@@ -13057,6 +13059,8 @@ const TRANSLATIONS = {
     'bridge.toast.transfer_unfinished': 'Agent: přenesl nedokončené úkoly',
     'bridge.toast.transfer_reusable': 'Agent: přenesl opakovatelné úkoly',
     'bridge.toast.add_branch':    'Agent: přidal větev {label}',
+    'bridge.toast.rename_branch': 'Agent: přejmenoval větev na {label}',
+    'bridge.toast.delete_branch': 'Agent: smazal větev {label}',
     'bridge.toast.set_horizon':   'Agent: {label} má horizont {horizon}',
     'bridge.toast.undo':          'Agent: vrátil zpět {what}',
     'bridge.toast.redo':          'Agent: zopakoval {what}',
@@ -29665,6 +29669,44 @@ const BRIDGE_TOOLS = {
       if (color) setBranchColor(node.id, color);
       saveBranchColors();
       return { result: { id: node.id, label: node.label, side, color: BRANCH_COLORS[node.id]?.main || null, tasks: [] }, pulse: [node.id] };
+    },
+  },
+
+  // A branch label is a category name: literal on a week and on the Vision, so
+  // no day or Nx is read from it.
+  rename_branch: {
+    args: ['branch', 'label'],
+    check(a) {
+      const node = _bridgeBranch(a.branch);
+      if (typeof a.label !== 'string' || !a.label.trim()) throw _bridgeBad('label must be a non-empty string');
+      const label = a.label.trim().slice(0, BRIDGE_LABEL_MAX);
+      if (node.label === label) return { noop: true, result: { id: node.id, label } };
+      return { id: node.id, label, toast: { label } };
+    },
+    apply({ id, label }) {
+      findNode(id).label = label;
+      touchNode(id);
+      return { result: { id, label }, pulse: [id] };
+    },
+  },
+
+  // The branch and everything under it, as the context menu deletes it. The
+  // last branch stays: a record keeps at least one.
+  delete_branch: {
+    async: true, resolve: true, args: ['branch'],
+    async run(a) {
+      const node = _bridgeBranch(a.branch);
+      if (weekData.nodes.filter(n => n.type === 'branch').length <= 1) {
+        throw new BridgeError('wrong_type', `${node.id} is the last branch; a record keeps at least one`);
+      }
+      const summary = t('bridge.toast.delete_branch', { label: node.label });
+      await withWeekLock(mapRecordLockKey(), () => {
+        deleteBranch(node.id); // takes its own snapshot, saves and renders
+        _labelTopSnapshot(summary);
+      });
+      if (currentView === 'agenda') renderAgenda();
+      _bridgeAnnounce(summary);
+      return { deleted: node.id };
     },
   },
 
