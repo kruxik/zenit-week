@@ -203,3 +203,12 @@ describe('Settings dialog markup', () => {
     expect(body).toMatch(/matchMedia\('\(pointer: fine\)'\)/);
   });
 });
+
+describe('Account identity survives a language switch', () => {
+  // applyTranslations rewrites every data-i18n element; on these two it would
+  // put "Not signed in" over a signed-in account's name and email.
+  it.each(['account-name', 'account-email'])('%s carries no data-i18n', id => {
+    const tag = SRC.match(new RegExp(`<[^>]*id="${id}"[^>]*>`))[0];
+    expect(tag).not.toMatch(/data-i18n/);
+  });
+});
