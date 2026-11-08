@@ -867,6 +867,7 @@ export const {
   computeDayReschedule,
   applyDayReschedule,
   rescheduleTargetKind,
+  rescheduleWeekMoves,
   weekDistance,
   localDateStr,
   tabDateString,

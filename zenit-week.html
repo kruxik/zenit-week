@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-N5m27PRUqC031wcKyPBKkxAbIRkxDekDd2Q2EOzfsfw=';
+               'sha256-+F4trMCP7pj5ANaioBu6BwzvML6tF+kyUxdEpfJ/fUU=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1147,6 +1147,21 @@
     border-radius: 50%;
     background: currentColor;
   }
+  /* A week number that takes the task to that week with no day. */
+  .dp-weekno {
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    font-family: inherit;
+    color: var(--text-dim);
+    cursor: pointer;
+    outline: none;
+    transition: background 0.15s, color 0.15s;
+  }
+  .dp-weekno:hover,
+  :where(#date-picker-panel:not(.dp-quiet-focus)) .dp-weekno:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-primary); color: var(--accent-primary); }
   .dp-day.selected,
   .dp-day.selected:hover { background: var(--accent-primary); color: #fff; }
   .dp-day:disabled { opacity: 0.35; cursor: default; box-shadow: none; color: var(--text-muted); }
@@ -11943,6 +11958,7 @@ const TRANSLATIONS = {
     'datePicker.setFrom':         'Repeat from {date}',
     'datePicker.pickEnd':         'Pick the last day',
     'datePicker.pickStart':       'Pick the first day',
+    'datePicker.weekAnyDay':      'Week {week}, any day',
     'sendFuture.noRepeat':        'No repeat',
     'sendFuture.unitDay':         'days',
     'sendFuture.unitWeek':        'weeks',
@@ -12434,6 +12450,7 @@ const TRANSLATIONS = {
     'datePicker.setFrom':         'Opakovat od {date}',
     'datePicker.pickEnd':         'Vyber poslední den',
     'datePicker.pickStart':       'Vyber první den',
+    'datePicker.weekAnyDay':      'Týden {week}, kdykoli',
     'sendFuture.noRepeat':        'Bez opakování',
     'sendFuture.unitDay':         'dní',
     'sendFuture.unitWeek':        'týdnů',
@@ -20947,11 +20964,14 @@ function monthOfDayString(date) {
   return part ? { y: part.y, m: part.m - 1 } : null;
 }
 
+// `onPickWeek`, when given, turns the number of each week `isWeekPickable`
+// accepts into a button: the week itself, with no day in it.
 function openDatePicker({ title, anchorRect = null, focusDate, selected = [], weekMark = null,
-                          isDisabled = () => false, onPick, actions = [], repeat = null }) {
+                          isDisabled = () => false, onPick, onPickWeek = null,
+                          isWeekPickable = () => false, actions = [], repeat = null }) {
   _dp = {
     month: monthOfDayString(focusDate) || monthOfDayString(localDateStr()),
-    selected: new Set(selected), weekMark, isDisabled, onPick, anchorRect,
+    selected: new Set(selected), weekMark, isDisabled, onPick, onPickWeek, isWeekPickable, anchorRect,
     repeat: repeat && { ...repeat, start: null, end: null, stage: 'start' },
   };
   if (repeat) {
@@ -21031,9 +21051,21 @@ function renderDatePicker() {
     const row = document.createElement('div');
     row.className = 'dp-row' + (wk === weekMark ? ' open-week' : '');
 
-    const no = document.createElement('span');
-    no.className = 'wp-weekno';
+    // While a rule is written every click picks one of its days, so no week.
+    const weekPick = _dp.onPickWeek && !dpRepeatOn() && _dp.isWeekPickable(wk);
+    const no = document.createElement(weekPick ? 'button' : 'span');
+    no.className = 'wp-weekno' + (weekPick ? ' dp-weekno' : '');
     no.textContent = String(iso.week);
+    if (weekPick) {
+      no.type = 'button';
+      no.title = t('datePicker.weekAnyDay', { week: iso.week });
+      no.setAttribute('aria-label', no.title);
+      no.addEventListener('click', () => {
+        const { onPickWeek } = _dp;
+        closeDatePicker();
+        onPickWeek(wk);
+      });
+    }
     row.appendChild(no);
 
     for (let i = 0; i < 7; i++) {
@@ -21146,9 +21178,16 @@ function rescheduleTargetKind(date, { openWeek, todayWeek, today, canLater }) {
   const wk = weekKeyForDayString(date);
   if (!wk) return 'disabled';
   if (wk === openWeek) return 'retag';
-  if (wk === offsetWeek(openWeek, 1)) return 'move';
-  if (wk < openWeek) return wk >= todayWeek ? 'move' : 'disabled';
+  if (rescheduleWeekMoves(wk, { openWeek, todayWeek })) return 'move';
+  if (wk < openWeek) return 'disabled';
   return canLater && date >= today ? 'later' : 'disabled';
+}
+
+// Whether a task moves into week `wk` as it is (the `move` kind): the next
+// week, or back to any week from today's on. Only these weeks can take a task
+// with no day - a Later entry is always a date.
+function rescheduleWeekMoves(wk, { openWeek, todayWeek }) {
+  return wk === offsetWeek(openWeek, 1) || (wk < openWeek && wk >= todayWeek);
 }
 
 // Whole weeks from week key `from` to `to`, negative going back.
@@ -21268,6 +21307,15 @@ async function afterScheduleWrite(written, { announce }) {
       } else if (kind === 'later') await sendLater(date);
     };
 
+    // A week number: the task moves there on Any day. A task on several days
+    // or counting repetitions keeps its days, as a day click leaves them.
+    const onPickWeek = async (wk) => {
+      if (currentWeekKey !== openWeek || !findNode(node.id)) return;
+      if (!rescheduleWeekMoves(wk, ctx)) return;
+      await moveNodeToWeek(node.id, { offset: weekDistance(openWeek, wk), day: keepDays ? undefined : null });
+      if (currentView === 'agenda') renderAgenda();
+    };
+
     const actions = [{
       icon: 'calendar-down', label: t('menu.now'),
       // Today, pinned to the top of today's agenda (the (now) token's effect).
@@ -21328,6 +21376,8 @@ async function afterScheduleWrite(written, { announce }) {
         return false;
       },
       onPick,
+      onPickWeek,
+      isWeekPickable: (wk) => rescheduleWeekMoves(wk, ctx),
       actions,
       // A repeat is a standing intention, so it leaves the week even when its
       // first day falls in it (see sendNodeToDate). Ticks and day leaves repeat
