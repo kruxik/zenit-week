@@ -476,6 +476,7 @@ _state.closeSettings = function() { closeSettings(); };
 _state.isSettingsOpen = function() { return isSettingsOpen(); };
 _state.selectSettingsTab = function(name) { selectSettingsTab(name); };
 _state.getSettingsTab = function() { return settingsActiveTab; };
+_state.holdSettingsHeight = function() { holdSettingsHeight(); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 _state.setViewLevel = function(v) { currentViewLevel = v; pebblesExtraDepth = 0; };
 _state.closeViewLevels = function() { closeViewLevels(); };

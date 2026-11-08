@@ -116,6 +116,34 @@ describe('Settings dialog tabs', () => {
   });
 });
 
+describe('Settings dialog height hold', () => {
+  // The AI tab changes height as the connection moves; the open window must
+  // not follow it down, or every flip of the switch makes it jump.
+  it('grows but never shrinks while open, and lets go on close', () => {
+    const dialog = el('settings-dialog');
+    _state.openSettings();
+    dialog.getBoundingClientRect = () => ({ height: 500 });
+    _state.holdSettingsHeight();
+    expect(dialog.style.minHeight).toBe('500px');
+    dialog.getBoundingClientRect = () => ({ height: 420 });
+    _state.holdSettingsHeight();
+    expect(dialog.style.minHeight).toBe('500px');
+    dialog.getBoundingClientRect = () => ({ height: 560 });
+    _state.holdSettingsHeight();
+    expect(dialog.style.minHeight).toBe('560px');
+    _state.closeSettings();
+    expect(dialog.style.minHeight).toBe('');
+  });
+
+  it('holds nothing while closed', () => {
+    const dialog = el('settings-dialog');
+    _state.closeSettings();
+    dialog.getBoundingClientRect = () => ({ height: 500 });
+    _state.holdSettingsHeight();
+    expect(dialog.style.minHeight).toBe('');
+  });
+});
+
 describe('Settings dialog markup', () => {
   const CONTROLS = {
     general: ['zoom-track', 'lang-select', 'theme-select', 'autolayout-toggle', 'tips-toggle', 'tips-replay-btn', 'settings-help-btn'],

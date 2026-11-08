@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-JloX7V+7nF3Wax390iOXDnj9AvJJ7UBXcH28AagocCM=';
+               'sha256-BNxj6h6nev/WCJU5wt2mWFIAtacmrEoStU/9RH/HB+c=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -19447,6 +19447,7 @@ function closeSettings() {
   const overlay = document.getElementById('settings-overlay');
   if (!overlay || !overlay.classList.contains('visible')) return;
   overlay.classList.remove('visible');
+  releaseSettingsHeight();
   const fab = document.getElementById('fab-settings');
   fab?.classList.remove('active');
   // Back to the gear it was opened from, unless focus already moved on.
@@ -26610,7 +26611,25 @@ function selectSettingsTab(name, { focus = false } = {}) {
   if (focus) document.getElementById('settings-tab-' + name)?.focus?.();
 }
 
+// While open, the window may grow but never shrink. Its height is the tallest
+// tab's, and the AI tab changes height on its own as the connection moves
+// (Off -> waiting -> Connected and back), so a window that followed it would
+// jump on every switch of the toggle. Called before such a change; released
+// on close and on a viewport resize, so min-height never outlives max-height.
+function holdSettingsHeight() {
+  if (!isSettingsOpen()) return;
+  const dialog = document.getElementById('settings-dialog');
+  const h = dialog.getBoundingClientRect?.().height || 0;
+  if (h > (parseFloat(dialog.style.minHeight) || 0)) dialog.style.minHeight = h + 'px';
+}
+
+function releaseSettingsHeight() {
+  const dialog = document.getElementById('settings-dialog');
+  if (dialog) dialog.style.minHeight = '';
+}
+
 function openSettings() {
+  releaseSettingsHeight();
   selectSettingsTab(settingsActiveTab);
   document.getElementById('settings-overlay').classList.add('visible');
   document.getElementById('fab-settings').classList.add('active');
@@ -26627,6 +26646,7 @@ function openSettings() {
     else openSettings();
   });
   document.getElementById('settings-close').addEventListener('click', () => closeSettings());
+  window.addEventListener('resize', releaseSettingsHeight);
   // The backdrop itself, never a click that started inside the dialog.
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeSettings();
@@ -27019,11 +27039,19 @@ function bridgeInitials(name) {
   return words.slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
 }
 
+// The guide waits this long in waiting-server before it appears. Switching on
+// passes through that state for the few milliseconds the sockets take to open;
+// shown at once, the guide would flash in and out on every switch-on.
+const BRIDGE_GUIDE_DELAY_MS = 1500;
+let _bridgeWaitingSince = 0;
+let _bridgeGuideTimer = null;
+
 function renderBridgeStatus() {
   const el = document.getElementById('bridge-status');
   const toggle = document.getElementById('bridge-toggle');
   // Shown only by initBridgeSettings at boot, after every bridge binding exists.
   if (!el || !toggle || document.getElementById('settings-tab-ai').hidden) return;
+  holdSettingsHeight();
   const rec = loadBridgeRecord();
   const supported = bridgeSupported();
   toggle.disabled = !supported;
@@ -27066,7 +27094,15 @@ function renderBridgeStatus() {
   list.hidden = !rows.length;
 
   // The guide also carries the extension download an update may need.
-  document.getElementById('bridge-guide').hidden = shown !== 'waiting-server' && shown !== 'update-server';
+  if (shown !== 'waiting-server') {
+    _bridgeWaitingSince = 0;
+    clearTimeout(_bridgeGuideTimer);
+  } else if (!_bridgeWaitingSince) {
+    _bridgeWaitingSince = Date.now();
+    _bridgeGuideTimer = setTimeout(renderBridgeStatus, BRIDGE_GUIDE_DELAY_MS);
+  }
+  const guideDue = shown === 'waiting-server' && Date.now() - _bridgeWaitingSince >= BRIDGE_GUIDE_DELAY_MS;
+  document.getElementById('bridge-guide').hidden = !(shown === 'update-server' || guideDue);
   const paired = document.getElementById('bridge-paired');
   paired.hidden = !rec.key;
   if (rec.key) {
