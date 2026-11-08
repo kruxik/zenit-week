@@ -1350,7 +1350,9 @@
   #settings-dialog {
     position: absolute;
     right: 12px;
-    top: 56px;
+    /* Level with #week-picker-fold: its top edge is the week label's bottom
+       (toolbar 56, label 36 centred in it) plus the fold's own 8px gap. */
+    top: 54px;
     width: 380px;
     max-width: calc(100vw - 24px);
     max-height: calc(100vh - 70px);
@@ -1451,7 +1453,8 @@
      so they stay pinned. dvh, so the window clears the browser's own bars as
      they slide in and out. */
   @media (max-width: 520px) {
-    #settings-dialog { width: 290px; top: 52px; max-height: calc(100dvh - 64px); }
+    /* Level with #week-picker-fold, which drops 4px below the toolbar here. */
+    #settings-dialog { width: 261px; top: calc(var(--toolbar-h) + 4px); max-height: calc(100dvh - 72px); }
   }
 
   .settings-section {
