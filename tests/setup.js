@@ -778,6 +778,12 @@ export const {
   weekActionClearWeek,
   openBaselinePanel,
   setHorizon,
+  setCollapsed,
+  collapsedCount,
+  focusBranch,
+  clearBranchFocus,
+  focusedNodeIds,
+  mindmapNodeBounds,
   applyHorizon,
   // Delete semantics
   weekKeyForDayString,

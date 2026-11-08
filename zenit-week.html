@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-xdPUPvXkH0y7vAryBIKSqheJJX27kXemz6hp8laneLc=';
+               'sha256-FcepTu+EW9ulkBJqP//0IVqjngbNk6WYSvdxpVUK0tY=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -657,7 +657,8 @@
      tasks, and the update-ready hint. One component, so they cannot drift
      apart; only one is ever visible at a time. */
   #playground-nudge,
-  #update-banner {
+  #update-banner,
+  #vision-empty-hint {
     position: fixed;
     bottom: 68px;
     /* Span the same gutters as the bottom bars (#undo-redo-bar, #fab-pill),
@@ -679,7 +680,8 @@
     transition: opacity 0.2s ease, transform 0.2s ease;
   }
   #playground-nudge.visible,
-  #update-banner.visible {
+  #update-banner.visible,
+  #vision-empty-hint.visible {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);
@@ -3789,6 +3791,10 @@
   }
 
   .node-group.no-add .add-btn { display: none; }
+  .collapse-badge { cursor: pointer; }
+  /* Focus branch: the rest of the Vision at the Dropped opacity. */
+  #main-svg .focus-dim { opacity: 0.45; }
+  #vision-empty-hint .dialog-body { padding: 12px 14px; }
 
   .add-btn {
     opacity: 0;
@@ -4384,6 +4390,17 @@
 
 <div id="view-level-toast"></div>
 
+<!-- The empty Vision's one hint: seeded areas, no intention yet. Gone with the
+     first add; the Vision has no coachmark set of its own. -->
+<div id="vision-empty-hint" class="dialog-shell" role="status" aria-live="polite">
+  <div class="dialog-header">
+    <div class="dialog-title" data-i18n="view.vision">Vision</div>
+  </div>
+  <div class="dialog-body">
+    <div data-i18n="vision.emptyHint">Add an intention to an area with its "+": where you want to go, and why.</div>
+  </div>
+</div>
+
 <div id="playground-nudge" class="dialog-shell" role="status" aria-live="polite">
   <div class="dialog-header">
     <div class="dialog-title" data-i18n="onboarding.nudgeCaption">Done exploring?</div>
@@ -4460,6 +4477,9 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item" id="ctx-rename"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"/></svg> <span data-i18n="menu.rename">Rename</span></div>
   <div class="ctx-item" id="ctx-comment"><svg class="icon" aria-hidden="true"><use href="#icon-message"/></svg> <span data-i18n="menu.comment">Comment</span></div>
   <div class="ctx-item" id="ctx-add-child"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg> <span data-i18n="menu.addActivity">Add Activity</span></div>
+  <div class="ctx-item" id="ctx-collapse"><svg class="icon" aria-hidden="true"><use href="#icon-caret-up"/></svg> <span data-i18n="menu.collapse">Collapse</span></div>
+  <div class="ctx-item" id="ctx-expand"><svg class="icon" aria-hidden="true"><use href="#icon-caret-down"/></svg> <span data-i18n="menu.expand">Expand</span></div>
+  <div class="ctx-item" id="ctx-focus"><svg class="icon" aria-hidden="true"><use href="#icon-telescope"/></svg> <span data-i18n="menu.focusBranch">Focus branch</span></div>
   <div class="ctx-separator" id="ctx-sep-color"></div>
   <div class="ctx-item" id="ctx-change-color"><span id="ctx-color-swatch"></span> <span data-i18n="menu.changeColor">Change color</span></div>
   <div class="ctx-separator" id="ctx-sep-3"></div>
@@ -6382,6 +6402,7 @@ function openVisionIntoView(record) {
 // The way back: the week the week bar names, as IndexedDB holds it now - a
 // Drive merge or a peer tab may have written it while the Vision was open.
 function reopenWeekIntoView(week) {
+  focusedBranchId = null;
   weekData = week;
   mapRecord = { kind: 'week' };
   rebuildNodeMap();
@@ -8667,8 +8688,15 @@ function localizeDayGroups(label) {
 // other node gets its day annotation localized.
 function nodeDisplayLabel(node) {
   if (!node) return '';
-  // Literal on the Vision: "(mo)" is text there, not a day to localise.
-  if (isVisionInView()) return node.label || '';
+  // Literal on the Vision: "(mo)" is text there, not a day to localise. The
+  // horizon rides on the label the way a lone day leaf rides on its task, and is
+  // never written into it.
+  if (isVisionInView()) {
+    const label = node.label || '';
+    return node.horizon && VISION_HORIZONS.has(node.horizon)
+      ? `${label} \u00b7 ${t('horizon.' + node.horizon)}`
+      : label;
+  }
   if (node.dayChild && node.dayIndex != null) return dayAbbr(node.dayIndex) || node.label || '';
   // A task with one day leaf shows that day on itself; the leaf is not drawn.
   const lone = node.type === 'activity' ? loneDayLeaf(node) : null;
@@ -12013,6 +12041,13 @@ const TRANSLATIONS = {
     'view.stats':                 'Stats',
     'view.vision':                'Vision',
     'menu.letGo':                 'Let go',
+    'menu.collapse':              'Collapse',
+    'menu.expand':                'Expand',
+    'menu.focusBranch':           'Focus branch',
+    'horizon.year':               'this year',
+    'horizon.years':              'in a few years',
+    'horizon.someday':            'someday',
+    'vision.emptyHint':           'Add an intention to an area with its "+": where you want to go, and why.',
     'menu.takeBack':              'Take back',
     'menu.horizon.year':          'This year',
     'menu.horizon.years':         'In a few years',
@@ -12448,6 +12483,13 @@ const TRANSLATIONS = {
     'view.stats':                 'Statistika',
     'view.vision':                'Vize',
     'menu.letGo':                 'Nechat být',
+    'menu.collapse':              'Sbalit',
+    'menu.expand':                'Rozbalit',
+    'menu.focusBranch':           'Zaměřit větev',
+    'horizon.year':               'letos',
+    'horizon.years':              'za pár let',
+    'horizon.someday':            'jednou',
+    'vision.emptyHint':           'Přidejte záměr k oblasti jejím „+“: kam chcete dojít a proč.',
     'menu.takeBack':              'Vzít zpět',
     'menu.horizon.year':          'Letos',
     'menu.horizon.years':         'Za pár let',
@@ -14838,6 +14880,82 @@ function touchLayout(id) {
   node._posTs = Date.now();
 }
 
+// ─── Collapse and focus (the Vision's two tools for a large map) ─────────────
+// A collapsed node is a leaf for layout: its subtree is pruned the way a view
+// level prunes, and the node wears the count of what it hides in place of its
+// "+". The mechanism reads the flag wherever it is; only the Vision offers it
+// (the flag never reaches a week node), so the week map is unchanged.
+function hasCollapsedAncestor(nodeId) {
+  let n = findNode(nodeId);
+  const seen = new Set();
+  while (n && n.parent && !seen.has(n.parent)) {
+    seen.add(n.parent);
+    const p = findNode(n.parent);
+    if (p && p.collapsed) return true;
+    n = p;
+  }
+  return false;
+}
+
+function collapsedCount(nodeId) {
+  return getDescendantIds(nodeId).length;
+}
+
+// Layout, not content: touchLayout, merged on _posTs, and no undo entry - a
+// collapse is like a zoom.
+function setCollapsed(nodeId, collapsed) {
+  if (!isVisionInView()) return false;
+  const node = findNode(nodeId);
+  if (!node || (node.type !== 'activity' && node.type !== 'branch')) return false;
+  const want = !!collapsed && (node.children || []).length > 0;
+  if (!!node.collapsed === want) return false;
+  if (want) node.collapsed = true;
+  else delete node.collapsed;
+  touchLayout(nodeId);
+  saveMapRecord();
+  renderIfVisible();
+  return true;
+}
+
+// Focus is view state, not data. One branch at a time; cleared by Esc, by
+// focusing another branch, by a click on the centre and by leaving the Vision.
+let focusedBranchId = null;
+
+function focusBranch(branchId) {
+  if (!isVisionInView()) return;
+  const b = findNode(branchId);
+  if (!b || b.type !== 'branch') return;
+  focusedBranchId = branchId;
+  applyFocusDim();
+  fitMindmapView();
+}
+
+function clearBranchFocus() {
+  if (focusedBranchId === null) return false;
+  focusedBranchId = null;
+  applyFocusDim();
+  return true;
+}
+
+// The ids a focus covers: the branch and every descendant of it.
+function focusedNodeIds() {
+  if (!focusedBranchId || !isVisionInView()) return null;
+  return new Set([focusedBranchId, ...getDescendantIds(focusedBranchId)]);
+}
+
+// Every other branch at the Dropped opacity, without the slash or the badge.
+function applyFocusDim() {
+  const ids = focusedNodeIds();
+  document.querySelectorAll('#main-svg .node-group[data-id]').forEach(g => {
+    const id = g.getAttribute('data-id');
+    g.classList.toggle('focus-dim', !!ids && id !== 'center' && !ids.has(id));
+  });
+  document.querySelectorAll('#main-svg path[data-to]').forEach(p => {
+    const to = p.getAttribute('data-to');
+    p.classList.toggle('focus-dim', !!ids && !!to && !ids.has(to));
+  });
+}
+
 function tombstoneNodes(ids) {
   audit('tombstoneNodes', { wk: currentWeekKey, ids: Array.from(ids) });
   if (!Array.isArray(weekData.tombstones)) weekData.tombstones = [];
@@ -15429,7 +15547,7 @@ function computeLayout() {
   // tight against each other.
   function isVisibleNode(nodeId) {
     return getNodeDepth(nodeId) < hideDepth && dayFilterMatches(nodeId, dayMatch) &&
-      !isHiddenDayLeaf(findNode(nodeId));
+      !isHiddenDayLeaf(findNode(nodeId)) && !hasCollapsedAncestor(nodeId);
   }
 
   // Children that take part in this layout pass: skip nodes being edited
@@ -15960,8 +16078,27 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
     g.appendChild(plusG);
   }
 
+  // A collapsed node shows what it hides, in the "+"'s place: branch colour,
+  // white numeral. A click expands it.
+  const collapsedKids = !isCenter && node?.collapsed && (node.children || []).length > 0;
+  if (collapsedKids) {
+    const bc = BRANCH_COLORS[branch] || { main: '#888888' };
+    const depth = getNodeDepth(id);
+    const r = (depth <= 2 ? 1.5 : 1.125) * 11;
+    const btnX = (side === 'left') ? -boxW / 2 : boxW / 2;
+    const badgeG = svgEl('g', { class: 'collapse-badge', 'data-id': id, transform: `translate(${btnX}, 0)` });
+    badgeG.appendChild(svgDisc(r, { fill: bc.main }));
+    const num = svgEl('text', {
+      x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+      fill: '#ffffff', 'font-size': (r * 0.95).toFixed(1), 'font-weight': '700', 'pointer-events': 'none',
+    });
+    num.textContent = String(collapsedCount(id));
+    badgeG.appendChild(num);
+    g.appendChild(badgeG);
+  }
+
   // "+" add-child button (hidden for counter nodes, day-child leaves, and inbox nodes)
-  if (!isCenter && type !== 'counter' && !node?.dayChild && !node?.tickChild && !node?.inbox) {
+  if (!collapsedKids && !isCenter && type !== 'counter' && !node?.dayChild && !node?.tickChild && !node?.inbox) {
     // Built whatever the view level, hidden by .no-add while a child would land
     // in a pruned level - a repack toggles the class without rebuilding.
     g.classList.toggle('no-add', !canAddChildAt(id));
@@ -19506,6 +19643,8 @@ function render() {
   dropHoverIfPruned(positions);
   applyFilters();
   updateSummary();
+  applyFocusDim();
+  updateVisionEmptyHint();
 
   markMapGeometryChanged();
   _mapDirty = false;
@@ -19776,6 +19915,9 @@ const ESC_DISMISSALS = [
   // something the user cannot see - that is what made leaving Agenda reset the
   // map instead. The gate is also what makes the walk read as last-in-first-out
   // without a stack: a view switch always outranks the map state beneath it.
+  // A focus is the more transient state, so it clears before the focus ring.
+  { isOpen: () => isVisionInView() && focusedBranchId !== null,
+    dismiss: () => { clearBranchFocus(); } },
   { isOpen: () => isMapView() && kbFocusId !== null,
     dismiss: () => { clearKbFocus(); } },
   // The views the user can back out of, before the map state they were set on
@@ -20265,6 +20407,7 @@ function attachNodeListeners() {
     g.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (e.target.closest('.add-btn')) return;
+      if (e.target.closest('.collapse-badge')) return;
       if (e.target.closest('.add-branch-btn')) return;
       if (e.target.closest('.counter-btn')) return;
       if (e.target.closest('.comment-badge')) return;
@@ -20311,6 +20454,7 @@ function attachNodeListeners() {
     // Tap-to-select: shows drag handle (mainly for touch; harmless on desktop)
     g.addEventListener('click', (e) => {
       if (e.target.closest('.add-btn')) return;
+      if (e.target.closest('.collapse-badge')) return;
       if (e.target.closest('.add-branch-btn')) return;
       if (e.target.closest('.counter-btn')) return;
       if (e.target.closest('.drag-handle')) return;
@@ -20319,6 +20463,14 @@ function attachNodeListeners() {
         if (el !== g) el.classList.remove('selected');
       });
       g.classList.add('selected');
+    });
+
+    g.querySelectorAll('.collapse-badge').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setCollapsed(badge.getAttribute('data-id'), false);
+      });
     });
 
     g.querySelectorAll('.add-btn').forEach(btn => {
@@ -20777,6 +20929,8 @@ function showContextMenu(x, y, nodeId) {
     const show = (...ids) => ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
     show('ctx-rename');
     if (canAddChildAt(contextTarget)) show('ctx-add-child');
+    if ((node.children || []).length) show(node.collapsed ? 'ctx-expand' : 'ctx-collapse');
+    if (isBranch) show('ctx-focus');
     if (isBranch) {
       show('ctx-sep-color', 'ctx-change-color');
       document.getElementById('ctx-color-swatch').style.background = BRANCH_COLORS[node.branch || nodeId]?.main || '#888';
@@ -20792,6 +20946,7 @@ function showContextMenu(x, y, nodeId) {
     return;
   }
   document.getElementById('ctx-sep-horizon').style.display = 'none';
+  ['ctx-collapse', 'ctx-expand', 'ctx-focus'].forEach(id => { document.getElementById(id).style.display = 'none'; });
   ['year', 'years', 'someday', 'none'].forEach(h => { document.getElementById('ctx-horizon-' + h).style.display = 'none'; });
 
   // Transfer items (Center only)
@@ -20923,6 +21078,13 @@ function positionContextMenu(x, y) {
   ctxMenu.style.left = Math.max(pad, Math.min(mx, vw - menuW - pad)) + 'px';
   ctxMenu.style.top  = Math.max(pad, Math.min(my, vh - menuH - pad)) + 'px';
   ctxMenu.style.visibility = '';
+}
+
+function updateVisionEmptyHint() {
+  const el = document.getElementById('vision-empty-hint');
+  if (!el) return;
+  const empty = isVisionInView() && !weekData.nodes.some(n => n.type === 'activity');
+  el.classList.toggle('visible', empty);
 }
 
 function hideContextMenu() {
@@ -21801,6 +21963,19 @@ document.getElementById('ctx-undone').addEventListener('click', () => {
     setStatus(target, findNode(target)?.dropped ? 'undropped' : 'undone');
   }
   if (currentView === 'agenda') renderAgenda();
+  hideContextMenu();
+});
+
+document.getElementById('ctx-collapse').addEventListener('click', () => {
+  if (contextTarget) setCollapsed(contextTarget, true);
+  hideContextMenu();
+});
+document.getElementById('ctx-expand').addEventListener('click', () => {
+  if (contextTarget) setCollapsed(contextTarget, false);
+  hideContextMenu();
+});
+document.getElementById('ctx-focus').addEventListener('click', () => {
+  if (contextTarget) focusBranch(contextTarget);
   hideContextMenu();
 });
 
@@ -25004,9 +25179,11 @@ function mindmapContentExtent(positions = computeLayout()) {
 }
 
 // Bounding box of the laid-out nodes; null when there is nothing to measure.
-function mindmapNodeBounds(positions) {
-  const nodes = Object.values(positions);
-  if (nodes.length <= 1) return null;
+function mindmapNodeBounds(positions, onlyIds = null) {
+  const nodes = onlyIds
+    ? Object.entries(positions).filter(([id]) => onlyIds.has(id)).map(([, p]) => p)
+    : Object.values(positions);
+  if (onlyIds ? nodes.length === 0 : nodes.length <= 1) return null;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   nodes.forEach(p => {
     const hw = (p.w || 80) / 2;
@@ -25102,7 +25279,8 @@ function fitMindmapView() {
   const bandH = band.bottom - band.top;
   const bandMidY = (band.top + band.bottom) / 2;
 
-  const bounds = mindmapNodeBounds(computeLayout());
+  // Inside a focus, F and the focus itself fit the focused branch only.
+  const bounds = mindmapNodeBounds(computeLayout(), focusedNodeIds());
   if (bounds) {
     const { minX, maxX, minY, maxY } = bounds;
     const pad = isMobile ? 20 : 60;
@@ -25635,6 +25813,8 @@ function endCenterPan(e) {
     panX = panStartPanX;
     panY = panStartPanY;
     applyTransform();
+    // The Vision's centre has no ring to explain; a click there ends a focus.
+    if (isVisionInView()) { clearBranchFocus(); return; }
     switchView('stats');
   }
 }
