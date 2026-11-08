@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-pQIFhyrkyZTy2bNbt/RDoiCbMnwaZ/msiQp6zJy+eGo=';
+               'sha256-BAMpsLjuAHLoEyLkRN7i4fIHCG23m9nE+zrgEP065g0=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -8744,21 +8744,55 @@ function buildMapCommentBadge(node, boxW, boxH) {
 const _textMeasureCache = new Map();
 const _TEXT_CACHE_MAX = 500;
 
+const TEXT_FONT_STACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+let _svgTextProbe = null;
+
+// A hidden <text> inside #main-svg, so it is laid out exactly as a node label
+// is: same font, same text-rendering. Canvas alone is not enough - Chrome can
+// lay geometricPrecision SVG text out up to 15% wider than canvas measures it
+// (seen in a tab that kept the state across reloads), and every box sized
+// from canvas then lets its label spill out over its badges.
+function svgTextProbe() {
+  if (_svgTextProbe && _svgTextProbe.isConnected) return _svgTextProbe;
+  const svg = document.getElementById('main-svg');
+  if (!svg || typeof svg.appendChild !== 'function') return null;
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  if (typeof el.getComputedTextLength !== 'function') return null;
+  el.setAttribute('visibility', 'hidden');
+  el.setAttribute('aria-hidden', 'true');
+  el.setAttribute('x', '-100000');
+  el.setAttribute('y', '-100000');
+  el.style.fontFamily = TEXT_FONT_STACK;
+  svg.appendChild(el);
+  _svgTextProbe = el;
+  return el;
+}
+
+// The width of a label in SVG units at its logical size, independent of zoom.
+// The SVG probe is the truth; canvas answers only when the map is not laid out
+// (another view in front, tests), and that answer is not cached, so the next
+// measure on a visible map replaces it.
 function measureText(text, fontSize, fontWeight = 'normal') {
-  // Measured at the logical size, independent of zoom: #main-svg renders text
-  // with geometricPrecision, so a label's width in SVG units is the same at
-  // every zoom level and equals what the canvas reports here.
   const key = fontWeight + '|' + fontSize + '|' + text;
   const cached = _textMeasureCache.get(key);
   if (cached !== undefined) return cached;
-  ctx.font = `${fontWeight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
-  const result = ctx.measureText(text).width;
-  _textMeasureCache.set(key, result);
-  if (_textMeasureCache.size > _TEXT_CACHE_MAX) {
-    // Map iteration is insertion order: drop the oldest entry (FIFO).
-    _textMeasureCache.delete(_textMeasureCache.keys().next().value);
+  const probe = svgTextProbe();
+  if (probe && text) {
+    probe.setAttribute('font-size', fontSize);
+    probe.setAttribute('font-weight', fontWeight);
+    probe.textContent = text;
+    const w = probe.getComputedTextLength();
+    if (w > 0) {
+      _textMeasureCache.set(key, w);
+      if (_textMeasureCache.size > _TEXT_CACHE_MAX) {
+        // Map iteration is insertion order: drop the oldest entry (FIFO).
+        _textMeasureCache.delete(_textMeasureCache.keys().next().value);
+      }
+      return w;
+    }
   }
-  return result;
+  ctx.font = `${fontWeight} ${fontSize}px ${TEXT_FONT_STACK}`;
+  return ctx.measureText(text).width;
 }
 
 // Map each canonical weekday index (0=Sun … 6=Sat) to its accepted tokens
