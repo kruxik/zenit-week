@@ -30,6 +30,7 @@ const labels = (rec) => rec.nodes.filter(n => n.type === 'activity').map(n => n.
 beforeEach(() => {
   _state.clearIDBStore();
   _state.resetSyncState();
+  _state.setMapKind('week');
   _state.setCurrentView('mindmap');
   _state.clearPendingRemoteMerge();
   _state.sandbox._tabPosts = [];
@@ -110,7 +111,7 @@ describe('mergeRemoteVision', () => {
   it('replaces the record in view when the Vision is on screen', async () => {
     const local = vision([branch('vb1', ['a']), intention('a', 'vb1')]);
     await _state.saveValueIDB('vision', structuredClone(local));
-    _state.setCurrentView('vision');
+    _state.setMapKind('vision');
     _state.set(structuredClone(local));
     await mergeRemoteVision(vision([branch('vb1', ['b']), intention('b', 'vb1')]));
     expect(labels(_state.get())).toEqual(['Intention a', 'Intention b']);
@@ -126,7 +127,7 @@ describe('peer tab', () => {
   });
 
   it('a tab with the Vision in view merges the peer write', async () => {
-    _state.setCurrentView('vision');
+    _state.setMapKind('vision');
     _state.set(vision([branch('vb1', ['a']), intention('a', 'vb1')]));
     await _state.saveValueIDB('vision', vision([branch('vb1', ['b']), intention('b', 'vb1')]));
     await onPeerVisionSaved({ type: 'week-saved', wk: 'vision', sig: 'x' });

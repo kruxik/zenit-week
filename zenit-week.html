@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-b2yelW1YRxkL6ksXLGlPrk8Gg1jtRkmWHF3TbIxsgf0=';
+               'sha256-8tptkAoU4/8MC2cSar2Km9r/3DqJtm25Vw5SG1uKliA=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -5718,7 +5718,7 @@ async function onPeerVisionSaved(msg) {
 // IndexedDB, so there is nothing to reconcile for them here.
 async function onPeerWeekSaved(msg) {
   const wk = msg.wk;
-  if (wk !== currentWeekKey) return;
+  if (!isWeekInMemory(wk)) return;
   // Cheap convergence dedup: identical content signature means already merged.
   // This guard also terminates any A→B→A re-broadcast echo.
   if (msg.sig && msg.sig === _weekContentSig(weekData)) return;
@@ -6274,7 +6274,116 @@ async function saveVision(data) {
 
 // Whether the map is drawing the vision record right now.
 function isVisionInView() {
-  return currentView === 'vision';
+  return mapRecord.kind === 'vision';
+}
+
+// Whether `wk` is the week held in memory. Every path that reads weekData as
+// "the current week" asks this rather than comparing keys, because while the
+// Vision is open currentWeekKey still names a week that is only in IndexedDB.
+function isWeekInMemory(wk) {
+  return wk === currentWeekKey && mapRecord.kind === 'week';
+}
+
+// The one save of the record the map is drawing. Every edit of the map ends
+// here; call sites that save a week by its key are about that week and stay
+// with saveWeek.
+function saveMapRecord() {
+  return mapRecord.kind === 'vision' ? saveVision(weekData) : saveWeek(currentWeekKey, weekData);
+}
+
+// The first areas of a vision: one branch per branch of the week in view, same
+// label and side, a copy of its palette under a new id (V4), and nothing else.
+// Pure apart from genId - it returns the record and which week branch each new
+// branch copies its colour from.
+function seedVisionFromWeek(week) {
+  const record = emptyVision();
+  const colorFrom = {};
+  const now = Date.now();
+  const branches = ((week && week.nodes) || []).filter(n => n.type === 'branch');
+  branches.forEach((b, i) => {
+    const id = genId();
+    colorFrom[id] = b.id;
+    record.nodes.push({
+      id, type: 'branch', branch: id,
+      label: typeof b.label === 'string' ? b.label : '',
+      side: b.side || BRANCH_CONFIG[b.id]?.side || (i === 0 ? 'left' : 'right'),
+      children: [],
+      _ts: now,
+    });
+  });
+  return { record, colorFrom };
+}
+
+// Loads the vision for the view, seeding it on the first open. A device that is
+// signed in asks Drive first and seeds only when Drive has answered that it
+// holds none: a seed that raced a download would give the user two sets of
+// areas, merged together forever. A Drive that could not be asked is not an
+// answer, so the vision opens empty and unseeded and the next open asks again.
+// Reads the week it seeds from before anything is swapped, so `week` is the
+// week record in view.
+async function loadVisionForView(week) {
+  let raw = null;
+  try { raw = await loadValueIDB(VISION_STORAGE_KEY); } catch { raw = null; }
+  if (raw) return validateAndRepairVision(raw);
+
+  let driveAnswer = 'absent';
+  if (googleAccessToken) {
+    driveAnswer = await syncVisionFromDrive();
+    try { raw = await loadValueIDB(VISION_STORAGE_KEY); } catch { raw = null; }
+    if (raw) return validateAndRepairVision(raw);
+  }
+  if (driveAnswer !== 'absent') return emptyVision();
+
+  const { record, colorFrom } = seedVisionFromWeek(week);
+  if (!record.nodes.length) return record;
+  for (const [id, from] of Object.entries(colorFrom)) {
+    BRANCH_COLORS[id] = deriveBranchPalette(BRANCH_COLORS[from]?.main || pickBranchColor());
+  }
+  saveBranchColors();
+  await saveVision(record);
+  return record;
+}
+
+// The Vision's openWeekIntoView: the record becomes the one in view. No
+// materialisation, no week lock, no next-week cache. Synchronous on purpose -
+// switchView calls it in the same step that flips the view, so there is no
+// moment where the view and the record disagree.
+function openVisionIntoView(record) {
+  weekData = record;
+  mapRecord = { kind: 'vision' };
+  rebuildNodeMap();
+  syncBranchConfig();
+  bridgeNotifyView();
+}
+
+// The way back: the week the week bar names, as IndexedDB holds it now - a
+// Drive merge or a peer tab may have written it while the Vision was open.
+function reopenWeekIntoView(week) {
+  weekData = week;
+  mapRecord = { kind: 'week' };
+  rebuildNodeMap();
+  syncBranchConfig();
+  bridgeNotifyView();
+}
+
+// Requests to change records resolve in order and only the latest one lands:
+// pressing V and then M while the vision is still loading ends on the Mindmap.
+let _recordSwapSeq = 0;
+
+// Loads what a switch between the Vision and the week views needs, then hands
+// it to `apply` in one synchronous step. Returns false when a later switch
+// overtook this one.
+async function swapMapRecordFor(view, apply) {
+  const seq = ++_recordSwapSeq;
+  const toVision = view === 'vision';
+  // Anything open on a node of the record being left belongs to that record.
+  if (commentTargetId) closeCommentDialog();
+  const next = toVision ? await loadVisionForView(weekData) : await loadWeek(currentWeekKey);
+  if (seq !== _recordSwapSeq) return false;
+  if (toVision) openVisionIntoView(next);
+  else reopenWeekIntoView(next);
+  apply();
+  return true;
 }
 
 // The one way a remote vision (another device via Drive, or a peer tab via the
@@ -7004,6 +7113,9 @@ function rebuildNodeMap() {
 }
 
 function takeSnapshot() {
+  // The week stacks never hold the vision: a vision snapshot carries the week's
+  // key and would write the vision over that week on undo.
+  if (mapRecord.kind !== 'week') return;
   // Deep clone and clean weekData before pushing to history
   const clone = JSON.parse(JSON.stringify(weekData));
   clone.nodes = clone.nodes.filter(n => !n._editing).map(n => {
@@ -7109,7 +7221,7 @@ async function _reverseOccurrences(entry, remove, { notBefore = null } = {}) {
       [occurrenceNodeId(entry.id, d), occurrenceDayNodeId(entry.id, d)]));
 
     await withWeekLock(wk, async () => {
-      const isOpen = wk === currentWeekKey;
+      const isOpen = isWeekInMemory(wk);
       const data = isOpen ? weekData : await loadWeek(wk);
       if (!data || !Array.isArray(data.nodes)) return;
       if (!Array.isArray(data.tombstones)) data.tombstones = [];
@@ -7424,7 +7536,7 @@ async function _applySnapshot(raw) {
 // `nextKey` is the destination week the snapshot scopes - the next week unless
 // the operation being reversed moved a task elsewhere.
 async function _currentSnapshot(wk = currentWeekKey, nextKey = offsetWeek(wk, +1)) {
-  const data = (wk === currentWeekKey && weekData?.nodes)
+  const data = (isWeekInMemory(wk) && weekData?.nodes)
     ? weekData
     : (await loadWeekIDB(wk)) || { nodes: [] };
   let nextRaw;
@@ -7448,6 +7560,8 @@ async function _currentSnapshot(wk = currentWeekKey, nextKey = offsetWeek(wk, +1
 }
 
 async function undo() {
+  // The week stacks are never run while the Vision is in view (R2, rows 3-4).
+  if (mapRecord.kind !== 'week') return;
   if (undoStack.length === 0) return;
   audit('undo', { wk: currentWeekKey, depth: undoStack.length });
   const raw = undoStack.pop();
@@ -7459,6 +7573,7 @@ async function undo() {
 }
 
 async function redo() {
+  if (mapRecord.kind !== 'week') return;
   if (redoStack.length === 0) return;
   audit('redo', { wk: currentWeekKey, depth: redoStack.length });
   const raw = redoStack.pop();
@@ -9759,7 +9874,7 @@ function hasEditingNode() {
 // atomic op, 'applied' when it is committed - syncWeekFromDrive reports the
 // difference upward, and both count as "seen".
 async function applyRemoteMerge(wKey, mergedData, mergedJson, mergedHash, scheduleUpload, remoteData, callerWillPush = false) {
-  if (wKey === currentWeekKey && (isAtomicOpActive() || hasEditingNode())) {
+  if (isWeekInMemory(wKey) && (isAtomicOpActive() || hasEditingNode())) {
     pendingRemoteMerge = { wKey, remoteData };
     // Nothing was committed, so the caller's upload cannot carry this merge -
     // the flush that eventually commits it schedules its own push.
@@ -9792,7 +9907,9 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
   // The agent's resource feed hears every origin: deduplicated by signature,
   // so a clean pull that changed nothing stays silent.
   bridgeNotifyWeekSaved(wKey, mergedData);
-  if (wKey === currentWeekKey) {
+  // While the Vision is open the merged week goes to IndexedDB only; leaving the
+  // Vision reloads it from there.
+  if (isWeekInMemory(wKey)) {
     // Re-render only when the merge actually altered visible content.
     // Skipping no-op renders kills the drift once seen after repeated
     // zoom+sync cycles, when measureText() still depended on zoom.
@@ -9842,7 +9959,7 @@ async function _flushPendingMerge() {
     // Reading IDB here would lose any node added to weekData since the last
     // completed write (e.g. the follow-up node from a chained commitEdit).
     // Other weeks aren't held in memory; IDB is authoritative for them.
-    const localData = (wKey === currentWeekKey)
+    const localData = isWeekInMemory(wKey)
       ? structuredClone(weekData)
       : (await loadWeekIDB(wKey)) || { nodes: [] };
     const mergedData = mergeWeekData(localData, remoteData, wKey);
@@ -11366,6 +11483,11 @@ let currentWeekKey = '';   // 'YYYY-WW'
 // that pass. An empty week draws an empty map, which is what that early frame
 // should show anyway.
 let weekData = { nodes: [], tombstones: [] };
+// Which record `weekData` holds: the week the week bar names, or the vision.
+// weekData holds the vision if and only if the Vision is the view (R1), and
+// switchView is the one place that flips this and swaps weekData, together and
+// in one synchronous step. currentWeekKey is never touched by the Vision.
+let mapRecord = { kind: 'week' };
 let currentLang = 'en';
 // Own keys only: `in` would also accept 'constructor' or '__proto__' from a
 // synced file or a browser language tag.
@@ -13312,6 +13434,10 @@ async function importAllData(file) {
 
     endParse(Object.keys(parsed.data).length + ' keys');
 
+    // The import rewrites weeks and reopens one; it never has to know about the
+    // Vision, because it leaves it first.
+    if (isVisionInView()) await switchView('mindmap');
+
     // Wipe existing IDB data
     const endWipe = traceSpan('import:wipe');
     const weekKeys = await listWeekKeysIDB();
@@ -13650,7 +13776,7 @@ async function transferFromPrevWeek(pickIds, prepareCopy) {
   // parent's done/unplanned status - resync up from each transferred node.
   newNodes.forEach(n => { syncStatusUp(n.id, 'done'); syncStatusUp(n.id, 'unplanned'); });
 
-  await saveWeek(currentWeekKey, weekData);
+  await saveMapRecord();
   endAtomicOp();
   renderIfVisible();
   applyAutoLayout();
@@ -13916,6 +14042,13 @@ function sweepPastDue(week, ctx) {
 // saveSchedule only queue their sync work, which is why they are safe here.
 // No snapshot is taken - materialisation is delivery, not a user edit.
 async function openWeekIntoView(wk) {
+  // Only ever called with the week as the record in view: loadAndRender and the
+  // hashchange handler leave the Vision first. Refusing here keeps a stray
+  // caller from putting a week into weekData behind the Vision's back.
+  if (mapRecord.kind !== 'week') {
+    console.error('[zenit-week] openWeekIntoView called while the Vision is in view');
+    return;
+  }
   // The overdue filter is current-week-only, and every caller sets currentWeekKey
   // before getting here - this does not set it itself. Clear it rather than leave the bar's "!" lit over a week
   // it no longer filters. Assigned directly, not via setDayFilter: the callers
@@ -13950,6 +14083,7 @@ async function openWeekIntoView(wk) {
 // reloads the record and takes the same non-re-entrant lock.
 async function materialiseOpenWeek() {
   const wk = currentWeekKey;
+  if (!isWeekInMemory(wk)) return;
   if (scheduleData.entries.length) {
     await withWeekLock(wk, async () => {
       if (materialiseWeek(wk, weekData)) await saveWeek(wk, weekData);
@@ -14405,7 +14539,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
   }
   if (!placed) {
     if (day !== undefined) {
-      await saveWeek(currentWeekKey, weekData);
+      await saveMapRecord();
       renderIfVisible();
     }
     endAtomicOp();
@@ -14463,7 +14597,7 @@ async function moveNodeToWeek(nodeId, { offset = 1, takeSnap = true, day } = {})
   //    step 4b, inside the lock.
   if (tickChild && findNode(originalParentId)) renumberTickChildren(originalParentId);
 
-  await saveWeek(currentWeekKey, weekData);
+  await saveMapRecord();
   endAtomicOp();
   renderIfVisible();
   applyAutoLayout();
@@ -14651,7 +14785,7 @@ function addBranch(side) {
   takeSnapshot();
   const { id } = createBranch({ side, label: 'New Branch', editing: true });
   saveBranchColors();
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   _openInlineInput(id, true);
   revealNewlyEditedNode(id);
 }
@@ -14690,7 +14824,7 @@ function deleteBranch(id) {
   delete BRANCH_CONFIG[id];
   rebuildNodeMap();
   saveBranchColors();
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   render();
   applyAutoLayout();
 }
@@ -14749,7 +14883,7 @@ function _performDelete(id, { snapshot = true } = {}) {
   weekData.nodes = weekData.nodes.filter(n => !toRemove.has(n.id));
   rebuildNodeMap();
   if (wasTick && origParentId) renumberTickChildren(origParentId);
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   renderIfVisible();
   applyAutoLayout();
   if (currentView === 'agenda') renderAgenda();
@@ -14855,7 +14989,7 @@ function setPriority(id, value) {
 // every snapshot-taking wrapper of applyStatus / setPriority, so the UI and the
 // bridge leave the screen in the same state.
 function commitStatusWrite(id, fullRenderNeeded) {
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   if (fullRenderNeeded) {
     renderIfVisible();
   } else {
@@ -16879,7 +17013,7 @@ function saveAgendaGroupOrder(tabKey, group, ids) {
   // Per-key timestamp drives LWW in mergeWeekData - bumping a document-level
   // savedAt would let any unrelated edit on another device clobber this order.
   weekData.agendaOrder[`${tabKey}-${group}`] = { ids, ts: Date.now() };
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
 }
 
 // Apply saved order to a node list; append unknowns; prune stale IDs.
@@ -17242,7 +17376,7 @@ function commitEdit(followUp = 'auto') {
     // startAddNode so a discard doesn't un-done the parent. Apply it now.
     if (isNew) finishNewTask(nodeId);
 
-    saveWeek(currentWeekKey, weekData);
+    saveMapRecord();
     // Deferred: this commit is usually triggered by a blur from a pointerdown
     // on another control - rebuilding now would eat that control's click.
     scheduleRender();
@@ -19306,7 +19440,7 @@ function toggleReusableNode(nodeId) {
   if (!n) return;
   takeSnapshot();
   setReusable(nodeId, !n.reusable);
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
 }
@@ -19731,7 +19865,7 @@ function _windowKeydownHandler(e) {
       if ((node.dayIndex ?? null) !== next) {
         takeSnapshot();
         setTickDay(id, next);
-        saveWeek(currentWeekKey, weekData);
+        saveMapRecord();
         render();
       }
     } else if (node.type === 'activity' && !node.dayChild) {
@@ -19739,7 +19873,7 @@ function _windowKeydownHandler(e) {
       const currentDays = taskDays(node);
       const mode = e.key === '8' ? 'clear' : taskDayMode(node);
       if (applyDayReschedule(id, mode, { currentDays, newDayIndex: KEY_TO_DAY[e.key] })) {
-        saveWeek(currentWeekKey, weekData);
+        saveMapRecord();
         render();
       }
 
@@ -19756,7 +19890,7 @@ function _windowKeydownHandler(e) {
         currentDayIndex: node.dayIndex,
         newDayIndex: KEY_TO_DAY[e.key],
       })) {
-        saveWeek(currentWeekKey, weekData);
+        saveMapRecord();
         render();
       }
     }
@@ -19793,7 +19927,7 @@ function updateCounter(id, dir) {
     touchNode(id);
     syncStatusUp(id, 'done');
 
-    saveWeek(currentWeekKey, weekData);
+    saveMapRecord();
 
     // Same reason as setStatus: clearing a drop removes a badge and a slash,
     // which the surgical path cannot do.
@@ -20086,7 +20220,7 @@ function sendNodeToDate(nodeId, options) {
   if (!unit && weekKeyForDayString(anchor) === currentWeekKey) {
     takeSnapshot();
     setActivityDays(nodeId, new Set([weekdayOfDayString(anchor)]));
-    saveWeek(currentWeekKey, weekData);
+    saveMapRecord();
     return [];
   }
 
@@ -20163,7 +20297,7 @@ async function deleteOccurrence(entryId, date) {
   const ids = [occurrenceNodeId(entryId, date), occurrenceDayNodeId(entryId, date)];
 
   await withWeekLock(wk, async () => {
-    const data = wk === currentWeekKey ? weekData : await loadWeek(wk);
+    const data = isWeekInMemory(wk) ? weekData : await loadWeek(wk);
     if (!Array.isArray(data.tombstones)) data.tombstones = [];
     const buried = new Set(data.tombstones);
     const live = new Set(ids);
@@ -20225,7 +20359,7 @@ async function pullOccurrenceIntoWeek(entryId, date, dayIndex) {
   let planted = false;
   await withWeekLock(currentWeekKey, async () => {
     planted = plantOccurrence(ctx, entry, date, dayIndex);
-    if (planted) await saveWeek(currentWeekKey, weekData);
+    if (planted) await saveMapRecord();
   });
   if (!planted) return false;
 
@@ -20662,7 +20796,7 @@ document.getElementById('bp-apply').addEventListener('click', () => {
   if (!isNaN(val) && val >= 1) {
     takeSnapshot();
     weekData.baseline = val;
-    saveWeek(currentWeekKey, weekData);
+    saveMapRecord();
     updateSummary();
   }
   closeBaselinePanel();
@@ -21079,7 +21213,7 @@ async function afterScheduleWrite(written, { announce }) {
   }
 
   const afterMutation = () => {
-    saveWeek(currentWeekKey, weekData);
+    saveMapRecord();
     renderIfVisible();
     if (currentView === 'agenda') renderAgenda();
   };
@@ -21330,7 +21464,7 @@ async function clearWeek(withPlayground) {
     await applyPlaygroundColors(idFor, (b) => idMap.get(b) === b);
   }
   rebuildNodeMap();
-  await saveWeek(currentWeekKey, weekData);
+  await saveMapRecord();
   syncBranchConfig();
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
@@ -21375,7 +21509,7 @@ document.getElementById('ctx-reset').addEventListener('click', () => {
       node.ticks = [];
       touchNode(contextTarget);
       syncStatusUp(contextTarget, 'done');
-      saveWeek(currentWeekKey, weekData);
+      saveMapRecord();
       updateNodeUI(contextTarget);
       updateSummary();
     }
@@ -22501,7 +22635,7 @@ function persistCommentDraft() {
     return;
   }
   writeComment(id, write);
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
 
   // The map badge appears, disappears or changes its checklist count - none of
   // which updateNodeUI can do surgically, so those take a full render.
@@ -24348,16 +24482,31 @@ function isCommentDialogOpen() {
 // content layers (canvas, agenda panel, stats panel) so no hidden view stays
 // "live" behind another - the source of the earlier stale-control bugs.
 // All three are persisted, so a refresh lands back on the view the user left.
-function switchView(view) {
+//
+// The Vision is the fourth view and the one that changes the record: entering
+// or leaving it swaps weekData first (swapMapRecordFor) and shows the view in
+// the same step, so Agenda and Stats never read the vision and the Vision never
+// draws a week. A switch that swaps returns a promise and re-enters here with
+// `swapped` once the record is in place; one that does not runs synchronously,
+// as it always has. `swapped` also means the map is redrawn and refitted.
+function switchView(view, opts) {
+  const swapped = !!(opts && opts.swapped);
+  if (!swapped && (view === 'vision') !== isVisionInView()) {
+    return swapMapRecordFor(view, () => switchView(view, { swapped: true }));
+  }
+  // A switch that needs no swap still overtakes one that is loading: V and then
+  // M before the vision arrived ends on the Mindmap, with the week.
+  if (!swapped) _recordSwapSeq++;
   currentView = view;
+  const isMapView = view === 'mindmap' || view === 'vision';
   // Help is a modal floating over whichever view is beneath it; navigating to
   // any view dismisses it first so the destination is actually visible.
   if (window.doCloseHelp) window.doCloseHelp();
   // The mobile level row belongs to the mindmap; leaving it takes the row along.
   // So does the keyboard focus ring - hoveredNodeId must not follow the user
   // into a view where nothing can clear it.
-  if (view !== 'mindmap') {
-    closeViewLevels();
+  if (!isMapView || swapped) {
+    if (!isMapView) closeViewLevels();
     clearKbFocus();
   }
   localStorage.setItem('zenit-week-view', view);
@@ -24377,6 +24526,8 @@ function switchView(view) {
 
   // Pill highlight
   btnMM.classList.toggle('active', view === 'mindmap');
+  const btnVI = document.getElementById('vtb-vision');
+  if (btnVI) btnVI.classList.toggle('active', view === 'vision');
   btnAG.classList.toggle('active', isAgenda);
   btnST.classList.toggle('active', isStats);
 
@@ -24408,8 +24559,13 @@ function switchView(view) {
     // it), so that is the one case where the DOM can be stale. Coming back from
     // Stats, or from either view on desktop, the map on screen is already current
     // and only needs unhiding.
-    if (_mapDirty) render();
+    if (swapped) { render(); fitMindmapView(); }
+    else if (_mapDirty) render();
   }
+  // The record changed under a hidden mobile canvas: renderIfVisible draws it,
+  // or flags it for the way back.
+  if (swapped && (isAgenda || isStats) && !isDesktop) renderIfVisible();
+  return undefined;
 }
 
 // Ensure layout updates on resize for the overlay views (agenda / stats), which
@@ -24695,7 +24851,7 @@ function applyAutoLayout() {
   weekData.nodes.forEach(n => {
     if (n.type !== 'center') { n.offX = 0; n.offY = 0; }
   });
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   renderIfVisible();
 }
 
@@ -25140,7 +25296,7 @@ function endCenterPan(e) {
     weekData.nodes.forEach(n => {
       if (n.type !== 'center') { n.offX = 0; n.offY = 0; touchLayout(n.id); }
     });
-    saveWeek(currentWeekKey, weekData);
+    saveMapRecord();
     render();
   } else {
     // The root wears the week's completion ring, so a click on it - anywhere
@@ -25316,7 +25472,7 @@ function handleNodeDrop(mouseX, mouseY) {
     touchLayout(nodeId);
   }
 
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   render();
   applyAutoLayout();
 }
@@ -26277,6 +26433,9 @@ async function loadAndRender(wk) {
   // meaningless. Refit below, exactly as a fresh load would. Boot (no previous
   // week) is excluded: init owns the first fit, and its quiet-refresh restore
   // must not be overwritten.
+  // A week is opened on a week view: from the Vision (the agent's open_week, an
+  // import) the Mindmap comes back first, with the week it left.
+  if (isVisionInView()) await switchView('mindmap');
   const refit = currentWeekKey && currentWeekKey !== wk;
   // The draft belongs to the week on screen - save it there before the key
   // moves, or its node is gone from the week the autosave then looks in.
@@ -26313,6 +26472,7 @@ window.addEventListener('hashchange', async () => {
   const hashWeek = location.hash.slice(1);
   const target = /^\d{4}-\d{2}$/.test(hashWeek) ? hashWeek : todayWeekKey();
   if (target !== currentWeekKey) {
+    if (isVisionInView()) await switchView('mindmap');
     if (commentTargetId) closeCommentDialog();
     currentWeekKey = target;
     if (_importInProgress && _pendingImportData && _pendingImportData.has(target)) {
@@ -26809,7 +26969,7 @@ document.addEventListener('click', (e) => {
       await moveNodeToWeek(node.id, { takeSnap: false });
     } else {
       finishNewTask(node.id);
-      saveWeek(currentWeekKey, weekData);
+      saveMapRecord();
     }
     renderIfVisible();
     if (currentView === 'agenda') renderAgenda();
@@ -27335,7 +27495,7 @@ function _bridgeSyncWrite(tool, def, args) {
     _bridgeRollback(redoBefore);
     throw err;
   }
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   renderIfVisible();
   if (currentView === 'agenda') renderAgenda();
   _bridgeAnnounce(summary, out && out.pulse);
@@ -27347,7 +27507,7 @@ function _bridgeRollback(redoBefore) {
   redoStack = redoBefore;
   if (!raw) return;
   const snap = JSON.parse(raw);
-  if (snap.weekKey === currentWeekKey && snap.weekData) {
+  if (isWeekInMemory(snap.weekKey) && snap.weekData) {
     weekData = snap.weekData;
     rebuildNodeMap();
   }
@@ -27510,7 +27670,7 @@ function projectTask(n, byId = nodeMap) {
 const _bridgeProjected = id => projectTask(findNode(id));
 
 async function _bridgeWeekRecord(wk) {
-  if (wk === currentWeekKey) return weekData; // memory, never the lagging IDB copy
+  if (isWeekInMemory(wk)) return weekData; // memory, never the lagging IDB copy
   return loadWeekIDB(wk);
 }
 
@@ -28032,7 +28192,7 @@ function relabelDemoNodes() {
     n._ts = Date.now();   // carry the new wording out to the other devices
     changed++;
   });
-  if (changed) saveWeek(currentWeekKey, weekData);
+  if (changed) saveMapRecord();
   return changed;
 }
 
@@ -28069,7 +28229,7 @@ function clearExampleTasks() {
     if (Array.isArray(n.children)) n.children = n.children.filter(id => !removed.has(id));
   });
   rebuildNodeMap();
-  saveWeek(currentWeekKey, weekData);
+  saveMapRecord();
   render();
   if (typeof updateSummary === 'function') updateSummary();
   return removed.size;

@@ -462,6 +462,11 @@ _state.setCommentTyped = function(v) { commentTyped = v; };
 _state.getRestoreKey = function() { return RESTORE_KEY; };
 _state.getCommentEditor = function() { return commentEditor; };
 _state.setCurrentView = function(v) { currentView = v; };
+// The record descriptor and the view flip together in the app (switchView);
+// tests that stage the Vision without a switch set both.
+_state.setMapKind = function(kind) { mapRecord = { kind }; currentView = kind === 'vision' ? 'vision' : (currentView === 'vision' ? 'mindmap' : currentView); };
+_state.getMapKind = function() { return mapRecord.kind; };
+_state.getRecordSwapSeq = function() { return _recordSwapSeq; };
 _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 // hoveredNodeId / kbFocusId are module-level \`let\`s - the hotkeys read the first
@@ -751,6 +756,14 @@ export const {
   syncVisionToDrive,
   syncVisionFromDrive,
   importCarriesRecord,
+  isVisionInView,
+  isWeekInMemory,
+  saveMapRecord,
+  seedVisionFromWeek,
+  loadVisionForView,
+  openVisionIntoView,
+  swapMapRecordFor,
+  onPeerWeekSaved,
   // Delete semantics
   weekKeyForDayString,
   deleteOccurrence,
