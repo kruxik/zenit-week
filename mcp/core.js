@@ -20,9 +20,21 @@ export const READ_TOOLS = new Set(['read_weeks', 'read_week', 'read_schedule', '
 const ALLOWED_EXACT = new Set(['https://zenitweek.com', 'https://www.zenitweek.com']);
 const ALLOWED_DEV = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
 
-export function isAllowedOrigin(origin) {
+// `extra` holds origins added with --allow-origin (a dev tunnel such as ngrok).
+// Only https origins are accepted there, compared exactly.
+export function isAllowedOrigin(origin, extra = []) {
   if (typeof origin !== 'string') return false;
-  return ALLOWED_EXACT.has(origin) || ALLOWED_DEV.test(origin);
+  return ALLOWED_EXACT.has(origin) || ALLOWED_DEV.test(origin) || extra.includes(origin);
+}
+
+// Normalises an --allow-origin value to a bare https origin, or null.
+export function parseExtraOrigin(value) {
+  try {
+    const u = new URL(String(value));
+    return u.protocol === 'https:' && !u.username && !u.password ? u.origin : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 // Same construction as the page: HMAC-SHA256 over the nonce, keyed with the

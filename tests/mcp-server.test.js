@@ -2,7 +2,7 @@
 // handshake timeout, rate budget, tab routing, no_app_tab, resource updates.
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  Relay, isAllowedOrigin, proofFor, urisForWeekSaved, loadOrCreateToken,
+  Relay, isAllowedOrigin, parseExtraOrigin, proofFor, urisForWeekSaved, loadOrCreateToken,
   HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN,
 } from '../mcp/core.js';
 import { bridgeHmac } from './setup.js';
@@ -48,6 +48,19 @@ describe('origin allowlist', () => {
       'http://localhost.evil.com', 'http://127.0.0.1.nip.io', 'https://localhost:3000', 'chrome-extension://abc']) {
       expect(isAllowedOrigin(o)).toBe(false);
     }
+  });
+});
+
+describe('--allow-origin', () => {
+  test('accepts exactly the https origin it names', () => {
+    const extra = [parseExtraOrigin('https://dev-x.ngrok.app/app')];
+    expect(extra).toEqual(['https://dev-x.ngrok.app']);
+    expect(isAllowedOrigin('https://dev-x.ngrok.app', extra)).toBe(true);
+    expect(isAllowedOrigin('https://dev-y.ngrok.app', extra)).toBe(false);
+    expect(isAllowedOrigin('https://dev-x.ngrok.app', [])).toBe(false);
+    expect(parseExtraOrigin('http://dev-x.ngrok.app')).toBeNull();
+    expect(parseExtraOrigin('https://u:p@dev-x.ngrok.app')).toBeNull();
+    expect(parseExtraOrigin('nope')).toBeNull();
   });
 });
 

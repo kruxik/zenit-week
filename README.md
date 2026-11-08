@@ -110,7 +110,7 @@ claude mcp add zenit-week -- node "$PWD/server.js"
 node server.js pair    # prints the pairing code and copies it
 ```
 
-Paste the code in **Settings > Agent bridge** and choose **Allow** when the browser asks to reach apps on this computer (in Firefox, also tick "Remember my choice"). `node server.js rotate` makes a new code and unpairs every tab; **Disconnect and forget**, signing out or resetting removes the pairing in the app. Add `--open` to the server command to have it open the app when no tab is connected.
+Paste the code in **Settings > Agent bridge** and choose **Allow** when the browser asks to reach apps on this computer (in Firefox, also tick "Remember my choice"). `node server.js rotate` makes a new code and unpairs every tab; **Disconnect and forget**, signing out or resetting removes the pairing in the app. Add `--open` to the server command to have it open the app when no tab is connected. For a dev tunnel (ngrok), add `--allow-origin https://<your-tunnel-host>`.
 
 ## Privacy
 

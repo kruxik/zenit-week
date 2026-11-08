@@ -7,6 +7,7 @@
 //   zenit-week-mcp pair       print the pairing code again and copy it
 //   zenit-week-mcp rotate     make a new code; every paired tab must re-pair
 //   options: --port <n>  --open (launch the app when no tab is connected)
+//            --allow-origin <https-url> (also accept that page origin, e.g. an ngrok dev tunnel)
 //
 // stdout belongs to the MCP protocol: everything human-readable goes to stderr.
 import { spawn } from 'node:child_process';
@@ -16,7 +17,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import {
-  DEFAULT_PORT, OPEN_WAIT_MS, Relay, RelayError, isAllowedOrigin, loadOrCreateToken,
+  DEFAULT_PORT, OPEN_WAIT_MS, Relay, RelayError, isAllowedOrigin, parseExtraOrigin, loadOrCreateToken,
   pairingCode, tokenPath, urisForWeekSaved,
 } from './core.js';
 
@@ -27,6 +28,14 @@ const portArg = argv.indexOf('--port');
 const PORT = portArg >= 0 ? parseInt(argv[portArg + 1], 10) : DEFAULT_PORT;
 const OPEN = argv.includes('--open');
 const err = (...a) => process.stderr.write(a.join(' ') + '\n');
+// --allow-origin https://<host> (repeatable): an extra page origin, for a dev tunnel.
+const EXTRA_ORIGINS = [];
+argv.forEach((a, i) => {
+  if (a !== '--allow-origin') return;
+  const o = parseExtraOrigin(argv[i + 1]);
+  if (!o) { err('zenit-week-mcp: --allow-origin needs an https URL'); process.exit(2); }
+  EXTRA_ORIGINS.push(o);
+});
 
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) { err('zenit-week-mcp: --port must be 1-65535'); process.exit(2); }
 
@@ -180,7 +189,7 @@ const wss = new WebSocketServer({
   host: '127.0.0.1',
   port: PORT,
   maxPayload: 4 * 1024 * 1024,
-  verifyClient: ({ origin }) => isAllowedOrigin(origin),
+  verifyClient: ({ origin }) => isAllowedOrigin(origin, EXTRA_ORIGINS),
 });
 wss.on('connection', ws => {
   const tab = relay.onOpen(ws);
