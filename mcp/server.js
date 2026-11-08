@@ -72,8 +72,10 @@ if (cmd === 'origins') {
 }
 if (cmd !== 'serve') { err(`zenit-week-mcp: unknown command "${cmd}"`); process.exit(2); }
 
-// Which update hint the page shows on a protocol mismatch (setup spec 4.5, row 4).
-const INSTALL = /[\\/]_npx[\\/]/.test(fileURLToPath(import.meta.url)) ? 'npx' : 'repo';
+// Which update hint the page shows on a protocol mismatch (setup spec 4.5,
+// row 4). The Claude Desktop extension says so in its manifest's env.
+const INSTALL = process.env.ZENIT_WEEK_MCP_INSTALL === 'mcpb' ? 'mcpb'
+  : /[\\/]_npx[\\/]/.test(fileURLToPath(import.meta.url)) ? 'npx' : 'repo';
 
 // ── MCP side ──
 const mcp = new McpServer(

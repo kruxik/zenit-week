@@ -4,7 +4,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   _state, genId, defaultWeekData, findNode, rebuildNodeMap, getTickInfo,
-  bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeUnpair,
+  bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeUnpair, bridgeUpdateHintKey,
   bridgeSocketUrl, loadBridgeRecord, saveBridgeRecord, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
   mergeWeekData, applyRemoteMerge, weekContentHash, reloadAppFresh,
@@ -35,7 +35,8 @@ class FakeSocket {
     const page = this;
     srv.ws = {
       send: s => { const f = JSON.parse(s); queueMicrotask(() => page.receive(f)); },
-      close: (code, reason) => { page.closed = { code, reason }; queueMicrotask(() => page.drop(reason, code)); },
+      // Frames sent before the close still arrive, as on a real socket.
+      close: (code, reason) => queueMicrotask(() => { page.closed = { code, reason }; page.drop(reason, code); }),
     };
     srv.tab = srv.relay.onOpen(srv.ws, srv.origin || ORIGIN);
     this.srv = srv;
@@ -201,7 +202,8 @@ describe('connection', () => {
     const ws = await (async () => { await until(() => socketOn(47831).srv); return socketOn(47831); })();
     await ws.drop('handshake timeout', 4002);
     expect(_state.getBridgeStatus().state).toBe('update-server');
-    expect(_state.getBridgeStatus().agents).toEqual([{ port: 47831, client: '', state: 'old' }]);
+    expect(_state.getBridgeStatus().agents).toEqual([{ port: 47831, client: '', state: 'old', install: null }]);
+    expect(bridgeUpdateHintKey(_state.getBridgeStatus().agents)).toBe('bridge.state.update-server');
     bridgeDisconnect();
     sockets = [];
     servers = new Map();
@@ -210,6 +212,39 @@ describe('connection', () => {
     await until(() => socketOn(47832).srv);
     await socketOn(47832).drop('protocol', 4003);
     expect(_state.getBridgeStatus().state).toBe('reload-app');
+  });
+});
+
+describe('protocol mismatch names the side to update (setup spec 4.5)', () => {
+  test('an older server says how it was installed; the hint follows it', async () => {
+    const relay = new Relay({ pairings: memoryPairings(), install: 'mcpb' });
+    relay.onMessage = (tab, text) => {
+      // A server one protocol behind: what core.js sends on a mismatch.
+      if (JSON.parse(text).type === 'open') { tab.ws.send(JSON.stringify({ type: 'mismatch', protocol: 1, install: 'mcpb' })); tab.ws.close(4003, 'protocol'); }
+    };
+    relay.onOpen = ws => ({ ws });
+    servers.set(47831, { relay, tab: null });
+    turnOn();
+    await until(() => _state.getBridgeStatus().state === 'update-server');
+    expect(_state.getBridgeStatus().agents).toEqual([{ port: 47831, client: '', state: 'old', install: 'mcpb' }]);
+    expect(bridgeUpdateHintKey(_state.getBridgeStatus().agents)).toBe('bridge.state.update-server-mcpb');
+  });
+
+  test('a newer server reads as Reload Zenit Week', async () => {
+    const relay = { onOpen: ws => ({ ws }), onClose: () => {}, onMessage: (tab, text) => {
+      if (JSON.parse(text).type === 'open') { tab.ws.send(JSON.stringify({ type: 'mismatch', protocol: 3, install: 'npx' })); tab.ws.close(4003, 'protocol'); }
+    } };
+    servers.set(47831, { relay, tab: null });
+    turnOn();
+    await until(() => _state.getBridgeStatus().state === 'reload-app');
+  });
+
+  test('hints: one per shared install path, both when any cannot say', () => {
+    const old = install => ({ port: 1, client: '', state: 'old', install });
+    expect(bridgeUpdateHintKey([old('npx'), old('npx')])).toBe('bridge.state.update-server-npx');
+    expect(bridgeUpdateHintKey([old('repo')])).toBe('bridge.state.update-server-repo');
+    expect(bridgeUpdateHintKey([old('npx'), old('mcpb')])).toBe('bridge.state.update-server');
+    expect(bridgeUpdateHintKey([old(null)])).toBe('bridge.state.update-server');
   });
 });
 

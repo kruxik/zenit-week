@@ -105,10 +105,12 @@ describe('handshake', () => {
     expect(ws.sent[0]).toMatchObject({ paired: false, unknown: true });
   });
 
-  test('a v1 page, or another protocol, is closed with protocol', () => {
+  test('a v1 page, or another protocol, hears the server\'s protocol and install, then is closed', () => {
+    relay.install = 'mcpb';
     for (const frame of [{ type: 'challenge', nonce: 'x'.repeat(32) }, { type: 'open', protocol: 3 }]) {
       const ws = new Sock();
       relay.onMessage(relay.onOpen(ws, ORIGIN), JSON.stringify(frame));
+      expect(ws.sent).toEqual([{ type: 'mismatch', protocol: PROTOCOL, install: 'mcpb' }]);
       expect(ws.closed).toEqual({ code: 4003, reason: 'protocol' });
     }
   });
@@ -423,5 +425,39 @@ describe('production and dev side by side (setup spec section 6)', () => {
     expect(readOrigins(file)).toEqual([]);
     expect(removeOrigin('abc.ngrok-free.app', file)).toBe(false);
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('Claude Desktop extension (setup spec section 3.2)', () => {
+  const root = new URL('..', import.meta.url);
+  const read = p => fs.readFileSync(new URL(p, root), 'utf8');
+  const manifest = JSON.parse(read('mcp/manifest.json'));
+
+  test('manifest 0.3 with the required fields, a node server and the mcpb install marker', () => {
+    expect(manifest.manifest_version).toBe('0.3');
+    for (const k of ['name', 'version', 'description', 'author', 'server']) expect(manifest[k]).toBeTruthy();
+    expect(manifest.author.name).toBeTruthy();
+    expect(manifest.server).toEqual({
+      type: 'node', entry_point: 'server.js',
+      mcp_config: { command: 'node', args: ['${__dirname}/server.js'], env: { ZENIT_WEEK_MCP_INSTALL: 'mcpb' } },
+    });
+    expect(manifest.compatibility.runtimes.node).toBe('>=20.0.0');
+    expect(manifest.user_config).toBeUndefined(); // dev sites go through `origins add`, one way for every install
+  });
+
+  test('same version as the npm package', () => {
+    expect(manifest.version).toBe(JSON.parse(read('mcp/package.json')).version);
+  });
+
+  test('declares exactly the tools the server registers', () => {
+    const registered = [...read('mcp/server.js').matchAll(/^tool\('([a-z_]+)'/gm)].map(m => m[1]);
+    expect(manifest.tools.map(t => t.name)).toEqual(registered);
+    expect(manifest.tools.every(t => t.description)).toBe(true);
+  });
+
+  test('every bundled file exists, the icon among them', async () => {
+    const { BUNDLE_FILES } = await import('../scripts/mcp-bundle.mjs');
+    for (const f of BUNDLE_FILES) expect(fs.existsSync(new URL(f.from, root)), f.from).toBe(true);
+    expect(BUNDLE_FILES.map(f => f.to)).toEqual(expect.arrayContaining(['manifest.json', manifest.server.entry_point, 'core.js', manifest.icon]));
   });
 });

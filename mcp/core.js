@@ -303,8 +303,14 @@ export class Relay {
   }
 
   _onFirstFrame(tab, f) {
-    // A v1 page opens with `challenge`; any other protocol is told to reload.
-    if (f.type === 'challenge' || (f.type === 'open' && f.protocol !== PROTOCOL)) { this._close(tab, 4003, 'protocol'); return; }
+    // A v1 page opens with `challenge`. On any mismatch the server names its
+    // protocol and install path first, so a newer page can say which side to
+    // update and how (setup spec 4.5), then closes.
+    if (f.type === 'challenge' || (f.type === 'open' && f.protocol !== PROTOCOL)) {
+      this._send(tab, { type: 'mismatch', protocol: PROTOCOL, install: this.install });
+      this._close(tab, 4003, 'protocol');
+      return;
+    }
     if (f.type !== 'open') return;
     clearTimeout(tab.timer);
     tab.state = 'open';

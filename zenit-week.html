@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-4qoLiZUbck3DbeXQ43Ja613bkwMwWEPg6ReCnmF0+48=';
+               'sha256-vUnJ6dzrNUV6swvbuRbv6+B98Bf+GodzNdQS3X5K6PE=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4691,11 +4691,13 @@ Or remove them later in Settings → Help.</div>
     <div id="bridge-agents" class="bridge-list" hidden></div>
     <div id="bridge-guide" class="bridge-list" hidden>
       <div class="bridge-note bridge-guide-title" data-i18n="bridge.guide.title">Connect an agent</div>
+      <div class="bridge-row"><span>Claude Desktop</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-desktop" data-i18n="bridge.guide.download">Download</button></div>
+      <div class="bridge-note" data-i18n="bridge.guide.desktopNote">No setup needed: open the file and confirm in Claude Desktop.</div>
       <div class="bridge-row"><span>Claude Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-code" data-i18n="bridge.guide.copyCommand">Copy command</button></div>
       <div class="bridge-row"><span>Cursor</span><button type="button" class="agenda-action-btn" id="bridge-guide-cursor" data-i18n="bridge.guide.addCursor">Add to Cursor</button></div>
       <div class="bridge-row"><span>VS Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-vscode" data-i18n="bridge.guide.addVscode">Add to VS Code</button></div>
       <div class="bridge-row"><span data-i18n="bridge.guide.other">Other MCP app</span><button type="button" class="agenda-action-btn" id="bridge-guide-other" data-i18n="bridge.guide.copyConfig">Copy config</button></div>
-      <div class="bridge-note" data-i18n="bridge.guide.node">Needs Node.js 20 or newer. If your agent does not see Zenit Week, restart it.</div>
+      <div class="bridge-note" data-i18n="bridge.guide.node">All but Claude Desktop need Node.js 20 or newer. If your agent does not see Zenit Week, restart it.</div>
     </div>
     <div id="bridge-paired" class="bridge-list" hidden>
       <div id="bridge-paired-date" class="bridge-note"></div>
@@ -11405,7 +11407,13 @@ const TRANSLATIONS = {
     'bridge.state.connected':     'Connected - {client}',
     'bridge.state.connectedNoName': 'Connected',
     'bridge.state.unpaired-remote': 'Unpaired on the agent side - ask your agent something to pair again',
-    'bridge.state.update-server': "Update your agent's Zenit Week server - restart your agent app",
+    'bridge.state.update-server': "Update your agent's Zenit Week server - restart your agent app, or download the new Zenit Week extension for Claude Desktop below",
+    'bridge.state.update-server-npx': "Update your agent's Zenit Week server - restart your agent app",
+    'bridge.state.update-server-mcpb': 'Update your Zenit Week extension - download the new one below and open it',
+    'bridge.state.update-server-repo': "Update your agent's Zenit Week server - pull the repository and restart your agent app",
+    'bridge.agent.oldServer':     'Older Zenit Week server',
+    'bridge.guide.download':      'Download',
+    'bridge.guide.desktopNote':   'No setup needed: open the file and confirm in Claude Desktop.',
     'bridge.state.reload-app':    'Reload Zenit Week - your agent has a newer Zenit Week server',
     'bridge.state.unsupported':   'Not supported in this browser yet',
     'bridge.unnamedAgent':        'agent',
@@ -11417,7 +11425,7 @@ const TRANSLATIONS = {
     'bridge.guide.addVscode':     'Add to VS Code',
     'bridge.guide.other':         'Other MCP app',
     'bridge.guide.copyConfig':    'Copy config',
-    'bridge.guide.node':          'Needs Node.js 20 or newer. If your agent does not see Zenit Week, restart it.',
+    'bridge.guide.node':          'All but Claude Desktop need Node.js 20 or newer. If your agent does not see Zenit Week, restart it.',
     'bridge.copied':              'Copied',
     'bridge.paired':              'Paired',
     'bridge.pairedOn':            'Paired on {date}',
@@ -11854,7 +11862,13 @@ const TRANSLATIONS = {
     'bridge.state.connected':     'Připojeno - {client}',
     'bridge.state.connectedNoName': 'Připojeno',
     'bridge.state.unpaired-remote': 'Spárování zrušeno na straně agenta - zeptej se agenta na něco a spáruj znovu',
-    'bridge.state.update-server': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta',
+    'bridge.state.update-server': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta, nebo níže stáhni nové rozšíření Zenit Week pro Claude Desktop',
+    'bridge.state.update-server-npx': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta',
+    'bridge.state.update-server-mcpb': 'Aktualizuj rozšíření Zenit Week - níže stáhni nové a otevři ho',
+    'bridge.state.update-server-repo': 'Aktualizuj Zenit Week server svého agenta - stáhni změny repozitáře a restartuj aplikaci agenta',
+    'bridge.agent.oldServer':     'Starší Zenit Week server',
+    'bridge.guide.download':      'Stáhnout',
+    'bridge.guide.desktopNote':   'Bez nastavování: otevři soubor a potvrď v Claude Desktop.',
     'bridge.state.reload-app':    'Obnov Zenit Week - tvůj agent má novější Zenit Week server',
     'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje',
     'bridge.unnamedAgent':        'agent',
@@ -11866,7 +11880,7 @@ const TRANSLATIONS = {
     'bridge.guide.addVscode':     'Přidat do VS Code',
     'bridge.guide.other':         'Jiná MCP aplikace',
     'bridge.guide.copyConfig':    'Kopírovat nastavení',
-    'bridge.guide.node':          'Potřebuje Node.js 20 nebo novější. Když agent Zenit Week nevidí, restartuj ho.',
+    'bridge.guide.node':          'Všechny kromě Claude Desktop potřebují Node.js 20 nebo novější. Když agent Zenit Week nevidí, restartuj ho.',
     'bridge.copied':              'Zkopírováno',
     'bridge.paired':              'Spárováno',
     'bridge.pairedOn':            'Spárováno {date}',
@@ -26658,6 +26672,8 @@ syncAutoLayoutToggleUI();
 // device-local (zenit-week-bridge), never in the synced settings blob.
 // Setup spec docs/specs/agent-bridge-setup.md section 3.4.
 const BRIDGE_NPX_ARGS = ['-y', 'zenit-week-mcp@1'];
+// The latest Claude Desktop extension, attached to each mcp-v<version> release.
+const BRIDGE_DESKTOP_EXTENSION_URL = 'https://github.com/kruxik/zenit-week/releases/latest/download/zenit-week.mcpb';
 const BRIDGE_CLAUDE_CODE_CMD = `claude mcp add --scope user zenit-week -- npx ${BRIDGE_NPX_ARGS.join(' ')}`;
 const BRIDGE_SERVER_JSON = { command: 'npx', args: BRIDGE_NPX_ARGS };
 const BRIDGE_OTHER_CONFIG = JSON.stringify({ mcpServers: { 'zenit-week': BRIDGE_SERVER_JSON } }, null, 2);
@@ -26688,6 +26704,7 @@ function renderBridgeStatus() {
   const names = bridgeClientList(clients);
   el.textContent = shown === 'connected'
     ? (names ? t('bridge.state.connected', { client: names }) : t('bridge.state.connectedNoName'))
+    : shown === 'update-server' ? t(bridgeUpdateHintKey(agents))
     : t(`bridge.state.${shown}`);
 
   // One row per agent app the page knows: connected, or speaking an old protocol.
@@ -26701,13 +26718,15 @@ function renderBridgeStatus() {
     const st = document.createElement('span');
     st.className = 'bridge-note';
     st.textContent = t(a.state === 'connected' ? 'bridge.agent.connected' : 'bridge.agent.old');
+    if (a.state === 'old' && !a.client) name.textContent = t('bridge.agent.oldServer');
     row.append(name, st);
     return row;
   });
   rows.forEach(r => list.appendChild(r));
   list.hidden = !rows.length;
 
-  document.getElementById('bridge-guide').hidden = shown !== 'waiting-server';
+  // The guide also carries the extension download an update may need.
+  document.getElementById('bridge-guide').hidden = shown !== 'waiting-server' && shown !== 'update-server';
   const paired = document.getElementById('bridge-paired');
   paired.hidden = !rec.key;
   if (rec.key) {
@@ -26716,6 +26735,14 @@ function renderBridgeStatus() {
       ? t('bridge.pairedOn', { date: when.toLocaleDateString(currentLang === 'cs' ? 'cs-CZ' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) })
       : t('bridge.paired');
   }
+}
+
+// How to update the servers that are behind: one hint when they share an
+// install path, both common ones when any cannot say (a v1 server).
+function bridgeUpdateHintKey(agents) {
+  const installs = new Set(agents.filter(a => a.state === 'old').map(a => a.install || 'unknown'));
+  if (installs.size === 1 && !installs.has('unknown')) return `bridge.state.update-server-${[...installs][0]}`;
+  return 'bridge.state.update-server';
 }
 
 function _bridgeCopy(text) {
@@ -26762,6 +26789,12 @@ function initBridgeSettings() {
     } else {
       _bridgeTurnOn();
     }
+  });
+  document.getElementById('bridge-guide-claude-desktop').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.href = BRIDGE_DESKTOP_EXTENSION_URL;
+    link.rel = 'noopener';
+    link.click();
   });
   document.getElementById('bridge-guide-claude-code').addEventListener('click', () => _bridgeCopy(BRIDGE_CLAUDE_CODE_CMD));
   document.getElementById('bridge-guide-other').addEventListener('click', () => _bridgeCopy(BRIDGE_OTHER_CONFIG));
@@ -26962,7 +26995,11 @@ function _setBridgeStatus(state, clients = [], agents = []) {
 // port -> { port, ws, opened, welcomed, ready, unknown, client, install, serverNonce, pageNonce }
 const _bridgeConns = new Map();
 const _bridgeRefusedPorts = new Set(); // proved the wrong key: not retried until the switch is cycled
-const _bridgePortNotes = new Map();    // port -> 'old' (a v1 server) | 'reload' (a newer one)
+// port -> { kind: 'old', install } for a server on an older protocol (install
+// 'npx' | 'mcpb' | 'repo', or null for a v1 server, which cannot say), or
+// { kind: 'reload' } for a newer one.
+const _bridgePortNotes = new Map();
+const BRIDGE_INSTALLS = new Set(['npx', 'mcpb', 'repo']);
 let _bridgeBlocked = false;
 let _bridgePermWaiting = false;
 let _bridgeAttempts = 0;
@@ -26985,9 +27022,10 @@ function _refreshBridgeStatus() {
   const conns = _bridgeConnList();
   const ready = conns.filter(c => c.ready);
   const notes = [..._bridgePortNotes.values()];
+  const old = [..._bridgePortNotes].filter(([, n]) => n.kind === 'old');
   const agents = [
     ...ready.map(c => ({ port: c.port, client: c.client || '', state: 'connected' })),
-    ...[..._bridgePortNotes].filter(([, n]) => n === 'old').map(([port]) => ({ port, client: '', state: 'old' })),
+    ...old.map(([port, n]) => ({ port, client: '', state: 'old', install: n.install })),
   ].sort((a, b) => a.port - b.port);
   const clients = ready.map(c => c.client || '');
   // A server on another protocol is named in its own row; it decides the line
@@ -26996,8 +27034,8 @@ function _refreshBridgeStatus() {
     : ready.length ? 'connected'
     : conns.some(c => c.unknown) ? 'unpaired-remote'
     : conns.some(c => c.welcomed) ? 'waiting-agent'
-    : notes.includes('reload') ? 'reload-app'
-    : notes.includes('old') ? 'update-server'
+    : notes.some(n => n.kind === 'reload') ? 'reload-app'
+    : old.length ? 'update-server'
     : _bridgeBlocked ? 'blocked'
     : _bridgePermWaiting ? 'waiting-permission'
     : 'waiting-server';
@@ -27071,7 +27109,11 @@ function _openBridgeSocket(port) {
     let frame;
     try { frame = JSON.parse(ev.data); } catch (_) { return; }
     if (!frame || typeof frame !== 'object' || _bridgeConns.get(port) !== conn) return;
-    if (!conn.welcomed) { if (frame.type === 'welcome') await _onBridgeWelcome(conn, frame); return; }
+    if (!conn.welcomed) {
+      if (frame.type === 'welcome') await _onBridgeWelcome(conn, frame);
+      else if (frame.type === 'mismatch') _onBridgeMismatch(conn, frame);
+      return;
+    }
     if (conn.ready) { if (frame.type === 'call') return bridgeHandleCall(frame, conn); return; }
     if (frame.type === 'pair-start') await _onBridgePairStart(conn, frame);
     else if (frame.type === 'pair-reveal') await _onBridgePairReveal(conn, frame);
@@ -27083,9 +27125,11 @@ function _openBridgeSocket(port) {
     conn.ready = false;
     _endBridgePair(conn, { tellServer: false });
     if (_bridgeStopped) return;
-    if (ev.reason === 'protocol') _bridgePortNotes.set(port, 'reload');
+    // A mismatch frame already said which side is behind; without one, a
+    // protocol close means this page is the older side.
+    if (ev.reason === 'protocol') { if (!conn.mismatch) _bridgePortNotes.set(port, { kind: 'reload' }); }
     // A v1 server ignores `open` and closes the handshake after 2 s (4002).
-    else if (conn.opened && !conn.welcomed && ev.code === 4002) _bridgePortNotes.set(port, 'old');
+    else if (conn.opened && !conn.welcomed && ev.code === 4002) _bridgePortNotes.set(port, { kind: 'old', install: null });
     if (wasReady || ev.reason === 'unpaired') {
       // A server went away (its agent app quit, or it restarted and may come
       // back on another port): look again soon.
@@ -27100,9 +27144,19 @@ function _openBridgeSocket(port) {
   ws.onerror = () => { /* onclose follows and decides */ };
 }
 
+// The server speaks another protocol and says which, and how it was installed,
+// so the status can name the side to update and how (setup spec 4.5).
+function _onBridgeMismatch(conn, frame) {
+  if (typeof frame.protocol !== 'number') return;
+  conn.mismatch = true;
+  _bridgePortNotes.set(conn.port, frame.protocol < BRIDGE_PROTOCOL
+    ? { kind: 'old', install: BRIDGE_INSTALLS.has(frame.install) ? frame.install : null }
+    : { kind: 'reload' });
+}
+
 async function _onBridgeWelcome(conn, frame) {
   if (typeof frame.protocol !== 'number' || frame.protocol !== BRIDGE_PROTOCOL || typeof frame.nonce !== 'string') {
-    if (frame.protocol > BRIDGE_PROTOCOL) _bridgePortNotes.set(conn.port, 'reload');
+    if (frame.protocol > BRIDGE_PROTOCOL) _bridgePortNotes.set(conn.port, { kind: 'reload' });
     try { conn.ws.close(1000, 'protocol'); } catch (_) { /* already closing */ }
     return;
   }

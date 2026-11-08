@@ -20,14 +20,16 @@ The MCP client starts the server. The app connects to it once you turn on **Sett
 
 ## Setup
 
-You need [Node.js](https://nodejs.org/) 20 or newer. Your agent app downloads and starts the server with `npx`; there is nothing to install by hand.
+**Claude Desktop:** download [zenit-week.mcpb](https://github.com/kruxik/zenit-week/releases/latest/download/zenit-week.mcpb), open it and confirm in Claude Desktop. It brings its own runtime, so you need nothing else. Then continue with step 2. An extension installed from a file does not update itself: when Zenit Week asks you to update it, download the new one the same way. If Claude does not see the new tools, restart Claude Desktop.
+
+**Other agent apps** need [Node.js](https://nodejs.org/) 20 or newer. The agent app downloads and starts the server with `npx`; there is nothing to install by hand.
 
 1. Register the server with your agent.
    - Claude Code:
      ```sh
      claude mcp add --scope user zenit-week -- npx -y zenit-week-mcp@1
      ```
-   - Claude Desktop: add it to `claude_desktop_config.json` and restart Claude Desktop:
+   - Claude Desktop without the extension: add it to `claude_desktop_config.json` and restart Claude Desktop:
      ```json
      {
        "mcpServers": {

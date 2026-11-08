@@ -769,6 +769,7 @@ export const {
   bridgeSocketUrl,
   bridgePairCode,
   bridgeUnpair,
+  bridgeUpdateHintKey,
   loadBridgeRecord,
   saveBridgeRecord,
   forgetBridge,

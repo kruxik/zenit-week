@@ -111,13 +111,15 @@ Let an AI agent on your computer - Claude Code, Claude Desktop or any MCP client
 
 ### Set it up
 
-You need [Node.js](https://nodejs.org/) 20 or newer. A one-click install for Claude Desktop, without a terminal, is planned.
+**Claude Desktop:** download [zenit-week.mcpb](https://github.com/kruxik/zenit-week/releases/latest/download/zenit-week.mcpb), open it and confirm in Claude Desktop - no terminal, no Node.js. Then continue with step 2.
+
+Other agent apps need [Node.js](https://nodejs.org/) 20 or newer.
 
 1. Register the server with your agent. For Claude Code:
    ```sh
    claude mcp add --scope user zenit-week -- npx -y zenit-week-mcp@1
    ```
-   For Claude Desktop or another MCP client, add a stdio server with the command `npx` and the arguments `-y zenit-week-mcp@1`. The [server README](mcp/README.md) has the Claude Desktop config.
+   For another MCP client, add a stdio server with the command `npx` and the arguments `-y zenit-week-mcp@1`. The [server README](mcp/README.md) has the Claude Desktop config.
 2. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > AI agents** and turn on **AI agents**. Your browser then asks to let Zenit Week reach apps on this computer: choose **Allow**. In Firefox, also tick **Remember my choice**.
 3. Ask your agent something about your week. Zenit Week shows a 6-digit code and your agent shows the same one. Check that they match and click **Allow**.
 4. Settings shows **Connected**. From now on requests run at once, also after a restart.
@@ -144,7 +146,7 @@ To work on the server itself, run it from a clone of this repository instead of 
    For another MCP client, the command is `node /path/to/zenit-week/mcp/server.js`.
 3. Continue with step 2 above.
 
-The package is published with `npm run mcp:publish` from the repository root; it is versioned separately from the app.
+The package is published with `npm run mcp:publish` from the repository root; it is versioned separately from the app. `npm run mcp:bundle` builds the Claude Desktop extension into `mcp/dist/zenit-week.mcpb` with the official `mcpb` tool; it is attached to a GitHub Release tagged `mcp-v<version>`, for example `gh release create mcp-v1.1.0 mcp/dist/zenit-week.mcpb`.
 
 ## Privacy
 
