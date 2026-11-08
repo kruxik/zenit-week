@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Iwl3TBDJo2rw7o3iATQk5UDS/PChNPrgNJb7GOSPigQ=';
+               'sha256-AmRsqGtncRxjGAxA4aafWWUqsF6xxA8JQZX4OGeDniU=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3754,15 +3754,17 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Settings > Account: the badge is a person while signed out and the
-     initials disc (coloured inline per account) once signed in; the status
+  /* Settings > Account: the badge is a grey person while signed out and the
+     initials on green once signed in - it states the account, so it wears the
+     state's colour, not the account's own; the status
      dot wears the sync state's colour, as the account button's badge does. */
   #account-section { --bridge-state: var(--text-muted); }
   #account-section[data-state="drive"][data-status="connected"],
   #account-section[data-state="drive"][data-status="syncing"] { --bridge-state: var(--accent-success-text); }
   #account-section[data-state="drive"][data-status="error"] { --bridge-state: var(--accent-danger); }
   #account-avatar .icon { width: 18px; height: 18px; }
-  #account-section[data-state="local"] #account-avatar { background: var(--accent-warning-text); }
+  #account-avatar { background: var(--text-muted); transition: background 0.25s; }
+  #account-section[data-state="drive"] #account-avatar { background: var(--accent-success-text); }
   #account-section[data-state="drive"] .account-avatar-placeholder { display: none; }
   #account-section[data-state="local"] #account-avatar-initials { display: none; }
   #account-section .bridge-list > .agenda-action-btn { align-self: flex-end; }
@@ -3771,11 +3773,6 @@
   @media (prefers-reduced-motion: reduce) {
     #account-section .bridge-status::before { animation: none !important; }
   }
-  /* Settings > Data: the badge says where the data lives - green with a Drive
-     copy, amber when this browser holds the only one. */
-  #data-avatar { background: var(--accent-warning-text); transition: background 0.25s; }
-  #data-section[data-state="drive"] #data-avatar { background: var(--accent-success-text); }
-  #data-avatar .icon { width: 18px; height: 18px; }
   .settings-tiles { display: flex; gap: 8px; }
   .settings-tile {
     flex: 1;
@@ -3808,9 +3805,10 @@
   .settings-block > .agenda-action-btn { align-self: flex-end; }
   .settings-badge.settings-badge-warn { color: var(--accent-warning-text); }
   .settings-badge.settings-badge-danger { color: var(--accent-danger); }
-  /* Settings > Development: the badge in the accent. */
-  #dev-avatar { background: var(--accent-primary); }
-  #dev-avatar .icon { width: 18px; height: 18px; }
+  /* An informative hero badge (General, Data, Development): the accent blue,
+     whatever the state. Status badges (Account, AI) colour by state instead. */
+  .settings-badge.settings-badge-info { background: var(--accent-primary); }
+  .settings-badge-info .icon { width: 18px; height: 18px; }
   /* A read-only value under its caption, shown whole: a long host wraps. */
   .settings-value {
     font-size: 13px;
@@ -4886,6 +4884,16 @@ Or remove them later in Settings → Help.</div>
     </div>
     <div class="settings-pane" id="settings-pane-general" role="tabpanel" aria-labelledby="settings-tab-general">
       <div class="settings-section">
+        <div class="settings-hero">
+          <div class="settings-badge settings-badge-info" aria-hidden="true"><svg class="icon"><use href="#icon-settings"/></svg></div>
+          <div class="settings-identity">
+            <div class="settings-name" data-i18n="settings.generalHero">Look and feel</div>
+            <div class="settings-sub" data-i18n="settings.generalSub">Zoom, language, theme and tips</div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
         <div id="zoom-slider-header">
           <div class="settings-label" data-i18n="settings.zoom">Zoom</div>
           <div id="zoom-label" data-i18n-title="settings.resetView" title="Click to reset view">100%</div>
@@ -4974,12 +4982,11 @@ Or remove them later in Settings → Help.</div>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-data" role="tabpanel" aria-labelledby="settings-tab-data" hidden>
-      <!-- Where the data lives, read like the AI tab: the badge is green when
-           Google Drive holds a copy, amber when this browser is the only one.
-           Filled by refreshDataSummary whenever the tab is shown. -->
+      <!-- Where the data lives, read like the AI tab under an informative
+           badge. Filled by refreshDataSummary whenever the tab is shown. -->
       <div class="settings-section" id="data-section" data-state="local">
         <div class="settings-hero">
-          <div class="settings-badge" id="data-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-database"/></svg></div>
+          <div class="settings-badge settings-badge-info" id="data-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-database"/></svg></div>
           <div class="settings-identity">
             <div class="settings-name" data-i18n="settings.dataHero">Your weeks</div>
             <div class="settings-sub" id="data-where"></div>
@@ -5026,7 +5033,7 @@ Or remove them later in Settings → Help.</div>
            Version are filled behind the devResetEnabled() guard. -->
       <div class="settings-section" id="settings-dev-section">
         <div class="settings-hero">
-          <div class="settings-badge" id="dev-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-code"/></svg></div>
+          <div class="settings-badge settings-badge-info" id="dev-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-code"/></svg></div>
           <div class="settings-identity">
             <div class="settings-name">Development</div>
             <div class="settings-sub">Tools for this development host. Never shown in production.</div>
@@ -8921,8 +8928,6 @@ function showSignedInState(user) {
   if (section) section.dataset.state = 'drive';
   const avatarInitials = document.getElementById('account-avatar-initials');
   if (avatarInitials) avatarInitials.textContent = initials;
-  const avatar = document.getElementById('account-avatar');
-  if (avatar) avatar.style.background = googleUserInitialsColor || '';
   const nameEl = document.getElementById('account-name');
   if (nameEl) nameEl.textContent = googleUserName || googleUserEmail;
   const emailEl = document.getElementById('account-email');
@@ -8954,8 +8959,6 @@ function showSignedOutState(labelKey = 'account.signIn') {
   if (section) section.dataset.state = 'local';
   const avatarInitials = document.getElementById('account-avatar-initials');
   if (avatarInitials) avatarInitials.textContent = '';
-  const avatar = document.getElementById('account-avatar');
-  if (avatar) avatar.style.background = '';
   const signedIn = document.getElementById('account-signed-in');
   if (signedIn) signedIn.hidden = true;
   const signedOut = document.getElementById('account-signed-out');
@@ -11706,6 +11709,8 @@ const TRANSLATIONS = {
     'account.signedOut':          'Not signed in',
     'account.signedOutSub':       'Your weeks are only in this browser',
     'settings.dataHero':          'Your weeks',
+    'settings.generalHero':       'Look and feel',
+    'settings.generalSub':        'Zoom, language, theme and tips',
     'settings.dataWhereDrive':    'In this browser and your Google Drive',
     'settings.dataWhereLocal':    'Only in this browser - keep a backup',
     'settings.dataWeeks':         'Weeks',
@@ -12174,6 +12179,8 @@ const TRANSLATIONS = {
     'account.signedOut':          'Nepřihlášeno',
     'account.signedOutSub':       'Tvoje týdny jsou jen v tomto prohlížeči',
     'settings.dataHero':          'Tvoje týdny',
+    'settings.generalHero':       'Vzhled a chování',
+    'settings.generalSub':        'Přiblížení, jazyk, téma a tipy',
     'settings.dataWhereDrive':    'V tomto prohlížeči a na tvém Google Disku',
     'settings.dataWhereLocal':    'Jen v tomto prohlížeči - měj zálohu',
     'settings.dataWeeks':         'Týdny',
