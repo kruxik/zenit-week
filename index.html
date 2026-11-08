@@ -60,6 +60,14 @@
       "name": "Petr Burian",
       "url": "https://www.petrburian.com/"
     },
+    "featureList": [
+      "Weekly plan as a mind map",
+      "Agenda by day",
+      "Week statistics",
+      "Carry unfinished and recurring tasks into next week",
+      "Optional Google Drive sync",
+      "AI agent bridge over MCP (Claude Code, Claude Desktop)"
+    ],
     "license": "https://opensource.org/license/mit"
   }
   </script>
@@ -736,6 +744,54 @@
       .features-grid { grid-template-columns: 1fr; }
     }
 
+    /* ── AI agent section (reuses .preview; white after the grey features) ── */
+    .agent {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .agent .benefit { background: var(--cloud); }
+
+    .agent-demo {
+      max-width: 560px;
+      margin: 0 auto 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .agent-prompt {
+      align-self: stretch;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 40px rgba(26,26,46,0.08);
+      padding: 18px 22px 18px 16px;
+      font-size: 16px;
+      line-height: 1.5;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .agent-toast {
+      background: var(--ink);
+      color: #fff;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .agent-setup {
+      margin-top: 28px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .agent-setup a { color: inherit; font-weight: 600; }
+
     /* ── Ritual section ───────────────────────────────────────────── */
     .ritual {
       background: var(--ink);
@@ -1088,6 +1144,50 @@
       </div>
 
     </div>
+  </div>
+</section>
+
+<!-- ── AI agent ──────────────────────────────────────────────────────── -->
+<section class="preview agent" id="ai-agent">
+  <div class="preview-inner">
+    <p class="section-label">New</p>
+    <div class="section-divider"></div>
+    <h2 class="h2-light">Plan with your <strong>AI&nbsp;agent</strong></h2>
+    <p>Tell Claude or another AI agent what your week needs.<br>It adds the tasks to your map as if you clicked them yourself.</p>
+
+    <figure class="agent-demo">
+      <div class="agent-prompt">
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z"/></svg></div>
+        <p>"Add a run on Tuesday and Thursday to Me, and carry over what I didn't finish at work."</p>
+      </div>
+      <figcaption class="agent-toast">Added Run (Tu, Th) · Moved 3 tasks to this week</figcaption>
+    </figure>
+
+    <div class="benefits">
+      <div class="benefit">
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg></div>
+        <div class="benefit-body">
+          <h3>You stay in control</h3>
+          <p>Every change shows on the map as it happens, and each one is a single undo&nbsp;away.</p>
+        </div>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z"/><path d="M7 20h10"/><path d="M9 16v4"/><path d="M15 16v4"/></svg></div>
+        <div class="benefit-body">
+          <h3>Stays local</h3>
+          <p>The agent connects to the app on your computer only. Nothing goes through&nbsp;us.</p>
+        </div>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12l5 5l-1.5 1.5a3.5 3.5 0 1 1 -5 -5l1.5 -1.5z"/><path d="M17 12l-5 -5l1.5 -1.5a3.5 3.5 0 1 1 5 5l-1.5 1.5z"/><path d="M3 21l2.5 -2.5"/><path d="M18.5 5.5l2.5 -2.5"/><path d="M10 11l-2 2"/><path d="M13 14l-2 2"/></svg></div>
+        <div class="benefit-body">
+          <h3>Off until you turn it on</h3>
+          <p>Works with Claude Code, Claude Desktop or any MCP client. Desktop Chrome and&nbsp;Firefox.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="agent-setup">Setup takes a few commands today. <a href="https://github.com/kruxik/zenit-week#ai-agent-bridge-desktop" target="_blank" rel="noopener">How to connect an agent →</a></p>
   </div>
 </section>
 
