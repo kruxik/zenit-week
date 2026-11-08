@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-BNxj6h6nev/WCJU5wt2mWFIAtacmrEoStU/9RH/HB+c=';
+               'sha256-bQnchuXRXYArwKjhieZn4tgKBDn9fmqrv68Vkn509Iw=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3748,14 +3748,14 @@
   #bridge-section[data-state="unpaired-remote"],
   #bridge-section[data-state^="update"] { --bridge-state: var(--accent-danger); }
 
-  .bridge-hero {
+  .settings-hero {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 2px 2px 4px;
     min-width: 0;
   }
-  .bridge-badge {
+  .settings-badge {
     flex-shrink: 0;
     width: 30px;
     height: 30px;
@@ -3780,14 +3780,14 @@
   @media (prefers-reduced-motion: reduce) {
     #bridge-avatar { animation: none !important; }
   }
-  .bridge-identity {
+  .settings-identity {
     flex: 1;
     display: flex;
     flex-direction: column;
     gap: 1px;
     min-width: 0;
   }
-  .bridge-name {
+  .settings-name {
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
@@ -3795,7 +3795,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .bridge-sub {
+  .settings-sub {
     font-size: 11px;
     line-height: 1.35;
     color: var(--text-muted);
@@ -3822,7 +3822,7 @@
   .bridge-note { font-size: 11px; line-height: 1.4; color: var(--text-muted); padding: 0 2px; }
   .bridge-indent { padding-left: 34px; }
   .bridge-list { display: flex; flex-direction: column; gap: 6px; }
-  .bridge-row {
+  .settings-row {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -3830,15 +3830,51 @@
     font-size: 12px;
     color: var(--text-secondary);
   }
-  .bridge-row-name {
+  .settings-row-name {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* Settings > Data: the badge says where the data lives - green with a Drive
+     copy, amber when this browser holds the only one. */
+  #data-avatar { background: var(--accent-warning-text); transition: background 0.25s; }
+  #data-section[data-state="drive"] #data-avatar { background: var(--accent-success-text); }
+  #data-avatar .icon { width: 18px; height: 18px; }
+  .settings-tiles { display: flex; gap: 8px; }
+  .settings-tile {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-soft);
+  }
+  .settings-tile .settings-label { padding: 0; }
+  .settings-tile-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .settings-badge-app .icon { width: 14px; height: 14px; }
+  /* A described action: badge and text get the full width, the button sits
+     under them on the right, so no title or description is cut short. */
+  .settings-block { display: flex; flex-direction: column; gap: 4px; }
+  .settings-block > .settings-row { align-items: flex-start; min-height: 0; }
+  .settings-block .settings-badge { margin-top: 2px; }
+  .settings-block .settings-name { white-space: normal; }
+  .settings-block > .agenda-action-btn { align-self: flex-end; }
+  .settings-badge.settings-badge-warn { color: var(--accent-warning-text); }
   /* App badges in the guide: the same badge, squared off and quiet. */
-  .bridge-badge.bridge-badge-app {
+  .settings-badge.settings-badge-app {
     width: 24px;
     height: 24px;
     border-radius: 6px;
@@ -3848,9 +3884,9 @@
     border: 1px solid var(--border-soft);
   }
   /* A connected agent: the badge in the state colour, name over its state. */
-  .bridge-agent .bridge-badge { width: 24px; height: 24px; font-size: 10px; }
-  .bridge-agent[data-agent-state="connected"] .bridge-badge { background: var(--accent-success-text); }
-  .bridge-agent[data-agent-state="old"] .bridge-badge { background: var(--accent-warning-text); }
+  .bridge-agent .settings-badge { width: 24px; height: 24px; font-size: 10px; }
+  .bridge-agent[data-agent-state="connected"] .settings-badge { background: var(--accent-success-text); }
+  .bridge-agent[data-agent-state="old"] .settings-badge { background: var(--accent-warning-text); }
   /* A pairing code: the visual centre of its dialog, digits in groups of three. */
   #app-confirm-highlight {
     font-size: 32px;
@@ -4343,6 +4379,8 @@
   <symbol id="icon-circle-dashed" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/></symbol>
   <symbol id="icon-circle-dashed-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/><path d="M9 12l2 2l4 -4"/></symbol>
   <symbol id="icon-sparkles" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z"/></symbol>
+  <symbol id="icon-database" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0 -16 0"/><path d="M4 6v6a8 3 0 0 0 16 0v-6"/><path d="M4 12v6a8 3 0 0 0 16 0v-6"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/></symbol>
   <symbol id="icon-bolt" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></symbol>
   <symbol id="icon-ban" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></symbol>
   <symbol id="icon-bolt-off" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 3l18 18"/><path d="M15.212 15.21l-4.212 5.79v-7h-6l3.79 -5.21m1.685 -2.32l2.525 -3.47v6m1 1h5l-2.104 2.893"/></symbol>
@@ -4949,11 +4987,11 @@ Or remove them later in Settings → Help.</div>
       <div class="settings-section" id="bridge-section" data-state="off">
         <!-- Read like the Drive account card: who (the badge, coloured by state),
              what, and the switch. -->
-        <div class="bridge-hero">
-          <div class="bridge-badge" id="bridge-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-sparkles"/></svg></div>
-          <div class="bridge-identity">
-            <div class="bridge-name" id="bridge-label" data-i18n="settings.bridge">AI agents</div>
-            <div class="bridge-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer</div>
+        <div class="settings-hero">
+          <div class="settings-badge" id="bridge-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-sparkles"/></svg></div>
+          <div class="settings-identity">
+            <div class="settings-name" id="bridge-label" data-i18n="settings.bridge">AI agents</div>
+            <div class="settings-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer</div>
           </div>
           <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Allow AI agents on this computer">
             <span class="theme-toggle-thumb"></span>
@@ -4966,12 +5004,12 @@ Or remove them later in Settings → Help.</div>
         <div id="bridge-guide" class="bridge-list" hidden>
           <div class="settings-separator"></div>
           <div class="settings-label" data-i18n="bridge.guide.title">Connect an agent</div>
-          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">CD</span><span class="bridge-row-name">Claude Desktop</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-desktop" data-i18n="bridge.guide.download">Download</button></div>
+          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">CD</span><span class="settings-row-name">Claude Desktop</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-desktop" data-i18n="bridge.guide.download">Download</button></div>
           <div class="bridge-note bridge-indent" data-i18n="bridge.guide.desktopNote">No setup needed: open the file and confirm in Claude Desktop.</div>
-          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">CC</span><span class="bridge-row-name">Claude Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-code" data-i18n="bridge.guide.copyCommand">Copy command</button></div>
-          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">Cu</span><span class="bridge-row-name">Cursor</span><button type="button" class="agenda-action-btn" id="bridge-guide-cursor" data-i18n="bridge.guide.addCursor">Add to Cursor</button></div>
-          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">VS</span><span class="bridge-row-name">VS Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-vscode" data-i18n="bridge.guide.addVscode">Add to VS Code</button></div>
-          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">{ }</span><span class="bridge-row-name" data-i18n="bridge.guide.other">Other MCP app</span><button type="button" class="agenda-action-btn" id="bridge-guide-other" data-i18n="bridge.guide.copyConfig">Copy config</button></div>
+          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">CC</span><span class="settings-row-name">Claude Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-code" data-i18n="bridge.guide.copyCommand">Copy command</button></div>
+          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">Cu</span><span class="settings-row-name">Cursor</span><button type="button" class="agenda-action-btn" id="bridge-guide-cursor" data-i18n="bridge.guide.addCursor">Add to Cursor</button></div>
+          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">VS</span><span class="settings-row-name">VS Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-vscode" data-i18n="bridge.guide.addVscode">Add to VS Code</button></div>
+          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">{ }</span><span class="settings-row-name" data-i18n="bridge.guide.other">Other MCP app</span><button type="button" class="agenda-action-btn" id="bridge-guide-other" data-i18n="bridge.guide.copyConfig">Copy config</button></div>
           <div class="bridge-note" data-i18n="bridge.guide.node">All but Claude Desktop need Node.js 20 or newer. If your agent does not see Zenit Week, restart it.</div>
         </div>
         <div id="bridge-paired" class="bridge-list" hidden>
@@ -4982,10 +5020,49 @@ Or remove them later in Settings → Help.</div>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-data" role="tabpanel" aria-labelledby="settings-tab-data" hidden>
-      <div class="settings-section">
-        <div class="settings-label" data-i18n="settings.data">Data</div>
-        <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData">Import</button>
-        <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData">Export</button>
+      <!-- Where the data lives, read like the AI tab: the badge is green when
+           Google Drive holds a copy, amber when this browser is the only one.
+           Filled by refreshDataSummary whenever the tab is shown. -->
+      <div class="settings-section" id="data-section" data-state="local">
+        <div class="settings-hero">
+          <div class="settings-badge" id="data-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-database"/></svg></div>
+          <div class="settings-identity">
+            <div class="settings-name" data-i18n="settings.dataHero">Your weeks</div>
+            <div class="settings-sub" id="data-where"></div>
+          </div>
+        </div>
+        <div class="settings-tiles">
+          <div class="settings-tile">
+            <div class="settings-label" data-i18n="settings.dataWeeks">Weeks</div>
+            <div class="settings-tile-value" id="data-weeks-count">-</div>
+          </div>
+          <div class="settings-tile">
+            <div class="settings-label" data-i18n="settings.dataFirstWeek">First week</div>
+            <div class="settings-tile-value" id="data-first-week">-</div>
+          </div>
+        </div>
+        <div class="settings-separator"></div>
+        <div class="settings-label" data-i18n="settings.backupCaption">Backup</div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-badge settings-badge-app" aria-hidden="true"><svg class="icon"><use href="#icon-download"/></svg></span>
+            <div class="settings-identity">
+              <div class="settings-name" data-i18n="settings.exportTitle">Download a backup</div>
+              <div class="settings-sub" data-i18n="settings.exportSub">Every week and setting in one file</div>
+            </div>
+          </div>
+          <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData">Export</button>
+        </div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-badge settings-badge-app settings-badge-warn" aria-hidden="true"><svg class="icon"><use href="#icon-upload"/></svg></span>
+            <div class="settings-identity">
+              <div class="settings-name" data-i18n="settings.importTitle">Restore a backup</div>
+              <div class="settings-sub" data-i18n="settings.importSub">Replaces everything here</div>
+            </div>
+          </div>
+          <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData">Import</button>
+        </div>
         <input type="file" id="import-file-input" accept=".json" style="display:none;">
         <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file - could not import.</div>
       </div>
@@ -11637,8 +11714,17 @@ const TRANSLATIONS = {
     'settings.zoom':              'Zoom',
     'settings.resetView':         'Click to reset view',
     'settings.language':          'Language',
-    'settings.data':              'Data',
     'settings.tabGeneral':        'General',
+    'settings.dataHero':          'Your weeks',
+    'settings.dataWhereDrive':    'In this browser and your Google Drive',
+    'settings.dataWhereLocal':    'Only in this browser - keep a backup',
+    'settings.dataWeeks':         'Weeks',
+    'settings.dataFirstWeek':     'First week',
+    'settings.backupCaption':     'Backup',
+    'settings.exportTitle':       'Download a backup',
+    'settings.exportSub':         'Every week and setting in one file',
+    'settings.importTitle':       'Restore a backup',
+    'settings.importSub':         'Replaces everything here',
     'settings.tabAi':             'AI',
     'settings.tabData':           'Data',
     'settings.exportData':        'Export',
@@ -12095,8 +12181,17 @@ const TRANSLATIONS = {
     'settings.zoom':              'Přiblížení',
     'settings.resetView':         'Kliknutím resetovat pohled',
     'settings.language':          'Jazyk',
-    'settings.data':              'Data',
     'settings.tabGeneral':        'Obecné',
+    'settings.dataHero':          'Tvoje týdny',
+    'settings.dataWhereDrive':    'V tomto prohlížeči a na tvém Google Disku',
+    'settings.dataWhereLocal':    'Jen v tomto prohlížeči - měj zálohu',
+    'settings.dataWeeks':         'Týdny',
+    'settings.dataFirstWeek':     'První týden',
+    'settings.backupCaption':     'Záloha',
+    'settings.exportTitle':       'Stáhnout zálohu',
+    'settings.exportSub':         'Všechny týdny a nastavení v jednom souboru',
+    'settings.importTitle':       'Obnovit ze zálohy',
+    'settings.importSub':         'Nahradí vše, co tu je',
     'settings.tabAi':             'AI',
     'settings.tabData':           'Data',
     'settings.exportData':        'Exportovat',
@@ -26608,6 +26703,7 @@ function selectSettingsTab(name, { focus = false } = {}) {
       pane.inert = !on;
     }
   }
+  if (name === 'data') refreshDataSummary();
   if (focus) document.getElementById('settings-tab-' + name)?.focus?.();
 }
 
@@ -26626,6 +26722,25 @@ function holdSettingsHeight() {
 function releaseSettingsHeight() {
   const dialog = document.getElementById('settings-dialog');
   if (dialog) dialog.style.minHeight = '';
+}
+
+// Data tab: where the data lives, how many weeks and since when. Re-read each
+// time the tab is shown - a sign-in, a new week or a language switch since the
+// last look must show.
+async function refreshDataSummary() {
+  const drive = !!googleUserEmail;
+  const section = document.getElementById('data-section');
+  if (section) section.dataset.state = drive ? 'drive' : 'local';
+  const where = document.getElementById('data-where');
+  if (where) where.textContent = t(drive ? 'settings.dataWhereDrive' : 'settings.dataWhereLocal');
+  let keys = [];
+  try { keys = (await listWeekKeysIDB()) || []; } catch { /* IDB unavailable: show what we can */ }
+  const weeks = keys.filter(k => /^\d{4}-\d{1,2}$/.test(k)).map(parseWeekKey)
+    .sort((a, b) => a.year - b.year || a.week - b.week);
+  const count = document.getElementById('data-weeks-count');
+  if (count) count.textContent = String(weeks.length);
+  const first = document.getElementById('data-first-week');
+  if (first) first.textContent = weeks.length ? `${weeks[0].week} / ${weeks[0].year}` : '-';
 }
 
 function openSettings() {
@@ -27071,20 +27186,20 @@ function renderBridgeStatus() {
   // state colour, the name, and its state underneath.
   const rows = (shown === 'off' ? [] : agents).map(a => {
     const row = document.createElement('div');
-    row.className = 'bridge-row bridge-agent';
+    row.className = 'settings-row bridge-agent';
     row.dataset.agentState = a.state;
     const label = a.state === 'old' && !a.client ? t('bridge.agent.oldServer') : (a.client || t('bridge.unnamedAgent'));
     const badge = document.createElement('span');
-    badge.className = 'bridge-badge';
+    badge.className = 'settings-badge';
     badge.setAttribute('aria-hidden', 'true');
     badge.textContent = bridgeInitials(label);
     const identity = document.createElement('div');
-    identity.className = 'bridge-identity';
+    identity.className = 'settings-identity';
     const name = document.createElement('div');
-    name.className = 'bridge-name';
+    name.className = 'settings-name';
     name.textContent = label;
     const st = document.createElement('div');
-    st.className = 'bridge-sub';
+    st.className = 'settings-sub';
     st.textContent = t(a.state === 'connected' ? 'bridge.agent.connected' : 'bridge.agent.old');
     identity.append(name, st);
     row.append(badge, identity);

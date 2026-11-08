@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { _state } from './setup.js';
+import { _state, saveWeekIDB } from './setup.js';
 
 const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8');
 const TABS = ['general', 'ai', 'data', 'dev'];
@@ -141,6 +141,26 @@ describe('Settings dialog height hold', () => {
     dialog.getBoundingClientRect = () => ({ height: 500 });
     _state.holdSettingsHeight();
     expect(dialog.style.minHeight).toBe('');
+  });
+});
+
+describe('Settings Data summary', () => {
+  it('counts the stored weeks and names the first one, in calendar order', async () => {
+    _state.clearIDBStore();
+    await saveWeekIDB('2026-14', { nodes: [] });
+    await saveWeekIDB('2025-52', { nodes: [] });
+    await saveWeekIDB('2026-3', { nodes: [] });
+    await _state.refreshDataSummary();
+    expect(el('data-weeks-count').textContent).toBe('3');
+    expect(el('data-first-week').textContent).toBe('52 / 2025');
+  });
+
+  it('marks the data as local when no Drive account is signed in', async () => {
+    _state.clearIDBStore();
+    await _state.refreshDataSummary();
+    expect(el('data-section').dataset.state).toBe('local');
+    expect(el('data-weeks-count').textContent).toBe('0');
+    expect(el('data-first-week').textContent).toBe('-');
   });
 });
 
