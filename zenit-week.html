@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-bQnchuXRXYArwKjhieZn4tgKBDn9fmqrv68Vkn509Iw=';
+               'sha256-Pv8aoG0L01VK9B9BY74CgeN/Ia+8AfKyimdDcl6q1rg=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3873,6 +3873,17 @@
   .settings-block .settings-name { white-space: normal; }
   .settings-block > .agenda-action-btn { align-self: flex-end; }
   .settings-badge.settings-badge-warn { color: var(--accent-warning-text); }
+  .settings-badge.settings-badge-danger { color: var(--accent-danger); }
+  /* Settings > Development: the badge in the accent. */
+  #dev-avatar { background: var(--accent-primary); }
+  #dev-avatar .icon { width: 18px; height: 18px; }
+  /* A read-only value under its caption, shown whole: a long host wraps. */
+  .settings-value {
+    font-size: 13px;
+    color: var(--text-primary);
+    padding: 0 2px;
+    overflow-wrap: anywhere;
+  }
   /* App badges in the guide: the same badge, squared off and quiet. */
   .settings-badge.settings-badge-app {
     width: 24px;
@@ -4381,6 +4392,8 @@
   <symbol id="icon-sparkles" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z"/></symbol>
   <symbol id="icon-database" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0 -16 0"/><path d="M4 6v6a8 3 0 0 0 16 0v-6"/><path d="M4 12v6a8 3 0 0 0 16 0v-6"/></symbol>
   <symbol id="icon-download" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/></symbol>
+  <symbol id="icon-code" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 8l-4 4l4 4"/><path d="M17 8l4 4l-4 4"/><path d="M14 4l-4 16"/></symbol>
+  <symbol id="icon-activity" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12h4l3 8l4 -16l3 8h4"/></symbol>
   <symbol id="icon-bolt" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></symbol>
   <symbol id="icon-ban" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></symbol>
   <symbol id="icon-bolt-off" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 3l18 18"/><path d="M15.212 15.21l-4.212 5.79v-7h-6l3.79 -5.21m1.685 -2.32l2.525 -3.47v6m1 1h5l-2.104 2.893"/></symbol>
@@ -5068,10 +5081,50 @@ Or remove them later in Settings → Help.</div>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-dev" role="tabpanel" aria-labelledby="settings-tab-dev" hidden>
+      <!-- What this is, where it runs, then one block per tool. Host and
+           Version are filled behind the devResetEnabled() guard. -->
       <div class="settings-section" id="settings-dev-section">
-        <div class="settings-label">Development</div>
-        <button type="button" class="agenda-action-btn" id="dev-probe-btn" title="Record the next tap: phase marks, delivered frames, long animation frames">Record perf trace</button>
-        <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor">Reset to first visit</button>
+        <div class="settings-hero">
+          <div class="settings-badge" id="dev-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-code"/></svg></div>
+          <div class="settings-identity">
+            <div class="settings-name">Development</div>
+            <div class="settings-sub">Tools for this development host. Never shown in production.</div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label">Host</div>
+        <div class="settings-value" id="dev-host">-</div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label">Version</div>
+        <div class="settings-value" id="dev-version">-</div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label">Tools</div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-badge settings-badge-app" aria-hidden="true"><svg class="icon"><use href="#icon-activity"/></svg></span>
+            <div class="settings-identity">
+              <div class="settings-name">Record perf trace</div>
+              <div class="settings-sub">The next tap: phase marks, delivered frames, long animation frames</div>
+            </div>
+          </div>
+          <button type="button" class="agenda-action-btn" id="dev-probe-btn">Record</button>
+        </div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-badge settings-badge-app settings-badge-danger" aria-hidden="true"><svg class="icon"><use href="#icon-arrow-back-up"/></svg></span>
+            <div class="settings-identity">
+              <div class="settings-name">Reset to first visit</div>
+              <div class="settings-sub">Wipe all local data and reload as a first-time visitor</div>
+            </div>
+          </div>
+          <button type="button" class="agenda-action-btn danger" id="dev-reset-btn">Reset</button>
+        </div>
       </div>
     </div>
     </div>
@@ -29535,6 +29588,10 @@ window.addEventListener('load', async () => {
   if (devResetEnabled()) {
     const devTab = document.getElementById('settings-tab-dev');
     if (devTab) devTab.hidden = false;
+    const devHost = document.getElementById('dev-host');
+    if (devHost) devHost.textContent = location.host || location.protocol;
+    const devVersion = document.getElementById('dev-version');
+    if (devVersion) devVersion.textContent = _displayVersion;
 
     const devProbeBtn = document.getElementById('dev-probe-btn');
     if (devProbeBtn) {
