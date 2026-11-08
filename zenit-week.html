@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-q7hX+HF/U+RsQRiOWYE9CYXkypG7am/pWNKncCSLiA0=';
+               'sha256-JloX7V+7nF3Wax390iOXDnj9AvJJ7UBXcH28AagocCM=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1491,7 +1491,7 @@
   .settings-pane > * { flex-shrink: 0; }
 
   .settings-section > .agenda-action-btn,
-  .bridge-list > .agenda-action-btn { align-self: flex-end; }
+  #bridge-paired > .agenda-action-btn { align-self: flex-end; }
 
   /* Every shown pane sits in the same grid cell, so the cell is as tall as the
      tallest one; the inactive ones are only invisible (and inert), not removed.
@@ -3735,11 +3735,122 @@
   }
   .agenda-action-btn.commit::before { content: none; }
   .agenda-action-btn.commit:disabled { cursor: default; box-shadow: none; }
-  /* Settings > AI: status, connected agents, the setup guide. */
+  /* Settings > AI, read like the Drive account card: a round badge coloured by
+     the connection state, a name and a muted line beside it, the switch on the
+     right; then a Status caption, one row per agent and the setup guide. The
+     state colour lives on #bridge-section[data-state], set by
+     renderBridgeStatus, so the badge and the status dot never disagree. */
+  #bridge-section { --bridge-state: var(--text-muted); }
+  #bridge-section[data-state="connected"] { --bridge-state: var(--accent-success-text); }
+  #bridge-section[data-state^="waiting"],
+  #bridge-section[data-state="approve"] { --bridge-state: var(--accent-warning-text); }
+  #bridge-section[data-state="blocked"],
+  #bridge-section[data-state="unpaired-remote"],
+  #bridge-section[data-state^="update"] { --bridge-state: var(--accent-danger); }
+
+  .bridge-hero {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 2px 4px;
+    min-width: 0;
+  }
+  .bridge-badge {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #fff;
+    background: var(--text-muted);
+  }
+  #bridge-avatar {
+    background: var(--bridge-state);
+    transition: background 0.25s;
+  }
+  #bridge-avatar .icon { width: 18px; height: 18px; }
+  /* Something is pending: the badge breathes, like the syncing cloud. */
+  #bridge-section[data-state^="waiting"] #bridge-avatar,
+  #bridge-section[data-state="approve"] #bridge-avatar { animation: sync-pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    #bridge-avatar { animation: none !important; }
+  }
+  .bridge-identity {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .bridge-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bridge-sub {
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text-muted);
+  }
+  /* The status sentence with a dot in the state colour in front of it. */
+  .bridge-status {
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    padding: 0 2px;
+  }
+  .bridge-status::before {
+    content: '';
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: var(--bridge-state);
+  }
+  .bridge-status-line { font-size: 12px; line-height: 1.4; color: var(--text-secondary); padding: 0 2px; }
   .bridge-note { font-size: 11px; line-height: 1.4; color: var(--text-muted); padding: 0 2px; }
+  .bridge-indent { padding-left: 34px; }
   .bridge-list { display: flex; flex-direction: column; gap: 6px; }
-  .bridge-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-secondary); }
-  .bridge-guide-title { font-weight: 600; color: var(--text-secondary); }
+  .bridge-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .bridge-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* App badges in the guide: the same badge, squared off and quiet. */
+  .bridge-badge.bridge-badge-app {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    background: var(--bg-muted);
+    border: 1px solid var(--border-soft);
+  }
+  /* A connected agent: the badge in the state colour, name over its state. */
+  .bridge-agent .bridge-badge { width: 24px; height: 24px; font-size: 10px; }
+  .bridge-agent[data-agent-state="connected"] .bridge-badge { background: var(--accent-success-text); }
+  .bridge-agent[data-agent-state="old"] .bridge-badge { background: var(--accent-warning-text); }
   /* A pairing code: the visual centre of its dialog, digits in groups of three. */
   #app-confirm-highlight {
     font-size: 32px;
@@ -4231,6 +4342,7 @@
   <symbol id="icon-circle-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></symbol>
   <symbol id="icon-circle-dashed" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/></symbol>
   <symbol id="icon-circle-dashed-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95"/><path d="M3.69 8.56a9 9 0 0 0 -.69 3.44"/><path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/><path d="M8.56 20.31a9 9 0 0 0 3.44 .69"/><path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95"/><path d="M20.31 15.44a9 9 0 0 0 .69 -3.44"/><path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92"/><path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69"/><path d="M9 12l2 2l4 -4"/></symbol>
+  <symbol id="icon-sparkles" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z"/></symbol>
   <symbol id="icon-bolt" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></symbol>
   <symbol id="icon-ban" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></symbol>
   <symbol id="icon-bolt-off" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 3l18 18"/><path d="M15.212 15.21l-4.212 5.79v-7h-6l3.79 -5.21m1.685 -2.32l2.525 -3.47v6m1 1h5l-2.104 2.893"/></symbol>
@@ -4834,27 +4946,37 @@ Or remove them later in Settings → Help.</div>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-ai" role="tabpanel" aria-labelledby="settings-tab-ai" hidden>
-      <div class="settings-section" id="bridge-section">
-        <div class="theme-toggle-row">
-          <span class="settings-label" id="bridge-label" data-i18n="settings.bridge">AI agents</span>
+      <div class="settings-section" id="bridge-section" data-state="off">
+        <!-- Read like the Drive account card: who (the badge, coloured by state),
+             what, and the switch. -->
+        <div class="bridge-hero">
+          <div class="bridge-badge" id="bridge-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-sparkles"/></svg></div>
+          <div class="bridge-identity">
+            <div class="bridge-name" id="bridge-label" data-i18n="settings.bridge">AI agents</div>
+            <div class="bridge-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer</div>
+          </div>
           <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Allow AI agents on this computer">
             <span class="theme-toggle-thumb"></span>
           </button>
         </div>
-        <div id="bridge-status" class="bridge-note" role="status" aria-live="polite"></div>
+        <div class="settings-separator"></div>
+        <div class="settings-label" data-i18n="bridge.statusCaption">Status</div>
+        <div id="bridge-status" class="bridge-status" role="status" aria-live="polite"></div>
         <div id="bridge-agents" class="bridge-list" hidden></div>
         <div id="bridge-guide" class="bridge-list" hidden>
-          <div class="bridge-note bridge-guide-title" data-i18n="bridge.guide.title">Connect an agent</div>
-          <div class="bridge-row"><span>Claude Desktop</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-desktop" data-i18n="bridge.guide.download">Download</button></div>
-          <div class="bridge-note" data-i18n="bridge.guide.desktopNote">No setup needed: open the file and confirm in Claude Desktop.</div>
-          <div class="bridge-row"><span>Claude Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-code" data-i18n="bridge.guide.copyCommand">Copy command</button></div>
-          <div class="bridge-row"><span>Cursor</span><button type="button" class="agenda-action-btn" id="bridge-guide-cursor" data-i18n="bridge.guide.addCursor">Add to Cursor</button></div>
-          <div class="bridge-row"><span>VS Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-vscode" data-i18n="bridge.guide.addVscode">Add to VS Code</button></div>
-          <div class="bridge-row"><span data-i18n="bridge.guide.other">Other MCP app</span><button type="button" class="agenda-action-btn" id="bridge-guide-other" data-i18n="bridge.guide.copyConfig">Copy config</button></div>
+          <div class="settings-separator"></div>
+          <div class="settings-label" data-i18n="bridge.guide.title">Connect an agent</div>
+          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">CD</span><span class="bridge-row-name">Claude Desktop</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-desktop" data-i18n="bridge.guide.download">Download</button></div>
+          <div class="bridge-note bridge-indent" data-i18n="bridge.guide.desktopNote">No setup needed: open the file and confirm in Claude Desktop.</div>
+          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">CC</span><span class="bridge-row-name">Claude Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-code" data-i18n="bridge.guide.copyCommand">Copy command</button></div>
+          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">Cu</span><span class="bridge-row-name">Cursor</span><button type="button" class="agenda-action-btn" id="bridge-guide-cursor" data-i18n="bridge.guide.addCursor">Add to Cursor</button></div>
+          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">VS</span><span class="bridge-row-name">VS Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-vscode" data-i18n="bridge.guide.addVscode">Add to VS Code</button></div>
+          <div class="bridge-row"><span class="bridge-badge bridge-badge-app" aria-hidden="true">{ }</span><span class="bridge-row-name" data-i18n="bridge.guide.other">Other MCP app</span><button type="button" class="agenda-action-btn" id="bridge-guide-other" data-i18n="bridge.guide.copyConfig">Copy config</button></div>
           <div class="bridge-note" data-i18n="bridge.guide.node">All but Claude Desktop need Node.js 20 or newer. If your agent does not see Zenit Week, restart it.</div>
         </div>
         <div id="bridge-paired" class="bridge-list" hidden>
-          <div id="bridge-paired-date" class="bridge-note"></div>
+          <div class="settings-separator"></div>
+          <div id="bridge-paired-date" class="bridge-status-line"></div>
           <button type="button" class="agenda-action-btn" id="bridge-unpair-btn" data-i18n="bridge.unpair">Unpair</button>
         </div>
       </div>
@@ -11541,8 +11663,7 @@ const TRANSLATIONS = {
     'bridge.state.blocked':       'Blocked by browser - click the icon left of the address, open the site settings, set "Apps on this device" (Chrome) or "Local network" (Firefox) to Allow, then reload',
     'bridge.state.waiting-agent': 'Waiting for an agent - ask your agent something about your week',
     'bridge.state.approve':       'Approve the request',
-    'bridge.state.connected':     'Connected - {client}',
-    'bridge.state.connectedNoName': 'Connected',
+    'bridge.state.connected':     'Connected',
     'bridge.state.unpaired-remote': 'Unpaired on the agent side - ask your agent something to pair again',
     'bridge.state.update-server': "Update your agent's Zenit Week server - restart your agent app, or download the new Zenit Week extension for Claude Desktop below",
     'bridge.state.update-server-npx': "Update your agent's Zenit Week server - restart your agent app",
@@ -11557,6 +11678,7 @@ const TRANSLATIONS = {
     'bridge.agent.connected':     'Connected',
     'bridge.agent.old':           "Update its Zenit Week server",
     'bridge.guide.title':         'Connect an agent',
+    'bridge.statusCaption':       'Status',
     'bridge.guide.copyCommand':   'Copy command',
     'bridge.guide.addCursor':     'Add to Cursor',
     'bridge.guide.addVscode':     'Add to VS Code',
@@ -11999,8 +12121,7 @@ const TRANSLATIONS = {
     'bridge.state.blocked':       'Zablokováno prohlížečem - klikni na ikonu vlevo od adresy, otevři nastavení webu, nastav "Aplikace na tomto zařízení" (Chrome) nebo "Místní síť" (Firefox) na Povolit a stránku obnov',
     'bridge.state.waiting-agent': 'Čekám na agenta - zeptej se svého agenta na něco o týdnu',
     'bridge.state.approve':       'Schval žádost',
-    'bridge.state.connected':     'Připojeno - {client}',
-    'bridge.state.connectedNoName': 'Připojeno',
+    'bridge.state.connected':     'Připojeno',
     'bridge.state.unpaired-remote': 'Spárování zrušeno na straně agenta - zeptej se agenta na něco a spáruj znovu',
     'bridge.state.update-server': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta, nebo níže stáhni nové rozšíření Zenit Week pro Claude Desktop',
     'bridge.state.update-server-npx': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta',
@@ -12015,6 +12136,7 @@ const TRANSLATIONS = {
     'bridge.agent.connected':     'Připojeno',
     'bridge.agent.old':           'Aktualizuj jeho Zenit Week server',
     'bridge.guide.title':         'Připoj agenta',
+    'bridge.statusCaption':       'Stav',
     'bridge.guide.copyCommand':   'Kopírovat příkaz',
     'bridge.guide.addCursor':     'Přidat do Cursoru',
     'bridge.guide.addVscode':     'Přidat do VS Code',
@@ -26891,14 +27013,10 @@ const BRIDGE_OTHER_CONFIG = JSON.stringify({ mcpServers: { 'zenit-week': BRIDGE_
 const BRIDGE_CURSOR_LINK = `cursor://anysphere.cursor-deeplink/mcp/install?name=zenit-week&config=${btoa(JSON.stringify(BRIDGE_SERVER_JSON))}`;
 const BRIDGE_VSCODE_LINK = `https://vscode.dev/redirect?url=${encodeURIComponent(`vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'zenit-week', ...BRIDGE_SERVER_JSON }))}`)}`;
 
-// Every connected agent app, once each, in port order: "claude-code (2), claude-ai".
-// Empty when no server named its agent app; a nameless one beside named ones
-// shows as "agent".
-function bridgeClientList(clients) {
-  if (!clients.some(Boolean)) return '';
-  const counts = new Map();
-  clients.map(c => c || t('bridge.unnamedAgent')).forEach(c => counts.set(c, (counts.get(c) || 0) + 1));
-  return [...counts].map(([name, n]) => (n > 1 ? `${name} (${n})` : name)).join(', ');
+// Up to two letters for an agent's badge: "claude-code" -> "CC", "cursor" -> "C".
+function bridgeInitials(name) {
+  const words = String(name || '').split(/[\s_.-]+/).filter(Boolean);
+  return words.slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
 }
 
 function renderBridgeStatus() {
@@ -26910,27 +27028,38 @@ function renderBridgeStatus() {
   const supported = bridgeSupported();
   toggle.disabled = !supported;
   toggle.setAttribute('aria-checked', supported && rec.enabled ? 'true' : 'false');
-  const { state, clients, agents } = supported ? bridgeStatus : { state: 'unsupported', clients: [], agents: [] };
+  const { state, agents } = supported ? bridgeStatus : { state: 'unsupported', agents: [] };
   const shown = rec.enabled || state === 'unsupported' ? state : 'off';
-  const names = bridgeClientList(clients);
-  el.textContent = shown === 'connected'
-    ? (names ? t('bridge.state.connected', { client: names }) : t('bridge.state.connectedNoName'))
-    : shown === 'update-server' ? t(bridgeUpdateHintKey(agents))
+  // One state colour for the badge and the status dot (see #bridge-section CSS).
+  document.getElementById('bridge-section').dataset.state = shown;
+  // The state alone: the agents are named in their own rows right below.
+  el.textContent = shown === 'update-server' ? t(bridgeUpdateHintKey(agents))
     : t(`bridge.state.${shown}`);
 
   // One row per agent app the page knows: connected, or speaking an old protocol.
   const list = document.getElementById('bridge-agents');
   list.textContent = '';
+  // Each reads like the Drive account row: an initials badge in the agent's
+  // state colour, the name, and its state underneath.
   const rows = (shown === 'off' ? [] : agents).map(a => {
     const row = document.createElement('div');
-    row.className = 'bridge-row';
-    const name = document.createElement('span');
-    name.textContent = a.client || t('bridge.unnamedAgent');
-    const st = document.createElement('span');
-    st.className = 'bridge-note';
+    row.className = 'bridge-row bridge-agent';
+    row.dataset.agentState = a.state;
+    const label = a.state === 'old' && !a.client ? t('bridge.agent.oldServer') : (a.client || t('bridge.unnamedAgent'));
+    const badge = document.createElement('span');
+    badge.className = 'bridge-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    badge.textContent = bridgeInitials(label);
+    const identity = document.createElement('div');
+    identity.className = 'bridge-identity';
+    const name = document.createElement('div');
+    name.className = 'bridge-name';
+    name.textContent = label;
+    const st = document.createElement('div');
+    st.className = 'bridge-sub';
     st.textContent = t(a.state === 'connected' ? 'bridge.agent.connected' : 'bridge.agent.old');
-    if (a.state === 'old' && !a.client) name.textContent = t('bridge.agent.oldServer');
-    row.append(name, st);
+    identity.append(name, st);
+    row.append(badge, identity);
     return row;
   });
   rows.forEach(r => list.appendChild(r));
