@@ -191,6 +191,7 @@ const sandbox = {
   // Agent bridge: HMAC and base64url. WebSocket is installed per test.
   TextEncoder: globalThis.TextEncoder,
   btoa: globalThis.btoa,
+  atob: globalThis.atob,
   // Read at call time, so vi.useFakeTimers() reaches the app's timers too.
   setTimeout: (...a) => globalThis.setTimeout(...a),
   clearTimeout: (...a) => globalThis.clearTimeout(...a),
@@ -766,7 +767,8 @@ export const {
   bridgeDisconnect,
   bridgeHmac,
   bridgeSocketUrl,
-  parseBridgePairingCode,
+  bridgePairCode,
+  bridgeUnpair,
   loadBridgeRecord,
   saveBridgeRecord,
   forgetBridge,

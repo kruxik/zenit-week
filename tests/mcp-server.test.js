@@ -1,17 +1,19 @@
-// zenit-week-mcp, relay side (mcp/core.js): origin allowlist, handshake,
-// handshake timeout, rate budget, tab routing, no_app_tab, resource updates.
+// zenit-week-mcp, relay side (mcp/core.js): origin allowlist, the v2
+// handshake (setup spec 4.4), pairing, tab routing, rate budget, no_app_tab,
+// resource updates, the shared pairings file and the port range.
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  Relay, isAllowedOrigin, parseExtraOrigin, proofFor, urisForWeekSaved, loadOrCreateToken,
-  listenOnFirstFreePort, pairingCode, PORTS, PORT_MIN, PORT_MAX,
-  HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN,
+  Relay, isAllowedOrigin, parseExtraOrigin, urisForWeekSaved, hmacB64, memoryPairings, filePairings,
+  matchSite, listenOnFirstFreePort, formatPairCode, PORTS, PORT_MIN, PORT_MAX, PROTOCOL,
+  HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN, PAIR_TIMEOUT_MS,
 } from '../mcp/core.js';
-import { bridgeHmac } from './setup.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const TOKEN = 'abcdefghijklmnopqrstuvwxyz012345';
+const ORIGIN = 'https://zenitweek.com';
+const KEY = 'k'.repeat(43);
+const PAIRING_ID = 'p'.repeat(22);
 
 class Sock {
   constructor() { this.sent = []; this.closed = null; }
@@ -19,12 +21,15 @@ class Sock {
   close(code, reason) { this.closed = { code, reason }; }
 }
 
-let relay, saved;
-function connect({ tabId = 't1', visible = true, week = '2026-45', token = TOKEN } = {}) {
+let relay, saved, pairings;
+const open = (tab, extra = {}) => relay.onMessage(tab, JSON.stringify({ type: 'open', protocol: PROTOCOL, visible: true, focused: true, ...extra }));
+// A paired page: open with its pairing, then prove the key.
+function connect({ tabId = 't1', visible = true, week = '2026-45', key = KEY } = {}) {
   const ws = new Sock();
-  const tab = relay.onOpen(ws);
-  relay.onMessage(tab, JSON.stringify({ type: 'challenge', nonce: 'n'.repeat(32) }));
-  relay.onMessage(tab, JSON.stringify({ type: 'hello', token, tabId, week, visible }));
+  const tab = relay.onOpen(ws, ORIGIN);
+  open(tab, { visible, focused: visible, pairingId: PAIRING_ID, nonce: 'n'.repeat(43) });
+  const { nonce } = ws.sent[0];
+  relay.onMessage(tab, JSON.stringify({ type: 'ready', proof: hmacB64(key, `page|${nonce}`), tabId, week, visible }));
   return { ws, tab };
 }
 // The page's side of a call: answer the last call frame.
@@ -36,7 +41,8 @@ function answer({ ws, tab }, data = { ok: 1 }) {
 
 beforeEach(() => {
   saved = [];
-  relay = new Relay({ token: TOKEN, clientName: () => 'claude-code', onWeekSaved: (wk, tab) => saved.push([wk, tab.id]) });
+  pairings = memoryPairings([{ pairingId: PAIRING_ID, origin: ORIGIN, key: KEY, pairedAt: '2026-11-08T00:00:00.000Z' }]);
+  relay = new Relay({ pairings, clientName: () => 'claude-code', onWeekSaved: (wk, tab) => saved.push([wk, tab.id]) });
 });
 afterEach(() => vi.useRealTimers());
 
@@ -66,34 +72,157 @@ describe('--allow-origin', () => {
 });
 
 describe('handshake', () => {
-  test('the proof matches what the page computes', async () => {
+  test('a known pairing: the server proves the key first, then the page', () => {
     const ws = new Sock();
-    const tab = relay.onOpen(ws);
-    relay.onMessage(tab, JSON.stringify({ type: 'challenge', nonce: 'abc'.repeat(8) }));
-    expect(ws.sent[0]).toEqual({ type: 'proof', hmac: await bridgeHmac(TOKEN, 'abc'.repeat(8)), client: 'claude-code' });
-    expect(proofFor(TOKEN, 'x')).not.toBe(proofFor('other-token-value-here', 'x'));
+    const tab = relay.onOpen(ws, ORIGIN);
+    open(tab, { pairingId: PAIRING_ID, nonce: 'a'.repeat(43) });
+    expect(ws.sent[0]).toMatchObject({ type: 'welcome', protocol: 2, paired: true, client: 'claude-code', proof: hmacB64(KEY, `server|${'a'.repeat(43)}`) });
+    expect(relay.pickTab()).toBeNull();
+    relay.onMessage(tab, JSON.stringify({ type: 'ready', proof: hmacB64(KEY, `page|${ws.sent[0].nonce}`), tabId: 't', week: '2026-45' }));
+    expect(relay.pickTab()?.week).toBe('2026-45');
   });
 
-  test('a wrong token is closed with refused', () => {
-    const { ws } = connect({ token: 'wrong-token-wrong-token-wrong' });
+  test('a wrong page proof is closed with refused', () => {
+    const { ws } = connect({ key: 'w'.repeat(43) });
     expect(ws.closed).toEqual({ code: 4001, reason: 'refused' });
     expect(relay.pickTab()).toBeNull();
   });
 
-  test('a socket without hello is closed after the handshake timeout', () => {
+  test('an unknown pairing is said so, and the page is left open to pair again', () => {
+    const ws = new Sock();
+    const tab = relay.onOpen(ws, ORIGIN);
+    open(tab, { pairingId: 'q'.repeat(22), nonce: 'a'.repeat(43) });
+    expect(ws.sent[0]).toMatchObject({ type: 'welcome', paired: false, unknown: true });
+    expect(ws.sent[0].proof).toBeUndefined();
+    expect(ws.closed).toBeNull();
+  });
+
+  test('a pairing of another site does not count for this one', () => {
+    const ws = new Sock();
+    const tab = relay.onOpen(ws, 'https://dev-x.ngrok.app');
+    open(tab, { pairingId: PAIRING_ID, nonce: 'a'.repeat(43) });
+    expect(ws.sent[0]).toMatchObject({ paired: false, unknown: true });
+  });
+
+  test('a v1 page, or another protocol, is closed with protocol', () => {
+    for (const frame of [{ type: 'challenge', nonce: 'x'.repeat(32) }, { type: 'open', protocol: 3 }]) {
+      const ws = new Sock();
+      relay.onMessage(relay.onOpen(ws, ORIGIN), JSON.stringify(frame));
+      expect(ws.closed).toEqual({ code: 4003, reason: 'protocol' });
+    }
+  });
+
+  test('a socket without open is closed after the handshake timeout', () => {
     vi.useFakeTimers();
     const ws = new Sock();
-    relay.onOpen(ws);
+    relay.onOpen(ws, ORIGIN);
     vi.advanceTimersByTime(HANDSHAKE_TIMEOUT_MS + 1);
     expect(ws.closed.code).toBe(4002);
     expect(relay.tabs.size).toBe(0);
   });
 
-  test('calls are not sent before hello', async () => {
+  test('calls are not sent before the page proved the key', async () => {
     const ws = new Sock();
-    relay.onOpen(ws);
+    open(relay.onOpen(ws, ORIGIN));
     await expect(relay.call('read_week')).rejects.toMatchObject({ code: 'no_app_tab' });
-    expect(ws.sent).toEqual([]);
+    expect(ws.sent.map(f => f.type)).toEqual(['welcome']);
+  });
+});
+
+describe('pairing', () => {
+  const unpaired = (visible = true) => {
+    const ws = new Sock();
+    const tab = relay.onOpen(ws, ORIGIN);
+    open(tab, { visible, focused: visible });
+    return { ws, tab };
+  };
+
+  test('nothing connected, or only hidden tabs: no pairing starts', async () => {
+    expect((await relay.requestPairing()).kind).toBe('no_tab');
+    const { ws } = unpaired(false);
+    expect((await relay.requestPairing()).kind).toBe('hidden');
+    expect(ws.sent.map(f => f.type)).toEqual(['welcome']);
+  });
+
+  test('a bad pair-key breaks the pairing off', async () => {
+    const t = unpaired();
+    const p = relay.requestPairing();
+    relay.onMessage(t.tab, JSON.stringify({ type: 'pair-key', pub: 'x', nonce: 'y' }));
+    expect((await p).kind).toBe('failed');
+  });
+
+  test('the 120 s start when the dialog is shown', async () => {
+    vi.useFakeTimers();
+    const t = unpaired();
+    const page = (await import('node:crypto')).createECDH('prime256v1');
+    page.generateKeys();
+    const req = relay.requestPairing();
+    relay.onMessage(t.tab, JSON.stringify({ type: 'pair-key', pub: page.getPublicKey().toString('base64url'), nonce: Buffer.alloc(32, 1).toString('base64url') }));
+    const p = await req;
+    expect(p.code).toMatch(/^\d{6}$/);
+    expect(formatPairCode('482913')).toBe('482 913');
+    vi.advanceTimersByTime(PAIR_TIMEOUT_MS * 2); // not shown yet: still waiting
+    relay.onMessage(t.tab, JSON.stringify({ type: 'pair-shown' }));
+    vi.advanceTimersByTime(PAIR_TIMEOUT_MS + 1);
+    expect(await p.settled).toBe('timeout');
+    expect(t.ws.sent.at(-1)).toEqual({ type: 'pair-cancel' });
+  });
+
+  test('pair-ok without a proof of the new key is refused', async () => {
+    const t = unpaired();
+    const page = (await import('node:crypto')).createECDH('prime256v1');
+    page.generateKeys();
+    const req = relay.requestPairing();
+    relay.onMessage(t.tab, JSON.stringify({ type: 'pair-key', pub: page.getPublicKey().toString('base64url'), nonce: Buffer.alloc(32, 2).toString('base64url') }));
+    const p = await req;
+    relay.onMessage(t.tab, JSON.stringify({ type: 'pair-ok', pairingId: 'z'.repeat(22), proof: 'nope' }));
+    expect(await p.settled).toBe('failed');
+    expect(pairings.get(ORIGIN).pairingId).toBe(PAIRING_ID);
+  });
+
+  test('another server\'s request on screen answers busy', async () => {
+    const t = unpaired();
+    const req = relay.requestPairing();
+    relay.onMessage(t.tab, JSON.stringify({ type: 'pair-deny', reason: 'busy' }));
+    expect((await req).kind).toBe('busy');
+  });
+});
+
+describe('unpair', () => {
+  test('from the app: the site\'s pairing goes and its tabs are shut out', () => {
+    const a = connect({ tabId: 'a' });
+    const b = connect({ tabId: 'b' });
+    relay.onMessage(a.tab, JSON.stringify({ type: 'unpair' }));
+    expect(pairings.get(ORIGIN)).toBeNull();
+    expect(a.ws.closed).toEqual({ code: 4004, reason: 'unpaired' });
+    expect(b.ws.closed).toEqual({ code: 4004, reason: 'unpaired' });
+  });
+
+  test('the command matches an origin or a host name', () => {
+    expect(matchSite('https://zenitweek.com', ORIGIN)).toBe(true);
+    expect(matchSite('zenitweek.com', ORIGIN)).toBe(true);
+    expect(matchSite('https://zenitweek.com/', ORIGIN)).toBe(true);
+    expect(matchSite('abc.ngrok-free.app', ORIGIN)).toBe(false);
+    expect(matchSite('', ORIGIN)).toBe(false);
+  });
+});
+
+describe('pairings file', () => {
+  test('owner-only, one entry per site, shared by every reader', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zwmcp-'));
+    const file = path.join(dir, 'sub', 'pairings.json');
+    const a = filePairings(file);
+    const b = filePairings(file); // a second server on the machine
+    a.set({ pairingId: PAIRING_ID, origin: ORIGIN, key: KEY, pairedAt: 'x' });
+    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    expect(b.get(ORIGIN)).toMatchObject({ pairingId: PAIRING_ID, key: KEY });
+    a.set({ pairingId: 'r'.repeat(22), origin: ORIGIN, key: KEY, pairedAt: 'y' });
+    expect(b.list()).toHaveLength(1);
+    expect(b.delete(ORIGIN)).toBe(1);
+    expect(a.get(ORIGIN)).toBeNull();
+    fs.writeFileSync(file, '{ not json');
+    expect(a.list()).toEqual([]);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });
 
@@ -196,22 +325,5 @@ describe('port range (setup spec section 5)', () => {
   test('another bind failure is not mistaken for a taken port', async () => {
     const e = Object.assign(new Error('denied'), { code: 'EACCES' });
     await expect(listenOnFirstFreePort(async () => { throw e; })).rejects.toBe(e);
-  });
-
-  test('the pairing code keeps its port.token shape', () => {
-    expect(pairingCode(TOKEN)).toBe(`47831.${TOKEN}`);
-  });
-});
-
-describe('token file', () => {
-  test('created owner-only, reused, rotated', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zwmcp-'));
-    const file = path.join(dir, 'sub', 'token');
-    const a = loadOrCreateToken(file);
-    expect(a.created).toBe(true);
-    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
-    expect(loadOrCreateToken(file)).toEqual({ token: a.token, created: false });
-    expect(loadOrCreateToken(file, { rotate: true }).token).not.toBe(a.token);
-    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -3,9 +3,9 @@
 // an open Zenit Week tab. MCP over stdio on one side, a loopback-only WebSocket
 // on the other; the page does every read and write itself.
 //
-//   zenit-week-mcp            run the server (what the MCP client launches)
-//   zenit-week-mcp pair       print the pairing code again and copy it
-//   zenit-week-mcp rotate     make a new code; every paired tab must re-pair
+//   zenit-week-mcp                  run the server (what the MCP client launches)
+//   zenit-week-mcp unpair <site>    forget a site's pairing (an origin or a host name)
+//   zenit-week-mcp unpair --all     forget every pairing
 //   options: --open (launch the app when no tab is connected)
 //            --allow-origin <https-url> (also accept that page origin, e.g. an ngrok dev tunnel)
 //
@@ -15,14 +15,16 @@
 // stdout belongs to the MCP protocol: everything human-readable goes to stderr.
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import {
-  OPEN_WAIT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError, isAllowedOrigin, parseExtraOrigin,
-  listenOnFirstFreePort, loadOrCreateToken, pairingCode, tokenPath, urisForWeekSaved,
+  OPEN_WAIT_MS, PAIR_TIMEOUT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError, filePairings,
+  formatPairCode, isAllowedOrigin, listenOnFirstFreePort, matchSite, pairingsPath, parseExtraOrigin,
+  urisForWeekSaved,
 } from './core.js';
 
 const APP_URL = 'https://zenitweek.com/app';
@@ -40,36 +42,21 @@ argv.forEach((a, i) => {
   EXTRA_ORIGINS.push(o);
 });
 
-function copyToClipboard(text) {
-  const tool = process.platform === 'darwin' ? ['pbcopy', []]
-    : process.platform === 'win32' ? ['clip', []]
-    : ['xclip', ['-selection', 'clipboard']];
-  try {
-    const p = spawn(tool[0], tool[1], { stdio: ['pipe', 'ignore', 'ignore'] });
-    p.on('error', () => {});
-    p.stdin.end(text);
-    return true;
-  } catch (_) { return false; }
-}
+const pairings = filePairings(pairingsPath());
 
-function announceCode(token, out) {
-  const code = pairingCode(token);
-  copyToClipboard(code);
-  out(`Zenit Week pairing code (copied to the clipboard):\n\n  ${code}\n`);
-  out('Paste it in Zenit Week: Settings > Agent bridge. Your browser will ask to let');
-  out('Zenit Week reach apps on this computer - choose Allow (Firefox: also tick "Remember").');
-}
-
-if (cmd === 'pair' || cmd === 'rotate') {
-  const { token } = loadOrCreateToken(tokenPath(), { rotate: cmd === 'rotate' });
-  if (cmd === 'rotate') console.log('New code made; every paired tab has to be paired again.\n');
-  announceCode(token, s => console.log(s));
+if (cmd === 'unpair') {
+  const site = argv[1];
+  if (!site) { err('zenit-week-mcp: unpair needs a site (https://zenitweek.com or a host name) or --all'); process.exit(2); }
+  const all = pairings.list();
+  const gone = site === '--all' ? all : all.filter(e => matchSite(site, e.origin));
+  gone.forEach(e => pairings.delete(e.origin));
+  console.log(gone.length ? `Unpaired: ${gone.map(e => e.origin).join(', ')}` : `No pairing for ${site}.`);
   process.exit(0);
 }
 if (cmd !== 'serve') { err(`zenit-week-mcp: unknown command "${cmd}"`); process.exit(2); }
 
-const { token, created } = loadOrCreateToken(tokenPath());
-if (created) announceCode(token, err);
+// Which update hint the page shows on a protocol mismatch (setup spec 4.5, row 4).
+const INSTALL = /[\\/]_npx[\\/]/.test(fileURLToPath(import.meta.url)) ? 'npx' : 'repo';
 
 // ── MCP side ──
 const mcp = new McpServer(
@@ -82,6 +69,7 @@ const mcp = new McpServer(
       'Read zenit://week/current (or call get_stats) first to learn branch and task ids. Use open_week to switch weeks before writing to another week.',
       'Days are ISO weekdays: 1 = Monday ... 7 = Sunday. A label ending in "Nx" (e.g. "Pushups 10x") makes N ticks recorded with tick_task; days and Nx do not combine.',
       'Never put relative days (today, tomorrow) in labels: pass days instead.',
+      'The first request may answer that Zenit Week is not connected yet and give a code: tell the user that code, ask them to check it matches the one shown in Zenit Week and click Allow there, and call again only after they confirm.',
     ].join(' '),
   },
 );
@@ -91,7 +79,8 @@ mcp.server.setRequestHandler(SubscribeRequestSchema, async req => { subscription
 mcp.server.setRequestHandler(UnsubscribeRequestSchema, async req => { subscriptions.delete(req.params.uri); return {}; });
 
 const relay = new Relay({
-  token,
+  pairings,
+  install: INSTALL,
   clientName: () => mcp.server.getClientVersion()?.name || null,
   log: s => err(`zenit-week-mcp: ${s}`),
   onWeekSaved: (wk, tab) => {
@@ -109,12 +98,58 @@ function openApp() {
 }
 
 const STARTED_AT = Date.now();
+
+// A result the agent should read out rather than treat as a failure: the
+// pairing code, or what the user has to do first (setup spec 4.2, row 2).
+class Notice { constructor(text) { this.text = text; } }
+
+const NOT_PAIRED = code => `Not connected yet. Zenit Week shows a request with the code ${formatPairCode(code)}. `
+  + 'Ask the user to check that the code matches and click Allow there, then call again. Do not retry before the user confirms.';
+const PAIR_NOTICES = {
+  hidden: 'Zenit Week is open but not in front. Ask the user to bring the Zenit Week tab to the front, then ask again.',
+  busy: 'Zenit Week is showing another approval request. Ask the user to answer it, then ask again.',
+  failed: 'Pairing with Zenit Week broke off. Ask again to start a new request.',
+  denied: 'The user did not allow this agent in Zenit Week. Ask again only if the user wants to connect.',
+  timeout: 'Nobody answered the request in Zenit Week. Ask again to show a new code.',
+  closed: 'The Zenit Week tab closed during pairing. Ask again once it is open.',
+};
+
+const canElicit = () => !!mcp.server.getClientCapabilities()?.elicitation;
+
+// Pairing on the agent's first request (setup spec 4.1, step 3). Where the agent
+// app can show a message during the wait, the request is held and runs once
+// the user clicks Allow; otherwise the code comes back as a normal result.
+async function pairFirst() {
+  const p = await relay.requestPairing();
+  if (p.kind === 'no_tab') return null;
+  if (p.kind !== 'pairing') return new Notice(PAIR_NOTICES[p.kind] || PAIR_NOTICES.failed);
+  if (!canElicit()) return new Notice(NOT_PAIRED(p.code));
+  const abort = new AbortController();
+  mcp.server.elicitInput({
+    message: `Zenit Week is asking you to approve this agent. The code there should be ${formatPairCode(p.code)}. Click Allow in Zenit Week.`,
+    requestedSchema: { type: 'object', properties: {} },
+  }, { signal: abort.signal, timeout: PAIR_TIMEOUT_MS * 5 }).then(r => {
+    if (r?.action === 'decline') relay.cancelPairing();
+  }).catch(() => { /* aborted after Allow, or the app has no prompt after all */ });
+  const outcome = await p.settled;
+  abort.abort();
+  if (outcome !== 'paired') return new Notice(PAIR_NOTICES[outcome] || PAIR_NOTICES.failed);
+  await relay.waitForTab(5000, { paired: true });
+  return null;
+}
+
 async function forward(tool, args) {
   if (!relay.pickTab()) {
-    if (OPEN) openApp();
-    const grace = STARTUP_GRACE_MS - (Date.now() - STARTED_AT);
-    const wait = Math.max(OPEN ? OPEN_WAIT_MS : 0, grace);
-    if (wait > 0) await relay.waitForTab(wait);
+    if (!relay.hasAnyTab()) {
+      if (OPEN) openApp();
+      const grace = STARTUP_GRACE_MS - (Date.now() - STARTED_AT);
+      const wait = Math.max(OPEN ? OPEN_WAIT_MS : 0, grace);
+      if (wait > 0) await relay.waitForTab(wait);
+    }
+    if (!relay.pickTab()) {
+      const notice = await pairFirst();
+      if (notice) return notice;
+    }
   }
   return relay.call(tool, args);
 }
@@ -127,7 +162,10 @@ const asError = e => ({
 
 function tool(name, description, shape, annotations = {}) {
   mcp.registerTool(name, { description, inputSchema: shape, annotations }, async args => {
-    try { return asText(await forward(name, args || {})); } catch (e) { return asError(e); }
+    try {
+      const out = await forward(name, args || {});
+      return out instanceof Notice ? { content: [{ type: 'text', text: out.text }] } : asText(out);
+    } catch (e) { return asError(e); }
   });
 }
 
@@ -177,6 +215,7 @@ tool('get_stats', 'Completion statistics of the week in view.', {}, readOnly);
 function resource(name, uri, description, args) {
   mcp.registerResource(name, uri, { description, mimeType: 'application/json' }, async (u, vars) => {
     const data = await forward(args.tool, args.map ? args.map(vars) : {});
+    if (data instanceof Notice) return { contents: [{ uri: u.href, mimeType: 'text/plain', text: data.text }] };
     return { contents: [{ uri: u.href, mimeType: 'application/json', text: JSON.stringify(data, null, 2) }] };
   });
 }
@@ -216,8 +255,8 @@ if (!bound) {
   process.exit(1);
 }
 const { port: PORT, server: wss } = bound;
-wss.on('connection', ws => {
-  const tab = relay.onOpen(ws);
+wss.on('connection', (ws, req) => {
+  const tab = relay.onOpen(ws, req.headers.origin);
   ws.on('message', data => relay.onMessage(tab, data.toString()));
   ws.on('close', () => relay.onClose(tab));
   ws.on('error', () => {});

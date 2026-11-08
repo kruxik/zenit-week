@@ -16,7 +16,7 @@ Works with Zenit Week in desktop Chrome and Firefox. Safari is not supported yet
 MCP client  --stdio-->  zenit-week-mcp  --WebSocket on 127.0.0.1-->  Zenit Week tab
 ```
 
-The MCP client starts the server. The app connects to it once you pair them in **Settings > Agent bridge**.
+The MCP client starts the server. The app connects to it once you turn on **Settings > AI agents** and approve your agent once.
 
 ## Setup
 
@@ -39,13 +39,9 @@ You need [Node.js](https://nodejs.org/) 20 or newer. Your agent app downloads an
      }
      ```
    - Any other MCP client: a stdio server with the command `npx -y zenit-week-mcp@1`.
-2. Print the pairing code. It is also copied to your clipboard:
-   ```sh
-   npx -y zenit-week-mcp@1 pair
-   ```
-3. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > Agent bridge** and paste the code.
-4. When the browser asks to let Zenit Week reach apps on this computer, choose **Allow**. In Firefox, also tick **Remember my choice**.
-5. Settings shows **Connected**. Ask your agent to look at your week.
+2. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > AI agents** and turn on **AI agents**. Your browser then asks to let Zenit Week reach apps on this computer: choose **Allow**. In Firefox, also tick **Remember my choice**.
+3. Ask your agent something about your week. Zenit Week shows a 6-digit code and your agent shows the same one. Check that they match and click **Allow**.
+4. Settings shows **Connected**. From now on requests run at once, also after a restart.
 
 `@1` pins the major version: updates within 1.x arrive the next time your agent app starts the server, and a new major version never arrives unannounced.
 
@@ -62,7 +58,7 @@ For working on the server itself, run it from a clone instead of npm:
    claude mcp add --scope user zenit-week -- node "$PWD/server.js"
    ```
    For another client, the command is `node /path/to/zenit-week/mcp/server.js`.
-3. Print the pairing code with `node server.js pair`, then continue with step 3 above.
+3. Continue with step 2 above.
 
 ## Commands and options
 
@@ -71,8 +67,8 @@ For working on the server itself, run it from a clone instead of npm:
 | Command | What it does |
 |---|---|
 | `zenit-week-mcp` | Runs the server. This is what the MCP client launches. |
-| `zenit-week-mcp pair` | Prints the pairing code again and copies it. |
-| `zenit-week-mcp rotate` | Makes a new code. Every paired tab has to be paired again. |
+| `zenit-week-mcp unpair <site>` | Forgets a site's pairing, for example `unpair zenitweek.com`. The app then shows "Unpaired on the agent side" and pairs again on the next request. |
+| `zenit-week-mcp unpair --all` | Forgets every pairing. |
 
 | Option | What it does |
 |---|---|
@@ -83,7 +79,7 @@ Options go after the package name, for example `npx -y zenit-week-mcp@1 --open`.
 
 ### Several agent apps at once
 
-Every agent app starts its own copy of the server: Claude Desktop at launch, Claude Code per session, Cursor per window. Each copy listens on the first free port from `47831` to `47838`, and the app connects to all of them, so they can run side by side with one pairing code. Settings lists every connected agent app. A copy that finds all eight ports taken says "Too many Zenit Week servers running" and exits. Calls from two agents never interleave: the app runs them one at a time.
+Every agent app starts its own copy of the server: Claude Desktop at launch, Claude Code per session, Cursor per window. Each copy listens on the first free port from `47831` to `47838`, and the app connects to all of them, so they can run side by side. Pairings are shared through one file, so approving one agent app pairs the site for all of them. Settings lists every connected agent app. A copy that finds all eight ports taken says "Too many Zenit Week servers running" and exits. Calls from two agents never interleave: the app runs them one at a time.
 
 ## What the agent can do
 
@@ -121,11 +117,12 @@ Read-only resources:
 ## Security
 
 - **Your computer only.** The server listens on `127.0.0.1` and accepts connections only from `https://zenitweek.com`, local development origins and any origin you add with `--allow-origin`.
-- **Pairing code.** A tab must prove it knows the code before it can do anything. The code is stored in `~/.config/zenit-week-mcp/token` (or under `$XDG_CONFIG_HOME`). `rotate` replaces it.
+- **Approve once, by code.** On the agent's first request the app and the server agree a key (ECDH P-256 with a commitment) and both show a 6-digit code derived from it; you compare them and click Allow. A program sitting in between cannot make the two codes match. Afterwards both sides prove the key on every connection; it never crosses the socket again. Before pairing the app sends only its protocol version and whether it is in front. Pairings live in `~/.config/zenit-week-mcp/pairings.json` (owner-only, or under `$XDG_CONFIG_HOME`), one per site.
+- **What pairing protects against.** On a computer shared by several user accounts, another account's programs can reach `127.0.0.1` but not your browser profile or `~/.config`. A program running as you can already read both; no local scheme stops it.
 - **The app stays in charge.** The server never reads or changes week data itself. The app applies every change through its own actions, and each one can be undone.
 - **Rate limit.** At most 200 writes a minute. Reads are not limited.
 - **Several tabs.** Requests go to the most recently focused visible tab, or else to the tab that was visible most recently.
-- **Turning it off.** **Disconnect and forget** in Settings, signing out or resetting the app removes the pairing.
+- **Turning it off.** **Unpair** in Settings, signing out or resetting the app removes the pairing. `unpair` on the server side forgets it there; the app keeps its own key until you approve a new pairing, so a program on the port cannot make it drop a good key.
 
 ## License
 

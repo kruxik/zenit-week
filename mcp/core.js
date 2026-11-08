@@ -1,7 +1,8 @@
 // The relay half of zenit-week-mcp, free of third-party dependencies so the
 // app's test suite can load it directly. It knows the wire protocol
-// (docs/specs/agent-bridge.md, section 9), the origin allowlist, the pairing
-// token, tab routing and the rate budget. It never reads or merges week data:
+// (docs/specs/agent-bridge.md section 9, handshake and pairing replaced by
+// docs/specs/agent-bridge-setup.md section 4), the origin allowlist, the
+// pairing store, tab routing and the rate budget. It never reads or merges week data:
 // every call is forwarded to a page, which does the work.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -45,26 +46,104 @@ export function parseExtraOrigin(value) {
   }
 }
 
-// Same construction as the page: HMAC-SHA256 over the nonce, keyed with the
-// UTF-8 bytes of the token string, base64url without padding.
-export function proofFor(token, nonce) {
-  return crypto.createHmac('sha256', token).update(String(nonce)).digest('base64url');
+// ── Pairing v2 (docs/specs/agent-bridge-setup.md section 4.4) ──
+// The page and the server agree a key once, with ECDH P-256 and a commitment,
+// and the user approves it by comparing a 6-digit code. Afterwards each
+// connection is a mutual HMAC proof with that key; the key never crosses the
+// socket.
+export const PROTOCOL = 2;
+export const PAIR_TIMEOUT_MS = 120000;     // from the moment the dialog is shown
+export const PAIR_UNSHOWN_MAX_MS = 600000; // a dialog that waits behind the user's editing
+const PAIR_INFO = 'zenit-week pairing v2';
+const b64 = buf => Buffer.from(buf).toString('base64url');
+const unb64 = s => Buffer.from(String(s || ''), 'base64url');
+
+export function hmacB64(keyB64, message) {
+  return crypto.createHmac('sha256', unb64(keyB64)).update(String(message)).digest('base64url');
 }
 
-export function tokensEqual(a, b) {
+export function safeEqual(a, b) {
   const x = Buffer.from(String(a));
   const y = Buffer.from(String(b));
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
-export function newToken() {
-  return crypto.randomBytes(32).toString('base64url');
+const sha256 = (...parts) => crypto.createHash('sha256').update(Buffer.concat(parts.map(Buffer.from))).digest();
+
+// Six digits from both public keys and both nonces, server's first. The page
+// computes the same (pairCodeFor in zenit-week.html).
+export function pairCodeFor(pubS, pubP, nonceS, nonceP) {
+  const h = sha256(pubS, pubP, nonceS, nonceP);
+  return String(h.readUInt32BE(0) % 1000000).padStart(6, '0');
 }
 
-// `<port>.<token>`: the port part is kept so codes already pasted stay valid;
-// the page ignores it and scans the whole range.
-export function pairingCode(token) {
-  return `${PORT_MIN}.${token}`;
+export function pairKeyFor(shared, nonceS, nonceP) {
+  return b64(crypto.hkdfSync('sha256', shared, Buffer.concat([nonceS, nonceP]), PAIR_INFO, 32));
+}
+
+// "482 913": how both sides show a code.
+export const formatPairCode = code => `${code.slice(0, 3)} ${code.slice(3)}`;
+
+// ~/.config/zenit-week-mcp/pairings.json, owner-only: one entry per site,
+// shared by every server on the machine whatever installed it.
+export function configDir(home = os.homedir()) {
+  return path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'zenit-week-mcp');
+}
+export const pairingsPath = (home) => path.join(configDir(home), 'pairings.json');
+
+const PAIRING_ID = /^[A-Za-z0-9_-]{16,64}$/;
+const PAIRING_KEY = /^[A-Za-z0-9_-]{43}$/;
+
+export function readPairings(file = pairingsPath()) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const list = Array.isArray(raw?.pairings) ? raw.pairings : [];
+    return list.filter(e => e && typeof e.origin === 'string' && PAIRING_ID.test(e.pairingId) && PAIRING_KEY.test(e.key));
+  } catch (_) {
+    return [];
+  }
+}
+
+export function writePairings(list, file = pairingsPath()) {
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify({ version: 1, pairings: list }, null, 2) + '\n', { mode: 0o600 });
+  fs.chmodSync(tmp, 0o600);
+  fs.renameSync(tmp, file);
+}
+
+// The store the relay uses. Read on every handshake, so a pairing made through
+// one agent app's server is seen by every other one at once.
+export function filePairings(file = pairingsPath()) {
+  return {
+    get: origin => readPairings(file).find(e => e.origin === origin) || null,
+    set: entry => writePairings([...readPairings(file).filter(e => e.origin !== entry.origin), entry], file),
+    delete: origin => {
+      const list = readPairings(file);
+      const kept = list.filter(e => e.origin !== origin);
+      if (kept.length !== list.length) writePairings(kept, file);
+      return list.length - kept.length;
+    },
+    list: () => readPairings(file),
+  };
+}
+
+export function memoryPairings(initial = []) {
+  let list = [...initial];
+  return {
+    get: origin => list.find(e => e.origin === origin) || null,
+    set: entry => { list = [...list.filter(e => e.origin !== entry.origin), entry]; },
+    delete: origin => { const n = list.length; list = list.filter(e => e.origin !== origin); return n - list.length; },
+    list: () => [...list],
+  };
+}
+
+// `unpair <site>`: an origin, or a bare host name, matched against stored sites.
+export function matchSite(arg, origin) {
+  const a = String(arg || '').trim().replace(/\/+$/, '');
+  if (!a) return false;
+  if (a === origin) return true;
+  try { return new URL(origin).host === a || new URL(a).origin === origin; } catch (_) { return false; }
 }
 
 // Binds the first free port of `ports`. `tryListen(port)` resolves to the
@@ -78,50 +157,45 @@ export async function listenOnFirstFreePort(tryListen, ports = PORTS) {
   return null;
 }
 
-// ~/.config/zenit-week-mcp/token, owner-only.
-export function tokenPath(home = os.homedir()) {
-  const base = process.env.XDG_CONFIG_HOME || path.join(home, '.config');
-  return path.join(base, 'zenit-week-mcp', 'token');
-}
-
-export function loadOrCreateToken(file = tokenPath(), { rotate = false } = {}) {
-  if (!rotate) {
-    try {
-      const t = fs.readFileSync(file, 'utf8').trim();
-      if (/^[A-Za-z0-9_-]{16,128}$/.test(t)) return { token: t, created: false };
-    } catch (_) { /* first start */ }
-  }
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const token = newToken();
-  fs.writeFileSync(file, token + '\n', { mode: 0o600 });
-  fs.chmodSync(file, 0o600);
-  return { token, created: true };
-}
-
 class RelayError extends Error {
   constructor(code, message) { super(message || code); this.code = code; }
 }
 export { RelayError };
 
+const NONCE = /^[A-Za-z0-9_-]{43}$/;      // 32 bytes, base64url
+const PUBLIC_KEY = /^[A-Za-z0-9_-]{87}$/; // 65-byte uncompressed P-256 point
+
 // One connected page. `ws` needs only send(string), close(code, reason) and the
 // caller feeding frames into Relay.onMessage / onClose.
+//   new   - socket open, no `open` frame yet (2 s to send one)
+//   open  - protocol checked; not paired, or not proven yet. Knows only
+//           whether the tab is visible and focused: no week, no tab id.
+//   ready - both sides proved the pairing key; calls may run
 class Tab {
-  constructor(ws) {
+  constructor(ws, origin) {
     this.ws = ws;
-    this.ready = false;
+    this.origin = origin;
+    this.state = 'new';
     this.id = null;
     this.week = null;
     this.visible = false;
     this.lastFocus = 0;
     this.lastVisible = 0;
     this.timer = null;
+    this.nonce = null;      // the server's nonce of this connection
+    this.pairingId = null;  // the pairing this tab proved
   }
+  get ready() { return this.state === 'ready'; }
 }
 
 export class Relay {
-  constructor({ token, clientName = () => null, onWeekSaved = () => {}, now = () => Date.now(), log = () => {} }) {
-    this.token = token;
+  constructor({
+    pairings = memoryPairings(), clientName = () => null, install = 'npx',
+    onWeekSaved = () => {}, now = () => Date.now(), log = () => {},
+  } = {}) {
+    this.pairings = pairings;
     this.clientName = clientName;
+    this.install = install;
     this.onWeekSaved = onWeekSaved;
     this.now = now;
     this.log = log;
@@ -129,13 +203,14 @@ export class Relay {
     this.pending = new Map();
     this.nextId = 1;
     this.writes = [];
-    this.helloWaiters = new Set();
+    this.tabWaiters = new Set();
+    this.pairing = null; // the one open pairing of this server
   }
 
   // A socket that already passed the origin check.
-  onOpen(ws) {
-    const tab = new Tab(ws);
-    tab.timer = setTimeout(() => { if (!tab.ready) this._close(tab, 4002, 'handshake timeout'); }, HANDSHAKE_TIMEOUT_MS);
+  onOpen(ws, origin) {
+    const tab = new Tab(ws, origin);
+    tab.timer = setTimeout(() => { if (tab.state === 'new') this._close(tab, 4002, 'handshake timeout'); }, HANDSHAKE_TIMEOUT_MS);
     this.tabs.add(tab);
     return tab;
   }
@@ -144,22 +219,59 @@ export class Relay {
     let f;
     try { f = JSON.parse(text); } catch (_) { return; }
     if (!f || typeof f !== 'object') return;
-    if (!tab.ready) {
-      if (f.type === 'challenge' && typeof f.nonce === 'string' && f.nonce.length >= 16 && f.nonce.length <= 256) {
-        this._send(tab, { type: 'proof', hmac: proofFor(this.token, f.nonce), client: this.clientName() || null });
-      } else if (f.type === 'hello') {
-        if (!tokensEqual(f.token, this.token)) { this._close(tab, 4001, 'refused'); return; }
-        clearTimeout(tab.timer);
-        tab.ready = true;
-        tab.id = String(f.tabId || '');
-        tab.week = f.week || null;
-        tab.visible = !!f.visible;
-        if (tab.visible) tab.lastFocus = tab.lastVisible = this.now();
-        this.log(`tab ${tab.id} connected (week ${tab.week})`);
-        this.helloWaiters.forEach(fn => fn());
-      }
+    if (tab.state === 'new') return this._onFirstFrame(tab, f);
+    if (tab.state === 'open') return this._onUnpairedFrame(tab, f);
+    return this._onReadyFrame(tab, f);
+  }
+
+  _onFirstFrame(tab, f) {
+    // A v1 page opens with `challenge`; any other protocol is told to reload.
+    if (f.type === 'challenge' || (f.type === 'open' && f.protocol !== PROTOCOL)) { this._close(tab, 4003, 'protocol'); return; }
+    if (f.type !== 'open') return;
+    clearTimeout(tab.timer);
+    tab.state = 'open';
+    tab.nonce = b64(crypto.randomBytes(32));
+    this._seen(tab, !!f.visible, !!f.focused);
+    const welcome = { type: 'welcome', protocol: PROTOCOL, install: this.install, client: this.clientName() || null, nonce: tab.nonce, paired: false };
+    const entry = typeof f.pairingId === 'string' ? this.pairings.get(tab.origin) : null;
+    if (entry && entry.pairingId === f.pairingId && typeof f.nonce === 'string' && NONCE.test(f.nonce)) {
+      welcome.paired = true;
+      welcome.proof = hmacB64(entry.key, `server|${f.nonce}`);
+    } else if (typeof f.pairingId === 'string') {
+      welcome.unknown = true; // the page keeps its key (setup spec 4.7, row 2)
+    }
+    this._send(tab, welcome);
+    this._wakeTabWaiters();
+  }
+
+  _onUnpairedFrame(tab, f) {
+    if (f.type === 'event') { this._event(tab, f); return; }
+    if (f.type === 'ready') { this._onReady(tab, f); return; }
+    const p = this.pairing;
+    if (!p || p.tab !== tab) return;
+    if (f.type === 'pair-key') this._onPairKey(p, f);
+    else if (f.type === 'pair-shown') this._armPairTimer(p, PAIR_TIMEOUT_MS);
+    else if (f.type === 'pair-ok') this._onPairOk(p, f);
+    else if (f.type === 'pair-deny') this._settlePairing(p, f.reason === 'busy' ? 'busy' : 'denied');
+  }
+
+  // The page proves the pairing key; only then does it name its tab and week.
+  _onReady(tab, f) {
+    const entry = this.pairings.get(tab.origin);
+    if (!entry || typeof f.proof !== 'string' || !safeEqual(f.proof, hmacB64(entry.key, `page|${tab.nonce}`))) {
+      this._close(tab, 4001, 'refused');
       return;
     }
+    tab.state = 'ready';
+    tab.pairingId = entry.pairingId;
+    tab.id = String(f.tabId || '');
+    tab.week = f.week || null;
+    this._seen(tab, !!f.visible, !!f.visible);
+    this.log(`tab ${tab.id} connected (week ${tab.week})`);
+    this._wakeTabWaiters();
+  }
+
+  _onReadyFrame(tab, f) {
     if (f.type === 'result') {
       const p = this.pending.get(f.id);
       if (!p || p.tab !== tab) return;
@@ -168,17 +280,36 @@ export class Relay {
       if (f.ok) p.resolve(f.data);
       else p.reject(new RelayError(f.error?.code || 'internal', f.error?.message));
     } else if (f.type === 'event') {
-      const t = this.now();
-      if (f.event === 'focus') { tab.visible = true; tab.lastFocus = t; tab.lastVisible = t; }
-      else if (f.event === 'pause') { if (tab.visible) tab.lastVisible = t; tab.visible = false; }
-      if (f.wk && (f.event === 'view' || f.event === 'focus' || f.event === 'pause')) tab.week = f.wk;
+      this._event(tab, f);
       if (f.event === 'week-saved' && typeof f.wk === 'string') this.onWeekSaved(f.wk, tab);
+    } else if (f.type === 'unpair') {
+      // Settings "Unpair": this site's pairing goes for every server, since
+      // they share the file; every tab of the site here is shut out with it.
+      const entry = this.pairings.get(tab.origin);
+      if (entry && entry.pairingId === tab.pairingId) this.pairings.delete(tab.origin);
+      for (const t of [...this.tabs]) if (t.origin === tab.origin && t.ready) this._close(t, 4004, 'unpaired');
+      this.log(`site ${tab.origin} unpaired from the app`);
     }
+  }
+
+  _event(tab, f) {
+    const t = this.now();
+    if (f.event === 'focus') this._seen(tab, true, true);
+    else if (f.event === 'pause') { if (tab.visible) tab.lastVisible = t; tab.visible = false; }
+    if (tab.ready && f.wk && (f.event === 'view' || f.event === 'focus' || f.event === 'pause')) tab.week = f.wk;
+  }
+
+  _seen(tab, visible, focused) {
+    const t = this.now();
+    tab.visible = visible;
+    if (visible) tab.lastVisible = t;
+    if (focused) tab.lastFocus = t;
   }
 
   onClose(tab) {
     clearTimeout(tab.timer);
     this.tabs.delete(tab);
+    if (this.pairing && this.pairing.tab === tab) this._settlePairing(this.pairing, 'closed');
     for (const [id, p] of this.pending) {
       if (p.tab !== tab) continue;
       this.pending.delete(id);
@@ -188,27 +319,118 @@ export class Relay {
   }
 
   // The tab that executes: the most recently focused visible one, else the
-  // most recently visible one (a hidden tab still writes fine).
+  // most recently visible one (a hidden tab still writes fine). Paired only.
   pickTab() {
-    const ready = [...this.tabs].filter(t => t.ready);
-    if (!ready.length) return null;
-    const visible = ready.filter(t => t.visible).sort((a, b) => b.lastFocus - a.lastFocus);
+    return this._pick([...this.tabs].filter(t => t.ready));
+  }
+
+  _pick(tabs) {
+    if (!tabs.length) return null;
+    const visible = tabs.filter(t => t.visible).sort((a, b) => b.lastFocus - a.lastFocus);
     if (visible.length) return visible[0];
-    return ready.sort((a, b) => b.lastVisible - a.lastVisible)[0];
+    return tabs.sort((a, b) => b.lastVisible - a.lastVisible)[0];
+  }
+
+  hasAnyTab() {
+    return [...this.tabs].some(t => t.state !== 'new');
   }
 
   currentWeek() {
     return this.pickTab()?.week || null;
   }
 
-  waitForTab(ms = OPEN_WAIT_MS) {
-    if (this.pickTab()) return Promise.resolve(true);
+  // Resolves true once a tab is open (paired or not), false after `ms`.
+  waitForTab(ms = OPEN_WAIT_MS, { paired = false } = {}) {
+    const have = () => (paired ? !!this.pickTab() : this.hasAnyTab());
+    if (have()) return Promise.resolve(true);
     return new Promise(resolve => {
-      const done = ok => { clearTimeout(timer); this.helloWaiters.delete(fn); resolve(ok); };
-      const fn = () => done(true);
+      const done = ok => { clearTimeout(timer); this.tabWaiters.delete(fn); resolve(ok); };
+      const fn = () => { if (have()) done(true); };
       const timer = setTimeout(() => done(false), ms);
-      this.helloWaiters.add(fn);
+      this.tabWaiters.add(fn);
     });
+  }
+
+  _wakeTabWaiters() { [...this.tabWaiters].forEach(fn => fn()); }
+
+  // ── Pairing ──
+  // Called when the agent asks for something and no tab is paired. Resolves to
+  //   { kind: 'no_tab' }   nothing connected at all
+  //   { kind: 'hidden' }   only hidden tabs: no dialog (setup spec 4.3, row 2)
+  //   { kind: 'pairing', code, settled }  the dialog is (or will be) up; `code`
+  //       is the 6 digits, `settled` resolves to 'paired' | 'denied' | 'timeout'
+  //       | 'busy' | 'closed' | 'failed'. Repeated requests get the same pairing.
+  //   { kind: 'busy' }     the tab is showing another server's request
+  //   { kind: 'failed' }   the key exchange broke off
+  // A promise either way; with no tab it resolves at once.
+  requestPairing() {
+    if (this.pairing) return this.pairing.view;
+    const open = [...this.tabs].filter(t => t.state === 'open');
+    if (!open.length) return Promise.resolve({ kind: 'no_tab' });
+    const visible = open.filter(t => t.visible).sort((a, b) => b.lastFocus - a.lastFocus);
+    if (!visible.length) return Promise.resolve({ kind: 'hidden' });
+    const tab = visible[0];
+    const ecdh = crypto.createECDH('prime256v1');
+    ecdh.generateKeys();
+    const p = {
+      tab, ecdh, pub: ecdh.getPublicKey(), nonce: crypto.randomBytes(32), key: null, timer: null,
+      settled: null, settle: null, codeReady: null, codeResolve: null, view: null, outcome: null,
+    };
+    p.settled = new Promise(r => { p.settle = r; });
+    p.codeReady = new Promise(r => { p.codeResolve = r; });
+    this.pairing = p;
+    this._armPairTimer(p, PAIR_UNSHOWN_MAX_MS);
+    // Every request during this pairing gets this same promise, so the same code.
+    p.view = Promise.race([p.codeReady, p.settled.then(() => null)])
+      .then(code => (code ? { kind: 'pairing', code, settled: p.settled } : { kind: p.outcome === 'busy' ? 'busy' : 'failed' }));
+    this._send(tab, { type: 'pair-start', commit: b64(sha256(p.pub, p.nonce)), client: this.clientName() || null });
+    return p.view;
+  }
+
+  // Decline in the agent app's own prompt cancels the dialog in the app.
+  cancelPairing() {
+    const p = this.pairing;
+    if (!p) return;
+    this._send(p.tab, { type: 'pair-cancel' });
+    this._settlePairing(p, 'denied');
+  }
+
+  _onPairKey(p, f) {
+    if (p.key || !PUBLIC_KEY.test(f.pub || '') || !NONCE.test(f.nonce || '')) { this._settlePairing(p, 'failed'); return; }
+    const pubP = unb64(f.pub);
+    const nonceP = unb64(f.nonce);
+    let shared;
+    try { shared = p.ecdh.computeSecret(pubP); } catch (_) { this._settlePairing(p, 'failed'); return; }
+    p.key = pairKeyFor(shared, p.nonce, nonceP);
+    this._send(p.tab, { type: 'pair-reveal', pub: b64(p.pub), nonce: b64(p.nonce) });
+    p.codeResolve(pairCodeFor(p.pub, pubP, p.nonce, nonceP));
+  }
+
+  _onPairOk(p, f) {
+    if (!p.key || typeof f.pairingId !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(f.pairingId)
+      || typeof f.proof !== 'string' || !safeEqual(f.proof, hmacB64(p.key, `ok|${f.pairingId}`))) {
+      this._settlePairing(p, 'failed');
+      return;
+    }
+    this.pairings.set({ pairingId: f.pairingId, origin: p.tab.origin, key: p.key, pairedAt: new Date(this.now()).toISOString() });
+    this.log(`site ${p.tab.origin} paired`);
+    this._settlePairing(p, 'paired');
+  }
+
+  _armPairTimer(p, ms) {
+    clearTimeout(p.timer);
+    p.timer = setTimeout(() => {
+      this._send(p.tab, { type: 'pair-cancel' });
+      this._settlePairing(p, 'timeout');
+    }, ms);
+  }
+
+  _settlePairing(p, outcome) {
+    if (this.pairing !== p) return;
+    clearTimeout(p.timer);
+    this.pairing = null;
+    p.outcome = outcome;
+    p.settle(outcome);
   }
 
   _spendWrite() {
@@ -221,7 +443,7 @@ export class Relay {
 
   call(tool, args = {}) {
     const tab = this.pickTab();
-    if (!tab) return Promise.reject(new RelayError('no_app_tab', 'no Zenit Week tab is connected: open the app in Chrome or Firefox with the agent bridge on'));
+    if (!tab) return Promise.reject(new RelayError('no_app_tab', 'no Zenit Week tab is connected: open the app in Chrome or Firefox with AI agents on'));
     if (!READ_TOOLS.has(tool) && !this._spendWrite()) {
       return Promise.reject(new RelayError('rate_limited', `more than ${WRITE_BUDGET_PER_MIN} writes in a minute`));
     }

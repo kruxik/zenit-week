@@ -4,43 +4,99 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   _state, genId, defaultWeekData, findNode, rebuildNodeMap, getTickInfo,
-  bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeHmac,
-  bridgeSocketUrl, parseBridgePairingCode, loadBridgeRecord, saveBridgeRecord,
-  forgetBridge, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
+  bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeUnpair,
+  bridgeSocketUrl, loadBridgeRecord, saveBridgeRecord, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
   mergeWeekData, applyRemoteMerge, weekContentHash, reloadAppFresh,
 } from './setup.js';
+import nodeCrypto from 'node:crypto';
+import { Relay, memoryPairings } from '../mcp/core.js';
 
 const sandbox = _state.sandbox;
-const TOKEN = 'abcdefghijklmnopqrstuvwxyz012345';
 
-// ── Fake socket ──
+// ── Wire: page sockets to real relays (mcp/core.js) ──
+// A FakeSocket to a port with a relay behind it talks to that relay in
+// process, so the page's WebCrypto and the server's node:crypto meet for real.
+// A port without one never opens, like nothing listening.
+const ORIGIN = 'http://localhost:5000';
 let sockets;
+let servers; // port -> { relay, tab, ws }
 class FakeSocket {
-  constructor(url) { this.url = url; this.sent = []; this.closed = null; sockets.push(this); }
-  send(s) { this.sent.push(JSON.parse(s)); }
-  close(code, reason) { this.closed = { code, reason }; }
+  constructor(url) {
+    this.url = url;
+    this.sent = [];
+    this.closed = null;
+    sockets.push(this);
+    const srv = servers.get(this.port);
+    if (srv) queueMicrotask(() => this._attach(srv));
+  }
   get port() { return Number(new URL(this.url).port); }
-  open() { this.onopen && this.onopen(); }
-  async receive(frame) { await this.onmessage({ data: JSON.stringify(frame) }); }
-  async drop(reason = '') { await this.onclose({ reason }); }
+  _attach(srv) {
+    const page = this;
+    srv.ws = {
+      send: s => { const f = JSON.parse(s); queueMicrotask(() => page.receive(f)); },
+      close: (code, reason) => { page.closed = { code, reason }; queueMicrotask(() => page.drop(reason, code)); },
+    };
+    srv.tab = srv.relay.onOpen(srv.ws, srv.origin || ORIGIN);
+    this.srv = srv;
+    this.onopen && this.onopen();
+  }
+  send(s) { const f = JSON.parse(s); this.sent.push(f); if (this.srv && !this.closed) this.srv.relay.onMessage(this.srv.tab, s); }
+  close(code, reason) {
+    if (this.closed) return;
+    this.closed = { code, reason };
+    if (this.srv) this.srv.relay.onClose(this.srv.tab);
+    queueMicrotask(() => this.drop(reason, code));
+  }
+  async receive(frame) { if (!this.closed || frame.type === 'call') await this.onmessage({ data: JSON.stringify(frame) }); }
+  async drop(reason = '', code = 1006) { if (this._dropped) return; this._dropped = true; await this.onclose({ reason, code }); }
 }
-const PORTS = [47831, 47832, 47833, 47834, 47835, 47836, 47837, 47838];
+
+const settle = () => new Promise(r => setTimeout(r, 15));
+async function until(cond, ms = 2000) {
+  const end = Date.now() + ms;
+  while (!cond()) { if (Date.now() > end) throw new Error('timed out waiting'); await settle(); }
+}
+
+function serve(port, { client = 'claude-code', pairings = memoryPairings() } = {}) {
+  const srv = { relay: new Relay({ pairings, clientName: () => client }), tab: null, ws: null };
+  servers.set(port, srv);
+  return srv;
+}
 const socketOn = port => sockets.filter(s => s.port === port).at(-1);
 
-// A server on `port` answers the scan's socket and pairs.
-async function pairOn(port, client) {
-  const ws = socketOn(port);
-  ws.open();
-  const { nonce } = ws.sent[0];
-  await ws.receive({ type: 'proof', hmac: await bridgeHmac(TOKEN, nonce), client });
-  return ws;
+// The confirm dialog, stubbed: the last one shown, and whether it is open.
+let dialog;
+function stubDialog() {
+  dialog = null;
+  sandbox.showAppConfirm = opts => { dialog = { ...opts, open: true }; };
+  sandbox.window.isAppConfirmOpen = id => !!dialog?.open && (!id || id === dialog.id);
+  sandbox.window.closeAppConfirm = () => { if (dialog?.open) { dialog.open = false; dialog.onCancel?.(); } };
+}
+const allow = () => { dialog.open = false; return dialog.onConfirm(); };
+const deny = () => sandbox.window.closeAppConfirm();
+
+function turnOn() {
+  saveBridgeRecord({ ...loadBridgeRecord(), enabled: true, explained: true });
+  bridgeConnect();
+}
+
+// Pairs through the server on `port` and returns the page's socket to it.
+async function pairVia(port) {
+  const srv = servers.get(port);
+  await until(() => srv.tab && srv.relay.hasAnyTab());
+  const req = await srv.relay.requestPairing();
+  expect(req.kind).toBe('pairing');
+  await until(() => dialog?.open);
+  await allow();
+  await until(() => srv.relay.pickTab());
+  return { ws: socketOn(port), req, srv };
 }
 
 async function pairedSocket() {
-  saveBridgeRecord({ enabled: true, token: TOKEN });
-  bridgeConnect();
-  return pairOn(47831, 'claude-code');
+  serve(47831);
+  turnOn();
+  return (await pairVia(47831)).ws;
 }
 // A call as the server sends it; resolves when the page has answered.
 const serverCall = (ws, frame) => ws.receive({ type: 'call', ...frame });
@@ -67,7 +123,11 @@ const codeOf = p => p.then(() => 'ok', e => e.code);
 
 beforeEach(() => {
   sockets = [];
+  servers = new Map();
   sandbox.WebSocket = FakeSocket;
+  sandbox.document.visibilityState = 'visible';
+  sandbox.location.host = 'localhost:5000';
+  stubDialog();
   _state.reset();
   _state.clearLocalStorage();
   _state.set(defaultWeekData());
@@ -82,35 +142,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('pairing record', () => {
-  test('parses port.token, keeps only the token, and rejects anything else', () => {
-    expect(parseBridgePairingCode(` 47831.${TOKEN} `)).toEqual({ token: TOKEN });
-    expect(parseBridgePairingCode(`evil.com.${TOKEN}`)).toBeNull();
-    expect(parseBridgePairingCode(`99999.${TOKEN}`)).toBeNull();
-    expect(parseBridgePairingCode('47831.short')).toBeNull();
+describe('record', () => {
+  test('a v1 record keeps its switch and drops port and token', () => {
+    _state.setLocalStorage('zenit-week-bridge', { enabled: true, port: 47831, token: 'abcdefghijklmnopqrstuvwxyz012345' });
+    expect(loadBridgeRecord()).toEqual({ enabled: true, explained: true, pairingId: '', key: '', pairedAt: '' });
   });
 
   test('a tampered record falls back to safe values', () => {
-    _state.setLocalStorage('zenit-week-bridge', { enabled: true, port: 'evil.com', token: TOKEN });
-    expect(loadBridgeRecord()).toEqual({ enabled: true, token: TOKEN });
-    _state.setLocalStorage('zenit-week-bridge', { enabled: true, token: '<script>' });
-    expect(loadBridgeRecord()).toEqual({ enabled: false, token: '' });
+    _state.setLocalStorage('zenit-week-bridge', { enabled: true, pairingId: '<script>', key: 'x' });
+    expect(loadBridgeRecord()).toMatchObject({ enabled: true, pairingId: '', key: '' });
   });
 
   test('sign-out and reset (reloadAppFresh) clear the record', () => {
-    saveBridgeRecord({ enabled: true, token: TOKEN });
+    saveBridgeRecord({ enabled: true, explained: true });
     const realReload = sandbox.location.reload;
     sandbox.location.reload = () => {};
     try { reloadAppFresh(); } finally { sandbox.location.reload = realReload; }
     expect(_state.getLocalStorage('zenit-week-bridge')).toBeFalsy();
-  });
-
-  test('forget clears the record and closes the socket', async () => {
-    const ws = await pairedSocket();
-    forgetBridge();
-    expect(_state.getLocalStorage('zenit-week-bridge')).toBeFalsy();
-    expect(ws.closed).toBeTruthy();
-    expect(_state.getBridgeStatus().state).toBe('off');
   });
 });
 
@@ -120,138 +168,281 @@ describe('connection', () => {
     expect(sockets).toHaveLength(0);
   });
 
-  test('only ever targets loopback, on the port range', async () => {
-    await pairedSocket();
+  test('one scan opens a socket to every port of the range, loopback only', () => {
+    turnOn();
+    expect(sockets.map(s => s.port)).toEqual([47831, 47832, 47833, 47834, 47835, 47836, 47837, 47838]);
     expect(sockets.every(s => new URL(s.url).hostname === '127.0.0.1')).toBe(true);
     expect(new URL(bridgeSocketUrl(47838)).hostname).toBe('127.0.0.1');
     expect(() => bridgeSocketUrl(1234)).toThrow();
     expect(() => bridgeSocketUrl(47839)).toThrow();
   });
 
-  test('hello carries the token only after the server proves it', async () => {
-    const ws = await pairedSocket();
-    expect(ws.sent.map(f => f.type)).toEqual(['challenge', 'hello']);
-    expect(ws.sent[1].token).toBe(TOKEN);
-    expect(_state.getBridgeStatus()).toEqual({ state: 'connected', clients: ['claude-code'] });
+  test('before pairing the page sends only its protocol and visibility', async () => {
+    const srv = serve(47831);
+    turnOn();
+    await until(() => _state.getBridgeStatus().state === 'waiting-agent');
+    const sent = socketOn(47831).sent;
+    expect(sent).toEqual([{ type: 'open', protocol: 2, visible: true, focused: true }]);
+    expect(srv.relay.pickTab()).toBeNull();
   });
 
-  test('a wrong proof never sees the token and reads Refused', async () => {
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
+  test('presence events reach an unpaired server without the week', async () => {
+    serve(47831);
+    turnOn();
+    await until(() => _state.getBridgeStatus().state === 'waiting-agent');
+    _state.fireVisibilityChange('hidden');
     const ws = socketOn(47831);
-    ws.open();
-    await ws.receive({ type: 'proof', hmac: 'nope' });
-    expect(ws.sent.map(f => f.type)).toEqual(['challenge']);
-    expect(ws.closed.reason).toBe('refused');
-    expect(_state.getBridgeStatus().state).toBe('refused');
+    expect(JSON.stringify(ws.sent)).not.toContain('2026-45');
   });
 
-  test('week-saved is sent once per distinct content', async () => {
-    const ws = await pairedSocket();
-    const a = { nodes: [{ id: 'x', type: 'activity', label: 'A' }] };
-    const b = { nodes: [{ id: 'x', type: 'activity', label: 'B' }] };
-    bridgeNotifyWeekSaved('2026-45', a);
-    bridgeNotifyWeekSaved('2026-45', structuredClone(a));
-    bridgeNotifyWeekSaved('2026-45', b);
-    const sigs = ws.sent.filter(f => f.event === 'week-saved').map(f => f.sig);
-    expect(sigs).toHaveLength(2);
-    expect(sigs[0]).not.toBe(sigs[1]);
+  test('a v1 server reads as Update your server; a newer one as Reload', async () => {
+    servers.set(47831, { relay: { onOpen: () => ({}), onMessage: () => {}, onClose: () => {} }, tab: null });
+    turnOn();
+    const ws = await (async () => { await until(() => socketOn(47831).srv); return socketOn(47831); })();
+    await ws.drop('handshake timeout', 4002);
+    expect(_state.getBridgeStatus().state).toBe('update-server');
+    expect(_state.getBridgeStatus().agents).toEqual([{ port: 47831, client: '', state: 'old' }]);
+    bridgeDisconnect();
+    sockets = [];
+    servers = new Map();
+    servers.set(47832, { relay: { onOpen: () => ({}), onMessage: () => {}, onClose: () => {} }, tab: null });
+    turnOn();
+    await until(() => socketOn(47832).srv);
+    await socketOn(47832).drop('protocol', 4003);
+    expect(_state.getBridgeStatus().state).toBe('reload-app');
+  });
+});
+
+describe('pairing (setup spec section 4)', () => {
+  test('Allow: both sides show one code, store the key, and the tab becomes ready', async () => {
+    const pairings = memoryPairings();
+    serve(47831, { pairings });
+    turnOn();
+    const { req, srv } = await pairVia(47831);
+    expect(dialog.highlight).toBe(`${req.code.slice(0, 3)} ${req.code.slice(3)}`);
+    expect(dialog.body).toContain('claude-code');
+    expect(await req.settled).toBe('paired');
+    const rec = loadBridgeRecord();
+    expect(rec.key).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(pairings.get(ORIGIN)).toMatchObject({ pairingId: rec.pairingId, key: rec.key, origin: ORIGIN });
+    expect(srv.relay.pickTab().week).toBe('2026-45');
+    expect(_state.getBridgeStatus()).toMatchObject({ state: 'connected', clients: ['claude-code'] });
+    // The key never crosses the socket.
+    expect(JSON.stringify(socketOn(47831).sent)).not.toContain(rec.key);
+  });
+
+  test('repeated requests during one pairing get the same code and one dialog', async () => {
+    const srv = serve(47831);
+    turnOn();
+    await until(() => srv.relay.hasAnyTab());
+    let shown = 0;
+    const real = sandbox.showAppConfirm;
+    sandbox.showAppConfirm = o => { shown++; real(o); };
+    const a = await srv.relay.requestPairing();
+    const b = await srv.relay.requestPairing();
+    expect(b.code).toBe(a.code);
+    await until(() => dialog?.open);
+    expect(shown).toBe(1);
+  });
+
+  test('Deny: no key on either side, and the next request has a new pairing', async () => {
+    const pairings = memoryPairings();
+    const srv = serve(47831, { pairings });
+    turnOn();
+    await until(() => srv.relay.hasAnyTab());
+    const a = await srv.relay.requestPairing();
+    await until(() => dialog?.open);
+    deny();
+    expect(await a.settled).toBe('denied');
+    expect(loadBridgeRecord().key).toBe('');
+    expect(pairings.list()).toEqual([]);
+    const b = await srv.relay.requestPairing();
+    expect(b.kind).toBe('pairing');
+    expect(b.settled).not.toBe(a.settled);
+  });
+
+  test('a hidden tab gets no dialog', async () => {
+    const srv = serve(47831);
+    sandbox.document.visibilityState = 'hidden';
+    turnOn();
+    await until(() => srv.relay.hasAnyTab());
+    expect((await srv.relay.requestPairing()).kind).toBe('hidden');
+    expect(dialog).toBeNull();
+  });
+
+  test('the dialog waits while the user edits', async () => {
+    const srv = serve(47831);
+    turnOn();
+    await until(() => srv.relay.hasAnyTab());
+    _state.setEditState({ nodeId: 'x' });
+    await srv.relay.requestPairing();
+    await new Promise(r => setTimeout(r, 400));
+    expect(dialog).toBeNull();
+    _state.setEditState(null);
+    await until(() => dialog?.open);
+  });
+
+  test('a cancel from the agent side closes the dialog', async () => {
+    const srv = serve(47831);
+    turnOn();
+    await until(() => srv.relay.hasAnyTab());
+    const p = await srv.relay.requestPairing();
+    await until(() => dialog?.open);
+    srv.relay.cancelPairing();
+    expect(await p.settled).toBe('denied');
+    await until(() => !dialog.open);
+  });
+
+  test('later sessions connect silently with the stored key', async () => {
+    const pairings = memoryPairings();
+    serve(47831, { pairings });
+    turnOn();
+    await pairVia(47831);
+    bridgeDisconnect();
+    dialog = null;
+    const srv = serve(47831, { pairings });
+    turnOn();
+    await until(() => srv.relay.pickTab());
+    expect(dialog).toBeNull();
+    expect(_state.getBridgeStatus().state).toBe('connected');
+  });
+
+  test('a site paired through one agent app is paired for the other', async () => {
+    const pairings = memoryPairings(); // the shared pairings.json
+    serve(47831, { pairings, client: 'claude-ai' });
+    const other = serve(47832, { pairings, client: 'claude-code' });
+    turnOn();
+    await until(() => other.relay.hasAnyTab());
+    await pairVia(47831);
+    await until(() => other.relay.pickTab(), 5000);
+    expect(_state.getBridgeStatus().clients).toEqual(['claude-ai', 'claude-code']);
+  });
+
+  test('unpaired on the agent side: the page shows it and keeps its key', async () => {
+    const pairings = memoryPairings();
+    serve(47831, { pairings });
+    turnOn();
+    await pairVia(47831);
+    const key = loadBridgeRecord().key;
+    bridgeDisconnect();
+    pairings.delete(ORIGIN); // zenit-week-mcp unpair
+    serve(47831, { pairings });
+    turnOn();
+    await until(() => _state.getBridgeStatus().state === 'unpaired-remote');
+    expect(loadBridgeRecord().key).toBe(key);
+  });
+
+  test('Settings Unpair removes the pairing on the server and the key in the page', async () => {
+    const pairings = memoryPairings();
+    serve(47831, { pairings });
+    turnOn();
+    await pairVia(47831);
+    bridgeUnpair();
+    expect(pairings.list()).toEqual([]);
+    expect(loadBridgeRecord()).toMatchObject({ enabled: true, key: '', pairingId: '' });
+  });
+
+  test('a relay in the middle with its own keys: the two codes differ', async () => {
+    // The attacker plays page to the real server and server to the page.
+    const real = new Relay({ pairings: memoryPairings(), clientName: () => 'claude-code' });
+    const attacker = { ws: null, tab: null };
+    const toPage = [];
+    const realTab = real.onOpen({ send: s => toPage.push(JSON.parse(s)), close: () => {} }, ORIGIN);
+    real.onMessage(realTab, JSON.stringify({ type: 'open', protocol: 2, visible: true, focused: true }));
+    // The page side: an ordinary server on 47831 the attacker controls.
+    const ecdh = nodeCrypto.createECDH('prime256v1');
+    ecdh.generateKeys();
+    const attNonce = nodeCrypto.randomBytes(32);
+    const commit = nodeCrypto.createHash('sha256').update(Buffer.concat([ecdh.getPublicKey(), attNonce])).digest('base64url');
+    const fake = {
+      relay: {
+        onOpen: () => ({}),
+        onClose: () => {},
+        onMessage: (_t, s) => {
+          const f = JSON.parse(s);
+          if (f.type === 'open') fake.ws.send(JSON.stringify({ type: 'welcome', protocol: 2, install: 'npx', client: 'claude-code', nonce: 'n'.repeat(43), paired: false }));
+          if (f.type === 'pair-key') {
+            attacker.pagePub = Buffer.from(f.pub, 'base64url');
+            attacker.pageNonce = Buffer.from(f.nonce, 'base64url');
+            fake.ws.send(JSON.stringify({ type: 'pair-reveal', pub: ecdh.getPublicKey().toString('base64url'), nonce: attNonce.toString('base64url') }));
+          }
+        },
+      },
+    };
+    servers.set(47831, fake);
+    turnOn();
+    await until(() => fake.ws);
+    await until(() => _state.getBridgeStatus().state === 'waiting-agent');
+    const realReq = real.requestPairing();
+    // The attacker answers the real server with a key of its own.
+    const ecdh2 = nodeCrypto.createECDH('prime256v1');
+    ecdh2.generateKeys();
+    real.onMessage(realTab, JSON.stringify({ type: 'pair-key', pub: ecdh2.getPublicKey().toString('base64url'), nonce: nodeCrypto.randomBytes(32).toString('base64url') }));
+    fake.ws.send(JSON.stringify({ type: 'pair-start', commit, client: 'claude-code' }));
+    await until(() => dialog?.open);
+    const serverCode = (await realReq).code;
+    expect(dialog.highlight.replace(' ', '')).not.toBe(serverCode);
   });
 });
 
 describe('several agent apps (setup spec section 5)', () => {
-  test('one scan opens a socket to every port of the range', () => {
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
-    expect(sockets.map(s => s.port)).toEqual(PORTS);
-  });
-
-  test('two servers pair; status lists both agent apps in port order', async () => {
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
-    await pairOn(47832, 'claude-ai');
-    await pairOn(47831, 'claude-code');
-    expect(_state.getBridgeStatus()).toEqual({ state: 'connected', clients: ['claude-code', 'claude-ai'] });
-  });
-
-  test('a rescan leaves connected servers alone and probes only the others', async () => {
-    vi.useFakeTimers();
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
-    await pairOn(47831, 'claude-code');
-    PORTS.slice(1).forEach(p => socketOn(p).drop());
-    await vi.advanceTimersByTimeAsync(0);
-    sockets.length = 0;
-    await vi.advanceTimersByTimeAsync(31000);
-    expect(sockets.length).toBeGreaterThan(0);
-    expect(sockets.some(s => s.port === 47831)).toBe(false);
-  });
-
   test('events reach every server; a result goes only to the server that called', async () => {
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
-    const a = await pairOn(47831, 'claude-code');
-    const b = await pairOn(47832, 'claude-ai');
+    const pairings = memoryPairings();
+    serve(47831, { pairings, client: 'claude-code' });
+    const b = serve(47832, { pairings, client: 'claude-ai' });
+    turnOn();
+    const { ws: a } = await pairVia(47831);
+    await until(() => b.relay.pickTab(), 5000);
+    const bws = socketOn(47832);
     bridgeNotifyWeekSaved('2026-45', { nodes: [{ id: 'x', type: 'activity', label: 'A' }] });
     expect(a.sent.filter(f => f.event === 'week-saved')).toHaveLength(1);
-    expect(b.sent.filter(f => f.event === 'week-saved')).toHaveLength(1);
-    await serverCall(b, { id: 7, tool: 'get_stats', args: {} });
-    expect(b.sent.filter(f => f.type === 'result').map(f => f.id)).toEqual([7]);
+    expect(bws.sent.filter(f => f.event === 'week-saved')).toHaveLength(1);
+    await serverCall(bws, { id: 7, tool: 'get_stats', args: {} });
+    expect(bws.sent.filter(f => f.type === 'result').map(f => f.id)).toEqual([7]);
     expect(a.sent.some(f => f.type === 'result')).toBe(false);
   });
 
   test('writes from two servers queue: one at a time, in arrival order', async () => {
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
-    const a = await pairOn(47831, 'claude-code');
-    const b = await pairOn(47832, 'claude-ai');
+    const pairings = memoryPairings();
+    serve(47831, { pairings });
+    const b = serve(47832, { pairings, client: 'claude-ai' });
+    turnOn();
+    const { ws: a } = await pairVia(47831);
+    await until(() => b.relay.pickTab(), 5000);
+    const bws = socketOn(47832);
     const br = branchId();
     await Promise.all([
       serverCall(a, { id: 1, tool: 'add_task', args: { branch: br, label: 'From A' } }),
-      serverCall(b, { id: 1, tool: 'add_task', args: { branch: br, label: 'From B' } }),
+      serverCall(bws, { id: 1, tool: 'add_task', args: { branch: br, label: 'From B' } }),
     ]);
     const labels = findNode(br).children.map(id => findNode(id).label);
     expect(labels.indexOf('From A')).toBeLessThan(labels.indexOf('From B'));
-    expect(a.sent.filter(f => f.type === 'result')).toHaveLength(1);
-    expect(b.sent.filter(f => f.type === 'result')).toHaveLength(1);
   });
 
-  test('one server quitting leaves the other connected and looks again soon', async () => {
-    vi.useFakeTimers();
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
-    const a = await pairOn(47831, 'claude-code');
-    await pairOn(47832, 'claude-ai');
-    await a.drop();
-    expect(_state.getBridgeStatus()).toEqual({ state: 'connected', clients: ['claude-ai'] });
-    sockets.length = 0;
-    await vi.advanceTimersByTimeAsync(1100);
-    expect(sockets.some(s => s.port === 47831)).toBe(true);
+  test('a call through the real relay comes back to its agent', async () => {
+    const srv = serve(47831);
+    turnOn();
+    await pairVia(47831);
+    const stats = await srv.relay.call('get_stats', {});
+    expect(stats.week).toBe('2026-45');
   });
 
-  test('a refused port does not hide a connected server and is not retried', async () => {
-    vi.useFakeTimers();
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
-    const bad = socketOn(47831);
-    bad.open();
-    await bad.receive({ type: 'proof', hmac: 'nope' });
-    expect(_state.getBridgeStatus().state).toBe('refused');
-    await pairOn(47832, 'claude-code');
-    expect(_state.getBridgeStatus().state).toBe('connected');
-    await bad.drop('refused');
-    sockets.length = 0;
-    await vi.advanceTimersByTimeAsync(31000);
-    expect(sockets.some(s => s.port === 47831)).toBe(false);
+  test('one server quitting leaves the other connected', async () => {
+    const pairings = memoryPairings();
+    serve(47831, { pairings, client: 'claude-code' });
+    const b = serve(47832, { pairings, client: 'claude-ai' });
+    turnOn();
+    const { ws: a } = await pairVia(47831);
+    await until(() => b.relay.pickTab(), 5000);
+    a.close(1001, 'gone');
+    await until(() => _state.getBridgeStatus().clients.length === 1);
+    expect(_state.getBridgeStatus().clients).toEqual(['claude-ai']);
   });
 
   test('disconnect closes every socket', async () => {
-    saveBridgeRecord({ enabled: true, token: TOKEN });
-    bridgeConnect();
-    const a = await pairOn(47831, 'claude-code');
-    const b = await pairOn(47832, 'claude-ai');
+    const ws = await pairedSocket();
     bridgeDisconnect();
-    expect(a.closed && b.closed).toBeTruthy();
+    expect(ws.closed).toBeTruthy();
     expect(_state.getBridgeStatus().state).toBe('off');
   });
 });

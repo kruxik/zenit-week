@@ -100,7 +100,7 @@ Arrow keys move a focus ring from node to node, so every shortcut below works wi
 
 Drag the background to pan. Scroll or pinch to zoom. Click the logo to fit everything to the view.
 
-## AI agent bridge (desktop)
+## AI agents (desktop)
 
 Let an AI agent on your computer - Claude Code, Claude Desktop or any MCP client - plan your week with you. Ask it to add tasks, set days or carry over what you didn't finish, and it does it in the app as if you clicked.
 
@@ -118,18 +118,14 @@ You need [Node.js](https://nodejs.org/) 20 or newer. A one-click install for Cla
    claude mcp add --scope user zenit-week -- npx -y zenit-week-mcp@1
    ```
    For Claude Desktop or another MCP client, add a stdio server with the command `npx` and the arguments `-y zenit-week-mcp@1`. The [server README](mcp/README.md) has the Claude Desktop config.
-2. Get the pairing code (it is also copied to your clipboard):
-   ```sh
-   npx -y zenit-week-mcp@1 pair
-   ```
-3. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > Agent bridge** and paste the code.
-4. When the browser asks to let Zenit Week reach apps on this computer, choose **Allow**. In Firefox, also tick **Remember my choice**.
-5. Settings now shows **Connected**. Ask your agent to look at your week.
+2. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > AI agents** and turn on **AI agents**. Your browser then asks to let Zenit Week reach apps on this computer: choose **Allow**. In Firefox, also tick **Remember my choice**.
+3. Ask your agent something about your week. Zenit Week shows a 6-digit code and your agent shows the same one. Check that they match and click **Allow**.
+4. Settings shows **Connected**. From now on requests run at once, also after a restart.
 
 ### Managing the connection
 
-- **Disconnect:** **Disconnect and forget** in Settings, signing out or resetting the app removes the pairing.
-- **New code:** `npx -y zenit-week-mcp@1 rotate` makes a new code and unpairs every tab.
+- **Unpair:** **Unpair** in Settings, signing out or resetting the app removes the pairing. From the terminal: `npx -y zenit-week-mcp@1 unpair zenitweek.com`.
+- **Several agent apps:** each runs its own server and the app connects to all of them. Pairing once covers them all.
 - **Open the app automatically:** add `--open` after `zenit-week-mcp@1` in the server command and it opens the app when no tab is connected.
 - **Dev tunnel (ngrok):** add `--allow-origin https://<your-tunnel-host>`.
 
@@ -146,7 +142,7 @@ To work on the server itself, run it from a clone of this repository instead of 
    claude mcp add --scope user zenit-week -- node "$PWD/server.js"
    ```
    For another MCP client, the command is `node /path/to/zenit-week/mcp/server.js`.
-3. Get the pairing code with `node server.js pair` and continue with step 3 above.
+3. Continue with step 2 above.
 
 The package is published with `npm run mcp:publish` from the repository root; it is versioned separately from the app.
 
