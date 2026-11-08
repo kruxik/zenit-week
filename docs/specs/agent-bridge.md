@@ -1,6 +1,7 @@
 # SPEC - Agent Bridge (local MCP server, "Door 3")
 
 > Status: Implemented on branch `agent-bridge` (2026-11-08), revision 3 of the design. Verification results are recorded in section 13.
+> Install, pairing and dev-site handling (sections 5, 6 rows 1-2, 7.5, 9 rows 1-3, 12 row 2) are being replaced by [agent-bridge-setup.md](agent-bridge-setup.md).
 > Scope: a device-local channel that lets a general-purpose AI agent (Claude Code, Claude Desktop, any MCP client) read and change Zenit Week data through the app's own actions. Touches `zenit-week.html` (bridge client, Settings, CSP, a few small extractions so the bridge and the UI share one path) and adds one tooling package under `mcp/`. No data-model change.
 
 ---
