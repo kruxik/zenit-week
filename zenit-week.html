@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-vUnJ6dzrNUV6swvbuRbv6+B98Bf+GodzNdQS3X5K6PE=';
+               'sha256-+089VNBzzVjwDd2QXgG4GO5N0ydpTb7uTZSCR88UbnY=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -972,12 +972,11 @@
   #week-picker.off-current #week-picker-label { color: var(--accent-warning-text); }
 
   /* ── The fold ───────────────────────────────────────────────────────────── */
-  /* Same glass surface as the toolbar's other dropdowns (#sync-dropdown,
-     #settings-dropdown) because it drops out of the same bar. Centred on the
+  /* Same glass surface as the toolbar's other dropdowns (#sync-dropdown)
+     because it drops out of the same bar. Centred on the
      label; on phones it is centred on the viewport instead (see the 520px query),
      which is what keeps it from hanging off a 360px screen. */
-  #week-picker-fold,
-  #settings-dropdown {
+  #week-picker-fold {
     background: var(--settings-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -993,7 +992,7 @@
     width: 300px;
     padding: 8px 0;
     /* Above the toolbar's own 2600 so no panel header clips it, below
-       #settings-dropdown's 2700, which can open over it. */
+       #settings-overlay's 2700, which can open over it. */
     z-index: 2650;
     display: none;
     /* Its own copy of the shared fadeIn: that keyframe animates transform, which
@@ -1424,22 +1423,116 @@
     #sync-btn-label { display: none; }
   }
 
-  #settings-dropdown {
+  /* Settings: a window pinned to the bottom-right corner, above the gear it
+     opens from. The overlay is transparent on desktop - it only catches the
+     click outside that closes it, and leaves the map visible for the zoom
+     slider. Fixed height, so switching tabs never resizes the window; only the
+     pane scrolls. */
+  #settings-overlay {
     position: fixed;
-    bottom: 58px;
-    right: 12px;
-    top: auto;
-    padding: 10px;
-    z-index: 2700; /* Above Agenda mobile panel (2000) and toolbar (2600) */
-    min-width: 200px;
+    inset: 0;
     display: none;
+    z-index: 2700; /* Above Agenda mobile panel (2000) and toolbar (2600), below the confirm (3000) */
+  }
+  #settings-overlay.visible { display: block; }
+  #settings-dialog {
+    position: absolute;
+    right: 12px;
+    bottom: 58px;
+    width: 480px;
+    max-width: calc(100vw - 24px);
+    height: 460px;
+    max-height: calc(100vh - 130px);
+    display: flex;
     flex-direction: column;
-    gap: 4px;
+    box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
     animation: fadeIn 0.12s ease-out;
   }
-
-  #settings-dropdown.visible {
+  .settings-body {
+    flex: 1;
+    min-height: 0;
     display: flex;
+  }
+
+  /* A sidebar of tabs on desktop; a segmented control on phones. */
+  .settings-tabs {
+    flex-shrink: 0;
+    width: 132px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 8px;
+    background: var(--bg-muted);
+    border-right: 1px solid var(--border-soft);
+  }
+  .settings-tab {
+    background: none;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 10px;
+    text-align: left;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+  .settings-tab:hover { color: var(--text-dim); }
+  .settings-tab[aria-selected="true"] {
+    color: var(--accent-primary);
+    background: var(--ctx-hover-bg);
+  }
+  .settings-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+
+  .settings-pane {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px 16px;
+  }
+
+  /* Phones: a full-screen sheet. Caption and tabs sit outside the scrolling
+     pane, so they stay pinned while the content scrolls under them. */
+  @media (max-width: 520px) {
+    #settings-dialog {
+      inset: 0;
+      width: 100%;
+      max-width: none;
+      height: 100%;
+      max-height: none;
+      border: none;
+      border-radius: 0;
+    }
+    .settings-body { flex-direction: column; }
+    .settings-tabs {
+      width: auto;
+      flex-direction: row;
+      gap: 2px;
+      margin: 8px 12px 4px;
+      padding: 3px;
+      border-right: none;
+      border-radius: 8px;
+    }
+    .settings-tab {
+      flex: 1;
+      padding: 6px 0;
+      text-align: center;
+    }
+    .settings-tab[aria-selected="true"] {
+      color: var(--text-primary);
+      background: var(--bg-surface);
+      box-shadow: 0 1px 3px var(--shadow-sm);
+    }
+    .settings-pane {
+      flex: 1;
+      min-height: 0;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
   }
 
   .settings-section {
@@ -3575,7 +3668,7 @@
     animation: fadeIn 0.12s ease-out;
   }
   .dialog-actions .agenda-action-btn,
-  #settings-dropdown .agenda-action-btn,
+  #settings-dialog .agenda-action-btn,
   #sync-dropdown .agenda-action-btn {
     white-space: nowrap;
     height: 36px;
@@ -3625,7 +3718,7 @@
   }
   .agenda-action-btn.commit::before { content: none; }
   .agenda-action-btn.commit:disabled { cursor: default; box-shadow: none; }
-  /* Settings > AI agents: status, connected agents, the setup guide. */
+  /* Settings > AI: status, connected agents, the setup guide. */
   .bridge-note { font-size: 11px; line-height: 1.4; color: var(--text-muted); padding: 0 2px; }
   .bridge-list { display: flex; flex-direction: column; gap: 6px; }
   .bridge-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-secondary); }
@@ -4621,7 +4714,7 @@ Or remove them later in Settings → Help.</div>
 </div>
 
 <div id="fab-pill">
-  <button type="button" id="fab-settings" data-i18n-aria="toolbar.settings" aria-label="Settings" aria-haspopup="true">
+  <button type="button" id="fab-settings" data-i18n-aria="toolbar.settings" aria-label="Settings" aria-haspopup="dialog">
     <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
   </button>
   <div class="fab-divider" aria-hidden="true"></div>
@@ -4649,100 +4742,126 @@ Or remove them later in Settings → Help.</div>
   </div>
 </div>
 
-<div id="settings-dropdown">
-  <div class="settings-section">
-    <div id="zoom-slider-header">
-      <div class="settings-label" data-i18n="settings.zoom">Zoom</div>
-      <div id="zoom-label" data-i18n-title="settings.resetView" title="Click to reset view">100%</div>
-    </div>
-    <div id="zoom-track">
-      <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
-      <div id="zoom-default-marker"></div>
-      <div id="zoom-thumb"></div>
-    </div>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="settings-label" data-i18n="settings.language">Language</div>
-    <select id="lang-select">
-      <option value="en">English</option>
-      <option value="cs">Čeština</option>
-    </select>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="settings-label" id="theme-select-label" data-i18n="settings.appearance">Theme</div>
-    <select id="theme-select" aria-labelledby="theme-select-label">
-      <option value="system" data-i18n="settings.system">System</option>
-      <option value="light" data-i18n="settings.light">Light</option>
-      <option value="dark" data-i18n="settings.dark">Dark</option>
-    </select>
-  </div>
-  <!-- AI agents: desktop only, unhidden by initBridgeSettings on a fine pointer. -->
-  <div class="settings-separator" id="bridge-separator" hidden></div>
-  <div class="settings-section" id="bridge-section" hidden>
-    <div class="theme-toggle-row">
-      <span class="settings-label" id="bridge-label" data-i18n="settings.bridge">AI agents</span>
-      <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Allow AI agents on this computer">
-        <span class="theme-toggle-thumb"></span>
+<!-- Settings: a window pinned above the gear with a tab sidebar on desktop, a
+     full-screen sheet with segmented tabs on phones (see the 520px query). The AI and Development tabs ship hidden: initBridgeSettings reveals
+     AI on a fine pointer, the devResetEnabled() guard reveals Development. -->
+<div id="settings-overlay">
+  <div id="settings-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="dialog-header">
+      <div class="dialog-title" id="settings-title" data-i18n="toolbar.settings">Settings</div>
+      <button type="button" class="help-close-btn" id="settings-close"
+        data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
       </button>
     </div>
-    <div id="bridge-status" class="bridge-note" role="status" aria-live="polite"></div>
-    <div id="bridge-agents" class="bridge-list" hidden></div>
-    <div id="bridge-guide" class="bridge-list" hidden>
-      <div class="bridge-note bridge-guide-title" data-i18n="bridge.guide.title">Connect an agent</div>
-      <div class="bridge-row"><span>Claude Desktop</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-desktop" data-i18n="bridge.guide.download">Download</button></div>
-      <div class="bridge-note" data-i18n="bridge.guide.desktopNote">No setup needed: open the file and confirm in Claude Desktop.</div>
-      <div class="bridge-row"><span>Claude Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-code" data-i18n="bridge.guide.copyCommand">Copy command</button></div>
-      <div class="bridge-row"><span>Cursor</span><button type="button" class="agenda-action-btn" id="bridge-guide-cursor" data-i18n="bridge.guide.addCursor">Add to Cursor</button></div>
-      <div class="bridge-row"><span>VS Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-vscode" data-i18n="bridge.guide.addVscode">Add to VS Code</button></div>
-      <div class="bridge-row"><span data-i18n="bridge.guide.other">Other MCP app</span><button type="button" class="agenda-action-btn" id="bridge-guide-other" data-i18n="bridge.guide.copyConfig">Copy config</button></div>
-      <div class="bridge-note" data-i18n="bridge.guide.node">All but Claude Desktop need Node.js 20 or newer. If your agent does not see Zenit Week, restart it.</div>
+    <div class="settings-body">
+    <div class="settings-tabs" id="settings-tabs" role="tablist" aria-labelledby="settings-title">
+      <button type="button" class="settings-tab" id="settings-tab-general" role="tab" aria-controls="settings-pane-general" aria-selected="true" data-i18n="settings.tabGeneral">General</button>
+      <button type="button" class="settings-tab" id="settings-tab-ai" role="tab" aria-controls="settings-pane-ai" aria-selected="false" tabindex="-1" data-i18n="settings.tabAi" hidden>AI</button>
+      <button type="button" class="settings-tab" id="settings-tab-data" role="tab" aria-controls="settings-pane-data" aria-selected="false" tabindex="-1" data-i18n="settings.tabData">Data</button>
+      <!-- Dev-only, never translated. -->
+      <button type="button" class="settings-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden>Development</button>
     </div>
-    <div id="bridge-paired" class="bridge-list" hidden>
-      <div id="bridge-paired-date" class="bridge-note"></div>
-      <button type="button" class="agenda-action-btn" id="bridge-unpair-btn" data-i18n="bridge.unpair" style="width:100%;">Unpair</button>
+    <div class="settings-pane" id="settings-pane-general" role="tabpanel" aria-labelledby="settings-tab-general">
+      <div class="settings-section">
+        <div id="zoom-slider-header">
+          <div class="settings-label" data-i18n="settings.zoom">Zoom</div>
+          <div id="zoom-label" data-i18n-title="settings.resetView" title="Click to reset view">100%</div>
+        </div>
+        <div id="zoom-track">
+          <div id="zoom-track-bg"><div id="zoom-fill"></div></div>
+          <div id="zoom-default-marker"></div>
+          <div id="zoom-thumb"></div>
+        </div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label" data-i18n="settings.language">Language</div>
+        <select id="lang-select">
+          <option value="en">English</option>
+          <option value="cs">Čeština</option>
+        </select>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label" id="theme-select-label" data-i18n="settings.appearance">Theme</div>
+        <select id="theme-select" aria-labelledby="theme-select-label">
+          <option value="system" data-i18n="settings.system">System</option>
+          <option value="light" data-i18n="settings.light">Light</option>
+          <option value="dark" data-i18n="settings.dark">Dark</option>
+        </select>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="theme-toggle-row">
+          <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
+          <button type="button" class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change" data-i18n-aria="settings.autoLayoutTitle" aria-label="Automatically reset layout after each change">
+            <span class="theme-toggle-thumb"></span>
+          </button>
+        </div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="theme-toggle-row">
+          <span class="settings-label" data-i18n="settings.tips">Show tips</span>
+          <button type="button" class="theme-toggle" id="tips-toggle" role="switch" aria-checked="true" data-i18n-title="settings.tipsTitle" title="Show just-in-time tips for first-time actions" data-i18n-aria="settings.tipsTitle" aria-label="Show just-in-time tips for first-time actions">
+            <span class="theme-toggle-thumb"></span>
+          </button>
+        </div>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay" style="flex:1;">Replay tips</button>
+          <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab" style="flex:1;">Help &amp; Hotkeys</button>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="theme-toggle-row">
-      <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
-      <button type="button" class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change" data-i18n-aria="settings.autoLayoutTitle" aria-label="Automatically reset layout after each change">
-        <span class="theme-toggle-thumb"></span>
-      </button>
+    <div class="settings-pane" id="settings-pane-ai" role="tabpanel" aria-labelledby="settings-tab-ai" hidden>
+      <div class="settings-section" id="bridge-section">
+        <div class="theme-toggle-row">
+          <span class="settings-label" id="bridge-label" data-i18n="settings.bridge">AI agents</span>
+          <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Allow AI agents on this computer">
+            <span class="theme-toggle-thumb"></span>
+          </button>
+        </div>
+        <div id="bridge-status" class="bridge-note" role="status" aria-live="polite"></div>
+        <div id="bridge-agents" class="bridge-list" hidden></div>
+        <div id="bridge-guide" class="bridge-list" hidden>
+          <div class="bridge-note bridge-guide-title" data-i18n="bridge.guide.title">Connect an agent</div>
+          <div class="bridge-row"><span>Claude Desktop</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-desktop" data-i18n="bridge.guide.download">Download</button></div>
+          <div class="bridge-note" data-i18n="bridge.guide.desktopNote">No setup needed: open the file and confirm in Claude Desktop.</div>
+          <div class="bridge-row"><span>Claude Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-code" data-i18n="bridge.guide.copyCommand">Copy command</button></div>
+          <div class="bridge-row"><span>Cursor</span><button type="button" class="agenda-action-btn" id="bridge-guide-cursor" data-i18n="bridge.guide.addCursor">Add to Cursor</button></div>
+          <div class="bridge-row"><span>VS Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-vscode" data-i18n="bridge.guide.addVscode">Add to VS Code</button></div>
+          <div class="bridge-row"><span data-i18n="bridge.guide.other">Other MCP app</span><button type="button" class="agenda-action-btn" id="bridge-guide-other" data-i18n="bridge.guide.copyConfig">Copy config</button></div>
+          <div class="bridge-note" data-i18n="bridge.guide.node">All but Claude Desktop need Node.js 20 or newer. If your agent does not see Zenit Week, restart it.</div>
+        </div>
+        <div id="bridge-paired" class="bridge-list" hidden>
+          <div id="bridge-paired-date" class="bridge-note"></div>
+          <button type="button" class="agenda-action-btn" id="bridge-unpair-btn" data-i18n="bridge.unpair" style="width:100%;">Unpair</button>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="theme-toggle-row">
-      <span class="settings-label" data-i18n="settings.tips">Show tips</span>
-      <button type="button" class="theme-toggle" id="tips-toggle" role="switch" aria-checked="true" data-i18n-title="settings.tipsTitle" title="Show just-in-time tips for first-time actions" data-i18n-aria="settings.tipsTitle" aria-label="Show just-in-time tips for first-time actions">
-        <span class="theme-toggle-thumb"></span>
-      </button>
+    <div class="settings-pane" id="settings-pane-data" role="tabpanel" aria-labelledby="settings-tab-data" hidden>
+      <div class="settings-section">
+        <div class="settings-label" data-i18n="settings.data">Data</div>
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
+          <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
+          <input type="file" id="import-file-input" accept=".json" style="display:none;">
+        </div>
+        <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file - could not import.</div>
+      </div>
     </div>
-    <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay" style="width:100%;margin-top:8px;">Replay tips</button>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab" style="width:100%;">Help &amp; Hotkeys</button>
-  </div>
-  <div class="settings-separator"></div>
-  <div class="settings-section">
-    <div class="settings-label" data-i18n="settings.data">Data</div>
-    <div style="display:flex;gap:6px;">
-      <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData" style="flex:1;">Import</button>
-      <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData" style="flex:1;">Export</button>
-      <input type="file" id="import-file-input" accept=".json" style="display:none;">
+    <div class="settings-pane" id="settings-pane-dev" role="tabpanel" aria-labelledby="settings-tab-dev" hidden>
+      <div class="settings-section" id="settings-dev-section">
+        <div class="settings-label">Development</div>
+        <button type="button" class="agenda-action-btn" id="dev-probe-btn" title="Record the next tap: phase marks, delivered frames, long animation frames" style="width:100%;">Record perf trace</button>
+        <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor" style="width:100%;">Reset to first visit</button>
+      </div>
     </div>
-    <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file - could not import.</div>
-  </div>
-  <!-- Dev-only; unhidden by init on a development host. Never translated. -->
-  <div class="settings-separator" id="settings-dev-separator" hidden></div>
-  <div class="settings-section" id="settings-dev-section" hidden>
-    <div class="settings-label">Development</div>
-    <button type="button" class="agenda-action-btn" id="dev-probe-btn" title="Record the next tap: phase marks, delivered frames, long animation frames" style="width:100%;">Record perf trace</button>
-    <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor" style="width:100%;">Reset to first visit</button>
+    </div>
   </div>
 </div>
 
@@ -4925,7 +5044,7 @@ Or remove them later in Settings → Help.</div>
 
       <div class="help-section">
         <div class="help-section-title" data-i18n="help.bridgeTitle">AI agents</div>
-        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.bridgeDesc">Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP app) read and change your week, as if you clicked: each change shows a toast and is one undo step. Install the zenit-week-mcp server in your agent app (Settings &gt; AI agents shows how), turn on AI agents and, the first time your agent asks, check that the code matches and click Allow. Desktop Chrome and Firefox only; your phone follows through Drive sync. Unpair in Settings, signing out or resetting removes the pairing.</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.bridgeDesc">Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP app) read and change your week, as if you clicked: each change shows a toast and is one undo step. Install the zenit-week-mcp server in your agent app (Settings &gt; AI shows how), turn on AI agents and, the first time your agent asks, check that the code matches and click Allow. Desktop Chrome and Firefox only; your phone follows through Drive sync. Unpair in Settings, signing out or resetting removes the pairing.</div>
       </div>
 
       <div class="help-section">
@@ -5405,7 +5524,7 @@ const QUIESCENCE_PANEL_IDS = [
   'help-overlay',
   'comment-panel',
   'comment-overlay',
-  'settings-dropdown',
+  'settings-overlay',
   'sync-dropdown',
   'color-picker-panel',
   'baseline-panel',
@@ -11382,6 +11501,9 @@ const TRANSLATIONS = {
     'settings.resetView':         'Click to reset view',
     'settings.language':          'Language',
     'settings.data':              'Data',
+    'settings.tabGeneral':        'General',
+    'settings.tabAi':             'AI',
+    'settings.tabData':           'Data',
     'settings.exportData':        'Export',
     'settings.importData':        'Import',
     'settings.importConfirmTitle':'Overwrite all data?',
@@ -11442,7 +11564,7 @@ const TRANSLATIONS = {
     'bridge.pair.toast':          'Paired with {client}. Unpair in Settings if this was not you.',
     'bridge.pair.toastNoName':    'Agent paired. Unpair in Settings if this was not you.',
     'help.bridgeTitle':           'AI agents',
-    'help.bridgeDesc':            'Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP app) read and change your week, as if you clicked: each change shows a toast and is one undo step. Install the zenit-week-mcp server in your agent app (Settings > AI agents shows how), turn on AI agents and, the first time your agent asks, check that the code matches and click Allow. Desktop Chrome and Firefox only; your phone follows through Drive sync. Unpair in Settings, signing out or resetting removes the pairing.',
+    'help.bridgeDesc':            'Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP app) read and change your week, as if you clicked: each change shows a toast and is one undo step. Install the zenit-week-mcp server in your agent app (Settings > AI shows how), turn on AI agents and, the first time your agent asks, check that the code matches and click Allow. Desktop Chrome and Firefox only; your phone follows through Drive sync. Unpair in Settings, signing out or resetting removes the pairing.',
     'settings.tipsReplayDone':    'Tips reset - they’ll show again.',
     'tips.doneCaption':           'Done',
     'tips.unplannedCaption':      'Unplanned',
@@ -11837,6 +11959,9 @@ const TRANSLATIONS = {
     'settings.resetView':         'Kliknutím resetovat pohled',
     'settings.language':          'Jazyk',
     'settings.data':              'Data',
+    'settings.tabGeneral':        'Obecné',
+    'settings.tabAi':             'AI',
+    'settings.tabData':           'Data',
     'settings.exportData':        'Exportovat',
     'settings.importData':        'Importovat',
     'settings.importConfirmTitle':'Přepsat všechna data?',
@@ -11897,7 +12022,7 @@ const TRANSLATIONS = {
     'bridge.pair.toast':          'Spárováno s {client}. Pokud to nebyla tvoje žádost, zruš spárování v Nastavení.',
     'bridge.pair.toastNoName':    'Agent spárován. Pokud to nebyla tvoje žádost, zruš spárování v Nastavení.',
     'help.bridgeTitle':           'AI agenti',
-    'help.bridgeDesc':            'Dovol AI agentovi na tomto počítači (Claude Code, Claude Desktop nebo jakákoli MCP aplikace) číst a měnit tvůj týden, jako by šlo o tvé kliknutí: každá změna ukáže oznámení a jde vrátit jedním krokem zpět. Nainstaluj do aplikace agenta server zenit-week-mcp (jak, ukazuje Nastavení > AI agenti), zapni AI agenty a když se agent poprvé zeptá, zkontroluj, že kód sedí, a klikni na Povolit. Jen v Chrome a Firefoxu na počítači; telefon se přizpůsobí přes synchronizaci s Diskem. Zrušení spárování v Nastavení, odhlášení nebo reset párování smaže.',
+    'help.bridgeDesc':            'Dovol AI agentovi na tomto počítači (Claude Code, Claude Desktop nebo jakákoli MCP aplikace) číst a měnit tvůj týden, jako by šlo o tvé kliknutí: každá změna ukáže oznámení a jde vrátit jedním krokem zpět. Nainstaluj do aplikace agenta server zenit-week-mcp (jak, ukazuje Nastavení > AI), zapni AI agenty a když se agent poprvé zeptá, zkontroluj, že kód sedí, a klikni na Povolit. Jen v Chrome a Firefoxu na počítači; telefon se přizpůsobí přes synchronizaci s Diskem. Zrušení spárování v Nastavení, odhlášení nebo reset párování smaže.',
     'settings.tipsReplayDone':    'Tipy resetovány - zobrazí se znovu.',
     'tips.doneCaption':           'Hotovo',
     'tips.unplannedCaption':      'Neplánované',
@@ -19145,8 +19270,8 @@ const ESC_DISMISSALS = [
     dismiss: () => { closeCommentDialog(); } },
   { isOpen: () => isWeekPickerOpen(),
     dismiss: () => { closeWeekPicker(); } },
-  { isOpen: () => isSettingsDropdownOpen(),
-    dismiss: () => { closeSettingsDropdown(); } },
+  { isOpen: () => isSettingsOpen(),
+    dismiss: () => { closeSettings(); } },
   // Mindmap-only from here down, and gated on it: the ring and the level row
   // are invisible from Agenda or Stats, and Esc must never spend itself on
   // something the user cannot see - that is what made leaving Agenda reset the
@@ -19176,24 +19301,31 @@ function runEscDismiss() {
   return false;
 }
 
-function isSettingsDropdownOpen() {
-  const d = document.getElementById('settings-dropdown');
+function isSettingsOpen() {
+  const d = document.getElementById('settings-overlay');
   return !!d && d.classList.contains('visible');
 }
 
-function closeSettingsDropdown() {
-  document.getElementById('settings-dropdown')?.classList.remove('visible');
-  document.getElementById('fab-settings')?.classList.remove('active');
+function closeSettings() {
+  const overlay = document.getElementById('settings-overlay');
+  if (!overlay || !overlay.classList.contains('visible')) return;
+  overlay.classList.remove('visible');
+  const fab = document.getElementById('fab-settings');
+  fab?.classList.remove('active');
+  // Back to the gear it was opened from, unless focus already moved on.
+  const active = document.activeElement;
+  if (fab && (!active || active === document.body || overlay.contains(active))) fab.focus?.();
 }
 
 // Global keyboard shortcuts for hovered node
 function _windowKeydownHandler(e) {
   if (editState) return; // Don't interfere with inline editing
 
-  // The week picker's fold and the date picker own the keyboard while open:
-  // their cells take the arrows, and a bare letter must not switch view out
-  // from under them. Esc still runs the normal walk, which closes them first.
-  if (isWeekPickerOpen() || isDatePickerOpen()) {
+  // The week picker's fold, the date picker and the Settings modal own the
+  // keyboard while open: their cells and tabs take the arrows, and a bare
+  // letter must not switch view out from under them. Esc still runs the normal
+  // walk, which closes them first.
+  if (isWeekPickerOpen() || isDatePickerOpen() || isSettingsOpen()) {
     if (e.key === 'Escape') { e.preventDefault(); runEscDismiss(); }
     return;
   }
@@ -26302,22 +26434,75 @@ window.addEventListener('pagehide', _flushOnTeardown);
   });
 })();
 
-// ─── Settings Dropdown ────────────────────────────────────────────────────────
-const settingsFab = document.getElementById('fab-settings');
-const settingsDropdown = document.getElementById('settings-dropdown');
+// ─── Settings ─────────────────────────────────────────────────────────────────
+// One modal, four tabs. AI and Development ship hidden and are revealed at boot
+// (initBridgeSettings, the devResetEnabled() guard); a hidden tab is never
+// selected, so the last-used tab falls back to General on a device without it.
+const SETTINGS_TABS = ['general', 'ai', 'data', 'dev'];
+let settingsActiveTab = 'general';
 
-settingsFab.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const isVisible = settingsDropdown.classList.toggle('visible');
-  settingsFab.classList.toggle('active', isVisible);
-});
+function isSettingsTabShown(name) {
+  const tab = document.getElementById('settings-tab-' + name);
+  return !!tab && !tab.hidden;
+}
 
-document.addEventListener('click', (e) => {
-  const fabPill = document.getElementById('fab-pill');
-  if (!settingsDropdown.contains(e.target) && !fabPill.contains(e.target)) {
-    closeSettingsDropdown();
+function selectSettingsTab(name, { focus = false } = {}) {
+  if (!SETTINGS_TABS.includes(name) || !isSettingsTabShown(name)) name = 'general';
+  settingsActiveTab = name;
+  for (const id of SETTINGS_TABS) {
+    const tab = document.getElementById('settings-tab-' + id);
+    const pane = document.getElementById('settings-pane-' + id);
+    const on = id === name;
+    if (tab) {
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.tabIndex = on ? 0 : -1;
+    }
+    if (pane) pane.hidden = !on;
   }
-});
+  if (focus) document.getElementById('settings-tab-' + name)?.focus?.();
+}
+
+function openSettings() {
+  selectSettingsTab(settingsActiveTab);
+  document.getElementById('settings-overlay').classList.add('visible');
+  document.getElementById('fab-settings').classList.add('active');
+  document.getElementById('settings-tab-' + settingsActiveTab)?.focus?.();
+}
+
+(function initSettingsDialog() {
+  const overlay = document.getElementById('settings-overlay');
+  const tablist = document.getElementById('settings-tabs');
+
+  document.getElementById('fab-settings').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isSettingsOpen()) closeSettings();
+    else openSettings();
+  });
+  document.getElementById('settings-close').addEventListener('click', () => closeSettings());
+  // The backdrop itself, never a click that started inside the dialog.
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSettings();
+  });
+
+  tablist.addEventListener('click', (e) => {
+    const tab = e.target.closest?.('.settings-tab');
+    if (tab) selectSettingsTab(tab.id.replace('settings-tab-', ''));
+  });
+  // Roving focus across the shown tabs: arrows wrap (up/down in the desktop
+  // sidebar, left/right in the phone's segmented row), Home and End jump.
+  tablist.addEventListener('keydown', (e) => {
+    const shown = SETTINGS_TABS.filter(isSettingsTabShown);
+    const at = shown.indexOf(settingsActiveTab);
+    let next = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = shown[(at + 1) % shown.length];
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = shown[(at - 1 + shown.length) % shown.length];
+    else if (e.key === 'Home') next = shown[0];
+    else if (e.key === 'End') next = shown[shown.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    selectSettingsTab(next, { focus: true });
+  });
+})();
 
 
 // ─── Quick-Add Panel ──────────────────────────────────────────────────────────
@@ -26590,8 +26775,8 @@ document.addEventListener('click', (e) => {
   // ── Event listeners ──
   // Shared by the FAB and the global Q hotkey, so both routes behave the same.
   function toggleQuickAdd() {
-    // Close settings dropdown if open
-    closeSettingsDropdown();
+    // Close settings if open
+    closeSettings();
     if (panel.classList.contains('is-open')) {
       closeQuickAdd();
     } else {
@@ -26694,7 +26879,7 @@ function renderBridgeStatus() {
   const el = document.getElementById('bridge-status');
   const toggle = document.getElementById('bridge-toggle');
   // Shown only by initBridgeSettings at boot, after every bridge binding exists.
-  if (!el || !toggle || document.getElementById('bridge-section').hidden) return;
+  if (!el || !toggle || document.getElementById('settings-tab-ai').hidden) return;
   const rec = loadBridgeRecord();
   const supported = bridgeSupported();
   toggle.disabled = !supported;
@@ -26761,7 +26946,7 @@ function _bridgeTurnOn() {
   };
   if (rec.explained) { on(); return; }
   const firefox = /Firefox\//.test(navigator.userAgent || '');
-  closeSettingsDropdown();
+  closeSettings();
   showAppConfirm({
     title: t('bridge.explain.title'),
     body: t('bridge.explain.body') + (firefox ? ` ${t('bridge.explain.firefox')}` : ''),
@@ -26773,11 +26958,9 @@ function _bridgeTurnOn() {
 
 function initBridgeSettings() {
   if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
-  const section = document.getElementById('bridge-section');
-  const separator = document.getElementById('bridge-separator');
-  if (!section) return;
-  section.hidden = false;
-  if (separator) separator.hidden = false;
+  const tab = document.getElementById('settings-tab-ai');
+  if (!tab) return;
+  tab.hidden = false;
   onBridgeStatus(renderBridgeStatus);
 
   document.getElementById('bridge-toggle').addEventListener('click', () => {
@@ -26830,7 +27013,7 @@ if (tipsReplayBtn) {
     replayTips();
     syncTipsToggleUI();
     // Close settings so the next first-time action can surface a tip.
-    closeSettingsDropdown();
+    closeSettings();
     if (typeof showToast === 'function') showToast(t('settings.tipsReplayDone'));
   });
 }
@@ -29044,17 +29227,15 @@ window.addEventListener('load', async () => {
   }
 
   if (devResetEnabled()) {
-    const devSection = document.getElementById('settings-dev-section');
-    const devSeparator = document.getElementById('settings-dev-separator');
-    if (devSection) devSection.hidden = false;
-    if (devSeparator) devSeparator.hidden = false;
+    const devTab = document.getElementById('settings-tab-dev');
+    if (devTab) devTab.hidden = false;
 
     const devProbeBtn = document.getElementById('dev-probe-btn');
     if (devProbeBtn) {
       devProbeBtn.addEventListener('click', () => {
         // Close settings first, then arm on a fresh task: the trace must start
         // from an idle main thread, not from inside this click.
-        closeSettingsDropdown();
+        closeSettings();
         deferFromInput(startPerfProbe);
       });
     }
@@ -29075,7 +29256,7 @@ window.addEventListener('load', async () => {
   const settingsHelpBtn = document.getElementById('settings-help-btn');
   if (settingsHelpBtn) {
     settingsHelpBtn.addEventListener('click', () => {
-      closeSettingsDropdown();
+      closeSettings();
       openHelp();
     });
   }
