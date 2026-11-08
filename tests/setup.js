@@ -791,6 +791,7 @@ export const {
   setHorizon,
   setCollapsed,
   collapsedCount,
+  edgeEndpoints,
   focusBranch,
   clearBranchFocus,
   focusedNodeIds,

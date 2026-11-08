@@ -25,7 +25,7 @@ The week stays the only place where things get done. The Vision Canvas is a map 
 | 3 | Progress, percentages, "last served" rings | Progress is the week's job. Needs the link anyway. |
 | 4 | A separate editor or layout engine | The renderer is reused whole. The Vision adds vocabulary, never a second map engine. |
 | 5 | Vision in Stats, Agenda, Transfer, Send to the Future | None of them has a meaning for an intention. The Vision is invisible to all four. |
-| 6 | Reading pane on mobile | Desktop first. Mobile keeps the comment indicator and the context-menu Comment item it already has. |
+| 6 | A reading pane | Removed after review (2026-11-08). An intention's "why" is its ordinary comment: the comment indicator and the context-menu Comment item open the one comment editor, as on a week. |
 | 7 | Mobile view toggle redesign | Four icon buttons fit the bar at its mobile width. Anything further is a later pass. |
 
 ---
@@ -174,13 +174,9 @@ The Vision draws with the week's renderer. Differences, all in existing hooks:
 | 5 | Focus | Non-focused branches at Dropped opacity, no slash, no badge. |
 | 6 | Comment indicator | As today. Clicking it opens the editor, as today. |
 
-### 4.2 Reading pane (desktop, width ≥ 768)
+### 4.2 Comments
 
-A pane docked to the right edge of the canvas, the width of the Stats panel, showing the **selected** node's comment rendered read-only through `tokenizeComment` - the Agenda preview's renderer, full length, links live through `openCommentLink`. Header: the node's display label in the `.dialog-header` style, with an *Edit* `.agenda-action-btn` that opens the existing comment editor (`openCommentDialog`). The pane is empty with a one-line hint when nothing is selected or the selection has no comment.
-
-**Selection** is `kbFocusId`: a click on a vision node sets it (`setKbFocus`), as the keyboard already does; clicking the canvas or pressing Esc clears it (already in `ESC_DISMISSALS`). On the week map a click keeps its current meaning; the pane does not exist there.
-
-The pane is hidden under 768 px (non-goal 6) and when the comment editor overlay is open. Closing the editor refreshes the pane from the saved comment.
+No reading pane. An intention's comment is read and edited exactly as on a week: the comment indicator and the context-menu Comment item open the one comment editor (non-goal 6).
 
 ### 4.3 View toggle and hotkey
 
@@ -222,7 +218,7 @@ Toasts: *Let go* / *Taken back* replace *Dropped* / *Undone* when the record is 
 
 ### i18n keys
 
-`view.vision`, `vision.center`, `vision.emptyHint`, `vision.readingEmpty`, `vision.readingNoComment`, `menu.letGo`, `menu.takeBack`, `menu.horizon.year`, `menu.horizon.years`, `menu.horizon.someday`, `menu.horizon.none`, `menu.collapse`, `menu.expand`, `menu.focusBranch`, `horizon.year`, `horizon.years`, `horizon.someday`, `toast.letGo`, `toast.takenBack`, `help.visionView`, `help.vision.*` (section rows). Both languages, no key without both.
+`view.vision`, `vision.center`, `vision.emptyHint`, `menu.letGo`, `menu.takeBack`, `menu.horizon.year`, `menu.horizon.years`, `menu.horizon.someday`, `menu.horizon.none`, `menu.collapse`, `menu.expand`, `menu.focusBranch`, `horizon.year`, `horizon.years`, `horizon.someday`, `toast.letGo`, `toast.takenBack`, `help.visionView`, `help.vision.*` (section rows). Both languages, no key without both.
 
 ---
 
@@ -264,7 +260,7 @@ No `recommend` tool. The recommendation is the agent's reasoning over `zenit://v
 | 2 | Drive sync (`syncScheduleToDrive` / `-FromDrive`, `_wKeyForDriveFileName`, `pollDriveChanges`, `initDriveSync`) | Vision twins of the schedule paths; `'vision'` as a non-week key. |
 | 3 | Drive week merge (line ~9571) | `mapRecord.kind === 'week'` guard. |
 | 4 | `tabChannel` receiver | `wk: 'vision'` handled. |
-| 5 | `switchView` | Fourth view; record swap first; pane, week bar and filter strip visibility; `_mapDirty` logic extended to the Vision's canvas. |
+| 5 | `switchView` | Fourth view; record swap first; week bar and filter strip visibility; `_mapDirty` logic extended to the Vision's canvas. |
 | 6 | `_windowKeydownHandler` | `V` for Vision, cycle view level moved to `W`; inert groups per section 3.6; Esc entries. |
 | 7 | `takeSnapshot`, `undo`, `redo`, `_bridgeRollback`, `updateUndoRedoButtons` | Active stack pair. |
 | 8 | 28 × `saveWeek(currentWeekKey, weekData)` | `saveMapRecord()`. |
@@ -275,7 +271,7 @@ No `recommend` tool. The recommendation is the agent's reasoning over `zenit://v
 | 13 | `showContextMenu` | Vision gating block; horizon, collapse, focus items; relabels. |
 | 14 | `updateCenterRing`, `updateSummary` | Skip on the Vision. |
 | 15 | Quick add panel | Branch list from the record in view; day row hidden on the Vision. |
-| 16 | HTML | `#vtb-vision`, `#vision-pane`, `#icon-telescope`, context-menu items. CSS in `<head>`, Flexbox, kebab-case. |
+| 16 | HTML | `#vtb-vision`, `#icon-telescope`, context-menu items. CSS in `<head>`, Flexbox, kebab-case. |
 | 17 | `TRANSLATIONS` | Section 5 keys, en and cs. |
 | 18 | Help | `V` row, `W` on the cycle-view-level row, and the Vision section. |
 | 19 | `exportAllData` / import, sign-out, reset, dev reset | `vision` key. |
@@ -292,7 +288,7 @@ No `recommend` tool. The recommendation is the agent's reasoning over `zenit://v
 - `'use strict'`, `const` / `let`, camelCase, `createElementNS` for SVG, `textContent` for every user string (labels, comments, branch names are user data and may arrive via Drive).
 - The Vision never gets a second copy of a map function. Where behaviour differs, the existing function reads `mapRecord.kind`; where a function has no meaning on the Vision, it returns early. One way per action.
 - `touchNode` for content (`label`, `comments`, `priority`, `horizon`, `dropped`), `touchLayout` for `collapsed`, `offX`, `offY`, `side`.
-- Dialog vocabulary (`.dialog-*`) for the empty-state hint and the pane header; `.agenda-action-btn` for the pane's *Edit*.
+- Dialog vocabulary (`.dialog-*`) for the empty-state hint.
 - No em dash anywhere.
 
 ---
@@ -314,7 +310,7 @@ Vitest, under `tests/`, following the schedule and dropped-status files:
 | 9 | `agent-bridge.test.js`, `mcp-server.test.js` | `read_vision`, `open_vision`, `set_horizon`, `not_in_view`, `wrong_type` matrix, `urisForVisionSaved`. |
 | 10 | `i18n.test.js`, `no-em-dash.test.js`, `csp-hashes.test.js` | Pass with the new keys and script. |
 
-Manual: drag, zoom, pan, collapse badge, focus and Esc, pane follows selection, editor round trip, reload restores the Vision, two tabs converge, two devices converge, `npm run validate`.
+Manual: drag, zoom, pan, collapse badge, focus and Esc, comment editor round trip, reload restores the Vision, two tabs converge, two devices converge, `npm run validate`.
 
 ---
 
@@ -346,7 +342,7 @@ Manual: drag, zoom, pan, collapse badge, focus and Esc, pane follows selection, 
 | 5 | A label `Pushups 10x` on the Vision is a literal label with no children. |
 | 6 | Horizon shows as an annotation, is set from the menu and the bridge, merges across devices. |
 | 7 | Collapse hides the subtree with a correct count, takes no undo entry, syncs as layout; Focus fits the branch, dims the rest, Esc clears it. |
-| 8 | Desktop pane shows the selected node's rendered comment; *Edit* opens the editor; a saved edit updates the pane. |
+| 8 | A comment on an intention opens and saves through the one comment editor, as on a week. |
 | 9 | Ctrl+Z on the Vision undoes only Vision edits; switching to the week and pressing Ctrl+Z undoes the last week edit. |
 | 10 | While the Vision is open, a week change from another device lands in IDB and is on the map when the user returns to the Mindmap; the Vision never shows week nodes. |
 | 11 | The agent reads `zenit://vision`, calls `open_vision`, adds an intention with a comment, sets a horizon, and sees `wrong_type` for `set_days`; the week tools still work after `open_week`. |
@@ -360,6 +356,6 @@ Manual: drag, zoom, pan, collapse badge, focus and Esc, pane follows selection, 
 | # | Question | Decision |
 |---|---|---|
 | 1 | Let go: reuse the Dropped drawing and the ⊘ badge, or a glyph of its own? | Reuse. One visual language for "will not happen"; only the words differ. |
-| 2 | Reading pane on the week map too? | Not in v1. It is a Vision feature until asked for. |
+| 2 | Reading pane on the week map too? | Superseded: the pane was removed from the Vision as well (non-goal 6). |
 | 3 | Deleting a Vision branch with intentions below | As a week: at once, undoable, minimum one branch remains. |
 | 4 | Own onboarding coachmark set for the Vision? | No. One empty-state hint. |

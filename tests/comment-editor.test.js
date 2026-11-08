@@ -723,7 +723,7 @@ describe('opening a comment link has one way in', () => {
     expect(code).toMatch(/onConfirm: \(\) => openCommentLink\(href\)/);
     // Editor tap (touch), editor Cmd/Ctrl-click, Agenda preview click, and the
     // Vision's reading pane.
-    expect(code.match(/askOpenCommentLink\(/g)).toHaveLength(5);
+    expect(code.match(/askOpenCommentLink\(/g)).toHaveLength(4);
     expect(code).not.toMatch(/comment-link-chip/);
   });
 });

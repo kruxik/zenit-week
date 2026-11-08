@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { _state, computeLayout, nodeDisplayLabel, setCollapsed, focusBranch, clearBranchFocus,
-  focusedNodeIds, mindmapNodeBounds, collapsedCount } from './setup.js';
+  focusedNodeIds, mindmapNodeBounds, collapsedCount, edgeEndpoints } from './setup.js';
 
 // The Vision's map vocabulary: collapse prunes a subtree and counts it, focus
 // covers exactly one branch, and the horizon rides on the label.
@@ -118,5 +118,17 @@ describe('horizon annotation', () => {
     _state.setLang('cs');
     expect(nodeDisplayLabel(n)).toBe('I a2 · za pár let');
     _state.setLang('en');
+  });
+});
+
+describe('root lines', () => {
+  it('reach the plate on the Vision, where there is no ring, and the ring on a week', () => {
+    const pos = computeLayout();
+    const at = id => pos[id];
+    const vision = edgeEndpoints('center', 'nvb', at).x1;
+    _state.setMapKind('week');
+    const week = edgeEndpoints('center', 'nvb', at).x1;
+    expect(vision).toBeGreaterThan(0);
+    expect(vision).toBeLessThan(week);
   });
 });
