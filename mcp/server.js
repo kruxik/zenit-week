@@ -81,6 +81,8 @@ const mcp = new McpServer(
       'Zenit Week is a weekly planner shown as a mind map: branches (categories) hold tasks, tasks may hold sub-tasks.',
       'All writes act on the week open in the app, exactly as if the user clicked; each call is one undo step and shows the user a toast.',
       'Read zenit://week/current (or call get_stats) first to learn branch and task ids. Use open_week to switch weeks before writing to another week.',
+      'Before proposing what a week should carry, read zenit://vision: the user\'s long view, a mind map of intentions (branches are life areas, comments say why). The Vision has no days, ticks or done; an intention can be let go (set_status dropped) and taken back (undone), and has an optional horizon (set_horizon).',
+      'The node tools act on the record in view: call open_vision before writing to an intention and open_week to come back. An id from the other record answers not_in_view.',
       'Days are ISO weekdays: 1 = Monday ... 7 = Sunday. A label ending in "Nx" (e.g. "Pushups 10x") makes N ticks recorded with tick_task; days and Nx do not combine.',
       'Never put relative days (today, tomorrow) in labels: pass days instead.',
     ].join(' '),
@@ -133,9 +135,12 @@ const id = z.string().describe('Node id from a week read');
 const isoDays = z.array(z.number().int().min(1).max(7)).describe('ISO weekdays, 1 = Monday ... 7 = Sunday');
 const readOnly = { readOnlyHint: true };
 
-tool('open_week', 'Show a week in the app (navigation, not an undo step). Required before writing to a week other than the one in view. Creates the week if absent. Returns the week.',
+tool('open_vision', 'Show the Vision (the long-view mind map) in the app: navigation, not an undo step. Required before writing to an intention. Returns the vision.', {});
+tool('set_horizon', 'Set when an intention is meant to happen: this year, in a few years, someday, or none. Vision only. Same value is a no-op.',
+  { id, horizon: z.enum(['year', 'years', 'someday', 'none']) });
+tool('open_week', 'Show a week in the app (navigation, not an undo step); also leaves the Vision. Required before writing to a week other than the one in view. Creates the week if absent. Returns the week.',
   { week: z.string().regex(/^\d{4}-\d{2}$/).describe('ISO week key YYYY-WW') });
-tool('add_task', 'Add a task to the week in view. A label like "Pushups 10x" makes 10 ticks. Pass days for weekdays; never "today"/"tomorrow" in the label. Returns the new task.',
+tool('add_task', 'Add a task to the week in view, or an intention to the Vision when it is in view (no days, no Nx there). A label like "Pushups 10x" makes 10 ticks on a week. Pass days for weekdays; never "today"/"tomorrow" in a week label. Returns the new task.',
   {
     branch: z.string().describe('Branch id or its exact name'),
     label: z.string(),
@@ -145,7 +150,7 @@ tool('add_task', 'Add a task to the week in view. A label like "Pushups 10x" mak
     comment: z.string().optional().describe('Markdown: # heading, - bullet, 1. item, - [ ] checkbox, **bold**, *italic*, [text](https://...)'),
   });
 tool('rename_task', 'Rename a task. Day tokens in the label, e.g. "Run (mo, we)", replace its days; "Nx" sets ticks.', { id, label: z.string() });
-tool('set_status', 'Mark a task done, undone (reopens done or dropped), dropped (will not happen), unplanned or planned. Cascades to sub-tasks.',
+tool('set_status', 'Mark a task done, undone (reopens done or dropped), dropped (will not happen), unplanned or planned. Cascades to sub-tasks. On the Vision only dropped (let go) and undone (take back).',
   { id, status: z.enum(['done', 'undone', 'dropped', 'unplanned', 'planned']) });
 tool('set_priority', 'Set a task priority (cascades to sub-tasks). Same value is a no-op.', { id, priority: z.enum(['normal', 'high', 'critical']) });
 tool('set_days', 'Replace the weekdays of a task. Empty array removes all days. Days remove Nx ticks.', { id, days: isoDays });
@@ -183,6 +188,7 @@ resource('week-current', 'zenit://week/current', 'The week in view: branches, ta
 resource('week', new ResourceTemplate('zenit://week/{week}', { list: undefined }), 'Any stored week (YYYY-WW).',
   { tool: 'read_week', map: v => ({ week: String(v.week) }) });
 resource('schedule', 'zenit://schedule', 'Dated and repeating entries (the Later tab).', { tool: 'read_schedule' });
+resource('vision', 'zenit://vision', 'The Vision: life areas (branches) and intentions with priority, horizon, let-go state and comments (the why). Read it before proposing a week.', { tool: 'read_vision' });
 resource('agenda', new ResourceTemplate('zenit://agenda/{day}', { list: undefined }), 'Agenda of the week in view for ISO day 1-7.',
   { tool: 'read_agenda', map: v => ({ day: parseInt(v.day, 10) }) });
 

@@ -84,14 +84,18 @@ Options go after the package name, for example `npx -y zenit-week-mcp@1 --open`.
 
 ## What the agent can do
 
-Writes act on the week open in the app. Use `open_week` first to work on another week.
+Writes act on the record open in the app: a week, or the Vision. Use `open_week` first to work on another week, and `open_vision` before writing to an intention. An id from the record that is not in view answers `not_in_view`.
+
+The Vision is the user's long view: a mind map of intentions, with life areas as branches and the why in the comments. Read `zenit://vision` before proposing what the coming weeks should carry.
 
 | Tool | What it does |
 |---|---|
-| `open_week` | Shows a week in the app, creating it if absent. |
+| `open_week` | Shows a week in the app, creating it if absent. Also leaves the Vision. |
+| `open_vision` | Shows the Vision. Required before writing to an intention. |
 | `add_task` | Adds a task to a branch, optionally under a parent, with days, priority and a comment. A label like "Pushups 10x" makes 10 ticks. |
 | `rename_task` | Renames a task. |
-| `set_status` | Marks a task done, undone, dropped, unplanned or planned. |
+| `set_status` | Marks a task done, undone, dropped, unplanned or planned. On the Vision only dropped (let go) and undone (take back). |
+| `set_horizon` | Vision only: when an intention is meant to happen (year, years, someday, none). |
 | `set_priority` | Sets normal, high or critical priority. |
 | `set_days` | Replaces a task's weekdays (1 = Monday ... 7 = Sunday). |
 | `tick_task` | Records repetitions of an Nx task. |
@@ -101,8 +105,8 @@ Writes act on the week open in the app. Use `open_week` first to work on another
 | `send_to_date` | Moves a task to a date, optionally repeating. |
 | `transfer_unfinished` | Copies last week's unfinished tasks into this week. |
 | `transfer_reusable` | Copies last week's reusable tasks into this week. |
-| `add_branch` | Adds a branch (category). |
-| `undo` / `redo` | Undoes or redoes the last action, whoever made it. |
+| `add_branch` | Adds a branch (category) to the record in view. |
+| `undo` / `redo` | Undoes or redoes the last action on the record in view, whoever made it. The result names the record. |
 | `get_stats` | Completion statistics of the week in view. |
 
 Read-only resources:
@@ -114,6 +118,9 @@ Read-only resources:
 | `zenit://weeks` | Weeks stored on this device, with task counts. |
 | `zenit://schedule` | Dated and repeating entries (the Later tab). |
 | `zenit://agenda/{1-7}` | The agenda of one day of the week in view. |
+| `zenit://vision` | The Vision: areas and intentions with priority, horizon, let-go state and comments. |
+
+On the Vision, `set_days`, `tick_task`, `set_reusable`, `send_to_date` and the transfers answer `wrong_type`, and `add_task` refuses days and an `Nx` label: an intention has no days, repetitions or done.
 
 ## Security
 

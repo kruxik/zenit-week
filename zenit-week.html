@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Dn4YQxlLkP3SJrqVFq/zljKn6qi41Ozw4u8aK1pgT9M=';
+               'sha256-y0GSWwFMy4mHKdH9EYnkpSRYgyM1hvA9myE7XKYjwuY=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -6358,6 +6358,7 @@ async function saveVision(data) {
     return false;
   }
   tabChannel.postMessage({ type: 'week-saved', wk: VISION_STORAGE_KEY, sig: _weekContentSig(persisted), origin: TAB_ID });
+  bridgeNotifyVisionSaved(persisted);
   scheduleVisionSync();
   return true;
 }
@@ -6522,6 +6523,8 @@ async function mergeRemoteVision(remoteRaw) {
       tabChannel.postMessage({ type: 'week-saved', wk: VISION_STORAGE_KEY, sig: _weekContentSig(merged), origin: TAB_ID });
       scheduleVisionSync();
     }
+    // The agent hears every origin of a change, as it does for weeks.
+    bridgeNotifyVisionSaved(merged);
     if (isVisionInView() && _weekContentSig(merged) !== _weekContentSig(weekData)) {
       weekData = merged;
       rebuildNodeMap();
@@ -12153,6 +12156,7 @@ const TRANSLATIONS = {
     'bridge.toast.transfer_unfinished': 'Agent: transferred unfinished tasks',
     'bridge.toast.transfer_reusable': 'Agent: transferred reusable tasks',
     'bridge.toast.add_branch':    'Agent: added branch {label}',
+    'bridge.toast.set_horizon':   'Agent: {label} set to {horizon}',
     'bridge.toast.undo':          'Agent: undid {what}',
     'bridge.toast.redo':          'Agent: redid {what}',
     'bridge.status.done':         'marked done',
@@ -12598,6 +12602,7 @@ const TRANSLATIONS = {
     'bridge.toast.transfer_unfinished': 'Agent: přenesl nedokončené úkoly',
     'bridge.toast.transfer_reusable': 'Agent: přenesl opakovatelné úkoly',
     'bridge.toast.add_branch':    'Agent: přidal větev {label}',
+    'bridge.toast.set_horizon':   'Agent: {label} má horizont {horizon}',
     'bridge.toast.undo':          'Agent: vrátil zpět {what}',
     'bridge.toast.redo':          'Agent: zopakoval {what}',
     'bridge.status.done':         'hotovo',
@@ -28062,6 +28067,13 @@ function bridgeNotifyWeekSaved(wk, data) {
   _bridgeSend({ type: 'event', event: 'week-saved', wk, sig });
 }
 
+// The vision's resource feed, deduplicated by content exactly as weeks are, so
+// a no-op save stays silent. Rides the week-saved event under the key 'vision';
+// the server maps it to zenit://vision.
+function bridgeNotifyVisionSaved(data) {
+  bridgeNotifyWeekSaved(VISION_STORAGE_KEY, data);
+}
+
 function bridgeNotifyView() {
   _bridgeSend({ type: 'event', event: 'view', wk: currentWeekKey });
 }
@@ -28119,11 +28131,18 @@ async function bridgeRunTool(tool, rawArgs) {
   for (const k of Object.keys(args)) if (!allowed.has(k)) throw _bridgeBad(`unknown argument "${k}"`);
   if (def.read) return def.run(args);
   await _bridgeWaitForUser();
-  if (def.async) return def.run(args);
-  // A synchronous write: inside the week lock, so no Drive or peer-tab merge
-  // can land between its read of weekData and its write.
-  const wk = currentWeekKey;
-  return withWeekLock(wk, () => _bridgeSyncWrite(tool, def, args));
+  if (def.async) {
+    if (def.weekOnly && isVisionInView()) throw _bridgeVisionRefusal(tool);
+    if (def.resolve) await _bridgeResolveRecord(args);
+    return def.run(args);
+  }
+  // Every id the call names must belong to the record in view; one in the other
+  // record answers not_in_view with the call that opens it.
+  await _bridgeResolveRecord(args);
+  if (def.weekOnly && isVisionInView()) throw _bridgeVisionRefusal(tool);
+  // A synchronous write: inside the record's lock, so no Drive or peer-tab
+  // merge can land between its read of weekData and its write.
+  return withWeekLock(mapRecordLockKey(), () => _bridgeSyncWrite(tool, def, args));
 }
 
 // The user typing in the map editor or the comment panel holds writes back, so
@@ -28211,11 +28230,44 @@ function _bridgeAnnounce(summary, ids) {
   });
 }
 
+// The lock that guards the record in view: the week's key, or the vision's.
+function mapRecordLockKey() {
+  return isVisionInView() ? VISION_STORAGE_KEY : currentWeekKey;
+}
+
+// The record a call acts on, named for messages.
+function _bridgeRecordName() {
+  return isVisionInView() ? 'the Vision' : `week ${currentWeekKey}`;
+}
+
+function _bridgeVisionRefusal(tool) {
+  return new BridgeError('wrong_type', `${tool} has no meaning on the Vision, which is in view: it has no days, ticks, dates or weeks. Call open_week first to act on a week.`);
+}
+
+// Node and branch ids are looked up in the record in view. One that is missing
+// there but lives in the other record (the vision behind a week, or the week
+// behind the Vision) is not an unknown id: the agent is told which call opens
+// it. Async because the other record is only in IndexedDB.
+async function _bridgeResolveRecord(args) {
+  const refs = ['id', 'parent', 'branch'].map(k => args[k]).filter(v => typeof v === 'string' && v);
+  const missing = refs.filter(ref => !findNode(ref) && ref !== 'center');
+  if (!missing.length) return;
+  const other = isVisionInView()
+    ? await loadWeekIDB(currentWeekKey)
+    : await loadValueIDB(VISION_STORAGE_KEY);
+  const ids = new Set(((other && other.nodes) || []).map(n => n.id));
+  const hit = missing.find(ref => ids.has(ref));
+  if (!hit) return;
+  throw new BridgeError('not_in_view', isVisionInView()
+    ? `${hit} is in week ${currentWeekKey}, but the Vision is in view; call open_week first`
+    : `${hit} is on the Vision, but week ${currentWeekKey} is in view; call open_vision first`);
+}
+
 // ── Argument helpers ──
 function _bridgeNode(id, ...types) {
   if (typeof id !== 'string' || !id) throw _bridgeBad('id is required');
   const node = findNode(id);
-  if (!node || node.type === 'center') throw new BridgeError('not_found', `no node ${id} in week ${currentWeekKey}`);
+  if (!node || node.type === 'center') throw new BridgeError('not_found', `no node ${id} in ${_bridgeRecordName()}`);
   if (types.length && !types.includes(node.type)) throw new BridgeError('wrong_type', `${id} is a ${node.type}`);
   return node;
 }
@@ -28231,6 +28283,8 @@ function _bridgeLabel(label) {
   if (typeof label !== 'string' || !label.trim()) throw _bridgeBad('label must be a non-empty string');
   const s = label.trim();
   if (s.length > BRIDGE_LABEL_MAX) throw _bridgeBad(`label longer than ${BRIDGE_LABEL_MAX} characters`);
+  // A vision label is literal: no day is resolved from it, so no word is refused.
+  if (isVisionInView()) return s;
   // A relative day resolves against today, so "tomorrow" on a Sunday would
   // quietly move the task to next week. The agent passes `days` instead.
   if (resolveMagicDayTokens(s) !== s || hasNowToken(s)) throw _bridgeBad('relative day words (today, tomorrow, now) are refused; pass days instead');
@@ -28330,7 +28384,43 @@ function projectTask(n, byId = nodeMap) {
   };
 }
 
-const _bridgeProjected = id => projectTask(findNode(id));
+// The node in the shape of the record in view.
+const _bridgeProjected = id => (isVisionInView() ? projectIntention(findNode(id)) : projectTask(findNode(id)));
+
+// ── Vision projection (vision spec, section 6.1) ──
+// Pure over a vision record. Collapse, positions and stamps never leave the page.
+function projectVision(record) {
+  const nodes = (record && Array.isArray(record.nodes)) ? record.nodes : [];
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  return {
+    branches: nodes.filter(n => n.type === 'branch').map(b => ({
+      id: b.id,
+      label: b.label,
+      color: BRANCH_COLORS[b.id]?.main || null,
+      intentions: (b.children || []).map(id => byId.get(id)).filter(isProjectedTask).map(n => projectIntention(n, byId)),
+    })),
+  };
+}
+
+function projectIntention(n, byId = nodeMap) {
+  const kids = (n.children || []).map(id => byId.get(id)).filter(isProjectedTask);
+  return {
+    id: n.id,
+    label: n.label || '',
+    priority: n.priority === 'high' || n.priority === 'critical' ? n.priority : 'normal',
+    horizon: VISION_HORIZONS.has(n.horizon) ? n.horizon : null,
+    letGo: !!n.dropped,
+    letGoAt: n.droppedAt || null,
+    comments: n.comments || '',
+    children: kids.map(c => projectIntention(c, byId)),
+  };
+}
+
+// Reads of "the week in view" while the Vision is in view: there is none on
+// screen, so the call says how to get one rather than describe the vision.
+function _bridgeWeekViewOnly(tool) {
+  if (isVisionInView()) throw new BridgeError('not_in_view', `${tool} reads the week in view, but the Vision is in view; call open_week first`);
+}
 
 async function _bridgeWeekRecord(wk) {
   if (isWeekInMemory(wk)) return weekData; // memory, never the lagging IDB copy
@@ -28369,9 +28459,15 @@ const BRIDGE_TOOLS = {
     read: true, args: [],
     run: async () => JSON.parse(JSON.stringify(scheduleData)),
   },
+  read_vision: {
+    read: true, args: [],
+    // Memory when the Vision is in view, never the lagging IDB copy.
+    run: async () => projectVision(isVisionInView() ? weekData : await loadVision()),
+  },
   read_agenda: {
     read: true, args: ['day'],
     async run({ day }) {
+      _bridgeWeekViewOnly('read_agenda');
       if (!Number.isInteger(day) || day < 1 || day > 7) throw _bridgeBad('day must be an ISO weekday 1-7');
       const { groups } = computeAgendaGroups(day % 7);
       return {
@@ -28390,15 +28486,50 @@ const BRIDGE_TOOLS = {
   },
   get_stats: {
     read: true, args: [],
-    run: async () => ({ week: currentWeekKey, ...JSON.parse(JSON.stringify(computeWeekStats())) }),
+    run: async () => {
+      _bridgeWeekViewOnly('get_stats');
+      return { week: currentWeekKey, ...JSON.parse(JSON.stringify(computeWeekStats())) };
+    },
   },
 
   open_week: {
     async: true, args: ['week'],
     async run({ week }) {
       const wk = _bridgeWeekKey(week);
+      // It also leaves the Vision: it ends on the Mindmap with the week in view.
       if (wk !== currentWeekKey) await loadAndRender(wk);
+      else if (isVisionInView()) await switchView('mindmap');
       return projectWeek(weekData, currentWeekKey);
+    },
+  },
+
+  open_vision: {
+    async: true, args: [],
+    // Navigation, like open_week: no undo entry. Required before any write to a
+    // vision node.
+    async run() {
+      if (!isVisionInView()) await switchView('vision');
+      return projectVision(weekData);
+    },
+  },
+
+  set_horizon: {
+    args: ['id', 'horizon'],
+    check(a) {
+      if (!isVisionInView()) {
+        _bridgeNode(a.id);
+        throw new BridgeError('wrong_type', 'horizon is a Vision field; call open_vision to set it on an intention');
+      }
+      const node = _bridgeTask(a.id);
+      const allowed = ['year', 'years', 'someday', 'none'];
+      if (!allowed.includes(a.horizon)) throw _bridgeBad(`horizon must be one of ${allowed.join(', ')}`);
+      const next = a.horizon === 'none' ? null : a.horizon;
+      if ((node.horizon || null) === next) return { noop: true, result: _bridgeProjected(node.id) };
+      return { id: node.id, horizon: next, toast: { label: node.label, horizon: t(`menu.horizon.${a.horizon}`) } };
+    },
+    apply({ id, horizon }) {
+      applyHorizon(id, horizon);
+      return { result: _bridgeProjected(id), pulse: [id] };
     },
   },
 
@@ -28412,6 +28543,10 @@ const BRIDGE_TOOLS = {
         const p = _bridgeTask(a.parent);
         if (p.branch !== branch.id) throw _bridgeBad('parent is not in that branch');
         parentId = p.id;
+      }
+      if (isVisionInView()) {
+        if (a.days !== undefined) throw _bridgeBad('the Vision has no days; days are refused on an intention');
+        if (parseNxCount(label) >= 2) throw _bridgeBad('the Vision has no repetitions; an Nx count is refused on an intention');
       }
       const days = a.days !== undefined ? _bridgeDays(a.days) : null;
       if (days && days.size && parseNxCount(label) >= 2) throw _bridgeBad('days and an Nx count cannot be combined: days win and the count would be lost');
@@ -28438,7 +28573,8 @@ const BRIDGE_TOOLS = {
       return { id: node.id, label, toast: { label: stripDayGroups(label).trim() || label } };
     },
     apply({ id, label }) {
-      applyLabelEdit(id, label, { replaceDays: parseTodoDays(label).size > 0 });
+      // applyLabelEdit is literal on the Vision; replaceDays is never read there.
+      applyLabelEdit(id, label, { replaceDays: !isVisionInView() && parseTodoDays(label).size > 0 });
       return { result: _bridgeProjected(id), pulse: [id] };
     },
   },
@@ -28449,6 +28585,15 @@ const BRIDGE_TOOLS = {
       const node = _bridgeTask(a.id);
       const allowed = ['done', 'undone', 'dropped', 'unplanned', 'planned'];
       if (!allowed.includes(a.status)) throw _bridgeBad(`status must be one of ${allowed.join(', ')}`);
+      if (isVisionInView()) {
+        // Let go and Take back are the Vision's only outcome; it has no done.
+        if (a.status !== 'dropped' && a.status !== 'undone') {
+          throw new BridgeError('wrong_type', 'the Vision has no done and no plan: use dropped (let go) or undone (take back)');
+        }
+        if ((a.status === 'dropped') === !!node.dropped) return { noop: true, result: _bridgeProjected(node.id) };
+        const status = a.status === 'dropped' ? 'dropped' : 'undropped';
+        return { id: node.id, status, toast: { label: node.label, status: t(status === 'dropped' ? 'toast.letGo' : 'toast.takenBack').toLowerCase() } };
+      }
       // Undone reopens from either closed state - the context menu's redirect.
       const status = a.status === 'undone' && node.dropped ? 'undropped' : a.status;
       return { id: node.id, status, toast: { label: node.label, status: t(`bridge.status.${a.status}`) } };
@@ -28475,6 +28620,7 @@ const BRIDGE_TOOLS = {
   },
 
   set_days: {
+    weekOnly: true,
     args: ['id', 'days'],
     check(a) {
       const node = _bridgeTask(a.id);
@@ -28489,6 +28635,7 @@ const BRIDGE_TOOLS = {
   },
 
   tick_task: {
+    weekOnly: true,
     args: ['id', 'n'],
     check(a) {
       const node = _bridgeTask(a.id);
@@ -28525,6 +28672,7 @@ const BRIDGE_TOOLS = {
   },
 
   set_reusable: {
+    weekOnly: true,
     args: ['id', 'on'],
     check(a) {
       const node = _bridgeTask(a.id);
@@ -28539,7 +28687,7 @@ const BRIDGE_TOOLS = {
   },
 
   delete_task: {
-    async: true, args: ['id', 'scope'],
+    async: true, resolve: true, args: ['id', 'scope'],
     async run(a) {
       const node = _bridgeTask(a.id);
       if (a.scope !== undefined && a.scope !== 'occurrence' && a.scope !== 'series') throw _bridgeBad('scope must be occurrence or series');
@@ -28553,7 +28701,7 @@ const BRIDGE_TOOLS = {
       } else if (entry) {
         await deleteEntryWithNode(entry.id, node.id); // a one-off: both answers are the same act
       } else {
-        await withWeekLock(currentWeekKey, () => {
+        await withWeekLock(mapRecordLockKey(), () => {
           takeSnapshot();
           _labelTopSnapshot(summary);
           _performDelete(node.id, { snapshot: false });
@@ -28566,7 +28714,7 @@ const BRIDGE_TOOLS = {
   },
 
   send_to_date: {
-    async: true, args: ['id', 'date', 'repeat'],
+    weekOnly: true, async: true, args: ['id', 'date', 'repeat'],
     async run(a) {
       const node = _bridgeTask(a.id);
       if (!canSendToDate(node)) throw new BridgeError('wrong_type', 'this node cannot be sent to a date');
@@ -28602,11 +28750,11 @@ const BRIDGE_TOOLS = {
   },
 
   transfer_unfinished: {
-    async: true, args: [],
+    weekOnly: true, async: true, args: [],
     async run() { return _bridgeTransfer('transfer_unfinished', transferUnfinished); },
   },
   transfer_reusable: {
-    async: true, args: [],
+    weekOnly: true, async: true, args: [],
     async run() { return _bridgeTransfer('transfer_reusable', transferReusable); },
   },
 
@@ -28637,26 +28785,26 @@ const BRIDGE_TOOLS = {
     async: true, args: [],
     async run() {
       const stack = activeUndoPair().undo;
-      if (!stack.length) return { undone: null };
+      if (!stack.length) return { undone: null, record: isVisionInView() ? 'vision' : currentWeekKey };
       const label = _snapshotLabel(stack[stack.length - 1]);
       await undo();
       _labelRedoTop(label);
       const what = label || t('bridge.userAction');
       _bridgeAnnounce(t('bridge.toast.undo', { what }));
-      return { undone: what };
+      return { undone: what, record: isVisionInView() ? 'vision' : currentWeekKey };
     },
   },
   redo: {
     async: true, args: [],
     async run() {
       const stack = activeUndoPair().redo;
-      if (!stack.length) return { redone: null };
+      if (!stack.length) return { redone: null, record: isVisionInView() ? 'vision' : currentWeekKey };
       const label = _snapshotLabel(stack[stack.length - 1]);
       await redo();
       _labelTopSnapshot(label);
       const what = label || t('bridge.userAction');
       _bridgeAnnounce(t('bridge.toast.redo', { what }));
-      return { redone: what };
+      return { redone: what, record: isVisionInView() ? 'vision' : currentWeekKey };
     },
   },
 };
