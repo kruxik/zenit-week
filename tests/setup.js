@@ -958,9 +958,6 @@ export const {
   deriveBranchPalette,
   t,
   // Center node + week bar
-  firstNameFrom,
-  centerDisplayName,
-  centerNodeText,
   canShowAvatarPhoto,
   formatWeekParts,
   formatWeekLabel,

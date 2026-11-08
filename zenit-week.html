@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Pv8aoG0L01VK9B9BY74CgeN/Ia+8AfKyimdDcl6q1rg=';
+               'sha256-xpIo7MM1/ciccPnsVfEQOaB7l5rBkzPPU6DbuUrvQOg=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -438,10 +438,6 @@
     align-items: center;
     user-select: none;
     cursor: pointer;
-  }
-
-  #sync-btn .icon {
-    vertical-align: middle;
   }
 
   #zoom-slider-header {
@@ -904,8 +900,8 @@
      there could only ever name the week for the Mindmap. The toolbar already
      paints above every panel, so nothing per-view keeps this visible.
      Absolutely centred instead of a flex child, so neither the logo's two
-     widths nor the sync button's changing label can shove it sideways. One
-     button, dressed as #sync-btn so the toolbar speaks one button style;
+     widths nor the account button can shove it sideways. One button, in the
+     toolbar's glass button style;
      stepping a week at a time is the [ / ] hotkeys' job. */
   #week-picker {
     position: absolute;
@@ -951,7 +947,7 @@
     box-shadow: 0 4px 12px var(--shadow-md);
   }
   #week-picker-label:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
-  /* Grey and regular like #sync-btn; only the week number itself is bold. */
+  /* Grey and regular; only the week number itself is bold. */
   #week-picker-week,
   #week-picker-week-short { font-weight: 700; }
   #week-picker-week,
@@ -972,8 +968,7 @@
   #week-picker.off-current #week-picker-label { color: var(--accent-warning-text); }
 
   /* ── The fold ───────────────────────────────────────────────────────────── */
-  /* Same glass surface as the toolbar's other dropdowns (#sync-dropdown)
-     because it drops out of the same bar. Centred on the
+  /* The toolbar's glass dropdown surface, because it drops out of the bar. Centred on the
      label; on phones it is centred on the viewport instead (see the 520px query),
      which is what keeps it from hanging off a 360px screen. */
   #week-picker-fold {
@@ -1206,149 +1201,56 @@
     text-rendering: geometricPrecision;
   }
 
-  /* Google Drive Sync UI */
-  #sync-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  /* No backdrop-filter on small controls. Each one is its own compositor render
-     surface that re-blurs whatever sits behind it, and behind these is the full
-     SVG mindmap. At button size the blur is not legible anyway - --glass-bg
-     carries the look on its own. */
-  #sync-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    height: 36px;
-    padding: 0 16px;
-    background: var(--glass-bg);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-subtle);
-    box-shadow: 0 2px 8px var(--shadow-md);
-    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-    white-space: nowrap;
-    position: relative;
-    z-index: 1;
-  }
-
-  #sync-btn { display: none; }
-
-  #sync-btn:hover {
-    color: var(--text-dim);
-    box-shadow: 0 4px 12px var(--shadow-md);
-  }
-
-  #sync-btn:hover::before {
-    content: '';
-    position: absolute;
-    top: 3px; left: 3px; right: 3px; bottom: 3px;
-    background: var(--bg-hover);
-    border-radius: 5px;
-    z-index: -1;
-  }
-
+  /* Account button: the top-right door to Settings. Round, like the face it
+     wears. No backdrop-filter on small controls - each one is its own
+     compositor render surface re-blurring the full SVG mindmap behind it, and
+     at button size the blur is not legible anyway; --glass-bg carries the look. */
   @keyframes sync-pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.35; }
   }
 
-  #sync-state-btn {
+  #account-btn {
+    position: relative;
     width: 36px;
     height: 36px;
-    border-radius: 8px;
-    border: 1px solid var(--border-subtle);
     padding: 0;
-    cursor: pointer;
-    background: var(--glass-bg);
     flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
+    background: var(--glass-bg);
     box-shadow: 0 2px 8px var(--shadow-md);
-    transition: transform 0.15s, box-shadow 0.15s, color 0.3s;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
+    cursor: pointer;
+    color: var(--text-subtle);
+    transition: transform 0.15s, box-shadow 0.15s, color 0.15s;
   }
-
-  html:not(.zw-has-session) #sync-btn { display: inline-flex; }
-  html.zw-has-session #sync-state-btn { display: flex; }
-
-  #sync-state-btn:hover {
+  #account-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 4px 12px var(--shadow-md);
+    color: var(--text-dim);
   }
-
-  /* The status dot the avatar used to carry now lives in the glyph itself, so
-     exactly one variant is visible at a time. */
-  .sync-glyph { display: none; }
-  #sync-state-btn[data-status="connected"]    .sync-glyph-connected    { display: block; }
-  #sync-state-btn[data-status="syncing"]      .sync-glyph-syncing      { display: block; }
-  #sync-state-btn[data-status="error"]        .sync-glyph-error        { display: block; }
-  #sync-state-btn[data-status="disconnected"] .sync-glyph-disconnected { display: block; }
-
-  /* Syncing is a healthy state, so it wears the OK green; the glyph and its
-     animation say "in progress". Warning and danger colours stay reserved for
-     states that want attention. */
-  #sync-state-btn[data-status="connected"],
-  #sync-state-btn[data-status="syncing"]   { color: var(--accent-success-text); }
-  #sync-state-btn[data-status="error"]     { color: var(--accent-danger); }
-
-  #sync-state-btn[data-status="syncing"] .sync-glyph-syncing {
-    animation: sync-pulse 1s ease-in-out infinite;
+  #account-btn.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--view-btn-active-bg), 0 2px 8px var(--shadow-md);
   }
+  #account-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 
-  @media (prefers-reduced-motion: reduce) {
-    #sync-state-btn[data-status="syncing"] .sync-glyph-syncing { animation: none; }
-  }
-
-  /* A popup dialog hung under the cloud: the shared .dialog-shell surface and
-     caption bar, positioned like the toolbar's other dropdowns. */
-  #sync-dropdown {
+  /* The face: a person while signed out; signed in, the initials disc with the
+     photo laid over it, so a photo that fails reveals the initials. */
+  #account-btn-face {
     position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
-    z-index: 1001;
-    min-width: 264px;
-    max-width: 320px;
-    display: none;
-    flex-direction: column;
-    animation: fadeIn 0.12s ease-out;
-  }
-
-  #sync-dropdown.visible { display: flex; }
-
-  /* Account, sync status and Sign out are short lines that belong together;
-     the dialog's default 12px gap would scatter them. */
-  #sync-dropdown .dialog-body {
-    gap: 6px;
-    padding: 14px;
-  }
-
-  /* Read top to bottom: who you are, the sync status, then what you can do. Everything is left-aligned against one edge - the
-     centred text and the two full-size glass buttons this replaced gave four
-     competing alignments in a 264px box. */
-  #sync-dropdown-account {
+    inset: 2px;
+    border-radius: 50%;
+    overflow: hidden;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 2px 0 4px;
-    min-width: 0;
+    justify-content: center;
   }
-
-  #sync-dropdown-avatar {
-    flex-shrink: 0;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    display: flex;
+  .account-btn-placeholder { width: 20px; height: 20px; }
+  #account-btn-initials {
+    position: absolute;
+    inset: 0;
+    display: none;
     align-items: center;
     justify-content: center;
     font-size: 12px;
@@ -1357,44 +1259,55 @@
     color: #fff;
     background: var(--text-muted);
   }
+  #account-btn-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  #account-btn-photo[hidden] { display: none; }
+  #account-btn.signed-in .account-btn-placeholder { display: none; }
+  #account-btn.signed-in #account-btn-initials { display: flex; }
 
-  /* min-width:0 on both, or the ellipsis below never triggers: a flex item's
-     default min-width is its content, so a long address widens the menu. */
-  #sync-dropdown-identity {
+  /* The sync badge on the face's lower-right edge, ringed in the toolbar's
+     surface so it reads as a status chip and not as part of the photo. Exactly
+     one glyph is visible at a time. */
+  #account-btn-badge {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
     display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-  }
-
-  #sync-dropdown-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  #sync-dropdown-name:empty { display: none; }
-
-  #sync-dropdown-email {
-    font-size: 12px;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-surface);
+    box-shadow: 0 0 0 1px var(--border-subtle), 0 1px 3px var(--shadow-md);
     color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  }
+  .sync-glyph { display: none; }
+  #account-btn[data-status="connected"]    .sync-glyph-connected    { display: block; }
+  #account-btn[data-status="syncing"]      .sync-glyph-syncing      { display: block; }
+  #account-btn[data-status="error"]        .sync-glyph-error        { display: block; }
+  #account-btn[data-status="disconnected"] .sync-glyph-disconnected { display: block; }
+  /* A returning session, before Drive has answered: no "not connected" flash. */
+  html.zw-has-session #account-btn:not(.signed-in) #account-btn-badge { visibility: hidden; }
+
+  /* Syncing is a healthy state, so it wears the OK green; the glyph and its
+     animation say "in progress". Warning and danger colours stay reserved for
+     states that want attention. */
+  #account-btn[data-status="connected"] #account-btn-badge,
+  #account-btn[data-status="syncing"]   #account-btn-badge { color: var(--accent-success-text); }
+  #account-btn[data-status="error"]     #account-btn-badge { color: var(--accent-danger); }
+
+  #account-btn[data-status="syncing"] .sync-glyph-syncing {
+    animation: sync-pulse 1s ease-in-out infinite;
   }
 
-  /* The tip reads as a second status line under Last sync: what the red cloud
-     means and what, if anything, to do. Empty - and so gone - unless in error. */
-  #sync-dropdown-tip:empty { display: none; }
-
-  #sync-dropdown-last-sync,
-  #sync-dropdown-tip {
-    font-size: 11px;
-    color: var(--text-secondary);
-    padding: 0 0 2px;
+  @media (prefers-reduced-motion: reduce) {
+    #account-btn[data-status="syncing"] .sync-glyph-syncing { animation: none; }
   }
 
   /* Settings & Toolbar Right */
@@ -1419,12 +1332,10 @@
     #toolbar { padding: 8px 12px; }
     .logo-full    { display: none; }
     .logo-compact { display: block; }
-    #sync-btn { padding: 0 10px; }
-    #sync-btn-label { display: none; }
   }
 
-  /* Settings: a window pinned to the bottom-right corner, above the gear it
-     opens from. The overlay is transparent on desktop - it only catches the
+  /* Settings: a window hung under the account button in the top-right corner,
+     the one control it opens from. The overlay is transparent on desktop - it only catches the
      click outside that closes it, and leaves the map visible for the zoom
      slider. Its height is that of the tallest tab (see .settings-panes), so
      switching tabs never resizes it; it scrolls only when the viewport is
@@ -1439,10 +1350,10 @@
   #settings-dialog {
     position: absolute;
     right: 12px;
-    bottom: 58px;
+    top: 56px;
     width: 380px;
     max-width: calc(100vw - 24px);
-    max-height: calc(100vh - 130px);
+    max-height: calc(100vh - 70px);
     display: flex;
     flex-direction: column;
     box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
@@ -1516,13 +1427,13 @@
     padding: 12px 14px 16px;
   }
 
-  /* Phones: the same window above the gear, narrower so it reads as a popup
+  /* Phones: the same window under the account button, narrower so it reads as a popup
      and not a sheet, and the tabs become a segmented
      row on top - a sidebar would leave the content too narrow. Caption and
      tabs sit outside the scrolling pane, so they stay pinned. dvh, so the
      window clears the browser's own bars as they slide in and out. */
   @media (max-width: 520px) {
-    #settings-dialog { width: 290px; max-height: calc(100dvh - 130px); }
+    #settings-dialog { width: 290px; top: 52px; max-height: calc(100dvh - 64px); }
     .settings-body { flex-direction: column; }
     .settings-tabs {
       width: auto;
@@ -1634,7 +1545,7 @@
 
   .agenda-item .agenda-action-btn { font-weight: 400; }
 
-  /* Blur-free for the same reason as #sync-btn - and this class is worn by every
+  /* Blur-free for the same reason as #account-btn - and this class is worn by every
      agenda row action and quick-add pill, so it was the densest cluster of
      render surfaces in the app. */
   .agenda-action-btn {
@@ -2034,7 +1945,7 @@
     right: 12px;
     z-index: 1000;
   }
-  #fab-settings, #fab-add {
+  #fab-add {
     width: 36px;
     height: 36px;
     display: flex;
@@ -2048,19 +1959,9 @@
     transition: background 0.15s, color 0.15s;
     outline: none;
   }
-  #fab-settings:hover, #fab-add:hover {
+  #fab-add:hover {
     background: var(--bg-hover);
     color: var(--text-dim);
-  }
-  #fab-settings.active {
-    background: var(--view-btn-active-bg);
-    color: var(--view-btn-active-text);
-  }
-  .fab-divider {
-    width: 1px;
-    height: 22px;
-    background: var(--view-separator);
-    flex-shrink: 0;
   }
 
   /* ─── Unified panel window (.app-panel) ─────────────────────────────────────
@@ -2234,17 +2135,19 @@
   .stats-donut { width: 234px; height: 234px; overflow: visible; }
   /* Sized in the chart's user units: "100%" and "HOTOVO" both keep clear of
      the plate's opaque middle (r 83.75). */
-  .stats-donut-center-num {
+  .pie-center-num {
     font-size: 44px;
     font-weight: 700;
     fill: var(--text-primary);
+    pointer-events: none;
   }
-  .stats-donut-center-sub {
+  .pie-center-sub {
     font-size: 16px;
     font-weight: 600;
     letter-spacing: 2px;
     text-transform: uppercase;
     fill: var(--text-placeholder);
+    pointer-events: none;
   }
   .stats-legend {
     display: grid;
@@ -3679,8 +3582,7 @@
     animation: fadeIn 0.12s ease-out;
   }
   .dialog-actions .agenda-action-btn,
-  #settings-dialog .agenda-action-btn,
-  #sync-dropdown .agenda-action-btn {
+  #settings-dialog .agenda-action-btn {
     white-space: nowrap;
     height: 36px;
     padding: 0 16px;
@@ -3830,6 +3732,23 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* Settings > Account: the badge is a person while signed out and the
+     initials disc (coloured inline per account) once signed in; the status
+     dot wears the sync state's colour, as the account button's badge does. */
+  #account-section { --bridge-state: var(--text-muted); }
+  #account-section[data-state="drive"][data-status="connected"],
+  #account-section[data-state="drive"][data-status="syncing"] { --bridge-state: var(--accent-success-text); }
+  #account-section[data-state="drive"][data-status="error"] { --bridge-state: var(--accent-danger); }
+  #account-avatar .icon { width: 18px; height: 18px; }
+  #account-section[data-state="local"] #account-avatar { background: var(--accent-warning-text); }
+  #account-section[data-state="drive"] .account-avatar-placeholder { display: none; }
+  #account-section[data-state="local"] #account-avatar-initials { display: none; }
+  #account-section .bridge-list > .agenda-action-btn { align-self: flex-end; }
+  #account-sync-tip:empty { display: none; }
+  #account-section[data-state="drive"][data-status="syncing"] .bridge-status::before { animation: sync-pulse 1s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    #account-section .bridge-status::before { animation: none !important; }
   }
   /* Settings > Data: the badge says where the data lives - green with a Drive
      copy, amber when this browser holds the only one. */
@@ -4373,7 +4292,7 @@
   THIRD_PARTY_NOTICES.md (https://github.com/kruxik/zenit-week/blob/main/THIRD_PARTY_NOTICES.md).
 -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
-  <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
+  <symbol id="icon-user" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></symbol>
   <symbol id="icon-chart-donut" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></symbol>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
   <symbol id="icon-menu-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></symbol>
@@ -4492,81 +4411,54 @@
       </div>
     </div>
     <div id="toolbar-right">
-      <div id="sync-container">
-        <button type="button" id="sync-btn">
-          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
-            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-            <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-            <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
-            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-          </svg>
-          <span id="sync-btn-label">Sign in</span>
-        </button>
-        <!--
-          Signed in, this replaces the sign-in button. It deliberately does NOT
-          wear the profile photo: the root node already carries the user's face,
-          and the menu behind this button is about Drive sync (account, last
-          sync, sign out), not about identity. So the glyph states what sync is
-          doing. All four variants ship in the DOM and CSS picks one off
-          [data-status] - no runtime markup building, no innerHTML.
-          Glyphs: Tabler Icons (MIT) cloud-check / cloud-up / cloud-exclamation
-          / cloud-off.
-        -->
-        <button type="button" id="sync-state-btn" data-status="disconnected"
-                data-i18n-aria="sync.stateAria" aria-label="Sync options"
-                data-i18n-title="sync.badge.disconnected" title="Not connected to Google Drive"
-                aria-haspopup="true">
-          <svg class="sync-glyph sync-glyph-connected" viewBox="0 0 24 24" width="20" height="20"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-               stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M11 18.004h-4.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.388 0 2.585 .82 3.138 2.007"/>
-            <path d="M15 19l2 2l4 -4"/>
-          </svg>
-          <svg class="sync-glyph sync-glyph-syncing" viewBox="0 0 24 24" width="20" height="20"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-               stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M12 18.004h-5.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.38 0 2.57 .811 3.128 1.986"/>
-            <path d="M19 22v-6"/>
-            <path d="M22 19l-3 -3l-3 3"/>
-          </svg>
-          <svg class="sync-glyph sync-glyph-error" viewBox="0 0 24 24" width="20" height="20"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-               stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M15 18.004h-8.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.374 0 2.562 .805 3.121 1.972"/>
-            <path d="M19 16v3"/>
-            <path d="M19 22v.01"/>
-          </svg>
-          <svg class="sync-glyph sync-glyph-disconnected" viewBox="0 0 24 24" width="20" height="20"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-               stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M9.58 5.548c.24 -.11 .492 -.207 .752 -.286c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 .957 -.383 1.824 -1.003 2.454m-2.997 1.033h-11.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.13 -.582 .37 -1.128 .7 -1.62"/>
-            <path d="M3 3l18 18"/>
-          </svg>
-        </button>
-        <div id="sync-dropdown" class="dialog-shell" role="dialog" aria-labelledby="sync-dropdown-title">
-          <div class="dialog-header">
-            <div class="dialog-title" id="sync-dropdown-title" data-i18n="sync.dialogTitle">Google Drive sync</div>
-            <button type="button" class="help-close-btn" id="sync-dropdown-close"
-              data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
-              <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
-            </button>
-          </div>
-          <div class="dialog-body">
-            <div id="sync-dropdown-account">
-              <div id="sync-dropdown-avatar" aria-hidden="true"></div>
-              <div id="sync-dropdown-identity">
-                <div id="sync-dropdown-name"></div>
-                <div id="sync-dropdown-email"></div>
-              </div>
-            </div>
-            <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
-            <div id="sync-dropdown-last-sync">Last sync: -</div>
-            <div id="sync-dropdown-tip" role="status"></div>
-            <div class="settings-separator"></div>
-            <button type="button" class="agenda-action-btn" id="sync-dropdown-signout" data-i18n="sync.signOut">Sign out</button>
-          </div>
-        </div>
-      </div>
+      <!--
+        The one top-right control: who you are and how sync is doing, and the
+        door to Settings, where the Account tab holds sign-in and sync. Signed
+        out it is a neutral person; signed in, the profile photo over an
+        initials disc (a photo that fails or is skipped reveals the initials).
+        The badge on its edge states what sync is doing: all four glyphs ship
+        in the DOM and CSS picks one off [data-status] - no runtime markup
+        building, no innerHTML. Glyphs: Tabler Icons (MIT) cloud-check /
+        cloud-up / cloud-exclamation / cloud-off.
+      -->
+      <button type="button" id="account-btn" data-status="disconnected"
+              data-i18n-aria="account.btnAria" aria-label="Account and settings"
+              data-i18n-title="sync.badge.disconnected" title="Not connected to Google Drive"
+              aria-haspopup="dialog">
+        <span id="account-btn-face" aria-hidden="true">
+          <svg class="icon account-btn-placeholder"><use href="#icon-user"/></svg>
+          <span id="account-btn-initials"></span>
+          <img id="account-btn-photo" src="data:," alt="" hidden>
+        </span>
+        <span id="account-btn-badge" aria-hidden="true">
+            <svg class="sync-glyph sync-glyph-connected" viewBox="0 0 24 24" width="12" height="12"
+                 fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M11 18.004h-4.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.388 0 2.585 .82 3.138 2.007"/>
+              <path d="M15 19l2 2l4 -4"/>
+            </svg>
+            <svg class="sync-glyph sync-glyph-syncing" viewBox="0 0 24 24" width="12" height="12"
+                 fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M12 18.004h-5.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.38 0 2.57 .811 3.128 1.986"/>
+              <path d="M19 22v-6"/>
+              <path d="M22 19l-3 -3l-3 3"/>
+            </svg>
+            <svg class="sync-glyph sync-glyph-error" viewBox="0 0 24 24" width="12" height="12"
+                 fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M15 18.004h-8.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.374 0 2.562 .805 3.121 1.972"/>
+              <path d="M19 16v3"/>
+              <path d="M19 22v.01"/>
+            </svg>
+            <svg class="sync-glyph sync-glyph-disconnected" viewBox="0 0 24 24" width="12" height="12"
+                 fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M9.58 5.548c.24 -.11 .492 -.207 .752 -.286c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 .957 -.383 1.824 -1.003 2.454m-2.997 1.033h-11.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.13 -.582 .37 -1.128 .7 -1.62"/>
+              <path d="M3 3l18 18"/>
+            </svg>
+        </span>
+      </button>
     </div>
   </div>
 
@@ -4888,10 +4780,6 @@ Or remove them later in Settings → Help.</div>
 </div>
 
 <div id="fab-pill">
-  <button type="button" id="fab-settings" data-i18n-aria="toolbar.settings" aria-label="Settings" aria-haspopup="dialog">
-    <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
-  </button>
-  <div class="fab-divider" aria-hidden="true"></div>
   <button type="button" id="fab-add" aria-label="Quick add">
     <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
   </button>
@@ -4930,13 +4818,45 @@ Or remove them later in Settings → Help.</div>
     </div>
     <div class="settings-body">
     <div class="settings-tabs" id="settings-tabs" role="tablist" aria-labelledby="settings-title">
-      <button type="button" class="settings-tab" id="settings-tab-general" role="tab" aria-controls="settings-pane-general" aria-selected="true" data-i18n="settings.tabGeneral">General</button>
+      <button type="button" class="settings-tab" id="settings-tab-account" role="tab" aria-controls="settings-pane-account" aria-selected="true" data-i18n="settings.tabAccount">Account</button>
+      <button type="button" class="settings-tab" id="settings-tab-general" role="tab" aria-controls="settings-pane-general" aria-selected="false" tabindex="-1" data-i18n="settings.tabGeneral">General</button>
       <button type="button" class="settings-tab" id="settings-tab-ai" role="tab" aria-controls="settings-pane-ai" aria-selected="false" tabindex="-1" data-i18n="settings.tabAi" hidden>AI</button>
       <button type="button" class="settings-tab" id="settings-tab-data" role="tab" aria-controls="settings-pane-data" aria-selected="false" tabindex="-1" data-i18n="settings.tabData">Data</button>
       <!-- Dev-only, never translated. -->
       <button type="button" class="settings-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden>Development</button>
     </div>
     <div class="settings-panes">
+    <div class="settings-pane" id="settings-pane-account" role="tabpanel" aria-labelledby="settings-tab-account">
+      <!-- Who is signed in and how Google Drive sync is doing, read like the AI
+           tab: the badge carries the initials (a person while signed out), the
+           status line a dot in the state colour. data-state and data-status
+           are set by showSignedInState / showSignedOutState / setSyncStatus. -->
+      <div class="settings-section" id="account-section" data-state="local" data-status="disconnected">
+        <div class="settings-hero">
+          <div class="settings-badge" id="account-avatar" aria-hidden="true">
+            <svg class="icon account-avatar-placeholder"><use href="#icon-user"/></svg>
+            <span id="account-avatar-initials"></span>
+          </div>
+          <div class="settings-identity">
+            <div class="settings-name" id="account-name" data-i18n="account.signedOut">Not signed in</div>
+            <div class="settings-sub" id="account-email" data-i18n="account.signedOutSub">Your weeks are only in this browser</div>
+          </div>
+        </div>
+        <div id="account-signed-out" class="bridge-list">
+          <div class="bridge-note" data-i18n="sync.btnTitle">Sign in with Google to sync across devices.</div>
+          <button type="button" class="agenda-action-btn commit" id="account-signin-btn" data-i18n="account.signIn">Sign in with Google</button>
+        </div>
+        <div id="account-signed-in" class="bridge-list" hidden>
+          <div class="settings-separator"></div>
+          <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
+          <div id="account-sync-status" class="bridge-status" role="status" aria-live="polite"></div>
+          <div id="account-last-sync" class="bridge-status-line"></div>
+          <div id="account-sync-tip" class="bridge-status-line"></div>
+          <div class="settings-separator"></div>
+          <button type="button" class="agenda-action-btn" id="account-signout-btn" data-i18n="sync.signOut">Sign out</button>
+        </div>
+      </div>
+    </div>
     <div class="settings-pane" id="settings-pane-general" role="tabpanel" aria-labelledby="settings-tab-general">
       <div class="settings-section">
         <div id="zoom-slider-header">
@@ -5676,7 +5596,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       _offlineUploadQueue.delete(data.weekKey);
       if (data.contentHash) lastSyncedHash.set(data.weekKey, data.contentHash);
       lastSyncedAt = Date.now();
-      updateDropdownSyncTime();
+      updateAccountSyncTime();
       if (syncStatus === 'error') setSyncStatus('connected', 'sync.msg.synced');
     }
   });
@@ -5786,7 +5706,6 @@ const QUIESCENCE_PANEL_IDS = [
   'comment-panel',
   'comment-overlay',
   'settings-overlay',
-  'sync-dropdown',
   'color-picker-panel',
   'baseline-panel',
 ];
@@ -8180,9 +8099,9 @@ const CENTER_H = NODE_STYLE.center.minH;
 // in size, as in the infographic, and the size still says something. The radii
 // carry the root's 1.25× growth (312.5 node). The part of each wedge the plate
 // leaves visible was then grown 30%, so the largest now reaches past the node edge.
-const CENTER_AVATAR_R = 83.75;
+const CENTER_PLATE_CORE_R = 83.75;
 const CENTER_PLATE_R = 101.25;
-const CENTER_WEDGE_INNER_R = CENTER_AVATAR_R;
+const CENTER_WEDGE_INNER_R = CENTER_PLATE_CORE_R;
 // How much of the chart the plate's rim, between photo and wedges, lets through.
 const CENTER_PLATE_RIM_OPACITY = 0.3;
 // Outer radius and label size by rank, largest share first.
@@ -8195,12 +8114,6 @@ const CENTER_TRACK_R = CENTER_WEDGE_OUTER_R[0];
 const CENTER_RING_LABEL_MIN_SHARE = 0.06;
 // Clearance a label keeps from the plate's edge and from its wedge's outer edge.
 const CENTER_LABEL_PAD = 3;
-
-// Initials fill the avatar disc, so they are sized off it rather than off the
-// node's label font - that one only ever paints the signed-out wording, which
-// is a word and not a monogram. Scaled with the disc, so the monogram keeps the
-// same clearance inside it that it had at r 110.
-const CENTER_INITIALS_FONT = 50;
 
 // Hit radius of the root's two "+ branch" discs, which are drawn at r 22.5. The
 // root opens Stats on click, so every pixel that is not the + belongs to a
@@ -8626,7 +8539,8 @@ function getNodeSize(nodeId) {
 }
 
 function _computeNodeSize(nodeId) {
-  const node = (nodeId === 'center') ? { type: 'center', label: centerDisplayName() } : findNode(nodeId);
+  // The root is a fixed circle whose plate shows the done percentage, not a label.
+  const node = (nodeId === 'center') ? { type: 'center', label: '' } : findNode(nodeId);
   if (!node) return { w: 0, h: 0 };
 
   const type = node.type || 'activity';
@@ -8734,7 +8648,7 @@ const PKCE_SESSION_KEY        = 'zenit-week-pkce-pending'; // sessionStorage: { 
 // Sync status: 'disconnected' | 'connected' | 'syncing' | 'error'
 let syncStatus = 'disconnected';
 let lastSyncMessageKey = null;
-let lastSignedOutLabelKey = 'sync.btnLabel';
+let lastSignedOutLabelKey = 'account.signIn';
 let googleAccessToken = null;   // current OAuth access token string
 let driveFileIdCache = new Map(); // weekKey → Drive file ID
 // Drive has no get-by-name: turning 'zenit-week-2026-34.json' into a file id
@@ -8804,42 +8718,13 @@ function getInitials(name) {
     : name.slice(0, 2).toUpperCase();
 }
 
-// Longest name the root node shows. A first name past this is pathological
-// (a pasted display name, not a name), so it is cut with an ellipsis rather
-// than silently - a hard cut would read as a real, odd-looking name.
-const MAX_CENTER_NAME_LEN = 16;
-
-// First name for the root node, derived - never stored. Google's displayName
-// first, its email local-part as the fallback for accounts that have no
-// display name, and '' when neither is available (the caller supplies the
-// signed-out wording). Deliberately does not capitalize the local-part: a
-// handle is shown as the handle it is rather than dressed up as a name.
-function firstNameFrom(displayName, email) {
-  const token = String(displayName || '').trim().split(/\s+/)[0] || '';
-  const local = String(email || '').split('@')[0] || '';
-  const name = token || local;
-  if (!name) return '';
-  return name.length > MAX_CENTER_NAME_LEN
-    ? name.slice(0, MAX_CENTER_NAME_LEN - 1) + '…'
-    : name;
-}
-
-// The root's accessible name and hover title. Not painted - the circle shows an
-// avatar - so without this an image-only node would be a blank to a screen reader.
-function centerDisplayName() {
-  return firstNameFrom(googleUserName, googleUserEmail) || t('center.me');
-}
-
 // Drive's `about.user.photoLink` comes back at a fixed, tiny size (`=s64`), and
 // for an account with no uploaded picture that URL is a server-drawn monogram
-// bitmap - not an absence of a photo. The root circle paints it 220 units wide,
-// so the letter arrives upscaled ~3x and looks blurred next to the rest of the
-// SVG. Google honours any `=sN` on these URLs, so ask for one that survives the
-// biggest place we show it: ~2× the painted size, which holds up on a hidpi
-// screen and through the upper half of the zoom range. Idempotent, so re-sizing
-// an already-sized link (an auth blob cached before this existed, say) is
-// harmless.
-const AVATAR_PHOTO_PX = 400;
+// bitmap - not an absence of a photo. Google honours any `=sN` on these URLs,
+// so ask for 3x the account button's 32px face, which stays sharp on a hidpi
+// screen. Idempotent, so re-sizing an already-sized link (an auth blob cached
+// at another size, say) is harmless.
+const AVATAR_PHOTO_PX = 96;
 function sizedAvatarUrl(url) {
   if (!url) return '';
   // `=s64`, `=s64-c`, `=s64-c-k-no`: keep any modifiers, swap only the number.
@@ -8853,20 +8738,12 @@ function sizedAvatarUrl(url) {
 // Whether the profile photo is worth requesting right now. Offline the request
 // usually only fails and, under Data Saver, spends bytes the user asked us not
 // to - unless a service worker is in control, in which case Cache Storage may
-// answer it without any CSP widening. The root node is the only place the photo
-// is shown - the toolbar reports sync state, not identity.
+// answer it without any CSP widening. The account button is the only place the
+// photo is shown.
 function canShowAvatarPhoto() {
   if (!googleUserPhoto) return false;
   const swControlled = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
   return !isDefinitelyOffline() || swControlled;
-}
-
-// What the root circle paints, in descending order of what the account offers.
-// The photo is not a text tier: it is layered over the initials, so a failed or
-// skipped image reveals them with no error handling (see plan AD8).
-function centerNodeText() {
-  if (!googleUserEmail && !googleUserName) return t('center.me');  // signed out
-  return googleUserInitials || getInitials(googleUserEmail || '?');
 }
 
 function formatSyncTime(ts) {
@@ -8877,13 +8754,13 @@ function formatSyncTime(ts) {
   });
 }
 
-function updateDropdownSyncTime() {
-  const el = document.getElementById('sync-dropdown-last-sync');
+function updateAccountSyncTime() {
+  const el = document.getElementById('account-last-sync');
   if (el) el.textContent = `${t('sync.lastSyncLabel')}: ${formatSyncTime(lastSyncedAt)}`;
 }
 
-// Fallback tooltip per sync state, used whenever a call site has no more
-// specific message of its own.
+// Fallback tooltip and status line per sync state, used whenever a call site
+// has no more specific message of its own.
 const SYNC_STATE_TITLE_KEYS = {
   disconnected: 'sync.badge.disconnected',
   connected:    'sync.badge.connected',
@@ -8891,8 +8768,8 @@ const SYNC_STATE_TITLE_KEYS = {
   error:        'sync.badge.error',
 };
 
-// The one-line tip the dropdown shows for each error message: either that the
-// app is already recovering, or the single step the user has to take.
+// The one-line tip the Account tab shows for each error message: either that
+// the app is already recovering, or the single step the user has to take.
 const SYNC_ERROR_TIP_KEYS = {
   'sync.msg.reconnecting':         'sync.tip.reconnecting',
   'sync.msg.failedSavedLocal':     'sync.tip.failedSavedLocal',
@@ -8913,37 +8790,68 @@ function syncErrorTipKey() {
   return SYNC_ERROR_TIP_KEYS[lastSyncMessageKey] || null;
 }
 
-function updateDropdownTip() {
-  const el = document.getElementById('sync-dropdown-tip');
-  if (!el) return;
-  const key = syncErrorTipKey();
-  el.textContent = key ? `${t('sync.issueLabel')}: ${t(key)}` : '';
+// The status sentence and the tip in Settings > Account, and the account
+// button's tooltip: all three say what sync is doing, from one place.
+function updateAccountSyncStatus() {
+  const key = lastSyncMessageKey || SYNC_STATE_TITLE_KEYS[syncStatus];
+  const btn = document.getElementById('account-btn');
+  if (btn) btn.title = key ? t(key) : '';
+  const section = document.getElementById('account-section');
+  if (section) section.dataset.status = syncStatus;
+  const status = document.getElementById('account-sync-status');
+  if (status) status.textContent = key ? t(key) : '';
+  const tip = document.getElementById('account-sync-tip');
+  if (tip) {
+    const tipKey = syncErrorTipKey();
+    tip.textContent = tipKey ? `${t('sync.issueLabel')}: ${t(tipKey)}` : '';
+  }
 }
 
 // Re-render any sync UI text that's set imperatively, so language switches
 // (and first paint) display localized strings.
 function refreshSyncUiText() {
-  const labelEl = document.getElementById('sync-btn-label');
-  if (labelEl) labelEl.textContent = t(lastSignedOutLabelKey);
-  const stateBtn = document.getElementById('sync-state-btn');
-  if (stateBtn) {
-    const key = lastSyncMessageKey || SYNC_STATE_TITLE_KEYS[syncStatus];
-    if (key) stateBtn.title = t(key);
+  const signin = document.getElementById('account-signin-btn');
+  if (signin) signin.textContent = t(lastSignedOutLabelKey);
+  if (!googleUserEmail && !googleUserName) {
+    const name = document.getElementById('account-name');
+    if (name) name.textContent = t('account.signedOut');
+    const sub = document.getElementById('account-email');
+    if (sub) sub.textContent = t('account.signedOutSub');
   }
-  updateDropdownSyncTime();
-  updateDropdownTip();
+  updateAccountSyncStatus();
+  updateAccountSyncTime();
 }
 
 // Set when a photo exists but was skipped because the device had no link, so
-// the 'online' listener knows there is something to go back for. The root node
-// is the only place the photo is painted, so getting it back is a re-render.
+// the 'online' listener knows there is something to go back for.
 let _avatarPhotoDeferred = false;
 
 window.addEventListener('online', () => {
   if (!_avatarPhotoDeferred) return;
   _avatarPhotoDeferred = false;
-  scheduleRender();   // the root node wears the photo
+  updateAccountPhoto();
 });
+
+// The photo is laid over the initials disc and shown only once it has loaded,
+// so a photo that 404s, is blocked or was never requested simply leaves the
+// initials visible.
+function updateAccountPhoto() {
+  const img = document.getElementById('account-btn-photo');
+  if (!img) return;
+  const want = canShowAvatarPhoto() ? googleUserPhoto : '';
+  if (img.dataset.src === want) return;
+  img.dataset.src = want;
+  img.hidden = true;
+  if (want) img.src = want;
+  else img.removeAttribute?.('src');
+}
+
+(function initAccountPhoto() {
+  const img = document.getElementById('account-btn-photo');
+  if (!img) return;
+  img.addEventListener('load', () => { img.hidden = !img.dataset.src; });
+  img.addEventListener('error', () => { img.hidden = true; });
+})();
 
 function showSignedInState(user) {
   googleUserEmail = user?.emailAddress || '';
@@ -8951,18 +8859,9 @@ function showSignedInState(user) {
   googleUserPhoto = sizedAvatarUrl(user?.photoLink || '');
   googleUserInitials = getInitials(user?.displayName || googleUserEmail || '?');
   googleUserInitialsColor = hashColor(googleUserEmail || googleUserInitials);
-  // Signing in renames the root node from the signed-out wording to a first
-  // name, and the node's width follows its label - so redraw, don't patch text.
-  scheduleRender();
-
-  const btn      = document.getElementById('sync-btn');
-  const stateBtn = document.getElementById('sync-state-btn');
-  const emailEl  = document.getElementById('sync-dropdown-email');
-
-  if (btn) btn.style.display = 'none';
 
   // The profile photo is the one image the app loads from the network, and it
-  // is decoration - the root node's initials disc says exactly as much. Offline,
+  // is decoration - the initials disc under it says exactly as much. Offline,
   // skip the request entirely rather than spending it on a load that can only
   // fail into those initials a moment later.
   //
@@ -8980,34 +8879,38 @@ function showSignedInState(user) {
   // from Cache Storage, and if it is not, it fails into the same initials disc.
   _avatarPhotoDeferred = canShowAvatarPhoto() ? false : !!googleUserPhoto;
 
-  if (emailEl) emailEl.textContent = googleUserEmail;
-
-  // Initials, never the photo: the disc needs no network and no widening of
-  // connect-src, and it is the same identity mark the root node already wears.
-  const nameEl   = document.getElementById('sync-dropdown-name');
-  const avatarEl = document.getElementById('sync-dropdown-avatar');
-  if (nameEl) nameEl.textContent = googleUserName || '';
-  if (avatarEl) {
-    avatarEl.textContent = googleUserInitials || getInitials(googleUserEmail || '?');
-    avatarEl.style.background = googleUserInitialsColor || '';
+  const initials = googleUserInitials || getInitials(googleUserEmail || '?');
+  const btn = document.getElementById('account-btn');
+  if (btn) btn.classList.add('signed-in');
+  const btnInitials = document.getElementById('account-btn-initials');
+  if (btnInitials) {
+    btnInitials.textContent = initials;
+    btnInitials.style.background = googleUserInitialsColor || '';
   }
+  updateAccountPhoto();
 
-  if (stateBtn) stateBtn.style.display = 'flex';
-  updateDropdownSyncTime();
+  // Settings > Account: initials, never the photo - one network image is enough.
+  const section = document.getElementById('account-section');
+  if (section) section.dataset.state = 'drive';
+  const avatarInitials = document.getElementById('account-avatar-initials');
+  if (avatarInitials) avatarInitials.textContent = initials;
+  const avatar = document.getElementById('account-avatar');
+  if (avatar) avatar.style.background = googleUserInitialsColor || '';
+  const nameEl = document.getElementById('account-name');
+  if (nameEl) nameEl.textContent = googleUserName || googleUserEmail;
+  const emailEl = document.getElementById('account-email');
+  if (emailEl) emailEl.textContent = googleUserName ? googleUserEmail : '';
+  const signedIn = document.getElementById('account-signed-in');
+  if (signedIn) signedIn.hidden = false;
+  const signedOut = document.getElementById('account-signed-out');
+  if (signedOut) signedOut.hidden = true;
+
+  updateAccountSyncTime();
 }
 
-function showSignedOutButton(labelKey = 'sync.btnLabel') {
-  const btn       = document.getElementById('sync-btn');
-  const stateBtn  = document.getElementById('sync-state-btn');
-  const dropdown  = document.getElementById('sync-dropdown');
-
-  if (dropdown) dropdown.classList.remove('visible');
-  if (stateBtn) stateBtn.style.display = 'none';
+function showSignedOutState(labelKey = 'account.signIn') {
   document.documentElement.classList.remove('zw-has-session');
-  if (btn) { btn.style.display = ''; }
   lastSignedOutLabelKey = labelKey;
-  const labelEl = document.getElementById('sync-btn-label');
-  if (labelEl) labelEl.textContent = t(labelKey);
 
   googleUserEmail = '';
   googleUserName = '';
@@ -9015,10 +8918,22 @@ function showSignedOutButton(labelKey = 'sync.btnLabel') {
   googleUserInitials = '';
   googleUserInitialsColor = '';
   lastSyncedAt = null;
-  // The root node is labelled with the signed-in first name, so losing the
-  // identity changes the map. Its width follows the label, so this is a
-  // re-render rather than a text patch.
-  scheduleRender();
+
+  const btn = document.getElementById('account-btn');
+  if (btn) btn.classList.remove('signed-in');
+  updateAccountPhoto();
+
+  const section = document.getElementById('account-section');
+  if (section) section.dataset.state = 'local';
+  const avatarInitials = document.getElementById('account-avatar-initials');
+  if (avatarInitials) avatarInitials.textContent = '';
+  const avatar = document.getElementById('account-avatar');
+  if (avatar) avatar.style.background = '';
+  const signedIn = document.getElementById('account-signed-in');
+  if (signedIn) signedIn.hidden = true;
+  const signedOut = document.getElementById('account-signed-out');
+  if (signedOut) signedOut.hidden = false;
+  refreshSyncUiText();
 }
 
 // Legacy cleanup: before the HttpOnly-cookie change the refresh token was kept
@@ -9208,7 +9123,7 @@ function _handleAuthExpiry() {
   googleAccessToken = null;
   _driveSessionStarted = false;
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
-  showSignedOutButton('sync.reconnect');
+  showSignedOutState('sync.reconnect');
   setSyncStatus('disconnected', 'sync.msg.sessionExpired');
 }
 
@@ -9530,7 +9445,7 @@ async function signOut() {
   _isFirstConnection = false;
   _forgetDriveAccountCaches();
   localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
-  showSignedOutButton('sync.btnLabel');
+  showSignedOutState();
   setSyncStatus('disconnected');
   // Clear the HttpOnly refresh cookie server-side (JS can't read it). Google
   // keeps the grant, so the other devices stay signed in.
@@ -9587,12 +9502,9 @@ function setSyncStatus(status, messageKey) {
   if (status === 'error' && syncStatus === 'disconnected') return;
   syncStatus = status;
   lastSyncMessageKey = messageKey || null;
-  const stateBtn = document.getElementById('sync-state-btn');
-  if (!stateBtn) return;
-  stateBtn.dataset.status = status;   // CSS swaps the cloud glyph off this
-  const key = messageKey || SYNC_STATE_TITLE_KEYS[status];
-  stateBtn.title = key ? t(key) : '';
-  updateDropdownTip();
+  const btn = document.getElementById('account-btn');
+  if (btn) btn.dataset.status = status;   // CSS swaps the badge glyph off this
+  updateAccountSyncStatus();
 }
 
 // Cache user info so the avatar renders instantly on the next page load.
@@ -10001,7 +9913,7 @@ async function _commitRemoteMerge(wKey, mergedData, mergedJson, mergedHash, sche
   // syncWeekToDrive sees hash(localStorage) != lastSyncedHash and uploads.
   if (!scheduleUpload) lastSyncedHash.set(wKey, mergedHash);
   lastSyncedAt = Date.now();
-  updateDropdownSyncTime();
+  updateAccountSyncTime();
   // A merge that produced content Drive lacks has to be pushed - but when the
   // pull was syncWeekToDrive's own (callerWillPush), that push is the next
   // thing to happen, and arming the debounce here only buys a second, empty
@@ -10650,7 +10562,7 @@ async function _uploadWeekToDrive(wKey, json) {
   if (result !== 'ok') return false;
   lastSyncedHash.set(wKey, hash);
   lastSyncedAt = Date.now();
-  updateDropdownSyncTime();
+  updateAccountSyncTime();
   return true;
 }
 
@@ -10967,7 +10879,7 @@ async function syncColorsToDrive() {
   if (result !== 'ok') return;
   colorsSyncedHash = hash;
   lastSyncedAt = Date.now();
-  updateDropdownSyncTime();
+  updateAccountSyncTime();
   setSyncStatus('connected', 'sync.msg.synced');
 }
 
@@ -11057,7 +10969,7 @@ async function syncColorsFromDrive() {
       if (currentView === 'agenda') renderAgenda();
       colorsSyncedHash = remoteHash;
       lastSyncedAt = Date.now();
-      updateDropdownSyncTime();
+      updateAccountSyncTime();
     } else if (colorsContentHash(localData || {}) === remoteHash) {
       // Remote is not newer but content is identical - mark synced so the 10s
       // poll stops re-downloading an unchanged colors file every cycle.
@@ -11748,7 +11660,6 @@ const TRANSLATIONS = {
     'quick_add.placeholder':      'Add a task…',
     'quick_add.title':            'Quick add',
     'week.word':                  'Week',
-    'center.me':                  'Me',
     'weekbar.today':              'Jump to current week',
     'weekpicker.title':           'Choose week',
     'weekpicker.prevMonth':       'Previous month',
@@ -11761,7 +11672,12 @@ const TRANSLATIONS = {
     'settings.zoom':              'Zoom',
     'settings.resetView':         'Click to reset view',
     'settings.language':          'Language',
+    'settings.tabAccount':        'Account',
     'settings.tabGeneral':        'General',
+    'account.btnAria':            'Account and settings',
+    'account.signIn':             'Sign in with Google',
+    'account.signedOut':          'Not signed in',
+    'account.signedOutSub':       'Your weeks are only in this browser',
     'settings.dataHero':          'Your weeks',
     'settings.dataWhereDrive':    'In this browser and your Google Drive',
     'settings.dataWhereLocal':    'Only in this browser - keep a backup',
@@ -12158,11 +12074,8 @@ const TRANSLATIONS = {
     'filter.none':                'None',
     'menu.clearDayFilter':        'Clear Day Filter',
     'error.quotaExceeded':        'Storage quota exceeded - changes might not be saved',
-    'sync.btnLabel':              'Sign in',
     'sync.btnTitle':              'Sign in with Google to sync across devices. Your data is stored only in your own Google Drive - Zenit Week never sees or stores it.',
-    'sync.stateAria':             'Sync options',
     'sync.lastSyncLabel':         'Last sync',
-    'sync.dialogTitle':           'Google Drive sync',
     'sync.statusCaption':         'Sync status',
     'sync.issueLabel':            'Issue',
     'sync.signOut':               'Sign out',
@@ -12215,7 +12128,6 @@ const TRANSLATIONS = {
     'quick_add.placeholder':      'Přidat úkol…',
     'quick_add.title':            'Rychlé přidání',
     'week.word':                  'Týden',
-    'center.me':                  'Já',
     'weekbar.today':              'Přejít na aktuální týden',
     'weekpicker.title':           'Vybrat týden',
     'weekpicker.prevMonth':       'Předchozí měsíc',
@@ -12228,7 +12140,12 @@ const TRANSLATIONS = {
     'settings.zoom':              'Přiblížení',
     'settings.resetView':         'Kliknutím resetovat pohled',
     'settings.language':          'Jazyk',
+    'settings.tabAccount':        'Účet',
     'settings.tabGeneral':        'Obecné',
+    'account.btnAria':            'Účet a nastavení',
+    'account.signIn':             'Přihlásit se přes Google',
+    'account.signedOut':          'Nepřihlášeno',
+    'account.signedOutSub':       'Tvoje týdny jsou jen v tomto prohlížeči',
     'settings.dataHero':          'Tvoje týdny',
     'settings.dataWhereDrive':    'V tomto prohlížeči a na tvém Google Disku',
     'settings.dataWhereLocal':    'Jen v tomto prohlížeči - měj zálohu',
@@ -12625,11 +12542,8 @@ const TRANSLATIONS = {
     'filter.none':                'Žádný',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena - změny nemusí být uloženy',
-    'sync.btnLabel':              'Přihlásit se',
     'sync.btnTitle':              'Přihlas se přes Google a synchronizuj data mezi zařízeními. Data se ukládají pouze na tvém Disku Google - Zenit Week k nim nemá přístup.',
-    'sync.stateAria':             'Možnosti synchronizace',
     'sync.lastSyncLabel':         'Aktualizace',
-    'sync.dialogTitle':           'Synchronizace s Diskem Google',
     'sync.statusCaption':         'Stav synchronizace',
     'sync.issueLabel':            'Problém',
     'sync.signOut':               'Odhlásit se',
@@ -15611,51 +15525,15 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   }
 
   if (isCenter) {
-    // Named, so a screen reader and a hover both get something better than an
-    // unlabelled image.
-    g.appendChild(svgText('title', {}, centerDisplayName()));
+    // Named, so a screen reader and a hover both get the figure the plate
+    // shows. setPieChart keeps it current.
+    g.appendChild(svgText('title', { class: 'pie-title' }, ''));
 
-    // The week's split as the infographic Stats shows too; the photo goes on
-    // its plate and the percentages over everything (see buildPieChart).
+    // The week's split as the infographic Stats shows too, with the done
+    // percentage on its plate and the wedge percentages over everything (see
+    // buildPieChart).
     const pie = buildPieChart('center');
     g.appendChild(pie.chart);
-
-    // Initials disc first, photo clipped over it. If the photo 404s, is blocked,
-    // or was never requested, the initials are simply what remains visible - no
-    // error handling inside a subtree that gets rebuilt on every render.
-    if (googleUserInitials) {
-      g.appendChild(svgDisc(CENTER_AVATAR_R, {
-        fill: googleUserInitialsColor || '#888888',
-      }));
-    }
-    g.appendChild(svgText('text', {
-      x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-      'font-family': 'inherit', 'font-size': googleUserInitials ? CENTER_INITIALS_FONT : fontSize,
-      'font-weight': '700', fill: googleUserInitials ? textColor : (isDarkTheme ? '#f2f2f2' : '#2b2b33'),
-      'pointer-events': 'none',
-    }, centerNodeText()));
-
-    if (canShowAvatarPhoto()) {
-      g.appendChild(svgEl('image', {
-        class: 'center-avatar-img',
-        href: googleUserPhoto,
-        x: -CENTER_AVATAR_R, y: -CENTER_AVATAR_R,
-        width: CENTER_AVATAR_R * 2, height: CENTER_AVATAR_R * 2,
-        preserveAspectRatio: 'xMidYMid slice',
-        'clip-path': 'url(#center-avatar-clip)',
-        'pointer-events': 'none',
-      }));
-    }
-
-    // The photo's dished face, over it: the disc paints only the filter's inner
-    // light and shade, never its own fill.
-    g.appendChild(svgDisc(CENTER_AVATAR_R, {
-      class: 'center-avatar-bevel', fill: '#000', filter: 'url(#center-avatar-bevel)',
-      'pointer-events': 'none',
-    }));
-
-    // Percentages last, so nothing on the root - plate, its shadow, the photo -
-    // can ever cover them.
     g.appendChild(pie.labels);
   }
 
@@ -18097,13 +17975,6 @@ function _statsDonut(c) {
   });
   const pie = buildPieChart('stats-pie');
   svg.appendChild(pie.chart);
-  svg.appendChild(svgText('text', {
-    x: 0, y: -6, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-    class: 'stats-donut-center-num',
-  }, `${c.percent}%`));
-  svg.appendChild(svgText('text', {
-    x: 0, y: 30, 'text-anchor': 'middle', class: 'stats-donut-center-sub',
-  }, t('todo.done')));
   svg.appendChild(pie.labels);
   setPieChart(svg, c, STATS_PIE_FONT_SCALE);
   return svg;
@@ -19017,12 +18888,20 @@ function buildPieChart(prefix) {
   // Opaque in the middle, frosted glass in the rim around it, so the wedges
   // show through dimmed; the rim's shadow is as light as its fill.
   const plate = svgEl('g', { class: 'pie-plate', filter: `url(#${prefix}-plate-shadow)`, 'pointer-events': 'none' });
-  plate.appendChild(svgDisc(CENTER_AVATAR_R, { fill: `url(#${prefix}-plate-grad)` }));
+  plate.appendChild(svgDisc(CENTER_PLATE_CORE_R, { fill: `url(#${prefix}-plate-grad)` }));
   plate.appendChild(svgEl('path', {
-    d: `${discPathD(CENTER_PLATE_R)} ${discPathD(CENTER_AVATAR_R)}`, 'fill-rule': 'evenodd',
+    d: `${discPathD(CENTER_PLATE_R)} ${discPathD(CENTER_PLATE_CORE_R)}`, 'fill-rule': 'evenodd',
     fill: `url(#${prefix}-plate-grad)`, 'fill-opacity': CENTER_PLATE_RIM_OPACITY,
   }));
   chart.appendChild(plate);
+
+  // The done percentage on the plate, in both charts. Filled by setPieChart.
+  chart.appendChild(svgEl('text', {
+    x: 0, y: -6, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'pie-center-num',
+  }));
+  chart.appendChild(svgEl('text', {
+    x: 0, y: 30, 'text-anchor': 'middle', class: 'pie-center-sub',
+  }));
 
   const labels = svgEl('g', { class: 'pie-labels' });
   STATS_SPLIT_BANDS.forEach((band, i) => {
@@ -19086,6 +18965,12 @@ function setPieChart(root, stats, fontScale = 1) {
   const rank = new Array(shares.length);
   shares.map((v, i) => i).sort((a, b) => shares[b] - shares[a] || a - b).forEach((i, r) => { rank[i] = r; });
   const avoid = placePieAddBtns(root, shares, rank);
+  const num = root.querySelector('.pie-center-num');
+  if (num) num.textContent = `${stats.percent}%`;
+  const sub = root.querySelector('.pie-center-sub');
+  if (sub) sub.textContent = t('todo.done');
+  const title = root.querySelector(':scope > .pie-title');
+  if (title) title.textContent = `${stats.percent}% ${t('todo.done')}`;
   // The track stands in for the chart on an empty week only: at full size it
   // would show behind every shorter wedge.
   const track = root.querySelector('.pie-track');
@@ -19169,39 +19054,6 @@ function render() {
   centerGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isDark ? '#444444' : '#252525' }));
   defsEl.appendChild(centerGrad);
 
-  // The photo as a concave dish, lit from the same top left: a thin white lip
-  // where the top-left rim catches the light, a broad soft shade the lip casts
-  // into the dish below it, and a soft glow where the light lands on the far,
-  // bottom-right slope. Each layer is the disc's own outside, offset, blurred
-  // and clipped back to the disc, so it paints only inward from the side the
-  // offset pushes it in from. Merged in order, so the lip sits on the shade.
-  const bevel = svgEl('filter', {
-    id: 'center-avatar-bevel', filterUnits: 'userSpaceOnUse',
-    x: -CENTER_AVATAR_R - 24, y: -CENTER_AVATAR_R - 24,
-    width: 2 * CENTER_AVATAR_R + 48, height: 2 * CENTER_AVATAR_R + 48,
-  });
-  const bevelMerge = svgEl('feMerge', {});
-  [
-    ['shade', '#000', isDark ? 0.35 : 0.22, 6, 8, 10],
-    ['glow', '#fff', isDark ? 0.15 : 0.35, -4, -5, 8],
-    ['light', '#fff', isDark ? 0.45 : 0.9, 2.5, 3, 1.5],
-  ].forEach(([name, color, opacity, dx, dy, blur]) => {
-    bevel.appendChild(svgEl('feFlood', { 'flood-color': color, 'flood-opacity': opacity, result: `${name}-flood` }));
-    bevel.appendChild(svgEl('feComposite', { in: `${name}-flood`, in2: 'SourceAlpha', operator: 'out', result: `${name}-outside` }));
-    bevel.appendChild(svgEl('feOffset', { in: `${name}-outside`, dx, dy, result: `${name}-offset` }));
-    bevel.appendChild(svgEl('feGaussianBlur', { in: `${name}-offset`, stdDeviation: blur, result: `${name}-blur` }));
-    bevel.appendChild(svgEl('feComposite', { in: `${name}-blur`, in2: 'SourceAlpha', operator: 'in', result: name }));
-    bevelMerge.appendChild(svgEl('feMergeNode', { in: name }));
-  });
-  bevel.appendChild(bevelMerge);
-  defsEl.appendChild(bevel);
-
-  // Rounds off the root's profile photo. A clipPath rather than a CSS
-  // basic-shape so the geometry is plain SVG in every engine.
-  const avatarClip = svgEl('clipPath', { id: 'center-avatar-clip' });
-  avatarClip.appendChild(svgEl('circle', { cx: 0, cy: 0, r: CENTER_AVATAR_R }));
-  defsEl.appendChild(avatarClip);
-
   const linesG = svgEl('g', { id: 'lines-layer' });
   root.appendChild(linesG);
 
@@ -19254,9 +19106,9 @@ function render() {
     drawEdges(bid, 0);
   });
 
-  // Draw center node. Its label is the user, not the week - the week and its
-  // navigation live in #week-picker.
-  const centerG = makeNodeGroup('center', 0, 0, centerDisplayName(), 'center', null, null, null);
+  // Draw center node. It carries no label: its plate shows the week's done
+  // percentage, and the week and its navigation live in #week-picker.
+  const centerG = makeNodeGroup('center', 0, 0, '', 'center', null, null, null);
   nodesG.appendChild(centerG);
 
   // Draw all other nodes, pruned ones included but hidden. SVG paints in DOM
@@ -19590,11 +19442,11 @@ function closeSettings() {
   if (!overlay || !overlay.classList.contains('visible')) return;
   overlay.classList.remove('visible');
   releaseSettingsHeight();
-  const fab = document.getElementById('fab-settings');
-  fab?.classList.remove('active');
-  // Back to the gear it was opened from, unless focus already moved on.
+  const btn = document.getElementById('account-btn');
+  btn?.classList.remove('active');
+  // Back to the button it was opened from, unless focus already moved on.
   const active = document.activeElement;
-  if (fab && (!active || active === document.body || overlay.contains(active))) fab.focus?.();
+  if (btn && (!active || active === document.body || overlay.contains(active))) btn.focus?.();
 }
 
 // Global keyboard shortcuts for hovered node
@@ -26113,7 +25965,7 @@ function renderWeekPickerFold() {
     rows[i + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
   });
 
-  // One outside-click dismissal, the same one #sync-dropdown uses.
+  // One outside-click dismissal.
   document.addEventListener('click', () => closeWeekPicker());
 })();
 
@@ -26507,49 +26359,21 @@ window.addEventListener('hashchange', async () => {
 });
 
 
-// ─── Google Drive Sync Button (signed-out state only) ────────────────────────
-document.getElementById('sync-btn').addEventListener('click', () => { startSignIn(); });
+// ─── Settings > Account: sign in and sign out ─────────────────────────────────
+document.getElementById('account-signin-btn').addEventListener('click', () => { startSignIn(); });
 
-// ─── Sync state button + sync dropdown ───────────────────────────────────────
-(function () {
-  const stateBtn   = document.getElementById('sync-state-btn');
-  const dropdown   = document.getElementById('sync-dropdown');
-  const signoutBtn = document.getElementById('sync-dropdown-signout');
-  const closeBtn   = document.getElementById('sync-dropdown-close');
-
-  // A click inside the dialog keeps it open; only the X, Escape, Sign out or
-  // a click elsewhere closes it.
-  dropdown.addEventListener('click', (e) => e.stopPropagation());
-  closeBtn.addEventListener('click', () => dropdown.classList.remove('visible'));
-
-  stateBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    dropdown.classList.toggle('visible');
-    if (dropdown.classList.contains('visible')) {
-      updateDropdownSyncTime();
-      updateDropdownTip();   // offline-ness can change without a status change
-    }
+document.getElementById('account-signout-btn').addEventListener('click', () => {
+  closeSettings();
+  showAppConfirm({
+    title:           t('sync.signOutConfirm.title'),
+    body:            t('sync.signOutConfirm.body'),
+    okLabel:         t('sync.signOutConfirm.keepLocal'),
+    onConfirm:       signOut,
+    secondaryLabel:  t('sync.signOutConfirm.clearLocal'),
+    secondaryDanger: true,
+    onSecondary:     signOutAndClear,
   });
-
-  signoutBtn.addEventListener('click', () => {
-    dropdown.classList.remove('visible');
-    showAppConfirm({
-      title:           t('sync.signOutConfirm.title'),
-      body:            t('sync.signOutConfirm.body'),
-      okLabel:         t('sync.signOutConfirm.keepLocal'),
-      onConfirm:       signOut,
-      secondaryLabel:  t('sync.signOutConfirm.clearLocal'),
-      secondaryDanger: true,
-      onSecondary:     signOutAndClear,
-    });
-  });
-
-  // Close dropdown on outside click or Escape
-  document.addEventListener('click', () => dropdown.classList.remove('visible'));
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') dropdown.classList.remove('visible');
-  });
-})();
+});
 
 // Upload every week with a pending debounce, not just the displayed one. A
 // transfer queues the *next* week too, and nothing else ever uploads a week the
@@ -26720,11 +26544,12 @@ window.addEventListener('pagehide', _flushOnTeardown);
 })();
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
-// One modal, four tabs. AI and Development ship hidden and are revealed at boot
-// (initBridgeSettings, the devResetEnabled() guard); a hidden tab is never
-// selected, so the last-used tab falls back to General on a device without it.
-const SETTINGS_TABS = ['general', 'ai', 'data', 'dev'];
-let settingsActiveTab = 'general';
+// One modal, five tabs, opened from the account button. AI and Development ship
+// hidden and are revealed at boot (initBridgeSettings, the devResetEnabled()
+// guard); a hidden tab is never selected, so the last-used tab falls back to
+// Account on a device without it.
+const SETTINGS_TABS = ['account', 'general', 'ai', 'data', 'dev'];
+let settingsActiveTab = 'account';
 
 function isSettingsTabShown(name) {
   const tab = document.getElementById('settings-tab-' + name);
@@ -26732,7 +26557,7 @@ function isSettingsTabShown(name) {
 }
 
 function selectSettingsTab(name, { focus = false } = {}) {
-  if (!SETTINGS_TABS.includes(name) || !isSettingsTabShown(name)) name = 'general';
+  if (!SETTINGS_TABS.includes(name) || !isSettingsTabShown(name)) name = 'account';
   settingsActiveTab = name;
   for (const id of SETTINGS_TABS) {
     const tab = document.getElementById('settings-tab-' + id);
@@ -26751,6 +26576,8 @@ function selectSettingsTab(name, { focus = false } = {}) {
     }
   }
   if (name === 'data') refreshDataSummary();
+  // Offline-ness can change without a status change, so re-read on show.
+  if (name === 'account') { updateAccountSyncStatus(); updateAccountSyncTime(); }
   if (focus) document.getElementById('settings-tab-' + name)?.focus?.();
 }
 
@@ -26792,9 +26619,11 @@ async function refreshDataSummary() {
 
 function openSettings() {
   releaseSettingsHeight();
-  selectSettingsTab(settingsActiveTab);
+  // A sync problem is the first thing to see: the badge that brought the user
+  // here was red.
+  selectSettingsTab(syncStatus === 'error' ? 'account' : settingsActiveTab);
   document.getElementById('settings-overlay').classList.add('visible');
-  document.getElementById('fab-settings').classList.add('active');
+  document.getElementById('account-btn').classList.add('active');
   document.getElementById('settings-tab-' + settingsActiveTab)?.focus?.();
 }
 
@@ -26802,7 +26631,7 @@ function openSettings() {
   const overlay = document.getElementById('settings-overlay');
   const tablist = document.getElementById('settings-tabs');
 
-  document.getElementById('fab-settings').addEventListener('click', (e) => {
+  document.getElementById('account-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     if (isSettingsOpen()) closeSettings();
     else openSettings();
@@ -29300,13 +29129,16 @@ const _touchHintGates = [];
 // el is what the user taps; anchorEl is what the bubble points at, which for
 // the level buttons is the bar they sit in. pulseTarget may be a function, as
 // the ring around those buttons is measured when it is drawn.
-function armTouchHintGate(el, id, pulseTarget, anchorEl) {
+// `when`, if given, says whether the hint applies right now; a tap that finds it
+// false passes through to the control untouched.
+function armTouchHintGate(el, id, pulseTarget, anchorEl, when) {
   if (!el) return;
   if (!_touchHintGates.length) {
     document.addEventListener('click', (e) => {
       if (coachmarkKeysApply()) return; // a pointer device hovered it already
       const gate = _touchHintGates.find(g => g.el.contains(e.target));
       if (!gate || !_tipsEnabled || isHintSeen(gate.id)) return;
+      if (gate.when && !gate.when()) return;
       const pulse = (typeof gate.pulseTarget === 'function') ? gate.pulseTarget() : gate.pulseTarget;
       maybeShowHint(gate.id, gate.anchorEl, pulse);
       markHintSeen(gate.id);
@@ -29314,7 +29146,7 @@ function armTouchHintGate(el, id, pulseTarget, anchorEl) {
       e.stopPropagation();
     }, true);
   }
-  _touchHintGates.push({ el, id, pulseTarget, anchorEl: anchorEl || el });
+  _touchHintGates.push({ el, id, pulseTarget, anchorEl: anchorEl || el, when });
 }
 
 // Nodes are rebuilt on every render, so they gate through one delegated
@@ -29463,10 +29295,12 @@ window.addEventListener('load', async () => {
     _viewToggleBar.addEventListener('mouseenter', () => maybeShowHint('views', _viewToggleBar));
     armTouchHintGate(_viewToggleBar, 'views');
   }
-  const _syncBtn = document.getElementById('sync-btn');
-  if (_syncBtn) {
-    _syncBtn.addEventListener('mouseenter', () => maybeShowHint('signin', _syncBtn));
-    armTouchHintGate(_syncBtn, 'signin');
+  // The sign-in tip teaches what the account button offers a signed-out user.
+  const _accountBtn = document.getElementById('account-btn');
+  if (_accountBtn) {
+    const signedOut = () => !googleUserEmail && !googleUserName;
+    _accountBtn.addEventListener('mouseenter', () => { if (signedOut()) maybeShowHint('signin', _accountBtn); });
+    armTouchHintGate(_accountBtn, 'signin', undefined, undefined, signedOut);
   }
   const _weekPicker = document.getElementById('week-picker-label');
   if (_weekPicker) {

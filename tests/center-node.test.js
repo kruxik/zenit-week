@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   _state,
-  firstNameFrom,
-  centerDisplayName,
-  centerNodeText,
   formatWeekParts,
   formatWeekLabel,
   roundedRectPathD,
@@ -13,103 +10,6 @@ import {
 // which is the only case where the Czech wording repeats the month name.
 const W34 = [2026, 34];
 const W36 = [2026, 36];
-
-describe('centerDisplayName', () => {
-  afterEach(() => {
-    _state.setGoogleUser('', '');
-    _state.setLang('en');
-  });
-
-  describe('firstNameFrom', () => {
-    it('takes the first token of a Google display name', () => {
-      expect(firstNameFrom('Petr Burian', 'petr@example.com')).toBe('Petr');
-    });
-
-    it('collapses surrounding and inner whitespace', () => {
-      expect(firstNameFrom('   Petr    Burian  ', '')).toBe('Petr');
-    });
-
-    it('falls back to the email local-part when there is no display name', () => {
-      expect(firstNameFrom('', 'kruxik@gmail.com')).toBe('kruxik');
-    });
-
-    it('does not dress a handle up as a name', () => {
-      // Deliberately not capitalized - see firstNameFrom's comment.
-      expect(firstNameFrom('', 'petr.burian@example.com')).toBe('petr.burian');
-    });
-
-    it('returns empty when neither source has anything usable', () => {
-      expect(firstNameFrom('', '')).toBe('');
-      expect(firstNameFrom(null, undefined)).toBe('');
-      expect(firstNameFrom('   ', '')).toBe('');
-    });
-
-    it('clamps a pathologically long name with an ellipsis', () => {
-      const out = firstNameFrom('Averyveryverylongfirstname', '');
-      expect(out).toBe('Averyveryverylo…');
-      expect(out).toHaveLength(16);
-    });
-
-    it('leaves a name exactly at the limit alone', () => {
-      const sixteen = 'Abcdefghijklmnop';
-      expect(sixteen).toHaveLength(16);
-      expect(firstNameFrom(sixteen, '')).toBe(sixteen);
-    });
-  });
-
-  it('uses the signed-out wording in both languages', () => {
-    _state.setGoogleUser('', '');
-    _state.setLang('en');
-    expect(centerDisplayName()).toBe('Me');
-    _state.setLang('cs');
-    expect(centerDisplayName()).toBe('Já');
-  });
-
-  it('uses the signed-in first name regardless of language', () => {
-    _state.setGoogleUser('Petr Burian', 'kruxik@gmail.com');
-    _state.setLang('en');
-    expect(centerDisplayName()).toBe('Petr');
-    _state.setLang('cs');
-    expect(centerDisplayName()).toBe('Petr');
-  });
-
-  it('falls back to the local-part for an account with no display name', () => {
-    _state.setGoogleUser('', 'kruxik@gmail.com');
-    expect(centerDisplayName()).toBe('kruxik');
-  });
-});
-
-// What the root circle paints. The photo is not a tier here - it is layered over
-// the initials in the DOM, so a failed or skipped image reveals them.
-describe('centerNodeText', () => {
-  afterEach(() => {
-    _state.setGoogleUser('', '');
-    _state.setLang('en');
-  });
-
-  it('shows the signed-out wording when there is no account', () => {
-    _state.setGoogleUser('', '');
-    expect(centerNodeText()).toBe('Me');
-    _state.setLang('cs');
-    expect(centerNodeText()).toBe('Já');
-  });
-
-  it('shows initials for a signed-in account', () => {
-    _state.setGoogleUser('Petr Burian', 'kruxik@gmail.com');
-    expect(centerNodeText()).toBe('PB');
-  });
-
-  it('derives initials from the email when there is no display name', () => {
-    _state.setGoogleUser('', 'kruxik@gmail.com');
-    expect(centerNodeText()).toBe('KR');
-  });
-
-  it('stays initials in Czech - a name is not translated', () => {
-    _state.setGoogleUser('Petr Burian', 'kruxik@gmail.com');
-    _state.setLang('cs');
-    expect(centerNodeText()).toBe('PB');
-  });
-});
 
 describe('week label', () => {
   afterEach(() => { _state.setLang('en'); });

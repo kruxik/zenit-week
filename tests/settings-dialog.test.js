@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { _state, saveWeekIDB } from './setup.js';
 
 const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8');
-const TABS = ['general', 'ai', 'data', 'dev'];
+const TABS = ['account', 'general', 'ai', 'data', 'dev'];
 
 const el = (id) => _state.getElement(id);
 const pane = (name) => el('settings-pane-' + name);
@@ -31,33 +31,43 @@ describe('Settings dialog tabs', () => {
     _state.setEditState(null);
     el('settings-tab-ai').hidden = true;
     el('settings-tab-dev').hidden = true;
-    _state.selectSettingsTab('general');
+    _state.setSyncStatus('disconnected');
+    _state.selectSettingsTab('account');
     _state.closeSettings();
   });
 
-  it('opens on General with only its pane shown', () => {
+  it('opens from the account button on Account with only its pane shown', () => {
     _state.openSettings();
     expect(_state.isSettingsOpen()).toBe(true);
-    expect(el('fab-settings').classList.contains('active')).toBe(true);
-    expect(shownPanes()).toEqual(['general']);
+    expect(el('account-btn').classList.contains('active')).toBe(true);
+    expect(shownPanes()).toEqual(['account']);
+    _state.closeSettings();
+    expect(el('account-btn').classList.contains('active')).toBe(false);
+  });
+
+  it('opens on Account when sync is in error, whatever tab was last used', () => {
+    _state.selectSettingsTab('data');
+    _state.setSyncStatus('error');
+    _state.openSettings();
+    expect(_state.getSettingsTab()).toBe('account');
   });
 
   it('keeps the pane of every shown tab in layout, so the dialog is as tall as the tallest', () => {
     _state.openSettings();
-    expect(laidOutPanes()).toEqual(['general', 'data']);
+    expect(laidOutPanes()).toEqual(['account', 'general', 'data']);
     expect(pane('data').inert).toBe(true);
-    expect(pane('general').inert).toBe(false);
+    expect(pane('account').inert).toBe(false);
     el('settings-tab-ai').hidden = false;
     _state.selectSettingsTab('data');
-    expect(laidOutPanes()).toEqual(['general', 'ai', 'data']);
+    expect(laidOutPanes()).toEqual(['account', 'general', 'ai', 'data']);
     expect(shownPanes()).toEqual(['data']);
   });
 
   it('never selects a hidden tab', () => {
     _state.selectSettingsTab('ai');
-    expect(_state.getSettingsTab()).toBe('general');
+    expect(_state.getSettingsTab()).toBe('account');
     _state.selectSettingsTab('dev');
-    expect(shownPanes()).toEqual(['general']);
+    expect(shownPanes()).toEqual(['account']);
   });
 
   it('shows a revealed tab and remembers it across close and reopen', () => {
@@ -74,21 +84,23 @@ describe('Settings dialog tabs', () => {
   it('arrow keys walk the shown tabs only, wrapping at both ends', () => {
     _state.openSettings();
     key('ArrowRight');
+    expect(_state.getSettingsTab()).toBe('general');
+    key('ArrowRight');
     expect(_state.getSettingsTab()).toBe('data');
     key('ArrowRight');
-    expect(_state.getSettingsTab()).toBe('general');
+    expect(_state.getSettingsTab()).toBe('account');
     key('ArrowLeft');
     expect(_state.getSettingsTab()).toBe('data');
     el('settings-tab-dev').hidden = false;
     key('End');
     expect(_state.getSettingsTab()).toBe('dev');
     key('Home');
-    expect(_state.getSettingsTab()).toBe('general');
+    expect(_state.getSettingsTab()).toBe('account');
     // The desktop sidebar is vertical: up and down walk it the same way.
     key('ArrowDown');
-    expect(_state.getSettingsTab()).toBe('data');
-    key('ArrowUp');
     expect(_state.getSettingsTab()).toBe('general');
+    key('ArrowUp');
+    expect(_state.getSettingsTab()).toBe('account');
   });
 
   it('owns the keyboard while open: a bare view hotkey does not switch view', () => {
