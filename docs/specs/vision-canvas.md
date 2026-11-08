@@ -184,7 +184,7 @@ The pane is hidden under 768 px (non-goal 6) and when the comment editor overlay
 
 ### 4.3 View toggle and hotkey
 
-A fourth button, `#vtb-vision`, after Stats, same `.view-toggle-btn`, icon `#icon-telescope` (added to the sprite; one static SVG). On mobile the label hides like the others and four 36 px buttons fit the bar.
+A fourth button, `#vtb-vision`, **first** in the bar (Vision, Mindmap, Agenda, Stats - decided 2026-11-08), same `.view-toggle-btn`, icon `#icon-telescope` (added to the sprite; one static SVG). On mobile the label hides like the others and four 36 px buttons fit the bar.
 
 Hotkey: **`V`**, global, modifier-free, not while typing, placed with `A` / `M` / `S` in `_windowKeydownHandler`. `V` is today *cycle view level* on the Mindmap; that hotkey **moves to `W`** in the same change (handler, Help row `help.cycleViewLevel`, and any coachmark or tip text that names it), so Vision owns the letter it is named after. `W` is free on every map (the used letters are `a m l s q h t f v z y d u x c r n b p`). One change, both letters land together; there is no interim where either is unbound or doubly bound.
 

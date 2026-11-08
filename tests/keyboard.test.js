@@ -185,13 +185,13 @@ describe('Global hotkeys', () => {
     expect(_state.getWeekKey()).toBe('2026-10');
   });
 
-  test('V cycles the view level', () => {
+  test('W cycles the view level', () => {
     _state.setViewLevel('full');
-    press('v');
+    press('w');
     expect(_state.getViewLevel()).toBe('rocks');
-    press('v');
+    press('w');
     expect(_state.getViewLevel()).toBe('pebbles');
-    press('v');
+    press('w');
     expect(_state.getViewLevel()).toBe('full');
   });
 

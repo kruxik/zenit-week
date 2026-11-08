@@ -8,9 +8,9 @@
                'sha256-9cHk6BCgeoaZ3r+XHirBQXVF1CuGv1rw0EZVt4ISDiQ='
                'sha256-Eb714yfcTC94dtr1Jp6/cuqxaILMzVLouNmVKkT2KiE='
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
-               'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
+               'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-8tptkAoU4/8MC2cSar2Km9r/3DqJtm25Vw5SG1uKliA=';
+               'sha256-fDKVNnmd49OPQ/ipLxXHDIcTcmwQdsDrWyvRSUiRh74=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -609,7 +609,8 @@
     pointer-events: none;
     transition: opacity 0.15s ease, transform 0.15s ease;
   }
-  html.view-levels-open[data-view="mindmap"] #view-level-bar {
+  html.view-levels-open[data-view="mindmap"] #view-level-bar,
+  html.view-levels-open[data-view="vision"] #view-level-bar {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
     pointer-events: auto;
@@ -2903,7 +2904,8 @@
      ID-based selectors override the static .active class in markup. */
   html[data-view="agenda"]  #vtb-agenda,
   html[data-view="mindmap"] #vtb-mindmap,
-  html[data-view="stats"]   #vtb-stats {
+  html[data-view="stats"]   #vtb-stats,
+  html[data-view="vision"]  #vtb-vision {
     background: var(--view-btn-active-bg);
     color: var(--view-btn-active-text);
   }
@@ -2914,10 +2916,19 @@
   html[data-view="mindmap"] #vtb-agenda:not(:hover),
   html[data-view="mindmap"] #vtb-stats:not(:hover),
   html[data-view="stats"]   #vtb-agenda:not(:hover),
-  html[data-view="stats"]   #vtb-mindmap:not(:hover) {
+  html[data-view="stats"]   #vtb-mindmap:not(:hover),
+  html:not([data-view="vision"]) #vtb-vision:not(:hover),
+  html[data-view="vision"]  #vtb-mindmap:not(:hover),
+  html[data-view="vision"]  #vtb-agenda:not(:hover),
+  html[data-view="vision"]  #vtb-stats:not(:hover) {
     background: none;
     color: var(--text-subtle);
   }
+  /* The Vision has no weeks and no days: the week bar and the day filter cell
+     are not drawn there (their hotkeys are inert in the keydown handler). */
+  html[data-view="vision"] #week-picker,
+  html[data-view="vision"] #day-filter-btn,
+  html[data-view="vision"] #day-filter-btn + .view-level-separator { display: none; }
 
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
   /* Window chrome comes from .app-panel; only the Agenda-specific bits live here:
@@ -4060,7 +4071,7 @@
   try {
     var v = localStorage.getItem('zenit-week-view');
     document.documentElement.dataset.view =
-      (v === 'agenda' || v === 'stats') ? v : 'mindmap';
+      (v === 'agenda' || v === 'stats' || v === 'vision') ? v : 'mindmap';
   } catch (e) {
     document.documentElement.dataset.view = 'mindmap';
   }
@@ -4097,6 +4108,7 @@
 -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
+  <symbol id="icon-telescope" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 21l6 -5l6 5"/><path d="M12 13v8"/><path d="M3.294 13.678l.166 .281c.52 .88 1.624 1.265 2.605 .91l14.242 -5.165a1.023 1.023 0 0 0 .565 -1.456l-2.62 -4.705a1.087 1.087 0 0 0 -1.447 -.42l-.056 .032l-12.694 7.618c-1.02 .613 -1.357 1.897 -.76 2.905z"/><path d="M14 5l3 5.5"/></symbol>
   <symbol id="icon-chart-donut" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></symbol>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
   <symbol id="icon-menu-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></symbol>
@@ -4576,6 +4588,11 @@ Or remove them later in Settings → Help.</div>
 </div>
 
 <div id="view-toggle-bar">
+  <button type="button" class="view-toggle-btn" id="vtb-vision">
+    <svg class="icon" aria-hidden="true"><use href="#icon-telescope"/></svg>
+    <span data-i18n="view.vision">Vision</span>
+  </button>
+  <div class="view-toggle-separator"></div>
   <button type="button" class="view-toggle-btn active" id="vtb-mindmap">
     <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-sitemap"/></svg>
     <span data-i18n="view.mindmap">Mindmap</span>
@@ -4830,6 +4847,7 @@ Or remove them later in Settings → Help.</div>
 
       <div class="help-section">
         <div class="help-section-title" data-i18n="help.viewsTitle">Views &amp; general</div>
+        <div class="help-row"><span data-i18n="help.visionView">Vision</span> <kbd>V</kbd></div>
         <div class="help-row"><span data-i18n="help.mindmapView">Mindmap view</span> <kbd>M</kbd></div>
         <div class="help-row"><span data-i18n="help.agendaView">Agenda view</span> <kbd>A</kbd></div>
         <div class="help-row"><span data-i18n="help.statsView">Stats view</span> <kbd>S</kbd></div>
@@ -4841,7 +4859,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="filter.unscheduled">Unscheduled</span> <kbd>8</kbd></div>
         <div class="help-row"><span data-i18n="agenda.overdue">Overdue</span> <kbd>0</kbd></div>
         <div class="help-row"><span data-i18n="help.fitView">Fit to view</span> <kbd>F</kbd></div>
-        <div class="help-row"><span data-i18n="help.cycleViewLevel">Cycle view level</span> <kbd>V</kbd></div>
+        <div class="help-row"><span data-i18n="help.cycleViewLevel">Cycle view level</span> <kbd>W</kbd></div>
         <div class="help-row"><span data-i18n="help.prevWeek">Previous week</span> <span><kbd>[</kbd> <kbd>⇧ ←</kbd></span></div>
         <div class="help-row"><span data-i18n="help.nextWeek">Next week</span> <span><kbd>]</kbd> <kbd>⇧ →</kbd></span></div>
         <div class="help-row"><span data-i18n="help.currentWeek">Current week</span> <kbd>T</kbd></div>
@@ -6373,7 +6391,14 @@ let _recordSwapSeq = 0;
 // Loads what a switch between the Vision and the week views needs, then hands
 // it to `apply` in one synchronous step. Returns false when a later switch
 // overtook this one.
+let _recordSwapsInFlight = 0;
 async function swapMapRecordFor(view, apply) {
+  _recordSwapsInFlight++;
+  try { return await _swapMapRecordFor(view, apply); }
+  finally { _recordSwapsInFlight--; }
+}
+
+async function _swapMapRecordFor(view, apply) {
   const seq = ++_recordSwapSeq;
   const toVision = view === 'vision';
   // Anything open on a node of the record being left belongs to that record.
@@ -8756,6 +8781,7 @@ function firstNameFrom(displayName, email) {
 // The root's accessible name and hover title. Not painted - the circle shows an
 // avatar - so without this an image-only node would be a blank to a screen reader.
 function centerDisplayName() {
+  if (isVisionInView()) return t('vision.center');
   return firstNameFrom(googleUserName, googleUserEmail) || t('center.me');
 }
 
@@ -11860,12 +11886,14 @@ const TRANSLATIONS = {
     'tips.undoIntro':             'Every change can be taken back. Experiment freely - nothing gets lost.',
     'tips.dayFilter':             'Narrows the map to one day. Pick a day here and the rest of the week steps aside.',
     'tips.levels':                'How much detail the map draws. Rocks shows what matters, Pebbles adds sub-tasks - tap it again to go one level deeper - Sand shows everything. Nothing is lost - it just steps into the background.',
-    'tips.views':                 'Three views of your week: Mindmap to plan, Agenda day by day, Stats for how it went.',
+    'tips.views':                 'Three views of your week: Mindmap to plan, Agenda day by day, Stats for how it went. Vision is the long view the weeks are planned against.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
     'view.agenda':                'Agenda',
     'view.stats':                 'Stats',
+    'view.vision':                'Vision',
+    'vision.center':              'My vision',
     'agenda.overdue':             'Overdue',
     'agenda.emptyDay':            'No tasks for this day.',
     'agenda.emptyDayHint':        'Give a task this day on the mindmap and it lands here.',
@@ -12095,6 +12123,7 @@ const TRANSLATIONS = {
     'help.mindmapView':           'Mindmap view',
     'help.agendaView':            'Agenda view',
     'help.statsView':             'Stats view',
+    'help.visionView':            'Vision',
     'help.escClose':              'Close panel / menu',
     'help.filterDay':             'Filter day',
     'help.undo':                  'Undo',
@@ -12284,12 +12313,14 @@ const TRANSLATIONS = {
     'tips.undoIntro':             'Každou změnu lze vzít zpět. Klidně zkoušej - nic se neztratí.',
     'tips.dayFilter':             'Zúží mapu na jeden den. Vyberte den a zbytek týdne ustoupí.',
     'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to klíčové, Oblázky přidají podúkoly - dalším klepnutím jdou o úroveň hlouběji - Písek ukáže vše. Nic se neztratí - jen ustoupí do pozadí.',
-    'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek.',
+    'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek. Vize je dlouhý výhled, podle kterého se týdny plánují.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
     'view.mindmap':               'Mapa',
     'view.agenda':                'Agenda',
     'view.stats':                 'Statistika',
+    'view.vision':                'Vize',
+    'vision.center':              'Moje vize',
     'agenda.overdue':             'Zpožděné',
     'agenda.emptyDay':            'Pro tento den žádné úkoly.',
     'agenda.emptyDayHint':        'Přiřaď úkolu tento den v myšlenkové mapě a objeví se tady.',
@@ -12519,6 +12550,7 @@ const TRANSLATIONS = {
     'help.mindmapView':           'Myšlenková mapa',
     'help.agendaView':            'Agenda',
     'help.statsView':             'Statistika',
+    'help.visionView':            'Vize',
     'help.escClose':              'Zavřít panel / menu',
     'help.filterDay':             'Filtr dne',
     'help.undo':                  'Zpět',
@@ -15654,7 +15686,9 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       btnG.appendChild(svgEl('line', { x1: 0, y1: -centerArm, x2: 0, y2: centerArm, stroke: btnSymbolColor, 'stroke-width': centerPlusSW, 'stroke-linecap': 'round', 'pointer-events': 'none' }));
       g.appendChild(btnG);
     });
-    setPieChart(g, computeWeekStats().global);
+    // The Vision has no done, so its centre draws no completion ring.
+    if (isVisionInView()) clearPieChart(g);
+    else setPieChart(g, computeWeekStats().global);
   }
 
   // Text
@@ -17750,6 +17784,8 @@ function _hasOwnSchedule(node) {
 
 function dayFilterMatchSet() {
   if (activeDayFilter === null) return null;
+  // The Vision has no days, whatever filter the week left set.
+  if (isVisionInView()) return null;
   // Overdue is current-week-only; setDayFilter clears it on a week change, and
   // this is the belt to that braces - nothing should ever be pruned by a filter
   // the week cannot answer.
@@ -18803,6 +18839,8 @@ function closeStatsPanel() { if (currentView === 'stats') switchView('mindmap');
 // branch legend and, while it's the active view, the Stats panel. (The old
 // top-of-mindmap mini-stats box this also fed has been removed.)
 function updateSummary() {
+  // Stats, the legend and the ring describe a week; the Vision has none of them.
+  if (isVisionInView()) return;
   const sig = _computeSummarySignature();
   if (sig === _lastSummarySig) return;
   _lastSummarySig = sig;
@@ -18845,6 +18883,7 @@ function updateSummary() {
 // input the percentage depends on. makeNodeGroup still draws the ring correctly
 // itself, because updateSummary early-returns on an unchanged signature.
 function updateCenterRing() {
+  if (isVisionInView()) return;
   const g = document.querySelector('.node-group[data-id="center"]');
   if (g) setPieChart(g, computeWeekStats().global);
 }
@@ -19049,6 +19088,14 @@ function pieLabelFit(text, font, a, rOut) {
 // charts. Bands are laid clockwise from 12 o'clock in STATS_SPLIT_BANDS order.
 // Size comes from rank: largest share first, ties in band order. `fontScale`
 // lets a chart drawn small keep its percentages readable; the fit still holds.
+// The plate with no ring at all: no wedges, no labels and no empty-week track.
+// The add buttons are still placed, since they sit where the ring would.
+function clearPieChart(root) {
+  setPieChart(root, { total: 0 });
+  const track = root.querySelector('.pie-track');
+  if (track) track.setAttribute('display', 'none');
+}
+
 function setPieChart(root, stats, fontScale = 1) {
   const prefix = root.querySelector('.pie-chart')?.dataset.prefix;
   if (!prefix) return;
@@ -19414,7 +19461,7 @@ function nearestNodeInDirection(positions, fromId, dx, dy) {
 }
 
 function moveKbFocus(dx, dy) {
-  if (currentView !== 'mindmap') return;
+  if (!isMapView()) return;
   const positions = computeLayout();
   const start = kbFocusId || hoveredNodeId;
   // First press lands on the root; from there the arrows walk outward.
@@ -19526,7 +19573,7 @@ const ESC_DISMISSALS = [
   // something the user cannot see - that is what made leaving Agenda reset the
   // map instead. The gate is also what makes the walk read as last-in-first-out
   // without a stack: a view switch always outranks the map state beneath it.
-  { isOpen: () => currentView === 'mindmap' && kbFocusId !== null,
+  { isOpen: () => isMapView() && kbFocusId !== null,
     dismiss: () => { clearKbFocus(); } },
   // The views the user can back out of, before the map state they were set on
   // top of: leaving Stats or Agenda hands back the Mindmap exactly as it was,
@@ -19534,6 +19581,10 @@ const ESC_DISMISSALS = [
   { isOpen: () => _statsPanelOpen,
     dismiss: () => { switchView('mindmap'); } }, // leave Stats → default view
   { isOpen: () => currentView === 'agenda' && window.innerWidth >= 768,
+    dismiss: () => { switchView('mindmap'); } },
+  // The Vision is backed out of like Stats: the Mindmap comes back with its
+  // week, and the view level is left for the next press.
+  { isOpen: () => currentView === 'vision',
     dismiss: () => { switchView('mindmap'); } },
   // Last: everything transient has cleared and the Mindmap is what's on screen,
   // so the map springs back to Sand as one motion the user can actually watch.
@@ -19575,9 +19626,9 @@ function _windowKeydownHandler(e) {
   // View toggle shortcuts - active unless typing in an input
   if (!e.metaKey && !e.ctrlKey && !e.shiftKey) {
     const key = e.key.toLowerCase();
-    if (key === 'a' || key === 'm') {
+    if (key === 'a' || key === 'm' || key === 'v') {
       if (!isTypingTarget(e.target)) {
-        const targetView = key === 'a' ? 'agenda' : 'mindmap';
+        const targetView = key === 'a' ? 'agenda' : key === 'v' ? 'vision' : 'mindmap';
         if (_statsPanelOpen || currentView !== targetView) {
           e.preventDefault();
           switchView(targetView);
@@ -19632,6 +19683,9 @@ function _windowKeydownHandler(e) {
     if (!isHelpOpen() && !isCommentDialogOpen()) {
       // Bracket keys are the desktop pair; Shift+arrows cover the layouts where
       // brackets need a modifier of their own (Czech included).
+      // Week navigation is inert on the Vision, which has no week (the
+      // functions themselves refuse too). The press is still spent, so it does
+      // not fall through to anything else.
       if (e.key === '[' || (e.shiftKey && e.key === 'ArrowLeft')) {
         e.preventDefault();
         stepWeek(-1);
@@ -19647,13 +19701,13 @@ function _windowKeydownHandler(e) {
         goToTodayWeek();
         return;
       }
-      if (currentView === 'mindmap' && !e.shiftKey) {
+      if (isMapView() && !e.shiftKey) {
         if (k === 'f') {
           e.preventDefault();
           fitMindmapView();
           return;
         }
-        if (k === 'v') {
+        if (k === 'w') {
           e.preventDefault();
           cycleViewLevel();
           return;
@@ -19773,7 +19827,7 @@ function _windowKeydownHandler(e) {
 
   // Arrow keys walk the focus ring across the map. Shift+←/→ is week navigation
   // and was already claimed above.
-  if (currentView === 'mindmap' && ARROW_DIRS[e.key]
+  if (isMapView() && ARROW_DIRS[e.key]
       && !e.metaKey && !e.ctrlKey && !e.shiftKey && !isTypingTarget(e.target)) {
     e.preventDefault();
     moveKbFocus(ARROW_DIRS[e.key][0], ARROW_DIRS[e.key][1]);
@@ -22847,10 +22901,21 @@ const mapRoot   = document.getElementById('map-root');
 // ─── View state ───────────────────────────────────────────────────────────────
 // All three peer views are persisted and restored on load; anything else in
 // storage coerces to the default (mindmap).
+// The Vision is persisted too, but boot always opens a week first (R1: the
+// record in memory is the week until switchView swaps it), so a stored
+// 'vision' starts as the Mindmap and _bootIntoVision carries it to the swap.
+let _bootIntoVision = false;
 let currentView = (() => {
   const v = localStorage.getItem('zenit-week-view');
+  if (v === 'vision') { _bootIntoVision = true; return 'mindmap'; }
   return (v === 'agenda' || v === 'stats') ? v : 'mindmap';
 })();
+
+// The two views that draw a map. Map gestures (focus ring, arrows, fit, view
+// levels) work on both; what is week-only says so where it is decided.
+function isMapView() {
+  return currentView === 'mindmap' || currentView === 'vision';
+}
 
 // 'overdue' | 0–6 (dayIndex). null = uninitialised, defaults to today on first open.
 let agendaActiveTab = null;
@@ -24717,7 +24782,7 @@ function _viewportIsBusy() {
 // leave the user looking at the wrong part of it - a first sync after sign-in
 // filling an empty week, or a week that just lost most of its content.
 function maybeRefitAfterRemoteChange() {
-  if (currentView !== 'mindmap' || _viewportIsBusy()) return;
+  if (!isMapView() || _viewportIsBusy()) return;
   const after = mindmapContentExtent();
   if (!shouldRefitForExtentChange(_lastFitExtent, after)) return;
   fitMindmapView();
@@ -25544,7 +25609,7 @@ function openViewLevels() {
 
 // True while the map is pruned by either control in the row.
 function viewFiltersActive() {
-  return activeDayFilter !== null || currentViewLevel !== 'full';
+  return (activeDayFilter !== null && !isVisionInView()) || currentViewLevel !== 'full';
 }
 
 // Safe to call unconditionally - used as a catch-all dismiss from view switches,
@@ -25832,7 +25897,7 @@ function refreshDayFilterUI() {
 
   // The row names whatever is pruning the map, so it follows the filter: back
   // from Agenda or Stats, or in from a reload, it opens itself again.
-  if (currentView === 'mindmap' && viewFiltersActive()) openViewLevels();
+  if (isMapView() && viewFiltersActive()) openViewLevels();
 
   const btn = document.getElementById('day-filter-btn');
   if (btn) {
@@ -25882,10 +25947,12 @@ function updateWeekPicker() {
 
 // Week navigation for the [ / ] hotkeys.
 function stepWeek(delta) {
+  if (isVisionInView()) return undefined;
   return loadAndRender(offsetWeek(currentWeekKey, delta));
 }
 
 function goToTodayWeek() {
+  if (isVisionInView()) return undefined;
   const twk = todayWeekKey();
   if (twk !== currentWeekKey) return loadAndRender(twk);
 }
@@ -28417,6 +28484,7 @@ const HINTS = {
     priority: 9,
     introKey: 'tips.views',
     keys: [
+      { k: 'V', labelKey: 'help.visionView' },
       { k: 'M', labelKey: 'help.mindmapView' },
       { k: 'A', labelKey: 'help.agendaView' },
       { k: 'S', labelKey: 'help.statsView' },
@@ -28427,7 +28495,7 @@ const HINTS = {
     priority: 10,
     introKey: 'tips.levels',
     keys: [
-      { k: 'V', labelKey: 'help.cycleViewLevel' },
+      { k: 'W', labelKey: 'help.cycleViewLevel' },
     ],
   },
   'root': {
@@ -28879,6 +28947,7 @@ window.addEventListener('load', async () => {
     panY        = _quietRestore.panY;
     zoom        = _quietRestore.zoom;
     currentView = _quietRestore.currentView;
+    if (currentView === 'vision') { _bootIntoVision = true; currentView = 'mindmap'; }
     console.debug('[quiet-refresh] restore-applied', _quietRestore);
   }
 
@@ -28907,6 +28976,10 @@ window.addEventListener('load', async () => {
   });
   document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'false');
   document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
+  document.getElementById('vtb-vision').addEventListener('click', () => {
+    if (currentView === 'vision') toggleViewLevels();
+    else switchView('vision');
+  });
   document.getElementById('vtb-stats').addEventListener('click', () => {
     // Toggle Stats; leaving lands on the default (mindmap). With Help open the
     // click spends itself on dismissing Help, so Stats stays put.
@@ -28955,6 +29028,8 @@ window.addEventListener('load', async () => {
     }
   }
   switchView(currentView); // apply persisted view (mindmap / agenda / stats)
+  // A persisted Vision opens once the week is in place, through the one swap.
+  if (_bootIntoVision) { _bootIntoVision = false; switchView('vision'); }
 
   positionZoomDefaultMarker();
 

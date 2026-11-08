@@ -467,6 +467,7 @@ _state.setCurrentView = function(v) { currentView = v; };
 _state.setMapKind = function(kind) { mapRecord = { kind }; currentView = kind === 'vision' ? 'vision' : (currentView === 'vision' ? 'mindmap' : currentView); };
 _state.getMapKind = function() { return mapRecord.kind; };
 _state.getRecordSwapSeq = function() { return _recordSwapSeq; };
+_state.isSwapPending = function() { return _recordSwapsInFlight > 0; };
 _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 // hoveredNodeId / kbFocusId are module-level \`let\`s - the hotkeys read the first
@@ -474,6 +475,8 @@ _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 _state.setHoveredNode = function(id) { hoveredNodeId = id; };
 _state.getHoveredNode = function() { return hoveredNodeId; };
 _state.getKbFocus = function() { return kbFocusId; };
+_state.setKbFocusId = function(id) { kbFocusId = id; };
+_state.getDayFilter = function() { return activeDayFilter; };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
 _state.setViewLevel = function(v) { currentViewLevel = v; pebblesExtraDepth = 0; };
