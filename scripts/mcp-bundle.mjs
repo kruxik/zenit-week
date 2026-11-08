@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds the Claude Desktop extension: mcp/dist/zenit-week.mcpb
 // (docs/specs/agent-bridge-setup.md section 3.2). The output is not committed;
-// it is attached to a GitHub Release tagged mcp-v<version>.
+// the production deploy builds it and attaches it to every app release.
 //
 // Flow:
 //   1. Check that mcp/manifest.json and mcp/package.json agree on the version.

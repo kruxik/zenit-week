@@ -146,7 +146,7 @@ To work on the server itself, run it from a clone of this repository instead of 
    For another MCP client, the command is `node /path/to/zenit-week/mcp/server.js`.
 3. Continue with step 2 above.
 
-The package is published with `npm run mcp:publish` from the repository root; it is versioned separately from the app. `npm run mcp:bundle` builds the Claude Desktop extension into `mcp/dist/zenit-week.mcpb` with the official `mcpb` tool; it is attached to a GitHub Release tagged `mcp-v<version>`, for example `gh release create mcp-v1.1.0 mcp/dist/zenit-week.mcpb`.
+The server ships with the app: `npm run release` raises its minor version when anything in it changed since the last release, and the production deploy publishes it to npm (trusted publishing, no stored token) and attaches the Claude Desktop extension, built by `npm run mcp:bundle`, to the release. The package keeps its own version number; app and server agree through a protocol number.
 
 ## Privacy
 

@@ -13,6 +13,12 @@
 //      based on Conventional Commits since the previous tag.
 //   4. Open $VISUAL || $EDITOR || vi on CHANGELOG.md so the human can
 //      polish the generated entries.
+//   4b. Agent server version (see planMcpVersion): when a server file in
+//      mcp/ changed since the previous tag and its version is already on npm,
+//      raise the minor version in mcp/package.json, its lock file and
+//      mcp/manifest.json. The release commit carries it, and the deploy
+//      publishes it to npm and attaches the Claude Desktop extension to the
+//      release, so the app, the server and the extension ship together.
 //   5. Confirm, commit "chore(release): vX", tag vX.
 //   6. Print the push instruction - never push automatically; tag push
 //      is what triggers production deploy via deploy-production.yml.
@@ -23,6 +29,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+import { publishedVersions } from './mcp-publish.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -126,6 +133,49 @@ function runEditorChecks() {
   console.log('✅ Tests pass');
 }
 
+// ── Agent server version ──
+// The files whose change makes a new server release. The README alone does not.
+export const MCP_RELEASE_FILES = ['mcp/server.js', 'mcp/core.js', 'mcp/package.json', 'mcp/manifest.json'];
+// The files that carry the version, written together.
+export const MCP_VERSION_FILES = ['mcp/package.json', 'mcp/package-lock.json', 'mcp/manifest.json'];
+
+export function nextMinorVersion(v) {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(v));
+  if (!m) throw new Error(`not a plain semver version: ${v}`);
+  return `${m[1]}.${Number(m[2]) + 1}.0`;
+}
+
+// Bump only when the server changed AND its current version is already out:
+// a version raised by hand and not yet published ships as it is. npm, not the
+// tag history, says what is out (the server is newer than some app tags).
+export function planMcpVersion({ changed, current, published }) {
+  if (!changed.length) return { bump: false, version: current, reason: 'no server change since the last tag' };
+  if (!published.includes(current)) return { bump: false, version: current, reason: `${current} is not on npm yet` };
+  return { bump: true, from: current, version: nextMinorVersion(current), reason: `changed: ${changed.join(', ')}` };
+}
+
+// Sets the version in a package.json, package-lock.json or mcpb manifest,
+// keeping two-space JSON and the trailing newline.
+export function withVersion(file, text, version) {
+  const json = JSON.parse(text);
+  json.version = version;
+  if (file.endsWith('package-lock.json') && json.packages && json.packages['']) json.packages[''].version = version;
+  return JSON.stringify(json, null, 2) + '\n';
+}
+
+function changedMcpFiles(prior) {
+  if (!prior) return MCP_RELEASE_FILES.filter(f => existsSync(resolve(REPO_ROOT, f)));
+  const out = sh(`git diff --name-only ${prior} -- ${MCP_RELEASE_FILES.join(' ')}`);
+  return out.split('\n').filter(Boolean);
+}
+
+function writeMcpVersion(version) {
+  for (const f of MCP_VERSION_FILES) {
+    const p = resolve(REPO_ROOT, f);
+    writeFileSync(p, withVersion(f, readFileSync(p, 'utf8'), version));
+  }
+}
+
 function computeNextVersion() {
   const now = new Date();
   const y = now.getFullYear();
@@ -224,6 +274,17 @@ async function main() {
   console.log(`\n🚀 ${dryRun ? '[DRY RUN] ' : ''}Preparing release: ${version}`);
   console.log(`   Previous tag: ${prior || '(none)'}`);
 
+  const mcpCurrent = JSON.parse(readFileSync(resolve(REPO_ROOT, 'mcp/package.json'), 'utf8')).version;
+  let mcpPlan;
+  try {
+    mcpPlan = planMcpVersion({ changed: changedMcpFiles(prior), current: mcpCurrent, published: publishedVersions() });
+  } catch (err) {
+    die(`Could not plan the agent server version: ${err.message}`);
+  }
+  console.log(mcpPlan.bump
+    ? `   Agent server: ${mcpPlan.from} -> ${mcpPlan.version} (${mcpPlan.reason}); the deploy publishes it and attaches the extension`
+    : `   Agent server: stays ${mcpPlan.version} (${mcpPlan.reason})`);
+
   // Back up CHANGELOG so dry-run can restore it after the editor closes.
   const changelogBackup = dryRun ? readFileSync(CHANGELOG_PATH, 'utf8') : null;
 
@@ -240,6 +301,7 @@ async function main() {
     writeFileSync(CHANGELOG_PATH, changelogBackup);
     console.log(`🧪 Dry run complete. CHANGELOG.md restored. No commit, no tag.`);
     console.log(`   Would have committed: chore(release): ${version}`);
+    if (mcpPlan.bump) console.log(`   Would have raised:    zenit-week-mcp ${mcpPlan.from} -> ${mcpPlan.version}`);
     console.log(`   Would have tagged:    ${version}\n`);
     return;
   }
@@ -254,7 +316,8 @@ async function main() {
     rl.close();
   }
 
-  shInherit('git add CHANGELOG.md');
+  if (mcpPlan.bump) writeMcpVersion(mcpPlan.version);
+  shInherit(`git add CHANGELOG.md${mcpPlan.bump ? ` ${MCP_VERSION_FILES.join(' ')}` : ''}`);
   shInherit(`git commit -m "chore(release): ${version}"`);
   // Annotated tag - `git push --follow-tags` only pushes annotated tags,
   // so lightweight tags get left behind on the local machine and never

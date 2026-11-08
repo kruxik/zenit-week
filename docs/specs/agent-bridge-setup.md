@@ -1,6 +1,6 @@
 # SPEC - Agent Bridge setup: install, pairing, production and dev
 
-> Status: Draft for review, revision 2 (2026-11-08). Revision 2 works in a two-persona review (a regular user who knows MCP, and the developer-owner). Phases 1 (npm), 2 (several agent apps), 3 (pairing v2), 4 (production and dev), 5 (Claude Desktop extension: manifest, `npm run mcp:bundle`, Download in Settings; bundle tested in Claude Desktop on macOS) and 6 (documentation) of section 9 implemented 2026-11-08. Not yet: the first npm and GitHub release of protocol 2, and the Windows install test.
+> Status: Draft for review, revision 2 (2026-11-08). Revision 2 works in a two-persona review (a regular user who knows MCP, and the developer-owner). Phases 1 (npm), 2 (several agent apps), 3 (pairing v2), 4 (production and dev), 5 (Claude Desktop extension: manifest, `npm run mcp:bundle`, Download in Settings; bundle tested in Claude Desktop on macOS) and 6 (documentation) of section 9 implemented 2026-11-08. The release ships app, npm package and extension together (section 3.1). Not yet: the first release of protocol 2, and the Windows install test.
 > Scope: how a user installs `zenit-week-mcp`, pairs it with the app, and how a developer uses the production app and a dev tunnel side by side. Replaces sections 5 (opt-in and pairing), 6 rows 1-2 (origin and server proof), 9 rows 1-3 (handshake frames) and 12 row 2 (distribution) of [agent-bridge.md](agent-bridge.md), and changes 7.5 (which tab executes). Everything else there - execution model, tools, resources, mobile, network-policy exception - stays as it is.
 
 ---
@@ -43,7 +43,7 @@ Turn on the bridge without a terminal, a repository or a pasted secret, the way 
 
 `zenit-week-mcp` is published to npm from `mcp/`. Every command-based install runs `npx -y zenit-week-mcp@1`: the major version is pinned, so a new major never arrives silently against a page that speaks the old protocol, and minor updates still arrive on the next start of the agent app. The package version is independent of the app version; compatibility is checked by a protocol number (section 4.5).
 
-Release: `npm run mcp:publish` from the repository root runs the server tests, checks that the version in `mcp/package.json` is new, and runs `npm publish` in `mcp/`. Separate from the app's `npm run release`.
+Release: together with the app, with no separate step. `npm run release` raises the package's minor version when a server file (`server.js`, `core.js`, `package.json`, `manifest.json`) changed since the previous tag and the current version is already on npm. The production deploy (`deploy-production.yml`) then builds the extension, runs `npm run mcp:publish -- --if-new` (server tests, publish only a version not yet on npm; trusted publishing through GitHub OIDC, no stored token) and only then deploys the app, so a page never meets an older server for longer than the job takes. `npm run mcp:publish` still works by hand.
 
 ### 3.2 Claude Desktop extension (`.mcpb`)
 
@@ -52,7 +52,7 @@ A Desktop Extension bundle: `manifest.json`, `server.js`, `core.js` and the prod
 | # | Decision | Detail |
 |---|---|---|
 | 1 | Built by | `npm run mcp:bundle` (the official `mcpb pack` tool) from `mcp/`. Output is not committed. |
-| 2 | Hosted on | GitHub Releases of this repository, as `zenit-week.mcpb`, attached to an `mcp-v<version>` tag. Anthropic's extension directory no longer takes submissions, and zenitweek.com stays the app only (single-file policy). |
+| 2 | Hosted on | GitHub Releases of this repository, as `zenit-week.mcpb`, attached to every app release by the production deploy, so `releases/latest/download/zenit-week.mcpb` always resolves (a separate `mcp-v<version>` tag would be buried by the next app release). Anthropic's extension directory no longer takes submissions, and zenitweek.com stays the app only (single-file policy). |
 | 3 | Linked from | Settings (section 3.4), the README and the landing page's "How to connect an agent" link, always to the latest release asset. |
 | 4 | Updates | An extension installed from a file does not update itself. The update hint for this path is "Download the new Zenit Week extension" with the link (section 4.5). |
 | 5 | User config in the manifest | None. Dev sites are added with the `origins` command (section 6), the one way for every install path. |
