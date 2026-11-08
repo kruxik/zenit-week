@@ -96,7 +96,7 @@ describe('Settings dialog tabs', () => {
     expect(_state.getSettingsTab()).toBe('dev');
     key('Home');
     expect(_state.getSettingsTab()).toBe('account');
-    // The desktop sidebar is vertical: up and down walk it the same way.
+    // Up and down walk the strip the same way as left and right.
     key('ArrowDown');
     expect(_state.getSettingsTab()).toBe('general');
     key('ArrowUp');

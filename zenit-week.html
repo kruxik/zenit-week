@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-xpIo7MM1/ciccPnsVfEQOaB7l5rBkzPPU6DbuUrvQOg=';
+               'sha256-oOMfglnZDJHFfkqUx0yRT3UI9fv7EREZKGrt6Lk2arA=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1363,37 +1363,56 @@
     flex: 1;
     min-height: 0;
     display: flex;
+    flex-direction: column;
   }
 
-  /* A sidebar of tabs on desktop; a segmented control on phones. */
+  /* On phones the tabs are the Agenda day strip's: .agenda-tab buttons with
+     .agenda-tab-separator rules between them, one row under the caption that
+     scrolls sideways when the window is narrower than the run. Only the strip
+     itself is Settings-specific. A separator before a tab this device hides
+     goes with it. */
   .settings-tabs {
     flex-shrink: 0;
-    width: 116px;
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 2px;
-    padding: 10px 8px;
-    border-right: 1px solid var(--border-soft);
+    padding: 6px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border-soft);
   }
-  .settings-tab {
-    background: none;
-    border: none;
-    border-radius: 6px;
-    padding: 7px 10px;
-    text-align: left;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: color 0.15s, background 0.15s;
+  .settings-tabs::-webkit-scrollbar { display: none; }
+  .settings-tabs .agenda-tab-separator:has(+ .agenda-tab[hidden]) { display: none; }
+  .settings-tabs .agenda-tab[hidden] { display: none; }
+  .settings-tabs .agenda-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+
+  /* Desktop keeps a sidebar of tabs beside the panes: the same buttons, stacked
+     and left-aligned, with no separators. The selected tab wears the accent on
+     the menu-hover tint, and hover only darkens the text. Phones keep the strip
+     above. */
+  @media (min-width: 521px) {
+    .settings-body { flex-direction: row; }
+    .settings-tabs {
+      width: 116px;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 10px 8px;
+      overflow-x: visible;
+      border-bottom: none;
+      border-right: 1px solid var(--border-soft);
+    }
+    .settings-tabs .agenda-tab-separator { display: none; }
+    .settings-tabs .agenda-tab {
+      height: auto;
+      padding: 7px 10px;
+      border-radius: 6px;
+    }
+    .settings-tabs .agenda-tab:hover { background: none; color: var(--text-dim); }
+    .settings-tabs .agenda-tab.active {
+      color: var(--accent-primary);
+      background: var(--ctx-hover-bg);
+    }
   }
-  .settings-tab:hover { color: var(--text-dim); }
-  .settings-tab[aria-selected="true"] {
-    color: var(--accent-primary);
-    background: var(--ctx-hover-bg);
-  }
-  .settings-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
 
   /* Buttons keep their own width and stand one per line, right-aligned like
      the toggles above them. */
@@ -1427,34 +1446,12 @@
     padding: 12px 14px 16px;
   }
 
-  /* Phones: the same window under the account button, narrower so it reads as a popup
-     and not a sheet, and the tabs become a segmented
-     row on top - a sidebar would leave the content too narrow. Caption and
-     tabs sit outside the scrolling pane, so they stay pinned. dvh, so the
-     window clears the browser's own bars as they slide in and out. */
+  /* Phones: the same window under the account button, narrower so it reads as
+     a popup and not a sheet. Caption and tabs sit outside the scrolling pane,
+     so they stay pinned. dvh, so the window clears the browser's own bars as
+     they slide in and out. */
   @media (max-width: 520px) {
     #settings-dialog { width: 290px; top: 52px; max-height: calc(100dvh - 64px); }
-    .settings-body { flex-direction: column; }
-    .settings-tabs {
-      width: auto;
-      flex-direction: row;
-      gap: 2px;
-      margin: 8px 12px 4px;
-      padding: 3px;
-      border-right: none;
-      border-radius: 8px;
-      background: var(--bg-muted);
-    }
-    .settings-tab {
-      flex: 1;
-      padding: 6px 0;
-      text-align: center;
-    }
-    .settings-tab[aria-selected="true"] {
-      color: var(--text-primary);
-      background: var(--bg-surface);
-      box-shadow: 0 1px 3px var(--shadow-sm);
-    }
   }
 
   .settings-section {
@@ -4804,9 +4801,10 @@ Or remove them later in Settings → Help.</div>
   </div>
 </div>
 
-<!-- Settings: a window pinned above the gear, with a tab sidebar on desktop
-     and a segmented tab row on phones (see the 520px query). The AI and Development tabs ship hidden: initBridgeSettings reveals
-     AI on a fine pointer, the devResetEnabled() guard reveals Development. -->
+<!-- Settings: a window hung under the account button, with a tab sidebar on
+     desktop and the Agenda's tab strip under its caption on phones. The AI and Development tabs ship hidden:
+     initBridgeSettings reveals AI on a fine pointer, the devResetEnabled()
+     guard reveals Development. -->
 <div id="settings-overlay">
   <div id="settings-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="dialog-header">
@@ -4818,12 +4816,16 @@ Or remove them later in Settings → Help.</div>
     </div>
     <div class="settings-body">
     <div class="settings-tabs" id="settings-tabs" role="tablist" aria-labelledby="settings-title">
-      <button type="button" class="settings-tab" id="settings-tab-account" role="tab" aria-controls="settings-pane-account" aria-selected="true" data-i18n="settings.tabAccount">Account</button>
-      <button type="button" class="settings-tab" id="settings-tab-general" role="tab" aria-controls="settings-pane-general" aria-selected="false" tabindex="-1" data-i18n="settings.tabGeneral">General</button>
-      <button type="button" class="settings-tab" id="settings-tab-ai" role="tab" aria-controls="settings-pane-ai" aria-selected="false" tabindex="-1" data-i18n="settings.tabAi" hidden>AI</button>
-      <button type="button" class="settings-tab" id="settings-tab-data" role="tab" aria-controls="settings-pane-data" aria-selected="false" tabindex="-1" data-i18n="settings.tabData">Data</button>
+      <button type="button" class="agenda-tab active" id="settings-tab-account" role="tab" aria-controls="settings-pane-account" aria-selected="true" data-i18n="settings.tabAccount">Account</button>
+      <div class="agenda-tab-separator" aria-hidden="true"></div>
+      <button type="button" class="agenda-tab" id="settings-tab-general" role="tab" aria-controls="settings-pane-general" aria-selected="false" tabindex="-1" data-i18n="settings.tabGeneral">General</button>
+      <div class="agenda-tab-separator" aria-hidden="true"></div>
+      <button type="button" class="agenda-tab" id="settings-tab-ai" role="tab" aria-controls="settings-pane-ai" aria-selected="false" tabindex="-1" data-i18n="settings.tabAi" hidden>AI</button>
+      <div class="agenda-tab-separator" aria-hidden="true"></div>
+      <button type="button" class="agenda-tab" id="settings-tab-data" role="tab" aria-controls="settings-pane-data" aria-selected="false" tabindex="-1" data-i18n="settings.tabData">Data</button>
       <!-- Dev-only, never translated. -->
-      <button type="button" class="settings-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden>Dev</button>
+      <div class="agenda-tab-separator" aria-hidden="true"></div>
+      <button type="button" class="agenda-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden>Dev</button>
     </div>
     <div class="settings-panes">
     <div class="settings-pane" id="settings-pane-account" role="tabpanel" aria-labelledby="settings-tab-account">
@@ -26565,6 +26567,7 @@ function selectSettingsTab(name, { focus = false } = {}) {
     const on = id === name;
     if (tab) {
       tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.classList.toggle('active', on);
       tab.tabIndex = on ? 0 : -1;
     }
     if (pane) {
@@ -26644,11 +26647,11 @@ function openSettings() {
   });
 
   tablist.addEventListener('click', (e) => {
-    const tab = e.target.closest?.('.settings-tab');
+    const tab = e.target.closest?.('.agenda-tab');
     if (tab) selectSettingsTab(tab.id.replace('settings-tab-', ''));
   });
-  // Roving focus across the shown tabs: arrows wrap (up/down in the desktop
-  // sidebar, left/right in the phone's segmented row), Home and End jump.
+  // Roving focus across the shown tabs: arrows wrap (left/right, and up/down
+  // the same way), Home and End jump.
   tablist.addEventListener('keydown', (e) => {
     const shown = SETTINGS_TABS.filter(isSettingsTabShown);
     const at = shown.indexOf(settingsActiveTab);

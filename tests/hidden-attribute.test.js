@@ -65,7 +65,7 @@ describe('hidden attribute', () => {
 
 describe('dev-only Settings tab', () => {
   it('ships hidden in the markup', () => {
-    expect(SRC).toMatch(/<button type="button" class="settings-tab" id="settings-tab-dev"[^>]* hidden>/);
+    expect(SRC).toMatch(/<button type="button" class="agenda-tab" id="settings-tab-dev"[^>]* hidden>/);
     expect(SRC).toMatch(/<div class="settings-pane" id="settings-pane-dev"[^>]* hidden>/);
   });
 
