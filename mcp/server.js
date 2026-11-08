@@ -11,6 +11,7 @@
 //
 // stdout belongs to the MCP protocol: everything human-readable goes to stderr.
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -22,6 +23,7 @@ import {
 } from './core.js';
 
 const APP_URL = 'https://zenitweek.com/app';
+const { version: VERSION } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 const argv = process.argv.slice(2);
 const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'serve';
 const portArg = argv.indexOf('--port');
@@ -72,7 +74,7 @@ if (created) announceCode(token, err);
 
 // ── MCP side ──
 const mcp = new McpServer(
-  { name: 'zenit-week', version: '0.1.0' },
+  { name: 'zenit-week', version: VERSION },
   {
     capabilities: { resources: { subscribe: true } },
     instructions: [

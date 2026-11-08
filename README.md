@@ -109,13 +109,33 @@ Let an AI agent on your computer - Claude Code, Claude Desktop or any MCP client
 - It is off by default and talks only to `127.0.0.1`, never to us.
 - Works in desktop Chrome and Firefox. Safari is not supported yet.
 
-### For everyone: planned
+### Set it up
 
-A one-click install for Claude Desktop is planned, so you won't need a terminal. Until then, setting up the bridge takes the developer steps below.
+You need [Node.js](https://nodejs.org/) 20 or newer. A one-click install for Claude Desktop, without a terminal, is planned.
 
-### For developers: set it up from the repository
+1. Register the server with your agent. For Claude Code:
+   ```sh
+   claude mcp add --scope user zenit-week -- npx -y zenit-week-mcp@1
+   ```
+   For Claude Desktop or another MCP client, add a stdio server with the command `npx` and the arguments `-y zenit-week-mcp@1`. The [server README](mcp/README.md) has the Claude Desktop config.
+2. Get the pairing code (it is also copied to your clipboard):
+   ```sh
+   npx -y zenit-week-mcp@1 pair
+   ```
+3. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > Agent bridge** and paste the code.
+4. When the browser asks to let Zenit Week reach apps on this computer, choose **Allow**. In Firefox, also tick **Remember my choice**.
+5. Settings now shows **Connected**. Ask your agent to look at your week.
 
-You need [Node.js](https://nodejs.org/) 20 or newer and a clone of this repository.
+### Managing the connection
+
+- **Disconnect:** **Disconnect and forget** in Settings, signing out or resetting the app removes the pairing.
+- **New code:** `npx -y zenit-week-mcp@1 rotate` makes a new code and unpairs every tab.
+- **Open the app automatically:** add `--open` after `zenit-week-mcp@1` in the server command and it opens the app when no tab is connected.
+- **Dev tunnel (ngrok):** add `--allow-origin https://<your-tunnel-host>`.
+
+### For developers: run it from the repository
+
+To work on the server itself, run it from a clone of this repository instead of npm:
 
 1. Install the server:
    ```sh
@@ -123,23 +143,12 @@ You need [Node.js](https://nodejs.org/) 20 or newer and a clone of this reposito
    ```
 2. Register it with your agent. For Claude Code:
    ```sh
-   claude mcp add zenit-week -- node "$PWD/server.js"
+   claude mcp add --scope user zenit-week -- node "$PWD/server.js"
    ```
-   For Claude Desktop or another MCP client, add a server that runs `node /path/to/zenit-week/mcp/server.js`.
-3. Get the pairing code (it is also copied to your clipboard):
-   ```sh
-   node server.js pair
-   ```
-4. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > Agent bridge** and paste the code.
-5. When the browser asks to let Zenit Week reach apps on this computer, choose **Allow**. In Firefox, also tick **Remember my choice**.
-6. Settings now shows **Connected**. Ask your agent to look at your week.
+   For another MCP client, the command is `node /path/to/zenit-week/mcp/server.js`.
+3. Get the pairing code with `node server.js pair` and continue with step 3 above.
 
-### Managing the connection
-
-- **Disconnect:** **Disconnect and forget** in Settings, signing out or resetting the app removes the pairing.
-- **New code:** `node server.js rotate` makes a new code and unpairs every tab.
-- **Open the app automatically:** add `--open` to the server command and it opens the app when no tab is connected.
-- **Dev tunnel (ngrok):** add `--allow-origin https://<your-tunnel-host>`.
+The package is published with `npm run mcp:publish` from the repository root; it is versioned separately from the app.
 
 ## Privacy
 

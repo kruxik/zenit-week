@@ -40,7 +40,8 @@
     "csp": "node scripts/csp-hashes.mjs",
     "editor:build": "node scripts/build-editor.mjs",
     "release": "node scripts/release.mjs",
-    "release:notes": "node scripts/extract-release-notes.mjs"
+    "release:notes": "node scripts/extract-release-notes.mjs",
+    "mcp:publish": "node scripts/mcp-publish.mjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.5",

@@ -20,50 +20,67 @@ The MCP client starts the server. The app connects to it once you pair them in *
 
 ## Setup
 
-You need [Node.js](https://nodejs.org/) 20 or newer. The package is not on npm yet, so it runs from a clone of the repository.
+You need [Node.js](https://nodejs.org/) 20 or newer. Your agent app downloads and starts the server with `npx`; there is nothing to install by hand.
 
-1. Install the dependencies:
-   ```sh
-   cd mcp && npm install
-   ```
-2. Register the server with your agent.
+1. Register the server with your agent.
    - Claude Code:
      ```sh
-     claude mcp add zenit-week -- node "$PWD/server.js"
+     claude mcp add --scope user zenit-week -- npx -y zenit-week-mcp@1
      ```
    - Claude Desktop: add it to `claude_desktop_config.json` and restart Claude Desktop:
      ```json
      {
        "mcpServers": {
          "zenit-week": {
-           "command": "node",
-           "args": ["/path/to/zenit-week/mcp/server.js"]
+           "command": "npx",
+           "args": ["-y", "zenit-week-mcp@1"]
          }
        }
      }
      ```
-   - Any other MCP client: a stdio server with the command `node /path/to/zenit-week/mcp/server.js`.
-3. Print the pairing code. It is also copied to your clipboard:
+   - Any other MCP client: a stdio server with the command `npx -y zenit-week-mcp@1`.
+2. Print the pairing code. It is also copied to your clipboard:
    ```sh
-   node server.js pair
+   npx -y zenit-week-mcp@1 pair
    ```
-4. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > Agent bridge** and paste the code.
-5. When the browser asks to let Zenit Week reach apps on this computer, choose **Allow**. In Firefox, also tick **Remember my choice**.
-6. Settings shows **Connected**. Ask your agent to look at your week.
+3. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > Agent bridge** and paste the code.
+4. When the browser asks to let Zenit Week reach apps on this computer, choose **Allow**. In Firefox, also tick **Remember my choice**.
+5. Settings shows **Connected**. Ask your agent to look at your week.
+
+`@1` pins the major version: updates within 1.x arrive the next time your agent app starts the server, and a new major version never arrives unannounced.
+
+### Running from the repository
+
+For working on the server itself, run it from a clone instead of npm:
+
+1. Install the dependencies:
+   ```sh
+   cd mcp && npm install
+   ```
+2. Register it, for Claude Code:
+   ```sh
+   claude mcp add --scope user zenit-week -- node "$PWD/server.js"
+   ```
+   For another client, the command is `node /path/to/zenit-week/mcp/server.js`.
+3. Print the pairing code with `node server.js pair`, then continue with step 3 above.
 
 ## Commands and options
 
+`zenit-week-mcp` below stands for `npx -y zenit-week-mcp@1` (or `node server.js` in a clone).
+
 | Command | What it does |
 |---|---|
-| `node server.js` | Runs the server. This is what the MCP client launches. |
-| `node server.js pair` | Prints the pairing code again and copies it. |
-| `node server.js rotate` | Makes a new code. Every paired tab has to be paired again. |
+| `zenit-week-mcp` | Runs the server. This is what the MCP client launches. |
+| `zenit-week-mcp pair` | Prints the pairing code again and copies it. |
+| `zenit-week-mcp rotate` | Makes a new code. Every paired tab has to be paired again. |
 
 | Option | What it does |
 |---|---|
 | `--open` | Opens the app in your browser when a request arrives and no tab is connected. |
 | `--port <n>` | Listens on another port (default `47831`). The port is part of the pairing code, so pair again after changing it. |
 | `--allow-origin <https-url>` | Also accepts that page origin, for example an ngrok dev tunnel. Repeatable. |
+
+Options go after the package name, for example `npx -y zenit-week-mcp@1 --open`.
 
 ## What the agent can do
 

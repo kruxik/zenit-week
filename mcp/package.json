@@ -1,12 +1,40 @@
 {
   "name": "zenit-week-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Local MCP server that lets an AI agent act on an open Zenit Week tab over a loopback WebSocket.",
   "type": "module",
   "license": "MIT",
+  "author": {
+    "name": "Petr Burian",
+    "email": "petr@petrburian.com",
+    "url": "https://www.petrburian.com/"
+  },
+  "homepage": "https://github.com/kruxik/zenit-week/tree/main/mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kruxik/zenit-week.git",
+    "directory": "mcp"
+  },
+  "bugs": "https://github.com/kruxik/zenit-week/issues",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "claude",
+    "ai-agent",
+    "zenit-week",
+    "weekly-planner",
+    "planner"
+  ],
   "bin": {
     "zenit-week-mcp": "server.js"
   },
+  "files": [
+    "server.js",
+    "core.js",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=20"
   },
