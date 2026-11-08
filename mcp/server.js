@@ -6,8 +6,11 @@
 //   zenit-week-mcp            run the server (what the MCP client launches)
 //   zenit-week-mcp pair       print the pairing code again and copy it
 //   zenit-week-mcp rotate     make a new code; every paired tab must re-pair
-//   options: --port <n>  --open (launch the app when no tab is connected)
+//   options: --open (launch the app when no tab is connected)
 //            --allow-origin <https-url> (also accept that page origin, e.g. an ngrok dev tunnel)
+//
+// Each copy listens on the first free port of 47831-47838, so every agent app
+// can run its own; the page connects to all of them.
 //
 // stdout belongs to the MCP protocol: everything human-readable goes to stderr.
 import { spawn } from 'node:child_process';
@@ -18,16 +21,14 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import {
-  DEFAULT_PORT, OPEN_WAIT_MS, Relay, RelayError, isAllowedOrigin, parseExtraOrigin, loadOrCreateToken,
-  pairingCode, tokenPath, urisForWeekSaved,
+  OPEN_WAIT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError, isAllowedOrigin, parseExtraOrigin,
+  listenOnFirstFreePort, loadOrCreateToken, pairingCode, tokenPath, urisForWeekSaved,
 } from './core.js';
 
 const APP_URL = 'https://zenitweek.com/app';
 const { version: VERSION } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 const argv = process.argv.slice(2);
 const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'serve';
-const portArg = argv.indexOf('--port');
-const PORT = portArg >= 0 ? parseInt(argv[portArg + 1], 10) : DEFAULT_PORT;
 const OPEN = argv.includes('--open');
 const err = (...a) => process.stderr.write(a.join(' ') + '\n');
 // --allow-origin https://<host> (repeatable): an extra page origin, for a dev tunnel.
@@ -38,8 +39,6 @@ argv.forEach((a, i) => {
   if (!o) { err('zenit-week-mcp: --allow-origin needs an https URL'); process.exit(2); }
   EXTRA_ORIGINS.push(o);
 });
-
-if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) { err('zenit-week-mcp: --port must be 1-65535'); process.exit(2); }
 
 function copyToClipboard(text) {
   const tool = process.platform === 'darwin' ? ['pbcopy', []]
@@ -54,7 +53,7 @@ function copyToClipboard(text) {
 }
 
 function announceCode(token, out) {
-  const code = pairingCode(PORT, token);
+  const code = pairingCode(token);
   copyToClipboard(code);
   out(`Zenit Week pairing code (copied to the clipboard):\n\n  ${code}\n`);
   out('Paste it in Zenit Week: Settings > Agent bridge. Your browser will ask to let');
@@ -109,10 +108,13 @@ function openApp() {
   try { spawn(c, a, { stdio: 'ignore', detached: true }).on('error', () => {}).unref(); } catch (_) { /* no opener */ }
 }
 
+const STARTED_AT = Date.now();
 async function forward(tool, args) {
-  if (!relay.pickTab() && OPEN) {
-    openApp();
-    await relay.waitForTab(OPEN_WAIT_MS);
+  if (!relay.pickTab()) {
+    if (OPEN) openApp();
+    const grace = STARTUP_GRACE_MS - (Date.now() - STARTED_AT);
+    const wait = Math.max(OPEN ? OPEN_WAIT_MS : 0, grace);
+    if (wait > 0) await relay.waitForTab(wait);
   }
   return relay.call(tool, args);
 }
@@ -187,22 +189,44 @@ resource('agenda', new ResourceTemplate('zenit://agenda/{day}', { list: undefine
   { tool: 'read_agenda', map: v => ({ day: parseInt(v.day, 10) }) });
 
 // ── Page side: loopback only ──
-const wss = new WebSocketServer({
-  host: '127.0.0.1',
-  port: PORT,
-  maxPayload: 4 * 1024 * 1024,
-  verifyClient: ({ origin }) => isAllowedOrigin(origin, EXTRA_ORIGINS),
-});
+// Resolves to the listening server, or null when the port is taken.
+function tryListen(port) {
+  return new Promise((resolve, reject) => {
+    const wss = new WebSocketServer({
+      host: '127.0.0.1',
+      port,
+      maxPayload: 4 * 1024 * 1024,
+      verifyClient: ({ origin }) => isAllowedOrigin(origin, EXTRA_ORIGINS),
+    });
+    const failed = e => { wss.close(); if (e.code === 'EADDRINUSE') resolve(null); else reject(e); };
+    wss.once('error', failed);
+    wss.once('listening', () => { wss.off('error', failed); resolve(wss); });
+  });
+}
+
+let bound;
+try {
+  bound = await listenOnFirstFreePort(tryListen);
+} catch (e) {
+  err(`zenit-week-mcp: cannot listen on 127.0.0.1 (${e.code || e.message})`);
+  process.exit(1);
+}
+if (!bound) {
+  err(`zenit-week-mcp: Too many Zenit Week servers running (ports ${PORT_MIN}-${PORT_MAX} are all taken). Quit an agent app you no longer use.`);
+  process.exit(1);
+}
+const { port: PORT, server: wss } = bound;
 wss.on('connection', ws => {
   const tab = relay.onOpen(ws);
   ws.on('message', data => relay.onMessage(tab, data.toString()));
   ws.on('close', () => relay.onClose(tab));
   ws.on('error', () => {});
 });
-wss.on('error', e => {
-  err(`zenit-week-mcp: cannot listen on 127.0.0.1:${PORT} (${e.code || e.message}). Is another copy running?`);
-  process.exit(1);
-});
+wss.on('error', e => err(`zenit-week-mcp: socket server error on 127.0.0.1:${PORT} (${e.code || e.message})`));
 
 await mcp.connect(new StdioServerTransport());
+// The agent app is gone when stdin ends. Exit then, or the orphaned copy would
+// keep its port of the range for good.
+process.stdin.on('end', () => process.exit(0));
+process.stdin.on('close', () => process.exit(0));
 err(`zenit-week-mcp: listening on ws://127.0.0.1:${PORT}`);

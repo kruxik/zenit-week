@@ -94,13 +94,13 @@ Off by default on every device. Nothing connects anywhere until the user turns i
 |---|---|---|
 | 1 | Settings section "Agent bridge" | Below Theme. A toggle, a pairing-code field, a status line, a "Disconnect and forget" button. Reuses `.settings-section`, `.settings-label`, `.dialog-field`, `.agenda-action-btn`. Hidden when `(pointer: fine)` does not match - on a phone it can only confuse. |
 | 2 | Pairing code | The server prints a one-line code on first start (`port.token`, token 32 random bytes base64url) and copies it to the clipboard. The user pastes it into the field. The page stores it and connects. This is the single pairing mechanism; no URL-hash variant. Chrome and Firefox ask for permission here, once (section 4). |
-| 3 | Storage | `zenit-week-bridge` in `localStorage`: `{ enabled, port, token }`. **Device-local, never in the synced colors/settings blob.** A phone must never learn the desktop's token or try to connect. |
+| 3 | Storage | `zenit-week-bridge` in `localStorage`: `{ enabled, token }`. **Device-local, never in the synced colors/settings blob.** A phone must never learn the desktop's token or try to connect. |
 | 4 | Status line | `Off` / `Waiting for server` / `Waiting for permission` / `Connected - <client name>` / `Refused (wrong code)` / `Blocked by browser` / `Not supported in this browser yet`. Driven by socket state and the handshake: `Connected` once the page has verified `proof` and sent `hello`; the client name comes from `proof.client`. `Refused` when the server closes with code `refused` after `hello`. |
 | 5 | Forget | "Disconnect and forget" clears the record and closes the socket. Sign-out and reset (`reloadAppFresh`) also clear it: sign-out means "this browser stops being my workspace", and a paired agent must not keep access to whoever signs in next. |
 
 The server keeps its token in `~/.config/zenit-week-mcp/token` (0600). `zenit-week-mcp pair` prints the code again; `zenit-week-mcp rotate` makes a new one, which invalidates every paired tab.
 
-Port: fixed default `47831`, `--port` to override. CSP uses the port wildcard either way.
+Port: the range `47831` to `47838`, one server per agent app, the page connected to all of them ([agent-bridge-setup.md](agent-bridge-setup.md) section 5). CSP uses the port wildcard.
 
 ---
 

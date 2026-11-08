@@ -3,6 +3,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   Relay, isAllowedOrigin, parseExtraOrigin, proofFor, urisForWeekSaved, loadOrCreateToken,
+  listenOnFirstFreePort, pairingCode, PORTS, PORT_MIN, PORT_MAX,
   HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN,
 } from '../mcp/core.js';
 import { bridgeHmac } from './setup.js';
@@ -168,6 +169,37 @@ describe('resource updates', () => {
     expect(saved).toEqual([['2026-45', 't1']]);
     expect(urisForWeekSaved('2026-45', '2026-45')).toEqual(expect.arrayContaining(['zenit://week/current', 'zenit://week/2026-45', 'zenit://agenda/3', 'zenit://weeks']));
     expect(urisForWeekSaved('2026-44', '2026-45')).not.toContain('zenit://week/current');
+  });
+});
+
+describe('port range (setup spec section 5)', () => {
+  test('eight ports from 47831, the same range the page scans', () => {
+    expect([PORT_MIN, PORT_MAX]).toEqual([47831, 47838]);
+    expect(PORTS).toHaveLength(8);
+    const html = fs.readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8');
+    expect(html).toContain(`const BRIDGE_PORT_MIN = ${PORT_MIN};`);
+    expect(html).toContain(`const BRIDGE_PORT_MAX = ${PORT_MAX};`);
+  });
+
+  test('takes the first free port', async () => {
+    const taken = new Set([47831, 47832]);
+    const tried = [];
+    const r = await listenOnFirstFreePort(async p => { tried.push(p); return taken.has(p) ? null : { p }; });
+    expect(r).toEqual({ port: 47833, server: { p: 47833 } });
+    expect(tried).toEqual([47831, 47832, 47833]);
+  });
+
+  test('null when every port is taken', async () => {
+    expect(await listenOnFirstFreePort(async () => null)).toBeNull();
+  });
+
+  test('another bind failure is not mistaken for a taken port', async () => {
+    const e = Object.assign(new Error('denied'), { code: 'EACCES' });
+    await expect(listenOnFirstFreePort(async () => { throw e; })).rejects.toBe(e);
+  });
+
+  test('the pairing code keeps its port.token shape', () => {
+    expect(pairingCode(TOKEN)).toBe(`47831.${TOKEN}`);
   });
 });
 

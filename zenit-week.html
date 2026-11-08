@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ZoxT3lYQNTCszSMmKXosu7xsWt7CUqgEx00vmlEx9zg=';
+               'sha256-j8xNET031LA9PustGDEZ0fx0NLsGylcPerGcUL7iQFY=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -11376,6 +11376,7 @@ const TRANSLATIONS = {
     'bridge.state.waiting-permission': 'Waiting for permission - your browser asks to let Zenit Week reach apps on this computer: choose Allow',
     'bridge.state.connected':     'Connected - {client}',
     'bridge.state.connectedNoName': 'Connected',
+    'bridge.unnamedAgent':        'agent',
     'bridge.state.refused':       'Refused (wrong code) - paste the code again',
     'bridge.state.blocked':       'Blocked by browser - allow apps on this device in the site settings',
     'bridge.state.unsupported':   'Not supported in this browser yet',
@@ -11800,6 +11801,7 @@ const TRANSLATIONS = {
     'bridge.state.waiting-permission': 'Čekám na povolení - prohlížeč se ptá, zda smí Zenit Week přistupovat k aplikacím na tomto počítači: zvol Povolit',
     'bridge.state.connected':     'Připojeno - {client}',
     'bridge.state.connectedNoName': 'Připojeno',
+    'bridge.unnamedAgent':        'agent',
     'bridge.state.refused':       'Odmítnuto (špatný kód) - vlož kód znovu',
     'bridge.state.blocked':       'Zablokováno prohlížečem - povol přístup k aplikacím na tomto zařízení v nastavení webu',
     'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje',
@@ -26580,12 +26582,23 @@ function renderBridgeStatus() {
   const supported = bridgeSupported();
   toggle.disabled = !supported;
   toggle.setAttribute('aria-checked', supported && rec.enabled ? 'true' : 'false');
-  const { state, client } = supported ? bridgeStatus : { state: 'unsupported', client: null };
+  const { state, clients } = supported ? bridgeStatus : { state: 'unsupported', clients: [] };
   const shown = rec.enabled || state === 'unsupported' || state === 'refused' ? state : 'off';
+  const names = bridgeClientList(clients);
   el.textContent = shown === 'connected'
-    ? (client ? t('bridge.state.connected', { client }) : t('bridge.state.connectedNoName'))
+    ? (names ? t('bridge.state.connected', { client: names }) : t('bridge.state.connectedNoName'))
     : t(`bridge.state.${shown}`);
   document.getElementById('bridge-forget-btn').hidden = !rec.token;
+}
+
+// Every connected agent app, once each, in port order: "claude-code (2), claude-ai".
+// Empty when no server named its agent app; a nameless one beside named ones
+// shows as "agent".
+function bridgeClientList(clients) {
+  if (!clients.some(Boolean)) return '';
+  const counts = new Map();
+  clients.map(c => c || t('bridge.unnamedAgent')).forEach(c => counts.set(c, (counts.get(c) || 0) + 1));
+  return [...counts].map(([name, n]) => (n > 1 ? `${name} (${n})` : name)).join(', ');
 }
 
 function bridgeSettingsHint(key) {
@@ -26628,7 +26641,7 @@ function initBridgeSettings() {
     if (!parsed) { bridgeSettingsHint('bridge.state.badCode'); return; }
     code.value = '';
     bridgeDisconnect();
-    saveBridgeRecord({ enabled: true, port: parsed.port, token: parsed.token });
+    saveBridgeRecord({ enabled: true, token: parsed.token });
     bridgeConnect();
     renderBridgeStatus();
   });
@@ -26689,55 +26702,68 @@ document.getElementById('lang-select').addEventListener('change', e => {
 // never on the boot path. With the record off nothing below creates a socket or
 // a timer.
 const BRIDGE_KEY = 'zenit-week-bridge';
-const BRIDGE_DEFAULT_PORT = 47831;
+// Every agent app starts its own server, which takes the first free port of
+// this range (docs/specs/agent-bridge-setup.md section 5); the page talks to
+// all of them. Keep in step with PORT_MIN / PORT_MAX in mcp/core.js.
+const BRIDGE_PORT_MIN = 47831;
+const BRIDGE_PORT_MAX = 47838;
 const BRIDGE_HOST = '127.0.0.1';
 const BRIDGE_PERMISSION_HINT_MS = 10000;
 const BRIDGE_BACKOFF_MIN_MS = 1000;
 const BRIDGE_BACKOFF_MAX_MS = 30000;
+const BRIDGE_FOCUS_SCAN_MS = 2000;
 const BRIDGE_USER_BUSY_MS = 30000;
 const BRIDGE_COMMENT_MAX = 20000;
 const BRIDGE_LABEL_MAX = 500;
+
+function bridgePorts() {
+  const ports = [];
+  for (let p = BRIDGE_PORT_MIN; p <= BRIDGE_PORT_MAX; p++) ports.push(p);
+  return ports;
+}
 
 // ── Record: device-local, never synced ──
 function loadBridgeRecord() {
   try {
     const rec = JSON.parse(localStorage.getItem(BRIDGE_KEY) || 'null');
-    if (!rec || typeof rec !== 'object') return { enabled: false, port: BRIDGE_DEFAULT_PORT, token: '' };
-    const port = Number.isInteger(rec.port) && rec.port > 0 && rec.port < 65536 ? rec.port : BRIDGE_DEFAULT_PORT;
+    if (!rec || typeof rec !== 'object') return { enabled: false, token: '' };
     const token = typeof rec.token === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(rec.token) ? rec.token : '';
-    return { enabled: rec.enabled === true && !!token, port, token };
+    return { enabled: rec.enabled === true && !!token, token };
   } catch (_) {
-    return { enabled: false, port: BRIDGE_DEFAULT_PORT, token: '' };
+    return { enabled: false, token: '' };
   }
 }
 
 function saveBridgeRecord(rec) {
-  try { localStorage.setItem(BRIDGE_KEY, JSON.stringify({ enabled: !!rec.enabled, port: rec.port, token: rec.token })); } catch (_) { /* storage unavailable */ }
+  try { localStorage.setItem(BRIDGE_KEY, JSON.stringify({ enabled: !!rec.enabled, token: rec.token })); } catch (_) { /* storage unavailable */ }
 }
 
-// "Disconnect and forget", sign-out and reset: the record goes and the socket closes.
+// "Disconnect and forget", sign-out and reset: the record goes and every socket closes.
 function forgetBridge() {
   try { localStorage.removeItem(BRIDGE_KEY); } catch (_) { /* storage unavailable */ }
   bridgeDisconnect();
 }
 
-// The pairing code the server prints: `<port>.<token>`.
+// The pairing code the server prints: `<port>.<token>`. The port part is a
+// leftover of the single-port server; the page scans the whole range, so only
+// the token is kept.
 function parseBridgePairingCode(code) {
   const m = /^\s*(\d{1,5})\.([A-Za-z0-9_-]{16,128})\s*$/.exec(String(code || ''));
   if (!m) return null;
   const port = parseInt(m[1], 10);
   if (port < 1 || port > 65535) return null;
-  return { port, token: m[2] };
+  return { token: m[2] };
 }
 
 function isLoopbackHost(host) {
   return host === '127.0.0.1' || host === 'localhost';
 }
 
-// The only URL the bridge ever opens. The host is a constant, not stored, and is
-// checked again here so no edit to this file or to the record can point the
-// socket anywhere but this machine.
+// The only URL the bridge ever opens. The host is a constant and the port one
+// of the range, both checked again here so no edit to this file or to the
+// record can point a socket anywhere but this machine's Zenit Week servers.
 function bridgeSocketUrl(port) {
+  if (!Number.isInteger(port) || port < BRIDGE_PORT_MIN || port > BRIDGE_PORT_MAX) throw new Error('bridge: port outside the range refused');
   const url = new URL(`ws://${BRIDGE_HOST}:${port}/`);
   if (url.protocol !== 'ws:' || !isLoopbackHost(url.hostname)) throw new Error('bridge: non-loopback host refused');
   return url.href;
@@ -26753,24 +26779,45 @@ function bridgeSupported() {
 
 // ── Status ──
 // off | waiting-server | waiting-permission | connected | refused | blocked | unsupported
-let bridgeStatus = { state: 'off', client: null };
+// `clients` names the agent app of every connected server, in port order.
+let bridgeStatus = { state: 'off', clients: [] };
 const _bridgeStatusListeners = new Set();
 function onBridgeStatus(fn) { _bridgeStatusListeners.add(fn); return () => _bridgeStatusListeners.delete(fn); }
-function _setBridgeStatus(state, client = null) {
-  if (bridgeStatus.state === state && bridgeStatus.client === client) return;
-  bridgeStatus = { state, client };
+function _setBridgeStatus(state, clients = []) {
+  if (bridgeStatus.state === state && bridgeStatus.clients.join('\n') === clients.join('\n')) return;
+  bridgeStatus = { state, clients };
   _bridgeStatusListeners.forEach(fn => { try { fn(bridgeStatus); } catch (_) { /* a listener never breaks the bridge */ } });
 }
 
-// ── Connection ──
-let _bridgeSocket = null;
-let _bridgeReady = false;      // proof verified and hello sent
+// ── Connections: one per listening server ──
+// port -> { port, ws, opened, ready, client }
+const _bridgeConns = new Map();
+const _bridgeRefusedPorts = new Set(); // proof failed: not retried until the code is pasted again
+let _bridgeBlocked = false;
+let _bridgePermWaiting = false;
 let _bridgeAttempts = 0;
 let _bridgeRetryTimer = null;
 let _bridgePermTimer = null;
+let _bridgeLastScan = 0;
 let _bridgeStopped = true;
 let _bridgeLastSig = new Map();
 let _bridgeWindowHooked = false;
+
+function _readyBridgeConns() {
+  return [..._bridgeConns.values()].filter(c => c.ready).sort((a, b) => a.port - b.port);
+}
+
+// One status for all sockets: any connected server wins, then a refusal, then
+// what the browser says, then plain waiting.
+function _refreshBridgeStatus() {
+  if (_bridgeStopped) { _setBridgeStatus('off'); return; }
+  const ready = _readyBridgeConns();
+  if (ready.length) _setBridgeStatus('connected', ready.map(c => c.client || ''));
+  else if (_bridgeRefusedPorts.size) _setBridgeStatus('refused');
+  else if (_bridgeBlocked) _setBridgeStatus('blocked');
+  else if (_bridgePermWaiting) _setBridgeStatus('waiting-permission');
+  else _setBridgeStatus('waiting-server');
+}
 
 function _b64url(bytes) {
   let s = '';
@@ -26796,68 +26843,92 @@ function startBridgeWhenIdle() {
   else window.addEventListener('load', go, { once: true });
 }
 
+// One scan: a socket to every port of the range that has none yet. Servers
+// already connected keep theirs. The next scan follows with the backoff, so a
+// server started later (a second agent app) is found within 30 s, or at once
+// when the tab gains focus.
 function bridgeConnect() {
   const rec = loadBridgeRecord();
   if (!rec.enabled) { _setBridgeStatus('off'); return; }
   if (!bridgeSupported()) { _setBridgeStatus('unsupported'); return; }
-  if (_bridgeSocket) return;
   _bridgeStopped = false;
   _hookBridgeWindowEvents();
+  clearTimeout(_bridgeRetryTimer);
+  _bridgeLastScan = Date.now();
+  const opening = bridgePorts().filter(p => !_bridgeConns.has(p) && !_bridgeRefusedPorts.has(p));
+  opening.forEach(port => _openBridgeSocket(port, rec.token));
+  // Chrome holds the sockets silently while its permission prompt is open.
+  if (!_bridgePermTimer && opening.length && !_readyBridgeConns().length) {
+    _bridgePermTimer = setTimeout(() => {
+      _bridgePermTimer = null;
+      if (![..._bridgeConns.values()].some(c => c.opened)) { _bridgePermWaiting = true; _refreshBridgeStatus(); }
+    }, BRIDGE_PERMISSION_HINT_MS);
+  }
+  _refreshBridgeStatus();
+  _scheduleBridgeRetry();
+}
 
+function _openBridgeSocket(port, token) {
   let ws;
   try {
-    ws = new WebSocket(bridgeSocketUrl(rec.port));
+    ws = new WebSocket(bridgeSocketUrl(port));
   } catch (_) {
-    _scheduleBridgeRetry();
-    return;
+    return; // the next scan tries again
   }
-  _bridgeSocket = ws;
-  _bridgeReady = false;
-  let opened = false;
+  const conn = { port, ws, opened: false, ready: false, client: null };
+  _bridgeConns.set(port, conn);
   let refused = false;
   const nonce = _b64url(crypto.getRandomValues(new Uint8Array(32)));
-  if (bridgeStatus.state !== 'waiting-permission') _setBridgeStatus('waiting-server');
-  // Chrome holds the socket silently while its permission prompt is open.
-  _bridgePermTimer = setTimeout(() => { if (!opened) _setBridgeStatus('waiting-permission'); }, BRIDGE_PERMISSION_HINT_MS);
 
   ws.onopen = () => {
-    opened = true;
-    clearTimeout(_bridgePermTimer);
+    conn.opened = true;
+    _bridgePermWaiting = false;
+    _bridgeBlocked = false;
     ws.send(JSON.stringify({ type: 'challenge', nonce }));
   };
   ws.onmessage = async ev => {
     let frame;
     try { frame = JSON.parse(ev.data); } catch (_) { return; }
     if (!frame || typeof frame !== 'object') return;
-    if (!_bridgeReady) {
+    if (!conn.ready) {
       if (frame.type !== 'proof') return;
-      const want = await bridgeHmac(rec.token, nonce);
+      const want = await bridgeHmac(token, nonce);
       if (frame.hmac !== want) {
         // Wrong code, or something else on the port: the token is never sent.
         refused = true;
-        _setBridgeStatus('refused');
+        _bridgeRefusedPorts.add(port);
         try { ws.close(4001, 'refused'); } catch (_) { /* already closing */ }
+        _refreshBridgeStatus();
         return;
       }
-      _bridgeReady = true;
-      _bridgeAttempts = 0;
+      conn.ready = true;
+      conn.client = typeof frame.client === 'string' ? frame.client.slice(0, 80) : null;
       ws.send(JSON.stringify({
-        type: 'hello', token: rec.token, tabId: TAB_ID, appVersion: APP_VERSION,
+        type: 'hello', token, tabId: TAB_ID, appVersion: APP_VERSION,
         week: currentWeekKey, lang: currentLang, visible: document.visibilityState === 'visible',
       }));
-      _setBridgeStatus('connected', typeof frame.client === 'string' ? frame.client.slice(0, 80) : null);
+      _refreshBridgeStatus();
       return;
     }
-    if (frame.type === 'call') bridgeHandleCall(frame);
+    if (frame.type === 'call') return bridgeHandleCall(frame, conn);
   };
   ws.onclose = async ev => {
-    clearTimeout(_bridgePermTimer);
-    if (_bridgeSocket === ws) { _bridgeSocket = null; _bridgeReady = false; }
+    if (_bridgeConns.get(port) === conn) _bridgeConns.delete(port);
+    const wasReady = conn.ready;
+    conn.ready = false;
     if (_bridgeStopped) return;
-    if (refused || ev.reason === 'refused') { _setBridgeStatus('refused'); return; }
-    if (!opened && await _bridgePermissionDenied()) _setBridgeStatus('blocked');
-    else _setBridgeStatus('waiting-server');
-    _scheduleBridgeRetry();
+    if (refused || ev.reason === 'refused') {
+      _bridgeRefusedPorts.add(port);
+    } else if (wasReady) {
+      // A server went away (its agent app quit, or it restarted and may come
+      // back on another port): look again soon.
+      _bridgeAttempts = 0;
+      _scheduleBridgeRetry();
+    } else if (!conn.opened) {
+      _bridgePermWaiting = false;
+      if (!_readyBridgeConns().length) _bridgeBlocked = await _bridgePermissionDenied();
+    }
+    _refreshBridgeStatus();
   };
   ws.onerror = () => { /* onclose follows and decides */ };
 }
@@ -26888,23 +26959,29 @@ function bridgeDisconnect() {
   clearTimeout(_bridgePermTimer);
   _bridgeRetryTimer = _bridgePermTimer = null;
   _bridgeAttempts = 0;
-  const ws = _bridgeSocket;
-  _bridgeSocket = null;
-  _bridgeReady = false;
-  if (ws) { try { ws.close(1000, 'forget'); } catch (_) { /* already closed */ } }
+  _bridgeBlocked = _bridgePermWaiting = false;
+  _bridgeRefusedPorts.clear();
+  const conns = [..._bridgeConns.values()];
+  _bridgeConns.clear();
+  conns.forEach(c => { c.ready = false; try { c.ws.close(1000, 'forget'); } catch (_) { /* already closed */ } });
   _setBridgeStatus('off');
 }
 
+function _bridgeSendTo(conn, frame) {
+  if (!conn.ready || _bridgeConns.get(conn.port) !== conn) return; // that server is gone
+  try { conn.ws.send(JSON.stringify(frame)); } catch (_) { /* socket closing */ }
+}
+
+// Events go to every connected server: each one tells its own agent.
 function _bridgeSend(frame) {
-  if (!_bridgeSocket || !_bridgeReady) return;
-  try { _bridgeSocket.send(JSON.stringify(frame)); } catch (_) { /* socket closing */ }
+  _readyBridgeConns().forEach(c => _bridgeSendTo(c, frame));
 }
 
 // Called from every place a week's content can change (saveWeek, a Drive or
 // peer-tab merge). Deduplicated by content signature, so each distinct change
 // yields one event whichever path wrote it.
 function bridgeNotifyWeekSaved(wk, data) {
-  if (!_bridgeReady) return; // nothing is hashed while no agent listens
+  if (!_readyBridgeConns().length) return; // nothing is hashed while no agent listens
   const sig = weekContentHash(data);
   if (_bridgeLastSig.get(wk) === sig) return;
   _bridgeLastSig.set(wk, sig);
@@ -26915,12 +26992,24 @@ function bridgeNotifyView() {
   _bridgeSend({ type: 'event', event: 'view', wk: currentWeekKey });
 }
 
+// Coming back to the tab looks for new servers at once (a just-started agent
+// app), throttled so focus churn does not open sockets in a burst.
+function _bridgeScanOnFocus() {
+  if (_bridgeStopped || Date.now() - _bridgeLastScan < BRIDGE_FOCUS_SCAN_MS) return;
+  bridgeConnect();
+}
+
 function _hookBridgeWindowEvents() {
   if (_bridgeWindowHooked) return;
   _bridgeWindowHooked = true;
-  window.addEventListener('focus', () => _bridgeSend({ type: 'event', event: 'focus', wk: currentWeekKey }));
+  window.addEventListener('focus', () => {
+    _bridgeSend({ type: 'event', event: 'focus', wk: currentWeekKey });
+    _bridgeScanOnFocus();
+  });
   document.addEventListener('visibilitychange', () => {
-    _bridgeSend({ type: 'event', event: document.visibilityState === 'visible' ? 'focus' : 'pause', wk: currentWeekKey });
+    const visible = document.visibilityState === 'visible';
+    _bridgeSend({ type: 'event', event: visible ? 'focus' : 'pause', wk: currentWeekKey });
+    if (visible) _bridgeScanOnFocus();
   });
 }
 
@@ -26933,14 +27022,17 @@ const _bridgeBad = msg => new BridgeError('bad_args', msg);
 const _bridgeQueue = [];
 let _bridgeBusy = false;
 
-// Writes run strictly one at a time, in arrival order. Reads never wait.
-function bridgeHandleCall(frame) {
+// Writes run strictly one at a time, in arrival order, whichever server sent
+// them: calls from two agent apps queue, they never interleave. Reads never
+// wait. The result goes back only to the server that asked.
+function bridgeHandleCall(frame, conn) {
   const { id, tool } = frame;
+  const reply = f => _bridgeSendTo(conn, f);
   const def = Object.prototype.hasOwnProperty.call(BRIDGE_TOOLS, tool) ? BRIDGE_TOOLS[tool] : null;
-  if (!def) { _bridgeSend({ type: 'result', id, ok: false, error: { code: 'unknown_tool', message: String(tool) } }); return Promise.resolve(); }
+  if (!def) { reply({ type: 'result', id, ok: false, error: { code: 'unknown_tool', message: String(tool) } }); return Promise.resolve(); }
   const run = () => bridgeRunTool(tool, frame.args)
-    .then(data => _bridgeSend({ type: 'result', id, ok: true, data }))
-    .catch(err => _bridgeSend({ type: 'result', id, ok: false, error: {
+    .then(data => reply({ type: 'result', id, ok: true, data }))
+    .catch(err => reply({ type: 'result', id, ok: false, error: {
       code: err instanceof BridgeError ? err.code : 'internal',
       message: String(err && err.message || err),
     } }));

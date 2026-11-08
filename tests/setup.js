@@ -191,8 +191,9 @@ const sandbox = {
   // Agent bridge: HMAC and base64url. WebSocket is installed per test.
   TextEncoder: globalThis.TextEncoder,
   btoa: globalThis.btoa,
-  setTimeout,
-  clearTimeout,
+  // Read at call time, so vi.useFakeTimers() reaches the app's timers too.
+  setTimeout: (...a) => globalThis.setTimeout(...a),
+  clearTimeout: (...a) => globalThis.clearTimeout(...a),
   // Unref'd so a top-level interval in the app (the foreground update check)
   // never keeps the test worker alive.
   setInterval: (fn, ms) => { const t = setInterval(fn, ms); if (t.unref) t.unref(); return t; },

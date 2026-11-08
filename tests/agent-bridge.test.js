@@ -4,7 +4,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   _state, genId, defaultWeekData, findNode, rebuildNodeMap, getTickInfo,
-  bridgeRunTool, bridgeHandleCall, bridgeConnect, bridgeDisconnect, bridgeHmac,
+  bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeHmac,
   bridgeSocketUrl, parseBridgePairingCode, loadBridgeRecord, saveBridgeRecord,
   forgetBridge, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
@@ -20,19 +20,30 @@ class FakeSocket {
   constructor(url) { this.url = url; this.sent = []; this.closed = null; sockets.push(this); }
   send(s) { this.sent.push(JSON.parse(s)); }
   close(code, reason) { this.closed = { code, reason }; }
+  get port() { return Number(new URL(this.url).port); }
   open() { this.onopen && this.onopen(); }
   async receive(frame) { await this.onmessage({ data: JSON.stringify(frame) }); }
+  async drop(reason = '') { await this.onclose({ reason }); }
+}
+const PORTS = [47831, 47832, 47833, 47834, 47835, 47836, 47837, 47838];
+const socketOn = port => sockets.filter(s => s.port === port).at(-1);
+
+// A server on `port` answers the scan's socket and pairs.
+async function pairOn(port, client) {
+  const ws = socketOn(port);
+  ws.open();
+  const { nonce } = ws.sent[0];
+  await ws.receive({ type: 'proof', hmac: await bridgeHmac(TOKEN, nonce), client });
+  return ws;
 }
 
 async function pairedSocket() {
-  saveBridgeRecord({ enabled: true, port: 47831, token: TOKEN });
+  saveBridgeRecord({ enabled: true, token: TOKEN });
   bridgeConnect();
-  const ws = sockets[sockets.length - 1];
-  ws.open();
-  const { nonce } = ws.sent[0];
-  await ws.receive({ type: 'proof', hmac: await bridgeHmac(TOKEN, nonce), client: 'claude-code' });
-  return ws;
+  return pairOn(47831, 'claude-code');
 }
+// A call as the server sends it; resolves when the page has answered.
+const serverCall = (ws, frame) => ws.receive({ type: 'call', ...frame });
 
 // ── Week fixture ──
 const branchId = () => _state.get().nodes.find(n => n.type === 'branch').id;
@@ -72,8 +83,8 @@ afterEach(() => {
 });
 
 describe('pairing record', () => {
-  test('parses port.token and rejects anything else', () => {
-    expect(parseBridgePairingCode(` 47831.${TOKEN} `)).toEqual({ port: 47831, token: TOKEN });
+  test('parses port.token, keeps only the token, and rejects anything else', () => {
+    expect(parseBridgePairingCode(` 47831.${TOKEN} `)).toEqual({ token: TOKEN });
     expect(parseBridgePairingCode(`evil.com.${TOKEN}`)).toBeNull();
     expect(parseBridgePairingCode(`99999.${TOKEN}`)).toBeNull();
     expect(parseBridgePairingCode('47831.short')).toBeNull();
@@ -81,11 +92,13 @@ describe('pairing record', () => {
 
   test('a tampered record falls back to safe values', () => {
     _state.setLocalStorage('zenit-week-bridge', { enabled: true, port: 'evil.com', token: TOKEN });
-    expect(loadBridgeRecord()).toEqual({ enabled: true, port: 47831, token: TOKEN });
+    expect(loadBridgeRecord()).toEqual({ enabled: true, token: TOKEN });
+    _state.setLocalStorage('zenit-week-bridge', { enabled: true, token: '<script>' });
+    expect(loadBridgeRecord()).toEqual({ enabled: false, token: '' });
   });
 
   test('sign-out and reset (reloadAppFresh) clear the record', () => {
-    saveBridgeRecord({ enabled: true, port: 47831, token: TOKEN });
+    saveBridgeRecord({ enabled: true, token: TOKEN });
     const realReload = sandbox.location.reload;
     sandbox.location.reload = () => {};
     try { reloadAppFresh(); } finally { sandbox.location.reload = realReload; }
@@ -107,23 +120,25 @@ describe('connection', () => {
     expect(sockets).toHaveLength(0);
   });
 
-  test('only ever targets loopback', async () => {
+  test('only ever targets loopback, on the port range', async () => {
     await pairedSocket();
-    expect(new URL(sockets[0].url).hostname).toBe('127.0.0.1');
-    expect(new URL(bridgeSocketUrl(1234)).hostname).toBe('127.0.0.1');
+    expect(sockets.every(s => new URL(s.url).hostname === '127.0.0.1')).toBe(true);
+    expect(new URL(bridgeSocketUrl(47838)).hostname).toBe('127.0.0.1');
+    expect(() => bridgeSocketUrl(1234)).toThrow();
+    expect(() => bridgeSocketUrl(47839)).toThrow();
   });
 
   test('hello carries the token only after the server proves it', async () => {
     const ws = await pairedSocket();
     expect(ws.sent.map(f => f.type)).toEqual(['challenge', 'hello']);
     expect(ws.sent[1].token).toBe(TOKEN);
-    expect(_state.getBridgeStatus()).toEqual({ state: 'connected', client: 'claude-code' });
+    expect(_state.getBridgeStatus()).toEqual({ state: 'connected', clients: ['claude-code'] });
   });
 
   test('a wrong proof never sees the token and reads Refused', async () => {
-    saveBridgeRecord({ enabled: true, port: 47831, token: TOKEN });
+    saveBridgeRecord({ enabled: true, token: TOKEN });
     bridgeConnect();
-    const ws = sockets[0];
+    const ws = socketOn(47831);
     ws.open();
     await ws.receive({ type: 'proof', hmac: 'nope' });
     expect(ws.sent.map(f => f.type)).toEqual(['challenge']);
@@ -144,10 +159,107 @@ describe('connection', () => {
   });
 });
 
+describe('several agent apps (setup spec section 5)', () => {
+  test('one scan opens a socket to every port of the range', () => {
+    saveBridgeRecord({ enabled: true, token: TOKEN });
+    bridgeConnect();
+    expect(sockets.map(s => s.port)).toEqual(PORTS);
+  });
+
+  test('two servers pair; status lists both agent apps in port order', async () => {
+    saveBridgeRecord({ enabled: true, token: TOKEN });
+    bridgeConnect();
+    await pairOn(47832, 'claude-ai');
+    await pairOn(47831, 'claude-code');
+    expect(_state.getBridgeStatus()).toEqual({ state: 'connected', clients: ['claude-code', 'claude-ai'] });
+  });
+
+  test('a rescan leaves connected servers alone and probes only the others', async () => {
+    vi.useFakeTimers();
+    saveBridgeRecord({ enabled: true, token: TOKEN });
+    bridgeConnect();
+    await pairOn(47831, 'claude-code');
+    PORTS.slice(1).forEach(p => socketOn(p).drop());
+    await vi.advanceTimersByTimeAsync(0);
+    sockets.length = 0;
+    await vi.advanceTimersByTimeAsync(31000);
+    expect(sockets.length).toBeGreaterThan(0);
+    expect(sockets.some(s => s.port === 47831)).toBe(false);
+  });
+
+  test('events reach every server; a result goes only to the server that called', async () => {
+    saveBridgeRecord({ enabled: true, token: TOKEN });
+    bridgeConnect();
+    const a = await pairOn(47831, 'claude-code');
+    const b = await pairOn(47832, 'claude-ai');
+    bridgeNotifyWeekSaved('2026-45', { nodes: [{ id: 'x', type: 'activity', label: 'A' }] });
+    expect(a.sent.filter(f => f.event === 'week-saved')).toHaveLength(1);
+    expect(b.sent.filter(f => f.event === 'week-saved')).toHaveLength(1);
+    await serverCall(b, { id: 7, tool: 'get_stats', args: {} });
+    expect(b.sent.filter(f => f.type === 'result').map(f => f.id)).toEqual([7]);
+    expect(a.sent.some(f => f.type === 'result')).toBe(false);
+  });
+
+  test('writes from two servers queue: one at a time, in arrival order', async () => {
+    saveBridgeRecord({ enabled: true, token: TOKEN });
+    bridgeConnect();
+    const a = await pairOn(47831, 'claude-code');
+    const b = await pairOn(47832, 'claude-ai');
+    const br = branchId();
+    await Promise.all([
+      serverCall(a, { id: 1, tool: 'add_task', args: { branch: br, label: 'From A' } }),
+      serverCall(b, { id: 1, tool: 'add_task', args: { branch: br, label: 'From B' } }),
+    ]);
+    const labels = findNode(br).children.map(id => findNode(id).label);
+    expect(labels.indexOf('From A')).toBeLessThan(labels.indexOf('From B'));
+    expect(a.sent.filter(f => f.type === 'result')).toHaveLength(1);
+    expect(b.sent.filter(f => f.type === 'result')).toHaveLength(1);
+  });
+
+  test('one server quitting leaves the other connected and looks again soon', async () => {
+    vi.useFakeTimers();
+    saveBridgeRecord({ enabled: true, token: TOKEN });
+    bridgeConnect();
+    const a = await pairOn(47831, 'claude-code');
+    await pairOn(47832, 'claude-ai');
+    await a.drop();
+    expect(_state.getBridgeStatus()).toEqual({ state: 'connected', clients: ['claude-ai'] });
+    sockets.length = 0;
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(sockets.some(s => s.port === 47831)).toBe(true);
+  });
+
+  test('a refused port does not hide a connected server and is not retried', async () => {
+    vi.useFakeTimers();
+    saveBridgeRecord({ enabled: true, token: TOKEN });
+    bridgeConnect();
+    const bad = socketOn(47831);
+    bad.open();
+    await bad.receive({ type: 'proof', hmac: 'nope' });
+    expect(_state.getBridgeStatus().state).toBe('refused');
+    await pairOn(47832, 'claude-code');
+    expect(_state.getBridgeStatus().state).toBe('connected');
+    await bad.drop('refused');
+    sockets.length = 0;
+    await vi.advanceTimersByTimeAsync(31000);
+    expect(sockets.some(s => s.port === 47831)).toBe(false);
+  });
+
+  test('disconnect closes every socket', async () => {
+    saveBridgeRecord({ enabled: true, token: TOKEN });
+    bridgeConnect();
+    const a = await pairOn(47831, 'claude-code');
+    const b = await pairOn(47832, 'claude-ai');
+    bridgeDisconnect();
+    expect(a.closed && b.closed).toBeTruthy();
+    expect(_state.getBridgeStatus().state).toBe('off');
+  });
+});
+
 describe('dispatch', () => {
   test('unknown tool and unknown argument are refused by the page', async () => {
     const ws = await pairedSocket();
-    await bridgeHandleCall({ id: 1, tool: 'eval', args: {} });
+    await serverCall(ws, { id: 1, tool: 'eval', args: {} });
     expect(ws.sent.at(-1)).toMatchObject({ id: 1, ok: false, error: { code: 'unknown_tool' } });
     expect(await codeOf(call('add_task', { branch: branchId(), label: 'x', js: 1 }))).toBe('bad_args');
   });
@@ -156,8 +268,8 @@ describe('dispatch', () => {
     const ws = await pairedSocket();
     const b = branchId();
     await Promise.all([
-      bridgeHandleCall({ id: 1, tool: 'add_task', args: { branch: b, label: 'First' } }),
-      bridgeHandleCall({ id: 2, tool: 'add_task', args: { branch: b, label: 'Second' } }),
+      serverCall(ws, { id: 1, tool: 'add_task', args: { branch: b, label: 'First' } }),
+      serverCall(ws, { id: 2, tool: 'add_task', args: { branch: b, label: 'Second' } }),
     ]);
     const results = ws.sent.filter(f => f.type === 'result');
     expect(results.map(r => r.id)).toEqual([1, 2]);

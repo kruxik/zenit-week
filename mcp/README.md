@@ -77,10 +77,13 @@ For working on the server itself, run it from a clone instead of npm:
 | Option | What it does |
 |---|---|
 | `--open` | Opens the app in your browser when a request arrives and no tab is connected. |
-| `--port <n>` | Listens on another port (default `47831`). The port is part of the pairing code, so pair again after changing it. |
 | `--allow-origin <https-url>` | Also accepts that page origin, for example an ngrok dev tunnel. Repeatable. |
 
 Options go after the package name, for example `npx -y zenit-week-mcp@1 --open`.
+
+### Several agent apps at once
+
+Every agent app starts its own copy of the server: Claude Desktop at launch, Claude Code per session, Cursor per window. Each copy listens on the first free port from `47831` to `47838`, and the app connects to all of them, so they can run side by side with one pairing code. Settings lists every connected agent app. A copy that finds all eight ports taken says "Too many Zenit Week servers running" and exits. Calls from two agents never interleave: the app runs them one at a time.
 
 ## What the agent can do
 

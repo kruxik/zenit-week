@@ -6,7 +6,6 @@ import {
   checkForAssetUpdate,
   requestPersistentStorage,
   _state,
-  saveBridgeRecord,
   bridgeConnect,
   bridgeDisconnect,
   bridgeSocketUrl,
@@ -210,18 +209,22 @@ describe('agent bridge socket', () => {
     const urls = [];
     sandbox.WebSocket = class { constructor(u) { urls.push(u); } send() {} close() {} };
     try {
+      // A stored port is ignored: one scan opens the fixed range, nothing else.
       for (const port of [47831, 'evil.com', '1@evil.com', -1, 99999]) {
-        saveBridgeRecord({ enabled: true, port, token: 'abcdefghijklmnopqrstuvwxyz012345' });
+        _state.setLocalStorage('zenit-week-bridge', { enabled: true, port, token: 'abcdefghijklmnopqrstuvwxyz012345' });
         bridgeConnect();
         bridgeDisconnect();
       }
-      expect(urls.length).toBe(5);
+      expect(urls.length).toBe(5 * 8);
       for (const u of urls) {
         const url = new URL(u);
         expect(url.protocol).toBe('ws:');
         expect(url.hostname).toBe('127.0.0.1');
+        expect(Number(url.port)).toBeGreaterThanOrEqual(47831);
+        expect(Number(url.port)).toBeLessThanOrEqual(47838);
       }
       expect(() => bridgeSocketUrl('1@evil.com')).toThrow();
+      expect(() => bridgeSocketUrl(80)).toThrow();
     } finally {
       delete sandbox.WebSocket;
       _state.clearLocalStorage();

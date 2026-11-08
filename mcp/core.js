@@ -8,10 +8,18 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const DEFAULT_PORT = 47831;
+// Every agent app starts its own server; each takes the first free port of
+// this range and the page connects to all of them (agent-bridge-setup.md
+// section 5). Keep in step with BRIDGE_PORT_MIN / MAX in zenit-week.html.
+export const PORT_MIN = 47831;
+export const PORT_MAX = 47838;
+export const PORTS = Object.freeze(Array.from({ length: PORT_MAX - PORT_MIN + 1 }, (_, i) => PORT_MIN + i));
 export const HANDSHAKE_TIMEOUT_MS = 2000;
 export const CALL_TIMEOUT_MS = 60000; // a write may wait 30 s for an editing user, plus the lock
 export const OPEN_WAIT_MS = 15000;
+// A server that just started is found by an open page within its longest
+// rescan (30 s) or at once on focus, so its first calls wait that long for a tab.
+export const STARTUP_GRACE_MS = 35000;
 export const WRITE_BUDGET_PER_MIN = 200;
 
 // Tools that only read. They do not count against the write budget.
@@ -53,8 +61,21 @@ export function newToken() {
   return crypto.randomBytes(32).toString('base64url');
 }
 
-export function pairingCode(port, token) {
-  return `${port}.${token}`;
+// `<port>.<token>`: the port part is kept so codes already pasted stay valid;
+// the page ignores it and scans the whole range.
+export function pairingCode(token) {
+  return `${PORT_MIN}.${token}`;
+}
+
+// Binds the first free port of `ports`. `tryListen(port)` resolves to the
+// listening server, or to null when the port is taken; any other failure
+// rejects. Resolves to { port, server }, or null when every port is taken.
+export async function listenOnFirstFreePort(tryListen, ports = PORTS) {
+  for (const port of ports) {
+    const server = await tryListen(port);
+    if (server) return { port, server };
+  }
+  return null;
 }
 
 // ~/.config/zenit-week-mcp/token, owner-only.

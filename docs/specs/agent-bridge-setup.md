@@ -1,6 +1,6 @@
 # SPEC - Agent Bridge setup: install, pairing, production and dev
 
-> Status: Draft for review, revision 2 (2026-11-08). Revision 2 works in a two-persona review (a regular user who knows MCP, and the developer-owner). Not implemented.
+> Status: Draft for review, revision 2 (2026-11-08). Revision 2 works in a two-persona review (a regular user who knows MCP, and the developer-owner). Phases 1 (npm) and 2 (several agent apps) of section 9 implemented 2026-11-08; the rest not yet.
 > Scope: how a user installs `zenit-week-mcp`, pairs it with the app, and how a developer uses the production app and a dev tunnel side by side. Replaces sections 5 (opt-in and pairing), 6 rows 1-2 (origin and server proof), 9 rows 1-3 (handshake frames) and 12 row 2 (distribution) of [agent-bridge.md](agent-bridge.md), and changes 7.5 (which tab executes). Everything else there - execution model, tools, resources, mobile, network-policy exception - stays as it is.
 
 ---
