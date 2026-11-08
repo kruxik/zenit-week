@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-STzM5/nGpU2NeDLUtT/Qeamc2ClyFfMIEU+Or3JrYXw=';
+               'sha256-tbBB9X4qRbuQBvNSlT0HooQF37FPQOd6n0g5E+vGt/8=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1435,7 +1435,8 @@
   .settings-pane > * { flex-shrink: 0; }
 
   .settings-section > .agenda-action-btn,
-  #bridge-paired > .agenda-action-btn { align-self: flex-end; }
+  #bridge-paired > .agenda-action-btn,
+  #bridge-guide > .agenda-action-btn { align-self: flex-end; }
 
   /* Only the open tab's pane is shown, so the window is as tall as its
      content. This wrapper is the one that scrolls. */
@@ -1500,7 +1501,8 @@
   }
 
   #lang-select,
-  #theme-select {
+  #theme-select,
+  #bridge-guide-app {
     width: 100%;
     padding: 5px 8px;
     border-radius: 8px;
@@ -1512,7 +1514,8 @@
     outline: none;
   }
   #lang-select:focus,
-  #theme-select:focus { border-color: var(--border-hover); }
+  #theme-select:focus,
+  #bridge-guide-app:focus { border-color: var(--border-hover); }
 
   /* Theme toggle pill */
   .theme-toggle-row {
@@ -3741,7 +3744,6 @@
   }
   .bridge-status-line { font-size: 12px; line-height: 1.4; color: var(--text-secondary); padding: 0 2px; }
   .bridge-note { font-size: 11px; line-height: 1.4; color: var(--text-muted); padding: 0 2px; }
-  .bridge-indent { padding-left: 34px; }
   .bridge-list { display: flex; flex-direction: column; gap: 6px; }
   .settings-row {
     display: flex;
@@ -4979,14 +4981,16 @@ Or remove them later in Settings → Help.</div>
         <div id="bridge-agents" class="bridge-list" hidden></div>
         <div id="bridge-guide" class="bridge-list" hidden>
           <div class="settings-separator"></div>
-          <div class="settings-label" data-i18n="bridge.guide.title">Connect an agent</div>
-          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">CD</span><span class="settings-row-name">Claude Desktop</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-desktop" data-i18n="bridge.guide.download">Download</button></div>
-          <div class="bridge-note bridge-indent" data-i18n="bridge.guide.desktopNote">No setup needed: open the file and confirm in Claude Desktop.</div>
-          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">CC</span><span class="settings-row-name">Claude Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-claude-code" data-i18n="bridge.guide.copyCommand">Copy command</button></div>
-          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">Cu</span><span class="settings-row-name">Cursor</span><button type="button" class="agenda-action-btn" id="bridge-guide-cursor" data-i18n="bridge.guide.addCursor">Add to Cursor</button></div>
-          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">VS</span><span class="settings-row-name">VS Code</span><button type="button" class="agenda-action-btn" id="bridge-guide-vscode" data-i18n="bridge.guide.addVscode">Add to VS Code</button></div>
-          <div class="settings-row"><span class="settings-badge settings-badge-app" aria-hidden="true">{ }</span><span class="settings-row-name" data-i18n="bridge.guide.other">Other MCP app</span><button type="button" class="agenda-action-btn" id="bridge-guide-other" data-i18n="bridge.guide.copyConfig">Copy config</button></div>
-          <div class="bridge-note" data-i18n="bridge.guide.node">All but Claude Desktop need Node.js 20 or newer. If your agent does not see Zenit Week, restart it.</div>
+          <div class="settings-label" id="bridge-guide-label" data-i18n="bridge.guide.title">Connect an agent</div>
+          <select id="bridge-guide-app" aria-labelledby="bridge-guide-label">
+            <option value="claude-desktop">Claude Desktop</option>
+            <option value="claude-code">Claude Code</option>
+            <option value="cursor">Cursor</option>
+            <option value="vscode">VS Code</option>
+            <option value="other" data-i18n="bridge.guide.other">Other MCP app</option>
+          </select>
+          <div id="bridge-guide-note" class="bridge-note"></div>
+          <button type="button" class="agenda-action-btn commit" id="bridge-guide-action"></button>
         </div>
         <div id="bridge-paired" class="bridge-list" hidden>
           <div class="settings-separator"></div>
@@ -11780,7 +11784,10 @@ const TRANSLATIONS = {
     'bridge.guide.addVscode':     'Add to VS Code',
     'bridge.guide.other':         'Other MCP app',
     'bridge.guide.copyConfig':    'Copy config',
-    'bridge.guide.node':          'All but Claude Desktop need Node.js 20 or newer. If your agent does not see Zenit Week, restart it.',
+    'bridge.guide.codeNote':      'Paste the command in a terminal, then restart Claude Code. Needs Node.js 20 or newer.',
+    'bridge.guide.cursorNote':    'Cursor opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
+    'bridge.guide.vscodeNote':    'VS Code opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
+    'bridge.guide.otherNote':     "Paste it into your app's MCP settings, then restart the app. Needs Node.js 20 or newer.",
     'bridge.copied':              'Copied',
     'bridge.paired':              'Paired',
     'bridge.pairedOn':            'Paired on {date}',
@@ -12250,7 +12257,10 @@ const TRANSLATIONS = {
     'bridge.guide.addVscode':     'Přidat do VS Code',
     'bridge.guide.other':         'Jiná MCP aplikace',
     'bridge.guide.copyConfig':    'Kopírovat nastavení',
-    'bridge.guide.node':          'Všechny kromě Claude Desktop potřebují Node.js 20 nebo novější. Když agent Zenit Week nevidí, restartuj ho.',
+    'bridge.guide.codeNote':      'Vlož příkaz do terminálu a restartuj Claude Code. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.cursorNote':    'Otevře se Cursor a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.vscodeNote':    'Otevře se VS Code a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.otherNote':     'Vlož ho do MCP nastavení své aplikace a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
     'bridge.copied':              'Zkopírováno',
     'bridge.paired':              'Spárováno',
     'bridge.pairedOn':            'Spárováno {date}',
@@ -27184,6 +27194,7 @@ function renderBridgeStatus() {
   }
   const guideDue = shown === 'waiting-server' && Date.now() - _bridgeWaitingSince >= BRIDGE_GUIDE_DELAY_MS;
   document.getElementById('bridge-guide').hidden = !(shown === 'update-server' || guideDue);
+  renderBridgeGuide();
   const paired = document.getElementById('bridge-paired');
   paired.hidden = !rec.key;
   if (rec.key) {
@@ -27205,6 +27216,30 @@ function bridgeUpdateHintKey(agents) {
 function _bridgeCopy(text) {
   const done = () => showToast(t('bridge.copied'));
   if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, () => {});
+}
+
+// Opens a link the browser hands to an app (Cursor) or downloads (the extension).
+function _bridgeFollow(href) {
+  const link = document.createElement('a');
+  link.href = href;
+  link.rel = 'noopener';
+  link.click();
+}
+
+// One entry per agent app in the Connect an agent picker: the note under the
+// picker and the one button follow the choice.
+const BRIDGE_GUIDE = {
+  'claude-desktop': { note: 'bridge.guide.desktopNote', label: 'bridge.guide.download', run: () => _bridgeFollow(BRIDGE_DESKTOP_EXTENSION_URL) },
+  'claude-code': { note: 'bridge.guide.codeNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(BRIDGE_CLAUDE_CODE_CMD) },
+  cursor: { note: 'bridge.guide.cursorNote', label: 'bridge.guide.addCursor', run: () => _bridgeFollow(BRIDGE_CURSOR_LINK) },
+  vscode: { note: 'bridge.guide.vscodeNote', label: 'bridge.guide.addVscode', run: () => window.open(BRIDGE_VSCODE_LINK, '_blank', 'noopener') },
+  other: { note: 'bridge.guide.otherNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
+};
+
+function renderBridgeGuide() {
+  const entry = BRIDGE_GUIDE[document.getElementById('bridge-guide-app').value] || BRIDGE_GUIDE['claude-desktop'];
+  document.getElementById('bridge-guide-note').textContent = t(entry.note);
+  document.getElementById('bridge-guide-action').textContent = t(entry.label);
 }
 
 // The first switch-on explains the browser prompt that follows (setup spec
@@ -27245,21 +27280,10 @@ function initBridgeSettings() {
       _bridgeTurnOn();
     }
   });
-  document.getElementById('bridge-guide-claude-desktop').addEventListener('click', () => {
-    const link = document.createElement('a');
-    link.href = BRIDGE_DESKTOP_EXTENSION_URL;
-    link.rel = 'noopener';
-    link.click();
+  document.getElementById('bridge-guide-app').addEventListener('change', renderBridgeGuide);
+  document.getElementById('bridge-guide-action').addEventListener('click', () => {
+    BRIDGE_GUIDE[document.getElementById('bridge-guide-app').value]?.run();
   });
-  document.getElementById('bridge-guide-claude-code').addEventListener('click', () => _bridgeCopy(BRIDGE_CLAUDE_CODE_CMD));
-  document.getElementById('bridge-guide-other').addEventListener('click', () => _bridgeCopy(BRIDGE_OTHER_CONFIG));
-  // Cursor's link is handed to the app; the VS Code redirect opens in a tab.
-  document.getElementById('bridge-guide-cursor').addEventListener('click', () => {
-    const link = document.createElement('a');
-    link.href = BRIDGE_CURSOR_LINK;
-    link.click();
-  });
-  document.getElementById('bridge-guide-vscode').addEventListener('click', () => { window.open(BRIDGE_VSCODE_LINK, '_blank', 'noopener'); });
   document.getElementById('bridge-unpair-btn').addEventListener('click', () => {
     bridgeUnpair();
     renderBridgeStatus();
