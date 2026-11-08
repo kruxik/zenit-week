@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-bLTn+p8NO0nVSYKBBUyYDxuJJBRIBlq0Z9MM8OEM0vI=';
+               'sha256-WuGNaWMCkhuoUESKQtBmqzeM944JiLMaZdPNVnvy0mw=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -27229,8 +27229,11 @@ function _bridgeCopy(text) {
   if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, () => {});
 }
 
-// Opens a link the browser hands to an app (Cursor) or downloads (the extension).
+// Opens a guide link without leaving Zenit Week: a web link (the extension
+// download, the VS Code redirect) in a new tab, as comment links do; an app
+// link (cursor:) in place, where the browser hands it to the app and stays.
 function _bridgeFollow(href) {
+  if (/^https:\/\//.test(href)) { window.open(href, '_blank', 'noopener,noreferrer'); return; }
   const link = document.createElement('a');
   link.href = href;
   link.rel = 'noopener';
@@ -27246,7 +27249,7 @@ const BRIDGE_GUIDE = {
   gemini: { note: 'bridge.guide.geminiNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('gemini')) },
   cursor: { note: 'bridge.guide.cursorNote', label: 'bridge.guide.addCursor', run: () => _bridgeFollow(BRIDGE_CURSOR_LINK) },
   devin: { note: 'bridge.guide.devinNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
-  vscode: { note: 'bridge.guide.vscodeNote', label: 'bridge.guide.addVscode', run: () => window.open(BRIDGE_VSCODE_LINK, '_blank', 'noopener') },
+  vscode: { note: 'bridge.guide.vscodeNote', label: 'bridge.guide.addVscode', run: () => _bridgeFollow(BRIDGE_VSCODE_LINK) },
   other: { note: 'bridge.guide.otherNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
 };
 
