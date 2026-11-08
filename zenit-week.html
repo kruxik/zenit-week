@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-BioWeF3Mx099/FZNBQztU/yv8m3koRJNMwUUpxHxjkc=';
+               'sha256-ZoxT3lYQNTCszSMmKXosu7xsWt7CUqgEx00vmlEx9zg=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -16093,7 +16093,8 @@ function setActivityDays(nodeId, newDays, remap = null) {
 //   • Single-day token ("(tu)") → keep label as-is, no Nx expansion.
 //   • Plain label → drop any stale counter or tick-children.
 // Caller must have already assigned node.label and called touchNode.
-// Shared by commitEdit and submitQuickAdd so both flows behave identically.
+// Reached through applyLabelEdit, which the map editor, quick add and the
+// agent bridge all use, so every flow behaves identically.
 // The N of an `Nx` label ("Pushups 10x" -> 10), 0 when there is none. Values
 // below 2 make no ticks; callers apply that rule. The one reader of the token,
 // shared by label magic and the agent bridge's refusal of `days` with `Nx`.
@@ -26454,32 +26455,14 @@ document.addEventListener('click', (e) => {
     // Sunday belongs to next week, not this week's long-past Monday.
     const crossesNextWeek = magicTokenResolvesToNextWeek(label);
 
-    // Create inbox node
-    takeSnapshot();
+    // Create the inbox node through the same two halves the map editor and the
+    // agent bridge use (insertChildTask + applyLabelEdit, finishNewTask below),
+    // so label magic, the roll-up and the first-task event have one path.
     const branch = findNode(selectedBranchId);
     if (!branch) return;
-    const node = {
-      id:        genId(),
-      type:      'activity',
-      label:     label.slice(0, 200),
-      parent:    selectedBranchId,
-      branch:    selectedBranchId,
-      children:  [],
-      inbox:     true,
-      done:      false,
-      unplanned: false,
-      priority:  'normal',
-      reusable:  false,
-      offX: 0, offY: 0,
-      _ts: Date.now(),
-    };
-    weekData.nodes.push(node);
-    rebuildNodeMap();
-    branch.children.push(node.id);
-    touchNode(selectedBranchId);
-
-    // Apply day-token + Nx-counter rules - same logic as commitEdit.
-    applyMagicLabel(node.id);
+    takeSnapshot();
+    const node = insertChildTask(branch, { label: '', inbox: true });
+    applyLabelEdit(node.id, label.slice(0, 200), { isNew: true });
 
     // Capture before the possible move - after it the node lives in next week's
     // data and findNode() no longer resolves it.
@@ -26492,7 +26475,7 @@ document.addEventListener('click', (e) => {
       // reverses the add+move). move() saves both weeks and re-renders.
       await moveNodeToWeek(node.id, { takeSnap: false });
     } else {
-      noteTaskCreated(node.id);
+      finishNewTask(node.id);
       saveWeek(currentWeekKey, weekData);
     }
     renderIfVisible();
