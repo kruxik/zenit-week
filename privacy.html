@@ -184,10 +184,11 @@
     <p>Zenit Week is not directed at children under 16. We do not knowingly collect data from children. If you believe a child has used the app and you are their guardian, contact us and we will help you remove any associated data from your devices and your Google Drive (we cannot delete it ourselves because we hold no copies).</p>
 
     <h2>12. Automated decision-making and profiling</h2>
-    <p>The app does not perform profiling and does not subject users to any automated decision-making within the meaning of Article 22 GDPR. There is no AI/ML processing of your data.</p>
+    <p>The app does not perform profiling and does not subject users to any automated decision-making within the meaning of Article 22 GDPR. Zenit Week itself does no AI/ML processing of your data. If you connect an AI agent (§2.3), that agent processes what it reads at your direction, under its provider's terms.</p>
 
     <h2>13. Security</h2>
     <p>The website is served over HTTPS only. The OAuth flow uses PKCE and a CSRF state parameter. The Google client secret is held server-side in the Vercel Edge Function and never reaches the browser. The OAuth refresh token stored in your browser grants access only to the app-specific Drive folder (§5) and can be revoked at any time.</p>
+    <p>The optional agent bridge (§2.3) listens only on <code>127.0.0.1</code>, so it cannot be reached from another device. It accepts connections only from the Zenit Week site, and a tab must prove it knows your pairing code before an agent can read or change anything. The code is stored only on your computer and can be replaced at any time. Every change an agent makes goes through the app's own actions, is shown to you and can be undone.</p>
 
     <h2>14. Changes to this policy</h2>
     <p>Material changes will be reflected by an updated "Last updated" date above and, when warranted, by a notice in the app. Continued use of the app after changes constitutes acceptance.</p>
