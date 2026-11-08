@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-b1IzKrWH96b5KvYxbcmI+9lIzt3OFjgMVxvp5KczaaY=';
+               'sha256-SdEvE3Vf6H2q4K5v8qP7xAtv7PGnXGqgRC5NNVUzbrk=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4662,6 +4662,19 @@ Or remove them later in Settings → Help.</div>
       <option value="dark" data-i18n="settings.dark">Dark</option>
     </select>
   </div>
+  <!-- Agent bridge: desktop only, unhidden by initBridgeSettings on a fine pointer. -->
+  <div class="settings-separator" id="bridge-separator" hidden></div>
+  <div class="settings-section" id="bridge-section" hidden>
+    <div class="theme-toggle-row">
+      <span class="settings-label" id="bridge-label" data-i18n="settings.bridge">Agent bridge</span>
+      <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Let an AI agent on this computer read and change your week">
+        <span class="theme-toggle-thumb"></span>
+      </button>
+    </div>
+    <input type="text" id="bridge-code" class="dialog-field" autocomplete="off" spellcheck="false" data-i18n-placeholder="settings.bridgeCode" placeholder="Paste the pairing code" data-i18n-aria="settings.bridgeCode" aria-label="Paste the pairing code">
+    <div id="bridge-status" role="status" aria-live="polite" style="font-size:11px;line-height:1.4;color:var(--text-muted);padding:0 2px;"></div>
+    <button type="button" class="agenda-action-btn" id="bridge-forget-btn" data-i18n="settings.bridgeForget" style="width:100%;">Disconnect and forget</button>
+  </div>
   <div class="settings-separator"></div>
   <div class="settings-section">
     <div class="theme-toggle-row">
@@ -4879,6 +4892,11 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.mobileSwipeLeft">Swipe left for quick options.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.mobileTapDrag">Tap a node in the Mindmap to drag it.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.mobileLongPress">Long-press a node for quick options.</div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title" data-i18n="help.bridgeTitle">AI agent bridge</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.bridgeDesc">Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP client) read and change your week, as if you clicked: each change shows a toast and is one undo step. Run zenit-week-mcp, paste its pairing code in Settings &gt; Agent bridge and allow the browser prompt. Desktop Chrome and Firefox only; your phone follows through Drive sync. Disconnect and forget, signing out or resetting removes the pairing.</div>
       </div>
 
       <div class="help-section">
@@ -11349,6 +11367,22 @@ const TRANSLATIONS = {
     'settings.tips':              'Show tips',
     'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
     'settings.tipsReplay':        'Replay tips',
+    'settings.bridge':            'Agent bridge',
+    'settings.bridgeTitle':       'Let an AI agent on this computer read and change your week',
+    'settings.bridgeCode':        'Paste the pairing code',
+    'settings.bridgeForget':      'Disconnect and forget',
+    'bridge.state.off':           'Off',
+    'bridge.state.waiting-server': 'Waiting for server - run zenit-week-mcp',
+    'bridge.state.waiting-permission': 'Waiting for permission - your browser asks to let Zenit Week reach apps on this computer: choose Allow',
+    'bridge.state.connected':     'Connected - {client}',
+    'bridge.state.connectedNoName': 'Connected',
+    'bridge.state.refused':       'Refused (wrong code) - paste the code again',
+    'bridge.state.blocked':       'Blocked by browser - allow apps on this device in the site settings',
+    'bridge.state.unsupported':   'Not supported in this browser yet',
+    'bridge.state.needCode':      'Paste the pairing code first',
+    'bridge.state.badCode':       'That is not a pairing code',
+    'help.bridgeTitle':           'AI agent bridge',
+    'help.bridgeDesc':            'Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP client) read and change your week, as if you clicked: each change shows a toast and is one undo step. Run zenit-week-mcp, paste its pairing code in Settings > Agent bridge and allow the browser prompt. Desktop Chrome and Firefox only; your phone follows through Drive sync. Disconnect and forget, signing out or resetting removes the pairing.',
     'settings.tipsReplayDone':    'Tips reset - they’ll show again.',
     'tips.doneCaption':           'Done',
     'tips.unplannedCaption':      'Unplanned',
@@ -11757,6 +11791,22 @@ const TRANSLATIONS = {
     'settings.tips':              'Zobrazovat tipy',
     'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
     'settings.tipsReplay':        'Přehrát tipy znovu',
+    'settings.bridge':            'Propojení s agentem',
+    'settings.bridgeTitle':       'Dovol AI agentovi na tomto počítači číst a měnit tvůj týden',
+    'settings.bridgeCode':        'Vlož párovací kód',
+    'settings.bridgeForget':      'Odpojit a zapomenout',
+    'bridge.state.off':           'Vypnuto',
+    'bridge.state.waiting-server': 'Čekám na server - spusť zenit-week-mcp',
+    'bridge.state.waiting-permission': 'Čekám na povolení - prohlížeč se ptá, zda smí Zenit Week přistupovat k aplikacím na tomto počítači: zvol Povolit',
+    'bridge.state.connected':     'Připojeno - {client}',
+    'bridge.state.connectedNoName': 'Připojeno',
+    'bridge.state.refused':       'Odmítnuto (špatný kód) - vlož kód znovu',
+    'bridge.state.blocked':       'Zablokováno prohlížečem - povol přístup k aplikacím na tomto zařízení v nastavení webu',
+    'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje',
+    'bridge.state.needCode':      'Nejdřív vlož párovací kód',
+    'bridge.state.badCode':       'Tohle není párovací kód',
+    'help.bridgeTitle':           'Propojení s AI agentem',
+    'help.bridgeDesc':            'Dovol AI agentovi na tomto počítači (Claude Code, Claude Desktop nebo jakýkoli MCP klient) číst a měnit tvůj týden, jako by šlo o tvé kliknutí: každá změna ukáže oznámení a jde vrátit jedním krokem zpět. Spusť zenit-week-mcp, vlož jeho párovací kód do Nastavení > Propojení s agentem a povol dotaz prohlížeče. Jen v Chrome a Firefoxu na počítači; telefon se přizpůsobí přes synchronizaci s Diskem. Odpojení, odhlášení nebo reset párování smaže.',
     'settings.tipsReplayDone':    'Tipy resetovány - zobrazí se znovu.',
     'tips.doneCaption':           'Hotovo',
     'tips.unplannedCaption':      'Neplánované',
@@ -12160,6 +12210,7 @@ function applyTranslations() {
   const daysEn = document.getElementById('help-days-en');
   if (daysCs) daysCs.style.display = currentLang === 'cs' ? '' : 'none';
   if (daysEn) daysEn.style.display = currentLang === 'en' ? '' : 'none';
+  renderBridgeStatus(); // the status line is built from text, not data-i18n
 }
 
 function setLanguage(lang) {
@@ -26534,6 +26585,80 @@ document.getElementById('autolayout-toggle').addEventListener('click', () => {
 
 syncAutoLayoutToggleUI();
 
+// ─── Agent bridge settings ────────────────────────────────────────────────────
+// Desktop only: on a phone the loopback has nothing to reach. The record is
+// device-local (zenit-week-bridge), never in the synced settings blob.
+function renderBridgeStatus() {
+  const el = document.getElementById('bridge-status');
+  const toggle = document.getElementById('bridge-toggle');
+  // Shown only by initBridgeSettings at boot, after every bridge binding exists.
+  if (!el || !toggle || document.getElementById('bridge-section').hidden) return;
+  const rec = loadBridgeRecord();
+  const supported = bridgeSupported();
+  toggle.disabled = !supported;
+  toggle.setAttribute('aria-checked', supported && rec.enabled ? 'true' : 'false');
+  const { state, client } = supported ? bridgeStatus : { state: 'unsupported', client: null };
+  const shown = rec.enabled || state === 'unsupported' || state === 'refused' ? state : 'off';
+  el.textContent = shown === 'connected'
+    ? (client ? t('bridge.state.connected', { client }) : t('bridge.state.connectedNoName'))
+    : t(`bridge.state.${shown}`);
+  document.getElementById('bridge-forget-btn').hidden = !rec.token;
+}
+
+function bridgeSettingsHint(key) {
+  const el = document.getElementById('bridge-status');
+  if (el) el.textContent = t(key);
+}
+
+function initBridgeSettings() {
+  if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
+  const section = document.getElementById('bridge-section');
+  const separator = document.getElementById('bridge-separator');
+  if (!section) return;
+  section.hidden = false;
+  if (separator) separator.hidden = false;
+  onBridgeStatus(renderBridgeStatus);
+
+  document.getElementById('bridge-toggle').addEventListener('click', () => {
+    const rec = loadBridgeRecord();
+    if (rec.enabled) {
+      saveBridgeRecord({ ...rec, enabled: false });
+      bridgeDisconnect();
+    } else if (rec.token) {
+      saveBridgeRecord({ ...rec, enabled: true });
+      bridgeConnect();
+    } else {
+      document.getElementById('bridge-code').focus();
+      bridgeSettingsHint('bridge.state.needCode');
+      return;
+    }
+    renderBridgeStatus();
+  });
+
+  // Pasting a code is the one pairing step: it stores the code, turns the
+  // bridge on and connects. The field is cleared so the token is not on screen.
+  const code = document.getElementById('bridge-code');
+  code.addEventListener('input', () => {
+    const value = code.value.trim();
+    if (!value) { renderBridgeStatus(); return; }
+    const parsed = parseBridgePairingCode(value);
+    if (!parsed) { bridgeSettingsHint('bridge.state.badCode'); return; }
+    code.value = '';
+    bridgeDisconnect();
+    saveBridgeRecord({ enabled: true, port: parsed.port, token: parsed.token });
+    bridgeConnect();
+    renderBridgeStatus();
+  });
+  // Typing in the field must not reach the global hotkeys.
+  code.addEventListener('keydown', e => e.stopPropagation());
+
+  document.getElementById('bridge-forget-btn').addEventListener('click', () => {
+    forgetBridge();
+    renderBridgeStatus();
+  });
+  renderBridgeStatus();
+}
+
 // ─── Tips toggle + coachmark dismissal ────────────────────────────────────────
 function syncTipsToggleUI() {
   const toggle = document.getElementById('tips-toggle');
@@ -28287,6 +28412,7 @@ window.addEventListener('load', async () => {
   traceMilestone('local week painted');
   endBoot();
   scheduleCommentEditorPrefetch();
+  initBridgeSettings();
   startBridgeWhenIdle();
 
   if (_quietRestore && _quietRestore.hoveredNodeId && findNode(_quietRestore.hoveredNodeId)) {

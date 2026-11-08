@@ -54,7 +54,7 @@
   <nav><a href="/">← Zenit Week</a></nav>
   <main>
     <h1>Privacy Policy</h1>
-    <p class="meta">Last updated: 10 October 2026</p>
+    <p class="meta">Last updated: 8 November 2026</p>
 
     <div class="tldr">
       <strong>TL;DR</strong>
@@ -87,7 +87,10 @@
     <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.2 In your own Google Drive (only if you sign in)</h3>
     <p>If you choose to sign in with Google, the app stores a copy of your planning data inside <em>your own</em> Google Drive, in a private app-specific folder, using the <code>drive.appdata</code> scope. This folder is invisible to other apps and to us. We never read, copy, or process your Drive data on any server.</p>
 
-    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.3 Transient network data (during page loads)</h3>
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.3 AI agent bridge (only if you turn it on)</h3>
+    <p>On a desktop computer you can pair the app with an AI agent running on that same computer (for example Claude Code or Claude Desktop) through the optional agent bridge. It is off by default and connects only to <code>127.0.0.1</code> on your own machine, never to another device or to us. With the bridge on, the week is read by the AI agent you connected and goes to that agent's provider under its terms. Zenit Week itself still runs no servers for this and stores nothing. "Disconnect and forget" in Settings, signing out or resetting the app removes the pairing.</p>
+
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.4 Transient network data (during page loads)</h3>
     <p>When you open the website, our hosting provider Vercel processes your IP address and standard HTTP request metadata (user agent, referrer, timestamps) for the time strictly necessary to serve the page and operate our two serverless functions: the OAuth token-exchange endpoint at <code>/api/token</code> and the Umami relay at <code>/api/umami-send</code>. Vercel does not share this with us in identifiable form. See §4 (Service providers) for details.</p>
 
     <h2>3. Cookies and analytics</h2>
@@ -157,7 +160,7 @@
     </ul>
 
     <h2>9. Data sharing</h2>
-    <p>We do not sell, rent, share, or disclose your data to any third party for any purpose. The only external services involved are the sub-processors listed in §4, and the only data that ever touches them is described in §2.</p>
+    <p>We do not sell, rent, share, or disclose your data to any third party for any purpose. The only external services involved are the sub-processors listed in §4, and the only data that ever touches them is described in §2. If you turn on the agent bridge (§2.3), what the AI agent you connected reads goes to that agent's provider at your direction, not ours.</p>
 
     <h2>10. Your rights under GDPR</h2>
     <p>As an EU/EEA resident you have the right to:</p>

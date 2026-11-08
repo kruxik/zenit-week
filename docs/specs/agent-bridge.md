@@ -291,7 +291,7 @@ Client configuration for the user (Claude Code example): one `claude mcp add zen
 ## 13. Acceptance criteria
 
 - [x] Owner has approved the network-policy exception (section 3) and it is recorded.
-- [ ] Privacy text carries the agent-provider line required by section 3.
+- [x] Privacy text carries the agent-provider line required by section 3.
 - [x] Browser probe (section 4) run in Chrome, Firefox and Safari; findings written into section 4 and the status-line states adjusted.
 - [ ] Chrome: with the permission prompt open, status shows `Waiting for permission`; after Block, `Blocked by browser`. Safari shows `Not supported in this browser yet` with the toggle disabled.
 - [ ] Bridge off: no socket is created, no timer runs, boot timing unchanged.

@@ -100,6 +100,18 @@ Arrow keys move a focus ring from node to node, so every shortcut below works wi
 
 Drag the background to pan. Scroll or pinch to zoom. Click the logo to fit everything to the view.
 
+## AI agent bridge (desktop)
+
+Let an AI agent on your computer (Claude Code, Claude Desktop or any MCP client) read and change your week through the app's own actions: each change shows a toast and is one undo step, and your phone follows through Drive sync. It is off by default and talks only to `127.0.0.1`. Desktop Chrome and Firefox; Safari is not supported yet.
+
+```sh
+cd mcp && npm install
+claude mcp add zenit-week -- node "$PWD/server.js"
+node server.js pair    # prints the pairing code and copies it
+```
+
+Paste the code in **Settings > Agent bridge** and choose **Allow** when the browser asks to reach apps on this computer (in Firefox, also tick "Remember my choice"). `node server.js rotate` makes a new code and unpairs every tab; **Disconnect and forget**, signing out or resetting removes the pairing in the app. Add `--open` to the server command to have it open the app when no tab is connected.
+
 ## Privacy
 
 Zenit Week runs no servers that hold your data. Your data lives in your browser, or - if you opt in - in your own Google Drive's hidden app folder. We never see it. The only data that briefly touches our infrastructure is your IP address while the page loads, handled by our hosting provider Vercel, plus cookieless, aggregated usage counts from Vercel Web Analytics and Umami (no personal identifiers, never your task content). Signing in with Google goes through one small serverless function of ours that exchanges OAuth tokens; it never sees your plans. A second one passes Umami's usage counts on to Umami together with your IP address, so Umami can look up the country, and stores nothing.
