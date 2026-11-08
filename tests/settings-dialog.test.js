@@ -7,11 +7,8 @@ const TABS = ['account', 'general', 'ai', 'data', 'dev'];
 
 const el = (id) => _state.getElement(id);
 const pane = (name) => el('settings-pane-' + name);
-// The pane the user sees: in layout and not the invisible inactive kind.
-const shownPanes = () => TABS.filter(name =>
-  !pane(name).hidden && !pane(name).classList.contains('settings-pane-inactive'));
-// Panes that take part in layout, and so in the dialog's height.
-const laidOutPanes = () => TABS.filter(name => !pane(name).hidden);
+// The pane the user sees - the only one in layout.
+const shownPanes = () => TABS.filter(name => !pane(name).hidden);
 
 function key(k) {
   for (const fn of el('settings-tabs')._listeners.keydown || []) {
@@ -52,14 +49,13 @@ describe('Settings dialog tabs', () => {
     expect(_state.getSettingsTab()).toBe('account');
   });
 
-  it('keeps the pane of every shown tab in layout, so the dialog is as tall as the tallest', () => {
+  it('lays out only the open tab, so the window is as tall as its content', () => {
     _state.openSettings();
-    expect(laidOutPanes()).toEqual(['account', 'general', 'data']);
-    expect(pane('data').inert).toBe(true);
-    expect(pane('account').inert).toBe(false);
+    expect(shownPanes()).toEqual(['account']);
     el('settings-tab-ai').hidden = false;
+    _state.selectSettingsTab('ai');
+    expect(shownPanes()).toEqual(['ai']);
     _state.selectSettingsTab('data');
-    expect(laidOutPanes()).toEqual(['account', 'general', 'ai', 'data']);
     expect(shownPanes()).toEqual(['data']);
   });
 
@@ -128,31 +124,31 @@ describe('Settings dialog tabs', () => {
   });
 });
 
-describe('Settings dialog height hold', () => {
-  // The AI tab changes height as the connection moves; the open window must
-  // not follow it down, or every flip of the switch makes it jump.
-  it('grows but never shrinks while open, and lets go on close', () => {
+describe('Settings dialog height', () => {
+  // The window follows its content's height, eased from the height it had.
+  it('eases from the settled height to the new one, then lets go', async () => {
     const dialog = el('settings-dialog');
+    dialog.getBoundingClientRect = () => ({ height: 300 });
     _state.openSettings();
-    dialog.getBoundingClientRect = () => ({ height: 500 });
-    _state.holdSettingsHeight();
-    expect(dialog.style.minHeight).toBe('500px');
     dialog.getBoundingClientRect = () => ({ height: 420 });
-    _state.holdSettingsHeight();
-    expect(dialog.style.minHeight).toBe('500px');
-    dialog.getBoundingClientRect = () => ({ height: 560 });
-    _state.holdSettingsHeight();
-    expect(dialog.style.minHeight).toBe('560px');
+    _state.animateSettingsHeight();
+    expect(dialog.style.height).toBe('420px');
+    expect(dialog.style.transition).toContain('height');
+    // No scrollbar while it is merely catching up with its content.
+    expect(dialog.classList.contains('settings-height-moving')).toBe(true);
+    await new Promise(r => setTimeout(r, 260));
+    expect(dialog.classList.contains('settings-height-moving')).toBe(false);
+    expect(dialog.style.height).toBe('');
+    expect(dialog.style.transition).toBe('');
     _state.closeSettings();
-    expect(dialog.style.minHeight).toBe('');
   });
 
-  it('holds nothing while closed', () => {
+  it('does nothing while closed, and clears on close', () => {
     const dialog = el('settings-dialog');
     _state.closeSettings();
     dialog.getBoundingClientRect = () => ({ height: 500 });
-    _state.holdSettingsHeight();
-    expect(dialog.style.minHeight).toBe('');
+    _state.animateSettingsHeight();
+    expect(dialog.style.height).toBe('');
   });
 });
 

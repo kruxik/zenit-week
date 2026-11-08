@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-zxZjuLtBFbLrtds2SmkI5YN1d1pagSaIn7/H7lLB6AQ=';
+               'sha256-Iwl3TBDJo2rw7o3iATQk5UDS/PChNPrgNJb7GOSPigQ=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1344,9 +1344,9 @@
   /* Settings: a window hung under the account button in the top-right corner,
      the one control it opens from. The overlay is transparent on desktop - it only catches the
      click outside that closes it, and leaves the map visible for the zoom
-     slider. Its height is that of the tallest tab (see .settings-panes), so
-     switching tabs never resizes it; it scrolls only when the viewport is
-     shorter than that. */
+     slider. It hangs from its top edge, so its height follows the open tab's
+     content, eased by animateSettingsHeight; it scrolls only when the
+     viewport is shorter than that. */
   #settings-overlay {
     position: fixed;
     inset: 0;
@@ -1432,22 +1432,30 @@
   .settings-section > .agenda-action-btn,
   #bridge-paired > .agenda-action-btn { align-self: flex-end; }
 
-  /* Every shown pane sits in the same grid cell, so the cell is as tall as the
-     tallest one; the inactive ones are only invisible (and inert), not removed.
-     A pane whose tab is hidden on this device carries [hidden] and adds
-     nothing. This wrapper is the one that scrolls. */
+  /* Only the open tab's pane is shown, so the window is as tall as its
+     content. This wrapper is the one that scrolls. */
   .settings-panes {
     flex: 1;
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    display: grid;
   }
-  .settings-pane.settings-pane-inactive { visibility: hidden; }
+  /* While the window eases to a taller height it is briefly shorter than its
+     content; that is not overflow, so no scrollbar flashes. Once settled, a
+     window taller than the viewport scrolls as usual. */
+  #settings-dialog.settings-height-moving .settings-panes { overflow-y: hidden; }
+  /* A tab switch fades the new pane in while the window eases to its height. */
+  .settings-pane:not([hidden]) { animation: settingsPaneIn 0.18s ease-out; }
+  @keyframes settingsPaneIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .settings-pane:not([hidden]) { animation: none; }
+  }
 
   .settings-pane {
-    grid-area: 1 / 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -19454,7 +19462,7 @@ function closeSettings() {
   const overlay = document.getElementById('settings-overlay');
   if (!overlay || !overlay.classList.contains('visible')) return;
   overlay.classList.remove('visible');
-  releaseSettingsHeight();
+  resetSettingsHeight();
   const btn = document.getElementById('account-btn');
   btn?.classList.remove('active');
   // Back to the button it was opened from, unless focus already moved on.
@@ -26591,13 +26599,7 @@ function selectSettingsTab(name, { focus = false } = {}) {
       tab.classList.toggle('active', on);
       tab.tabIndex = on ? 0 : -1;
     }
-    if (pane) {
-      // Shown panes stay in layout so the dialog keeps the tallest one's
-      // height; only a pane whose tab this device does not show is removed.
-      pane.hidden = !isSettingsTabShown(id);
-      pane.classList.toggle('settings-pane-inactive', !on);
-      pane.inert = !on;
-    }
+    if (pane) pane.hidden = !on;
   }
   if (name === 'data') refreshDataSummary();
   // Offline-ness can change without a status change, so re-read on show.
@@ -26605,21 +26607,48 @@ function selectSettingsTab(name, { focus = false } = {}) {
   if (focus) document.getElementById('settings-tab-' + name)?.focus?.();
 }
 
-// While open, the window may grow but never shrink. Its height is the tallest
-// tab's, and the AI tab changes height on its own as the connection moves
-// (Off -> waiting -> Connected and back), so a window that followed it would
-// jump on every switch of the toggle. Called before such a change; released
-// on close and on a viewport resize, so min-height never outlives max-height.
-function holdSettingsHeight() {
-  if (!isSettingsOpen()) return;
+// The window's height follows the open tab's content, eased rather than
+// jumped: a tab switch, the AI tab's status moving (Off -> waiting ->
+// Connected), a sign-in filling the Account tab. Each pane is watched, and on a
+// change the window is pinned at the height it had, then let run to its new
+// natural height. One already under way starts from where it has got to.
+const SETTINGS_HEIGHT_MS = 180;
+let _settingsHeight = null;   // the window's settled height, null while closed
+let _settingsHeightTimer = null;
+
+function animateSettingsHeight() {
   const dialog = document.getElementById('settings-dialog');
-  const h = dialog.getBoundingClientRect?.().height || 0;
-  if (h > (parseFloat(dialog.style.minHeight) || 0)) dialog.style.minHeight = h + 'px';
+  if (!dialog || !isSettingsOpen()) { _settingsHeight = null; return; }
+  const moving = !!dialog.style.height;
+  const from = moving ? dialog.getBoundingClientRect().height : _settingsHeight;
+  dialog.style.transition = '';
+  dialog.style.height = '';
+  const to = dialog.getBoundingClientRect().height;
+  _settingsHeight = to;
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (from == null || Math.abs(from - to) < 1 || reduce) return;
+  dialog.classList.add('settings-height-moving');
+  dialog.style.height = `${from}px`;
+  void dialog.offsetHeight;   // commit the start height before easing off it
+  dialog.style.transition = `height ${SETTINGS_HEIGHT_MS}ms ease-out`;
+  dialog.style.height = `${to}px`;
+  clearTimeout(_settingsHeightTimer);
+  _settingsHeightTimer = setTimeout(() => {
+    dialog.style.transition = '';
+    dialog.style.height = '';
+    dialog.classList.remove('settings-height-moving');
+  }, SETTINGS_HEIGHT_MS + 20);
 }
 
-function releaseSettingsHeight() {
+function resetSettingsHeight() {
   const dialog = document.getElementById('settings-dialog');
-  if (dialog) dialog.style.minHeight = '';
+  clearTimeout(_settingsHeightTimer);
+  _settingsHeight = null;
+  if (dialog) {
+    dialog.style.transition = '';
+    dialog.style.height = '';
+    dialog.classList.remove('settings-height-moving');
+  }
 }
 
 // Data tab: where the data lives, how many weeks and since when. Re-read each
@@ -26642,12 +26671,14 @@ async function refreshDataSummary() {
 }
 
 function openSettings() {
-  releaseSettingsHeight();
+  resetSettingsHeight();
   // A sync problem is the first thing to see: the badge that brought the user
   // here was red.
   selectSettingsTab(syncStatus === 'error' ? 'account' : settingsActiveTab);
   document.getElementById('settings-overlay').classList.add('visible');
   document.getElementById('account-btn').classList.add('active');
+  // Opening is the popup's own fade; the height eases only from here on.
+  _settingsHeight = document.getElementById('settings-dialog').getBoundingClientRect?.().height ?? null;
   document.getElementById('settings-tab-' + settingsActiveTab)?.focus?.();
 }
 
@@ -26661,7 +26692,15 @@ function openSettings() {
     else openSettings();
   });
   document.getElementById('settings-close').addEventListener('click', () => closeSettings());
-  window.addEventListener('resize', releaseSettingsHeight);
+  // A rotation or window resize re-wraps the panes: take the new height as settled.
+  window.addEventListener('resize', () => {
+    const dialog = document.getElementById('settings-dialog');
+    if (isSettingsOpen() && !dialog.style.height) _settingsHeight = dialog.getBoundingClientRect().height;
+  });
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(() => animateSettingsHeight());
+    overlay.querySelectorAll('.settings-pane').forEach(p => ro.observe(p));
+  }
   // The backdrop itself, never a click that started inside the dialog.
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeSettings();
@@ -27066,7 +27105,6 @@ function renderBridgeStatus() {
   const toggle = document.getElementById('bridge-toggle');
   // Shown only by initBridgeSettings at boot, after every bridge binding exists.
   if (!el || !toggle || document.getElementById('settings-tab-ai').hidden) return;
-  holdSettingsHeight();
   const rec = loadBridgeRecord();
   const supported = bridgeSupported();
   toggle.disabled = !supported;
