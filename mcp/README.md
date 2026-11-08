@@ -1,0 +1,112 @@
+# zenit-week-mcp
+
+A local [MCP](https://modelcontextprotocol.io/) server that lets an AI agent - Claude Code, Claude Desktop or any MCP client - plan your week in [Zenit Week](https://zenitweek.com).
+
+Zenit Week has no server holding your plans: the app and your data live in your browser (and, if you sync, in your own Google Drive). So the agent never touches your data directly. The server passes each request to the Zenit Week tab open in your browser, and the app does the work as if you clicked:
+
+- Every change shows a toast and is one undo step.
+- Your phone follows through Drive sync, if you use it.
+- Nothing leaves your computer except what the agent itself reads, which goes to the agent's provider.
+
+Works with Zenit Week in desktop Chrome and Firefox. Safari is not supported yet.
+
+## How it works
+
+```
+MCP client  --stdio-->  zenit-week-mcp  --WebSocket on 127.0.0.1-->  Zenit Week tab
+```
+
+The MCP client starts the server. The app connects to it once you pair them in **Settings > Agent bridge**.
+
+## Setup
+
+You need [Node.js](https://nodejs.org/) 20 or newer. The package is not on npm yet, so it runs from a clone of the repository.
+
+1. Install the dependencies:
+   ```sh
+   cd mcp && npm install
+   ```
+2. Register the server with your agent.
+   - Claude Code:
+     ```sh
+     claude mcp add zenit-week -- node "$PWD/server.js"
+     ```
+   - Claude Desktop: add it to `claude_desktop_config.json` and restart Claude Desktop:
+     ```json
+     {
+       "mcpServers": {
+         "zenit-week": {
+           "command": "node",
+           "args": ["/path/to/zenit-week/mcp/server.js"]
+         }
+       }
+     }
+     ```
+   - Any other MCP client: a stdio server with the command `node /path/to/zenit-week/mcp/server.js`.
+3. Print the pairing code. It is also copied to your clipboard:
+   ```sh
+   node server.js pair
+   ```
+4. Open [zenitweek.com/app](https://zenitweek.com/app), go to **Settings > Agent bridge** and paste the code.
+5. When the browser asks to let Zenit Week reach apps on this computer, choose **Allow**. In Firefox, also tick **Remember my choice**.
+6. Settings shows **Connected**. Ask your agent to look at your week.
+
+## Commands and options
+
+| Command | What it does |
+|---|---|
+| `node server.js` | Runs the server. This is what the MCP client launches. |
+| `node server.js pair` | Prints the pairing code again and copies it. |
+| `node server.js rotate` | Makes a new code. Every paired tab has to be paired again. |
+
+| Option | What it does |
+|---|---|
+| `--open` | Opens the app in your browser when a request arrives and no tab is connected. |
+| `--port <n>` | Listens on another port (default `47831`). The port is part of the pairing code, so pair again after changing it. |
+| `--allow-origin <https-url>` | Also accepts that page origin, for example an ngrok dev tunnel. Repeatable. |
+
+## What the agent can do
+
+Writes act on the week open in the app. Use `open_week` first to work on another week.
+
+| Tool | What it does |
+|---|---|
+| `open_week` | Shows a week in the app, creating it if absent. |
+| `add_task` | Adds a task to a branch, optionally under a parent, with days, priority and a comment. A label like "Pushups 10x" makes 10 ticks. |
+| `rename_task` | Renames a task. |
+| `set_status` | Marks a task done, undone, dropped, unplanned or planned. |
+| `set_priority` | Sets normal, high or critical priority. |
+| `set_days` | Replaces a task's weekdays (1 = Monday ... 7 = Sunday). |
+| `tick_task` | Records repetitions of an Nx task. |
+| `set_comment` | Replaces a task's comment (Markdown). |
+| `set_reusable` | Marks a task to be copied into next week. |
+| `delete_task` | Deletes a task. |
+| `send_to_date` | Moves a task to a date, optionally repeating. |
+| `transfer_unfinished` | Copies last week's unfinished tasks into this week. |
+| `transfer_reusable` | Copies last week's reusable tasks into this week. |
+| `add_branch` | Adds a branch (category). |
+| `undo` / `redo` | Undoes or redoes the last action, whoever made it. |
+| `get_stats` | Completion statistics of the week in view. |
+
+Read-only resources:
+
+| Resource | Content |
+|---|---|
+| `zenit://week/current` | The week in view: branches, tasks, days, ticks, status and ids. |
+| `zenit://week/{YYYY-WW}` | Any stored week. |
+| `zenit://weeks` | Weeks stored on this device, with task counts. |
+| `zenit://schedule` | Dated and repeating entries (the Later tab). |
+| `zenit://agenda/{1-7}` | The agenda of one day of the week in view. |
+
+## Security
+
+- **Your computer only.** The server listens on `127.0.0.1` and accepts connections only from `https://zenitweek.com`, local development origins and any origin you add with `--allow-origin`.
+- **Pairing code.** A tab must prove it knows the code before it can do anything. The code is stored in `~/.config/zenit-week-mcp/token` (or under `$XDG_CONFIG_HOME`). `rotate` replaces it.
+- **The app stays in charge.** The server never reads or changes week data itself. The app applies every change through its own actions, and each one can be undone.
+- **Rate limit.** At most 200 writes a minute. Reads are not limited.
+- **Several tabs.** Requests go to the most recently focused visible tab, or else to the tab that was visible most recently.
+- **Turning it off.** **Disconnect and forget** in Settings, signing out or resetting the app removes the pairing.
+
+## License
+
+MIT, like the rest of [Zenit Week](https://github.com/kruxik/zenit-week).
