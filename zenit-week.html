@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-JPzr1KdsVtO3LAaS7V/NqMTFggf/KGohbY6xzkqmIk0=';
+               'sha256-b1IzKrWH96b5KvYxbcmI+9lIzt3OFjgMVxvp5KczaaY=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -11428,7 +11428,7 @@ const TRANSLATIONS = {
     'bridge.toast.set_status':    'Agent: {label} {status}',
     'bridge.toast.set_priority':  'Agent: {label} set to {priority} priority',
     'bridge.toast.set_days':      'Agent: changed the days of {label}',
-    'bridge.toast.tick_task':     'Agent: {label} {n} tick(s)',
+    'bridge.toast.tick_task':     'Agent: {label} {n}',
     'bridge.toast.set_comment':   'Agent: updated the comment on {label}',
     'bridge.toast.set_reusable':  'Agent: changed reusable on {label}',
     'bridge.toast.delete_task':   'Agent: deleted {label}',
@@ -11836,7 +11836,7 @@ const TRANSLATIONS = {
     'bridge.toast.set_status':    'Agent: {label} {status}',
     'bridge.toast.set_priority':  'Agent: {label} má prioritu {priority}',
     'bridge.toast.set_days':      'Agent: změnil dny u {label}',
-    'bridge.toast.tick_task':     'Agent: {label} {n} opakování',
+    'bridge.toast.tick_task':     'Agent: {label} {n}',
     'bridge.toast.set_comment':   'Agent: upravil komentář u {label}',
     'bridge.toast.set_reusable':  'Agent: změnil opakovatelnost u {label}',
     'bridge.toast.delete_task':   'Agent: smazal {label}',
@@ -27234,7 +27234,7 @@ const BRIDGE_TOOLS = {
       if (!Number.isInteger(n) || n === 0) throw _bridgeBad('n must be a non-zero integer');
       const available = n > 0 ? info.total - info.done : info.done;
       if (Math.abs(n) > available) throw _bridgeBad(`only ${available} tick(s) can be ${n > 0 ? 'closed' : 'reopened'}`);
-      return { id: node.id, n, toast: { label: node.label, n: String(n) } };
+      return { id: node.id, n, toast: { label: node.label, n: (n > 0 ? '+' : '') + n } };
     },
     apply({ id, n }) {
       // Picked the way the agenda picks: next pending forward, last done back.
