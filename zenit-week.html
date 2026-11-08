@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-WuGNaWMCkhuoUESKQtBmqzeM944JiLMaZdPNVnvy0mw=';
+               'sha256-GFVMi88vygtgMEt2XRAkDS13OuthbdiH8WD4cMXXFdU=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4852,9 +4852,9 @@ Or remove them later in Settings → Help.</div>
       <button type="button" class="agenda-tab" id="settings-tab-ai" role="tab" aria-controls="settings-pane-ai" aria-selected="false" tabindex="-1" hidden><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-sparkles"/></svg><span data-i18n="settings.tabAi">AI</span></button>
       <div class="agenda-tab-separator" aria-hidden="true"></div>
       <button type="button" class="agenda-tab" id="settings-tab-data" role="tab" aria-controls="settings-pane-data" aria-selected="false" tabindex="-1"><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-database"/></svg><span data-i18n="settings.tabData">Data</span></button>
-      <!-- Dev-only, never translated. -->
+      <!-- Dev-only: shown on development hosts alone. -->
       <div class="agenda-tab-separator" aria-hidden="true"></div>
-      <button type="button" class="agenda-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-code"/></svg><span>Dev</span></button>
+      <button type="button" class="agenda-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-code"/></svg><span data-i18n="dev.tab">Dev</span></button>
     </div>
     <div class="settings-panes">
     <div class="settings-pane" id="settings-pane-account" role="tabpanel" aria-labelledby="settings-tab-account">
@@ -5057,43 +5057,43 @@ Or remove them later in Settings → Help.</div>
         <div class="settings-hero">
           <div class="settings-badge settings-badge-info" id="dev-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-code"/></svg></div>
           <div class="settings-identity">
-            <div class="settings-name">Development</div>
+            <div class="settings-name" data-i18n="dev.title">Development</div>
           </div>
         </div>
-        <div class="settings-sub">Tools for this development host. Never shown in production.</div>
+        <div class="settings-sub" data-i18n="dev.desc">Tools for this development host. Never shown in production.</div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
-        <div class="settings-label">Host</div>
+        <div class="settings-label" data-i18n="dev.host">Host</div>
         <div class="settings-value" id="dev-host">-</div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
-        <div class="settings-label">Version</div>
+        <div class="settings-label" data-i18n="dev.version">Version</div>
         <div class="settings-value" id="dev-version">-</div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
-        <div class="settings-label">Tools</div>
+        <div class="settings-label" data-i18n="dev.tools">Tools</div>
         <div class="settings-block">
           <div class="settings-row">
             <span class="settings-badge settings-badge-app" aria-hidden="true"><svg class="icon"><use href="#icon-activity"/></svg></span>
             <div class="settings-identity">
-              <div class="settings-name">Record perf trace</div>
-              <div class="settings-sub">The next tap: phase marks, delivered frames, long animation frames</div>
+              <div class="settings-name" data-i18n="dev.probe">Record perf trace</div>
+              <div class="settings-sub" data-i18n="dev.probeDesc">The next tap: phase marks, delivered frames, long animation frames.</div>
             </div>
           </div>
-          <button type="button" class="agenda-action-btn" id="dev-probe-btn">Record</button>
+          <button type="button" class="agenda-action-btn" id="dev-probe-btn" data-i18n="dev.probeBtn">Record</button>
         </div>
         <div class="settings-block">
           <div class="settings-row">
             <span class="settings-badge settings-badge-app settings-badge-danger" aria-hidden="true"><svg class="icon"><use href="#icon-arrow-back-up"/></svg></span>
             <div class="settings-identity">
-              <div class="settings-name">Reset to first visit</div>
-              <div class="settings-sub">Wipe all local data and reload as a first-time visitor</div>
+              <div class="settings-name" data-i18n="dev.reset">Reset to first visit</div>
+              <div class="settings-sub" data-i18n="dev.resetDesc">Wipe all local data and reload as a first-time visitor.</div>
             </div>
           </div>
-          <button type="button" class="agenda-action-btn danger" id="dev-reset-btn">Reset</button>
+          <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" data-i18n="dev.resetBtn">Reset</button>
         </div>
       </div>
     </div>
@@ -11792,6 +11792,20 @@ const TRANSLATIONS = {
     'bridge.guide.codexNote':     'Paste the command in a terminal, then restart Codex. Needs Node.js 20 or newer.',
     'bridge.guide.geminiNote':    'Paste the command in a terminal, then restart Gemini CLI. Needs Node.js 20 or newer.',
     'bridge.guide.devinNote':     "Paste it into Devin Desktop's MCP config file (Settings, MCP servers), then restart it. Needs Node.js 20 or newer.",
+    'dev.tab':                    'Dev',
+    'dev.title':                  'Development',
+    'dev.desc':                   'Tools for this development host. Never shown in production.',
+    'dev.host':                   'Host',
+    'dev.version':                'Version',
+    'dev.tools':                  'Tools',
+    'dev.probe':                  'Record perf trace',
+    'dev.probeDesc':              'The next tap: phase marks, delivered frames, long animation frames.',
+    'dev.probeBtn':               'Record',
+    'dev.reset':                  'Reset to first visit',
+    'dev.resetDesc':              'Wipe all local data and reload as a first-time visitor.',
+    'dev.resetBtn':               'Reset',
+    'dev.resetTitle':             'Reset to first visit?',
+    'dev.resetBody':              'Deletes every week, setting and sync link stored in this browser, then reloads as a brand-new visitor. Data already synced to Google Drive is not touched.',
     'bridge.guide.vscodeNote':    'VS Code opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
     'bridge.guide.otherNote':     "Paste it into your app's MCP settings, then restart the app. Needs Node.js 20 or newer.",
     'bridge.copied':              'Copied',
@@ -12268,6 +12282,20 @@ const TRANSLATIONS = {
     'bridge.guide.codexNote':     'Vlož příkaz do terminálu a restartuj Codex. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.geminiNote':    'Vlož příkaz do terminálu a restartuj Gemini CLI. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.devinNote':     'Vlož ho do MCP nastavení Devin Desktop (Settings, MCP servers) a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
+    'dev.tab':                    'Vývoj',
+    'dev.title':                  'Vývoj',
+    'dev.desc':                   'Nástroje pro tento vývojový server. V produkci se nikdy nezobrazují.',
+    'dev.host':                   'Server',
+    'dev.version':                'Verze',
+    'dev.tools':                  'Nástroje',
+    'dev.probe':                  'Nahrát výkonnostní záznam',
+    'dev.probeDesc':              'Další klepnutí: značky fází, vykreslené snímky, dlouhé animační snímky.',
+    'dev.probeBtn':               'Nahrát',
+    'dev.reset':                  'Obnovit do první návštěvy',
+    'dev.resetDesc':              'Smaže všechna místní data a načte aplikaci jako pro nového návštěvníka.',
+    'dev.resetBtn':               'Obnovit',
+    'dev.resetTitle':             'Obnovit do první návštěvy?',
+    'dev.resetBody':              'Smaže všechny týdny, nastavení a propojení synchronizace uložené v tomto prohlížeči a načte aplikaci jako pro úplně nového návštěvníka. Data už synchronizovaná na Google Drive zůstanou beze změny.',
     'bridge.guide.vscodeNote':    'Otevře se VS Code a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.otherNote':     'Vlož ho do MCP nastavení své aplikace a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
     'bridge.copied':              'Zkopírováno',
@@ -29565,9 +29593,9 @@ window.addEventListener('load', async () => {
     if (devResetBtn) {
       devResetBtn.addEventListener('click', () => {
         showAppConfirm({
-          title: 'Reset to first visit?',
-          body: 'Deletes every week, setting and sync link stored in this browser, then reloads as a brand-new visitor. Data already synced to Google Drive is not touched.',
-          okLabel: 'Reset',
+          title: t('dev.resetTitle'),
+          body: t('dev.resetBody'),
+          okLabel: t('dev.resetBtn'),
           danger: true,
           onConfirm: () => { devResetApp(); },
         });
