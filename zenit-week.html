@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-4h0oYkEsahtmSMytnIIdds/buWhSpnpUFobu89yh82A=';
+               'sha256-q7hX+HF/U+RsQRiOWYE9CYXkypG7am/pWNKncCSLiA0=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1426,8 +1426,9 @@
   /* Settings: a window pinned to the bottom-right corner, above the gear it
      opens from. The overlay is transparent on desktop - it only catches the
      click outside that closes it, and leaves the map visible for the zoom
-     slider. Fixed height, so switching tabs never resizes the window; only the
-     pane scrolls. */
+     slider. Its height is that of the tallest tab (see .settings-panes), so
+     switching tabs never resizes it; it scrolls only when the viewport is
+     shorter than that. */
   #settings-overlay {
     position: fixed;
     inset: 0;
@@ -1441,7 +1442,6 @@
     bottom: 58px;
     width: 380px;
     max-width: calc(100vw - 24px);
-    height: 460px;
     max-height: calc(100vh - 130px);
     display: flex;
     flex-direction: column;
@@ -1492,11 +1492,23 @@
   .settings-section > .agenda-action-btn,
   .bridge-list > .agenda-action-btn { align-self: flex-start; }
 
-  .settings-pane {
+  /* Every shown pane sits in the same grid cell, so the cell is as tall as the
+     tallest one; the inactive ones are only invisible (and inert), not removed.
+     A pane whose tab is hidden on this device carries [hidden] and adds
+     nothing. This wrapper is the one that scrolls. */
+  .settings-panes {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    display: grid;
+  }
+  .settings-pane.settings-pane-inactive { visibility: hidden; }
+
+  .settings-pane {
+    grid-area: 1 / 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1536,11 +1548,7 @@
       background: var(--bg-surface);
       box-shadow: 0 1px 3px var(--shadow-sm);
     }
-    .settings-pane {
-      flex: 1;
-      min-height: 0;
-      padding-bottom: calc(16px + env(safe-area-inset-bottom));
-    }
+    .settings-pane { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
   }
 
   .settings-section {
@@ -4770,6 +4778,7 @@ Or remove them later in Settings → Help.</div>
       <!-- Dev-only, never translated. -->
       <button type="button" class="settings-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden>Development</button>
     </div>
+    <div class="settings-panes">
     <div class="settings-pane" id="settings-pane-general" role="tabpanel" aria-labelledby="settings-tab-general">
       <div class="settings-section">
         <div id="zoom-slider-header">
@@ -4867,6 +4876,7 @@ Or remove them later in Settings → Help.</div>
         <button type="button" class="agenda-action-btn" id="dev-probe-btn" title="Record the next tap: phase marks, delivered frames, long animation frames">Record perf trace</button>
         <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" title="Wipe all local data and reload as a first-time visitor">Reset to first visit</button>
       </div>
+    </div>
     </div>
     </div>
   </div>
@@ -26469,7 +26479,13 @@ function selectSettingsTab(name, { focus = false } = {}) {
       tab.setAttribute('aria-selected', on ? 'true' : 'false');
       tab.tabIndex = on ? 0 : -1;
     }
-    if (pane) pane.hidden = !on;
+    if (pane) {
+      // Shown panes stay in layout so the dialog keeps the tallest one's
+      // height; only a pane whose tab this device does not show is removed.
+      pane.hidden = !isSettingsTabShown(id);
+      pane.classList.toggle('settings-pane-inactive', !on);
+      pane.inert = !on;
+    }
   }
   if (focus) document.getElementById('settings-tab-' + name)?.focus?.();
 }

@@ -7,7 +7,11 @@ const TABS = ['general', 'ai', 'data', 'dev'];
 
 const el = (id) => _state.getElement(id);
 const pane = (name) => el('settings-pane-' + name);
-const shownPanes = () => TABS.filter(name => !pane(name).hidden);
+// The pane the user sees: in layout and not the invisible inactive kind.
+const shownPanes = () => TABS.filter(name =>
+  !pane(name).hidden && !pane(name).classList.contains('settings-pane-inactive'));
+// Panes that take part in layout, and so in the dialog's height.
+const laidOutPanes = () => TABS.filter(name => !pane(name).hidden);
 
 function key(k) {
   for (const fn of el('settings-tabs')._listeners.keydown || []) {
@@ -36,6 +40,17 @@ describe('Settings dialog tabs', () => {
     expect(_state.isSettingsOpen()).toBe(true);
     expect(el('fab-settings').classList.contains('active')).toBe(true);
     expect(shownPanes()).toEqual(['general']);
+  });
+
+  it('keeps the pane of every shown tab in layout, so the dialog is as tall as the tallest', () => {
+    _state.openSettings();
+    expect(laidOutPanes()).toEqual(['general', 'data']);
+    expect(pane('data').inert).toBe(true);
+    expect(pane('general').inert).toBe(false);
+    el('settings-tab-ai').hidden = false;
+    _state.selectSettingsTab('data');
+    expect(laidOutPanes()).toEqual(['general', 'ai', 'data']);
+    expect(shownPanes()).toEqual(['data']);
   });
 
   it('never selects a hidden tab', () => {
