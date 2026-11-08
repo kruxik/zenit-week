@@ -46,6 +46,7 @@ function elementStub() {
     setAttribute: () => {},
     getAttribute: () => null,
     appendChild: () => {},
+    replaceChildren: () => {},
     removeChild: () => {},
     insertBefore: () => {},
     querySelector: () => null,

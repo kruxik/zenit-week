@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-FcepTu+EW9ulkBJqP//0IVqjngbNk6WYSvdxpVUK0tY=';
+               'sha256-Dn4YQxlLkP3SJrqVFq/zljKn6qi41Ozw4u8aK1pgT9M=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3796,6 +3796,43 @@
   #main-svg .focus-dim { opacity: 0.45; }
   #vision-empty-hint .dialog-body { padding: 12px 14px; }
 
+  /* Reading pane: docked to the canvas's right edge on the Vision, desktop
+     only, and out of the way while the comment editor is open. */
+  #vision-pane {
+    display: none;
+    position: fixed;
+    top: calc(var(--toolbar-h) + 12px);
+    right: 12px;
+    bottom: 76px;
+    width: min(var(--panel-width), 36vw);
+    flex-direction: column;
+    z-index: 900;
+    overflow: hidden;
+    box-shadow: 0 4px 16px var(--shadow-md);
+  }
+  @media (min-width: 768px) {
+    html[data-view="vision"] #vision-pane { display: flex; }
+    html[data-view="vision"]:has(#comment-panel.visible) #vision-pane { display: none; }
+  }
+  #vision-pane .dialog-header { gap: 10px; }
+  #vision-pane-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  #vision-pane-body {
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #vision-pane-body .vp-empty { color: var(--text-muted); }
+  #vision-pane-body .vp-heading { font-weight: 700; font-size: 15px; margin-top: 6px; }
+  #vision-pane-body .vp-item { display: flex; gap: 8px; }
+  #vision-pane-body .vp-mark { flex: none; min-width: 1.2em; color: var(--text-muted); }
+  #vision-pane-body .vp-line { min-height: 1em; overflow-wrap: anywhere; }
+  #vision-pane-body .vp-done { text-decoration: line-through; color: var(--text-muted); }
+  #vision-pane-body a { color: var(--accent-primary); }
+
   .add-btn {
     opacity: 0;
     transition: opacity 0.15s ease;
@@ -4389,6 +4426,16 @@
 </div>
 
 <div id="view-level-toast"></div>
+
+<!-- The Vision's reading pane (desktop): the selected node's comment, read-only,
+     rendered through the comment grammar. Edit opens the one comment editor. -->
+<aside id="vision-pane" class="dialog-shell" aria-live="polite">
+  <div class="dialog-header">
+    <div class="dialog-title" id="vision-pane-title"></div>
+    <button type="button" class="agenda-action-btn" id="vision-pane-edit" data-i18n="vision.paneEdit">Edit</button>
+  </div>
+  <div class="dialog-body" id="vision-pane-body"></div>
+</aside>
 
 <!-- The empty Vision's one hint: seeded areas, no intention yet. Gone with the
      first add; the Vision has no coachmark set of its own. -->
@@ -12047,6 +12094,9 @@ const TRANSLATIONS = {
     'horizon.year':               'this year',
     'horizon.years':              'in a few years',
     'horizon.someday':            'someday',
+    'vision.paneEdit':            'Edit',
+    'vision.readingEmpty':        'Select an intention to read why it matters.',
+    'vision.readingNoComment':    'No words yet. Edit to write why this matters.',
     'vision.emptyHint':           'Add an intention to an area with its "+": where you want to go, and why.',
     'menu.takeBack':              'Take back',
     'menu.horizon.year':          'This year',
@@ -12489,6 +12539,9 @@ const TRANSLATIONS = {
     'horizon.year':               'letos',
     'horizon.years':              'za pár let',
     'horizon.someday':            'jednou',
+    'vision.paneEdit':            'Upravit',
+    'vision.readingEmpty':        'Vyberte záměr a přečtěte si, proč na něm záleží.',
+    'vision.readingNoComment':    'Zatím bez slov. Upravte a napište, proč na tom záleží.',
     'vision.emptyHint':           'Přidejte záměr k oblasti jejím „+“: kam chcete dojít a proč.',
     'menu.takeBack':              'Vzít zpět',
     'menu.horizon.year':          'Letos',
@@ -19645,6 +19698,7 @@ function render() {
   updateSummary();
   applyFocusDim();
   updateVisionEmptyHint();
+  updateVisionPane();
 
   markMapGeometryChanged();
   _mapDirty = false;
@@ -19723,6 +19777,8 @@ function isTypingTarget(el) {
 function paintKbFocus() {
   document.querySelectorAll('.node-group').forEach(g =>
     g.classList.toggle('kb-focus', kbFocusId !== null && g.getAttribute('data-id') === kbFocusId));
+  // The reading pane reads the same selection.
+  updateVisionPane();
 }
 
 // A pruned node keeps no position, and the pointer that was over it gets no
@@ -20463,6 +20519,9 @@ function attachNodeListeners() {
         if (el !== g) el.classList.remove('selected');
       });
       g.classList.add('selected');
+      // On the Vision a click selects the node for the reading pane, the same
+      // selection the keyboard's focus ring makes.
+      if (isVisionInView()) setKbFocus(id, null);
     });
 
     g.querySelectorAll('.collapse-badge').forEach(badge => {
@@ -21078,6 +21137,71 @@ function positionContextMenu(x, y) {
   ctxMenu.style.left = Math.max(pad, Math.min(mx, vw - menuW - pad)) + 'px';
   ctxMenu.style.top  = Math.max(pad, Math.min(my, vh - menuH - pad)) + 'px';
   ctxMenu.style.visibility = '';
+}
+
+// The reading pane follows the selection (kbFocusId). Every user string goes in
+// through textContent or buildCommentInline, never as markup.
+// Width the reading pane takes from the canvas: zero wherever it is not shown.
+function visionPaneInset() {
+  if (!isVisionInView()) return 0;
+  const pane = document.getElementById('vision-pane');
+  if (!pane || typeof getComputedStyle !== 'function' || getComputedStyle(pane).display === 'none') return 0;
+  return (pane.offsetWidth || 0) + 12;
+}
+
+function updateVisionPane() {
+  // The pane exists on the Vision only; nothing to keep current elsewhere.
+  if (!isVisionInView()) return;
+  const pane = document.getElementById('vision-pane');
+  if (!pane) return;
+  const title = document.getElementById('vision-pane-title');
+  const body = document.getElementById('vision-pane-body');
+  const edit = document.getElementById('vision-pane-edit');
+  const node = kbFocusId && kbFocusId !== 'center' ? findNode(kbFocusId) : null;
+  body.replaceChildren();
+  const hint = (key) => {
+    const p = document.createElement('div');
+    p.className = 'vp-empty';
+    p.textContent = t(key);
+    body.appendChild(p);
+  };
+  if (!node) {
+    title.textContent = t('view.vision');
+    edit.hidden = true;
+    hint('vision.readingEmpty');
+    return;
+  }
+  title.textContent = nodeDisplayLabel(node);
+  edit.hidden = node.type !== 'activity';
+  if (!node.comments) { hint('vision.readingNoComment'); return; }
+  renderCommentReadOnly(node.comments, body);
+}
+
+// The comment grammar drawn read-only: one row per block, the marker as text.
+function renderCommentReadOnly(str, parent) {
+  for (const block of tokenizeComment(str)) {
+    const row = document.createElement('div');
+    const line = document.createElement('div');
+    line.className = 'vp-line';
+    buildCommentInline(block.inline, line);
+    if (block.type === 'heading') {
+      row.className = 'vp-heading';
+      row.appendChild(line);
+    } else if (block.type === 'paragraph') {
+      row.appendChild(line);
+    } else {
+      row.className = 'vp-item';
+      const mark = document.createElement('span');
+      mark.className = 'vp-mark';
+      mark.textContent = block.type === 'bullet' ? '\u2022'
+        : block.type === 'ordered' ? `${block.number}.`
+        : block.checked ? '\u2611' : '\u2610';
+      if (block.type === 'check' && block.checked) line.classList.add('vp-done');
+      row.appendChild(mark);
+      row.appendChild(line);
+    }
+    parent.appendChild(row);
+  }
 }
 
 function updateVisionEmptyHint() {
@@ -21964,6 +22088,20 @@ document.getElementById('ctx-undone').addEventListener('click', () => {
   }
   if (currentView === 'agenda') renderAgenda();
   hideContextMenu();
+});
+
+// A link in the pane opens the way every comment link does: through the dialog
+// that shows the full address first.
+document.getElementById('vision-pane-body').addEventListener('click', e => {
+  const a = e.target.closest('a[href]');
+  if (!a) return;
+  e.preventDefault();
+  askOpenCommentLink(a.getAttribute('href'));
+});
+
+document.getElementById('vision-pane-edit').addEventListener('click', () => {
+  const node = kbFocusId ? findNode(kbFocusId) : null;
+  if (node && node.type === 'activity') openCommentDialog(node.id);
 });
 
 document.getElementById('ctx-collapse').addEventListener('click', () => {
@@ -23297,6 +23435,8 @@ function closeCommentDialog() {
   commentSession++;
   commentTargetId = null;
   commentEntryId = null;
+  // The pane shows what the editor just saved.
+  updateVisionPane();
 }
 window.closeCommentDialog = closeCommentDialog;
 
@@ -25273,7 +25413,10 @@ function fitMindmapView() {
   // which equals viewport. This lets us fit correctly on init even when boot
   // view is Agenda, so the mindmap (visible blurred on desktop) is laid out
   // and the zoom slider reflects the true zoom from the start.
-  const w = svg.clientWidth  || svg.getBoundingClientRect().width  || window.innerWidth  || 800;
+  const fullW = svg.clientWidth  || svg.getBoundingClientRect().width  || window.innerWidth  || 800;
+  // The Vision's reading pane covers the right edge of the canvas, so the map
+  // fits into what is left of it.
+  const w = Math.max(200, fullW - visionPaneInset());
   const h = svg.clientHeight || svg.getBoundingClientRect().height || window.innerHeight || 600;
   const band = mindmapClearBand(svg, h);
   const bandH = band.bottom - band.top;
@@ -25781,6 +25924,9 @@ window.addEventListener('pointerup', (e) => {
     isPanning = false;
     container.classList.remove('panning');
     if (panningFromCenter) endCenterPan(e);
+    // A click on the empty Vision canvas (a pan that never moved) clears the
+    // selection the reading pane follows.
+    else if (isVisionInView() && Math.hypot(e.clientX - panStartX, e.clientY - panStartY) <= CENTER_CLICK_SLOP_PX) clearKbFocus();
   }
 });
 

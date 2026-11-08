@@ -721,8 +721,9 @@ describe('opening a comment link has one way in', () => {
     // openCommentLink: its definition, and the dialog's OK - nothing else.
     expect(code.match(/openCommentLink\(/g)).toHaveLength(2);
     expect(code).toMatch(/onConfirm: \(\) => openCommentLink\(href\)/);
-    // Editor tap (touch), editor Cmd/Ctrl-click, Agenda preview click.
-    expect(code.match(/askOpenCommentLink\(/g)).toHaveLength(4);
+    // Editor tap (touch), editor Cmd/Ctrl-click, Agenda preview click, and the
+    // Vision's reading pane.
+    expect(code.match(/askOpenCommentLink\(/g)).toHaveLength(5);
     expect(code).not.toMatch(/comment-link-chip/);
   });
 });
