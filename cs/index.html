@@ -60,6 +60,14 @@
       "name": "Petr Burian",
       "url": "https://www.petrburian.com/"
     },
+    "featureList": [
+      "Týdenní plán jako myšlenková mapa",
+      "Agenda po dnech",
+      "Statistiky týdne",
+      "Přenos nedokončených a opakovaných úkolů do dalšího týdne",
+      "Volitelná synchronizace s Google Diskem",
+      "Propojení s AI agentem přes MCP (Claude Code, Claude Desktop)"
+    ],
     "license": "https://opensource.org/license/mit"
   }
   </script>
@@ -736,6 +744,54 @@
       .features-grid { grid-template-columns: 1fr; }
     }
 
+    /* ── AI agent section (reuses .preview; white after the grey features) ── */
+    .agent {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .agent .benefit { background: var(--cloud); }
+
+    .agent-demo {
+      max-width: 560px;
+      margin: 0 auto 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .agent-prompt {
+      align-self: stretch;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 40px rgba(26,26,46,0.08);
+      padding: 18px 22px 18px 16px;
+      font-size: 16px;
+      line-height: 1.5;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .agent-toast {
+      background: var(--ink);
+      color: #fff;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .agent-setup {
+      margin-top: 28px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .agent-setup a { color: inherit; font-weight: 600; }
+
     /* ── Ritual section ───────────────────────────────────────────── */
     .ritual {
       background: var(--ink);
@@ -1088,6 +1144,50 @@
       </div>
 
     </div>
+  </div>
+</section>
+
+<!-- ── AI agent ──────────────────────────────────────────────────────── -->
+<section class="preview agent" id="ai-agent">
+  <div class="preview-inner">
+    <p class="section-label">Novinka</p>
+    <div class="section-divider"></div>
+    <h2 class="h2-light">Plánuj se svým <strong>AI&nbsp;agentem</strong></h2>
+    <p>Řekni Claudovi nebo jinému AI agentovi, co tvůj týden potřebuje.<br>Úkoly přidá do mapy, jako by šlo o tvé vlastní kliknutí.</p>
+
+    <figure class="agent-demo">
+      <div class="agent-prompt">
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z"/></svg></div>
+        <p>„Nastav Osobní běh na úterý a&nbsp;čtvrtek. Přesuň nedokončené pracovní úkoly z&nbsp;minulého týdne.“</p>
+      </div>
+      <figcaption class="agent-toast">Přidán Běh (Út, Čt) · 3 úkoly přesunuty do tohoto týdne</figcaption>
+    </figure>
+
+    <div class="benefits">
+      <div class="benefit">
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg></div>
+        <div class="benefit-body">
+          <h3>Máš to pod kontrolou</h3>
+          <p>Každá změna se hned ukáže v&nbsp;mapě a&nbsp;jde vrátit jedním krokem&nbsp;zpět.</p>
+        </div>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z"/><path d="M7 20h10"/><path d="M9 16v4"/><path d="M15 16v4"/></svg></div>
+        <div class="benefit-body">
+          <h3>Zůstává u tebe</h3>
+          <p>Agent se připojí jen k&nbsp;aplikaci na tvém počítači. Nic nejde přes&nbsp;nás.</p>
+        </div>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12l5 5l-1.5 1.5a3.5 3.5 0 1 1 -5 -5l1.5 -1.5z"/><path d="M17 12l-5 -5l1.5 -1.5a3.5 3.5 0 1 1 5 5l-1.5 1.5z"/><path d="M3 21l2.5 -2.5"/><path d="M18.5 5.5l2.5 -2.5"/><path d="M10 11l-2 2"/><path d="M13 14l-2 2"/></svg></div>
+        <div class="benefit-body">
+          <h3>Zapínáš ho ty</h3>
+          <p>Funguje s&nbsp;Claude Code, Claude Desktop i&nbsp;jakýmkoli MCP klientem. Chrome a&nbsp;Firefox na&nbsp;počítači.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="agent-setup">Nastavení zatím zabere pár příkazů. <a href="https://github.com/kruxik/zenit-week#ai-agent-bridge-desktop" target="_blank" rel="noopener">Jak připojit agenta →</a></p>
   </div>
 </section>
 
