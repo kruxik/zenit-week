@@ -1,6 +1,6 @@
 # SPEC - Agent Bridge (local MCP server, "Door 3")
 
-> Status: Draft for discussion, revision 3 (second code review folded in: tick model, merge race, exact mappings)
+> Status: Implemented on branch `agent-bridge` (2026-11-08), revision 3 of the design. Verification results are recorded in section 13.
 > Scope: a device-local channel that lets a general-purpose AI agent (Claude Code, Claude Desktop, any MCP client) read and change Zenit Week data through the app's own actions. Touches `zenit-week.html` (bridge client, Settings, CSP, a few small extractions so the bridge and the UI share one path) and adds one tooling package under `mcp/`. No data-model change.
 
 ---
@@ -107,7 +107,7 @@ Port: fixed default `47831`, `--port` to override. CSP uses the port wildcard ei
 
 | # | Threat | Control |
 |---|---|---|
-| 1 | Any website on the machine opens `ws://127.0.0.1:<port>` and issues commands | Server checks the `Origin` header against an allowlist: `https://zenitweek.com`, `https://www.zenitweek.com`, `http://localhost:*`, `http://127.0.0.1:*`. A local page on an allowed dev origin still needs the token. The server closes any socket that has not completed the handshake within 2 s. |
+| 1 | Any website on the machine opens `ws://127.0.0.1:<port>` and issues commands | Server checks the `Origin` header against an allowlist: `https://zenitweek.com`, `https://www.zenitweek.com`, `http://localhost:*`, `http://127.0.0.1:*`, plus any exact `https` origin the user passes with `--allow-origin` (a dev tunnel such as ngrok). A local page on an allowed dev origin still needs the token. The server closes any socket that has not completed the handshake within 2 s. |
 | 2 | A rogue local process listens on the port and the page hands it the week | The page sends the token only after the server proves knowledge of it: the server's first frame carries `HMAC(token, nonce-from-page)`; the page verifies before sending anything else. Mutual, cheap, no TLS. |
 | 3 | Token in browser history or URLs | Never in a URL. Pasted into a field, stored in `localStorage` only. |
 | 4 | Agent escalates beyond the verb surface | No eval tool. Every tool has a JSON schema; unknown tool or malformed args is rejected by the page (`unknown_tool`, `bad_args`), not only by the server. |
@@ -169,7 +169,9 @@ Several tabs may be connected. The server routes each call to the most recently 
 
 ### 8.1 Resources (read)
 
-The week in view is read from memory (`weekData`), never from IndexedDB, because IndexedDB lags the last completed write (the comment at the Drive merge path, line ~9580, explains the same trap). Other weeks are read with `loadWeekIDB(wk)`. Reads never switch the view.
+The week in view is read from memory (`weekData`), never from IndexedDB, because IndexedDB lags the last completed write (the comment at the Drive merge path, line ~9580, explains the same trap). Other weeks are read with `loadWeekIDB(wk)`. Reads never switch the view, never wait in the write queue and are never held back by an editing user.
+
+On the wire each resource is a read call (`read_weeks`, `read_week`, `read_schedule`, `read_agenda`); the server maps the URIs below onto them.
 
 The projection to section 8.3 is a pure function over a week record, so the same code serves the week in view and stored weeks.
 
@@ -235,13 +237,13 @@ JSON text frames, one object per frame. `id` correlates a request and its reply.
 | 4 | `call` | server -> page | `id`, `tool`, `args` |
 | 5 | `result` | page -> server | `id`, `ok: true`, `data` |
 | 6 | `result` | page -> server | `id`, `ok: false`, `error: { code, message }` |
-| 7 | `event` | page -> server | `type: 'week-saved' | 'view' | 'focus' | 'pause'`, plus `wk`, `sig` where relevant |
+| 7 | `event` | page -> server | `event: 'week-saved' | 'view' | 'focus' | 'pause'`, plus `wk`, and `sig` (the week's content hash) on `week-saved`. The page sends one `week-saved` per distinct content, whichever path wrote it. |
 
 The server answers a bad token by closing with reason `refused`; there is no separate reply frame to `hello`.
 
 `week-saved` is emitted from two places: `saveWeek` (user, agent) and `_commitRemoteMerge` **whenever the merged content differs from what the page held** - not only at the existing `tabChannel` post, which fires only when `scheduleUpload` is true and so stays silent on a clean Drive pull. Together they cover every origin: user, agent, other tab, Drive. The server turns it into MCP `notifications/resources/updated` for subscribed clients.
 
-Error codes: `no_app_tab`, `unknown_tool`, `bad_args`, `not_found` (node id), `wrong_type` (e.g. tick on a task without ticks), `needs_choice` (delete of an occurrence without `scope`), `user_busy` (section 7.2a), `rate_limited`, `refused` (pairing).
+Error codes: `no_app_tab`, `unknown_tool`, `bad_args`, `not_found` (node id), `wrong_type` (e.g. tick on a task without ticks), `needs_choice` (delete of an occurrence without `scope`), `user_busy` (section 7.2a), `rate_limited`, `refused` (pairing), `timeout` (no answer from the page in 60 s), `internal` (an unexpected exception, after rollback).
 
 ---
 
@@ -294,22 +296,26 @@ Client configuration for the user (Claude Code example): one `claude mcp add zen
 - [x] Privacy text carries the agent-provider line required by section 3.
 - [x] Browser probe (section 4) run in Chrome, Firefox and Safari; findings written into section 4 and the status-line states adjusted.
 - [ ] Chrome: with the permission prompt open, status shows `Waiting for permission`; after Block, `Blocked by browser`. Safari shows `Not supported in this browser yet` with the toggle disabled.
+  - Verified 2026-11-08 over the ngrok https origin: `Waiting for permission` after 10 s with nothing reaching the server, then `Connected` after Allow. Not yet verified: the Block path, and Safari itself (correct under a Safari user agent in Chrome; real Safari kept a cached build behind the free-tunnel interstitial, a separate service-worker issue).
 - [ ] Bridge off: no socket is created, no timer runs, boot timing unchanged.
-- [ ] Pairing: wrong code shows `Refused`, right code shows `Connected` within 1 s (after any one-time browser prompt); forgetting, sign-out and reset clear the record.
-- [ ] Origin check: a page served from any origin outside the allowlist is closed before `hello`.
-- [ ] Every tool in 8.2 is covered by a test that asserts the mapped app function ran.
-- [ ] Every write tool pushes exactly one undo entry; one undo after it restores the exact pre-call state, one redo reapplies all of it. Covered for `add_task` with `Pushups 10x`, `add_task` with days and a comment, `tick_task` with `n = 3`, `add_branch` with label and colour, and `transfer_unfinished`.
-- [ ] `add_task` with `Pushups 10x` produces one activity with ten tick leaves; `add_task` with `Run` and days `[1,3,5]` produces one activity with three day leaves; both visible in map and agenda without reload. `days` together with an `Nx` label is refused.
-- [ ] `add_task` with `tomorrow` in the label is refused; with the user's day filter on, the new task gets only the days the agent passed.
-- [ ] `set_priority(high)` on a high task leaves it high; `set_status(undone)` reopens both a done and a dropped task.
-- [ ] `delete_task` on an occurrence without `scope` returns `needs_choice` and opens no dialog.
-- [ ] `set_comment` with an unsafe link is refused and the node is untouched; any other string is stored byte for byte.
-- [ ] Calls arriving together run in order; a call during `open_week` waits and then succeeds; a call while the user edits waits, and fails with `user_busy` after 30 s.
-- [ ] A write issued while a Drive merge is between its IDB read and its `weekData` assignment waits for the lock and survives; a remote change to another node in the same merge survives too.
-- [ ] A failed call is rolled back without touching the redo stack and without a Drive force-push.
-- [ ] `week-saved` from the user, the agent, a second tab and Drive each produce one resource update notification.
+  - No socket and no timer: verified (tests and Chrome). Boot timing: not measured.
+- [x] Pairing: wrong code shows `Refused`, right code shows `Connected` within 1 s (after any one-time browser prompt); forgetting, sign-out and reset clear the record.
+- [x] Origin check: a page served from any origin outside the allowlist is closed before `hello`.
+- [x] Every tool in 8.2 is covered by a test that asserts the mapped app function ran.
+- [x] Every write tool pushes exactly one undo entry; one undo after it restores the exact pre-call state, one redo reapplies all of it. Covered for `add_task` with `Pushups 10x`, `add_task` with days and a comment, `tick_task` with `n = 3`, `add_branch` with label and colour, and `transfer_unfinished`.
+- [x] `add_task` with `Pushups 10x` produces one activity with ten tick leaves; `add_task` with `Run` and days `[1,3,5]` produces one activity with three day leaves; both visible in map and agenda without reload. `days` together with an `Nx` label is refused.
+- [x] `add_task` with `tomorrow` in the label is refused; with the user's day filter on, the new task gets only the days the agent passed.
+- [x] `set_priority(high)` on a high task leaves it high; `set_status(undone)` reopens both a done and a dropped task.
+- [x] `delete_task` on an occurrence without `scope` returns `needs_choice` and opens no dialog.
+- [x] `set_comment` with an unsafe link is refused and the node is untouched; any other string is stored byte for byte.
+- [x] Calls arriving together run in order; a call during `open_week` waits and then succeeds; a call while the user edits waits, and fails with `user_busy` after 30 s.
+- [x] A write issued while a Drive merge is between its IDB read and its `weekData` assignment waits for the lock and survives; a remote change to another node in the same merge survives too.
+- [x] A failed call is rolled back without touching the redo stack and without a Drive force-push.
+- [x] `week-saved` from the user, the agent, a second tab and Drive each produce one resource update notification.
 - [ ] Phone with the app visible shows an agent-added task within one poll interval.
+  - Not yet verified (needs Drive sign-in and a phone).
 - [ ] `npm test`, `npm run validate`, `npm run csp` clean; no em dash anywhere.
+  - Clean except two `build-editor` tests, which fail only because `main` has since bumped `prosemirror-transform` and the worktree shares `main`'s `node_modules`; they pass once `main` is merged in.
 
 ---
 

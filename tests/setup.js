@@ -422,6 +422,7 @@ _state.getUndoStack = function() { return undoStack; };
 _state.getRedoStack = function() { return redoStack; };
 _state.getBridgeStatus = function() { return bridgeStatus; };
 _state.getBridgeQueueBusy = function() { return _bridgeBusy; };
+_state.flushPendingMerge = function() { return _flushPendingMerge(); };
 _state.getNextWeekRawCache = function() { return _nextWeekRawCache; };
 _state.setNextWeekRawCache = function(v) { _nextWeekRawCache = v; };
 _state.refreshNextWeekCache = function() { return refreshNextWeekCache(); };

@@ -8,6 +8,7 @@ import {
   bridgeSocketUrl, parseBridgePairingCode, loadBridgeRecord, saveBridgeRecord,
   forgetBridge, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
+  mergeWeekData, applyRemoteMerge, weekContentHash, reloadAppFresh,
 } from './setup.js';
 
 const sandbox = _state.sandbox;
@@ -81,6 +82,14 @@ describe('pairing record', () => {
   test('a tampered record falls back to safe values', () => {
     _state.setLocalStorage('zenit-week-bridge', { enabled: true, port: 'evil.com', token: TOKEN });
     expect(loadBridgeRecord()).toEqual({ enabled: true, port: 47831, token: TOKEN });
+  });
+
+  test('sign-out and reset (reloadAppFresh) clear the record', () => {
+    saveBridgeRecord({ enabled: true, port: 47831, token: TOKEN });
+    const realReload = sandbox.location.reload;
+    sandbox.location.reload = () => {};
+    try { reloadAppFresh(); } finally { sandbox.location.reload = realReload; }
+    expect(_state.getLocalStorage('zenit-week-bridge')).toBeFalsy();
   });
 
   test('forget clears the record and closes the socket', async () => {
@@ -418,5 +427,68 @@ describe('week lock', () => {
       sandbox.withWeekLock = real;
     }
     expect(reentries).toEqual([]);
+  });
+});
+
+// Spec 7.2 and 9, against real IndexedDB so the merge has a genuine await gap
+// between reading the week and assigning weekData.
+describe('merge window and week-saved events (real IDB)', () => {
+  const WK = '2026-45';
+  let realSaveWeek;
+  beforeEach(() => {
+    _state.useRealIDB(true);
+    realSaveWeek = sandbox.saveWeek;
+  });
+  afterEach(() => {
+    sandbox.saveWeek = realSaveWeek;
+    _state.useRealIDB(false);
+  });
+
+  function twoTasks() {
+    const a = addActivity('Local A', { _ts: 1 });
+    const b = addActivity('Shared B', { _ts: 1 });
+    return { a, b };
+  }
+  function remoteWith(id, patch) {
+    const remote = JSON.parse(JSON.stringify(_state.get()));
+    Object.assign(remote.nodes.find(n => n.id === id), patch, { _ts: Date.now() + 60000 });
+    return remote;
+  }
+
+  test('a write issued inside a merge waits for it, and both changes survive', async () => {
+    const { a, b } = twoTasks();
+    _state.setPendingRemoteMerge(WK, remoteWith(b, { label: 'Remote B' }));
+    const merge = _state.flushPendingMerge();          // takes the lock now, commits after its IDB write
+    const write = call('set_status', { id: a, status: 'done' }); // issued inside that window
+    await Promise.all([merge, write]);
+    expect(findNode(a).done).toBe(true);                // the agent's write was not overwritten
+    expect(findNode(b).label).toBe('Remote B');         // nor was the remote change
+  });
+
+  test('user, agent, second tab and Drive each produce one week-saved event; a no-op merge none', async () => {
+    const ws = await pairedSocket();
+    const events = () => ws.sent.filter(f => f.event === 'week-saved').length;
+    const settle = () => new Promise(r => setTimeout(r, 30));
+    const { b } = twoTasks();
+
+    await sandbox.saveWeek(WK, _state.get());           // the user's own save
+    expect(events()).toBe(1);
+
+    await call('add_task', { branch: branchId(), label: 'From agent' });
+    await settle();
+    expect(events()).toBe(2);
+
+    _state.setPendingRemoteMerge(WK, remoteWith(b, { label: 'From tab' }));
+    await _state.flushPendingMerge();                   // a peer tab's save, merged here
+    expect(events()).toBe(3);
+
+    const remote = remoteWith(b, { label: 'From Drive' });
+    const merged = mergeWeekData(JSON.parse(JSON.stringify(_state.get())), remote, WK);
+    await applyRemoteMerge(WK, merged, JSON.stringify(merged), weekContentHash(merged), false, remote);
+    expect(events()).toBe(4);
+
+    const same = JSON.parse(JSON.stringify(_state.get()));
+    await applyRemoteMerge(WK, same, JSON.stringify(same), weekContentHash(same), false, same);
+    expect(events()).toBe(4);
   });
 });
