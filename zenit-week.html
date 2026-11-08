@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-fDKVNnmd49OPQ/ipLxXHDIcTcmwQdsDrWyvRSUiRh74=';
+               'sha256-w7lnIv8TcDhatXOEYA3ARTAvioR23gpsDu3dXP5SnoY=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -6434,6 +6434,8 @@ async function mergeRemoteVision(remoteRaw) {
       local = validateAndRepairVision(local);
     }
     const merged = validateAndRepairVision(mergeWeekData(structuredClone(local), remote, VISION_STORAGE_KEY));
+    // So a later undo keeps what another device added, as it does for a week.
+    _recordRemoteArrivals(VISION_STORAGE_KEY, local, merged);
     const changed = weekContentHash(merged) !== weekContentHash(local);
     if (!changed) return { outcome: 'unchanged', merged };
     merged.crdtVersion = Math.max(local.crdtVersion || 0, remote.crdtVersion || 0) + 1;
@@ -7023,7 +7025,93 @@ function buildEmptyState(iconName, msgKey, hintKey) {
 // ─── Undo/Redo ────────────────────────────────────────────────────────────────
 let undoStack = [];
 let redoStack = [];
+// The Vision's own pair. A week snapshot carries the next week and the schedule
+// so one undo can reverse a move or a send; none of that exists on the Vision,
+// and a shared stack would let Ctrl+Z on the Vision rewind a week the user
+// cannot see. switchView clears neither pair.
+let visionUndoStack = [];
+let visionRedoStack = [];
 const MAX_UNDO = 100;
+
+// The pair that belongs to the record in view. Arrays are shared, so a push or
+// pop through it lands in the right stack; replacing a whole stack goes through
+// setActiveRedoStack.
+function activeUndoPair() {
+  return mapRecord.kind === 'vision'
+    ? { undo: visionUndoStack, redo: visionRedoStack }
+    : { undo: undoStack, redo: redoStack };
+}
+function setActiveRedoStack(arr) {
+  if (mapRecord.kind === 'vision') visionRedoStack = arr;
+  else redoStack = arr;
+}
+
+// Both pairs, emptied: the data they describe is gone (a reset, an import).
+function clearAllUndoStacks() {
+  undoStack = [];
+  redoStack = [];
+  visionUndoStack = [];
+  visionRedoStack = [];
+  if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
+}
+
+// The vision's colours: only its own branches, so restoring a vision snapshot
+// never touches a week branch's palette (they share BRANCH_COLORS, V4).
+function _visionBranchColors(data) {
+  const out = {};
+  for (const n of (data?.nodes || [])) {
+    if (n.type === 'branch' && BRANCH_COLORS[n.id]) out[n.id] = { main: BRANCH_COLORS[n.id].main };
+  }
+  return out;
+}
+
+// A vision snapshot: the record and its branch palettes, nothing else.
+function _visionSnapshot() {
+  const clone = JSON.parse(JSON.stringify(weekData));
+  clone.nodes = clone.nodes.filter(n => !n._editing);
+  const clean = validateAndRepairVision(clone);
+  return JSON.stringify({ kind: 'vision', weekData: clean, branchColors: _visionBranchColors(clean) });
+}
+
+// Restores a vision snapshot the way _applySnapshot restores a week's primary
+// record: only the nodes the restore changes are restamped, nodes another
+// device added meanwhile are kept, and nodes the restore drops are buried so a
+// merge cannot bring them back.
+async function _applyVisionSnapshot(raw) {
+  const snap = JSON.parse(raw);
+  await withWeekLock(VISION_STORAGE_KEY, async () => {
+    const inView = isVisionInView();
+    const live = inView ? weekData : await loadVision();
+    const restored = validateAndRepairVision(snap.weekData);
+    const liveNodes = (live.nodes || []).slice();
+    _restampRestoredNodes(restored.nodes, liveNodes, Date.now());
+    _preserveRemoteNodes(restored, liveNodes, _remoteOriginIds.get(VISION_STORAGE_KEY));
+    _tombstoneRemovedNodes(restored, liveNodes);
+    restored.tombstones = [...new Set([...(live.tombstones || []), ...restored.tombstones])];
+    restored.crdtVersion = live.crdtVersion || 0;
+
+    const snapColors = snap.branchColors || {};
+    for (const n of liveNodes) {
+      if (n.type === 'branch' && !snapColors[n.id]) delete BRANCH_COLORS[n.id];
+    }
+    for (const [id, c] of Object.entries(snapColors)) {
+      if (id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
+      if (c && c.main) BRANCH_COLORS[id] = deriveBranchPalette(c.main);
+    }
+    saveBranchColors();
+
+    if (isVisionInView()) {
+      weekData = restored;
+      rebuildNodeMap();
+      syncBranchConfig();
+    }
+    await saveVision(restored);
+  });
+  if (isVisionInView()) {
+    refreshOpenComment();
+    render();
+  }
+}
 let _nextWeekRawCache = null;
 // Set of week keys whose local state was just restored by undo/redo and must
 // reach Drive without first pulling (which would resurrect the undone change).
@@ -7138,9 +7226,15 @@ function rebuildNodeMap() {
 }
 
 function takeSnapshot() {
-  // The week stacks never hold the vision: a vision snapshot carries the week's
-  // key and would write the vision over that week on undo.
-  if (mapRecord.kind !== 'week') return;
+  // The Vision has its own pair: a week snapshot carries the week's key and
+  // would write the vision over that week on undo.
+  if (mapRecord.kind === 'vision') {
+    visionUndoStack.push(_visionSnapshot());
+    if (visionUndoStack.length > MAX_UNDO) visionUndoStack.shift();
+    visionRedoStack = [];
+    if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
+    return;
+  }
   // Deep clone and clean weekData before pushing to history
   const clone = JSON.parse(JSON.stringify(weekData));
   clone.nodes = clone.nodes.filter(n => !n._editing).map(n => {
@@ -7351,8 +7445,12 @@ async function _applySnapshot(raw) {
       if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
       BRANCH_COLORS[b] = deriveBranchPalette(snapshot.branchColors[b].main);
     });
+    // Only a branch of the week being restored may lose its colour: the
+    // Vision's branches share BRANCH_COLORS (V4) and a week snapshot taken
+    // before they existed says nothing about them.
+    const weekBranchIds = new Set((weekData?.nodes || []).filter(n => n.type === 'branch').map(n => n.id));
     Object.keys(BRANCH_COLORS).forEach(b => {
-      if (!snapshot.branchColors[b]) delete BRANCH_COLORS[b];
+      if (!snapshot.branchColors[b] && weekBranchIds.has(b)) delete BRANCH_COLORS[b];
     });
     saveBranchColors();
   }
@@ -7586,7 +7684,15 @@ async function _currentSnapshot(wk = currentWeekKey, nextKey = offsetWeek(wk, +1
 
 async function undo() {
   // The week stacks are never run while the Vision is in view (R2, rows 3-4).
-  if (mapRecord.kind !== 'week') return;
+  if (mapRecord.kind === 'vision') {
+    if (visionUndoStack.length === 0) return;
+    audit('undo', { wk: VISION_STORAGE_KEY, depth: visionUndoStack.length });
+    const raw = visionUndoStack.pop();
+    visionRedoStack.push(_visionSnapshot());
+    await _applyVisionSnapshot(raw);
+    if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
+    return;
+  }
   if (undoStack.length === 0) return;
   audit('undo', { wk: currentWeekKey, depth: undoStack.length });
   const raw = undoStack.pop();
@@ -7598,7 +7704,15 @@ async function undo() {
 }
 
 async function redo() {
-  if (mapRecord.kind !== 'week') return;
+  if (mapRecord.kind === 'vision') {
+    if (visionRedoStack.length === 0) return;
+    audit('redo', { wk: VISION_STORAGE_KEY, depth: visionRedoStack.length });
+    const raw = visionRedoStack.pop();
+    visionUndoStack.push(_visionSnapshot());
+    await _applyVisionSnapshot(raw);
+    if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
+    return;
+  }
   if (redoStack.length === 0) return;
   audit('redo', { wk: currentWeekKey, depth: redoStack.length });
   const raw = redoStack.pop();
@@ -11475,9 +11589,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   _remoteOriginIds.clear();
   // The undo stack describes data that no longer exists; replaying it would
   // write the discarded content straight back.
-  undoStack = [];
-  redoStack = [];
-  if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
+  clearAllUndoStacks();
   setSyncStatus('syncing', 'sync.msg.resyncing');
   await initDriveSync();
   // Re-read the displayed week: it was just deleted and re-fetched underneath us,
@@ -13543,9 +13655,7 @@ async function importAllData(file) {
     // Re-initialize and render current week immediately
     const endReinit = traceSpan('import:reinit');
     try {
-      undoStack = [];
-      redoStack = [];
-      if (window.updateUndoRedoButtons) window.updateUndoRedoButtons();
+      clearAllUndoStacks();
       currentLang = localStorage.getItem('zenit-week-lang') || 'en';
       applyTheme(localStorage.getItem('zenit-week-theme'));
       await loadBranchColors();
@@ -17441,7 +17551,7 @@ function cancelEdit() {
 }
 
 function _cleanupCancel(nodeId, isNew, originalLabel) {
-  undoStack.pop(); // Remove redundant snapshot taken at start of edit
+  activeUndoPair().undo.pop(); // Remove redundant snapshot taken at start of edit
   if (isNew) {
     const node = findNode(nodeId);
     if (node && node.parent) {
@@ -27551,7 +27661,7 @@ async function _bridgeWaitForUser() {
 function _bridgeSyncWrite(tool, def, args) {
   const ctx = def.check(args);
   if (ctx.noop) return ctx.result;
-  const redoBefore = redoStack.slice();
+  const redoBefore = activeUndoPair().redo.slice();
   takeSnapshot();
   const summary = t(`bridge.toast.${tool}`, ctx.toast || {});
   _labelTopSnapshot(summary);
@@ -27570,16 +27680,20 @@ function _bridgeSyncWrite(tool, def, args) {
 }
 
 function _bridgeRollback(redoBefore) {
-  const raw = undoStack.pop();
-  redoStack = redoBefore;
+  const raw = activeUndoPair().undo.pop();
+  setActiveRedoStack(redoBefore);
   if (!raw) return;
   const snap = JSON.parse(raw);
-  if (isWeekInMemory(snap.weekKey) && snap.weekData) {
+  // Only the record's own branches: the other record's colours are not this
+  // call's to touch.
+  const ownBranchIds = new Set((weekData?.nodes || []).filter(n => n.type === 'branch').map(n => n.id));
+  const restoresRecord = snap.kind === 'vision' ? isVisionInView() : isWeekInMemory(snap.weekKey);
+  if (restoresRecord && snap.weekData) {
     weekData = snap.weekData;
     rebuildNodeMap();
   }
   if (snap.branchColors) {
-    Object.keys(BRANCH_COLORS).forEach(k => { if (!snap.branchColors[k]) delete BRANCH_COLORS[k]; });
+    Object.keys(BRANCH_COLORS).forEach(k => { if (!snap.branchColors[k] && ownBranchIds.has(k)) delete BRANCH_COLORS[k]; });
     Object.assign(BRANCH_COLORS, snap.branchColors);
   }
   if (snap.branchConfig) {
@@ -27592,11 +27706,12 @@ function _bridgeRollback(redoBefore) {
 
 // The name of the action an undo entry reverses, so `undo` can tell the agent.
 function _labelTopSnapshot(label) {
-  if (!undoStack.length) return;
+  const stack = activeUndoPair().undo;
+  if (!stack.length) return;
   try {
-    const snap = JSON.parse(undoStack[undoStack.length - 1]);
+    const snap = JSON.parse(stack[stack.length - 1]);
     snap.actionLabel = label;
-    undoStack[undoStack.length - 1] = JSON.stringify(snap);
+    stack[stack.length - 1] = JSON.stringify(snap);
   } catch (_) { /* unreadable entry - leave it */ }
 }
 function _snapshotLabel(raw) {
@@ -28040,8 +28155,9 @@ const BRIDGE_TOOLS = {
   undo: {
     async: true, args: [],
     async run() {
-      if (!undoStack.length) return { undone: null };
-      const label = _snapshotLabel(undoStack[undoStack.length - 1]);
+      const stack = activeUndoPair().undo;
+      if (!stack.length) return { undone: null };
+      const label = _snapshotLabel(stack[stack.length - 1]);
       await undo();
       _labelRedoTop(label);
       const what = label || t('bridge.userAction');
@@ -28052,8 +28168,9 @@ const BRIDGE_TOOLS = {
   redo: {
     async: true, args: [],
     async run() {
-      if (!redoStack.length) return { redone: null };
-      const label = _snapshotLabel(redoStack[redoStack.length - 1]);
+      const stack = activeUndoPair().redo;
+      if (!stack.length) return { redone: null };
+      const label = _snapshotLabel(stack[stack.length - 1]);
       await redo();
       _labelTopSnapshot(label);
       const what = label || t('bridge.userAction');
@@ -28064,11 +28181,12 @@ const BRIDGE_TOOLS = {
 };
 
 function _labelRedoTop(label) {
-  if (!label || !redoStack.length) return;
+  const stack = activeUndoPair().redo;
+  if (!label || !stack.length) return;
   try {
-    const snap = JSON.parse(redoStack[redoStack.length - 1]);
+    const snap = JSON.parse(stack[stack.length - 1]);
     snap.actionLabel = label;
-    redoStack[redoStack.length - 1] = JSON.stringify(snap);
+    stack[stack.length - 1] = JSON.stringify(snap);
   } catch (_) { /* unreadable entry - leave it */ }
 }
 
@@ -29152,8 +29270,9 @@ window.addEventListener('load', async () => {
   function updateUndoRedoButtons() {
     const undoBtn = document.getElementById('undo-btn');
     const redoBtn = document.getElementById('redo-btn');
-    if (undoBtn) undoBtn.disabled = undoStack.length === 0;
-    if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+    const pair = activeUndoPair();
+    if (undoBtn) undoBtn.disabled = pair.undo.length === 0;
+    if (redoBtn) redoBtn.disabled = pair.redo.length === 0;
   }
   window.updateUndoRedoButtons = updateUndoRedoButtons;
 
