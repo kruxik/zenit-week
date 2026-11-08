@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-+akEA/FQm+dmJ72h64VGazxAEUJaNjZyhqCRvVDy/M4=';
+               'sha256-STzM5/nGpU2NeDLUtT/Qeamc2ClyFfMIEU+Or3JrYXw=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4874,7 +4874,17 @@ Or remove them later in Settings → Help.</div>
         <div class="settings-separator"></div>
         <div id="account-signed-out" class="bridge-list">
           <div class="bridge-note" data-i18n="sync.btnTitle">Sign in with Google to sync across devices.</div>
-          <button type="button" class="agenda-action-btn commit" id="account-signin-btn" data-i18n="account.signIn">Sign in with Google</button>
+          <!-- Google's own "G" in front of the label, as the toolbar's sign-in
+               button had it, so the button reads as Google sign-in at a glance. -->
+          <button type="button" class="agenda-action-btn" id="account-signin-btn">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+              <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </svg>
+            <span id="account-signin-label" data-i18n="account.signIn">Sign in</span>
+          </button>
         </div>
         <div id="account-signed-in" class="bridge-list" hidden>
           <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
@@ -8849,7 +8859,7 @@ function updateAccountSyncStatus() {
 // Re-render any sync UI text that's set imperatively, so language switches
 // (and first paint) display localized strings.
 function refreshSyncUiText() {
-  const signin = document.getElementById('account-signin-btn');
+  const signin = document.getElementById('account-signin-label');
   if (signin) signin.textContent = t(lastSignedOutLabelKey);
   if (!googleUserEmail && !googleUserName) {
     const name = document.getElementById('account-name');
@@ -11710,7 +11720,7 @@ const TRANSLATIONS = {
     'settings.tabAccount':        'Account',
     'settings.tabGeneral':        'General',
     'account.btnAria':            'Account and settings',
-    'account.signIn':             'Sign in with Google',
+    'account.signIn':             'Sign in',
     'account.signedOut':          'Not signed in',
     'account.signedOutSub':       'Your weeks are only in this browser.',
     'settings.dataHero':          'Your weeks',
@@ -12180,7 +12190,7 @@ const TRANSLATIONS = {
     'settings.tabAccount':        'Účet',
     'settings.tabGeneral':        'Obecné',
     'account.btnAria':            'Účet a nastavení',
-    'account.signIn':             'Přihlásit se přes Google',
+    'account.signIn':             'Přihlásit se',
     'account.signedOut':          'Nepřihlášeno',
     'account.signedOutSub':       'Tvoje týdny jsou jen v tomto prohlížeči.',
     'settings.dataHero':          'Tvoje týdny',
