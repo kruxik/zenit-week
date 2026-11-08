@@ -800,6 +800,7 @@ export const {
   mindmapNodeBounds,
   applyHorizon,
   horizonFilterMatchSet,
+  visionHorizonIcon,
   effectiveHorizon,
   // Delete semantics
   weekKeyForDayString,

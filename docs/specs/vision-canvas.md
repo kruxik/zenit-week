@@ -53,7 +53,7 @@ Nodes carry the week's node shape with the fields below. Everything not listed h
 | 2 | `priority` | As on a week: how much this matters. Drives the layout scale exactly as today. |
 | 3 | `comments` | As on a week. The same grammar, the same editor, the same `tokenizeComment`. On the Vision it is the body of the node, not a side note. |
 | 4 | `dropped`, `droppedAt` | **Let go.** An intention the user has consciously given up without erasing it. Reuses the Dropped mechanism whole: cascade, `syncStatusUp`, the 45% opacity, the slash and the badge. The context menu and the toast call it *Let go* (section 5). |
-| 5 | `horizon` | New, optional. One of `year`, `years`, `someday`, or absent. A time tag, not a status. Rendered as a label annotation (section 4.1), inherited by nothing. |
+| 5 | `horizon` | New, optional. One of `year`, `years`, `someday`, or absent. A time tag, not a status. Rendered as a badge icon (section 4.3a, row 5); a sub-intention without its own inherits its parent's for filtering. |
 | 6 | `collapsed` | New, optional, layout only (`touchLayout`, section 3.5). Children are not drawn; the node carries a count badge. |
 | 7 | `offX`, `offY`, `side`, `_ts`, `_posTs` | As on a week. `mergeWeekData` handles them unchanged. |
 
@@ -168,7 +168,7 @@ The Vision draws with the week's renderer. Differences, all in existing hooks:
 | # | Element | Vision |
 |---|---|---|
 | 1 | Center | Label from i18n, no ring. |
-| 2 | Horizon | Appended to the display label by `nodeDisplayLabel` as a muted annotation, the way a lone day leaf is drawn on its task today: `Live by the sea · someday`. Czech forms in `TRANSLATIONS`. Never written into `label`. |
+| 2 | Horizon | A right-hand badge icon per horizon (section 4.3a, row 5), never text on the label and never written into `label`. |
 | 3 | Let go | The Dropped drawing unchanged: branch colour at 45%, diagonal slash, ⊘ badge. |
 | 4 | Collapsed | Count badge in the "+" disc's place, branch colour, white numeral. |
 | 5 | Focus | Non-focused branches at Dropped opacity, no slash, no badge. |
@@ -195,7 +195,8 @@ The Vision's counterpart of the Mindmap's day filter (added 2026-11-08). The lev
 | 1 | State | `activeHorizonFilter` (`null`, `year`, `years`, `someday`, `none`), separate from `activeDayFilter`, so neither clears the other. Not persisted, like the day filter. |
 | 2 | Matching | `horizonFilterMatchSet`, returned by `dayFilterMatchSet` while the Vision is in view, so layout and Pebbles read one set. An intention matches on its effective horizon: its own, else its nearest ancestor's (`effectiveHorizon`). `none` is no effective horizon. A node stays when it or a descendant matches, so its branch stays. |
 | 3 | New nodes | An intention added from the map while the filter shows a horizon takes it, unless it already inherits it (the day filter's stamp). Anything the filter cannot place (a branch, an agent add, a node under `none`) rides along in `_dayFilterFresh` until the filter changes. |
-| 4 | Clearing | The Vision tab's reset, Esc and the home reset clear it with the day filter and the view level. The button face shows `∅` at rest and the horizon's glyph when on, lit, like the day cell. |
+| 4 | Clearing | The Vision tab's reset, Esc and the home reset clear it with the day filter and the view level. The button face shows `∅` at rest and the horizon's icon when on, lit, like the day cell. |
+| 5 | Icons | One icon per horizon, the same in the context menu, the filter menu, the filter button and the node badge: This year `calendar-exclamation`, In a few years `calendar-stats`, Someday `calendar-down`, No horizon `calendar-question`. On the map the horizon is a right-hand badge (`visionHorizonIcon`), never text on the label; a sub-intention that inherits its horizon wears none. |
 
 ### 4.4 Esc walk
 

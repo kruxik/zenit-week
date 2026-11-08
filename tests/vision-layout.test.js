@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { _state, computeLayout, nodeDisplayLabel, setCollapsed, focusBranch, clearBranchFocus,
-  focusedNodeIds, mindmapNodeBounds, collapsedCount, edgeEndpoints } from './setup.js';
+  focusedNodeIds, mindmapNodeBounds, collapsedCount, edgeEndpoints, visionHorizonIcon } from './setup.js';
 
 // The Vision's map vocabulary: collapse prunes a subtree and counts it, focus
-// covers exactly one branch, and the horizon rides on the label.
+// covers exactly one branch, and the horizon is a badge, not label text.
 
 const vb = (id, children, side) => ({ id, type: 'branch', branch: id, label: 'Area ' + id, children, side, _ts: 1 });
 const act = (id, parent, branch, children = [], extra = {}) =>
@@ -104,20 +104,25 @@ describe('focus', () => {
   });
 });
 
-describe('horizon annotation', () => {
-  it('rides on the display label and never on the label', () => {
+describe('horizon badge', () => {
+  it('never rides on the label', () => {
     const n = _state.get().nodes.find(x => x.id === 'a2');
     n.horizon = 'someday';
-    expect(nodeDisplayLabel(n)).toBe('I a2 · someday');
+    expect(nodeDisplayLabel(n)).toBe('I a2');
     expect(n.label).toBe('I a2');
   });
 
-  it('Czech uses its own words', () => {
-    const n = _state.get().nodes.find(x => x.id === 'a2');
-    n.horizon = 'years';
-    _state.setLang('cs');
-    expect(nodeDisplayLabel(n)).toBe('I a2 · za pár let');
-    _state.setLang('en');
+  it('one icon per horizon; an inherited horizon wears none; no horizon asks', () => {
+    const node = id => _state.get().nodes.find(x => x.id === id);
+    node('a1').horizon = 'year';
+    expect(visionHorizonIcon(node('a1'))).toBe('#icon-calendar-exclamation');
+    expect(visionHorizonIcon(node('a11'))).toBeNull();
+    node('a2').horizon = 'years';
+    expect(visionHorizonIcon(node('a2'))).toBe('#icon-calendar-stats');
+    node('a2').horizon = 'someday';
+    expect(visionHorizonIcon(node('a2'))).toBe('#icon-calendar-down');
+    expect(visionHorizonIcon(node('b1'))).toBe('#icon-calendar-question');
+    expect(visionHorizonIcon(node('nva'))).toBeNull();
   });
 });
 
