@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-AmRsqGtncRxjGAxA4aafWWUqsF6xxA8JQZX4OGeDniU=';
+               'sha256-+akEA/FQm+dmJ72h64VGazxAEUJaNjZyhqCRvVDy/M4=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3712,6 +3712,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* The tab's description sentence under its caption row: the ordinary
+     .settings-sub text, set in the section's own column. */
+  .settings-section > .settings-sub { padding: 0 2px 2px; }
+  .settings-section > .settings-sub:empty { display: none; }
   .settings-sub {
     font-size: 11px;
     line-height: 1.35;
@@ -4864,15 +4868,15 @@ Or remove them later in Settings → Help.</div>
           </div>
           <div class="settings-identity">
             <div class="settings-name" id="account-name" data-i18n="account.signedOut">Not signed in</div>
-            <div class="settings-sub" id="account-email" data-i18n="account.signedOutSub">Your weeks are only in this browser</div>
           </div>
         </div>
+        <div class="settings-sub" id="account-email" data-i18n="account.signedOutSub">Your weeks are only in this browser.</div>
+        <div class="settings-separator"></div>
         <div id="account-signed-out" class="bridge-list">
           <div class="bridge-note" data-i18n="sync.btnTitle">Sign in with Google to sync across devices.</div>
           <button type="button" class="agenda-action-btn commit" id="account-signin-btn" data-i18n="account.signIn">Sign in with Google</button>
         </div>
         <div id="account-signed-in" class="bridge-list" hidden>
-          <div class="settings-separator"></div>
           <div class="settings-label" data-i18n="sync.statusCaption">Sync status</div>
           <div id="account-sync-status" class="bridge-status" role="status" aria-live="polite"></div>
           <div id="account-last-sync" class="bridge-status-line"></div>
@@ -4888,9 +4892,9 @@ Or remove them later in Settings → Help.</div>
           <div class="settings-badge settings-badge-info" aria-hidden="true"><svg class="icon"><use href="#icon-settings"/></svg></div>
           <div class="settings-identity">
             <div class="settings-name" data-i18n="settings.generalHero">Look and feel</div>
-            <div class="settings-sub" data-i18n="settings.generalSub">Zoom, language, theme and tips</div>
           </div>
         </div>
+        <div class="settings-sub" data-i18n="settings.generalSub">Zoom, language, theme and tips for this device.</div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
@@ -4953,12 +4957,12 @@ Or remove them later in Settings → Help.</div>
           <div class="settings-badge" id="bridge-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-sparkles"/></svg></div>
           <div class="settings-identity">
             <div class="settings-name" id="bridge-label" data-i18n="settings.bridge">AI agents</div>
-            <div class="settings-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer</div>
           </div>
           <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Allow AI agents on this computer">
             <span class="theme-toggle-thumb"></span>
           </button>
         </div>
+        <div class="settings-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer.</div>
         <div class="settings-separator"></div>
         <div class="settings-label" data-i18n="bridge.statusCaption">Status</div>
         <div id="bridge-status" class="bridge-status" role="status" aria-live="polite"></div>
@@ -4989,9 +4993,10 @@ Or remove them later in Settings → Help.</div>
           <div class="settings-badge settings-badge-info" id="data-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-database"/></svg></div>
           <div class="settings-identity">
             <div class="settings-name" data-i18n="settings.dataHero">Your weeks</div>
-            <div class="settings-sub" id="data-where"></div>
           </div>
         </div>
+        <div class="settings-sub" id="data-where"></div>
+        <div class="settings-separator"></div>
         <div class="settings-tiles">
           <div class="settings-tile">
             <div class="settings-label" data-i18n="settings.dataWeeks">Weeks</div>
@@ -5036,9 +5041,9 @@ Or remove them later in Settings → Help.</div>
           <div class="settings-badge settings-badge-info" id="dev-avatar" aria-hidden="true"><svg class="icon"><use href="#icon-code"/></svg></div>
           <div class="settings-identity">
             <div class="settings-name">Development</div>
-            <div class="settings-sub">Tools for this development host. Never shown in production.</div>
           </div>
         </div>
+        <div class="settings-sub">Tools for this development host. Never shown in production.</div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
@@ -11707,19 +11712,19 @@ const TRANSLATIONS = {
     'account.btnAria':            'Account and settings',
     'account.signIn':             'Sign in with Google',
     'account.signedOut':          'Not signed in',
-    'account.signedOutSub':       'Your weeks are only in this browser',
+    'account.signedOutSub':       'Your weeks are only in this browser.',
     'settings.dataHero':          'Your weeks',
     'settings.generalHero':       'Look and feel',
-    'settings.generalSub':        'Zoom, language, theme and tips',
-    'settings.dataWhereDrive':    'In this browser and your Google Drive',
-    'settings.dataWhereLocal':    'Only in this browser - keep a backup',
+    'settings.generalSub':        'Zoom, language, theme and tips for this device.',
+    'settings.dataWhereDrive':    'Your weeks are stored in this browser and in your Google Drive.',
+    'settings.dataWhereLocal':    'Your weeks are stored only in this browser - keep a backup.',
     'settings.dataWeeks':         'Weeks',
     'settings.dataFirstWeek':     'First week',
     'settings.backupCaption':     'Backup',
     'settings.exportTitle':       'Download a backup',
-    'settings.exportSub':         'Every week and setting in one file',
+    'settings.exportSub':         'Every week and setting in one file.',
     'settings.importTitle':       'Restore a backup',
-    'settings.importSub':         'Replaces everything here',
+    'settings.importSub':         'Replaces everything here.',
     'settings.tabAi':             'AI',
     'settings.tabData':           'Data',
     'settings.exportData':        'Export',
@@ -11737,24 +11742,24 @@ const TRANSLATIONS = {
     'settings.tipsTitle':         'Show just-in-time tips for first-time actions',
     'settings.tipsReplay':        'Replay tips',
     'settings.bridge':            'AI agents',
-    'settings.bridgeTitle':       'Allow AI agents on this computer',
+    'settings.bridgeTitle':       'Allow AI agents on this computer.',
     'bridge.state.off':           'Off',
     'bridge.state.waiting-server': 'Waiting for the agent app',
-    'bridge.state.waiting-permission': 'Waiting for permission - your browser asks to let Zenit Week reach apps on this computer: choose Allow',
-    'bridge.state.blocked':       'Blocked by browser - click the icon left of the address, open the site settings, set "Apps on this device" (Chrome) or "Local network" (Firefox) to Allow, then reload',
-    'bridge.state.waiting-agent': 'Waiting for an agent - ask your agent something about your week',
+    'bridge.state.waiting-permission': 'Waiting for permission - your browser asks to let Zenit Week reach apps on this computer: choose Allow.',
+    'bridge.state.blocked':       'Blocked by browser - click the icon left of the address, open the site settings, set "Apps on this device" (Chrome) or "Local network" (Firefox) to Allow, then reload.',
+    'bridge.state.waiting-agent': 'Waiting for an agent - ask your agent something about your week.',
     'bridge.state.approve':       'Approve the request',
     'bridge.state.connected':     'Connected',
-    'bridge.state.unpaired-remote': 'Unpaired on the agent side - ask your agent something to pair again',
-    'bridge.state.update-server': "Update your agent's Zenit Week server - restart your agent app, or download the new Zenit Week extension for Claude Desktop below",
-    'bridge.state.update-server-npx': "Update your agent's Zenit Week server - restart your agent app",
-    'bridge.state.update-server-mcpb': 'Update your Zenit Week extension - download the new one below and open it',
-    'bridge.state.update-server-repo': "Update your agent's Zenit Week server - pull the repository and restart your agent app",
+    'bridge.state.unpaired-remote': 'Unpaired on the agent side - ask your agent something to pair again.',
+    'bridge.state.update-server': "Update your agent's Zenit Week server - restart your agent app, or download the new Zenit Week extension for Claude Desktop below.",
+    'bridge.state.update-server-npx': "Update your agent's Zenit Week server - restart your agent app.",
+    'bridge.state.update-server-mcpb': 'Update your Zenit Week extension - download the new one below and open it.',
+    'bridge.state.update-server-repo': "Update your agent's Zenit Week server - pull the repository and restart your agent app.",
     'bridge.agent.oldServer':     'Older Zenit Week server',
     'bridge.guide.download':      'Download',
     'bridge.guide.desktopNote':   'No setup needed: open the file and confirm in Claude Desktop.',
-    'bridge.state.reload-app':    'Reload Zenit Week - your agent has a newer Zenit Week server',
-    'bridge.state.unsupported':   'Not supported in this browser yet',
+    'bridge.state.reload-app':    'Reload Zenit Week - your agent has a newer Zenit Week server.',
+    'bridge.state.unsupported':   'Not supported in this browser yet.',
     'bridge.unnamedAgent':        'agent',
     'bridge.agent.connected':     'Connected',
     'bridge.agent.old':           "Update its Zenit Week server",
@@ -12177,19 +12182,19 @@ const TRANSLATIONS = {
     'account.btnAria':            'Účet a nastavení',
     'account.signIn':             'Přihlásit se přes Google',
     'account.signedOut':          'Nepřihlášeno',
-    'account.signedOutSub':       'Tvoje týdny jsou jen v tomto prohlížeči',
+    'account.signedOutSub':       'Tvoje týdny jsou jen v tomto prohlížeči.',
     'settings.dataHero':          'Tvoje týdny',
     'settings.generalHero':       'Vzhled a chování',
-    'settings.generalSub':        'Přiblížení, jazyk, téma a tipy',
-    'settings.dataWhereDrive':    'V tomto prohlížeči a na tvém Google Disku',
-    'settings.dataWhereLocal':    'Jen v tomto prohlížeči - měj zálohu',
+    'settings.generalSub':        'Přiblížení, jazyk, téma a tipy pro toto zařízení.',
+    'settings.dataWhereDrive':    'Tvoje týdny jsou uložené v tomto prohlížeči a na tvém Google Disku.',
+    'settings.dataWhereLocal':    'Tvoje týdny jsou uložené jen v tomto prohlížeči - měj zálohu.',
     'settings.dataWeeks':         'Týdny',
     'settings.dataFirstWeek':     'První týden',
     'settings.backupCaption':     'Záloha',
     'settings.exportTitle':       'Stáhnout zálohu',
-    'settings.exportSub':         'Všechny týdny a nastavení v jednom souboru',
+    'settings.exportSub':         'Všechny týdny a nastavení v jednom souboru.',
     'settings.importTitle':       'Obnovit ze zálohy',
-    'settings.importSub':         'Nahradí vše, co tu je',
+    'settings.importSub':         'Nahradí vše, co tu je.',
     'settings.tabAi':             'AI',
     'settings.tabData':           'Data',
     'settings.exportData':        'Exportovat',
@@ -12207,24 +12212,24 @@ const TRANSLATIONS = {
     'settings.tipsTitle':         'Zobrazovat tipy pro akce při prvním použití',
     'settings.tipsReplay':        'Přehrát tipy znovu',
     'settings.bridge':            'AI agenti',
-    'settings.bridgeTitle':       'Povolit AI agenty na tomto počítači',
+    'settings.bridgeTitle':       'Povolit AI agenty na tomto počítači.',
     'bridge.state.off':           'Vypnuto',
     'bridge.state.waiting-server': 'Čekám na aplikaci agenta',
-    'bridge.state.waiting-permission': 'Čekám na povolení - prohlížeč se ptá, zda smí Zenit Week přistupovat k aplikacím na tomto počítači: zvol Povolit',
-    'bridge.state.blocked':       'Zablokováno prohlížečem - klikni na ikonu vlevo od adresy, otevři nastavení webu, nastav "Aplikace na tomto zařízení" (Chrome) nebo "Místní síť" (Firefox) na Povolit a stránku obnov',
-    'bridge.state.waiting-agent': 'Čekám na agenta - zeptej se svého agenta na něco o týdnu',
+    'bridge.state.waiting-permission': 'Čekám na povolení - prohlížeč se ptá, zda smí Zenit Week přistupovat k aplikacím na tomto počítači: zvol Povolit.',
+    'bridge.state.blocked':       'Zablokováno prohlížečem - klikni na ikonu vlevo od adresy, otevři nastavení webu, nastav "Aplikace na tomto zařízení" (Chrome) nebo "Místní síť" (Firefox) na Povolit a stránku obnov.',
+    'bridge.state.waiting-agent': 'Čekám na agenta - zeptej se svého agenta na něco o týdnu.',
     'bridge.state.approve':       'Schval žádost',
     'bridge.state.connected':     'Připojeno',
-    'bridge.state.unpaired-remote': 'Spárování zrušeno na straně agenta - zeptej se agenta na něco a spáruj znovu',
-    'bridge.state.update-server': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta, nebo níže stáhni nové rozšíření Zenit Week pro Claude Desktop',
-    'bridge.state.update-server-npx': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta',
-    'bridge.state.update-server-mcpb': 'Aktualizuj rozšíření Zenit Week - níže stáhni nové a otevři ho',
-    'bridge.state.update-server-repo': 'Aktualizuj Zenit Week server svého agenta - stáhni změny repozitáře a restartuj aplikaci agenta',
+    'bridge.state.unpaired-remote': 'Spárování zrušeno na straně agenta - zeptej se agenta na něco a spáruj znovu.',
+    'bridge.state.update-server': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta, nebo níže stáhni nové rozšíření Zenit Week pro Claude Desktop.',
+    'bridge.state.update-server-npx': 'Aktualizuj Zenit Week server svého agenta - restartuj aplikaci agenta.',
+    'bridge.state.update-server-mcpb': 'Aktualizuj rozšíření Zenit Week - níže stáhni nové a otevři ho.',
+    'bridge.state.update-server-repo': 'Aktualizuj Zenit Week server svého agenta - stáhni změny repozitáře a restartuj aplikaci agenta.',
     'bridge.agent.oldServer':     'Starší Zenit Week server',
     'bridge.guide.download':      'Stáhnout',
     'bridge.guide.desktopNote':   'Bez nastavování: otevři soubor a potvrď v Claude Desktop.',
-    'bridge.state.reload-app':    'Obnov Zenit Week - tvůj agent má novější Zenit Week server',
-    'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje',
+    'bridge.state.reload-app':    'Obnov Zenit Week - tvůj agent má novější Zenit Week server.',
+    'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje.',
     'bridge.unnamedAgent':        'agent',
     'bridge.agent.connected':     'Připojeno',
     'bridge.agent.old':           'Aktualizuj jeho Zenit Week server',
