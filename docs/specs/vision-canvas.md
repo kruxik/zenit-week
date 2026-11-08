@@ -186,6 +186,17 @@ Hotkey: **`V`**, global, modifier-free, not while typing, placed with `A` / `M` 
 
 Help gets a `V` row in the views section and one short section *Vision* (what it is, Let go, horizon, collapse, focus). Czech throughout.
 
+### 4.3a Horizon filter
+
+The Vision's counterpart of the Mindmap's day filter (added 2026-11-08). The level row carries a `Horizon` cell (`#horizon-filter-btn`) in the slot the day cell leaves on the Vision, opening the same menu (`#day-filter-menu`, built by `openFilterMenu`): This year, In a few years, Someday, No horizon, then None. Hotkeys **`1`-`4`** in that order, on the Vision only, not while a node is hovered or while typing; the same key again clears.
+
+| # | Rule | Behaviour |
+|---|---|---|
+| 1 | State | `activeHorizonFilter` (`null`, `year`, `years`, `someday`, `none`), separate from `activeDayFilter`, so neither clears the other. Not persisted, like the day filter. |
+| 2 | Matching | `horizonFilterMatchSet`, returned by `dayFilterMatchSet` while the Vision is in view, so layout and Pebbles read one set. An intention matches on its effective horizon: its own, else its nearest ancestor's (`effectiveHorizon`). `none` is no effective horizon. A node stays when it or a descendant matches, so its branch stays. |
+| 3 | New nodes | An intention added from the map while the filter shows a horizon takes it, unless it already inherits it (the day filter's stamp). Anything the filter cannot place (a branch, an agent add, a node under `none`) rides along in `_dayFilterFresh` until the filter changes. |
+| 4 | Clearing | The Vision tab's reset, Esc and the home reset clear it with the day filter and the view level. The button face shows `∅` at rest and the horizon's glyph when on, lit, like the day cell. |
+
 ### 4.4 Esc walk
 
 Two entries join `ESC_DISMISSALS`, in this order relative to the existing ones: *focus* clears before the keyboard focus ring (it is the more transient state), and *leave Vision for Mindmap* sits beside the Stats and Agenda entries.

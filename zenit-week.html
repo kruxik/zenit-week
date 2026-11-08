@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ZlS6zCvQ75MbFy+EQj5ah7xyFERf+K5p5VVQEvggap4=';
+               'sha256-44nabfDBIoE7dLNQ7jCWik64SKXxtwRNN6xgmDTYeKo=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -889,12 +889,14 @@
      so it reads as a peer of Sand/Pebbles/Rocks. Only the icon slot differs: a
      day abbreviation instead of a stack of dots, boxed to the same 16px the dot
      stack occupies so both cells end up exactly the same height. */
-  #day-filter-btn .view-level-icon {
+  #day-filter-btn .view-level-icon,
+  #horizon-filter-btn .view-level-icon {
     height: 16px;
     justify-content: center;
   }
 
-  #day-filter-glyph {
+  #day-filter-glyph,
+  #horizon-filter-glyph {
     font-size: 11px;
     font-weight: 700;
     line-height: 1;
@@ -2964,6 +2966,9 @@
   html[data-view="vision"] #week-picker,
   html[data-view="vision"] #day-filter-btn,
   html[data-view="vision"] #day-filter-btn + .view-level-separator { display: none; }
+  /* ...and the horizon cell is drawn only there. */
+  html:not([data-view="vision"]) #horizon-filter-btn,
+  html:not([data-view="vision"]) #horizon-filter-btn + .view-level-separator { display: none; }
 
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
   /* Window chrome comes from .app-panel; only the Agenda-specific bits live here:
@@ -4517,6 +4522,12 @@
         <span data-i18n="filter.dayShort">Day</span>
       </div>
       <div class="view-level-separator"></div>
+      <!-- Horizon filter: the Vision's counterpart of the day filter. -->
+      <div class="view-level-btn" id="horizon-filter-btn">
+        <div class="view-level-icon"><span id="horizon-filter-glyph">∅</span></div>
+        <span data-i18n="filter.horizonShort">Horizon</span>
+      </div>
+      <div class="view-level-separator"></div>
       <div class="view-level-btn active" data-level="full">
         <div class="view-level-icon">
           <div class="dot-row">
@@ -5259,6 +5270,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="help.filterDay">Filter day</span> <span><kbd>1</kbd>–<kbd>7</kbd></span></div>
         <div class="help-row"><span data-i18n="filter.unscheduled">Unscheduled</span> <kbd>8</kbd></div>
         <div class="help-row"><span data-i18n="agenda.overdue">Overdue</span> <kbd>0</kbd></div>
+        <div class="help-row"><span data-i18n="help.filterHorizon">Filter horizon (Vision)</span> <span><kbd>1</kbd>–<kbd>4</kbd></span></div>
         <div class="help-row"><span data-i18n="help.fitView">Fit to view</span> <kbd>F</kbd></div>
         <div class="help-row"><span data-i18n="help.cycleViewLevel">Cycle view level</span> <kbd>W</kbd></div>
         <div class="help-row"><span data-i18n="help.prevWeek">Previous week</span> <span><kbd>[</kbd> <kbd>⇧ ←</kbd></span></div>
@@ -12136,6 +12148,9 @@ let currentViewLevel = 'full'; // 'full' | 'pebbles' | 'rocks'
 // or V) steps one level deeper; any level change starts it again at 0.
 let pebblesExtraDepth = 0;
 let activeDayFilter = null;   // null | 0–6 | 'unscheduled'
+// The Vision's filter: null | 'year' | 'years' | 'someday' | 'none'. Its own
+// state, so a week's day filter and the Vision's horizon never clear each other.
+let activeHorizonFilter = null;
 
 let _atomicOpsDepth = 0;    // nesting counter; Drive sync deferred while > 0
 let _pendingUploadKeys = new Set(); // wKeys deferred by an active atomic op
@@ -12776,6 +12791,7 @@ const TRANSLATIONS = {
     'help.vision.focus': 'Focus branch fits one area and dims the rest; Esc or a click on the centre ends it. On a desktop the pane on the right reads the selected intention\'s comment.',
     'help.escClose':              'Close panel / menu',
     'help.filterDay':             'Filter day',
+    'help.filterHorizon':         'Filter horizon (Vision)',
     'help.undo':                  'Undo',
     'help.redo':                  'Redo',
     'help.navFitDesc':            'Click the logo to fit everything to the view.',
@@ -12825,6 +12841,10 @@ const TRANSLATIONS = {
     'filter.emptyDay':            '- nothing planned',
     'filter.emptyDayShort':       '- empty',
     'filter.dayShort':            'Day',
+    'filter.horizonShort':        'Horizon',
+    'filter.horizonGlyph.year':   'Y',
+    'filter.horizonGlyph.years':  'Y+',
+    'filter.horizonGlyph.someday': '∞',
     'filter.none':                'None',
     'menu.clearDayFilter':        'Clear Day Filter',
     'error.quotaExceeded':        'Storage quota exceeded - changes might not be saved',
@@ -13292,6 +13312,7 @@ const TRANSLATIONS = {
     'help.vision.focus': 'Zaměřit větev přiblíží jednu oblast a ostatní ztlumí; Esc nebo klik na střed zaměření ukončí. Na počítači panel vpravo ukazuje komentář vybraného záměru.',
     'help.escClose':              'Zavřít panel / menu',
     'help.filterDay':             'Filtr dne',
+    'help.filterHorizon':         'Filtr horizontu (Vize)',
     'help.undo':                  'Zpět',
     'help.redo':                  'Znovu',
     'help.navFitDesc':            'Kliknutím na logo vyplníš vše do pohledu.',
@@ -13341,6 +13362,10 @@ const TRANSLATIONS = {
     'filter.emptyDay':            '- nic naplánováno',
     'filter.emptyDayShort':       '- prázdné',
     'filter.dayShort':            'Den',
+    'filter.horizonShort':        'Horizont',
+    'filter.horizonGlyph.year':   'L',
+    'filter.horizonGlyph.years':  'L+',
+    'filter.horizonGlyph.someday': '∞',
     'filter.none':                'Žádný',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena - změny nemusí být uloženy',
@@ -18195,11 +18220,20 @@ function _openInlineInput(nodeId, isNew) {
 function applyLabelEdit(nodeId, label, { isNew = false, originalLabel = null, replaceDays = false, stampFilterDay = false } = {}) {
   const node = findNode(nodeId);
   if (!node) return;
-  // A vision label is literal: no Nx ticks, no day tokens, no filter stamp.
-  // "Run 3x a week" stays a sentence.
+  // A vision label is literal: no Nx ticks, no day tokens. "Run 3x a week"
+  // stays a sentence. Added while the Vision shows one horizon, an intention
+  // takes that horizon (the day filter's stamp, read on horizons); anything the
+  // filter cannot place rides along until the filter changes.
   if (isVisionInView()) {
     node.label = label;
     delete node._editing;
+    if (isNew && activeHorizonFilter !== null) {
+      const stamp = stampFilterDay && node.type === 'activity'
+        && VISION_HORIZONS.has(activeHorizonFilter)
+        && effectiveHorizon(node) !== activeHorizonFilter;
+      if (stamp) node.horizon = activeHorizonFilter;
+      else _dayFilterFresh.add(nodeId);
+    }
     touchNode(nodeId);
     return;
   }
@@ -18652,9 +18686,10 @@ function _hasOwnSchedule(node) {
 }
 
 function dayFilterMatchSet() {
+  // The Vision has no days, whatever filter the week left set: it filters by
+  // horizon instead, through the same set, so layout and Pebbles need no second path.
+  if (isVisionInView()) return horizonFilterMatchSet();
   if (activeDayFilter === null) return null;
-  // The Vision has no days, whatever filter the week left set.
-  if (isVisionInView()) return null;
   // Overdue is current-week-only; setDayFilter clears it on a week change, and
   // this is the belt to that braces - nothing should ever be pruned by a filter
   // the week cannot answer.
@@ -18749,6 +18784,46 @@ function dayFilterMatchSet() {
   for (const n of weekData.nodes) {
     if (n.type === 'counter' && visible.has(n.parent)) visible.add(n.id);
   }
+  return visible;
+}
+
+// ─── Horizon filter (Vision) ─────────────────────────────────────────────────
+// Hotkeys 1-4 and the Horizon menu, in this order. 'none' is an intention with
+// no horizon of its own or inherited.
+const HORIZON_FILTER_ORDER = ['year', 'years', 'someday', 'none'];
+
+// A sub-intention without a horizon belongs to its parent's, so a "this year"
+// intention keeps its steps under the "This year" filter.
+function effectiveHorizon(node) {
+  for (let n = node; n && n.type === 'activity'; n = findNode(n.parent)) {
+    if (VISION_HORIZONS.has(n.horizon)) return n.horizon;
+  }
+  return null;
+}
+
+// The day filter's rule, read on horizons: a node stays when it matches or a
+// descendant does, so the branch above a match stays too. Nodes being typed or
+// added under the filter ride along until they name a horizon.
+function horizonFilterMatchSet() {
+  const f = activeHorizonFilter;
+  if (f === null) return null;
+  const memo = new Map();
+  function matches(id) {
+    if (memo.has(id)) return memo.get(id);
+    memo.set(id, false); // guard against a malformed parent/child cycle
+    const n = findNode(id);
+    if (!n) return false;
+    let hit = !!n._editing || (_dayFilterFresh.has(id) && !VISION_HORIZONS.has(n.horizon));
+    if (!hit && n.type === 'activity') {
+      const h = effectiveHorizon(n);
+      hit = f === 'none' ? h === null : h === f;
+    }
+    if (!hit) hit = (n.children || []).some(matches);
+    memo.set(id, hit);
+    return hit;
+  }
+  const visible = new Set(['center']);
+  for (const n of weekData.nodes) if (matches(n.id)) visible.add(n.id);
   return visible;
 }
 
@@ -20693,6 +20768,16 @@ function _windowKeydownHandler(e) {
       openViewLevels(); // the row carries the day button - it shows what is set
       return;
     }
+  }
+
+  // Vision canvas hotkeys 1-4: toggle the horizon filter, in menu order.
+  if (currentView === 'vision' && !hoveredNodeId && !e.metaKey && !e.ctrlKey
+    && !isTypingTarget(e.target) && e.key >= '1' && e.key <= '4') {
+    e.preventDefault();
+    const h = HORIZON_FILTER_ORDER[Number(e.key) - 1];
+    deferFromInput(() => setHorizonFilter(activeHorizonFilter === h ? null : h));
+    openViewLevels(); // the row carries the horizon button - it shows what is set
+    return;
   }
 
   // Arrow keys walk the focus ring across the map. Shift+←/→ is week navigation
@@ -25866,8 +25951,9 @@ async function resetView() {
   // "Show me the whole week" - so every filter that is hiding part of it goes:
   // the day filter and the view level both prune the map, and a fit to a pruned
   // map is a fit to the wrong thing.
-  const hadFilter = activeDayFilter !== null || currentViewLevel !== 'full';
+  const hadFilter = activeDayFilter !== null || activeHorizonFilter !== null || currentViewLevel !== 'full';
   activeDayFilter = null;
+  activeHorizonFilter = null;
   applyViewLevel('full');
   closeViewLevels({ force: true }); // nothing left to name, so the row goes too
   if (currentWeekKey !== todayWeekKey()) {
@@ -26585,7 +26671,8 @@ function openViewLevels() {
 
 // True while the map is pruned by either control in the row.
 function viewFiltersActive() {
-  return (activeDayFilter !== null && !isVisionInView()) || currentViewLevel !== 'full';
+  return (isVisionInView() ? activeHorizonFilter !== null : activeDayFilter !== null)
+    || currentViewLevel !== 'full';
 }
 
 // Safe to call unconditionally - used as a catch-all dismiss from view switches,
@@ -26608,6 +26695,7 @@ function closeViewLevels({ force = false } = {}) {
 function resetViewLevels() {
   if (!areViewLevelsOpen() && !viewFiltersActive()) return false;
   if (activeDayFilter !== null) setDayFilter(null);
+  if (activeHorizonFilter !== null) setHorizonFilter(null);
   if (currentViewLevel !== 'full') switchViewLevel('full');
   closeViewLevels({ force: true });
   return true;
@@ -26772,6 +26860,23 @@ function setDayFilter(day) {
   repackWithSlide(() => { activeDayFilter = day; });
 }
 
+// The Vision's counterpart: hotkeys 1-4 and the Horizon menu land here. Pass
+// null to clear.
+function setHorizonFilter(horizon) {
+  if (activeHorizonFilter === horizon) return;
+  _dayFilterFresh = new Set();
+  repackWithSlide(() => { activeHorizonFilter = horizon; });
+}
+
+function horizonFilterName(h) {
+  return t('menu.horizon.' + h);
+}
+
+// Button face, like a day's abbreviation; 'none' shares the resting ∅, lit.
+function horizonFilterGlyph(h) {
+  return h === 'none' ? '∅' : t('filter.horizonGlyph.' + h);
+}
+
 // ─── Day filter indicators ────────────────────────────────────────────────────
 // Pruning makes a filtered week look like a small week, so the filter always has
 // to announce itself: the bar's day button carries the active day's abbreviation
@@ -26825,23 +26930,37 @@ function addCtxSeparator(menu) {
 }
 
 function openDayFilterMenu() {
+  openFilterMenu(document.getElementById('day-filter-btn'), dayFilterOrder(), activeDayFilter,
+    // typeof guard: 'overdue'/'unscheduled'/null are not weekdays, so no dot.
+    (row, day) => appendDayLabel(row, day === null ? t('filter.none') : dayFilterName(day), typeof day === 'number' ? day : null),
+    setDayFilter);
+}
+
+function openHorizonFilterMenu() {
+  openFilterMenu(document.getElementById('horizon-filter-btn'), HORIZON_FILTER_ORDER, activeHorizonFilter,
+    (row, h) => { row.textContent = h === null ? t('filter.none') : horizonFilterName(h); },
+    setHorizonFilter);
+}
+
+// The one filter menu (#day-filter-menu), shared by the day and horizon
+// buttons: the values in order, a separator, then None. Rebuilt on open so
+// names and the selected row follow the language and the filter.
+function openFilterMenu(btn, values, selected, fillRow, setFilter) {
   const menu = document.getElementById('day-filter-menu');
-  const btn = document.getElementById('day-filter-btn');
   if (!menu || !btn) return;
   menu.replaceChildren();
 
-  const addRow = (label, day) => addCtxItem(menu,
-    // typeof guard: 'overdue'/'unscheduled'/null are not weekdays, so no dot.
-    row => appendDayLabel(row, label, typeof day === 'number' ? day : null),
+  const addRow = value => addCtxItem(menu,
+    row => fillRow(row, value),
     () => {
       closeDayFilterMenu();
-      deferFromInput(() => setDayFilter(day));
+      deferFromInput(() => setFilter(value));
     },
-    activeDayFilter === day ? 'ctx-item-selected' : '');
+    selected === value ? 'ctx-item-selected' : '');
 
-  dayFilterOrder().forEach(day => addRow(dayFilterName(day), day));
+  values.forEach(addRow);
   addCtxSeparator(menu);
-  addRow(t('filter.none'), null);
+  addRow(null);
 
   // The row is docked bottom-centre, so the menu opens upward and centres on the
   // button, clamped to the viewport on both axes.
@@ -26868,8 +26987,7 @@ function isDayFilterMenuOpen() {
 function refreshDayFilterUI() {
   // Collapsed, the row shows nothing - so the tab caret carries the fact that
   // the map is pruned. Both prunings light it.
-  document.documentElement.classList.toggle('view-filtered',
-    currentViewLevel !== 'full' || activeDayFilter !== null);
+  document.documentElement.classList.toggle('view-filtered', viewFiltersActive());
 
   // The row names whatever is pruning the map, so it follows the filter: back
   // from Agenda or Stats, or in from a reload, it opens itself again.
@@ -26884,7 +27002,13 @@ function refreshDayFilterUI() {
       on ? dayFilterGlyph(activeDayFilter) : '∅';
     btn.classList.toggle('active', on);
   }
-
+  const hBtn = document.getElementById('horizon-filter-btn');
+  if (hBtn) {
+    const on = activeHorizonFilter !== null;
+    document.getElementById('horizon-filter-glyph').textContent =
+      on ? horizonFilterGlyph(activeHorizonFilter) : '∅';
+    hBtn.classList.toggle('active', on);
+  }
 }
 
 // ─── Week picker ──────────────────────────────────────────────────────────────
@@ -27272,6 +27396,10 @@ document.querySelectorAll('.view-level-btn[data-level]').forEach(btn => {
 document.getElementById('day-filter-btn').addEventListener('click', () => {
   if (isDayFilterMenuOpen()) closeDayFilterMenu();
   else openDayFilterMenu();
+});
+document.getElementById('horizon-filter-btn').addEventListener('click', () => {
+  if (isDayFilterMenuOpen()) closeDayFilterMenu();
+  else openHorizonFilterMenu();
 });
 
 // #view-level-bar swallows pointerdown, so this only ever sees clicks landing

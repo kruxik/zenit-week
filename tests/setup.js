@@ -497,6 +497,8 @@ _state.getSettingsTab = function() { return settingsActiveTab; };
 _state.animateSettingsHeight = function() { animateSettingsHeight(); };
 _state.refreshDataSummary = function() { return refreshDataSummary(); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
+_state.setHorizonFilter = function(v) { activeHorizonFilter = v; };
+_state.getHorizonFilter = function() { return activeHorizonFilter; };
 _state.setViewLevel = function(v) { currentViewLevel = v; pebblesExtraDepth = 0; };
 _state.closeViewLevels = function() { closeViewLevels(); };
 _state.getViewLevel = function() { return currentViewLevel; };
@@ -797,6 +799,8 @@ export const {
   focusedNodeIds,
   mindmapNodeBounds,
   applyHorizon,
+  horizonFilterMatchSet,
+  effectiveHorizon,
   // Delete semantics
   weekKeyForDayString,
   deleteOccurrence,
