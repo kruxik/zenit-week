@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-oOMfglnZDJHFfkqUx0yRT3UI9fv7EREZKGrt6Lk2arA=';
+               'sha256-zxZjuLtBFbLrtds2SmkI5YN1d1pagSaIn7/H7lLB6AQ=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -403,6 +403,13 @@
        own JS zoom. Any new panel is restricted automatically. */
     touch-action: pan-x pan-y;
   }
+
+  /* The browser's own pull-to-refresh is off: the app runs its own (see
+     initPullToRefresh), and the native one would otherwise reload the page
+     from any surface that lets a vertical pan through - a popup's backdrop,
+     a dialog - with no say from the app. overflow:hidden alone does not stop
+     it on Android Chrome. Not inherited, so inner lists keep their bounce. */
+  html, body { overscroll-behavior-y: none; }
 
   #app {
     display: flex;
@@ -2698,8 +2705,9 @@
   /* ─── Pull to refresh ────────────────────────────────────────────────────
      One layer for the whole app, pinned under the toolbar and clipping its own
      content, so the puck slides out from beneath the toolbar in every view and
-     is hidden the rest of the time. It lives in the toolbar's z-band (2600) so
-     it is drawn over the panels the same way the toolbar is. */
+     is hidden the rest of the time. It sits just over #settings-overlay (2700)
+     and under the confirm (3000): a pull started while Settings is open must
+     show its puck over the Settings window. */
   #ptr-layer {
     position: fixed;
     top: var(--toolbar-h);
@@ -2708,7 +2716,7 @@
     height: 160px;
     overflow: hidden;
     pointer-events: none;
-    z-index: 2600;
+    z-index: 2750;
   }
   #ptr-indicator {
     position: absolute;
@@ -26175,8 +26183,9 @@ window.addEventListener('pointerup', (e) => {
 //     the top bar is the handle instead.
 //   · the Agenda and Stats lists, at scroll top, where the gesture is expected.
 //
-// Nothing native is being duplicated: <body> is overflow:hidden, so the
-// browser's own pull-to-refresh never arms in this app and cannot double-fire.
+// Nothing native is being duplicated: html and body carry
+// overscroll-behavior-y: none, so the browser's own pull-to-refresh never arms
+// in this app and cannot double-fire.
 const PTR_TRIGGER_PX = 64;   // pulled distance (after resistance) that commits
 const PTR_MAX_PX     = 96;   // travel cap, so the indicator can't be dragged away
 const PTR_RESISTANCE = 0.5;  // finger travel → indicator travel
@@ -26244,7 +26253,8 @@ async function performPullRefresh() {
 
 // atTop: a scrolling source only owns the gesture while its list is at the top.
 // The toolbar passes null - it never scrolls, so it is always at the top.
-function initPullToRefresh(source, atTop = null) {
+// startsHere: a source that is only partly a handle says which touches it owns.
+function initPullToRefresh(source, atTop = null, startsHere = null) {
   let startY = 0, startX = 0, dist = 0;
   let armed = false, pulling = false;
   const isAtTop = () => (atTop ? atTop() : true);
@@ -26252,6 +26262,7 @@ function initPullToRefresh(source, atTop = null) {
   source.addEventListener('touchstart', e => {
     armed = false; pulling = false; dist = 0;
     if (_ptrBusy || e.touches.length !== 1 || !isAtTop()) return;
+    if (startsHere && !startsHere(e.touches[0])) return;
     // An in-flight edit or write owns the record; re-opening the week under it
     // would read a half-written state back over the screen.
     if (_atomicOpsDepth > 0) return;
@@ -26293,6 +26304,13 @@ function initPullToRefresh(source, atTop = null) {
 if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
   const toolbar = document.getElementById('toolbar');
   if (toolbar) initPullToRefresh(toolbar);
+  // Settings' backdrop covers the toolbar while it is open, so the band of it
+  // lying over the toolbar takes the toolbar's gesture.
+  const settingsOverlay = document.getElementById('settings-overlay');
+  if (settingsOverlay) {
+    initPullToRefresh(settingsOverlay, null, (touch) =>
+      touch.clientY <= (document.getElementById('toolbar')?.getBoundingClientRect().bottom || 0));
+  }
   // A pinned caption has taken the app bar's place, so it takes its gesture too.
   ['comment-header', 'help-header'].forEach(id => {
     const el = document.getElementById(id);
