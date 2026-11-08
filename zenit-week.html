@@ -1484,13 +1484,14 @@
   }
   .settings-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
 
-  /* Buttons keep their own width and stand one per line, left-aligned. */
+  /* Buttons keep their own width and stand one per line, right-aligned like
+     the toggles above them. */
   /* The pane is a fixed-height scrolling column, so its children must not
      shrink to fit: an empty separator would collapse to 0px and vanish. */
   .settings-pane > * { flex-shrink: 0; }
 
   .settings-section > .agenda-action-btn,
-  .bridge-list > .agenda-action-btn { align-self: flex-start; }
+  .bridge-list > .agenda-action-btn { align-self: flex-end; }
 
   /* Every shown pane sits in the same grid cell, so the cell is as tall as the
      tallest one; the inactive ones are only invisible (and inert), not removed.
