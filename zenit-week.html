@@ -1516,18 +1516,13 @@
     padding: 12px 14px 16px;
   }
 
-  /* Phones: a full-screen sheet. Caption and tabs sit outside the scrolling
-     pane, so they stay pinned while the content scrolls under them. */
+  /* Phones: the same window above the gear, narrower so it reads as a popup
+     and not a sheet, and the tabs become a segmented
+     row on top - a sidebar would leave the content too narrow. Caption and
+     tabs sit outside the scrolling pane, so they stay pinned. dvh, so the
+     window clears the browser's own bars as they slide in and out. */
   @media (max-width: 520px) {
-    #settings-dialog {
-      inset: 0;
-      width: 100%;
-      max-width: none;
-      height: 100%;
-      max-height: none;
-      border: none;
-      border-radius: 0;
-    }
+    #settings-dialog { width: 290px; max-height: calc(100dvh - 130px); }
     .settings-body { flex-direction: column; }
     .settings-tabs {
       width: auto;
@@ -1549,7 +1544,6 @@
       background: var(--bg-surface);
       box-shadow: 0 1px 3px var(--shadow-sm);
     }
-    .settings-pane { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
   }
 
   .settings-section {
@@ -4922,8 +4916,8 @@ Or remove them later in Settings → Help.</div>
   </div>
 </div>
 
-<!-- Settings: a window pinned above the gear with a tab sidebar on desktop, a
-     full-screen sheet with segmented tabs on phones (see the 520px query). The AI and Development tabs ship hidden: initBridgeSettings reveals
+<!-- Settings: a window pinned above the gear, with a tab sidebar on desktop
+     and a segmented tab row on phones (see the 520px query). The AI and Development tabs ship hidden: initBridgeSettings reveals
      AI on a fine pointer, the devResetEnabled() guard reveals Development. -->
 <div id="settings-overlay">
   <div id="settings-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="settings-title">
