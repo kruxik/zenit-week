@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-iQUY+rQmp05cw+RQKWYp4DvCgiKmV/dOf/B+vBQ1Luc=';
+               'sha256-LuaoQZB/CG1izYgmdq2X2QWdr/r3EsZ7uP8gGCqUEjQ=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4401,6 +4401,22 @@ function isProductionHost(hostname) {
       max-width: var(--panel-width);
       margin: 0 auto;
       transform: none;
+    }
+
+    /* Tap to hide: a tap on empty map hides every bar, the next one brings
+       them back (toggleChromeHidden). [data-view] lifts the selector over the
+       open level row's own rule. */
+    #toolbar { transition: opacity 0.2s ease, transform 0.2s ease; }
+    #view-toggle-bar,
+    #undo-redo-bar,
+    #fab-pill { transition: opacity 0.2s ease; }
+    html.chrome-hidden[data-view] #toolbar,
+    html.chrome-hidden[data-view] #view-toggle-bar,
+    html.chrome-hidden[data-view] #view-level-bar,
+    html.chrome-hidden[data-view] #undo-redo-bar,
+    html.chrome-hidden[data-view] #fab-pill {
+      opacity: 0;
+      pointer-events: none;
     }
   }
 
@@ -12688,6 +12704,7 @@ const TRANSLATIONS = {
     'menu.horizon.someday':       'Someday',
     'menu.horizon.none':          'No horizon',
     'toast.letGo':                'Let go',
+    'toast.controlsHidden':       'Tap the map again to show the controls',
     'toast.takenBack':            'Taken back',
     'vision.center':              'My vision',
     'agenda.overdue':             'Overdue',
@@ -13205,6 +13222,7 @@ const TRANSLATIONS = {
     'menu.horizon.someday':       'Jednou',
     'menu.horizon.none':          'Bez horizontu',
     'toast.letGo':                'Necháno být',
+    'toast.controlsHidden':       'Ovládání vrátíte dalším klepnutím na mapu',
     'toast.takenBack':            'Vzato zpět',
     'vision.center':              'Moje vize',
     'agenda.overdue':             'Zpožděné',
@@ -25794,6 +25812,8 @@ function switchView(view, opts) {
   // M before the vision arrived ends on the Mindmap, with the week.
   if (!swapped) _recordSwapSeq++;
   currentView = view;
+  // Any view switch brings the bars back - the rail is how the user gets around.
+  setChromeHidden(false);
   const isMapView = view === 'mindmap' || view === 'vision';
   // Help is a modal floating over whichever view is beneath it; navigating to
   // any view dismisses it first so the destination is actually visible.
@@ -26227,6 +26247,7 @@ container.addEventListener('pointerdown', (e) => {
 
   // Two-finger pinch: cancel any pan and record initial distance
   if (activePointers.size >= 2) {
+    _chromeTap = null;
     isPanning = false;
     container.classList.remove('panning');
     const pts = [...activePointers.values()];
@@ -26234,6 +26255,8 @@ container.addEventListener('pointerdown', (e) => {
     return;
   }
 
+  // Read before the lines below commit the edit and clear the selection.
+  armChromeTap(e);
   // Commit edit if clicking outside the input
   if (editState && e.target !== inlineInput) commitEdit();
   // Tapping canvas (not a node) clears selection
@@ -26562,6 +26585,58 @@ window.addEventListener('pointermove', (e) => {
   applyTransform();
 });
 
+// ─── Tap to hide (short screens) ──────────────────────────────────────────────
+// On a short screen (the navigation-rail layout) a tap on empty map hides every
+// bar and the next one brings them back, as in a photo viewer. Only a clean tap
+// counts: one finger, no pan, nothing it had to dismiss first - a tap that
+// commits an edit, clears a selection or closes the menu has done its job.
+const SHORT_SCREEN_MQ = window.matchMedia('(max-height: 500px)');
+const CHROME_TAP_SLOP_PX = 10;
+const CHROME_TAP_MAX_MS = 350;
+let _chromeTap = null;
+let _chromeHintShown = false;
+
+function setChromeHidden(hidden) {
+  document.documentElement.classList.toggle('chrome-hidden', hidden);
+}
+
+function toggleChromeHidden() {
+  if (!SHORT_SCREEN_MQ.matches) return;
+  if (currentView !== 'mindmap' && currentView !== 'vision') return;
+  const hide = !document.documentElement.classList.contains('chrome-hidden');
+  setChromeHidden(hide);
+  if (hide && !_chromeHintShown) {
+    _chromeHintShown = true;
+    showToast(t('toast.controlsHidden'));
+  }
+}
+// Leaving the short layout (rotating to portrait) always brings the bars back.
+SHORT_SCREEN_MQ.addEventListener('change', () => setChromeHidden(false));
+
+function armChromeTap(e) {
+  _chromeTap = (e.pointerType === 'touch'
+    && SHORT_SCREEN_MQ.matches
+    && !e.target.closest('.node-group')
+    && !editState
+    && !ctxMenu.classList.contains('visible')
+    && !document.querySelector('.node-group.selected'))
+    ? { x: e.clientX, y: e.clientY, t: performance.now() }
+    : null;
+}
+
+function resolveChromeTap(e) {
+  const tap = _chromeTap;
+  _chromeTap = null;
+  if (!tap) return;
+  if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > CHROME_TAP_SLOP_PX) return;
+  if (performance.now() - tap.t > CHROME_TAP_MAX_MS) return;
+  // Roll back the sub-slop drift so the map does not creep.
+  panX = panStartPanX;
+  panY = panStartPanY;
+  applyTransform();
+  toggleChromeHidden();
+}
+
 function endPointer(e) {
   activePointers.delete(e.pointerId);
   if (activePointers.size < 2) pinchLastDist = null;
@@ -26582,7 +26657,9 @@ window.addEventListener('pointerup', (e) => {
     isPanning = false;
     container.classList.remove('panning');
     if (panningFromCenter) endCenterPan(e);
+    else resolveChromeTap(e);
   }
+  _chromeTap = null;
 });
 
 // Resolves a press that began on the root node.
@@ -26656,6 +26733,7 @@ function abortActiveDrag() {
 
 window.addEventListener('pointercancel', (e) => {
   endPointer(e);
+  _chromeTap = null;
   abortActiveDrag();
 });
 
