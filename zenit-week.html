@@ -4352,6 +4352,8 @@ function isProductionHost(hostname) {
     /* The full logotype's empty tail scales with it: 27px at 34px tall. */
     :root[data-dev-host] #dev-badge { margin-left: -17px; }
     #import-spinner { top: var(--toolbar-h); height: calc(100% - var(--toolbar-h)); }
+    /* The toast's resting 68px clears the bottom tab bar, which is not there. */
+    #view-level-toast { bottom: var(--stack-l1); }
 
     #view-toggle-bar,
     #view-level-bar,
