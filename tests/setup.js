@@ -12,7 +12,10 @@ const html = readFileSync(resolve(__dirname, '../zenit-week.html'), 'utf8');
 // Extract the main app <script id="app-script">…</script> block
 const match = html.match(/<script\s+id="app-script">([\s\S]*?)<\/script>/);
 if (!match) throw new Error('Could not extract <script id="app-script"> block from zenit-week.html');
-const scriptCode = match[1];
+// The shared host check lives in its own head script; the app script calls it.
+const hostMatch = html.match(/<script\s+id="host-script">([\s\S]*?)<\/script>/);
+if (!hostMatch) throw new Error('Could not extract <script id="host-script"> block from zenit-week.html');
+const scriptCode = hostMatch[1] + '\n' + match[1];
 
 // Reusable stub for DOM elements returned by getElementById / createElement
 function elementStub() {

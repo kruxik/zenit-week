@@ -13,6 +13,9 @@
 //   assets/icon-1024.png          purpose "any"      - 1024 rounded bg (HiDPI)
 //   assets/icon-512-maskable.png  purpose "maskable" - 512  70% safe zone
 //   assets/icon-1024-maskable.png purpose "maskable" - 1024 70% safe zone
+//   assets/icon-dev-*.png         the four manifest icons again on an amber
+//                                 tile, for development copies (any host but
+//                                 zenitweek.com) so they never pass for prod
 //
 // 512 maskable is generated for completeness but intentionally NOT
 // listed in the manifest: Chrome was picking 512 maskable for the
@@ -74,10 +77,16 @@ function drawCenteredLabel(ctx, size, label) {
   ctx.fillText(label, size / 2, size / 2);
   ctx.restore();
 }
-window.renderAny = (size, watermark) => {
+// Production: dark tile, light root. Development: amber tile, dark root.
+const THEMES = {
+  prod: { tile: '#181825', root: '#f0f0f0' },
+  dev:  { tile: '#F59E0B', root: '#1a1a2e' },
+};
+window.renderAny = (size, watermark, theme) => {
+  const { tile, root } = THEMES[theme];
   const c = newCanvas(size);
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#181825';
+  ctx.fillStyle = tile;
   if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(0, 0, size, size, size * 0.22); ctx.fill(); }
   else ctx.fillRect(0, 0, size, size);
   if (watermark) {
@@ -85,14 +94,15 @@ window.renderAny = (size, watermark) => {
     // label so the picked icon is unambiguous on launcher and splash.
     drawCenteredLabel(ctx, size, String(size));
   } else {
-    drawBrandmark(ctx, size, '#f0f0f0');
+    drawBrandmark(ctx, size, root);
   }
   return c.toDataURL('image/png');
 };
-window.renderMaskable = (size, watermark) => {
+window.renderMaskable = (size, watermark, theme) => {
+  const { tile, root } = THEMES[theme];
   const c = newCanvas(size);
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#181825';
+  ctx.fillStyle = tile;
   ctx.fillRect(0, 0, size, size);
   if (watermark) {
     // Label sits at the true canvas center, fully inside the 70% safe
@@ -101,7 +111,7 @@ window.renderMaskable = (size, watermark) => {
   } else {
     ctx.translate(size * 0.15, size * 0.15);
     ctx.scale(0.7, 0.7);
-    drawBrandmark(ctx, size, '#f0f0f0');
+    drawBrandmark(ctx, size, root);
   }
   return c.toDataURL('image/png');
 };
@@ -125,12 +135,16 @@ async function main() {
       { fn: 'renderAny',      size: 1024, out: 'icon-1024.png' },
       { fn: 'renderMaskable', size: 512,  out: 'icon-512-maskable.png' },
       { fn: 'renderMaskable', size: 1024, out: 'icon-1024-maskable.png' },
-    ];
+    ].map(t => ({ ...t, theme: 'prod' }));
+    // Development set: only the four the manifest references.
+    for (const t of targets.filter(t => t.out !== 'icon-512-maskable.png')) {
+      targets.push({ ...t, theme: 'dev', out: t.out.replace('icon-', 'icon-dev-') });
+    }
 
     const watermark = !!process.env.WATERMARK;
     if (watermark) console.log('[pwa-icons] watermark mode ON - bake size labels into corners');
     for (const t of targets) {
-      const dataUrl = await page.evaluate(([fn, size, wm]) => window[fn](size, wm), [t.fn, t.size, watermark]);
+      const dataUrl = await page.evaluate(([fn, size, wm, theme]) => window[fn](size, wm, theme), [t.fn, t.size, watermark, t.theme]);
       const buf = dataUrlToBuffer(dataUrl);
       // Sanity floor - a blank PNG compresses to far less than a drawn one.
       // Anything near the floor for the given size means the canvas
