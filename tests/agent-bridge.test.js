@@ -612,8 +612,8 @@ describe('one call, one undo entry', () => {
 
   test('undo reports which action it reversed', async () => {
     await call('add_task', { branch: branchId(), label: 'Read' });
-    expect((await call('undo', {})).undone).toBe('Agent: added Read');
-    expect((await call('redo', {})).redone).toBe('Agent: added Read');
+    expect((await call('undo', {})).undone).toBe('Added Read');
+    expect((await call('redo', {})).redone).toBe('Added Read');
   });
 });
 

@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-fTOz3GzcZT9CevHPoH5ieQ8TSOpRCGQITl9/PnMSZEc=';
+               'sha256-Ua/+UUz+DHnSBhfELTqeXFBJzpVcqmyAyFGJCUhPpPU=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -639,7 +639,12 @@
        max-content sizes it to its text; the cap is the viewport, not the half. */
     width: max-content;
     max-width: calc(100vw - 24px);
-    text-align: center;
+    /* Icon + text: info-circle for what the user did, sparkles for what an AI
+       agent did through the bridge. */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: 8px;
@@ -654,6 +659,7 @@
     transition: opacity 0.2s ease;
   }
   #view-level-toast.visible { opacity: 1; }
+  #view-level-toast .toast-icon { width: 16px; height: 16px; flex: none; color: var(--text-dim); }
 
   /* Bottom banner - a gentle, actionable strip in the slot above the bottom
      bars. Two of them: the onboarding nudge offering to clear leftover example
@@ -4369,6 +4375,7 @@
   <symbol id="icon-ban" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></symbol>
   <symbol id="icon-bolt-off" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 3l18 18"/><path d="M15.212 15.21l-4.212 5.79v-7h-6l3.79 -5.21m1.685 -2.32l2.525 -3.47v6m1 1h5l-2.104 2.893"/></symbol>
   <symbol id="icon-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/></symbol>
+  <symbol id="icon-info-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></symbol>
   <symbol id="icon-alert-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
   <symbol id="icon-caret-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 14l-6 -6l-6 6h12"/></symbol>
   <symbol id="icon-caret-down" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 10l6 6l6 -6h-12"/></symbol>
@@ -12593,24 +12600,24 @@ const TRANSLATIONS = {
     'menu.disposable':            'Disposable',
     'menu.nextWeek':              'Next week',
     'toast.movedToNextWeek':      'Added to next week',
-    'bridge.toast.add_task':      'Agent: added {label}',
-    'bridge.toast.rename_task':   'Agent: renamed to {label}',
-    'bridge.toast.set_status':    'Agent: {label} {status}',
-    'bridge.toast.set_priority':  'Agent: {label} set to {priority} priority',
-    'bridge.toast.set_days':      'Agent: changed the days of {label}',
-    'bridge.toast.tick_task':     'Agent: {label} {n}',
-    'bridge.toast.set_comment':   'Agent: updated the comment on {label}',
-    'bridge.toast.set_reusable':  'Agent: changed reusable on {label}',
-    'bridge.toast.delete_task':   'Agent: deleted {label}',
-    'bridge.toast.send_to_date':  'Agent: {label} set for {date}',
-    'bridge.toast.transfer_unfinished': 'Agent: transferred unfinished tasks',
-    'bridge.toast.transfer_reusable': 'Agent: transferred reusable tasks',
-    'bridge.toast.add_branch':    'Agent: added branch {label}',
-    'bridge.toast.rename_branch': 'Agent: renamed branch to {label}',
-    'bridge.toast.delete_branch': 'Agent: deleted branch {label}',
-    'bridge.toast.set_horizon':   'Agent: {label} set to {horizon}',
-    'bridge.toast.undo':          'Agent: undid {what}',
-    'bridge.toast.redo':          'Agent: redid {what}',
+    'bridge.toast.add_task':      'Added {label}',
+    'bridge.toast.rename_task':   'Renamed to {label}',
+    'bridge.toast.set_status':    '{label} {status}',
+    'bridge.toast.set_priority':  '{label} set to {priority} priority',
+    'bridge.toast.set_days':      'Changed the days of {label}',
+    'bridge.toast.tick_task':     '{label} {n}',
+    'bridge.toast.set_comment':   'Updated the comment on {label}',
+    'bridge.toast.set_reusable':  'Changed reusable on {label}',
+    'bridge.toast.delete_task':   'Deleted {label}',
+    'bridge.toast.send_to_date':  '{label} set for {date}',
+    'bridge.toast.transfer_unfinished': 'Transferred unfinished tasks',
+    'bridge.toast.transfer_reusable': 'Transferred reusable tasks',
+    'bridge.toast.add_branch':    'Added branch {label}',
+    'bridge.toast.rename_branch': 'Renamed branch to {label}',
+    'bridge.toast.delete_branch': 'Deleted branch {label}',
+    'bridge.toast.set_horizon':   '{label} set to {horizon}',
+    'bridge.toast.undo':          'Undid {what}',
+    'bridge.toast.redo':          'Redid {what}',
     'bridge.status.done':         'marked done',
     'bridge.status.undone':       'reopened',
     'bridge.status.dropped':      'dropped',
@@ -13110,24 +13117,24 @@ const TRANSLATIONS = {
     'menu.disposable':            'Jednorázové',
     'menu.nextWeek':              'Příští týden',
     'toast.movedToNextWeek':      'Přidáno do příštího týdne',
-    'bridge.toast.add_task':      'Agent: přidal {label}',
-    'bridge.toast.rename_task':   'Agent: přejmenoval na {label}',
-    'bridge.toast.set_status':    'Agent: {label} {status}',
-    'bridge.toast.set_priority':  'Agent: {label} má prioritu {priority}',
-    'bridge.toast.set_days':      'Agent: změnil dny u {label}',
-    'bridge.toast.tick_task':     'Agent: {label} {n}',
-    'bridge.toast.set_comment':   'Agent: upravil komentář u {label}',
-    'bridge.toast.set_reusable':  'Agent: změnil opakovatelnost u {label}',
-    'bridge.toast.delete_task':   'Agent: smazal {label}',
-    'bridge.toast.send_to_date':  'Agent: {label} naplánováno na {date}',
-    'bridge.toast.transfer_unfinished': 'Agent: přenesl nedokončené úkoly',
-    'bridge.toast.transfer_reusable': 'Agent: přenesl opakovatelné úkoly',
-    'bridge.toast.add_branch':    'Agent: přidal větev {label}',
-    'bridge.toast.rename_branch': 'Agent: přejmenoval větev na {label}',
-    'bridge.toast.delete_branch': 'Agent: smazal větev {label}',
-    'bridge.toast.set_horizon':   'Agent: {label} má horizont {horizon}',
-    'bridge.toast.undo':          'Agent: vrátil zpět {what}',
-    'bridge.toast.redo':          'Agent: zopakoval {what}',
+    'bridge.toast.add_task':      'Přidal {label}',
+    'bridge.toast.rename_task':   'Přejmenoval na {label}',
+    'bridge.toast.set_status':    '{label} {status}',
+    'bridge.toast.set_priority':  '{label} má prioritu {priority}',
+    'bridge.toast.set_days':      'Změnil dny u {label}',
+    'bridge.toast.tick_task':     '{label} {n}',
+    'bridge.toast.set_comment':   'Upravil komentář u {label}',
+    'bridge.toast.set_reusable':  'Změnil opakovatelnost u {label}',
+    'bridge.toast.delete_task':   'Smazal {label}',
+    'bridge.toast.send_to_date':  '{label} naplánováno na {date}',
+    'bridge.toast.transfer_unfinished': 'Přenesl nedokončené úkoly',
+    'bridge.toast.transfer_reusable': 'Přenesl opakovatelné úkoly',
+    'bridge.toast.add_branch':    'Přidal větev {label}',
+    'bridge.toast.rename_branch': 'Přejmenoval větev na {label}',
+    'bridge.toast.delete_branch': 'Smazal větev {label}',
+    'bridge.toast.set_horizon':   '{label} má horizont {horizon}',
+    'bridge.toast.undo':          'Vrátil zpět {what}',
+    'bridge.toast.redo':          'Zopakoval {what}',
     'bridge.status.done':         'hotovo',
     'bridge.status.undone':       'znovu otevřeno',
     'bridge.status.dropped':      'zrušeno',
@@ -27512,8 +27519,19 @@ function cycleViewLevel() {
   else { stepPebbles(); openViewLevels(); }
 }
 
-function showToast(msg, duration = 2000) {
-  _toast.textContent = msg;
+// `agent: true` marks a toast announcing what an AI agent did (the sparkles
+// icon); everything else follows the user's own action (the info icon).
+function showToast(msg, duration = 2000, { agent = false } = {}) {
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('class', 'icon toast-icon');
+  icon.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  use.setAttribute('href', agent ? '#icon-sparkles' : '#icon-info-circle');
+  icon.appendChild(use);
+  const text = document.createElement('span');
+  text.textContent = msg;
+  _toast.replaceChildren(icon, text);
+  _toast.classList.toggle('agent', agent);
   _toast.classList.add('visible');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => _toast.classList.remove('visible'), duration);
@@ -29369,7 +29387,7 @@ function _snapshotLabel(raw) {
 }
 
 function _bridgeAnnounce(summary, ids) {
-  showToast(summary, 3000);
+  showToast(summary, 3000, { agent: true });
   (ids || []).forEach(id => {
     requestAnimationFrame(() => {
       const el = nodeGroupEl(id);

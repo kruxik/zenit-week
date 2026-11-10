@@ -46,7 +46,8 @@ function elementStub() {
     setAttribute: () => {},
     getAttribute: () => null,
     appendChild: () => {},
-    replaceChildren: () => {},
+    // Like the DOM: the element's text becomes its new children's text.
+    replaceChildren(...kids) { this.textContent = kids.map(k => (typeof k === 'string' ? k : k?.textContent || '')).join(''); },
     removeChild: () => {},
     insertBefore: () => {},
     querySelector: () => null,

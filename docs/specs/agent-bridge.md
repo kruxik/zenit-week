@@ -158,7 +158,7 @@ Reads take no snapshot. A call that fails validation takes none either and leave
 
 ### 7.4 Visible like a click
 
-Every successful write shows a toast `Agent: <summary>` in the UI language. The summary is built by the page from the tool name and its arguments via i18n keys `bridge.toast.<tool>` in EN and CS (e.g. "Agent: added Pushups 10x", "Agent: Gym marked done"). Affected nodes get a brief highlight pulse on the map, reusing the existing drop-target highlight style.
+Every successful write shows a toast led by the sparkles icon (the user's own actions get the info-circle icon) with the summary in the UI language - the icon, not a text prefix, says an agent did it. The summary is built by the page from the tool name and its arguments via i18n keys `bridge.toast.<tool>` in EN and CS (e.g. "Added Pushups 10x", "Gym marked done"). Affected nodes get a brief highlight pulse on the map, reusing the existing drop-target highlight style.
 
 ### 7.5 Which tab executes
 
