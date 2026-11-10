@@ -797,6 +797,8 @@ export const {
   focusBranch,
   clearBranchFocus,
   focusedNodeIds,
+  isCollapsedInView,
+  expandInView,
   mindmapNodeBounds,
   applyHorizon,
   horizonFilterMatchSet,

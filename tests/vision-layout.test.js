@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { _state, computeLayout, nodeDisplayLabel, setCollapsed, focusBranch, clearBranchFocus,
-  focusedNodeIds, mindmapNodeBounds, collapsedCount, edgeEndpoints, visionHorizonIcon } from './setup.js';
+  focusedNodeIds, isCollapsedInView, expandInView, mindmapNodeBounds, collapsedCount, edgeEndpoints, visionHorizonIcon } from './setup.js';
 
 // The Vision's map vocabulary: collapse prunes a subtree and counts it, focus
 // covers exactly one branch, and the horizon is a badge, not label text.
@@ -106,6 +106,37 @@ describe('focus', () => {
       metaKey: false, ctrlKey: false, altKey: false, shiftKey: false,
     });
     expect(focusedNodeIds()).toBeNull();
+  });
+
+  it('folds every other branch in layout without writing its collapsed flag', () => {
+    focusBranch('nva');
+    const nvb = _state.get().nodes.find(x => x.id === 'nvb');
+    expect(isCollapsedInView(nvb)).toBe(true);
+    const pos = computeLayout();
+    expect(pos.nvb).toBeDefined();
+    expect(pos.b1).toBeUndefined();
+    expect(pos.a111).toBeDefined();
+    expect(nvb.collapsed).toBeUndefined();
+    clearBranchFocus();
+    expect(isCollapsedInView(nvb)).toBe(false);
+    expect(computeLayout().b1).toBeDefined();
+  });
+
+  it('keeps the user\'s own folds inside the focused branch', () => {
+    setCollapsed('a11', true);
+    focusBranch('nva');
+    expect(computeLayout().a111).toBeUndefined();
+    clearBranchFocus();
+    expect(computeLayout().a111).toBeUndefined();
+  });
+
+  it('expanding a folded branch moves the focus to it', () => {
+    focusBranch('nva');
+    expandInView('nvb');
+    expect([...focusedNodeIds()].sort()).toEqual(['b1', 'nvb']);
+    const pos = computeLayout();
+    expect(pos.b1).toBeDefined();
+    expect(pos.a1).toBeUndefined();
   });
 
   it('an intention cannot be focused, only a branch', () => {

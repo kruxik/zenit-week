@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-qQCoVi8zb8HxeHx5kAYYWtkmtIDcGGSNmJ8OuBexuBc=';
+               'sha256-W73KgyHFa5Bl6YfkgqcqHli7QWqpGUTgOASaMGl9lYg=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -2968,6 +2968,11 @@
   html[data-view="vision"] #week-picker,
   html[data-view="vision"] #day-filter-btn,
   html[data-view="vision"] #day-filter-btn + .view-level-separator { display: none; }
+  /* The focus cell exists only while a branch focus is on. */
+  html:not(.branch-focused) #focus-filter-btn,
+  html:not(.branch-focused) #focus-filter-sep { display: none; }
+  #focus-filter-btn .view-level-icon { height: 16px; justify-content: center; }
+  #focus-filter-btn .icon { width: 14px; height: 14px; }
   /* ...and the horizon cell is drawn only there. */
   html:not([data-view="vision"]) #horizon-filter-btn,
   html:not([data-view="vision"]) #horizon-filter-btn + .view-level-separator { display: none; }
@@ -4345,6 +4350,7 @@
   <symbol id="icon-user" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></symbol>
   <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
   <symbol id="icon-telescope" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 21l6 -5l6 5"/><path d="M12 13v8"/><path d="M3.294 13.678l.166 .281c.52 .88 1.624 1.265 2.605 .91l14.242 -5.165a1.023 1.023 0 0 0 .565 -1.456l-2.62 -4.705a1.087 1.087 0 0 0 -1.447 -.42l-.056 .032l-12.694 7.618c-1.02 .613 -1.357 1.897 -.76 2.905z"/><path d="M14 5l3 5.5"/></symbol>
+  <symbol id="icon-focus" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11.5 12a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0" fill="currentColor"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/></symbol>
   <symbol id="icon-chart-donut" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></symbol>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
   <symbol id="icon-menu-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></symbol>
@@ -4533,6 +4539,12 @@
         <span data-i18n="filter.horizonShort">Horizon</span>
       </div>
       <div class="view-level-separator"></div>
+      <!-- Branch focus: drawn only while a focus is on, lit, naming it; a click ends it. -->
+      <div class="view-level-btn active" id="focus-filter-btn">
+        <div class="view-level-icon"><svg class="icon" aria-hidden="true"><use href="#icon-focus"/></svg></div>
+        <span data-i18n="filter.focusShort">Focus</span>
+      </div>
+      <div class="view-level-separator" id="focus-filter-sep"></div>
       <div class="view-level-btn active" data-level="full">
         <div class="view-level-icon">
           <div class="dot-row">
@@ -4685,7 +4697,7 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item" id="ctx-add-child"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg> <span data-i18n="menu.addActivity">Add Activity</span></div>
   <div class="ctx-item" id="ctx-collapse"><svg class="icon" aria-hidden="true"><use href="#icon-caret-up"/></svg> <span data-i18n="menu.collapse">Collapse</span></div>
   <div class="ctx-item" id="ctx-expand"><svg class="icon" aria-hidden="true"><use href="#icon-caret-down"/></svg> <span data-i18n="menu.expand">Expand</span></div>
-  <div class="ctx-item" id="ctx-focus"><svg class="icon" aria-hidden="true"><use href="#icon-telescope"/></svg> <span data-i18n="menu.focusBranch">Focus branch</span></div>
+  <div class="ctx-item" id="ctx-focus"><svg class="icon" aria-hidden="true"><use href="#icon-focus"/></svg> <span data-i18n="menu.focusBranch">Focus branch</span></div>
   <div class="ctx-separator" id="ctx-sep-color"></div>
   <div class="ctx-item" id="ctx-change-color"><span id="ctx-color-swatch"></span> <span data-i18n="menu.changeColor">Change color</span></div>
   <div class="ctx-separator" id="ctx-sep-3"></div>
@@ -12839,6 +12851,8 @@ const TRANSLATIONS = {
     'filter.emptyDayShort':       '- empty',
     'filter.dayShort':            'Day',
     'filter.horizonShort':        'Horizon',
+    'filter.focusShort':          'Focus',
+    'filter.focusEnd':            'Focused on {name} - click to see every branch',
     'filter.none':                'None',
     'menu.clearDayFilter':        'Clear Day Filter',
     'error.quotaExceeded':        'Storage quota exceeded - changes might not be saved',
@@ -13354,6 +13368,8 @@ const TRANSLATIONS = {
     'filter.emptyDayShort':       '- prázdné',
     'filter.dayShort':            'Den',
     'filter.horizonShort':        'Horizont',
+    'filter.focusShort':          'Fokus',
+    'filter.focusEnd':            'Zaměřeno na {name} - kliknutím zobrazíte všechny větve',
     'filter.none':                'Žádný',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena - změny nemusí být uloženy',
@@ -15463,7 +15479,7 @@ function hasCollapsedAncestor(nodeId) {
   while (n && n.parent && !seen.has(n.parent)) {
     seen.add(n.parent);
     const p = findNode(n.parent);
-    if (p && p.collapsed) return true;
+    if (isCollapsedInView(p)) return true;
     n = p;
   }
   return false;
@@ -15498,15 +15514,41 @@ function focusBranch(branchId) {
   const b = findNode(branchId);
   if (!b || b.type !== 'branch') return;
   focusedBranchId = branchId;
-  applyFocusDim();
+  renderIfVisible(); // the other branches fold, so the layout changes
   fitMindmapView();
 }
 
 function clearBranchFocus() {
   if (focusedBranchId === null) return false;
   focusedBranchId = null;
-  applyFocusDim();
+  renderIfVisible();
   return true;
+}
+
+// Inside a focus every other branch is drawn collapsed as well as dimmed. The
+// fold is view state like the focus itself: it never writes `collapsed`, so the
+// user's own folds are untouched and come back when the focus ends.
+function isFocusFolded(node) {
+  return !!node && focusedBranchId !== null && isVisionInView() &&
+    node.type === 'branch' && node.id !== focusedBranchId;
+}
+
+// The one reader of "is this node collapsed on screen": its own flag or a focus.
+function isCollapsedInView(node) {
+  if (!node || !(node.children || []).length) return false;
+  return !!node.collapsed || isFocusFolded(node);
+}
+
+// Expanding a branch the focus folded moves the focus to it (and lifts the
+// user's own fold on it, if any); anything else simply loses its flag.
+function expandInView(nodeId) {
+  const node = findNode(nodeId);
+  if (isFocusFolded(node)) {
+    setCollapsed(nodeId, false);
+    focusBranch(nodeId);
+    return;
+  }
+  setCollapsed(nodeId, false);
 }
 
 // The ids a focus covers: the branch and every descendant of it.
@@ -16626,7 +16668,7 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
 
   // A collapsed node shows what it hides, in the "+"'s place: branch colour,
   // white numeral. A click expands it.
-  const collapsedKids = !isCenter && node?.collapsed && (node.children || []).length > 0;
+  const collapsedKids = !isCenter && isCollapsedInView(node);
   if (collapsedKids) {
     const bc = BRANCH_COLORS[branch] || { main: '#888888' };
     const depth = getNodeDepth(id);
@@ -21086,7 +21128,7 @@ function attachNodeListeners() {
       badge.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
-        setCollapsed(badge.getAttribute('data-id'), false);
+        expandInView(badge.getAttribute('data-id'));
       });
     });
 
@@ -21546,7 +21588,7 @@ function showContextMenu(x, y, nodeId) {
     const show = (...ids) => ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
     show('ctx-rename');
     if (canAddChildAt(contextTarget)) show('ctx-add-child');
-    if ((node.children || []).length) show(node.collapsed ? 'ctx-expand' : 'ctx-collapse');
+    if ((node.children || []).length) show(isCollapsedInView(node) ? 'ctx-expand' : 'ctx-collapse');
     if (isBranch) show('ctx-focus');
     if (isBranch) {
       show('ctx-sep-color', 'ctx-change-color');
@@ -22581,7 +22623,7 @@ document.getElementById('ctx-collapse').addEventListener('click', () => {
   hideContextMenu();
 });
 document.getElementById('ctx-expand').addEventListener('click', () => {
-  if (contextTarget) setCollapsed(contextTarget, false);
+  if (contextTarget) expandInView(contextTarget);
   hideContextMenu();
 });
 document.getElementById('ctx-focus').addEventListener('click', () => {
@@ -26680,7 +26722,7 @@ function openViewLevels() {
 
 // True while the map is pruned by either control in the row.
 function viewFiltersActive() {
-  return (isVisionInView() ? activeHorizonFilter !== null : activeDayFilter !== null)
+  return (isVisionInView() ? activeHorizonFilter !== null || focusedBranchId !== null : activeDayFilter !== null)
     || currentViewLevel !== 'full';
 }
 
@@ -26705,6 +26747,7 @@ function resetViewLevels() {
   if (!areViewLevelsOpen() && !viewFiltersActive()) return false;
   if (activeDayFilter !== null) setDayFilter(null);
   if (activeHorizonFilter !== null) setHorizonFilter(null);
+  clearBranchFocus();
   if (currentViewLevel !== 'full') switchViewLevel('full');
   closeViewLevels({ force: true });
   return true;
@@ -27027,6 +27070,12 @@ function refreshDayFilterUI() {
     if (on) glyph.replaceChildren(horizonIconEl(activeHorizonFilter));
     else glyph.textContent = '∅';
     hBtn.classList.toggle('active', on);
+  }
+  const focused = isVisionInView() && focusedBranchId !== null ? findNode(focusedBranchId) : null;
+  document.documentElement.classList.toggle('branch-focused', !!focused);
+  const fBtn = document.getElementById('focus-filter-btn');
+  if (fBtn && focused) {
+    fBtn.title = t('filter.focusEnd', { name: focused.label || '' });
   }
 }
 
@@ -27415,6 +27464,9 @@ document.querySelectorAll('.view-level-btn[data-level]').forEach(btn => {
 document.getElementById('day-filter-btn').addEventListener('click', () => {
   if (isDayFilterMenuOpen()) closeDayFilterMenu();
   else openDayFilterMenu();
+});
+document.getElementById('focus-filter-btn').addEventListener('click', () => {
+  clearBranchFocus();
 });
 document.getElementById('horizon-filter-btn').addEventListener('click', () => {
   if (isDayFilterMenuOpen()) closeDayFilterMenu();
