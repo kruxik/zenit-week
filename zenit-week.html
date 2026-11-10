@@ -4330,6 +4330,80 @@ function isProductionHost(hostname) {
   body.app-loading #main-svg {
     opacity: 0;
   }
+
+  /* ─── Short screens: navigation rail ────────────────────────────────────── */
+  /* A landscape phone has width to spare and almost no height, and the bottom
+     chrome (view tabs, the disclosed level row, undo/redo) plus the toolbar took
+     a third of it. Below 500px of height the chrome moves to the sides, the
+     Material 3 navigation rail: the view tabs become an icon column on the left
+     edge, the level row unfolds as a column beside it (next to its own
+     disclosure, the caret now pointing at it), undo/redo stack in the
+     bottom-left corner, and the toolbar slims to 44px. Keyed on height, not
+     orientation, so a short split-screen window gets it too and a tablet does not. */
+  @media (max-height: 500px) {
+    :root {
+      --toolbar-h: 44px;
+      /* Nothing but the corner buttons is left at the bottom edge. */
+      --stack-l1: 12px;
+      --stack-l2: 12px;
+    }
+    #toolbar { height: var(--toolbar-h); padding: 0 12px; }
+    #logo svg { height: 26px; width: auto; }
+    /* The full logotype's empty tail scales with it: 27px at 34px tall. */
+    :root[data-dev-host] #dev-badge { margin-left: -17px; }
+    #import-spinner { top: var(--toolbar-h); height: calc(100% - var(--toolbar-h)); }
+
+    #view-toggle-bar,
+    #view-level-bar,
+    #undo-redo-bar { flex-direction: column; }
+
+    #view-toggle-bar {
+      left: 12px;
+      top: calc(var(--toolbar-h) + 8px);
+      bottom: auto;
+      transform: none;
+    }
+    .view-toggle-btn { width: 36px; height: 36px; padding: 0; gap: 0; }
+    .view-toggle-btn span:not(.vtb-caret) { display: none; }
+    .view-toggle-separator { width: 22px; height: 1px; }
+    /* The caret points right, at the row that unfolds beside the rail. */
+    .vtb-caret {
+      bottom: auto;
+      left: auto;
+      right: 1px;
+      top: 50%;
+      margin: -2px 0 0 0;
+      transform: rotate(90deg);
+    }
+    html.view-levels-open #vtb-mindmap .vtb-caret,
+    html.view-levels-open #vtb-vision .vtb-caret { transform: rotate(-90deg); }
+
+    #view-level-bar {
+      left: 62px;
+      top: calc(var(--toolbar-h) + 8px);
+      bottom: auto;
+      transform: translateX(-6px);
+    }
+    html.view-levels-open[data-view="mindmap"] #view-level-bar,
+    html.view-levels-open[data-view="vision"] #view-level-bar { transform: none; }
+    .view-level-separator { width: 26px; height: 1px; margin: 0 auto; }
+
+    .undo-redo-separator { width: 22px; height: 1px; }
+
+    /* Panels start right of the rail (12px edge + 44px rail + 12px gap) and
+       centre in what is left, so the rail stays reachable over them. */
+    .app-panel,
+    .app-panel.visible,
+    .app-panel.active {
+      left: 68px;
+      right: 12px;
+      width: auto;
+      max-width: var(--panel-width);
+      margin: 0 auto;
+      transform: none;
+    }
+  }
+
 </style>
 <!-- Theme init: runs synchronously before first paint to prevent flash of wrong theme -->
 <script>
