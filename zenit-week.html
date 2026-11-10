@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-W73KgyHFa5Bl6YfkgqcqHli7QWqpGUTgOASaMGl9lYg=';
+               'sha256-pqeOaWz75te6Yu3ImGPse+aIuYLa7SoA7ynYUiwAACE=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -9210,17 +9210,15 @@ function _computeNodeSize(nodeId) {
     const isThisNodeEditing = editState && editState.nodeId === nodeId;
     const nodeBadgeSize = style.fontSize;
     const nodeBadgeGap  = 4;
-    textW = lines.reduce((max, line, idx) => {
-      let lineW = measureText(line, style.fontSize, fontWeight);
-      if (idx === 0 && (type === 'activity' || type === 'branch') && !isThisNodeEditing) {
-        if (node.priority === 'high' || node.priority === 'critical') lineW += nodeBadgeSize + nodeBadgeGap;
-        if (node.unplanned) lineW += nodeBadgeSize + nodeBadgeGap;
-        if (node.reusable) lineW += nodeBadgeSize + nodeBadgeGap;
-        if (node.dropped) lineW += nodeBadgeSize + nodeBadgeGap;
-        if (visionHorizonIcon(node)) lineW += nodeBadgeSize + nodeBadgeGap;
-      }
-      return Math.max(max, lineW);
-    }, 0);
+    // The badges flank the whole text block (centred on the bubble, not on the
+    // first line). Icon and text sit as far apart as edge and icon (padX);
+    // neighbouring icons on one side keep the small gap.
+    textW = lines.reduce((max, line) => Math.max(max, measureText(line, style.fontSize, fontWeight)), 0);
+    if ((type === 'activity' || type === 'branch') && !isThisNodeEditing) {
+      if (node.priority === 'high' || node.priority === 'critical') textW += nodeBadgeSize + style.padX;
+      const right = [node.unplanned, node.reusable, node.dropped, visionHorizonIcon(node)].filter(Boolean).length;
+      if (right) textW += right * nodeBadgeSize + (right - 1) * nodeBadgeGap + style.padX;
+    }
   }
 
   const lineH = style.fontSize * 1.3;
@@ -16580,10 +16578,62 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
   // The root paints its own interior above (avatar over initials, or the
   // signed-out wording), layered so a failed photo reveals what is under it.
   // Running the generic label pass too would put text on top of the photo.
+  // Badges: the priority icon on the left of the text block, the rest on the
+  // right, both centred vertically on the bubble - on a wrapped label they
+  // flank the block, they do not ride on its first line.
+  const badgeSize = fontSize;
+  const badgeGap  = 4;
+  const hasPriorityIcon  = !isCenter && node && (isActivity || isBranch)
+    && (node.priority === 'high' || node.priority === 'critical');
+  const hasUnplannedIcon = !isCenter && node && (isActivity || isBranch) && node.unplanned;
+  const hasReusableIcon  = !isCenter && node && isActivity && node.reusable;
+  const hasDroppedIcon   = !isCenter && node && (isActivity || isBranch) && node.dropped;
+  const horizonIcon      = !isCenter ? visionHorizonIcon(node) : null;
+  // Right-hand badges in drawing order. The ban survives greyscale,
+  // colour-blindness and the zoomed-out Rocks view, where the diagonal
+  // alone gets thin.
+  const rightIcons = [
+    hasUnplannedIcon && '#icon-bolt',
+    hasReusableIcon  && '#icon-repeat',
+    hasDroppedIcon   && '#icon-ban',
+    horizonIcon,
+  ].filter(Boolean);
+  let textX = 0;
+  if (hasPriorityIcon || rightIcons.length) {
+    const blockW = lines.reduce((max, l) => Math.max(max, measureText(l, fontSize, fontWeight)), 0);
+    const leftW  = hasPriorityIcon ? badgeSize : 0;
+    const rightW = rightIcons.length ? rightIcons.length * badgeSize + (rightIcons.length - 1) * badgeGap : 0;
+    // [edge][gap][priority?][gap][text block][gap][bolt?][repeat?][ban?][horizon?][gap][edge]:
+    // every gap between edge, icon and text is the same `gap` - padX when the text
+    // sets the width, wider and still even when the minimum width wins.
+    const gaps = 2 + (hasPriorityIcon ? 1 : 0) + (rightIcons.length ? 1 : 0);
+    const gap = (boxW - blockW - leftW - rightW) / gaps;
+    const leftX = -boxW / 2 + gap;
+    textX = leftX + (hasPriorityIcon ? badgeSize + gap : 0) + blockW / 2;
+    // The single-line offset from the line's centre, kept for any line count.
+    const badgeY = lineH * 0.25 - badgeSize / 2 - fontSize * 0.35;
+    const badge = (href, x) => g.appendChild(svgEl('use', {
+      href,
+      width: badgeSize, height: badgeSize,
+      x,
+      y: badgeY,
+      style: `color:${textColor};fill:none;stroke:currentColor`,
+    }));
+    if (hasPriorityIcon) {
+      const priorityIcon = node.priority === 'high' ? 'alert-circle' : 'flame';
+      badge(`#icon-${priorityIcon}`, leftX);
+    }
+    let rightCursor = textX + blockW / 2 + gap;
+    rightIcons.forEach(href => {
+      badge(href, rightCursor);
+      rightCursor += badgeSize + badgeGap;
+    });
+  }
+
   (isCenter ? [] : lines).forEach((line, i) => {
     const textY = -totalTextH / 2 + lineH * i + lineH * 0.75;
     const t = svgEl('text', {
-      x: 0, y: textY,
+      x: textX, y: textY,
       'text-anchor': 'middle',
       'font-family': "inherit",
       'font-size': (isCenter && i === 0) ? (fontSize + 1) : fontSize,
@@ -16591,50 +16641,6 @@ function makeNodeGroup(id, x, y, label, type, branch, node, side) {
       fill: textColor,
       'pointer-events': 'none',
     });
-    const badgeSize = fontSize;
-    const badgeGap  = 4;
-    const hasPriorityIcon  = node && (isActivity || isBranch) && i === 0
-      && (node.priority === 'high' || node.priority === 'critical');
-    const hasUnplannedIcon = node && (isActivity || isBranch) && i === 0 && node.unplanned;
-    const hasReusableIcon  = node && isActivity && i === 0 && node.reusable;
-    const hasDroppedIcon   = node && (isActivity || isBranch) && i === 0 && node.dropped;
-    const horizonIcon      = i === 0 ? visionHorizonIcon(node) : null;
-
-    // Right-hand badges in drawing order. The ban survives greyscale,
-    // colour-blindness and the zoomed-out Rocks view, where the diagonal
-    // alone gets thin.
-    const rightIcons = [
-      hasUnplannedIcon && '#icon-bolt',
-      hasReusableIcon  && '#icon-repeat',
-      hasDroppedIcon   && '#icon-ban',
-      horizonIcon,
-    ].filter(Boolean);
-
-    if (hasPriorityIcon || rightIcons.length) {
-      const textOnlyW = measureText(line, fontSize, fontWeight);
-      const leftW  = hasPriorityIcon ? badgeSize + badgeGap : 0;
-      const rightW = rightIcons.length * (badgeGap + badgeSize);
-      // Center [priorityIcon?][text][boltIcon?][repeatIcon?][banIcon?] around x=0
-      const textX = (leftW - rightW) / 2;
-      t.setAttribute('x', textX);
-      const badge = (href, x) => g.appendChild(svgEl('use', {
-        href,
-        width: badgeSize, height: badgeSize,
-        x,
-        y: textY - badgeSize / 2 - fontSize * 0.35,
-        style: `color:${textColor};fill:none;stroke:currentColor`,
-      }));
-
-      if (hasPriorityIcon) {
-        const priorityIcon = node.priority === 'high' ? 'alert-circle' : 'flame';
-        badge(`#icon-${priorityIcon}`, textX - textOnlyW / 2 - badgeGap - badgeSize);
-      }
-      let rightCursor = textX + textOnlyW / 2 + badgeGap;
-      rightIcons.forEach(href => {
-        badge(href, rightCursor);
-        rightCursor += badgeSize + badgeGap;
-      });
-    }
     t.textContent = line;
     if (node && node.done && (isActivity || isBranch)) {
       t.setAttribute('text-decoration', 'line-through');
