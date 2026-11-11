@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-LTZEPuku/i8NeQrSWzHOgZKc14pLqMTgJ2RCtW8TBVg=';
+               'sha256-bZEN85VgywkNYHjwxYA7Hu+KR69V3j3RmpAEZ/os6V0=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -2609,6 +2609,32 @@
     cursor: default;
   }
   .qab-recent-item > .qab-pill-dot { margin-right: 4px; }
+  /* The tappable dot: a 28px target around the 8px dot, pulled back so the
+     dot keeps its place on the input's left edge. */
+  .qab-recent-branch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: 0 -6px 0 -10px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+  }
+  .qab-recent-branch:hover .qab-pill-dot,
+  .qab-recent-branch:focus-visible .qab-pill-dot { transform: scale(1.5); }
+  .qab-recent-branch .qab-pill-dot { transition: transform 0.15s; }
+  .qab-recent-move {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px;
+    border-top: 1px solid var(--border-soft);
+    animation: qab-recent-in 0.2s ease;
+  }
   .qab-recent-icon { display: inline-flex; flex-shrink: 0; }
   .qab-recent-label {
     flex: 1;
@@ -11757,6 +11783,7 @@ const TRANSLATIONS = {
     'toolbar.settings':           'Settings',
     'quick_add.placeholder':      'Add a task…',
     'quick_add.title':            'Quick add',
+    'quick_add.moveBranch':       'Move to another branch',
     'week.word':                  'Week',
     'weekbar.today':              'Jump to current week',
     'weekpicker.title':           'Choose week',
@@ -12249,6 +12276,7 @@ const TRANSLATIONS = {
     'toolbar.settings':           'Nastavení',
     'quick_add.placeholder':      'Přidat úkol…',
     'quick_add.title':            'Rychlé přidání',
+    'quick_add.moveBranch':       'Přesunout do jiné větve',
     'week.word':                  'Týden',
     'weekbar.today':              'Přejít na aktuální týden',
     'weekpicker.title':           'Vybrat týden',
@@ -25406,6 +25434,51 @@ window.addEventListener('pointercancel', (e) => {
   abortActiveDrag();
 });
 
+// Move a task (with its subtree) under a new parent - a task or a branch. The
+// one rebind path: the map's drop and the quick-add strip's branch change both
+// call it. The caller takes the snapshot and saves. `keepInbox` leaves an inbox
+// task unplaced: changing its branch is not filing it.
+function rebindNode(nodeId, targetParentId, { keepInbox = false } = {}) {
+  const node = findNode(nodeId);
+  const newParent = findNode(targetParentId);
+  if (!node || !newParent) return false;
+  // Remove from old parent
+  if (node.parent) {
+    const oldParent = findNode(node.parent);
+    if (oldParent) {
+      oldParent.children = oldParent.children.filter(id => id !== nodeId);
+      touchNode(node.parent);
+    }
+  }
+  // Re-sync old parent (node.parent still points to old parent here)
+  if (node.parent && node.parent !== 'center') {
+    syncStatusUp(nodeId, 'done');
+    syncStatusUp(nodeId, 'unplanned');
+  }
+  node.parent = targetParentId;
+  const newBranch = newParent.branch || newParent.id;
+  node.branch = newBranch;
+  // Rebinding across branches must repaint the whole subtree: colors, summary
+  // stats and CFD filters all read each node's own `branch`, not its parent's.
+  getDescendantIds(nodeId).forEach(cid => {
+    const c = findNode(cid);
+    if (c && c.branch !== newBranch) { c.branch = newBranch; touchNode(cid); }
+  });
+  if (!keepInbox) delete node.inbox; // promote from inbox to permanent map node
+  newParent.children.push(nodeId);
+  touchNode(targetParentId);
+  // Re-sync new parent (node.parent now points to new parent)
+  if (targetParentId !== 'center') {
+    syncStatusUp(nodeId, 'done');
+    syncStatusUp(nodeId, 'unplanned');
+  }
+  // Reset offsets for clean snap to new parent
+  node.offX = 0;
+  node.offY = 0;
+  touchNode(nodeId);
+  return true;
+}
+
 function handleNodeDrop(mouseX, mouseY) {
   const nodeId = dragState.activeNodeId;
   const node = findNode(nodeId);
@@ -25424,44 +25497,7 @@ function handleNodeDrop(mouseX, mouseY) {
   const targetParentId = ( node.dayChild || node.tickChild ) ? null : findRebindTarget(currentDragRect(mouseX, mouseY));
 
   if (targetParentId) {
-    // REBINDING
-    // Remove from old parent
-    if (node.parent) {
-      const oldParent = findNode(node.parent);
-      if (oldParent) {
-        oldParent.children = oldParent.children.filter(id => id !== nodeId);
-        touchNode(node.parent);
-      }
-    }
-    // Re-sync old parent (node.parent still points to old parent here)
-    if (node.parent && node.parent !== 'center') {
-      syncStatusUp(nodeId, 'done');
-      syncStatusUp(nodeId, 'unplanned');
-    }
-    // Set new parent
-    const newParent = findNode(targetParentId);
-    node.parent = targetParentId;
-    const newBranch = newParent.branch || newParent.id;
-    node.branch = newBranch;
-    // Rebinding across branches must repaint the whole subtree: colors, summary
-    // stats and CFD filters all read each node's own `branch`, not its parent's.
-    getDescendantIds(nodeId).forEach(cid => {
-      const c = findNode(cid);
-      if (c && c.branch !== newBranch) { c.branch = newBranch; touchNode(cid); }
-    });
-    delete node.inbox; // promote from inbox to permanent map node
-    newParent.children.push(nodeId);
-    touchNode(targetParentId);
-    // Re-sync new parent (node.parent now points to new parent)
-    if (targetParentId !== 'center') {
-      syncStatusUp(nodeId, 'done');
-      syncStatusUp(nodeId, 'unplanned');
-    }
-
-    // Reset offsets for clean snap to new parent
-    node.offX = 0;
-    node.offY = 0;
-    touchNode(nodeId);
+    rebindNode(nodeId, targetParentId);
   } else {
     // EXISTING REORDER/PAN LOGIC
     if (node.parent) {
@@ -26923,25 +26959,61 @@ function openSettings() {
     });
   }
 
+  // One branch pill: the panel's branch row and a row's branch chooser are the
+  // same control. mousedown acts and keeps focus in the input, so the mobile
+  // keyboard stays up.
+  function buildBranchPill(b, onPick) {
+    const bc = BRANCH_COLORS[b.id] || { main: '#888', light: '#eee', text: '#444' };
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'agenda-action-btn qab-pill';
+    pill.dataset.id = b.id;
+    const dot = document.createElement('span');
+    dot.className = 'qab-pill-dot';
+    dot.style.background = bc.main;
+    pill.appendChild(dot);
+    const label = document.createElement('span');
+    label.textContent = b.label;
+    pill.appendChild(label);
+    pill.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onPick(b.id); });
+    pill.addEventListener('click', (e) => { e.stopPropagation(); });
+    return pill;
+  }
+
   function populateBranches() {
-    branchesRow.innerHTML = '';
-    weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
-      const bc = BRANCH_COLORS[b.id] || { main: '#888', light: '#eee', text: '#444' };
-      const pill = document.createElement('button');
-      pill.type = 'button';
-      pill.className = 'agenda-action-btn qab-pill';
-      pill.dataset.id = b.id;
-      const dot = document.createElement('span');
-      dot.className = 'qab-pill-dot';
-      dot.style.background = bc.main;
-      pill.appendChild(dot);
-      const label = document.createElement('span');
-      label.textContent = b.label;
-      pill.appendChild(label);
-      pill.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); selectBranch(b.id); });
-      pill.addEventListener('click', (e) => { e.stopPropagation(); });
-      branchesRow.appendChild(pill);
+    branchesRow.replaceChildren(...weekData.nodes.filter(n => n.type === 'branch')
+      .map(b => buildBranchPill(b, selectBranch)));
+  }
+
+  // The row's branch dot opens this chooser under the row: the other branches,
+  // as the same pills as the branch row. Picking one moves the task there.
+  function toggleMoveChooser(entry, wrapper) {
+    const open = recentRow.querySelector('.qab-recent-move');
+    const wasThisRow = open && open.dataset.nodeId === entry.id;
+    if (open) open.remove();
+    if (wasThisRow) return;
+    const node = findNode(entry.id);
+    if (!node) return;
+    const chooser = document.createElement('div');
+    chooser.className = 'qab-recent-move';
+    chooser.dataset.nodeId = entry.id;
+    weekData.nodes.filter(n => n.type === 'branch' && n.id !== node.branch).forEach(b => {
+      chooser.appendChild(buildBranchPill(b, (branchId) => moveRecentToBranch(entry, branchId)));
     });
+    wrapper.after(chooser);
+  }
+
+  function moveRecentToBranch(entry, branchId) {
+    const node = findNode(entry.id);
+    if (node && node.branch !== branchId && findNode(branchId)) {
+      takeSnapshot();
+      rebindNode(node.id, branchId, { keepInbox: true });
+      entry.branch = branchId;
+      saveWeek(currentWeekKey, weekData);
+      renderIfVisible();
+      if (currentView === 'agenda') renderAgenda();
+    }
+    refreshRecent();
   }
 
   // Items stored this session, oldest first: { id, label, typed, branch,
@@ -26972,7 +27044,23 @@ function openSettings() {
     // Always the branch colour, whatever the status: the dot says where the
     // task lives, the row's colours say what state it is in.
     dot.style.background = (BRANCH_COLORS[node ? node.branch : entry.branch] || { main: '#888' }).main;
-    item.appendChild(dot);
+    // On a live row with somewhere else to go, the dot is the way to change the
+    // branch - a mis-picked branch is fixed here, not on the map.
+    const canMove = node && weekData.nodes.filter(n => n.type === 'branch').length > 1;
+    let branchBtn = null;
+    if (canMove) {
+      branchBtn = document.createElement('button');
+      branchBtn.type = 'button';
+      branchBtn.className = 'qab-recent-branch';
+      branchBtn.setAttribute('aria-label', t('quick_add.moveBranch'));
+      branchBtn.title = t('quick_add.moveBranch');
+      branchBtn.appendChild(dot);
+      // mousedown keeps focus in the input (mobile keyboard), as the pills do.
+      branchBtn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+      item.appendChild(branchBtn);
+    } else {
+      item.appendChild(dot);
+    }
 
     // Icons in the map's order: priority before the label; unplanned,
     // reusable and dropped after it. Dropped gets the ⊘ but not the map's
@@ -27014,6 +27102,12 @@ function openSettings() {
 
     const wrapper = wrapAgendaRowForSwipe(item, entry.id, iconSvg('circle-check'));
     if (!node) return wrapper;
+    if (branchBtn) {
+      branchBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleMoveChooser(entry, wrapper);
+      });
+    }
 
     item._doneAction = () => {
       setStatus(node.id, node.dropped ? 'undropped' : node.done ? 'undone' : 'done');
