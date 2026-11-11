@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-+F4trMCP7pj5ANaioBu6BwzvML6tF+kyUxdEpfJ/fUU=';
+               'sha256-NUbB5NhOZUVkFt37bc0zGLlZjPcsWHjRkcF9xNNls0s=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -7816,6 +7816,16 @@ function ensureContrast(fg, bg, min = 4.5) {
 // Agenda chip is the node's tint with its label colour, darkened or lightened
 // until it reads. A node from another week (Overdue, an earlier day's Done) is
 // not in this week's map, so it falls back to its branch's open palette.
+// The node that holds a row's comment. A day leaf is only its task on one
+// day, so its comment is the task's: the Agenda shows and edits that one.
+function commentOwner(node) {
+  if (node && node.dayChild) {
+    const p = findNode(node.parent);
+    if (p) return p;
+  }
+  return node;
+}
+
 function commentBadgeColors(node) {
   const bc = BRANCH_COLORS[node.branch]
     || deriveBranchPalette(document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666');
@@ -20556,7 +20566,7 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
   document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda' || !canAddChildAt(contextTarget)) ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
-  const isCommentable = isActivity && !isTick && !node.dayChild;
+  const isCommentable = isActivity && !isTick && !commentOwner(node).dayChild;
   document.getElementById('ctx-comment').style.display   = isCommentable ? '' : 'none';
   document.getElementById('ctx-reschedule').style.display = ((isStdActivity || isTick) && !node.done) ? '' : 'none';
 
@@ -21631,7 +21641,7 @@ document.getElementById('ctx-comment').addEventListener('click', () => {
   if (entryCtx) { openEntryCommentDialog(entryCtx.entryId, entryCtx.date); return; }
   // The comment dialog sits below the quick-add panel, so the panel yields.
   if (window.isQuickAddOpen()) window.closeQuickAdd();
-  if (id) openCommentDialog(id);
+  if (id) openCommentDialog(commentOwner(findNode(id))?.id || id);
 });
 
 // ─── Comment grammar ──────────────────────────────────────────────────────────
@@ -23638,16 +23648,18 @@ function buildAgendaItem(node, label, opts = {}) {
   }
 
   // Comment indicator - colored badge; click opens the comment dialog.
-  if (node.comments) {
+  // A day-leaf row carries its task's comment.
+  const commentNode = commentOwner(node);
+  if (commentNode.comments) {
     const cmt = document.createElement('span');
     cmt.className = 'daily-log-badge comment';
     cmt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;';
-    const { chip, chipInk } = commentBadgeColors(node);
+    const { chip, chipInk } = commentBadgeColors(commentNode);
     cmt.style.background = chip;
     cmt.style.color = chipInk;
     cmt.innerHTML = iconSvg('message');
     cmt.title = t('menu.comment');
-    const preview = commentPreview(node.comments);
+    const preview = commentPreview(commentNode.comments);
     if (preview.inline.length) {
       const text = document.createElement('span');
       text.className = 'comment-preview';
@@ -23673,7 +23685,7 @@ function buildAgendaItem(node, label, opts = {}) {
     cmt.addEventListener('click', e => {
       stopClickKeepingDismiss(e);
       if (entryRow) openEntryCommentDialog(entryRow.id, opts.date);
-      else openCommentDialog(node.id);
+      else openCommentDialog(commentNode.id);
     });
     item.appendChild(cmt);
   }
