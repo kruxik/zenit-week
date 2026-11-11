@@ -10,7 +10,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-M3B2BSKEq7Qw6tbM5K7K5uemqbfz7v3B2Yp2GCBhPd8='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-NUbB5NhOZUVkFt37bc0zGLlZjPcsWHjRkcF9xNNls0s=';
+               'sha256-LTZEPuku/i8NeQrSWzHOgZKc14pLqMTgJ2RCtW8TBVg=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -2963,6 +2963,22 @@
   html[data-view="mindmap"] #vtb-stats:not(:hover),
   html[data-view="stats"]   #vtb-agenda:not(:hover),
   html[data-view="stats"]   #vtb-mindmap:not(:hover) {
+    background: none;
+    color: var(--text-subtle);
+  }
+  /* Pressed tab: on a phone the view's own frame lands ~150 ms after the tap,
+     so the tab the finger is on takes the highlight at pointerdown and the tab
+     being left gives it up. `data-press-view` is the destination, set by the
+     press and cleared by the click that switches (same frame) or a lost press. */
+  html[data-press-view="agenda"][data-view]  #vtb-agenda,
+  html[data-press-view="mindmap"][data-view] #vtb-mindmap,
+  html[data-press-view="stats"][data-view]   #vtb-stats {
+    background: var(--view-btn-active-bg);
+    color: var(--view-btn-active-text);
+  }
+  html[data-press-view]:not([data-press-view="agenda"])  #vtb-agenda,
+  html[data-press-view]:not([data-press-view="mindmap"]) #vtb-mindmap,
+  html[data-press-view]:not([data-press-view="stats"])   #vtb-stats {
     background: none;
     color: var(--text-subtle);
   }
@@ -29510,17 +29526,36 @@ window.addEventListener('load', async () => {
   // View toggle bar
   // Clicking the tab you are already on is the disclosure gesture for the
   // view-level row; from any other view it just navigates, as before.
+  // Where a tab leads: Stats toggles back to the default (mindmap), except with
+  // Help open, where the click spends itself on dismissing Help.
+  const viewTabTarget = (view) =>
+    view === 'stats' && currentView === 'stats' && !isHelpOpen() ? 'mindmap' : view;
   document.getElementById('vtb-mindmap').addEventListener('click', () => {
     if (currentView === 'mindmap') toggleViewLevels();
     else switchView('mindmap');
   });
   document.getElementById('vtb-mindmap').setAttribute('aria-expanded', 'false');
   document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
-  document.getElementById('vtb-stats').addEventListener('click', () => {
-    // Toggle Stats; leaving lands on the default (mindmap). With Help open the
-    // click spends itself on dismissing Help, so Stats stays put.
-    switchView(currentView === 'stats' && !isHelpOpen() ? 'mindmap' : 'stats');
-  });
+  document.getElementById('vtb-stats').addEventListener('click', () => switchView(viewTabTarget('stats')));
+
+  // Press feedback: highlight the destination tab at pointerdown (see the
+  // `data-press-view` CSS). The click clears it in the same task that switches,
+  // so the highlight and the new view paint together; a press that slides off
+  // or is cancelled clears it too.
+  const clearViewPress = () => { delete document.documentElement.dataset.pressView; };
+  for (const view of ['mindmap', 'agenda', 'stats']) {
+    const btn = document.getElementById('vtb-' + view);
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      document.documentElement.dataset.pressView = viewTabTarget(view);
+    });
+    btn.addEventListener('pointerup', (e) => {
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      if (!under || !btn.contains(under)) clearViewPress();
+    });
+    btn.addEventListener('pointercancel', clearViewPress);
+    btn.addEventListener('click', clearViewPress);
+  }
 
   // Coachmark: teach the view controls on first hover of either bar.
   armNodeTouchHintGate();
