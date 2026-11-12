@@ -41,13 +41,13 @@ Severity: 🔴 severe · 🟠 medium · 🟡 minor
 | UI-2 | 🟠 | ✅ | same key | Says focus "dims the rest" and "Esc or a click on the centre ends it"; it also collapses the others, and F, the logo and the Focus cell end it. | Reword (en + cs). | 77c1a77 |
 | UI-3 | 🟠 | ✅ | `help.vision.horizon` (en 13087, cs 13617) | "Shown after the name" - it is a badge icon; the `1`-`4` filter is not mentioned. | Reword (en + cs). | 77c1a77 |
 | UI-4 | 🟠 | ✅ | Help 5516-5565 | Week-only hotkeys (D, U, R, N, B, days, week nav, Clear week) carry no "not on the Vision" note. | Mark rows or add one Vision line. | caf8081 |
-| UI-5 | 🟡 | ✅ | `tips.views` (12830, cs 13360) | "Three views" but four are listed. | "Four views ...". | |
-| UI-6 | 🟡 | ✅ | `tips.levels` (12829), 5495, 13026 | "Pebbles adds sub-tasks" is wrong on the Vision (Pebbles adds intentions). | Neutral wording. | |
-| UI-7 | 🟡 | ✅ | `help.featureBackupBody` (13048) | Backup also includes the Vision. | Mention the Vision. | |
-| UI-8 | 🟡 | ✅ | Help Key features 5490-5509 | No Vision entry. | Add one. | |
-| UI-9 | 🟡 | ✅ | `help.navFitDesc` (13095, 5586) | Logo also resets filters, level and focus, not only fits. | Reword. | |
-| UI-10 | 🟡 | ✅ | `toast.letGo` / `toast.takenBack` (12846, 12848); `help.navTitle` (13123) | Mixed grammar; "Canvas Navigation" is the only "canvas" in Help. | Align wording; "Map navigation". | |
-| UI-11 | 🟡 | ✅ | `help.filterHorizon` (5557) | Does not say 4 = No horizon / the order. | Add the order. | |
+| UI-5 | 🟡 | ✅ | `tips.views` (12830, cs 13360) | "Three views" but four are listed. | "Four views ...". | 87b96bd |
+| UI-6 | 🟡 | ✅ | `tips.levels` (12829), 5495, 13026 | "Pebbles adds sub-tasks" is wrong on the Vision (Pebbles adds intentions). | Neutral wording. | 87b96bd |
+| UI-7 | 🟡 | ✅ | `help.featureBackupBody` (13048) | Backup also includes the Vision. | Mention the Vision. | 87b96bd |
+| UI-8 | 🟡 | ✅ | Help Key features 5490-5509 | No Vision entry. | Add one. | 87b96bd |
+| UI-9 | 🟡 | ✅ | `help.navFitDesc` (13095, 5586) | Logo also resets filters, level and focus, not only fits. | Reword. | 87b96bd |
+| UI-10 | 🟡 | ✅ | `toast.letGo` / `toast.takenBack` (12846, 12848); `help.navTitle` (13123) | Mixed grammar; "Canvas Navigation" is the only "canvas" in Help. | Align wording; "Map navigation". | 87b96bd |
+| UI-11 | 🟡 | ✅ | `help.filterHorizon` (5557) | Does not say 4 = No horizon / the order. | Add the order. | 87b96bd |
 
 ## I18N (Czech translations)
 
@@ -55,9 +55,9 @@ Severity: 🔴 severe · 🟠 medium · 🟡 minor
 |---|---|---|---|---|---|---|
 | I18N-1 | 🟠 | ✅ | cs `help.vision.*` | Vykání ("chcete", "vzdali") in an app that uses tykání. | Rewrite in tykání. | 77c1a77 |
 | I18N-2 | 🟠 | ✅ | cs `filter.focusEnd`, `toast.controlsHidden`, `tips.dayFilter` | Vykání. | Tykání. | caf8081 |
-| I18N-3 | 🟡 | ⬜ | cs `menu.focusBranch` vs `filter.focusShort` / `help.vision.focus` | "Zaměřit" vs "Fokus" for one concept. | One term. | |
-| I18N-4 | 🟡 | ⬜ | `nav.prev`, `nav.next`, `weekbar.today`, `stats.trendWeek`, `filter.showing`, `filter.emptyDay`, `filter.emptyDayShort`, `stats.noUnplanned`, `help.fab` | Dead keys (last two referenced only by tests/i18n.test.js). | Remove from en + cs and the test. | |
-| I18N-5 | 🟡 | ⬜ | cs `bridge.toast.*` | Masculine past tense ("Přidal", "Vrátil"). | Neutral form. | |
+| I18N-3 | 🟡 | ✅ | cs `menu.focusBranch` vs `filter.focusShort` / `help.vision.focus` | "Zaměřit" vs "Fokus" for one concept. | One term. | |
+| I18N-4 | 🟡 | ✅ | `nav.prev`, `nav.next`, `weekbar.today`, `stats.trendWeek`, `filter.showing`, `filter.emptyDay`, `filter.emptyDayShort`, `stats.noUnplanned`, `help.fab` | Dead keys (last two referenced only by tests/i18n.test.js). | Remove from en + cs and the test. | |
+| I18N-5 | 🟡 | ✅ | cs `bridge.toast.*` | Masculine past tense ("Přidal", "Vrátil"). | Neutral form. | |
 | I18N-6 | 🟡 | ⬜ | cs terminology | Mixed "aktivita" / "úkol" (pre-existing). | Optional cleanup. | |
 
 ## ONB (Tips and Playground)

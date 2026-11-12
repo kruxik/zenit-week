@@ -18,7 +18,7 @@ describe('Internationalization', () => {
       'stats.legDone', 'stats.legOpen', 'stats.weekPrefix',
       'stats.followThrough', 'stats.effortBalance', 'stats.baseline',
       'stats.unplannedShort', 'stats.legendDone', 'stats.legendOpen', 'stats.legendUnplanned',
-      'stats.emptyWeek', 'stats.emptyWeekHint', 'stats.noUnplanned',
+      'stats.emptyWeek', 'stats.emptyWeekHint',
       'stats.theWeek', 'stats.tlDone', 'stats.tlUnpl',
     ];
     for (const lang of ['en', 'cs']) {
@@ -43,17 +43,17 @@ describe('Internationalization', () => {
     _state.setLang('en');
     // Mock some elements that applyTranslations updates
     const helpBtn = _state.getElement('help-fab');
-    helpBtn.dataset.i18nTitle = 'help.fab';
+    helpBtn.dataset.i18nTitle = 'help.featuresTitle';
     const settingsBtn = _state.getElement('settings-btn');
     
     applyTranslations();
     
     // In zenit-week.html, applyTranslations sets title/aria-label/textContent
     // Let's check help-fab's title
-    expect(helpBtn.title).toBe('Help & Hotkeys');
+    expect(helpBtn.title).toBe('Key features');
     
     _state.setLang('cs');
     applyTranslations();
-    expect(helpBtn.title).toBe('Nápověda & klávesové zkratky');
+    expect(helpBtn.title).toBe('Klíčové vlastnosti');
   });
 });
