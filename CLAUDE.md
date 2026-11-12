@@ -116,7 +116,7 @@ Before adding any control, find the nearest existing sibling of the same kind in
 | # | I need | Use |
 |---|---|---|
 | 1 | Button | `.btn` (+ `.commit` on the one committing button of a dialog, `.danger` for destructive); in script `uiButton()` |
-| 2 | Icon-only / close | `.help-close-btn` |
+| 2 | Icon-only / close | `.icon-btn` |
 | 3 | Select, text or number field | `.dialog-field`; inside a wrapper that already wears it (a prefixed or bare input), the input adds `.bare` |
 | 4 | On/off setting | `.switch` in `.switch-row` |
 | 5 | Settings entry | `.settings-label` + control inside `.settings-section` |

@@ -38,7 +38,7 @@ const ENTRIES = catalogueEntries();
 const CATALOGUE = new Set(ENTRIES.filter(e => e.kind === 'control').map(e => e.classes[0]));
 
 const SUGGEST = {
-  button: '`.btn` (or `.help-close-btn` for a close X)',
+  button: '`.btn` (or `.icon-btn` for a close X)',
   select: '`.dialog-field`',
   input: '`.dialog-field`',
   textarea: 'a shared field class (none exists yet: stop and ask)',
@@ -211,7 +211,7 @@ const CONTROL_CLASS_SET = [
   'comment-fmt-toggle',
   'dialog-field',
   'dp-field-row',
-  'help-close-btn',
+  'icon-btn',
   'undo-redo-btn',
   'view-level-btn',
   'view-toggle-btn',

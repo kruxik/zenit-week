@@ -154,7 +154,7 @@ function isProductionHost(hostname) {
      textarea must carry; a `part` line names the classes of a larger piece.
 
      control  button          .btn .commit .danger uiButton()
-     control  close           .help-close-btn
+     control  close           .icon-btn
      control  field           .dialog-field .bare
      control  switch          .switch .switch-row
      control  tab             .tab
@@ -809,7 +809,7 @@ function isProductionHost(hostname) {
   }
   /* Match the action button beside it - the panel headers this class comes from
      are one size up. */
-  #update-banner .help-close-btn { height: 32px; padding: 0 8px; }
+  #update-banner .icon-btn { height: 32px; padding: 0 8px; }
 
   /* Coachmark - anchored just-in-time tip bubble (Part B). */
   #coachmark {
@@ -2947,7 +2947,7 @@ function isProductionHost(hostname) {
 
   /* Bar buttons: the view tabs and the dialogs' X / Close pill. */
   .view-toggle-btn,
-  .help-close-btn {
+  .icon-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2967,13 +2967,13 @@ function isProductionHost(hostname) {
   }
 
   .view-toggle-btn:hover,
-  .help-close-btn:hover {
+  .icon-btn:hover {
     background: var(--bg-hover);
     color: var(--text-dim);
   }
   /* View tabs take no colour transition: on a switch the old tab would fade out
      while the new one fades in, so both wear the active fill for a frame or two. */
-  .help-close-btn { transition: background 0.15s, color 0.15s; }
+  .icon-btn { transition: background 0.15s, color 0.15s; }
 
   /* Tab state is two classes, written by syncViewTabs / setViewTabPress from
      VIEW_TABS: `.active` is the view in place, `.pressed` the tab under the
@@ -3657,13 +3657,13 @@ function isProductionHost(hostname) {
   /* The caption X, in dialogs and in the Help / comment panels: the bar button
      one size smaller so it fits a caption bar. Panel captions are larger, so
      their X carries a larger icon. */
-  .dialog-header .help-close-btn,
-  .app-panel-header .help-close-btn {
+  .dialog-header .icon-btn,
+  .app-panel-header .icon-btn {
     height: 28px;
     padding: 0 8px;
     flex-shrink: 0;
   }
-  .app-panel-header .help-close-btn { font-size: 18px; }
+  .app-panel-header .icon-btn { font-size: 18px; }
   .dialog-body {
     display: flex;
     flex-direction: column;
@@ -4902,7 +4902,7 @@ function isProductionHost(hostname) {
 <div id="playground-nudge" class="dialog-shell" role="status" aria-live="polite">
   <div class="dialog-header">
     <div class="dialog-title" data-i18n="onboarding.nudgeCaption">Done exploring?</div>
-    <button type="button" class="help-close-btn" id="playground-nudge-close"
+    <button type="button" class="icon-btn" id="playground-nudge-close"
       data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
       <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     </button>
@@ -4924,7 +4924,7 @@ Or remove them later in Settings → Help.</div>
 <div id="update-banner" class="dialog-shell" role="status" aria-live="polite">
   <div id="update-banner-text" data-i18n="update.body">There is a new version of Zenit Week.</div>
   <button type="button" class="btn" id="update-banner-reload" data-i18n="update.reload">Reload</button>
-  <button type="button" class="help-close-btn" id="update-banner-dismiss"
+  <button type="button" class="icon-btn" id="update-banner-dismiss"
     data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
     <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
   </button>
@@ -4933,7 +4933,7 @@ Or remove them later in Settings → Help.</div>
 <div id="coachmark" class="dialog-shell" role="dialog" aria-live="polite" aria-labelledby="coachmark-caption" hidden>
   <div class="dialog-header">
     <div class="dialog-title" id="coachmark-caption"></div>
-    <button type="button" class="help-close-btn" id="coachmark-close"
+    <button type="button" class="icon-btn" id="coachmark-close"
       data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
       <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     </button>
@@ -4991,7 +4991,7 @@ Or remove them later in Settings → Help.</div>
 <div id="date-picker-panel" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="date-picker-title">
   <div class="dialog-header">
     <div class="dialog-title" id="date-picker-title"></div>
-    <button type="button" class="help-close-btn" id="date-picker-close"
+    <button type="button" class="icon-btn" id="date-picker-close"
       data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
       <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     </button>
@@ -5047,7 +5047,7 @@ Or remove them later in Settings → Help.</div>
 <div id="baseline-panel" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="bp-title">
   <div class="dialog-header">
     <div class="dialog-title" id="bp-title" data-i18n="baseline.title">Activity Baseline</div>
-    <button type="button" class="help-close-btn" id="bp-close"
+    <button type="button" class="icon-btn" id="bp-close"
         data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
         <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
       </button>
@@ -5066,7 +5066,7 @@ Or remove them later in Settings → Help.</div>
 <div id="color-picker-panel" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="cp-title">
   <div class="dialog-header">
     <div class="dialog-title" id="cp-title" data-i18n="colorPicker.title">Branch color</div>
-    <button type="button" class="help-close-btn" id="cp-close"
+    <button type="button" class="icon-btn" id="cp-close"
         data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
         <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
       </button>
@@ -5089,7 +5089,7 @@ Or remove them later in Settings → Help.</div>
   <div id="app-confirm-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title">
     <div class="dialog-header">
       <div class="dialog-title" id="app-confirm-title"></div>
-      <button type="button" class="help-close-btn" id="app-confirm-close"
+      <button type="button" class="icon-btn" id="app-confirm-close"
         data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
         <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
       </button>
@@ -5156,7 +5156,7 @@ Or remove them later in Settings → Help.</div>
 <div id="quick-add-panel" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="quick-add-title">
   <div class="dialog-header">
     <div class="dialog-title" id="quick-add-title" data-i18n="quick_add.title">Quick add</div>
-    <button type="button" class="help-close-btn" id="quick-add-close"
+    <button type="button" class="icon-btn" id="quick-add-close"
       data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
       <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     </button>
@@ -5182,12 +5182,12 @@ Or remove them later in Settings → Help.</div>
 <div id="settings-overlay">
   <div id="settings-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="dialog-header">
-      <button type="button" class="help-close-btn" id="settings-back"
+      <button type="button" class="icon-btn" id="settings-back"
         data-i18n-title="settings.back" title="Back" data-i18n-aria="settings.back" aria-label="Back">
         <svg class="icon" aria-hidden="true"><use href="#icon-chevron-left"/></svg>
       </button>
       <div class="dialog-title" id="settings-title"><span id="settings-title-root" data-i18n="toolbar.settings">Settings</span><span id="settings-title-section"></span></div>
-      <button type="button" class="help-close-btn" id="settings-close"
+      <button type="button" class="icon-btn" id="settings-close"
         data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
         <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
       </button>
@@ -5493,7 +5493,7 @@ Or remove them later in Settings → Help.</div>
 <div id="help-panel" class="app-panel">
   <div id="help-header" class="app-panel-header">
     <div class="app-panel-title" data-i18n="help.title">Help &amp; Hotkeys</div>
-    <button type="button" class="help-close-btn" id="help-close"
+    <button type="button" class="icon-btn" id="help-close"
       data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
       <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     </button>
@@ -5675,7 +5675,7 @@ Or remove them later in Settings → Help.</div>
 </div>
 
 <div id="help-close-bar">
-  <button type="button" class="help-close-btn" id="help-close-mobile">
+  <button type="button" class="icon-btn" id="help-close-mobile">
     <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     <span data-i18n="help.close">Close</span>
   </button>
@@ -5685,7 +5685,7 @@ Or remove them later in Settings → Help.</div>
 <div id="comment-panel" class="app-panel">
   <div id="comment-header" class="app-panel-header">
     <div id="comment-title" class="app-panel-title"></div>
-    <button type="button" class="help-close-btn" id="comment-close"
+    <button type="button" class="icon-btn" id="comment-close"
       data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
       <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     </button>
@@ -5698,7 +5698,7 @@ Or remove them later in Settings → Help.</div>
   </div>
 </div>
 <div id="comment-close-bar">
-  <button type="button" class="help-close-btn" id="comment-close-mobile">
+  <button type="button" class="icon-btn" id="comment-close-mobile">
     <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
     <span data-i18n="help.close">Close</span>
   </button>
