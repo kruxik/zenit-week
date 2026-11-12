@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-Bs0XAPiyaCrYJuenuLr1LuxtSlUXK0ogf+vNpXjtbZ8=';
+               'sha256-53nxxcElZsmzt/9KiT0RvDlBTfYBBV7GqBZuSGu6HSc=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -5302,7 +5302,7 @@ Or remove them later in Settings → Help.</div>
         <!-- One pairing for this browser, shared by every agent above: it is part
              of the status, and Unpair disconnects them all. -->
         <div id="bridge-paired" class="bridge-list" hidden>
-          <div id="bridge-paired-date" class="bridge-status-line"></div>
+          <div id="bridge-paired-date" class="settings-sub"></div>
           <button type="button" class="agenda-action-btn" id="bridge-unpair-btn" data-i18n="bridge.unpair">Unpair all</button>
         </div>
         <div id="bridge-guide" class="bridge-list" hidden>
@@ -12770,8 +12770,8 @@ const TRANSLATIONS = {
     'bridge.guide.vscodeNote':    'VS Code opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
     'bridge.guide.otherNote':     "Paste it into your app's MCP settings, then restart the app. Needs Node.js 20 or newer.",
     'bridge.copied':              'Copied',
-    'bridge.paired':              'This computer is paired',
-    'bridge.pairedOn':            'This computer paired on {date}',
+    'bridge.paired':              'Paired',
+    'bridge.pairedOn':            'Paired on {date}',
     'bridge.unpair':              'Unpair all',
     'bridge.explain.title':       'Allow AI agents',
     'bridge.explain.body':        'Your browser will now ask to let Zenit Week access other apps and services on this device. That is how it reaches your AI agent, on this computer only. Choose Allow.',
@@ -13299,8 +13299,8 @@ const TRANSLATIONS = {
     'bridge.guide.vscodeNote':    'Otevře se VS Code a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.otherNote':     'Vlož ho do MCP nastavení své aplikace a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
     'bridge.copied':              'Zkopírováno',
-    'bridge.paired':              'Tento počítač je spárován',
-    'bridge.pairedOn':            'Tento počítač spárován {date}',
+    'bridge.paired':              'Spárováno',
+    'bridge.pairedOn':            'Spárováno {date}',
     'bridge.unpair':              'Zrušit spárování všech',
     'bridge.explain.title':       'Povolit AI agenty',
     'bridge.explain.body':        'Prohlížeč se teď zeptá, zda smí Zenit Week přistupovat k jiným aplikacím a službám na tomto zařízení. Tak se spojí s tvým AI agentem, jen na tomto počítači. Zvol Povolit.',
