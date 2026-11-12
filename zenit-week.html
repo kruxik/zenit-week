@@ -156,7 +156,7 @@ function isProductionHost(hostname) {
      control  button          .btn .commit .danger uiButton()
      control  close           .help-close-btn
      control  field           .dialog-field .bare
-     control  switch          .theme-toggle .theme-toggle-row
+     control  switch          .switch .switch-row
      control  tab             .agenda-tab
      control  menu-item       .ctx-item
      part     menu            .menu
@@ -1626,8 +1626,8 @@ function isProductionHost(hostname) {
     margin: 2px 0;
   }
 
-  /* Theme toggle pill */
-  .theme-toggle-row {
+  /* Switch: the on/off pill (Settings toggles) */
+  .switch-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1635,7 +1635,7 @@ function isProductionHost(hostname) {
     padding: 2px 2px;
   }
 
-  .theme-toggle {
+  .switch {
     position: relative;
     width: 44px;
     height: 24px;
@@ -1648,11 +1648,11 @@ function isProductionHost(hostname) {
     flex-shrink: 0;
   }
 
-  .theme-toggle[aria-checked="true"] {
+  .switch[aria-checked="true"] {
     background: var(--accent-primary);
   }
 
-  .theme-toggle-thumb {
+  .switch-thumb {
     position: absolute;
     top: 3px;
     left: 3px;
@@ -1665,7 +1665,7 @@ function isProductionHost(hostname) {
     pointer-events: none;
   }
 
-  .theme-toggle[aria-checked="true"] .theme-toggle-thumb {
+  .switch[aria-checked="true"] .switch-thumb {
     transform: translateX(20px);
   }
 
@@ -5298,19 +5298,19 @@ Or remove them later in Settings → Help.</div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
-        <div class="theme-toggle-row">
+        <div class="switch-row">
           <span class="settings-label" data-i18n="settings.autoLayout">Auto layout</span>
-          <button type="button" class="theme-toggle" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change" data-i18n-aria="settings.autoLayoutTitle" aria-label="Automatically reset layout after each change">
-            <span class="theme-toggle-thumb"></span>
+          <button type="button" class="switch" id="autolayout-toggle" role="switch" aria-checked="true" data-i18n-title="settings.autoLayoutTitle" title="Automatically reset layout after each change" data-i18n-aria="settings.autoLayoutTitle" aria-label="Automatically reset layout after each change">
+            <span class="switch-thumb"></span>
           </button>
         </div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
-        <div class="theme-toggle-row">
+        <div class="switch-row">
           <span class="settings-label" data-i18n="settings.tips">Show tips</span>
-          <button type="button" class="theme-toggle" id="tips-toggle" role="switch" aria-checked="true" data-i18n-title="settings.tipsTitle" title="Show just-in-time tips for first-time actions" data-i18n-aria="settings.tipsTitle" aria-label="Show just-in-time tips for first-time actions">
-            <span class="theme-toggle-thumb"></span>
+          <button type="button" class="switch" id="tips-toggle" role="switch" aria-checked="true" data-i18n-title="settings.tipsTitle" title="Show just-in-time tips for first-time actions" data-i18n-aria="settings.tipsTitle" aria-label="Show just-in-time tips for first-time actions">
+            <span class="switch-thumb"></span>
           </button>
         </div>
         <button type="button" class="btn" id="tips-replay-btn" data-i18n="settings.tipsReplay">Replay tips</button>
@@ -5325,8 +5325,8 @@ Or remove them later in Settings → Help.</div>
           <div class="settings-identity">
             <div class="settings-name" id="bridge-label" data-i18n="settings.bridge">AI agents</div>
           </div>
-          <button type="button" class="theme-toggle" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Allow AI agents on this computer">
-            <span class="theme-toggle-thumb"></span>
+          <button type="button" class="switch" id="bridge-toggle" role="switch" aria-checked="false" aria-labelledby="bridge-label" data-i18n-title="settings.bridgeTitle" title="Allow AI agents on this computer">
+            <span class="switch-thumb"></span>
           </button>
         </div>
         <div class="settings-sub" id="bridge-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer.</div>

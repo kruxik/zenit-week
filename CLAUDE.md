@@ -118,7 +118,7 @@ Before adding any control, find the nearest existing sibling of the same kind in
 | 1 | Button | `.btn` (+ `.commit` on the one committing button of a dialog, `.danger` for destructive); in script `uiButton()` |
 | 2 | Icon-only / close | `.help-close-btn` |
 | 3 | Select, text or number field | `.dialog-field`; inside a wrapper that already wears it (a prefixed or bare input), the input adds `.bare` |
-| 4 | On/off setting | `.theme-toggle` in `.theme-toggle-row` |
+| 4 | On/off setting | `.switch` in `.switch-row` |
 | 5 | Settings entry | `.settings-label` + control inside `.settings-section` |
 | 6 | Tabs | `.agenda-tab` |
 | 7 | Dialog | `.dialog-shell` / `.dialog-header` / `.dialog-title` / `.dialog-body` / `.dialog-actions`; confirm via `showAppConfirm` |
