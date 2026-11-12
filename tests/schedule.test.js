@@ -2052,7 +2052,7 @@ describe('Schedule and week sync fail independently', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(() => {

@@ -42,7 +42,7 @@ describe('account-change guard', () => {
   let answer;   // 'confirm' | 'cancel' | null (leave the dialog open)
   let pendingDialog;
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(() => {

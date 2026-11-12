@@ -7,7 +7,7 @@ import { _state, pollDriveChanges } from './setup.js';
 // file. The old path cost five requests an idle cycle and grew with every file
 // worth watching; this one does not depend on how many files exist.
 const server = setupServer();
-server.listen({ onUnhandledRequest: 'bypass' });
+server.listen({ onUnhandledRequest: 'error' });
 afterAll(() => server.close());
 
 const CHANGES = 'https://www.googleapis.com/drive/v3/changes';

@@ -66,7 +66,7 @@ describe('loadVisionForView, signed in', () => {
       return new HttpResponse(remote == null ? '' : JSON.stringify(remote));
     }),
   );
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
   beforeEach(() => {
     remote = null;

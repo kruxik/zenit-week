@@ -138,7 +138,7 @@ describe('Drive request shape', () => {
     http.patch('https://www.googleapis.com/upload/drive/v3/files/:id', () => HttpResponse.json({ id: 'ok' })),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
   beforeEach(() => {
     seen.length = 0;

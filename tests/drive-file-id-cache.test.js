@@ -79,7 +79,7 @@ describe('a stale persisted id', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
   beforeEach(() => {
     seen.length = 0;
@@ -174,7 +174,7 @@ describe('listAllDriveWeekFiles with a duplicated week', () => {
         ],
       })),
   );
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
   beforeEach(() => {
     _state.clearLocalStorage();
@@ -219,7 +219,7 @@ describe('creating a week file that another device just created', () => {
       return new HttpResponse(null, { status: 204 });
     }),
   );
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
   beforeEach(() => {
     calls.length = 0;
@@ -270,7 +270,7 @@ describe('a stale colours file id on upload', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
   beforeEach(() => {
     seen.length = 0;

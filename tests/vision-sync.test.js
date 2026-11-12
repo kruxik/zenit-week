@@ -157,7 +157,7 @@ describe('Vision Drive sync', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(() => {
@@ -227,7 +227,7 @@ describe('changes feed routing', () => {
       return new HttpResponse(JSON.stringify(vision([branch('vb1', ['r']), intention('r', 'vb1')])));
     }),
   );
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(() => {

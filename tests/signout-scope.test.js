@@ -9,7 +9,7 @@ import { signOut, _state } from './setup.js';
 // device - measured twice on real devices - and all it bought was a fresh
 // consent screen on the next sign-in.
 const server = setupServer();
-server.listen({ onUnhandledRequest: 'bypass' });
+server.listen({ onUnhandledRequest: 'error' });
 afterAll(() => server.close());
 
 describe('sign-out scope', () => {
@@ -28,6 +28,8 @@ describe('sign-out scope', () => {
         revokeCalls.push(new URL(request.url).searchParams.get('token'));
         return new HttpResponse(null, { status: 200 });
       }),
+      // Sign-out's last Drive lookup before the token goes; nothing is there.
+      http.get('https://www.googleapis.com/drive/v3/files', () => HttpResponse.json({ files: [] })),
     );
     _state.setAccessToken('access_token_of_this_device');
   });

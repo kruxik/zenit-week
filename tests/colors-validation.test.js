@@ -114,7 +114,7 @@ describe('colors download from Drive', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterEach(() => { server.resetHandlers(); _state.resetSyncState(); });
   afterAll(() => server.close());
 
