@@ -270,7 +270,13 @@ describe('analytics - returned_new_week', () => {
     });
   }
 
-  const settle = () => new Promise(r => setTimeout(r, 30));
+  // The returned_new_week check is one IndexedDB read the save does not await.
+  // The database answers requests in order, so a read queued now resolves after
+  // it; one more macrotask lets its .then (the trackEvent) run.
+  const settle = async () => {
+    await run('listWeekKeysIDB()');
+    await new Promise(r => setTimeout(r, 0));
+  };
 
   async function openAndSave(wk) {
     const data = await loadWeek(wk);

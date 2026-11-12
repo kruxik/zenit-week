@@ -240,6 +240,8 @@ describe('Drive sync E2E - clean pull does not ping-pong', () => {
   let mediaFetchCount = 0;
 
   const server = setupServer(
+    // The poll looks the neighbouring weeks up by name; none exist on this Drive.
+    http.get('https://www.googleapis.com/drive/v3/files', () => HttpResponse.json({ files: [] })),
     http.post('http://localhost/api/token', () =>
       HttpResponse.json({ access_token: 'new_access_token', expires_in: 3600 })
     ),
@@ -258,7 +260,7 @@ describe('Drive sync E2E - clean pull does not ping-pong', () => {
     })
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(async () => {
@@ -312,6 +314,8 @@ describe('Drive sync E2E - legacy-scheme appProperty self-heals (no download sto
   let mediaFetchCount = 0;
 
   const server = setupServer(
+    // The poll looks the neighbouring weeks up by name; none exist on this Drive.
+    http.get('https://www.googleapis.com/drive/v3/files', () => HttpResponse.json({ files: [] })),
     http.post('http://localhost/api/token', () =>
       HttpResponse.json({ access_token: 'new_access_token', expires_in: 3600 })
     ),
@@ -330,7 +334,7 @@ describe('Drive sync E2E - legacy-scheme appProperty self-heals (no download sto
     })
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(async () => {
@@ -372,6 +376,8 @@ describe('Colors sync E2E - legacy-scheme appProperty self-heals (no download st
   let colorsMediaFetchCount = 0;
 
   const server = setupServer(
+    // The poll looks the neighbouring weeks up by name; none exist on this Drive.
+    http.get('https://www.googleapis.com/drive/v3/files', () => HttpResponse.json({ files: [] })),
     http.post('http://localhost/api/token', () =>
       HttpResponse.json({ access_token: 'new_access_token', expires_in: 3600 })
     ),
@@ -386,7 +392,7 @@ describe('Colors sync E2E - legacy-scheme appProperty self-heals (no download st
     })
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(async () => {
@@ -427,6 +433,8 @@ describe('Drive sync E2E - Changes API poll (flagged)', () => {
   let changesPayload = { newStartPageToken: '1001', changes: [] };
 
   const server = setupServer(
+    // The poll looks the neighbouring weeks up by name; none exist on this Drive.
+    http.get('https://www.googleapis.com/drive/v3/files', () => HttpResponse.json({ files: [] })),
     http.post('http://localhost/api/token', () =>
       HttpResponse.json({ access_token: 'new_access_token', expires_in: 3600 })
     ),
@@ -446,7 +454,7 @@ describe('Drive sync E2E - Changes API poll (flagged)', () => {
     })
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(async () => {
@@ -533,7 +541,7 @@ describe('Drive sync - "seen" only when applied (I6)', () => {
     ),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
 
   beforeEach(async () => {
