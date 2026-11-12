@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import {
   nodeDisplayLabel,
@@ -2052,8 +2053,7 @@ describe('Schedule and week sync fail independently', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(() => {
     seen.length = 0;

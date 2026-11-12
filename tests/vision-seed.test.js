@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import { _state, seedVisionFromWeek, loadVisionForView, BRANCH_COLORS } from './setup.js';
 
@@ -66,8 +67,7 @@ describe('loadVisionForView, signed in', () => {
       return new HttpResponse(remote == null ? '' : JSON.stringify(remote));
     }),
   );
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
   beforeEach(() => {
     remote = null;
     status = 200;

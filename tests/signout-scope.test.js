@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterAll, afterEach } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import { signOut, _state } from './setup.js';
 
@@ -9,8 +10,7 @@ import { signOut, _state } from './setup.js';
 // device - measured twice on real devices - and all it bought was a fresh
 // consent screen on the next sign-in.
 const server = setupServer();
-server.listen({ onUnhandledRequest: 'error' });
-afterAll(() => server.close());
+useMockServer(server);
 
 describe('sign-out scope', () => {
   let tokenBodies;
@@ -28,8 +28,12 @@ describe('sign-out scope', () => {
         revokeCalls.push(new URL(request.url).searchParams.get('token'));
         return new HttpResponse(null, { status: 200 });
       }),
-      // Sign-out's last Drive lookup before the token goes; nothing is there.
+      // Sign-out flushes the week and colors to Drive before the token goes:
+      // nothing is there yet, so each file is created, read back empty, then uploaded.
       http.get('https://www.googleapis.com/drive/v3/files', () => HttpResponse.json({ files: [] })),
+      http.post('https://www.googleapis.com/drive/v3/files', () => HttpResponse.json({ id: 'new_file' })),
+      http.get('https://www.googleapis.com/drive/v3/files/:fileId', () => HttpResponse.json({ id: 'new_file', appProperties: {} })),
+      http.patch('https://www.googleapis.com/upload/drive/v3/files/:fileId', () => HttpResponse.json({ id: 'new_file' })),
     );
     _state.setAccessToken('access_token_of_this_device');
   });

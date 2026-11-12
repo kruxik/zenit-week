@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import { 
   _state, 
@@ -99,12 +100,11 @@ const handlers = [
 
 const server = setupServer(...handlers);
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+useMockServer(server);
 afterEach(() => {
   server.resetHandlers();
   _state.resetSyncState();
 });
-afterAll(() => server.close());
 
 describe('Google Drive Sync', () => {
   beforeEach(() => {

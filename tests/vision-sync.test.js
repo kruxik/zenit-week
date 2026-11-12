@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import {
   _state,
@@ -157,8 +158,7 @@ describe('Vision Drive sync', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(() => {
     seen.length = 0;
@@ -227,8 +227,7 @@ describe('changes feed routing', () => {
       return new HttpResponse(JSON.stringify(vision([branch('vb1', ['r']), intention('r', 'vb1')])));
     }),
   );
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(() => {
     downloads.length = 0;

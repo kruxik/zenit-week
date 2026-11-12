@@ -17,6 +17,7 @@
 
 import { describe, test, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import {
   _state,
@@ -260,8 +261,7 @@ describe('Drive sync E2E - clean pull does not ping-pong', () => {
     })
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(async () => {
     server.resetHandlers();
@@ -334,8 +334,7 @@ describe('Drive sync E2E - legacy-scheme appProperty self-heals (no download sto
     })
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(async () => {
     server.resetHandlers();
@@ -392,8 +391,7 @@ describe('Colors sync E2E - legacy-scheme appProperty self-heals (no download st
     })
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(async () => {
     server.resetHandlers();
@@ -454,8 +452,7 @@ describe('Drive sync E2E - Changes API poll (flagged)', () => {
     })
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(async () => {
     server.resetHandlers();
@@ -541,8 +538,7 @@ describe('Drive sync - "seen" only when applied (I6)', () => {
     ),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(async () => {
     server.resetHandlers();

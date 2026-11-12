@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import { _state, pollDriveChanges } from './setup.js';
 
@@ -7,8 +8,7 @@ import { _state, pollDriveChanges } from './setup.js';
 // file. The old path cost five requests an idle cycle and grew with every file
 // worth watching; this one does not depend on how many files exist.
 const server = setupServer();
-server.listen({ onUnhandledRequest: 'error' });
-afterAll(() => server.close());
+useMockServer(server);
 
 const CHANGES = 'https://www.googleapis.com/drive/v3/changes';
 const START = 'https://www.googleapis.com/drive/v3/changes/startPageToken';

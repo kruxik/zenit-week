@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import {
   _state,
@@ -65,9 +66,8 @@ const handlers = [
 
 const server = setupServer(...handlers);
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+useMockServer(server);
 afterEach(() => { server.resetHandlers(); _state.resetSyncState(); });
-afterAll(() => server.close());
 
 async function authAndLink() {
   _state.setLocalStorage(GOOGLE_AUTH_STORAGE_KEY, { hasSession: true });

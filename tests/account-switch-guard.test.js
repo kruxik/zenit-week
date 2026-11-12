@@ -5,6 +5,7 @@
 // or the user confirms the switch; declining signs out without uploading.
 import { describe, test, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import { _state, sandboxGlobal, verifyDriveIdentity, authFetch, handleAuthCode } from './setup.js';
 
@@ -42,8 +43,7 @@ describe('account-change guard', () => {
   let answer;   // 'confirm' | 'cancel' | null (leave the dialog open)
   let pendingDialog;
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
 
   beforeEach(() => {
     _state.resetSyncState();

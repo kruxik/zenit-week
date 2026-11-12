@@ -5,6 +5,7 @@
 // and dropped rather than retried into a wall.
 import { describe, test, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import { _state, syncWeekFromDrive, pickDriveSurvivor, listAllDriveWeekFiles, _uploadColorsToDrive } from './setup.js';
 
@@ -79,8 +80,7 @@ describe('a stale persisted id', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
   beforeEach(() => {
     seen.length = 0;
     _state.clearLocalStorage();
@@ -174,8 +174,7 @@ describe('listAllDriveWeekFiles with a duplicated week', () => {
         ],
       })),
   );
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
   beforeEach(() => {
     _state.clearLocalStorage();
     _state.resetSyncState();
@@ -219,8 +218,7 @@ describe('creating a week file that another device just created', () => {
       return new HttpResponse(null, { status: 204 });
     }),
   );
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
   beforeEach(() => {
     calls.length = 0;
     searchCount = 0;
@@ -270,8 +268,7 @@ describe('a stale colours file id on upload', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
   beforeEach(() => {
     seen.length = 0;
     _state.clearLocalStorage();

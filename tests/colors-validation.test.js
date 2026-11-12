@@ -4,6 +4,7 @@
 // so both are whitelisted on ingest.
 import { describe, test, expect, beforeEach, beforeAll, afterEach, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import {
   _state, sanitizeColorsData, loadBranchColors, syncColorsFromDrive,
@@ -114,9 +115,8 @@ describe('colors download from Drive', () => {
     }),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+  useMockServer(server);
   afterEach(() => { server.resetHandlers(); _state.resetSyncState(); });
-  afterAll(() => server.close());
 
   beforeEach(() => {
     _state.clearLocalStorage();

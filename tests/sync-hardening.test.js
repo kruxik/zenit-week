@@ -10,6 +10,7 @@
 //      a week another device created stayed invisible until the next sign-in.
 import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { setupServer } from 'msw/node';
+import { useMockServer } from './msw-strict.js';
 import { http, HttpResponse } from 'msw';
 import {
   _state, validateAndRepair, syncWeekToDrive, syncWeekFromDrive, pollDriveMeta,
@@ -138,8 +139,7 @@ describe('Drive request shape', () => {
     http.patch('https://www.googleapis.com/upload/drive/v3/files/:id', () => HttpResponse.json({ id: 'ok' })),
   );
 
-  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-  afterAll(() => server.close());
+  useMockServer(server);
   beforeEach(() => {
     seen.length = 0;
     _state.clearLocalStorage();
