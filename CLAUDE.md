@@ -115,16 +115,16 @@ Before adding any control, find the nearest existing sibling of the same kind in
 
 | # | I need | Use |
 |---|---|---|
-| 1 | Button | `.agenda-action-btn` (+ `.commit` on the one committing button of a dialog, `.danger` for destructive) |
+| 1 | Button | `.agenda-action-btn` (+ `.commit` on the one committing button of a dialog, `.danger` for destructive); in script `uiButton()` |
 | 2 | Icon-only / close | `.help-close-btn` |
-| 3 | Select, text or number field | `.dialog-field` |
+| 3 | Select, text or number field | `.dialog-field`; inside a wrapper that already wears it (a prefixed or bare input), the input adds `.bare` |
 | 4 | On/off setting | `.theme-toggle` in `.theme-toggle-row` |
 | 5 | Settings entry | `.settings-label` + control inside `.settings-section` |
 | 6 | Tabs | `.agenda-tab` |
 | 7 | Dialog | `.dialog-shell` / `.dialog-header` / `.dialog-title` / `.dialog-body` / `.dialog-actions`; confirm via `showAppConfirm` |
 | 8 | Side panel | `.app-panel*` |
-| 9 | Popup menu item | `.ctx-item` (in `#context-menu` or `#day-filter-menu`) |
-| 10 | Chip | `.agenda-action-btn.qab-pill`, `buildBranchPill()` |
+| 9 | Popup menu | `.menu` surface with `.ctx-item` rows |
+| 10 | Chip | `.agenda-action-btn.qab-pill`; in script `uiPill()`, or `buildBranchPill()` for a branch |
 | 11 | Icon | `iconSvg(name)` |
 | 12 | Toolbar button | `.undo-redo-btn` (undo bar), `.view-toggle-btn` (view switcher) - existing bars only, never a new one |
 

@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-WWy/DfRaQzrwcD+4684hszgnILk2vCUk6leRTlWhUFI=';
+               'sha256-48vzqLfh1/OqjxuRaaNhwx5dSDxqDs+rBGAI55Jd7bo=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -153,18 +153,19 @@ function isProductionHost(hostname) {
      A `control` line's first class is what a button, select, input or
      textarea must carry; a `part` line names the classes of a larger piece.
 
-     control  button          .agenda-action-btn .commit .danger
+     control  button          .agenda-action-btn .commit .danger uiButton()
      control  close           .help-close-btn
-     control  field           .dialog-field
+     control  field           .dialog-field .bare
      control  switch          .theme-toggle .theme-toggle-row
      control  tab             .agenda-tab
      control  menu-item       .ctx-item
+     part     menu            .menu
      control  toolbar         .undo-redo-btn
      control  view-switcher   .view-toggle-btn
      part     settings-entry  .settings-section .settings-label
      part     dialog          .dialog-shell .dialog-header .dialog-title .dialog-body .dialog-actions showAppConfirm()
      part     side-panel      .app-panel
-     part     chip            .qab-pill buildBranchPill()
+     part     chip            .qab-pill uiPill() buildBranchPill()
      part     icon            iconSvg()
      END COMPONENT CATALOGUE */
 
@@ -1058,18 +1059,12 @@ function isProductionHost(hostname) {
   #week-picker.off-current #week-picker-label { color: var(--accent-warning-text); }
 
   /* ── The fold ───────────────────────────────────────────────────────────── */
-  /* The toolbar's glass dropdown surface, because it drops out of the bar. Centred on the
-     label; on phones it is centred on the viewport instead (see the 520px query),
-     which is what keeps it from hanging off a 360px screen. */
+  /* The glass dialog surface (.dialog-shell), lifted with the popover shadow
+     because it drops out of the bar. Centred on the label; on phones it is
+     centred on the viewport instead (see the 520px query), which is what keeps
+     it from hanging off a 360px screen. */
   #week-picker-fold {
-    background: var(--settings-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
     box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
-  }
-  #week-picker-fold {
     position: absolute;
     top: calc(100% + 8px);
     left: 50%;
@@ -1719,26 +1714,29 @@ function isProductionHost(hostname) {
   }
 
   /* Modal */
-  /* Context menu */
-  #context-menu {
+  /* Popup menu surface: the context menu and the day/horizon filter menu.
+     Rows are .ctx-item; an ID sets only its layer and width. */
+  .menu {
     position: fixed;
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: 8px;
     box-shadow: 0 8px 30px var(--shadow-md);
     padding: 8px 0;
-    z-index: 3000;
-    min-width: 180px;
     display: none;
     animation: fadeIn 0.1s ease-out;
+  }
+  .menu.visible { display: block; }
+
+  #context-menu {
+    z-index: 3000;
+    min-width: 180px;
   }
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
   }
-
-  #context-menu.visible { display: block; }
 
   .ctx-item {
     padding: 10px 20px;
@@ -1848,15 +1846,9 @@ function isProductionHost(hostname) {
     font-family: monospace;
   }
   #cp-hex {
-    border: none;
-    background: transparent;
-    font-size: 13px;
     font-family: monospace;
-    width: 100%;
-    outline: none;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-primary);
   }
 
   #cp-buttons { width: 100%; }
@@ -1869,13 +1861,8 @@ function isProductionHost(hostname) {
   }
 
   #bp-input {
-    border: none;
-    background: transparent;
     font-size: 15px;
     font-weight: 700;
-    width: 100%;
-    outline: none;
-    color: var(--text-primary);
     text-align: center;
     -moz-appearance: textfield;
   }
@@ -2186,13 +2173,6 @@ function isProductionHost(hostname) {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .app-panel-close {
-    cursor: pointer;
-    font-size: 18px;
-    color: var(--text-placeholder);
-    transition: color 0.2s;
-  }
-  .app-panel-close:hover { color: var(--text-primary); }
 
   /* Scroll region spans the panel's full height so content passes under the
      header and the toolbar; the padding keeps the first item clear of both. A
@@ -3345,20 +3325,11 @@ function isProductionHost(hostname) {
   .agenda-priority-icon.high     { color: var(--accent-warning-text); }
   .agenda-priority-icon.critical { color: var(--accent-danger); }
 
-  /* The day-filter menu */
+  /* The day-filter menu (a .menu) */
   #day-filter-menu {
-    position: fixed;
     z-index: 9001;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: 8px;
-    padding: 4px 0;
     min-width: 100px;
-    box-shadow: 0 8px 32px var(--shadow-md);
-    display: none;
-    animation: fadeIn 0.1s ease-out;
   }
-  #day-filter-menu.visible { display: block; }
 
   /* Agenda inline rename input */
   .agenda-rename-input {
@@ -3411,8 +3382,6 @@ function isProductionHost(hostname) {
 
   /* Comment dialog - mirrors the Help dialog layout (desktop centered panel,
      mobile full-area with bottom "Close" pill). */
-  #comment-close { flex-shrink: 0; }
-
   /* Not a scroll region - the textarea fills the panel, so the top offset clears
      the floating header and the toolbar above it instead of scrolling under. */
   #comment-body {
@@ -3685,13 +3654,16 @@ function isProductionHost(hostname) {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* The X is the same button used to leave Help and the comment panel, one
-     size smaller so it fits a 40px caption bar. */
-  .dialog-header .help-close-btn {
+  /* The caption X, in dialogs and in the Help / comment panels: the bar button
+     one size smaller so it fits a caption bar. Panel captions are larger, so
+     their X carries a larger icon. */
+  .dialog-header .help-close-btn,
+  .app-panel-header .help-close-btn {
     height: 28px;
     padding: 0 8px;
     flex-shrink: 0;
   }
+  .app-panel-header .help-close-btn { font-size: 18px; }
   .dialog-body {
     display: flex;
     flex-direction: column;
@@ -3706,8 +3678,10 @@ function isProductionHost(hostname) {
   }
   /* One field idiom for every dialog: the bordered box the date dialog already
      used, so a hex code, a baseline number and a quick-add line all read the
-     same, and so do the Settings selects. The two wrappers (#cp-hex-row, #bp-input-row) carry it with a
-     transparent input inside, which is why the ring is also :focus-within. */
+     same, and so do the Settings selects. The two wrappers (#cp-hex-row,
+     #bp-input-row) carry it with a `.dialog-field.bare` input inside - the
+     field's type and colour without a second box - which is why the ring is
+     also :focus-within. */
   .dialog-field {
     background: var(--bg-surface);
     border: 1px solid var(--border-soft);
@@ -3725,6 +3699,13 @@ function isProductionHost(hostname) {
     border-color: var(--accent-primary);
   }
   select.dialog-field { cursor: pointer; }
+  .dialog-field.bare {
+    border: none;
+    background: transparent;
+    height: auto;
+    padding: 0;
+    width: 100%;
+  }
   /* Popovers are anchored and narrow: a tighter body and a full-width action
      row, but the same caption, fields and buttons as the modals. */
   #color-picker-panel .dialog-body,
@@ -4745,7 +4726,7 @@ function isProductionHost(hostname) {
       </button>
       <!-- The fold. Month paging never changes the open week - only a week row
            does - so browsing to September does not drag the app along with it. -->
-      <div id="week-picker-fold" role="dialog" data-i18n-aria="weekpicker.title" aria-label="Choose week">
+      <div id="week-picker-fold" class="dialog-shell" role="dialog" data-i18n-aria="weekpicker.title" aria-label="Choose week">
         <div id="week-picker-month">
           <button type="button" class="undo-redo-btn" id="week-picker-month-prev"
                   data-i18n-aria="weekpicker.prevMonth" aria-label="Previous month">
@@ -4967,7 +4948,7 @@ Or remove them later in Settings → Help.</div>
   <div id="coachmark-arrow"></div>
 </div>
 
-<div id="context-menu">
+<div id="context-menu" class="menu">
   <div class="ctx-item" id="ctx-transfer-unfinished"><svg class="icon" aria-hidden="true"><use href="#icon-transfer"/></svg> <span data-i18n="menu.transferUnfinished">Transfer Unfinished</span></div>
   <div class="ctx-item" id="ctx-transfer-reusable"><svg class="icon" aria-hidden="true"><use href="#icon-repeat"/></svg> <span data-i18n="menu.transferReusable">Transfer Reusable</span></div>
   <div class="ctx-item" id="ctx-set-baseline"><svg class="icon" aria-hidden="true"><use href="#icon-battery-2"/></svg> <span data-i18n="menu.setBaseline">Set Effort Baseline</span></div>
@@ -5003,7 +4984,7 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-item danger" id="ctx-delete"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg> <span data-i18n="menu.delete">Delete</span></div>
 </div>
 
-<div id="day-filter-menu"></div>
+<div id="day-filter-menu" class="menu"></div>
 
 <!-- The app's one calendar for choosing a day. openDatePicker fills the title,
      grid and actions for whoever opened it (Reschedule, Set a date). -->
@@ -5073,7 +5054,7 @@ Or remove them later in Settings → Help.</div>
   </div>
   <div class="dialog-body">
     <div id="bp-input-row" class="dialog-field">
-      <input type="number" id="bp-input" min="1" max="999" step="1" value="105">
+      <input type="number" id="bp-input" class="dialog-field bare" min="1" max="999" step="1" value="105">
     </div>
     <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
     <div id="bp-buttons" class="dialog-actions">
@@ -5095,7 +5076,7 @@ Or remove them later in Settings → Help.</div>
     <input type="range" id="cp-hue-slider" min="0" max="359" step="1">
     <div id="cp-hex-row" class="dialog-field">
       <span id="cp-hex-prefix">#</span>
-      <input type="text" id="cp-hex" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
+      <input type="text" id="cp-hex" class="dialog-field bare" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
     </div>
     <div id="cp-buttons" class="dialog-actions">
       <button type="button" id="cp-apply" class="agenda-action-btn commit" data-i18n="colorPicker.apply">Apply</button>
@@ -5512,7 +5493,10 @@ Or remove them later in Settings → Help.</div>
 <div id="help-panel" class="app-panel">
   <div id="help-header" class="app-panel-header">
     <div class="app-panel-title" data-i18n="help.title">Help &amp; Hotkeys</div>
-    <div id="help-close" class="app-panel-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
+    <button type="button" class="help-close-btn" id="help-close"
+      data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+      <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    </button>
   </div>
 
   <div id="help-content" class="app-panel-content">
@@ -5701,7 +5685,10 @@ Or remove them later in Settings → Help.</div>
 <div id="comment-panel" class="app-panel">
   <div id="comment-header" class="app-panel-header">
     <div id="comment-title" class="app-panel-title"></div>
-    <div id="comment-close" class="app-panel-close"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></div>
+    <button type="button" class="help-close-btn" id="comment-close"
+      data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
+      <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+    </button>
   </div>
   <div id="comment-body">
     <textarea id="comment-textarea" spellcheck="true"></textarea>
@@ -7860,6 +7847,55 @@ function buildEmptyState(iconName, msgKey, hintKey) {
   wrap.appendChild(hint);
   return wrap;
 }
+
+// ─── UI builders ──────────────────────────────────────────────────────────────
+// The JS side of the COMPONENT CATALOGUE at the top of the stylesheet. A control
+// built in script comes from here, so it wears the catalogue class by
+// construction; tests/design-system.test.js caps the controls created anywhere
+// else. Labels go in as text, never markup.
+
+// The button (`.agenda-action-btn`). `variant` adds catalogue modifiers
+// (`commit`, `danger`), `className` the caller's own hooks. An icon comes first,
+// with the label after a space, as the static markup writes it.
+function uiButton({ label = '', icon = null, variant = '', className = '', title = '', ariaLabel = '', onClick = null } = {}) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = ['agenda-action-btn', variant, className].filter(Boolean).join(' ');
+  if (icon) {
+    btn.innerHTML = iconSvg(icon); // static, constant markup
+    if (label) btn.appendChild(document.createTextNode(' ' + label));
+  } else {
+    btn.textContent = label;
+  }
+  if (title) btn.title = title;
+  if (ariaLabel) btn.setAttribute('aria-label', ariaLabel);
+  if (onClick) btn.addEventListener('click', onClick);
+  return btn;
+}
+
+// The chip (`.qab-pill` on the button): an optional colour dot, then the label.
+// `keepFocus` picks on mousedown and keeps the focus where it is, so a chip
+// under a text field does not close the phone keyboard.
+function uiPill({ label, dotColor = null, selected = false, keepFocus = false, onPick = null, ariaLabel = '' }) {
+  const pill = uiButton({ className: 'qab-pill' + (selected ? ' selected' : ''), ariaLabel });
+  if (dotColor) {
+    const dot = document.createElement('span');
+    dot.className = 'qab-pill-dot';
+    dot.style.background = dotColor;
+    pill.appendChild(dot);
+  }
+  const text = document.createElement('span');
+  text.textContent = label;
+  pill.appendChild(text);
+  if (keepFocus) {
+    pill.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); onPick?.(); });
+    pill.addEventListener('click', e => { e.stopPropagation(); });
+  } else if (onPick) {
+    pill.addEventListener('click', onPick);
+  }
+  return pill;
+}
+// ─── end UI builders ──────────────────────────────────────────────────────────
 
 // ─── Undo/Redo ────────────────────────────────────────────────────────────────
 let undoStack = [];
@@ -20265,43 +20301,36 @@ async function _renderStatsTrendSection() {
   };
 
   const makeChip = (id, label, dotColor) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'agenda-action-btn qab-pill' + (_cfdBranch === id ? ' selected' : '');
-    chip.dataset.id = id == null ? '' : id;
-    if (dotColor) {
-      const dot = document.createElement('span');
-      dot.className = 'qab-pill-dot';
-      dot.style.background = dotColor;
-      chip.appendChild(dot);
-    }
-    const text = document.createElement('span');
-    text.textContent = label;
-    chip.appendChild(text);
-    chip.addEventListener('click', () => {
-      _cfdBranch = id;
-      switcher.querySelectorAll('.qab-pill').forEach(p =>
-        p.classList.toggle('selected', (p.dataset.id || null) === (id || null)));
-      draw(true);
+    const chip = uiPill({
+      label,
+      dotColor,
+      selected: _cfdBranch === id,
+      onPick: () => {
+        _cfdBranch = id;
+        switcher.querySelectorAll('.qab-pill').forEach(p =>
+          p.classList.toggle('selected', (p.dataset.id || null) === (id || null)));
+        draw(true);
+      },
     });
+    chip.dataset.id = id == null ? '' : id;
     return chip;
   };
 
   // Range chips - same pill styling as the branch lens, one per supported span.
   _CFD_RANGES.forEach(n => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'agenda-action-btn qab-pill' + (_cfdRange === n ? ' selected' : '');
-    btn.dataset.range = String(n);
-    btn.textContent = t('stats.trendRange', { n });
-    btn.setAttribute('aria-label', t('stats.trendRangeAria', { n }));
-    btn.addEventListener('click', () => {
-      if (_cfdRange === n) return;
-      _cfdRange = n;
-      ranges.querySelectorAll('.qab-pill').forEach(p =>
-        p.classList.toggle('selected', p.dataset.range === String(n)));
-      draw(true);
+    const btn = uiPill({
+      label: t('stats.trendRange', { n }),
+      ariaLabel: t('stats.trendRangeAria', { n }),
+      selected: _cfdRange === n,
+      onPick: () => {
+        if (_cfdRange === n) return;
+        _cfdRange = n;
+        ranges.querySelectorAll('.qab-pill').forEach(p =>
+          p.classList.toggle('selected', p.dataset.range === String(n)));
+        draw(true);
+      },
     });
+    btn.dataset.range = String(n);
     ranges.appendChild(btn);
   });
 
@@ -24047,13 +24076,13 @@ function buildCommentToolbar(pm, schema, getView) {
   buttonsEl.setAttribute('role', 'toolbar');
   buttonsEl.inert = true;
   const buttons = COMMENT_TOOLBAR.map(item => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `agenda-action-btn comment-fmt-${item.id}`;
-    if (item.icon) btn.innerHTML = iconSvg(item.icon); // static markup only
-    else btn.textContent = item.label;
-    btn.title = t(item.title);
-    btn.setAttribute('aria-label', t(item.title));
+    const btn = uiButton({
+      icon: item.icon || null,
+      label: item.icon ? '' : item.label,
+      className: `comment-fmt-${item.id}`,
+      title: t(item.title),
+      ariaLabel: t(item.title),
+    });
     btn.setAttribute('aria-pressed', 'false');
     // Keep the caret, the selection and the phone keyboard where they are.
     btn.addEventListener('mousedown', e => e.preventDefault());
@@ -24070,12 +24099,12 @@ function buildCommentToolbar(pm, schema, getView) {
     return { item, btn };
   });
 
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.className = 'agenda-action-btn comment-fmt-toggle';
-  toggle.innerHTML = iconSvg('letter-case'); // static markup only
-  toggle.title = t('comment.fmtToggle');
-  toggle.setAttribute('aria-label', t('comment.fmtToggle'));
+  const toggle = uiButton({
+    icon: 'letter-case',
+    className: 'comment-fmt-toggle',
+    title: t('comment.fmtToggle'),
+    ariaLabel: t('comment.fmtToggle'),
+  });
   toggle.setAttribute('aria-controls', 'comment-fmt-buttons');
   toggle.setAttribute('aria-expanded', 'false');
   toggle.addEventListener('mousedown', e => e.preventDefault());
@@ -25413,22 +25442,21 @@ function buildAgendaItem(node, label, opts = {}) {
       e.stopPropagation();
       openEntryMenu(e.clientX, e.clientY);
     });
-    const del = document.createElement('button');
-    del.className = 'agenda-action-btn';
-    del.innerHTML = `${iconSvg('trash')} ${t('menu.delete')}`;
-    del.title = t('menu.delete');
-    del.addEventListener('click', e => {
-      stopClickKeepingDismiss(e); // the row itself opens the editor
-      confirmDeleteOccurrence(entryRow.id, opts.date);
+    const del = uiButton({
+      icon: 'trash',
+      label: t('menu.delete'),
+      title: t('menu.delete'),
+      onClick: e => {
+        stopClickKeepingDismiss(e); // the row itself opens the editor
+        confirmDeleteOccurrence(entryRow.id, opts.date);
+      },
     });
     item.appendChild(del);
     addAgendaHoverFocus(item, null);
     return item;
   }
-  const btn = document.createElement('button');
-  btn.className = 'agenda-action-btn';
+  let btn;
   if (showUndone) {
-    btn.innerHTML = `${iconSvg('circle-dashed-check')} ${t('todo.undone')}`;
     const undoneAction = () => {
       // Undone is the shared way back to open, so the Dropped group's rows
       // reuse it - button and swipe-right both undrop.
@@ -25447,9 +25475,8 @@ function buildAgendaItem(node, label, opts = {}) {
     };
     // Exposed for swipe-right on Done-section rows.
     item._undoneAction = undoneAction;
-    btn.addEventListener('click', undoneAction);
+    btn = uiButton({ icon: 'circle-dashed-check', label: t('todo.undone'), onClick: undoneAction });
   } else {
-    btn.innerHTML = `${iconSvg('circle-check')} ${t('todo.done')}`;
     const doneAction = tickRecord
       ? () => { setStatus(tickRecord.tick.id, 'done'); renderAgenda(); }
       : cc
@@ -25463,7 +25490,7 @@ function buildAgendaItem(node, label, opts = {}) {
           }
         : () => { setStatus(node.id, 'done'); renderAgenda(); };
     item._doneAction = doneAction;
-    btn.addEventListener('click', doneAction);
+    btn = uiButton({ icon: 'circle-check', label: t('todo.done'), onClick: doneAction });
   }
   item.appendChild(btn);
 
@@ -28835,19 +28862,8 @@ function openSettings() {
   // keyboard stays up.
   function buildBranchPill(b, onPick) {
     const bc = BRANCH_COLORS[b.id] || { main: '#888', light: '#eee', text: '#444' };
-    const pill = document.createElement('button');
-    pill.type = 'button';
-    pill.className = 'agenda-action-btn qab-pill';
+    const pill = uiPill({ label: b.label, dotColor: bc.main, keepFocus: true, onPick: () => onPick(b.id) });
     pill.dataset.id = b.id;
-    const dot = document.createElement('span');
-    dot.className = 'qab-pill-dot';
-    dot.style.background = bc.main;
-    pill.appendChild(dot);
-    const label = document.createElement('span');
-    label.textContent = b.label;
-    pill.appendChild(label);
-    pill.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onPick(b.id); });
-    pill.addEventListener('click', (e) => { e.stopPropagation(); });
     return pill;
   }
 
@@ -29320,12 +29336,12 @@ function renderBridgeStatus() {
     row.appendChild(identity);
     // Block a connected agent, let a blocked one back in.
     if (agentState === 'connected' || agentState === 'blocked') {
-      const act = document.createElement('button');
-      act.type = 'button';
-      act.className = 'agenda-action-btn bridge-agent-action';
+      const act = uiButton({
+        label: t(agentState === 'connected' ? 'bridge.agent.block' : 'bridge.agent.allow'),
+        className: 'bridge-agent-action',
+      });
       act.dataset.agentAction = agentState === 'connected' ? 'block' : 'allow';
       act.dataset.agentName = agentName;
-      act.textContent = t(agentState === 'connected' ? 'bridge.agent.block' : 'bridge.agent.allow');
       row.appendChild(act);
     }
     return row;

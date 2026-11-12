@@ -79,14 +79,16 @@ Tokens: colour is 322 of 326 declarations via variables (36 literal colours left
 
 ## Phase 3 - merge twins, add builders
 
-- [ ] **R6** One `.menu` surface for `#context-menu` and `#day-filter-menu`.
-- [ ] **R6** `.app-panel-close` becomes the shared icon button (a real `<button>`).
-- [ ] **R6** `#cp-hex` and `#bp-input` share one "bare field" modifier.
-- [ ] **R6** `#week-picker-fold` wears `.dialog-shell`.
+- [x] **R6** One `.menu` surface for `#context-menu` and `#day-filter-menu`.
+- [x] **R6** `.app-panel-close` becomes the shared icon button (a real `<button>`).
+- [x] **R6** `#cp-hex` and `#bp-input` share one "bare field" modifier.
+- [x] **R6** `#week-picker-fold` wears `.dialog-shell`.
 - [ ] **R5** Builders next to `iconSvg` / `buildEmptyState`: `uiButton({ label, icon, variant, onClick })`, `uiSwitch(...)`, `uiSelect(...)`, `settingsRow({ labelKey, control })`.
-- [ ] **R5** Route the 8 hand-built JS button sites through `uiButton`, and the 2 stats filter chips through `buildBranchPill`.
-- [ ] **R5** Guard: outside the builder block, the count of `createElement('button' | 'select' | 'input')` has a ceiling that may only shrink.
+- [x] **R5** Route the 8 hand-built JS button sites through `uiButton`, and the 2 stats filter chips through `buildBranchPill`.
+- [x] **R5** Guard: outside the builder block, the count of `createElement('button' | 'select' | 'input')` has a ceiling that may only shrink.
 - [ ] Shrink R1 baselines 1-4 toward empty as offenders are fixed.
+  - Landed: `.menu` takes the context menu's values (the day filter menu gains 4px of vertical padding); IDs keep only `z-index` and `min-width`. The panel X is a `.help-close-btn` button sized like the dialog-header X, with an 18px icon via `.app-panel-header .help-close-btn`. The bare field is `.dialog-field.bare` on the inner input (a `-field` name would break check 6); `#bp-input` keeps its 15px/700 number on the ID, so it stays in the check 2 baseline. `#week-picker-fold` wears `.dialog-shell` but has no `.dialog-header`, so it stays in the check 4 baseline until a caption is decided.
+  - Builders: `uiButton()` and `uiPill()` (the chip; `buildBranchPill()` now wraps it, as do the two stats chip sites, which are not branches). `uiSwitch`, `uiSelect` and `settingsRow` are not built: every switch, select and Settings section is static markup, so they would have no caller. Ceiling for controls created outside the builders: 7.
 
 ## Phase 4 - role names (one name per commit; tests reference them)
 

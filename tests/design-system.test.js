@@ -120,8 +120,6 @@ const CLASSLESS_BASELINE = [
   'button#perf-probe-arm',
   'button#perf-probe-last',
   'button#week-picker-label',
-  'input#bp-input',
-  'input#cp-hex',
   'textarea#comment-textarea',
   'textarea#inline-input',
 ];
@@ -136,7 +134,6 @@ const ID_SKIN_BASELINE = [
   'account-btn',
   'bp-input',
   'comment-textarea',
-  'cp-hex',
   'cp-hue-slider',
   'date-picker-set',
   'fab-add',
@@ -208,7 +205,6 @@ const CONTROL_CLASS_SET = [
   'add-btn-inner',
   'agenda-action-btn',
   'agenda-rename-input',
-  'app-panel-close',
   'comment-fmt-toggle',
   'dialog-field',
   'dp-field-row',
@@ -221,6 +217,14 @@ const CONTROL_CLASS_SET = [
   'view-toggle-btn',
   'view-toggle-separator',
 ];
+
+// ---- R5. controls come from the builders ---------------------------------
+
+// createElement('button' | 'select' | 'input' | 'textarea') outside the UI
+// builders block, as of Phase 3: the date-picker day cell and action row, the
+// week-picker row, the Agenda tab and rename field, the Quick add move dot, the
+// comment checkbox. Ceiling - may only go down.
+const CREATED_OUTSIDE_BUILDERS_CEILING = 7;
 
 describe('design system guard', () => {
   it('R7. the catalogue comment is well formed', () => {
@@ -336,6 +340,17 @@ describe('design system guard', () => {
     for (const m of SRC.matchAll(/(?:className\s*=\s*|classList\.(?:add|toggle|remove|contains)\()\s*(['`])([^'`]*)\1/g)) add(m[2]);
     expectBaseline([...found], CONTROL_CLASS_SET,
       'reuse a catalogue component or add it to the catalogue');
+  });
+
+  it('R5. controls are built by the UI builders; the count created elsewhere only goes down', () => {
+    const start = SRC.indexOf('// ─── UI builders');
+    const end = SRC.indexOf('// ─── end UI builders');
+    expect(start, 'no "UI builders" block in zenit-week.html').toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const outside = SRC.slice(0, start) + SRC.slice(end);
+    const count = (outside.match(/createElement\('(button|select|input|textarea)'\)/g) || []).length;
+    expect(count, 'a control created outside the UI builders - use uiButton() / uiPill(), or add a builder there').toBeLessThanOrEqual(CREATED_OUTSIDE_BUILDERS_CEILING);
+    expect(count, 'fewer controls are created outside the builders now - lower CREATED_OUTSIDE_BUILDERS_CEILING to match').toBe(CREATED_OUTSIDE_BUILDERS_CEILING);
   });
 
   it.todo('7. border-radius, font-size and z-index use tokens (switched on in Phase 5)');
