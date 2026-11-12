@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-cxRVbi3CSQc+zWEl35bt/vTUoLxjt7MuROMzIYnb0ms=';
+               'sha256-90MmIwW3aqr9KYSCw/xdVOh0G3Evg0qiYRy7zZS+2/c=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -5605,9 +5605,9 @@ Or remove them later in Settings → Help.</div>
         <div class="help-section-title" data-i18n="help.vision.title">Vision</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.what">The Vision (V) is one mind map of where you want your life to go and why. Branches are life areas, nodes are intentions, and the comment is the reason. It has no days, repetitions or done: the week is where things get done.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.letGo">Let go (X) keeps an intention you have given up without erasing it; Take back (U) reopens it.</div>
-        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.horizon">Horizon - this year, in a few years or someday - is set from the context menu and shown after the name.</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.horizon">Horizon - this year, in a few years or someday - is set from the context menu and shown as a badge on the node. Filter by it with the Horizon button or 1-4.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.collapse">Collapse a node with children to hide its subtree; the badge counts what is hidden, and a click expands it.</div>
-        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.focus">Focus branch fits one area and dims the rest; Esc or a click on the centre ends it. On a desktop the pane on the right reads the selected intention&#39;s comment.</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.focus">Focus branch fits one area and folds and dims the rest; Esc, F, the logo, a click on the centre or the Focus cell ends it.</div>
       </div>
 
       <div class="help-section">
@@ -13084,9 +13084,9 @@ const TRANSLATIONS = {
     'help.vision.title':          'Vision',
     'help.vision.what': 'The Vision (V) is one mind map of where you want your life to go and why. Branches are life areas, nodes are intentions, and the comment is the reason. It has no days, repetitions or done: the week is where things get done.',
     'help.vision.letGo': 'Let go (X) keeps an intention you have given up without erasing it; Take back (U) reopens it.',
-    'help.vision.horizon': 'Horizon - this year, in a few years or someday - is set from the context menu and shown after the name.',
+    'help.vision.horizon': 'Horizon - this year, in a few years or someday - is set from the context menu and shown as a badge on the node. Filter by it with the Horizon button or 1-4.',
     'help.vision.collapse': 'Collapse a node with children to hide its subtree; the badge counts what is hidden, and a click expands it.',
-    'help.vision.focus': 'Focus branch fits one area and dims the rest; Esc or a click on the centre ends it. On a desktop the pane on the right reads the selected intention\'s comment.',
+    'help.vision.focus': 'Focus branch fits one area and folds and dims the rest; Esc, F, the logo, a click on the centre or the Focus cell ends it.',
     'help.escClose':              'Close panel / menu',
     'help.filterDay':             'Filter day',
     'help.filterHorizon':         'Filter horizon (Vision)',
@@ -13612,11 +13612,11 @@ const TRANSLATIONS = {
     'help.statsView':             'Statistika',
     'help.visionView':            'Vize',
     'help.vision.title':          'Vize',
-    'help.vision.what': 'Vize (V) je jedna myšlenková mapa toho, kam chcete svůj život vést a proč. Větve jsou oblasti života, uzly záměry a komentář je důvod. Nemá dny, opakování ani hotovo: věci se dělají v týdnu.',
-    'help.vision.letGo': 'Nechat být (X) ponechá záměr, kterého jste se vzdali, aniž by se smazal; Vzít zpět (U) ho znovu otevře.',
-    'help.vision.horizon': 'Horizont - letos, za pár let nebo jednou - se nastaví v kontextové nabídce a ukáže se za názvem.',
-    'help.vision.collapse': 'Uzel s potomky lze sbalit a jeho podstrom skrýt; odznak ukazuje, kolik je skryto, a kliknutím se rozbalí.',
-    'help.vision.focus': 'Zaměřit větev přiblíží jednu oblast a ostatní ztlumí; Esc nebo klik na střed zaměření ukončí. Na počítači panel vpravo ukazuje komentář vybraného záměru.',
+    'help.vision.what': 'Vize (V) je jedna myšlenková mapa toho, kam chceš svůj život vést a proč. Větve jsou oblasti života, uzly záměry a komentář je důvod. Nemá dny, opakování ani hotovo: věci se dělají v týdnu.',
+    'help.vision.letGo': 'Nechat být (X) ponechá záměr, který už nechceš naplnit, aniž by se smazal; Vzít zpět (U) ho znovu otevře.',
+    'help.vision.horizon': 'Horizont - letos, za pár let nebo jednou - nastavíš v kontextové nabídce a ukáže se jako odznak na uzlu. Filtruješ podle něj tlačítkem Horizont nebo klávesami 1-4.',
+    'help.vision.collapse': 'Uzel s potomky můžeš sbalit a skrýt jeho podstrom; odznak ukazuje, kolik je skryto, a kliknutím se rozbalí.',
+    'help.vision.focus': 'Zaměřit větev přiblíží jednu oblast a ostatní sbalí a ztlumí; zaměření ukončí Esc, F, logo, klik na střed nebo políčko Fokus.',
     'help.escClose':              'Zavřít panel / menu',
     'help.filterDay':             'Filtr dne',
     'help.filterHorizon':         'Filtr horizontu (Vize)',
