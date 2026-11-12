@@ -39,8 +39,8 @@ const CATALOGUE = new Set(ENTRIES.filter(e => e.kind === 'control').map(e => e.c
 
 const SUGGEST = {
   button: '`.btn` (or `.icon-btn` for a close X)',
-  select: '`.dialog-field`',
-  input: '`.dialog-field`',
+  select: '`.field`',
+  input: '`.field`',
   textarea: 'a shared field class (none exists yet: stop and ask)',
 };
 
@@ -200,21 +200,20 @@ const LITERAL_COLOR_BASELINE = [
 
 // ---- 6. control-like class names are a closed set --------------------------
 
-const CONTROL_CLASS = /-(btn|toggle|field|select|input|close)(-|$)/;
+// A control-like name: btn, toggle, field, select, input or close as a whole
+// word of the class (`btn`, `icon-btn`, `field-row`). Catalogue classes are
+// the sanctioned ones and are not listed.
+const CONTROL_CLASS = /(^|-)(btn|toggle|field|select|input|close)(-|$)/;
 
-// Every class name in CSS, markup or JS that looks like a control, as of af4dc18.
+// Every non-catalogue class name in CSS, markup or JS that looks like a control, as of af4dc18.
 const CONTROL_CLASS_SET = [
   'account-btn-placeholder',
   'add-btn',
   'add-btn-inner',
   'agenda-rename-input',
   'comment-fmt-toggle',
-  'dialog-field',
   'dp-field-row',
-  'icon-btn',
-  'undo-redo-btn',
   'view-level-btn',
-  'view-toggle-btn',
   'view-toggle-separator',
 ];
 
@@ -332,9 +331,10 @@ describe('design system guard', () => {
       'use a colour token from :root (var(--...)), defining a new one there if needed');
   });
 
-  it('6. control-like class names (-btn, -toggle, -field, -select, -input, -close) are a frozen set', () => {
+  it('6. control-like class names (btn, toggle, field, select, input, close) outside the catalogue are a frozen set', () => {
+    const catalogued = new Set(ENTRIES.flatMap(e => e.classes));
     const found = new Set();
-    const add = list => list.split(/\s+/).forEach(c => { if (CONTROL_CLASS.test(c) && !c.includes('$')) found.add(c); });
+    const add = list => list.split(/\s+/).forEach(c => { if (CONTROL_CLASS.test(c) && !c.includes('$') && !catalogued.has(c)) found.add(c); });
     for (const m of CSS.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/\.([a-zA-Z_][\w-]*)/g)) add(m[1]);
     for (const m of SRC.matchAll(/\bclass="([^"]*)"/g)) add(m[1]);
     for (const m of SRC.matchAll(/(?:className\s*=\s*|classList\.(?:add|toggle|remove|contains)\()\s*(['`])([^'`]*)\1/g)) add(m[2]);

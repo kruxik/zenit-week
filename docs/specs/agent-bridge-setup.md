@@ -74,7 +74,7 @@ The two link formats were checked against the Cursor and VS Code documentation o
 
 ### 3.4 Settings becomes the guide
 
-The section is renamed from "Agent bridge" to **"AI agents"** in Settings and Help ("bridge" is our word, not the user's). It replaces the README as the place a user learns setup. Same vocabulary as today (`.settings-section`, `.settings-label`, `.dialog-field`, `.btn`); still hidden without `(pointer: fine)`.
+The section is renamed from "Agent bridge" to **"AI agents"** in Settings and Help ("bridge" is our word, not the user's). It replaces the README as the place a user learns setup. Same vocabulary as today (`.settings-section`, `.settings-label`, `.field`, `.btn`); still hidden without `(pointer: fine)`.
 
 | # | Element | Behaviour |
 |---|---|---|

@@ -155,7 +155,7 @@ function isProductionHost(hostname) {
 
      control  button          .btn .commit .danger uiButton()
      control  close           .icon-btn
-     control  field           .dialog-field .bare
+     control  field           .field .bare
      control  switch          .switch .switch-row
      control  tab             .tab
      control  menu-item       .ctx-item
@@ -3679,10 +3679,10 @@ function isProductionHost(hostname) {
   /* One field idiom for every dialog: the bordered box the date dialog already
      used, so a hex code, a baseline number and a quick-add line all read the
      same, and so do the Settings selects. The two wrappers (#cp-hex-row,
-     #bp-input-row) carry it with a `.dialog-field.bare` input inside - the
+     #bp-input-row) carry it with a `.field.bare` input inside - the
      field's type and colour without a second box - which is why the ring is
      also :focus-within. */
-  .dialog-field {
+  .field {
     background: var(--bg-surface);
     border: 1px solid var(--border-soft);
     border-radius: 6px;
@@ -3693,13 +3693,13 @@ function isProductionHost(hostname) {
     font-size: 13px;
     min-width: 0;
   }
-  .dialog-field:focus,
-  .dialog-field:focus-within {
+  .field:focus,
+  .field:focus-within {
     outline: none;
     border-color: var(--accent-primary);
   }
-  select.dialog-field { cursor: pointer; }
-  .dialog-field.bare {
+  select.field { cursor: pointer; }
+  .field.bare {
     border: none;
     background: transparent;
     height: auto;
@@ -5015,8 +5015,8 @@ Or remove them later in Settings → Help.</div>
     <div id="date-picker-repeat" hidden>
       <div class="dp-field-row">
         <label for="date-picker-unit" data-i18n="sendFuture.repeat">Repeat</label>
-        <input type="number" id="date-picker-every" class="dialog-field" min="1" max="999" value="1" aria-label="Interval">
-        <select id="date-picker-unit" class="dialog-field">
+        <input type="number" id="date-picker-every" class="field" min="1" max="999" value="1" aria-label="Interval">
+        <select id="date-picker-unit" class="field">
           <option value="none" data-i18n="sendFuture.noRepeat">No repeat</option>
           <option value="day" data-i18n="sendFuture.unitDay">days</option>
           <option value="week" data-i18n="sendFuture.unitWeek">weeks</option>
@@ -5026,12 +5026,12 @@ Or remove them later in Settings → Help.</div>
       </div>
       <div class="dp-field-row" id="date-picker-end-row">
         <label for="date-picker-end-type" data-i18n="sendFuture.end">Ends</label>
-        <select id="date-picker-end-type" class="dialog-field">
+        <select id="date-picker-end-type" class="field">
           <option value="never" data-i18n="sendFuture.endNever">Never</option>
           <option value="count" data-i18n="sendFuture.endCount">After</option>
           <option value="until" data-i18n="sendFuture.endUntil">On date</option>
         </select>
-        <input type="number" id="date-picker-end-count" class="dialog-field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
+        <input type="number" id="date-picker-end-count" class="field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
       </div>
       <div class="dialog-actions">
         <button type="button" class="btn commit" id="date-picker-set"></button>
@@ -5053,8 +5053,8 @@ Or remove them later in Settings → Help.</div>
       </button>
   </div>
   <div class="dialog-body">
-    <div id="bp-input-row" class="dialog-field">
-      <input type="number" id="bp-input" class="dialog-field bare" min="1" max="999" step="1" value="105">
+    <div id="bp-input-row" class="field">
+      <input type="number" id="bp-input" class="field bare" min="1" max="999" step="1" value="105">
     </div>
     <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
     <div id="bp-buttons" class="dialog-actions">
@@ -5074,9 +5074,9 @@ Or remove them later in Settings → Help.</div>
   <div class="dialog-body">
     <canvas id="cp-sb-canvas" width="160" height="120"></canvas>
     <input type="range" id="cp-hue-slider" min="0" max="359" step="1">
-    <div id="cp-hex-row" class="dialog-field">
+    <div id="cp-hex-row" class="field">
       <span id="cp-hex-prefix">#</span>
-      <input type="text" id="cp-hex" class="dialog-field bare" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
+      <input type="text" id="cp-hex" class="field bare" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
     </div>
     <div id="cp-buttons" class="dialog-actions">
       <button type="button" id="cp-apply" class="btn commit" data-i18n="colorPicker.apply">Apply</button>
@@ -5164,7 +5164,7 @@ Or remove them later in Settings → Help.</div>
   <div class="dialog-body">
     <div id="quick-add-branches" role="group" aria-label="Branch"></div>
     <div id="quick-add-recent" role="status" aria-live="polite"></div>
-    <input type="search" id="quick-add-input" class="dialog-field" maxlength="200"
+    <input type="search" id="quick-add-input" class="field" maxlength="200"
       data-i18n-placeholder="quick_add.placeholder" placeholder="Add a task…"
       autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
       enterkeyhint="done">
@@ -5272,7 +5272,7 @@ Or remove them later in Settings → Help.</div>
       <div class="settings-separator"></div>
       <div class="settings-section">
         <div class="settings-label" data-i18n="settings.language">Language</div>
-        <select id="lang-select" class="dialog-field">
+        <select id="lang-select" class="field">
           <option value="en">English</option>
           <option value="cs">Čeština</option>
         </select>
@@ -5280,7 +5280,7 @@ Or remove them later in Settings → Help.</div>
       <div class="settings-separator"></div>
       <div class="settings-section">
         <div class="settings-label" id="theme-select-label" data-i18n="settings.appearance">Theme</div>
-        <select id="theme-select" class="dialog-field" aria-labelledby="theme-select-label">
+        <select id="theme-select" class="field" aria-labelledby="theme-select-label">
           <option value="system" data-i18n="settings.system">System</option>
           <option value="light" data-i18n="settings.light">Light</option>
           <option value="dark" data-i18n="settings.dark">Dark</option>
@@ -5289,7 +5289,7 @@ Or remove them later in Settings → Help.</div>
       <div class="settings-separator"></div>
       <div class="settings-section">
         <div class="settings-label" id="start-view-select-label" data-i18n="settings.startView">Start view</div>
-        <select id="start-view-select" class="dialog-field" aria-labelledby="start-view-select-label">
+        <select id="start-view-select" class="field" aria-labelledby="start-view-select-label">
           <option value="vision" data-i18n="view.vision">Vision</option>
           <option value="mindmap" data-i18n="view.mindmap">Mindmap</option>
           <option value="agenda" data-i18n="view.agenda">Agenda</option>
@@ -5345,7 +5345,7 @@ Or remove them later in Settings → Help.</div>
         <div id="bridge-guide" class="bridge-list" hidden>
           <div class="settings-separator"></div>
           <div class="settings-label" id="bridge-guide-label" data-i18n="bridge.guide.title">Connect an agent</div>
-          <select id="bridge-guide-app" class="dialog-field" aria-labelledby="bridge-guide-label">
+          <select id="bridge-guide-app" class="field" aria-labelledby="bridge-guide-label">
             <option value="claude-code">Claude Code</option>
             <option value="claude-desktop">Claude Desktop</option>
             <option value="codex">Codex</option>
