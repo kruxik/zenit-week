@@ -25,7 +25,8 @@ No account is required. No cookies, only anonymous visit counts. Your data never
 ## Features
 
 - **Mind-map view** with a center node and radial branches. Defaults are Work, Family, Me - but every branch is yours to rename, recolor, add, or remove.
-- **Three views, one week:** *Mindmap* for the whole-week picture, *Agenda* for day-by-day execution with Mon–Sun tabs and an Overdue lane, *Stats* for balance, trend and completion.
+- **Four views:** *Vision* for the long view the weeks are planned against, *Mindmap* for the whole-week picture, *Agenda* for day-by-day execution with Mon–Sun tabs and an Overdue lane, *Stats* for balance, trend and completion.
+- **Vision** - one mind map of where you want your life to go and why: branches are life areas, nodes are intentions, the comment is the reason. No days, no repetitions, no done - the week is where things get done. Tag an intention with a horizon (this year, in a few years, someday) and filter by it, *Let go* of one without erasing it, collapse a subtree, or focus a single branch. Synced through Drive and readable by your AI agent.
 - **Week navigation** - a week bar with prev/next arrows, the week's date range, and a click on the label to jump back to the current week.
 - **View levels - Rocks, Pebbles, Sand:** zoom out to just the big rocks, fade out deep detail with pebbles, or reveal everything with sand.
 - **Priorities (Normal / High / Critical):** scale layout space and visual weight; cascade to children automatically.
@@ -53,15 +54,16 @@ No account is required. No cookies, only anonymous visit counts. Your data never
 
 | Action | Shortcut |
 | :--- | :--- |
-| Switch to Mindmap / Agenda / Stats | `M` / `A` / `S` |
+| Switch to Vision / Mindmap / Agenda / Stats | `V` / `M` / `A` / `S` |
 | Help & hotkeys | `?` or `H` |
 | Quick add (inbox item) | `Q` |
 | Previous / next week | `[` / `]`, or `Shift + ←` / `Shift + →` |
 | Jump to the current week | `T` |
 | Fit everything to the view (mindmap) | `F` |
-| Cycle view level - Sand · Pebbles · Rocks | `V` |
+| Cycle view level - Sand · Pebbles · Rocks | `W` |
 | Filter mindmap by day | `1`–`7` on empty canvas |
 | Filter to Unscheduled / Overdue | `8` / `0` on empty canvas |
+| Filter Vision by horizon - This year · In a few years · Someday · No horizon | `1`–`4` on empty canvas |
 | Undo | `Ctrl/⌘ + Z` |
 | Redo | `Ctrl/⌘ + Shift + Z` or `Ctrl/⌘ + Y` |
 | Close panel / dialog (in the agenda on desktop: back to the mindmap) | `Esc` |
@@ -86,6 +88,16 @@ Arrow keys move a focus ring from node to node, so every shortcut below works wi
 | Clear all day indicators | `8` |
 | Clear the whole week (on the root node) | `Backspace` / `Delete` |
 | Quick options menu | Right click |
+
+### Vision - on the hovered or focused intention
+
+Rename, add child, delete, priority, comment and the focus ring work as on the mindmap. Day, done, reusable and week keys do nothing here.
+
+| Action | Shortcut |
+| :--- | :--- |
+| Let go / Take back | `X` / `U` |
+| Set horizon, collapse, focus branch | Right click |
+| End a branch focus | `Esc` or `F` |
 
 ### Agenda
 
