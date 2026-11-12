@@ -52,7 +52,7 @@ A thin module so sync can be added in one place later:
 - Esc dismisses (counts as seen). Clicking elsewhere does **not** dismiss (avoid accidental skip) - TBD, tune in PB1.
 
 ## 4. Hint catalog
-Fifteen hints, in `HINTS` order. Each is either a plain text (`textKey`) or an intro with kbd rows (`introKey` + `keys`); some carry touch variants (`touchCaptionKey`, `touchTextKey`). Triggers live at the call sites, not in the registry.
+Seventeen hints, in `HINTS` order. Each is either a plain text (`textKey`) or an intro with kbd rows (`introKey` + `keys`); some carry touch variants (`touchCaptionKey`, `touchTextKey`). Triggers live at the call sites, not in the registry.
 
 | # | id | Teaches |
 |---|----|---------|
@@ -71,8 +71,10 @@ Fifteen hints, in `HINTS` order. Each is either a plain text (`textKey`) or an i
 | 13 | `weeknav` | Week navigation |
 | 14 | `quickadd` | Quick add (`Q`) |
 | 15 | `dayfilter` | The day filter |
+| 16 | `vision` | What the Vision is; shown on the Vision tab the first time the Vision opens |
+| 17 | `horizonfilter` | The horizon filter (`1`-`4`) on the Vision |
 
-Vision-specific hints (first open, horizon filter) are not built yet: see `docs/plans/post-vision-audit.md` ONB-3 / ONB-4.
+On the Vision a hint reads its `<key>Vision` string where one exists (`recordKey()`), so #5, #7 and #11 say "intention" instead of "task". The week-only hints (#1-#4, #6, #13, #15) cannot fire there: their nodes or controls do not exist on the Vision. Quick add (#14) works on the Vision and adds an intention.
 
 ## 5. Settings toggle
 - Add a "Show tips" row to the Settings dropdown (near theme/lang), checkbox/switch, default ON.

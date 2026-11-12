@@ -78,6 +78,9 @@ Removes only nodes still carrying `_demo: true`, preserving everything the user 
 - **Frequency:** show **once**. On dismiss or action, set `zenit-week-playground-nudged = true` in `misc`; never nudge again.
 - Rationale for 7 (raised from the original 3): late enough that the user has started a real week, early enough to fire in the first real session.
 
+## 5c. The Vision
+The first time the Vision opens while the week still holds untouched examples, `seedVisionFromWeek` adds the example intentions from `vision.nodes` in the seed file under the Vision copies of the week's branches, flagged `_demo` (kept on Vision intentions only, never on Vision branches). The Help entry and its confirm act on the record in view, so on the Vision they read "Clear example intentions" and clear only the Vision's examples; each record has its own undo. Untouched Vision examples are relabelled on a language switch, matched by their label in either language. The nudge banner stays week-only.
+
 ## 6. i18n
 All new strings (`#playground` is not user-visible) added to both `TRANSLATIONS.en` and `TRANSLATIONS.cs` via `t(key)`:
 - `onboarding.clearExample` (button), `onboarding.clearConfirmTitle`, `onboarding.clearConfirmBody`, `onboarding.clearConfirmOk`, `onboarding.nudge`, `onboarding.nudgeDismiss`.

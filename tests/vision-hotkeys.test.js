@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { _state, openDB, saveWeekIDB, saveValueIDB, switchView } from './setup.js';
 
+// The Vision's first-open tip is the coachmarks' to test; here it would only
+// sit over the view and take the first Esc.
+beforeEach(() => _state.setTipsSeen({ vision: true }));
+
 // V opens the Vision and W cycles the view level - the letter moved in the
 // same change, so neither is ever unbound or doubly bound. Week navigation and
 // the day digits are inert on the Vision, and Esc backs out of it.

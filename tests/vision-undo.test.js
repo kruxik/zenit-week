@@ -4,6 +4,10 @@ import {
   switchView, takeSnapshot, undo, redo, saveMapRecord, BRANCH_COLORS,
 } from './setup.js';
 
+// The Vision's first-open tip is the coachmarks' to test; here it would only
+// sit over the view and take the first Esc.
+beforeEach(() => _state.setTipsSeen({ vision: true }));
+
 // Two stack pairs: Ctrl+Z on the Vision undoes only Vision edits, and the
 // week's history waits untouched while the Vision is open.
 

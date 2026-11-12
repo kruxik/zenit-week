@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-NfwcTJi8QfZ56yrGoUVt8VOwGL4Ijs4XUJ724jbA60k=';
+               'sha256-yrxJPwEaXO5fUVuXa7SHkdR+yO8DAayOvRwbSYaqf3Y=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -6865,11 +6865,13 @@ async function saveSchedule(data) {
 const VISION_STORAGE_KEY = 'vision';
 const VISION_HORIZONS = new Set(['year', 'years', 'someday']);
 // The only fields a vision node may carry. Anything else is the week's own
-// machinery (done, days, ticks, reusable, schedule links, demo flags) and is
+// machinery (done, days, ticks, reusable, schedule links) and is
 // stripped, never refused: a record from an older build or a node moved in by
 // hand through an import must land as a usable vision, not as a failed load.
 // `_editing` is the transient in-place editor flag; it lives in memory only and
-// is filtered out of what is persisted, exactly as saveWeek does.
+// is filtered out of what is persisted, exactly as saveWeek does. `_demo` marks
+// an untouched example intention and is kept on intentions only (a branch is
+// never an example on the Vision); see stripVisionNode.
 const VISION_NODE_FIELDS = new Set([
   'id', 'type', 'branch', 'label', 'parent', 'children',
   'priority', 'comments', 'dropped', 'droppedAt', 'horizon', 'collapsed',
@@ -6885,7 +6887,9 @@ function emptyVision() {
 // Whether a collapsed node still has children to hide is a tree question, so
 // validateAndRepairVision settles it after the tree is repaired.
 function stripVisionNode(n) {
+  const keepDemo = n._demo === true && n.type === 'activity';
   for (const k of Object.keys(n)) if (!VISION_NODE_FIELDS.has(k)) delete n[k];
+  if (keepDemo) n._demo = true;
   if (n.horizon !== undefined && !VISION_HORIZONS.has(n.horizon)) delete n.horizon;
   if (n.collapsed !== undefined && n.collapsed !== true) delete n.collapsed;
   if (n.dropped !== undefined && n.dropped !== true) { delete n.dropped; delete n.droppedAt; }
@@ -7018,9 +7022,11 @@ function saveMapRecord() {
 }
 
 // The first areas of a vision: one branch per branch of the week in view, same
-// label and side, a copy of its palette under a new id (V4), and nothing else.
-// Pure apart from genId - it returns the record and which week branch each new
-// branch copies its colour from.
+// label and side, a copy of its palette under a new id (V4). While that week
+// still holds untouched playground examples, the areas get example intentions
+// too (PLAYGROUND_SEED.vision), flagged `_demo` like the week's, so the Help
+// entry clears them the same way. Pure apart from genId - it returns the record
+// and which week branch each new branch copies its colour from.
 function seedVisionFromWeek(week) {
   const record = emptyVision();
   const colorFrom = {};
@@ -7037,7 +7043,34 @@ function seedVisionFromWeek(week) {
       _ts: now,
     });
   });
+  if ((week?.nodes || []).some(n => n._demo && n.type !== 'branch')) {
+    const visionIdOf = {};
+    for (const [id, from] of Object.entries(colorFrom)) visionIdOf[from] = id;
+    addVisionExamples(record, visionIdOf, now);
+  }
   return { record, colorFrom };
+}
+
+// Example intentions for a fresh vision: each seed intention hangs from the
+// vision copy of its week branch (`visionIdOf`), or from another seed intention
+// by `parent`. A seed whose branch is not in the week is skipped with its steps.
+function addVisionExamples(record, visionIdOf, ts) {
+  const idOf = {};
+  for (const seed of (PLAYGROUND_SEED.vision?.nodes || [])) {
+    const parent = seed.parent
+      ? record.nodes.find(n => n.id === idOf[seed.parent])
+      : record.nodes.find(n => n.id === visionIdOf[seed.branch]);
+    if (!parent) continue;
+    const node = {
+      id: genId(), type: 'activity', branch: parent.branch, parent: parent.id,
+      label: seedLabel(seed), children: [], _ts: ts, _demo: true,
+    };
+    if (VISION_HORIZONS.has(seed.horizon)) node.horizon = seed.horizon;
+    if (seed.comments) node.comments = seedComments(seed);
+    idOf[seed.id] = node.id;
+    parent.children.push(node.id);
+    record.nodes.push(node);
+  }
 }
 
 // Loads the vision for the view, seeding it on the first open. A device that is
@@ -7079,6 +7112,7 @@ function openVisionIntoView(record) {
   mapRecord = { kind: 'vision' };
   rebuildNodeMap();
   syncBranchConfig();
+  relabelDemoNodes(); // a language switched while the week was in view
   bridgeNotifyView();
 }
 
@@ -7090,6 +7124,7 @@ function reopenWeekIntoView(week) {
   mapRecord = { kind: 'week' };
   rebuildNodeMap();
   syncBranchConfig();
+  relabelDemoNodes(); // a language switched while the Vision was in view
   bridgeNotifyView();
 }
 
@@ -12667,6 +12702,7 @@ const TRANSLATIONS = {
   en: {
     'toolbar.settings':           'Settings',
     'quick_add.placeholder':      'Add a task…',
+    'quick_add.placeholderVision': 'Add an intention…',
     'quick_add.title':            'Quick add',
     'quick_add.moveBranch':       'Move to another branch',
     'week.word':                  'Week',
@@ -12825,6 +12861,14 @@ const TRANSLATIONS = {
     'tips.priorityIntro':         'A flame marks critical, an exclamation high. Priority sizes the task on the map and passes down to everything beneath it.',
     'tips.undoIntro':             'Every change can be taken back. Experiment freely - nothing gets lost.',
     'tips.dayFilter':             'Narrows the map to one day. Pick a day here and the rest of the week steps aside.',
+    'tips.visionCaption':         'The long view',
+    'tips.vision':                'Life areas and what you want from them, with the reason in the comment. Nothing here gets ticked off - the weeks do that. Give an intention a horizon from its menu.',
+    'tips.horizonFilterCaption':  'Horizon filter',
+    'tips.horizonFilter':         'Shows the intentions of one horizon. A step without its own horizon follows its parent.',
+    'tips.priorityIntroVision':   'A flame marks critical, an exclamation high. Priority sizes the intention on the map and passes down to everything beneath it.',
+    'tips.hoverIntroVision':      'Hover an intention, then press:',
+    'tips.hoverTouchVision':      'Double-tap an intention to rename it. Long-press opens the menu with everything else.',
+    'tips.rootVision':            'Drag an intention to move it. Drop it on another and it belongs there instead - colour and all.',
     'tips.levels':                'How much detail the map draws. Rocks shows the big picture, Pebbles goes one level deeper with each tap, Sand shows everything. Nothing is lost - it just steps into the background.',
     'tips.views':                 'Four views: Vision is the long view the weeks are planned against, Mindmap to plan the week, Agenda day by day, Stats for how it went.',
     'tips.gotIt':                 'Got it',
@@ -13003,6 +13047,11 @@ const TRANSLATIONS = {
     'onboarding.nudgeCaption':    'Done exploring?',
     'onboarding.nudge':           'Clear the example tasks and keep just your own.\nOr remove them later in Settings → Help.',
     'onboarding.nudgeDismiss':    'Keep exploring',
+    'onboarding.clearTitleVision':        'Example Vision',
+    'onboarding.clearHelpBodyVision':     "This Vision was started with examples. Edit anything to make it yours - then clear what's left.",
+    'onboarding.clearExampleVision':      'Clear example intentions',
+    'onboarding.clearConfirmTitleVision': 'Clear example intentions?',
+    'onboarding.clearConfirmBodyVision':  'This removes the remaining example intentions you haven’t touched. Anything you edited or added stays. You can undo this.',
     'update.body':                'There is a new version of Zenit Week.',
     'update.reload':              'Reload',
     'help.aboutTitle':            'What it solves',
@@ -13191,6 +13240,7 @@ const TRANSLATIONS = {
   cs: {
     'toolbar.settings':           'Nastavení',
     'quick_add.placeholder':      'Přidat úkol…',
+    'quick_add.placeholderVision': 'Přidat záměr…',
     'quick_add.title':            'Rychlé přidání',
     'quick_add.moveBranch':       'Přesunout do jiné větve',
     'week.word':                  'Týden',
@@ -13349,6 +13399,14 @@ const TRANSLATIONS = {
     'tips.priorityIntro':         'Plamínek značí kritickou prioritu, vykřičník vysokou. Priorita zvětšuje úkol na mapě a propíše se na vše pod ním.',
     'tips.undoIntro':             'Každou změnu lze vzít zpět. Klidně zkoušej - nic se neztratí.',
     'tips.dayFilter':             'Zúží mapu na jeden den. Vyber den a zbytek týdne ustoupí.',
+    'tips.visionCaption':         'Dlouhý výhled',
+    'tips.vision':                'Oblasti života a co od nich chceš, s důvodem v komentáři. Tady se nic neodškrtává - to dělají týdny. Horizont záměru nastavíš v jeho nabídce.',
+    'tips.horizonFilterCaption':  'Filtr horizontu',
+    'tips.horizonFilter':         'Ukáže záměry jednoho horizontu. Krok bez vlastního horizontu patří k horizontu rodiče.',
+    'tips.priorityIntroVision':   'Plamínek značí kritickou prioritu, vykřičník vysokou. Priorita zvětšuje záměr na mapě a propíše se na vše pod ním.',
+    'tips.hoverIntroVision':      'Najeď na záměr, pak stiskni:',
+    'tips.hoverTouchVision':      'Dvojitým klepnutím záměr přejmenuješ. Podržením otevřeš nabídku se vším ostatním.',
+    'tips.rootVision':            'Přetažením záměr přesuneš. Puštěním na jiný ho přeřadíš pod něj - i s barvou.',
     'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to hlavní, Oblázky jdou každým klepnutím o úroveň hlouběji, Písek ukáže vše. Nic se neztratí - jen ustoupí do pozadí.',
     'tips.views':                 'Čtyři pohledy: Vize je dlouhý výhled, podle kterého se týdny plánují, Mapa pro plánování týdne, Agenda po dnech, Statistika pro výsledek.',
     'tips.gotIt':                 'Rozumím',
@@ -13527,6 +13585,11 @@ const TRANSLATIONS = {
     'onboarding.nudgeCaption':    'Hotovo s prozkoumáváním?',
     'onboarding.nudge':           'Smaž ukázkové úkoly a nech si jen ty své.\nNebo si je odstraň později v Nastavení → Nápověda.',
     'onboarding.nudgeDismiss':    'Zkoumat dál',
+    'onboarding.clearTitleVision':        'Ukázková vize',
+    'onboarding.clearHelpBodyVision':     'Tahle vize začala s ukázkami. Cokoli uprav, ať je tvoje - a pak zbytek smaž.',
+    'onboarding.clearExampleVision':      'Smazat ukázkové záměry',
+    'onboarding.clearConfirmTitleVision': 'Smazat ukázkové záměry?',
+    'onboarding.clearConfirmBodyVision':  'Odebere zbývající ukázkové záměry, na které nikdo nesáhl. Co je upravené nebo přidané, zůstane. Akci lze vrátit zpět.',
     'update.body':                'Je k dispozici nová verze Zenit Week.',
     'update.reload':              'Načíst',
     'help.aboutTitle':            'Co řeší',
@@ -13717,6 +13780,12 @@ const TRANSLATIONS = {
 function t(key, vars = {}) {
   const msg = TRANSLATIONS[currentLang]?.[key] ?? TRANSLATIONS.en[key] ?? key;
   return msg.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+}
+
+// The key to read for the record in view: a string that says "task" has a
+// `<key>Vision` twin saying "intention", read while the Vision is in view.
+function recordKey(key) {
+  return isVisionInView() && Object.hasOwn(TRANSLATIONS.en, key + 'Vision') ? key + 'Vision' : key;
 }
 
 function applyTranslations() {
@@ -25949,7 +26018,11 @@ function isHelpOpen() {
 function openHelp() {
   // Show the "Clear example tasks" entry only while untouched seed tasks remain.
   const onboardingSection = document.getElementById('help-onboarding-section');
-  if (onboardingSection) onboardingSection.hidden = !hasDemoActivityNodes();
+  if (onboardingSection) {
+    onboardingSection.hidden = !hasDemoActivityNodes();
+    onboardingSection.querySelectorAll('[data-i18n]')
+      .forEach(el => { el.textContent = t(recordKey(el.dataset.i18n)); });
+  }
   document.getElementById('help-overlay').classList.add('visible');
   document.getElementById('help-panel').classList.add('visible');
   resetPanelCaption(document.getElementById('help-panel'), document.getElementById('help-content'));
@@ -26106,6 +26179,8 @@ function switchView(view, opts) {
   // The record changed under a hidden mobile canvas: renderIfVisible draws it,
   // or flags it for the way back.
   if (swapped && (isAgenda || isStats) && !isDesktop) renderIfVisible();
+  // The first time the Vision is shown, its tab says what it is.
+  if (view === 'vision') maybeShowHint('vision', document.getElementById('vtb-vision'));
   return undefined;
 }
 
@@ -28656,7 +28731,7 @@ function openSettings() {
       takeSnapshot();
       rebindNode(node.id, branchId, { keepInbox: true });
       entry.branch = branchId;
-      saveWeek(currentWeekKey, weekData);
+      saveMapRecord();
       renderIfVisible();
       if (currentView === 'agenda') renderAgenda();
     }
@@ -28846,6 +28921,8 @@ function openSettings() {
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     input.value = '';
+    // On the Vision it adds an intention to the Vision; the placeholder says so.
+    input.placeholder = t(recordKey('quick_add.placeholder'));
     // The receipt is session-scoped - a fresh open starts a fresh strip, so the
     // panel never grows into a history log.
     recent = [];
@@ -28863,8 +28940,10 @@ function openSettings() {
     if (!label || !selectedBranchId) return;
 
     // Detect before applyMagicLabel freezes the token away: "tomorrow" on a
-    // Sunday belongs to next week, not this week's long-past Monday.
-    const crossesNextWeek = magicTokenResolvesToNextWeek(label);
+    // Sunday belongs to next week, not this week's long-past Monday. The Vision
+    // has no days and no inbox: its label is literal and the intention is filed.
+    const vision = isVisionInView();
+    const crossesNextWeek = !vision && magicTokenResolvesToNextWeek(label);
 
     // Create the inbox node through the same two halves the map editor and the
     // agent bridge use (insertChildTask + applyLabelEdit, finishNewTask below),
@@ -28872,7 +28951,7 @@ function openSettings() {
     const branch = findNode(selectedBranchId);
     if (!branch) return;
     takeSnapshot();
-    const node = insertChildTask(branch, { label: '', inbox: true });
+    const node = insertChildTask(branch, vision ? { label: '' } : { label: '', inbox: true });
     applyLabelEdit(node.id, label.slice(0, 200), { isNew: true });
 
     // Capture before the possible move - after it the node lives in next week's
@@ -28894,7 +28973,8 @@ function openSettings() {
 
     // Stay open for the next item: the receipt strip confirms the store, and
     // keeping focus means the mobile keyboard never dismisses between entries.
-    addRecent(node.id, storedLabel, resolveMagicDayTokens(label.slice(0, 200)), selectedBranchId, crossesNextWeek);
+    const typed = label.slice(0, 200);
+    addRecent(node.id, storedLabel, vision ? typed : resolveMagicDayTokens(typed), selectedBranchId, crossesNextWeek);
     input.value = '';
     if (panel.classList.contains('is-open')) input.focus();
   }
@@ -30799,7 +30879,7 @@ document.getElementById('export-data-btn').addEventListener('click', () => {
 // scripts/inject-playground-seed.mjs (build step). The block below is
 // machine-managed - edit the JSON, not this constant.
 /* PLAYGROUND_SEED_START */
-const PLAYGROUND_SEED = {"week":{"nodes":[{"id":"family","type":"branch","branch":"family","label":"Family","labelCs":"Rodina","children":["n08eceff4b1b1","n86d7bb85b7a0","n3a3a88ed82ca","n1f95a172cf3c","n7d41c0a9b3e2"],"offX":0,"offY":0,"side":"right"},{"id":"work","type":"branch","branch":"work","label":"Work","labelCs":"Práce","children":["nc615d740acdd","nbc765cabdc86","nc0e506d5cc89","n399c0070935b"],"offX":0,"offY":0,"side":"left"},{"id":"me","type":"branch","branch":"me","label":"Personal","labelCs":"Osobní","children":["ne9adc6b8de35","n674c41539736","n94947d5ad65d"],"offX":0,"offY":0,"side":"right"},{"id":"growth","type":"branch","branch":"growth","label":"Growth","labelCs":"Rozvoj","side":"left","children":["ne123a2b09d2e","nae518b467484"],"offX":0,"offY":0},{"id":"nc615d740acdd","type":"activity","branch":"work","parent":"work","label":"Q4 OKR draft","labelCs":"Návrh OKR na Q4","comments":"# Agenda\n- [x] Ask Product for priorities\n- [ ] Tech debt in engineering\n- [ ] Customer journey goals","commentsCs":"# Agenda\n- [x] Zeptat se produktu na priority\n- [ ] Technický dluh v engineeringu\n- [ ] Cíle pro customer journey","done":false,"unplanned":false,"children":[],"priority":"critical","offX":0,"offY":0},{"id":"nbc765cabdc86","type":"activity","branch":"work","parent":"work","label":"1:1 with Sara","labelCs":"1:1 se Sárou","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:57.408Z","donedOn":"2026-05-12"},{"id":"nc0e506d5cc89","type":"activity","branch":"work","parent":"work","label":"Sprint review","done":false,"unplanned":false,"children":["n8b8172d2dbe9","n8993e4720c6a","ncd8a291c78bd"],"offX":0,"offY":0},{"id":"n8b8172d2dbe9","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Prep","labelCs":"Příprava","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:56.101Z","donedOn":"2026-05-12"},{"id":"n8993e4720c6a","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Review","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:20.270Z","donedOn":"2026-05-13"},{"id":"ncd8a291c78bd","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Debrief","labelCs":"Vyhodnocení","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n399c0070935b","type":"activity","branch":"work","parent":"work","label":"Code review","done":false,"unplanned":false,"children":["nce194d8cd0df","n2113d3c4afe8","nfc2a45939626"],"offX":0,"offY":0},{"id":"nce194d8cd0df","type":"activity","tickChild":true,"tickIndex":1,"branch":"work","parent":"n399c0070935b","label":"1","done":true,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:47:32.316Z","donedOn":"2026-05-12"},{"id":"n2113d3c4afe8","type":"activity","tickChild":true,"tickIndex":2,"branch":"work","parent":"n399c0070935b","label":"2","done":true,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:05:57.265Z","donedOn":"2026-05-13"},{"id":"nfc2a45939626","type":"activity","tickChild":true,"tickIndex":3,"branch":"work","parent":"n399c0070935b","label":"3","done":false,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0},{"id":"ne123a2b09d2e","type":"activity","branch":"growth","parent":"growth","label":"AI","done":false,"unplanned":false,"children":["n3acbb94f9475","n601d146212c8","nf486f1cd2579"],"offX":0,"offY":0},{"id":"n3acbb94f9475","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Claude Code","done":false,"unplanned":false,"children":["n11a2a4a26dd6","n1474e7ac7516","n566977f573a3","n59733bcc6638","nfadba4369111","n6b02b4d97ed5","nee26e3ba5df6"],"offX":0,"offY":0,"reusable":true},{"id":"n11a2a4a26dd6","type":"activity","dayChild":true,"dayIndex":1,"branch":"growth","parent":"n3acbb94f9475","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:58:19.644Z","donedOn":"2026-05-09","offX":0,"offY":0,"reusable":true},{"id":"n1474e7ac7516","type":"activity","dayChild":true,"dayIndex":2,"branch":"growth","parent":"n3acbb94f9475","label":"Tu","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"n566977f573a3","type":"activity","dayChild":true,"dayIndex":3,"branch":"growth","parent":"n3acbb94f9475","label":"We","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"n59733bcc6638","type":"activity","dayChild":true,"dayIndex":4,"branch":"growth","parent":"n3acbb94f9475","label":"Th","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"nfadba4369111","type":"activity","dayChild":true,"dayIndex":5,"branch":"growth","parent":"n3acbb94f9475","label":"Fr","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"n6b02b4d97ed5","type":"activity","dayChild":true,"dayIndex":6,"branch":"growth","parent":"n3acbb94f9475","label":"Sa","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"nee26e3ba5df6","type":"activity","dayChild":true,"dayIndex":0,"branch":"growth","parent":"n3acbb94f9475","label":"Su","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"n601d146212c8","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Multi-Agent Teams","priority":"high","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"nf486f1cd2579","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Build MVP app","labelCs":"Postavit MVP aplikaci","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T19:01:36.028Z","donedOn":"2026-05-09","offX":0,"offY":0},{"id":"nae518b467484","type":"activity","branch":"growth","parent":"growth","label":"Addy Osmani: C. Debt","comments":"https://addyosmani.com/blog/comprehension-debt/","done":false,"unplanned":true,"children":[],"unplannedAt":"2026-05-09T19:01:41.320Z","offX":0,"offY":0},{"id":"n08eceff4b1b1","type":"activity","branch":"family","parent":"family","label":"Birthday cake for Mia","labelCs":"Narozeninový dort pro Janču","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:06:08.398Z","donedOn":"2026-05-13"},{"id":"n86d7bb85b7a0","type":"activity","branch":"family","parent":"family","label":"Plan summer trip","labelCs":"Naplánovat letní dovolenou","done":true,"unplanned":false,"children":["nd15eea9fae27","n7cf7ce957f3c"],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:06.734Z","donedOn":"2026-05-13"},{"id":"nd15eea9fae27","type":"activity","branch":"family","parent":"n86d7bb85b7a0","label":"Trips","labelCs":"Výlety","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:06.734Z","donedOn":"2026-05-13"},{"id":"n7cf7ce957f3c","type":"activity","branch":"family","parent":"n86d7bb85b7a0","label":"Requirements","labelCs":"Požadavky","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:50.882Z","donedOn":"2026-05-12"},{"id":"n3a3a88ed82ca","type":"activity","branch":"family","parent":"family","label":"Park walk together","labelCs":"Společná procházka v parku","done":false,"unplanned":false,"children":["n6838f13b1d74","na1bc2ccc40d3"],"offX":0,"offY":0},{"id":"n6838f13b1d74","type":"activity","dayChild":true,"dayIndex":1,"branch":"family","parent":"n3a3a88ed82ca","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:55:31.146Z","donedOn":"2026-05-09","offX":0,"offY":0},{"id":"na1bc2ccc40d3","type":"activity","dayChild":true,"dayIndex":5,"branch":"family","parent":"n3a3a88ed82ca","label":"Fr","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n1f95a172cf3c","type":"activity","branch":"family","parent":"family","label":"Call grandma","labelCs":"Zavolat babičce","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:44.285Z","donedOn":"2026-05-12"},{"id":"n7d41c0a9b3e2","type":"activity","branch":"family","parent":"family","label":"Buy a flower to Lucy","labelCs":"Koupit kytičku pro Lucku","done":false,"unplanned":false,"inbox":true,"children":[],"offX":0,"offY":0},{"id":"ne9adc6b8de35","type":"activity","branch":"me","parent":"me","label":"Pushups 50","labelCs":"Kliky 50","done":false,"unplanned":false,"children":["n12d18c4d4a95","n36f3112117cb"],"reusable":true,"offX":0,"offY":0},{"id":"n12d18c4d4a95","type":"activity","tickChild":true,"tickIndex":1,"branch":"me","parent":"ne9adc6b8de35","label":"1","done":true,"unplanned":false,"priority":null,"reusable":true,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:05:52.194Z","donedOn":"2026-05-13"},{"id":"n36f3112117cb","type":"activity","tickChild":true,"tickIndex":2,"branch":"me","parent":"ne9adc6b8de35","label":"2","done":false,"unplanned":false,"priority":null,"reusable":true,"children":[],"offX":0,"offY":0},{"id":"n674c41539736","type":"activity","branch":"me","parent":"me","label":"Read 15 min","labelCs":"Číst si 15 min","done":false,"unplanned":false,"children":["na5b1d3e15099","n30eb38ef93b6","nb30d1d326106","n52c1c9b25021","ne5a34e42e5a1","n345c8128e1ad","nbdc070c7108b"],"reusable":true,"offX":0,"offY":0},{"id":"na5b1d3e15099","type":"activity","dayChild":true,"dayIndex":1,"branch":"me","parent":"n674c41539736","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:55:26.977Z","donedOn":"2026-05-09","reusable":true,"offX":0,"offY":0},{"id":"n30eb38ef93b6","type":"activity","dayChild":true,"dayIndex":2,"branch":"me","parent":"n674c41539736","label":"Tu","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"nb30d1d326106","type":"activity","dayChild":true,"dayIndex":3,"branch":"me","parent":"n674c41539736","label":"We","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n52c1c9b25021","type":"activity","dayChild":true,"dayIndex":4,"branch":"me","parent":"n674c41539736","label":"Th","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"ne5a34e42e5a1","type":"activity","dayChild":true,"dayIndex":5,"branch":"me","parent":"n674c41539736","label":"Fr","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n345c8128e1ad","type":"activity","dayChild":true,"dayIndex":6,"branch":"me","parent":"n674c41539736","label":"Sa","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"nbdc070c7108b","type":"activity","dayChild":true,"dayIndex":0,"branch":"me","parent":"n674c41539736","label":"Su","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n94947d5ad65d","type":"activity","branch":"me","parent":"me","label":"Drop off donations","labelCs":"Odvézt věci na charitu","done":false,"unplanned":true,"children":[],"unplannedAt":"2026-05-09T18:55:48.351Z","offX":0,"offY":0}]},"colors":{"work":{"main":"#F24E1E"},"family":{"main":"#A259FF"},"me":{"main":"#1ABCFE"},"growth":{"main":"#0ACF83"}}};
+const PLAYGROUND_SEED = {"week":{"nodes":[{"id":"family","type":"branch","branch":"family","label":"Family","labelCs":"Rodina","children":["n08eceff4b1b1","n86d7bb85b7a0","n3a3a88ed82ca","n1f95a172cf3c","n7d41c0a9b3e2"],"offX":0,"offY":0,"side":"right"},{"id":"work","type":"branch","branch":"work","label":"Work","labelCs":"Práce","children":["nc615d740acdd","nbc765cabdc86","nc0e506d5cc89","n399c0070935b"],"offX":0,"offY":0,"side":"left"},{"id":"me","type":"branch","branch":"me","label":"Personal","labelCs":"Osobní","children":["ne9adc6b8de35","n674c41539736","n94947d5ad65d"],"offX":0,"offY":0,"side":"right"},{"id":"growth","type":"branch","branch":"growth","label":"Growth","labelCs":"Rozvoj","side":"left","children":["ne123a2b09d2e","nae518b467484"],"offX":0,"offY":0},{"id":"nc615d740acdd","type":"activity","branch":"work","parent":"work","label":"Q4 OKR draft","labelCs":"Návrh OKR na Q4","comments":"# Agenda\n- [x] Ask Product for priorities\n- [ ] Tech debt in engineering\n- [ ] Customer journey goals","commentsCs":"# Agenda\n- [x] Zeptat se produktu na priority\n- [ ] Technický dluh v engineeringu\n- [ ] Cíle pro customer journey","done":false,"unplanned":false,"children":[],"priority":"critical","offX":0,"offY":0},{"id":"nbc765cabdc86","type":"activity","branch":"work","parent":"work","label":"1:1 with Sara","labelCs":"1:1 se Sárou","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:57.408Z","donedOn":"2026-05-12"},{"id":"nc0e506d5cc89","type":"activity","branch":"work","parent":"work","label":"Sprint review","done":false,"unplanned":false,"children":["n8b8172d2dbe9","n8993e4720c6a","ncd8a291c78bd"],"offX":0,"offY":0},{"id":"n8b8172d2dbe9","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Prep","labelCs":"Příprava","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:56.101Z","donedOn":"2026-05-12"},{"id":"n8993e4720c6a","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Review","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:20.270Z","donedOn":"2026-05-13"},{"id":"ncd8a291c78bd","type":"activity","branch":"work","parent":"nc0e506d5cc89","label":"Debrief","labelCs":"Vyhodnocení","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n399c0070935b","type":"activity","branch":"work","parent":"work","label":"Code review","done":false,"unplanned":false,"children":["nce194d8cd0df","n2113d3c4afe8","nfc2a45939626"],"offX":0,"offY":0},{"id":"nce194d8cd0df","type":"activity","tickChild":true,"tickIndex":1,"branch":"work","parent":"n399c0070935b","label":"1","done":true,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:47:32.316Z","donedOn":"2026-05-12"},{"id":"n2113d3c4afe8","type":"activity","tickChild":true,"tickIndex":2,"branch":"work","parent":"n399c0070935b","label":"2","done":true,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:05:57.265Z","donedOn":"2026-05-13"},{"id":"nfc2a45939626","type":"activity","tickChild":true,"tickIndex":3,"branch":"work","parent":"n399c0070935b","label":"3","done":false,"unplanned":false,"priority":null,"reusable":false,"children":[],"offX":0,"offY":0},{"id":"ne123a2b09d2e","type":"activity","branch":"growth","parent":"growth","label":"AI","done":false,"unplanned":false,"children":["n3acbb94f9475","n601d146212c8","nf486f1cd2579"],"offX":0,"offY":0},{"id":"n3acbb94f9475","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Claude Code","done":false,"unplanned":false,"children":["n11a2a4a26dd6","n1474e7ac7516","n566977f573a3","n59733bcc6638","nfadba4369111","n6b02b4d97ed5","nee26e3ba5df6"],"offX":0,"offY":0,"reusable":true},{"id":"n11a2a4a26dd6","type":"activity","dayChild":true,"dayIndex":1,"branch":"growth","parent":"n3acbb94f9475","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:58:19.644Z","donedOn":"2026-05-09","offX":0,"offY":0,"reusable":true},{"id":"n1474e7ac7516","type":"activity","dayChild":true,"dayIndex":2,"branch":"growth","parent":"n3acbb94f9475","label":"Tu","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"n566977f573a3","type":"activity","dayChild":true,"dayIndex":3,"branch":"growth","parent":"n3acbb94f9475","label":"We","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"n59733bcc6638","type":"activity","dayChild":true,"dayIndex":4,"branch":"growth","parent":"n3acbb94f9475","label":"Th","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"nfadba4369111","type":"activity","dayChild":true,"dayIndex":5,"branch":"growth","parent":"n3acbb94f9475","label":"Fr","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"n6b02b4d97ed5","type":"activity","dayChild":true,"dayIndex":6,"branch":"growth","parent":"n3acbb94f9475","label":"Sa","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"nee26e3ba5df6","type":"activity","dayChild":true,"dayIndex":0,"branch":"growth","parent":"n3acbb94f9475","label":"Su","done":false,"unplanned":false,"children":[],"offX":0,"offY":0,"reusable":true},{"id":"n601d146212c8","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Multi-Agent Teams","priority":"high","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"nf486f1cd2579","type":"activity","branch":"growth","parent":"ne123a2b09d2e","label":"Build MVP app","labelCs":"Postavit MVP aplikaci","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T19:01:36.028Z","donedOn":"2026-05-09","offX":0,"offY":0},{"id":"nae518b467484","type":"activity","branch":"growth","parent":"growth","label":"Addy Osmani: C. Debt","comments":"https://addyosmani.com/blog/comprehension-debt/","done":false,"unplanned":true,"children":[],"unplannedAt":"2026-05-09T19:01:41.320Z","offX":0,"offY":0},{"id":"n08eceff4b1b1","type":"activity","branch":"family","parent":"family","label":"Birthday cake for Mia","labelCs":"Narozeninový dort pro Janču","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:06:08.398Z","donedOn":"2026-05-13"},{"id":"n86d7bb85b7a0","type":"activity","branch":"family","parent":"family","label":"Plan summer trip","labelCs":"Naplánovat letní dovolenou","done":true,"unplanned":false,"children":["nd15eea9fae27","n7cf7ce957f3c"],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:06.734Z","donedOn":"2026-05-13"},{"id":"nd15eea9fae27","type":"activity","branch":"family","parent":"n86d7bb85b7a0","label":"Trips","labelCs":"Výlety","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:07:06.734Z","donedOn":"2026-05-13"},{"id":"n7cf7ce957f3c","type":"activity","branch":"family","parent":"n86d7bb85b7a0","label":"Requirements","labelCs":"Požadavky","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:50.882Z","donedOn":"2026-05-12"},{"id":"n3a3a88ed82ca","type":"activity","branch":"family","parent":"family","label":"Park walk together","labelCs":"Společná procházka v parku","done":false,"unplanned":false,"children":["n6838f13b1d74","na1bc2ccc40d3"],"offX":0,"offY":0},{"id":"n6838f13b1d74","type":"activity","dayChild":true,"dayIndex":1,"branch":"family","parent":"n3a3a88ed82ca","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:55:31.146Z","donedOn":"2026-05-09","offX":0,"offY":0},{"id":"na1bc2ccc40d3","type":"activity","dayChild":true,"dayIndex":5,"branch":"family","parent":"n3a3a88ed82ca","label":"Fr","done":false,"unplanned":false,"children":[],"offX":0,"offY":0},{"id":"n1f95a172cf3c","type":"activity","branch":"family","parent":"family","label":"Call grandma","labelCs":"Zavolat babičce","done":true,"unplanned":false,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T21:46:44.285Z","donedOn":"2026-05-12"},{"id":"n7d41c0a9b3e2","type":"activity","branch":"family","parent":"family","label":"Buy a flower to Lucy","labelCs":"Koupit kytičku pro Lucku","done":false,"unplanned":false,"inbox":true,"children":[],"offX":0,"offY":0},{"id":"ne9adc6b8de35","type":"activity","branch":"me","parent":"me","label":"Pushups 50","labelCs":"Kliky 50","done":false,"unplanned":false,"children":["n12d18c4d4a95","n36f3112117cb"],"reusable":true,"offX":0,"offY":0},{"id":"n12d18c4d4a95","type":"activity","tickChild":true,"tickIndex":1,"branch":"me","parent":"ne9adc6b8de35","label":"1","done":true,"unplanned":false,"priority":null,"reusable":true,"children":[],"offX":0,"offY":0,"doneAt":"2026-05-12T22:05:52.194Z","donedOn":"2026-05-13"},{"id":"n36f3112117cb","type":"activity","tickChild":true,"tickIndex":2,"branch":"me","parent":"ne9adc6b8de35","label":"2","done":false,"unplanned":false,"priority":null,"reusable":true,"children":[],"offX":0,"offY":0},{"id":"n674c41539736","type":"activity","branch":"me","parent":"me","label":"Read 15 min","labelCs":"Číst si 15 min","done":false,"unplanned":false,"children":["na5b1d3e15099","n30eb38ef93b6","nb30d1d326106","n52c1c9b25021","ne5a34e42e5a1","n345c8128e1ad","nbdc070c7108b"],"reusable":true,"offX":0,"offY":0},{"id":"na5b1d3e15099","type":"activity","dayChild":true,"dayIndex":1,"branch":"me","parent":"n674c41539736","label":"Mo","done":true,"unplanned":false,"children":[],"doneAt":"2026-05-09T18:55:26.977Z","donedOn":"2026-05-09","reusable":true,"offX":0,"offY":0},{"id":"n30eb38ef93b6","type":"activity","dayChild":true,"dayIndex":2,"branch":"me","parent":"n674c41539736","label":"Tu","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"nb30d1d326106","type":"activity","dayChild":true,"dayIndex":3,"branch":"me","parent":"n674c41539736","label":"We","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n52c1c9b25021","type":"activity","dayChild":true,"dayIndex":4,"branch":"me","parent":"n674c41539736","label":"Th","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"ne5a34e42e5a1","type":"activity","dayChild":true,"dayIndex":5,"branch":"me","parent":"n674c41539736","label":"Fr","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n345c8128e1ad","type":"activity","dayChild":true,"dayIndex":6,"branch":"me","parent":"n674c41539736","label":"Sa","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"nbdc070c7108b","type":"activity","dayChild":true,"dayIndex":0,"branch":"me","parent":"n674c41539736","label":"Su","done":false,"unplanned":false,"children":[],"reusable":true,"offX":0,"offY":0},{"id":"n94947d5ad65d","type":"activity","branch":"me","parent":"me","label":"Drop off donations","labelCs":"Odvézt věci na charitu","done":false,"unplanned":true,"children":[],"unplannedAt":"2026-05-09T18:55:48.351Z","offX":0,"offY":0}]},"vision":{"nodes":[{"id":"vteam","branch":"work","label":"A team that runs without me","labelCs":"Tým, který jede i beze mě","horizon":"years","comments":"Why: more time to look ahead, less firefighting. The 1:1s and the Q4 OKRs are the steps.","commentsCs":"Proč: víc času na výhled, míň hašení požárů. Kroky jsou 1:1 a OKR na Q4."},{"id":"vsara","parent":"vteam","label":"Sara leads her own project","labelCs":"Sára vede vlastní projekt","horizon":"year"},{"id":"vsummer","branch":"family","label":"A summer trip together every year","labelCs":"Každé léto společný výlet","horizon":"year"},{"id":"vgrandma","branch":"family","label":"Stay close to grandma","labelCs":"Zůstat blízko babičce"},{"id":"vstrong","branch":"me","label":"Strong and healthy for decades","labelCs":"Silné a zdravé tělo na desítky let","horizon":"years","comments":"Why: energy for the family and the work. Pushups and reading every day are the habit.","commentsCs":"Proč: energie pro rodinu i práci. Kliky a čtení každý den jsou návyk."},{"id":"vpush","parent":"vstrong","label":"100 pushups in a row","labelCs":"100 kliků v kuse","horizon":"year"},{"id":"vproduct","branch":"growth","label":"Launch my own product","labelCs":"Spustit vlastní produkt","horizon":"years"},{"id":"vagents","parent":"vproduct","label":"Build with AI agents","labelCs":"Stavět s AI agenty","horizon":"year"},{"id":"vteach","branch":"growth","label":"Teach what I learn","labelCs":"Učit druhé, co se naučím","horizon":"someday"}]},"colors":{"work":{"main":"#F24E1E"},"family":{"main":"#A259FF"},"me":{"main":"#1ABCFE"},"growth":{"main":"#0ACF83"}}};
 /* PLAYGROUND_SEED_END */
 
 // First-run onboarding: seed a fully-populated example week so the canvas is
@@ -30897,6 +30977,13 @@ function seedComments(seedNode) {
   return (currentLang === 'cs' && seedNode.commentsCs) || seedNode.comments;
 }
 
+// The seed intention an untouched Vision example came from. Vision ids are
+// fresh genId()s (V4), so the label in either language is the link back.
+function visionSeedByLabel(label) {
+  return (PLAYGROUND_SEED.vision?.nodes || [])
+    .find(s => s.label === label || s.labelCs === label) || null;
+}
+
 // id -> seed node, for looking an untouched demo node's wording back up.
 let _seedById = null;
 function seedNodeById(id) {
@@ -30910,15 +30997,16 @@ function seedNodeById(id) {
 // Re-labels the still-untouched playground nodes of the loaded week into the
 // current language, so switching language on a fresh install doesn't leave the
 // example week stranded in the language it was seeded with (labels and comments
-// both). Only `_demo` nodes
+// both); on the Vision, its example intentions. Only `_demo` nodes
 // qualify: touchNode() drops that flag the moment the user claims a node, so a
 // renamed or edited task is never rewritten. Returns the number relabelled.
 function relabelDemoNodes() {
   if (!weekData || !Array.isArray(weekData.nodes)) return 0;
   let changed = 0;
+  const vision = isVisionInView();
   weekData.nodes.forEach(n => {
     if (!n._demo) return;
-    const seed = seedNodeById(n.id);
+    const seed = vision ? visionSeedByLabel(n.label) : seedNodeById(n.id);
     if (!seed) return;
     const label = seedLabel(seed);
     const comments = seed.comments ? seedComments(seed) : n.comments;
@@ -31001,7 +31089,8 @@ const PLAYGROUND_NUDGE_THRESHOLD = 7;
 // Show the nudge once the user has clearly started their own week (enough of
 // their own saved tasks) while untouched example tasks still remain - once only.
 function shouldShowPlaygroundNudge() {
-  return !_playgroundNudgeDone
+  return !isVisionInView()
+      && !_playgroundNudgeDone
       && !_playgroundNudgeShown
       && hasDemoActivityNodes()
       && playgroundUserNodeCount() >= PLAYGROUND_NUDGE_THRESHOLD;
@@ -31204,6 +31293,22 @@ const HINTS = {
       { k: '0',   labelKey: 'agenda.overdue' },
     ],
   },
+  'vision': {
+    captionKey: 'tips.visionCaption',
+    priority: 16,
+    textKey: 'tips.vision',
+  },
+  'horizonfilter': {
+    captionKey: 'tips.horizonFilterCaption',
+    priority: 17,
+    introKey: 'tips.horizonFilter',
+    keys: [
+      { k: '1', labelKey: 'menu.horizon.year' },
+      { k: '2', labelKey: 'menu.horizon.years' },
+      { k: '3', labelKey: 'menu.horizon.someday' },
+      { k: '4', labelKey: 'menu.horizon.none' },
+    ],
+  },
 };
 
 // Hint ids that compete for a hovered node, most important first.
@@ -31314,13 +31419,13 @@ function renderCoachmarkContent(hint) {
   // colour picker wear - not the first line of the body.
   const captionEl = document.getElementById('coachmark-caption');
   const captionKey = (!keysApply && hint.touchCaptionKey) || hint.captionKey;
-  if (captionEl) captionEl.textContent = captionKey ? t(captionKey) : '';
+  if (captionEl) captionEl.textContent = captionKey ? t(recordKey(captionKey)) : '';
 
   const bodyKey = (!keysApply && hint.touchTextKey) || hint.introKey || hint.textKey;
   if (bodyKey) {
     const body = document.createElement('div');
     body.className = 'coachmark-intro';
-    body.textContent = t(bodyKey);
+    body.textContent = t(recordKey(bodyKey));
     textEl.appendChild(body);
   }
 
@@ -31705,6 +31810,11 @@ window.addEventListener('load', async () => {
       dayFilterBtn.addEventListener('mouseenter', () => maybeShowHint('dayfilter', dayFilterBtn));
       armTouchHintGate(dayFilterBtn, 'dayfilter');
     }
+    const horizonFilterBtn = document.getElementById('horizon-filter-btn');
+    if (horizonFilterBtn) {
+      horizonFilterBtn.addEventListener('mouseenter', () => maybeShowHint('horizonfilter', horizonFilterBtn));
+      armTouchHintGate(horizonFilterBtn, 'horizonfilter');
+    }
   }
   // Apply the persisted view. A persisted Vision opens once the week is in
   // place, through the one swap, and straight from the boot: passing through
@@ -31742,8 +31852,8 @@ window.addEventListener('load', async () => {
   if (clearExampleBtn) {
     clearExampleBtn.addEventListener('click', () => {
       showAppConfirm({
-        title: t('onboarding.clearConfirmTitle'),
-        body: t('onboarding.clearConfirmBody'),
+        title: t(recordKey('onboarding.clearConfirmTitle')),
+        body: t(recordKey('onboarding.clearConfirmBody')),
         okLabel: t('onboarding.clearConfirmOk'),
         danger: true,
         onConfirm: () => {

@@ -9,6 +9,10 @@ import {
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
   mergeWeekData, applyRemoteMerge, weekContentHash, reloadAppFresh,
 } from './setup.js';
+
+// The Vision's first-open tip is the coachmarks' to test; here it would only
+// sit over the view and take the first Esc.
+beforeEach(() => _state.setTipsSeen({ vision: true }));
 import nodeCrypto from 'node:crypto';
 import { Relay, memoryPairings } from '../mcp/core.js';
 

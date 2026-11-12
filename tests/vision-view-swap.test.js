@@ -16,6 +16,10 @@ import {
   takeSnapshot,
 } from './setup.js';
 
+// The Vision's first-open tip is the coachmarks' to test; here it would only
+// sit over the view and take the first Esc.
+beforeEach(() => _state.setTipsSeen({ vision: true }));
+
 // R1: weekData holds the vision if and only if the Vision is the view, and the
 // swap happens before anything is drawn. R2: nothing else puts a week into
 // weekData while the Vision is open.

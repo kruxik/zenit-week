@@ -464,6 +464,7 @@ _state.getLocalStorage = function(key) {
   return _lsStore[key];
 };
 _state.getPlaygroundSeed = function() { return PLAYGROUND_SEED; };
+_state.getHints = function() { return HINTS; };
 // Seed the in-app tips state the way a session that has shown hints would.
 _state.setTipsSeen = function(seen) {
   _tipsSeen = seen;
@@ -1030,6 +1031,7 @@ export const {
   getThemeColors,
   deriveBranchPalette,
   t,
+  recordKey,
   // Center node + week bar
   canShowAvatarPhoto,
   formatWeekParts,

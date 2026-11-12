@@ -1,5 +1,5 @@
 {
-  "_comment": "Playground onboarding seed. Loaded into an empty IndexedDB on first run (#playground). The loader stamps _demo:true + fresh _ts per node and sets the week key to the current ISO week. Tune labels/structure here directly; labelCs / commentsCs hold the Czech label / comment where they differ from the English ones.",
+  "_comment": "Playground onboarding seed. Loaded into an empty IndexedDB on first run (#playground). The loader stamps _demo:true + fresh _ts per node and sets the week key to the current ISO week. Tune labels/structure here directly; labelCs / commentsCs hold the Czech label / comment where they differ from the English ones. vision.nodes are the example intentions added to the Vision the first time it opens while the week still holds untouched examples: branch names the week branch whose Vision copy holds the intention, parent names another seed intention.",
   "week": {
     "nodes": [
       {
@@ -738,6 +738,76 @@
         "unplannedAt": "2026-05-09T18:55:48.351Z",
         "offX": 0,
         "offY": 0
+      }
+    ]
+  },
+  "vision": {
+    "nodes": [
+      {
+        "id": "vteam",
+        "branch": "work",
+        "label": "A team that runs without me",
+        "labelCs": "Tým, který jede i beze mě",
+        "horizon": "years",
+        "comments": "Why: more time to look ahead, less firefighting. The 1:1s and the Q4 OKRs are the steps.",
+        "commentsCs": "Proč: víc času na výhled, míň hašení požárů. Kroky jsou 1:1 a OKR na Q4."
+      },
+      {
+        "id": "vsara",
+        "parent": "vteam",
+        "label": "Sara leads her own project",
+        "labelCs": "Sára vede vlastní projekt",
+        "horizon": "year"
+      },
+      {
+        "id": "vsummer",
+        "branch": "family",
+        "label": "A summer trip together every year",
+        "labelCs": "Každé léto společný výlet",
+        "horizon": "year"
+      },
+      {
+        "id": "vgrandma",
+        "branch": "family",
+        "label": "Stay close to grandma",
+        "labelCs": "Zůstat blízko babičce"
+      },
+      {
+        "id": "vstrong",
+        "branch": "me",
+        "label": "Strong and healthy for decades",
+        "labelCs": "Silné a zdravé tělo na desítky let",
+        "horizon": "years",
+        "comments": "Why: energy for the family and the work. Pushups and reading every day are the habit.",
+        "commentsCs": "Proč: energie pro rodinu i práci. Kliky a čtení každý den jsou návyk."
+      },
+      {
+        "id": "vpush",
+        "parent": "vstrong",
+        "label": "100 pushups in a row",
+        "labelCs": "100 kliků v kuse",
+        "horizon": "year"
+      },
+      {
+        "id": "vproduct",
+        "branch": "growth",
+        "label": "Launch my own product",
+        "labelCs": "Spustit vlastní produkt",
+        "horizon": "years"
+      },
+      {
+        "id": "vagents",
+        "parent": "vproduct",
+        "label": "Build with AI agents",
+        "labelCs": "Stavět s AI agenty",
+        "horizon": "year"
+      },
+      {
+        "id": "vteach",
+        "branch": "growth",
+        "label": "Teach what I learn",
+        "labelCs": "Učit druhé, co se naučím",
+        "horizon": "someday"
       }
     ]
   },

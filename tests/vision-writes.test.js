@@ -7,6 +7,10 @@ import {
   setHorizon, nodeDisplayLabel, showContextMenu,
 } from './setup.js';
 
+// The Vision's first-open tip is the coachmarks' to test; here it would only
+// sit over the view and take the first Esc.
+beforeEach(() => _state.setTipsSeen({ vision: true }));
+
 // What the week map offers that has no meaning on the Vision is refused at the
 // function: no change, no snapshot, no toast. Label magic is off. Drop and
 // Undone are Let go and Take back, and horizon is a Vision-only content field.

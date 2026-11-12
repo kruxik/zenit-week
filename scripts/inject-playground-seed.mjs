@@ -16,12 +16,13 @@ const START = '/* PLAYGROUND_SEED_START */';
 const END = '/* PLAYGROUND_SEED_END */';
 
 // Build the `const PLAYGROUND_SEED = {…};` line from the JSON source.
-// Only `week` and `colors` are inlined - the `_comment` doc field is dropped.
+// Only `week`, `vision` and `colors` are inlined - the `_comment` doc field is dropped.
 export function buildSeedBlock(jsonText) {
   const parsed = JSON.parse(jsonText);
-  const seed = { week: parsed.week, colors: parsed.colors };
-  if (!seed.week || !Array.isArray(seed.week.nodes) || !seed.colors) {
-    throw new Error('playground-seed.json must contain { week: { nodes: [...] }, colors: {...} }');
+  const seed = { week: parsed.week, vision: parsed.vision, colors: parsed.colors };
+  if (!seed.week || !Array.isArray(seed.week.nodes) || !seed.colors
+      || !seed.vision || !Array.isArray(seed.vision.nodes)) {
+    throw new Error('playground-seed.json must contain { week: { nodes: [...] }, vision: { nodes: [...] }, colors: {...} }');
   }
   return `${START}\nconst PLAYGROUND_SEED = ${JSON.stringify(seed)};\n${END}`;
 }

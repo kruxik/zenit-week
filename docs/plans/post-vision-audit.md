@@ -66,12 +66,12 @@ Coachmarks in HINTS order: 1 done, 2 unplanned, 3 counter, 4 days, 5 priority, 6
 
 | ID | Sev | Status | Where | Finding | Fix | Commit |
 |---|---|---|---|---|---|---|
-| ONB-1 | 🟠 | ⏸️ | `playgroundSeedNodes` (30871), assets/playground-seed.json | No Vision example content; a new user meets an empty Vision. Documented deferral. | Needs a spec (with ONB-2). | |
-| ONB-2 | 🟠 | ⏸️ | `clearExampleTasks` (30964), `hasDemoActivityNodes` (30948) | Clear / nudge act on `weekData` only; `validateAndRepairVision` strips `_demo`. | Design together with ONB-1. | |
-| ONB-3 | 🟠 | ⏸️ | HINTS | No Vision first-open coachmark. | Needs a spec (with ONB-4). | |
-| ONB-4 | 🟠 | ⏸️ | HINTS #15 (31208) | Day-filter tip is hidden on the Vision; `#horizon-filter-btn` has no tip. | Add a horizon hint. | |
-| ONB-5 | 🟡 | ⬜ | Hints #5, #7, #11 | Say "task" when shown on the Vision. | Vision wording when `isVisionInView()`. | |
-| ONB-6 | 🟡 | ⏸️ | Hints #13, #14 | Week-nav tip unreachable on the Vision; Quick add on the Vision undecided. | Decide Quick add on the Vision. | |
+| ONB-1 | 🟠 | ✅ | `playgroundSeedNodes` (30871), assets/playground-seed.json | No Vision example content; a new user meets an empty Vision. Documented deferral. | Needs a spec (with ONB-2). | |
+| ONB-2 | 🟠 | ✅ | `clearExampleTasks` (30964), `hasDemoActivityNodes` (30948) | Clear / nudge act on `weekData` only; `validateAndRepairVision` strips `_demo`. | Design together with ONB-1. | |
+| ONB-3 | 🟠 | ✅ | HINTS | No Vision first-open coachmark. | Needs a spec (with ONB-4). | |
+| ONB-4 | 🟠 | ✅ | HINTS #15 (31208) | Day-filter tip is hidden on the Vision; `#horizon-filter-btn` has no tip. | Add a horizon hint. | |
+| ONB-5 | 🟡 | ✅ | Hints #5, #7, #11 | Say "task" when shown on the Vision. | Vision wording when `isVisionInView()`. | |
+| ONB-6 | 🟡 | ✅ | Hints #13, #14 | Week-nav tip unreachable on the Vision; Quick add on the Vision undecided. | Decide Quick add on the Vision. | |
 | ONB-7 | 🟡 | ✅ | docs/specs/onboarding-part-b-coachmarks.md | Status Draft, 4 hints vs 15 in code, stale §7 sync section. | Rewrite to match code. | 8373aab |
 | ONB-8 | 🟡 | ✅ | docs/specs/onboarding-part-a-playground.md:76 | Nudge threshold 3 in spec, 7 in code. | Update to 7. | 8373aab |
 
@@ -104,7 +104,7 @@ Coachmarks in HINTS order: 1 done, 2 unplanned, 3 counter, 4 days, 5 priority, 6
 | LEGAL-2 | 🟠 | ✅ | privacy.html §3 (~112) | Claims the app loads `apis.google.com/js/api.js`; it does not. | Correct against the CSP. | 7491f13 |
 | LEGAL-3 | 🟠 | ✅ | privacy.html:184-190, 94 | "Vercel Edge Function"; it is a serverless function. | "serverless function". | 7491f13 |
 | LEGAL-4 | 🟠 | ✅ | privacy.html:76 | Points to §7 for the token function; it is §3/§4. | Fix the reference. | 7491f13 |
-| LEGAL-5 | 🟠 | ✅ | cs/ | No Czech privacy / terms; CS landing links English pages. | Added cs/privacy.html and cs/terms.html (GDPR WP260 ¶13, Civil Code § 1811), versions declared equivalent, hreflang, sitemap, CS footer. | |
+| LEGAL-5 | 🟠 | ✅ | cs/ | No Czech privacy / terms; CS landing links English pages. | Added cs/privacy.html and cs/terms.html (GDPR WP260 ¶13, Civil Code § 1811), versions declared equivalent, hreflang, sitemap, CS footer. || bbac99e |
 | LEGAL-6 | 🟡 | ✅ | privacy.html, terms.html | "Last updated: 8 November 2026" predates the Vision. | Update with LEGAL-1. | 7491f13 |
 | LEGAL-7 | 🟡 | ✅ | terms.html §1, §4 | Missing full stop in §4; awkward "operated by ..., the Czech Republic" in §1. | Fix wording. | 7491f13 |
 | LEGAL-8 | 🟡 | ✅ | THIRD_PARTY_NOTICES.md | MCP deps (`@modelcontextprotocol/sdk`, `ws`, `zod`) not credited. | Add them or ship notices in mcp/. | 7e5d44b |
