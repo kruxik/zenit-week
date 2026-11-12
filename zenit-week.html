@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-zNc4WG86r8Gnx78SWukN/kgz867gPGMrk8X6X+JraPU=';
+               'sha256-pbrkIWHpLFhdp4W27sxZSX9fOtguCMyocmD0kByLnRA=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -31588,12 +31588,26 @@ window.addEventListener('load', async () => {
   if (_quietRestore && _quietRestore.helpOpen) openHelp();
 });
 
+// A resize burst (one rotation sends several events while the toolbars settle)
+// is refitted twice at most: at once on its first event, so the map follows the
+// rotation without a wait, and once more when the burst has been quiet for
+// RESIZE_SETTLE_MS, only if the viewport still differs from that first fit.
+const RESIZE_SETTLE_MS = 200;
 let _resizeRefitTimer = null;
-// The width the map was last refitted for. On a touch device a height-only
-// resize is the soft keyboard or the address bar coming and going - after a
-// node save, around the comment editor, mid-scroll - and must leave the user's
-// zoom alone. Only a width change (rotation, split screen) is a new viewport.
+// The viewport the map was last refitted for. On a touch device a height-only
+// resize outside a burst is the soft keyboard or the address bar coming and
+// going - after a node save, around the comment editor, mid-scroll - and must
+// leave the user's zoom alone. Only a width change (rotation, split screen)
+// opens a burst; inside one, the height settling is part of the new viewport.
 let _resizeRefitWidth = window.innerWidth;
+let _resizeRefitHeight = window.innerHeight;
+function refitForResize() {
+  const canvasEl = document.getElementById('canvas-container');
+  if (canvasEl && getComputedStyle(canvasEl).display === 'none') return;
+  _resizeRefitWidth = window.innerWidth;
+  _resizeRefitHeight = window.innerHeight;
+  fitMindmapView();
+}
 window.addEventListener('resize', () => {
   if (typeof editState !== 'undefined' && editState) {
     // Reposition the input only. Node geometry lives in SVG coordinates, so a
@@ -31602,14 +31616,15 @@ window.addEventListener('resize', () => {
     resizeInlineInput(false, false);
     return;
   }
-  if (isMobile && window.innerWidth === _resizeRefitWidth) return;
+  const inBurst = _resizeRefitTimer !== null;
+  if (!inBurst && isMobile && window.innerWidth === _resizeRefitWidth) return;
+  if (!inBurst) refitForResize();
   clearTimeout(_resizeRefitTimer);
   _resizeRefitTimer = setTimeout(() => {
-    const canvasEl = document.getElementById('canvas-container');
-    if (canvasEl && getComputedStyle(canvasEl).display === 'none') return;
-    _resizeRefitWidth = window.innerWidth;
-    fitMindmapView();
-  }, 200);
+    _resizeRefitTimer = null;
+    if (window.innerWidth !== _resizeRefitWidth
+      || window.innerHeight !== _resizeRefitHeight) refitForResize();
+  }, RESIZE_SETTLE_MS);
 });
 </script>
 </body>
