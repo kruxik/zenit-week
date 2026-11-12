@@ -65,8 +65,8 @@ describe('pointer handlers never start the view slide inline', () => {
     expect(SRC).toMatch(/addEventListener\('click', \(\) => deferFromInput\(\(\) => pressViewLevel\(btn\.dataset\.level\)\)\)/);
     // the branch swipe
     expect(SRC).toMatch(/deferFromInput\(\(\) => _setViewLevel\(next\)\)/);
-    // the day-filter menu rows
-    expect(SRC).toMatch(/deferFromInput\(\(\) => setDayFilter\(day\)\)/);
+    // the filter menu rows (day and horizon share openFilterMenu)
+    expect(SRC).toMatch(/deferFromInput\(\(\) => setFilter\(value\)\)/);
   });
 
   test('the mobile reveal pan is deferred too', () => {

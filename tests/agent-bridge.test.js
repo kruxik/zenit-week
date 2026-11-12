@@ -612,8 +612,8 @@ describe('one call, one undo entry', () => {
 
   test('undo reports which action it reversed', async () => {
     await call('add_task', { branch: branchId(), label: 'Read' });
-    expect((await call('undo', {})).undone).toBe('Agent: added Read');
-    expect((await call('redo', {})).redone).toBe('Agent: added Read');
+    expect((await call('undo', {})).undone).toBe('Added Read');
+    expect((await call('redo', {})).redone).toBe('Added Read');
   });
 });
 
@@ -828,6 +828,173 @@ describe('merge window and week-saved events (real IDB)', () => {
     const same = JSON.parse(JSON.stringify(_state.get()));
     await applyRemoteMerge(WK, same, JSON.stringify(same), weekContentHash(same), false, same);
     expect(events()).toBe(4);
+  });
+});
+
+// ── Vision Canvas (docs/specs/vision-canvas.md, section 6) ──
+describe('vision', () => {
+  const WK = '2026-45';
+  const vb = (id, children = []) => ({ id, type: 'branch', branch: id, label: 'Sea', children, side: 'left', _ts: 1 });
+  const intent = (id, parent, extra = {}) => ({ id, type: 'activity', branch: 'nvb1', parent, label: 'Live by the sea', children: [], _ts: 1, ...extra });
+  const visionUndo = () => _state.getVisionUndoStack().length;
+  const node = id => _state.get().nodes.find(n => n.id === id);
+
+  beforeEach(async () => {
+    _state.useRealIDB(true);
+    const db = await sandbox.openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['weeks', 'misc'], 'readwrite');
+      tx.objectStore('weeks').clear();
+      tx.objectStore('misc').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    _state.setMapKind('week');
+    _state.setCurrentView('mindmap');
+    _state.setWindowInnerWidth(1280);
+    const week = defaultWeekData();
+    await sandbox.saveWeekIDB(WK, structuredClone(week));
+    await sandbox.saveValueIDB('vision', { nodes: [vb('nvb1', ['nv1']), intent('nv1', 'nvb1')], tombstones: [], crdtVersion: 1 });
+    _state.set(week);
+  });
+  afterEach(async () => {
+    if (_state.getMapKind() === 'vision') await sandbox.switchView('mindmap');
+    _state.useRealIDB(false);
+  });
+
+  test('read_vision projects the stored vision without opening it', async () => {
+    const v = await call('read_vision', {});
+    expect(_state.getMapKind()).toBe('week');
+    expect(v.branches[0].intentions[0]).toEqual({
+      id: 'nv1', label: 'Live by the sea', priority: 'normal', horizon: null,
+      letGo: false, letGoAt: null, comments: '', children: [],
+    });
+  });
+
+  test('open_vision navigates with no undo entry; open_week comes back', async () => {
+    const v = await call('open_vision', {});
+    expect(_state.getMapKind()).toBe('vision');
+    expect(v.branches.map(b => b.id)).toEqual(['nvb1']);
+    expect(visionUndo()).toBe(0);
+    await call('open_week', { week: WK });
+    expect(_state.getMapKind()).toBe('week');
+    expect(_state.getCurrentView()).toBe('mindmap');
+  });
+
+  test('a vision id while a week is in view answers not_in_view, and vice versa', async () => {
+    await expect(codeOf(call('rename_task', { id: 'nv1', label: 'x' }))).resolves.toBe('not_in_view');
+    const weekBranch = branchId();
+    await call('open_vision', {});
+    await expect(codeOf(call('add_task', { branch: weekBranch, label: 'x' }))).resolves.toBe('not_in_view');
+  });
+
+  test('add_task with a comment, then set_horizon: one undo entry each, on the vision stack', async () => {
+    await call('open_vision', {});
+    const added = await call('add_task', { branch: 'nvb1', label: 'Sail across', comment: '# Why\nFreedom.' });
+    expect(added).toMatchObject({ label: 'Sail across', comments: '# Why\nFreedom.', horizon: null });
+    const h = await call('set_horizon', { id: added.id, horizon: 'someday' });
+    expect(h.horizon).toBe('someday');
+    expect(visionUndo()).toBe(2);
+    expect(_state.getUndoStack()).toHaveLength(0);
+    // Same value: no-op, no snapshot.
+    await call('set_horizon', { id: added.id, horizon: 'someday' });
+    expect(visionUndo()).toBe(2);
+  });
+
+  test('add_task refuses days and Nx on the Vision; a relative word is just text', async () => {
+    await call('open_vision', {});
+    await expect(codeOf(call('add_task', { branch: 'nvb1', label: 'Run', days: [1] }))).resolves.toBe('bad_args');
+    await expect(codeOf(call('add_task', { branch: 'nvb1', label: 'Pushups 10x' }))).resolves.toBe('bad_args');
+    const t = await call('add_task', { branch: 'nvb1', label: 'Call home tomorrow' });
+    expect(t.label).toBe('Call home tomorrow');
+  });
+
+  test('rename is literal', async () => {
+    await call('open_vision', {});
+    await call('rename_task', { id: 'nv1', label: 'Run (mo) 3x' });
+    expect(node('nv1').label).toBe('Run (mo) 3x');
+    expect(node('nv1').children).toEqual([]);
+  });
+
+  test('rename_branch is literal, one vision undo entry; the same label is a no-op', async () => {
+    await expect(codeOf(call('rename_branch', { branch: 'nvb1', label: 'x' }))).resolves.toBe('not_in_view');
+    await call('open_vision', {});
+    expect(await call('rename_branch', { branch: 'nvb1', label: 'Sea 3x (mo)' })).toEqual({ id: 'nvb1', label: 'Sea 3x (mo)' });
+    expect(node('nvb1').label).toBe('Sea 3x (mo)');
+    expect(visionUndo()).toBe(1);
+    await call('rename_branch', { branch: 'nvb1', label: 'Sea 3x (mo)' });
+    expect(visionUndo()).toBe(1);
+  });
+
+  test('delete_branch takes the subtree, refuses the last branch, and one undo restores it', async () => {
+    await call('open_vision', {});
+    await expect(codeOf(call('delete_branch', { branch: 'nvb1' }))).resolves.toBe('wrong_type');
+    expect(visionUndo()).toBe(0);
+    const other = await call('add_branch', { label: 'Health' });
+    expect(await call('delete_branch', { branch: 'nvb1' })).toEqual({ deleted: 'nvb1' });
+    expect(node('nvb1')).toBeFalsy();
+    expect(node('nv1')).toBeFalsy();
+    expect(visionUndo()).toBe(2);
+    await call('undo', {});
+    expect(node('nvb1')).toBeTruthy();
+    expect(node('nv1')).toBeTruthy();
+    expect(node(other.id)).toBeTruthy();
+  });
+
+  test('set_status: dropped lets go, undone takes back, done is wrong_type', async () => {
+    await call('open_vision', {});
+    expect((await call('set_status', { id: 'nv1', status: 'dropped' })).letGo).toBe(true);
+    expect((await call('set_status', { id: 'nv1', status: 'undone' })).letGo).toBe(false);
+    for (const s of ['done', 'unplanned', 'planned']) {
+      await expect(codeOf(call('set_status', { id: 'nv1', status: s }))).resolves.toBe('wrong_type');
+    }
+    expect(node('nv1').done).toBeFalsy();
+  });
+
+  test('week-only tools are wrong_type while the Vision is in view', async () => {
+    await call('open_vision', {});
+    for (const [tool, args] of [
+      ['set_days', { id: 'nv1', days: [1] }],
+      ['tick_task', { id: 'nv1' }],
+      ['set_reusable', { id: 'nv1', on: true }],
+      ['send_to_date', { id: 'nv1', date: '2030-01-01' }],
+      ['transfer_unfinished', {}],
+      ['transfer_reusable', {}],
+    ]) {
+      await expect(codeOf(call(tool, args))).resolves.toBe('wrong_type');
+    }
+    expect(visionUndo()).toBe(0);
+  });
+
+  test('set_horizon on a week node is wrong_type', async () => {
+    const id = addActivity('Gym');
+    await expect(codeOf(call('set_horizon', { id, horizon: 'year' }))).resolves.toBe('wrong_type');
+  });
+
+  test('week reads of the week in view say not_in_view on the Vision', async () => {
+    await call('open_vision', {});
+    await expect(codeOf(call('get_stats', {}))).resolves.toBe('not_in_view');
+    await expect(codeOf(call('read_agenda', { day: 1 }))).resolves.toBe('not_in_view');
+    // A stored week is still readable.
+    expect((await call('read_week', { week: WK })).week).toBe(WK);
+  });
+
+  test('undo acts on the record in view and names it', async () => {
+    await call('open_vision', {});
+    await call('set_priority', { id: 'nv1', priority: 'high' });
+    const u = await call('undo', {});
+    expect(u.record).toBe('vision');
+    expect(node('nv1').priority).toBeFalsy();
+  });
+
+  test('a vision save tells the agent once, under the key vision', async () => {
+    const ws = await pairedSocket();
+    await call('open_vision', {});
+    ws.sent.length = 0;
+    await call('set_priority', { id: 'nv1', priority: 'critical' });
+    await new Promise(r => setTimeout(r, 30));
+    const ev = ws.sent.filter(f => f.type === 'event' && f.event === 'week-saved');
+    expect(ev.map(f => f.wk)).toEqual(['vision']);
   });
 });
 

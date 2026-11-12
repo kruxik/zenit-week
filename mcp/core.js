@@ -24,7 +24,10 @@ export const STARTUP_GRACE_MS = 35000;
 export const WRITE_BUDGET_PER_MIN = 200;
 
 // Tools that only read. They do not count against the write budget.
-export const READ_TOOLS = new Set(['read_weeks', 'read_week', 'read_schedule', 'read_agenda', 'get_stats']);
+export const READ_TOOLS = new Set(['read_weeks', 'read_week', 'read_schedule', 'read_agenda', 'read_vision', 'get_stats']);
+
+// The page reports a vision save as a week-saved event under this key.
+export const VISION_KEY = 'vision';
 
 const ALLOWED_EXACT = new Set(['https://zenitweek.com', 'https://www.zenitweek.com']);
 const ALLOWED_DEV = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
@@ -568,8 +571,15 @@ export class Relay {
   }
 }
 
-// The resource URIs a week-saved event touches.
+// The resource URIs a vision save touches.
+export function urisForVisionSaved() {
+  return ['zenit://vision'];
+}
+
+// The resource URIs a week-saved event touches. The vision rides the same
+// event under VISION_KEY and touches only its own resource.
 export function urisForWeekSaved(wk, currentWeek) {
+  if (wk === VISION_KEY) return urisForVisionSaved();
   const uris = ['zenit://weeks', `zenit://week/${wk}`];
   if (wk === currentWeek) {
     uris.push('zenit://week/current');

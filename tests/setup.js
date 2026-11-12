@@ -12,7 +12,10 @@ const html = readFileSync(resolve(__dirname, '../zenit-week.html'), 'utf8');
 // Extract the main app <script id="app-script">…</script> block
 const match = html.match(/<script\s+id="app-script">([\s\S]*?)<\/script>/);
 if (!match) throw new Error('Could not extract <script id="app-script"> block from zenit-week.html');
-const scriptCode = match[1];
+// The shared host check lives in its own head script; the app script calls it.
+const hostMatch = html.match(/<script\s+id="host-script">([\s\S]*?)<\/script>/);
+if (!hostMatch) throw new Error('Could not extract <script id="host-script"> block from zenit-week.html');
+const scriptCode = hostMatch[1] + '\n' + match[1];
 
 // Reusable stub for DOM elements returned by getElementById / createElement
 function elementStub() {
@@ -46,6 +49,8 @@ function elementStub() {
     setAttribute: () => {},
     getAttribute: () => null,
     appendChild: () => {},
+    // Like the DOM: the element's text becomes its new children's text.
+    replaceChildren(...kids) { this.textContent = kids.map(k => (typeof k === 'string' ? k : k?.textContent || '')).join(''); },
     removeChild: () => {},
     insertBefore: () => {},
     querySelector: () => null,
@@ -56,6 +61,10 @@ function elementStub() {
       }
       if (selector === '[data-i18n-title]') {
         return all.filter(el => el.dataset.i18nTitle);
+      }
+      // The context menu's rows: every element looked up under a ctx- id.
+      if (selector === '.ctx-item, .ctx-separator') {
+        return Object.entries(sandbox._elCache || {}).filter(([k]) => k.startsWith('ctx-')).map(([, el]) => el);
       }
       return [];
     },
@@ -117,7 +126,8 @@ const sandbox = {
   },
   BroadcastChannel: class {
     constructor() {}
-    postMessage() {}
+    // Recorded so a test can read what a save told peer tabs.
+    postMessage(m) { (sandbox._tabPosts ||= []).push(m); }
     close() {}
   },
   document: {
@@ -419,7 +429,11 @@ _state.get       = function() { return weekData; };
 _state.set       = function(v) { weekData = v; rebuildNodeMap(); };
 _state.setWeekKey = function(k) { currentWeekKey = k; };
 _state.getWeekKey = function() { return currentWeekKey; };
-_state.reset     = function() { undoStack = []; redoStack = []; };
+_state.reset     = function() { undoStack = []; redoStack = []; visionUndoStack = []; visionRedoStack = []; };
+_state.getVisionUndoStack = function() { return visionUndoStack; };
+_state.getToastText = function() { return _toast.textContent; };
+_state.clearToast = function() { _toast.textContent = ''; };
+_state.getVisionRedoStack = function() { return visionRedoStack; };
 _state.getUndoStack = function() { return undoStack; };
 _state.getRedoStack = function() { return redoStack; };
 _state.getBridgeStatus = function() { return bridgeStatus; };
@@ -463,6 +477,12 @@ _state.setCommentTyped = function(v) { commentTyped = v; };
 _state.getRestoreKey = function() { return RESTORE_KEY; };
 _state.getCommentEditor = function() { return commentEditor; };
 _state.setCurrentView = function(v) { currentView = v; };
+// The record descriptor and the view flip together in the app (switchView);
+// tests that stage the Vision without a switch set both.
+_state.setMapKind = function(kind) { mapRecord = { kind }; currentView = kind === 'vision' ? 'vision' : (currentView === 'vision' ? 'mindmap' : currentView); };
+_state.getMapKind = function() { return mapRecord.kind; };
+_state.getRecordSwapSeq = function() { return _recordSwapSeq; };
+_state.isSwapPending = function() { return _recordSwapsInFlight > 0; };
 _state.setWindowInnerWidth = function(v) { window.innerWidth = v; };
 _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 // hoveredNodeId / kbFocusId are module-level \`let\`s - the hotkeys read the first
@@ -470,6 +490,8 @@ _state.triggerKeydown = function(e) { _windowKeydownHandler(e); };
 _state.setHoveredNode = function(id) { hoveredNodeId = id; };
 _state.getHoveredNode = function() { return hoveredNodeId; };
 _state.getKbFocus = function() { return kbFocusId; };
+_state.setKbFocusId = function(id) { kbFocusId = id; };
+_state.getDayFilter = function() { return activeDayFilter; };
 _state.getElement = function(id) { return document.getElementById(id); };
 _state.openSettings = function() { openSettings(); };
 _state.closeSettings = function() { closeSettings(); };
@@ -479,6 +501,8 @@ _state.getSettingsTab = function() { return settingsActiveTab; };
 _state.animateSettingsHeight = function() { animateSettingsHeight(); };
 _state.refreshDataSummary = function() { return refreshDataSummary(); };
 _state.setActiveDayFilter = function(v) { activeDayFilter = v; };
+_state.setHorizonFilter = function(v) { activeHorizonFilter = v; };
+_state.getHorizonFilter = function() { return activeHorizonFilter; };
 _state.setViewLevel = function(v) { currentViewLevel = v; pebblesExtraDepth = 0; };
 _state.closeViewLevels = function() { closeViewLevels(); };
 _state.getViewLevel = function() { return currentViewLevel; };
@@ -500,6 +524,7 @@ _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
 _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
+_state.getViewTabs = function() { return VIEW_TABS; };
 _state.resetPlaygroundNudge = function() { _playgroundNudgeDone = false; _playgroundNudgeShown = false; };
 _state.setPlaygroundNudgeDone = function(v) { _playgroundNudgeDone = v; };
 _state.resetTips = function() { _tipsEnabled = true; _tipsSeen = {}; _coachmarkVisible = false; };
@@ -521,6 +546,8 @@ _state.resetSyncState = function() {
   etagCache.clear();
   colorsSyncedHash = null;
   lastSeenRemoteColorsHash = null;
+  visionSyncedHash = null;
+  lastSeenRemoteVisionHash = null;
   _changesPageToken = null;
   _undoRedoForcePush = new Set();
   _remoteOriginIds.clear();
@@ -584,6 +611,15 @@ _state.useRealIDB = function(v) {
   updateIDBMethods();
 };
 _state.getScheduleSyncedHash = function() { return scheduleSyncedHash; };
+_state.getVisionSyncedHash = function() { return visionSyncedHash; };
+_state.setVisionSyncedHash = function(v) { visionSyncedHash = v; };
+_state.getLastSeenRemoteVisionHash = function() { return lastSeenRemoteVisionHash; };
+_state.getDataRecords = function() { return DATA_RECORDS; };
+_state.getVisionSyncTimer = function() { return visionSyncDebounceTimer; };
+_state.clearVisionSyncTimer = function() {
+  if (visionSyncDebounceTimer) clearTimeout(visionSyncDebounceTimer);
+  visionSyncDebounceTimer = null;
+};
 _state.wKeyForDriveFileName = function(name) { return _wKeyForDriveFileName(name); };
 _state.getAgendaTabOrder = function() { return AGENDA_TAB_ORDER; };
 _state.getVisibleAgendaTabOrder = function() { return agendaTabOrder(); };
@@ -738,6 +774,41 @@ export const {
   mergeSchedule,
   syncScheduleToDrive,
   syncScheduleFromDrive,
+  // Vision record
+  emptyVision,
+  stripVisionNode,
+  validateAndRepairVision,
+  loadVision,
+  saveVision,
+  mergeRemoteVision,
+  onPeerVisionSaved,
+  syncVisionToDrive,
+  syncVisionFromDrive,
+  importCarriesRecord,
+  isVisionInView,
+  isWeekInMemory,
+  saveMapRecord,
+  seedVisionFromWeek,
+  loadVisionForView,
+  openVisionIntoView,
+  swapMapRecordFor,
+  onPeerWeekSaved,
+  weekActionClearWeek,
+  openBaselinePanel,
+  setHorizon,
+  setCollapsed,
+  collapsedCount,
+  edgeEndpoints,
+  focusBranch,
+  clearBranchFocus,
+  focusedNodeIds,
+  isCollapsedInView,
+  expandInView,
+  mindmapNodeBounds,
+  applyHorizon,
+  horizonFilterMatchSet,
+  visionHorizonIcon,
+  effectiveHorizon,
   // Delete semantics
   weekKeyForDayString,
   deleteOccurrence,
@@ -982,7 +1053,7 @@ export const {
   hexToHsv,
   hsvToHex,
   // View switching
-  switchView,
+  switchView, viewTabTarget, setViewTabPress,
   // Edge drawing
   taperedPathD,
   // Zoom

@@ -1,4 +1,4 @@
-import { switchView, _state } from './setup.js';
+import { switchView, _state, viewTabTarget, setViewTabPress } from './setup.js';
 
 describe('switchView', () => {
   beforeEach(() => {
@@ -68,5 +68,45 @@ describe('switchView', () => {
     switchView('mindmap');
     const agendaEl = _state.getElement('agenda-view');
     expect(agendaEl.classList.contains('active')).toBe(false);
+  });
+});
+
+describe('view tabs (VIEW_TABS)', () => {
+  const VIEW_TABS = _state.getViewTabs();
+  beforeEach(() => {
+    _state.setCurrentView('mindmap');
+    _state.setWindowInnerWidth(1280);
+  });
+
+  test('every tab has a button and exactly the view in place is active', () => {
+    switchView('stats');
+    for (const tab of VIEW_TABS) {
+      expect(_state.getElement('vtb-' + tab.view).classList.contains('active')).toBe(tab.view === 'stats');
+    }
+  });
+
+  test('applying a view clears the press, whichever tab was pressed', () => {
+    for (const tab of VIEW_TABS) {
+      setViewTabPress(tab.view);
+      switchView('agenda');
+      for (const t of VIEW_TABS) {
+        expect(_state.getElement('vtb-' + t.view).classList.contains('pressed')).toBe(false);
+      }
+    }
+  });
+
+  test('a click on the tab in view does its `again`', () => {
+    switchView('stats');
+    expect(viewTabTarget('stats')).toBe('mindmap');
+    switchView('mindmap');
+    expect(viewTabTarget('mindmap')).toBe('levels');
+    expect(viewTabTarget('agenda')).toBe('agenda');
+    switchView('agenda');
+    expect(viewTabTarget('agenda')).toBe('agenda');
+  });
+
+  test('both map tabs disclose the level row', () => {
+    const mapTabs = VIEW_TABS.filter(t => t.again === 'levels').map(t => t.view).sort();
+    expect(mapTabs).toEqual(['mindmap', 'vision']);
   });
 });

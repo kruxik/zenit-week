@@ -3,7 +3,7 @@
 // resource updates, the shared pairings file and the port range.
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  Relay, isAllowedOrigin, parseExtraOrigin, urisForWeekSaved, hmacB64, memoryPairings, filePairings,
+  Relay, isAllowedOrigin, parseExtraOrigin, urisForWeekSaved, urisForVisionSaved, READ_TOOLS, hmacB64, memoryPairings, filePairings,
   matchSite, listenOnFirstFreePort, formatPairCode, PORTS, PORT_MIN, PORT_MAX, PROTOCOL,
   appName, appMatches, routeWarning, readOrigins, addOrigin, removeOrigin, lastUsedSite,
   HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN, PAIR_TIMEOUT_MS,
@@ -301,6 +301,20 @@ describe('resource updates', () => {
     expect(saved).toEqual([['2026-45', 't1']]);
     expect(urisForWeekSaved('2026-45', '2026-45')).toEqual(expect.arrayContaining(['zenit://week/current', 'zenit://week/2026-45', 'zenit://agenda/3', 'zenit://weeks']));
     expect(urisForWeekSaved('2026-44', '2026-45')).not.toContain('zenit://week/current');
+  });
+
+  test('a vision save touches zenit://vision and nothing else', () => {
+    const t = connect();
+    relay.onMessage(t.tab, JSON.stringify({ type: 'event', event: 'week-saved', wk: 'vision', sig: 'y' }));
+    expect(saved).toEqual([['vision', 't1']]);
+    expect(urisForWeekSaved('vision', '2026-45')).toEqual(['zenit://vision']);
+    expect(urisForVisionSaved()).toEqual(['zenit://vision']);
+  });
+
+  test('read_vision is a read: it never spends the write budget', () => {
+    expect(READ_TOOLS.has('read_vision')).toBe(true);
+    expect(READ_TOOLS.has('open_vision')).toBe(false);
+    expect(READ_TOOLS.has('set_horizon')).toBe(false);
   });
 });
 

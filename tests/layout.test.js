@@ -67,10 +67,10 @@ describe('Zig-Zag Layout', () => {
     expect(positions['d2'].y - positions['d1'].y).toBeCloseTo((48.1 + 12 * 2) / 2, 1);
 
     // Horizontal stagger: (maxW1 + maxW2)/2 + 12
-    // maxW1 is d1 (oval, width 86)
+    // maxW1 is d1 (oval, width 110: the badge sits padX from the text)
     // maxW2 is d2 (circle, width 48.1)
-    // expectedStaggerX = (86 + 48.1)/2 + 12 = 67.05 + 12 = 79.05
-    expect(Math.abs(positions['d2'].x - positions['d1'].x)).toBeCloseTo(79.05, 1);
+    // expectedStaggerX = (110 + 48.1)/2 + 12 = 79.05 + 12 = 91.05
+    expect(Math.abs(positions['d2'].x - positions['d1'].x)).toBeCloseTo(91.05, 1);
   });
 
   test('every stagger pair is one gap apart, whatever the node widths', () => {

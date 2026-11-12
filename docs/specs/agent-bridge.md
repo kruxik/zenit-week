@@ -158,7 +158,7 @@ Reads take no snapshot. A call that fails validation takes none either and leave
 
 ### 7.4 Visible like a click
 
-Every successful write shows a toast `Agent: <summary>` in the UI language. The summary is built by the page from the tool name and its arguments via i18n keys `bridge.toast.<tool>` in EN and CS (e.g. "Agent: added Pushups 10x", "Agent: Gym marked done"). Affected nodes get a brief highlight pulse on the map, reusing the existing drop-target highlight style.
+Every successful write shows a toast led by the sparkles icon (the user's own actions get the info-circle icon) with the summary in the UI language - the icon, not a text prefix, says an agent did it. The summary is built by the page from the tool name and its arguments via i18n keys `bridge.toast.<tool>` in EN and CS (e.g. "Added Pushups 10x", "Gym marked done"). Affected nodes get a brief highlight pulse on the map, reusing the existing drop-target highlight style.
 
 ### 7.5 Which tab executes
 
@@ -183,6 +183,7 @@ The projection to section 8.3 is a pure function over a week record, so the same
 | 3 | `zenit://week/{YYYY-WW}` | Any stored week, same shape. From memory if it is the week in view. |
 | 4 | `zenit://schedule` | The `schedule` record (Later tab) as the `schedule` skill documents it. |
 | 5 | `zenit://agenda/{1-7}` | The agenda of the week in view for that day, rows in render order: Scheduled, Done, Any day, Dropped - produced by the same grouping code `renderAgenda` uses, extracted so it returns data instead of DOM. |
+| 6 | `zenit://vision` | The vision record projected as section 8.4. From memory when the Vision is in view, else `loadVision()`. Wire call `read_vision`, a read (no write budget). A vision save is reported as a `week-saved` event with `wk: 'vision'`, which the server maps to this URI only (`urisForVisionSaved`). |
 
 ### 8.2 Tools
 
@@ -207,6 +208,12 @@ Day numbers: the agent uses ISO weekdays `1`-`7` (Monday = 1, Sunday = 7). The p
 | 13 | `add_branch` | `label`, `side?`, `color?` | body of `addBranch(side)` without the editor: created with the given label and **no** `_editing` flag, never calls `_openInlineInput` (an `_editing` node is dropped by `takeSnapshot` and `saveWeek`); then the body of `applyBranchColor` | Side defaults to the side with fewer branches. One snapshot for all three steps. |
 | 14 | `undo` / `redo` | none | `undo` / `redo` | The shared stack: it undoes the last action whoever made it, as `Ctrl+Z` does. The result says which action was undone so the agent can tell. |
 | 15 | `get_stats` | none | `computeWeekStats` | The week in view: `week`, `global` and `perBranch` counts only, never the raw `leaves` list (the week read carries the tasks). Read-only, no snapshot. |
+| 16 | `open_vision` | none | `switchView('vision')` | Vision Canvas (`docs/specs/vision-canvas.md`, section 6). Navigation, no undo entry. Required before any write to a vision node, as `open_week` is before writing another week. Returns the projection of section 8.4. |
+| 17 | `set_horizon` | `id`, `horizon` in `year, years, someday, none` | `applyHorizon` (body of `setHorizon`) | Vision only; `wrong_type` on a week node. Same no-op rule as `set_priority`. |
+| 18 | `rename_branch` | `branch`, `label` | label set literally, `touchNode` | The record in view, a week or the Vision. Same label rules as `add_branch`; the same label is a no-op. |
+| 19 | `delete_branch` | `branch` | `deleteBranch` | The branch and its subtree, as the context menu deletes it; `deleteBranch` takes the snapshot. The last branch is refused with `wrong_type`. Async, inside the record's lock. |
+
+**The record in view.** Everything this section says about "the week in view" holds for the record in view: a week, or the Vision. Node and branch ids resolve in the record in view; an id that lives in the other record answers `not_in_view` naming `open_week` or `open_vision`. On the Vision: `add_task` refuses `days` and an `Nx` label (`bad_args`), and a relative-day word is literal text; `rename_task` is literal (no label magic); `set_status` accepts `dropped` (let go) and `undone` (take back) only, other values `wrong_type`; `set_days`, `tick_task`, `set_reusable`, `send_to_date` and both transfers answer `wrong_type`; `get_stats` and `zenit://agenda/{1-7}` answer `not_in_view` (they describe the week on screen); `undo` / `redo` act on the Vision's own stack pair and the result carries `record: 'vision'` or the week key; `add_branch` adds to the Vision. `open_week` also leaves the Vision. Synchronous writes take the lock of the record in view (`'vision'` for the Vision).
 
 Not offered in v1: moving or reordering nodes (layout only), colour changes beyond `add_branch`, language or theme, Drive sign-in, import/export.
 
@@ -226,6 +233,16 @@ Tool results return the affected node in the same shape so the agent does not ne
 
 ---
 
+### 8.4 Vision JSON shape
+
+```
+{ branches: [{ id, label, color, intentions: [
+    { id, label, priority, horizon, letGo, letGoAt, comments,
+      children: [ ...same shape... ] } ] }] }
+```
+
+`horizon` is `year`, `years`, `someday` or null; `letGo` / `letGoAt` are the node's `dropped` / `droppedAt`. `collapsed`, positions and stamps are omitted. Tool results on a vision node return it in this shape.
+
 ## 9. Wire protocol (page <-> server)
 
 JSON text frames, one object per frame. `id` correlates a request and its reply.
@@ -244,7 +261,7 @@ The server answers a bad token by closing with reason `refused`; there is no sep
 
 `week-saved` is emitted from two places: `saveWeek` (user, agent) and `_commitRemoteMerge` **whenever the merged content differs from what the page held** - not only at the existing `tabChannel` post, which fires only when `scheduleUpload` is true and so stays silent on a clean Drive pull. Together they cover every origin: user, agent, other tab, Drive. The server turns it into MCP `notifications/resources/updated` for subscribed clients.
 
-Error codes: `no_app_tab`, `unknown_tool`, `bad_args`, `not_found` (node id), `wrong_type` (e.g. tick on a task without ticks), `needs_choice` (delete of an occurrence without `scope`), `user_busy` (section 7.2a), `rate_limited`, `refused` (pairing), `timeout` (no answer from the page in 60 s), `internal` (an unexpected exception, after rollback).
+Error codes: `no_app_tab`, `unknown_tool`, `bad_args`, `not_found` (node id), `not_in_view` (the id lives in the record not in view: the week behind the Vision, or the Vision behind a week), `wrong_type` (e.g. tick on a task without ticks), `needs_choice` (delete of an occurrence without `scope`), `user_busy` (section 7.2a), `rate_limited`, `refused` (pairing), `timeout` (no answer from the page in 60 s), `internal` (an unexpected exception, after rollback).
 
 ---
 
