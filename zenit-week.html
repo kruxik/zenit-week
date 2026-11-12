@@ -10,9 +10,9 @@
                'sha256-Eb714yfcTC94dtr1Jp6/cuqxaILMzVLouNmVKkT2KiE='
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
-               'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
+               'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-KpHlLF5TT15QNQZZZdpQ3k+gpoMUopDn/xmhXGxM21c=';
+               'sha256-WWy/DfRaQzrwcD+4684hszgnILk2vCUk6leRTlWhUFI=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1612,6 +1612,7 @@ function isProductionHost(hostname) {
 
   #lang-select,
   #theme-select,
+  #start-view-select,
   #bridge-guide-app {
     width: 100%;
     padding: 5px 8px;
@@ -1625,6 +1626,7 @@ function isProductionHost(hostname) {
   }
   #lang-select:focus,
   #theme-select:focus,
+  #start-view-select:focus,
   #bridge-guide-app:focus { border-color: var(--border-hover); }
 
   /* Theme toggle pill */
@@ -4585,15 +4587,24 @@ function isProductionHost(hostname) {
   } catch (e) {}
 </script>
 <script>
-  // Apply persisted view before first paint so refresh in agenda or stats
-  // doesn't flash the mindmap. CSS rules keyed on html[data-view] handle
-  // visibility.
+  // The view boot will open, set before first paint so the wrong view never
+  // flashes. CSS rules keyed on html[data-view] handle visibility. Mirrors
+  // boot: a reload returns to the view saved on leaving (readReloadRestore),
+  // any other start opens the Start view chosen in Settings (startViewPref).
   try {
-    var v = localStorage.getItem('zenit-week-view');
-    document.documentElement.dataset.view =
-      (v === 'agenda' || v === 'stats' || v === 'vision') ? v : 'mindmap';
+    var views = { vision: 1, mindmap: 1, agenda: 1, stats: 1 };
+    var v = localStorage.getItem('zenit-week-start-view');
+    if (!views[v]) v = 'vision';
+    var perf = window.performance;
+    var nav = perf && perf.getEntriesByType ? perf.getEntriesByType('navigation')[0] : null;
+    var isReload = nav ? nav.type === 'reload' : !!(perf && perf.navigation && perf.navigation.type === 1);
+    if (isReload) {
+      var r = JSON.parse(localStorage.getItem('zenit-week-pending-restore') || 'null');
+      if (r && views[r.currentView] && Date.now() - r.ts <= 5 * 60 * 1000) v = r.currentView;
+    }
+    document.documentElement.dataset.view = v;
   } catch (e) {
-    document.documentElement.dataset.view = 'mindmap';
+    document.documentElement.dataset.view = 'vision';
   }
 </script>
 <script>
@@ -5260,7 +5271,7 @@ Or remove them later in Settings → Help.</div>
             <div class="settings-name" data-i18n="settings.generalHero">Look and feel</div>
           </div>
         </div>
-        <div class="settings-sub" data-i18n="settings.generalSub">Zoom, language, theme and tips for this device.</div>
+        <div class="settings-sub" data-i18n="settings.generalSub">Zoom, language, theme, start view and tips for this device.</div>
       </div>
       <div class="settings-separator"></div>
       <div class="settings-section">
@@ -5289,6 +5300,16 @@ Or remove them later in Settings → Help.</div>
           <option value="system" data-i18n="settings.system">System</option>
           <option value="light" data-i18n="settings.light">Light</option>
           <option value="dark" data-i18n="settings.dark">Dark</option>
+        </select>
+      </div>
+      <div class="settings-separator"></div>
+      <div class="settings-section">
+        <div class="settings-label" id="start-view-select-label" data-i18n="settings.startView">Start view</div>
+        <select id="start-view-select" aria-labelledby="start-view-select-label">
+          <option value="vision" data-i18n="view.vision">Vision</option>
+          <option value="mindmap" data-i18n="view.mindmap">Mindmap</option>
+          <option value="agenda" data-i18n="view.agenda">Agenda</option>
+          <option value="stats" data-i18n="view.stats">Stats</option>
         </select>
       </div>
       <div class="settings-separator"></div>
@@ -6145,6 +6166,7 @@ function isAppQuiescent(state) {
   if (state.hasEditingNode)      return { quiescent: false, reason: 'editing' };
   if (state.isPanning)           return { quiescent: false, reason: 'panning' };
   if (state.atomicOpsDepth > 0)  return { quiescent: false, reason: 'atomic-op' };
+  if (state.viewLoading)         return { quiescent: false, reason: 'view-loading' };
   if (state.pendingUploadCount)  return { quiescent: false, reason: 'pending-upload' };
   if (state.openPanel)           return { quiescent: false, reason: `panel:${state.openPanel}` };
   if (state.offline)             return { quiescent: false, reason: 'offline' };
@@ -6171,6 +6193,7 @@ function _collectQuiescenceState() {
     hasEditingNode:   weekData && weekData.nodes ? weekData.nodes.some(n => n._editing) : false,
     isPanning:        isPanning,
     atomicOpsDepth:   _atomicOpsDepth,
+    viewLoading:      _bootIntoVision || _recordSwapsInFlight > 0,
     pendingUploadCount: _pendingUploadKeys.size,
     openPanel,
     offline:          isDefinitelyOffline(),
@@ -6236,7 +6259,7 @@ let _reloadFresh = false;
 function stashViewStateForReload() {
   const payload = buildRestorePayload({
     panX, panY, zoom,
-    currentView, currentWeekKey,
+    currentView: viewForRestore(), currentWeekKey,
     hoveredNodeId,
     commentNodeId: commentEntryId ? null : commentTargetId,
     helpOpen: isHelpOpen(),
@@ -6244,6 +6267,14 @@ function stashViewStateForReload() {
   });
   localStorage.setItem(RESTORE_KEY, JSON.stringify(payload));
   return payload;
+}
+
+// The view the person is on, or on the way to: boot shows the Mindmap until
+// the Vision has loaded, and a swap applies its view only once its record
+// arrives. A reload in either moment returns to the destination.
+function viewForRestore() {
+  if (_bootIntoVision) return 'vision';
+  return _viewSwapTarget || currentView;
 }
 
 function saveViewStateOnLeave() {
@@ -7165,6 +7196,13 @@ function reopenWeekIntoView(week) {
 // Requests to change records resolve in order and only the latest one lands:
 // pressing V and then M while the vision is still loading ends on the Mindmap.
 let _recordSwapSeq = 0;
+// The view a swap still loading is heading for; currentView changes only when
+// the record arrives. What a reload in that moment must come back to.
+let _viewSwapTarget = null;
+// The week rolled over while the Vision was in view (openWeekBehindVision):
+// the week bar names a week that has not been opened yet. The next swap to a
+// week view opens it through openWeekIntoView, materialisation included.
+let _weekBehindVisionUnopened = false;
 
 // Loads what a switch between the Vision and the week views needs, then hands
 // it to `apply` in one synchronous step. Returns false when a later switch
@@ -7186,7 +7224,26 @@ async function _swapMapRecordFor(view, apply) {
   if (toVision) openVisionIntoView(next);
   else reopenWeekIntoView(next);
   apply();
+  if (!toVision && _weekBehindVisionUnopened) {
+    _weekBehindVisionUnopened = false;
+    await openWeekIntoView(currentWeekKey);
+    renderIfVisible();
+    updateSummary();
+    if (currentView === 'agenda') renderAgenda();
+    if (currentView === 'stats') renderStatsPanel();
+  }
   return true;
+}
+
+// The day's rollover moved the week on while the Vision is in view. The person
+// stays on the Vision; the week bar follows the new week, which opens when a
+// week view next comes up.
+function openWeekBehindVision(wk) {
+  currentWeekKey = wk;
+  _weekBehindVisionUnopened = true;
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  updateWeekPicker();
+  if (googleAccessToken) startDrivePoll(wk);
 }
 
 // The one way a remote vision (another device via Drive, or a peer tab via the
@@ -8811,10 +8868,11 @@ function sanitizeColorsData(raw) {
   if (isKnownLang(raw.lang)) {
     out.lang = raw.lang;
   }
+  if (isKnownStartView(raw.startView)) out.startView = raw.startView;
   const onboarding = sanitizeOnboarding(raw.onboarding);
   if (onboarding) out.onboarding = onboarding;
   Object.keys(raw).forEach(b => {
-    if (b === 'savedAt' || b === 'theme' || b === 'lang' || b === 'onboarding') return;
+    if (b === 'savedAt' || b === 'theme' || b === 'lang' || b === 'startView' || b === 'onboarding') return;
     if (b === '__proto__' || b === 'constructor' || b === 'prototype') return;
     if (!BRANCH_ID_RE.test(b)) return;
     const main = raw[b] && raw[b].main;
@@ -8827,7 +8885,7 @@ async function loadBranchColors() {
   try {
     const saved = sanitizeColorsData(await loadValueIDB(COLORS_STORAGE_KEY));
     Object.keys(saved).forEach(b => {
-      if (b === 'savedAt' || b === 'theme' || b === 'lang' || b === 'onboarding') return;
+      if (b === 'savedAt' || b === 'theme' || b === 'lang' || b === 'startView' || b === 'onboarding') return;
       BRANCH_COLORS[b] = deriveBranchPalette(saved[b].main);
     });
   } catch(e) {
@@ -8842,6 +8900,7 @@ async function saveBranchColors() {
   });
   toSave.theme = currentThemePref();
   toSave.lang  = currentLang || 'en';
+  toSave.startView = startViewPref();
   toSave.onboarding = onboardingSettings();
   await saveValueIDB(COLORS_STORAGE_KEY, toSave);
   scheduleColorsSync();
@@ -8926,6 +8985,34 @@ const systemDarkQuery = window.matchMedia ? window.matchMedia('(prefers-color-sc
 
 function isKnownTheme(v) {
   return THEME_PREFS.includes(v);
+}
+
+// The view a fresh start opens on - a link, a new tab, the installed app.
+// A reload returns to where the person was instead (readReloadRestore). Synced
+// in the colors blob beside theme and language; the head script reads the same
+// key for the first paint.
+const START_VIEW_KEY = 'zenit-week-start-view';
+const START_VIEWS = ['vision', 'mindmap', 'agenda', 'stats'];
+const DEFAULT_START_VIEW = 'vision';
+
+function isKnownStartView(v) {
+  return START_VIEWS.includes(v);
+}
+
+function startViewPref() {
+  const saved = localStorage.getItem(START_VIEW_KEY);
+  return isKnownStartView(saved) ? saved : DEFAULT_START_VIEW;
+}
+
+function setStartViewPref(view) {
+  if (!isKnownStartView(view)) return;
+  localStorage.setItem(START_VIEW_KEY, view);
+  syncStartViewSelectUI();
+}
+
+function syncStartViewSelectUI() {
+  const select = document.getElementById('start-view-select');
+  if (select) select.value = startViewPref();
 }
 
 function currentThemePref() {
@@ -10452,7 +10539,7 @@ const SIGNOUT_PRESERVE_KEYS = new Set([
   'zenit-week-theme',
   THEME_MIGRATED_KEY,
   'zenit-week-lang',
-  'zenit-week-view',
+  START_VIEW_KEY,
   'zenit-week-autolayout',
   'zenit-week-storage-migrated',
   // Onboarding state: a wipe clears the data, not the fact that this browser
@@ -11950,6 +12037,7 @@ async function syncColorsFromDrive() {
         localStorage.setItem('zenit-week-lang', remoteData.lang);
         applyTranslations();
       }
+      if (isKnownStartView(remoteData.startView)) setStartViewPref(remoteData.startView);
       updateColorDots();
       updateSvgFilters();
       renderIfVisible();
@@ -12363,6 +12451,9 @@ async function pollDriveChanges(_wKey) {
 
 // Called when poll detects a resetToken mismatch - wipe local weeks and resync everything from Drive.
 async function _handleResetTokenMismatch(remoteResetToken) {
+  // The week is reopened below, which leaves the Vision; the person is brought
+  // back to it, reloaded from the fresh data.
+  const returnToVision = isVisionInView();
   stopDrivePoll();
   // Adopt the remote reset token so we don't loop
   localStorage.setItem('zenit-week-reset-token', remoteResetToken);
@@ -12414,6 +12505,7 @@ async function _handleResetTokenMismatch(remoteResetToken) {
   // discarded the same way, and the copy in memory is just as stale.
   await loadSchedule();
   await loadAndRender(currentWeekKey);
+  if (returnToVision) await switchView('vision');
   startDrivePoll(currentWeekKey);
 }
 
@@ -12749,6 +12841,7 @@ const TRANSLATIONS = {
     'weekpicker.nextMonth':       'Next month',
     'weekpicker.thisWeek':        'This week',
     'settings.appearance':        'Theme',
+    'settings.startView':         'Start view',
     'settings.light':             'Light',
     'settings.dark':              'Dark',
     'settings.system':            'System',
@@ -12763,7 +12856,7 @@ const TRANSLATIONS = {
     'account.signedOutSub':       'Your weeks are only in this browser.',
     'settings.dataHero':          'Your weeks',
     'settings.generalHero':       'Look and feel',
-    'settings.generalSub':        'Zoom, language, theme and tips for this device.',
+    'settings.generalSub':        'Zoom, language, theme, start view and tips for this device.',
     'settings.dataWhereDrive':    'Your weeks are stored in this browser and in your Google Drive.',
     'settings.dataWhereLocal':    'Your weeks are stored only in this browser - keep a backup.',
     'settings.dataWeeks':         'Weeks',
@@ -13287,6 +13380,7 @@ const TRANSLATIONS = {
     'weekpicker.nextMonth':       'Další měsíc',
     'weekpicker.thisWeek':        'Tento týden',
     'settings.appearance':        'Téma',
+    'settings.startView':         'Úvodní pohled',
     'settings.light':             'Světlý',
     'settings.dark':              'Tmavý',
     'settings.system':            'Podle systému',
@@ -13301,7 +13395,7 @@ const TRANSLATIONS = {
     'account.signedOutSub':       'Tvoje týdny jsou jen v tomto prohlížeči.',
     'settings.dataHero':          'Tvoje týdny',
     'settings.generalHero':       'Vzhled a chování',
-    'settings.generalSub':        'Přiblížení, jazyk, téma a tipy pro toto zařízení.',
+    'settings.generalSub':        'Přiblížení, jazyk, téma, úvodní pohled a tipy pro toto zařízení.',
     'settings.dataWhereDrive':    'Tvoje týdny jsou uložené v tomto prohlížeči a na tvém Google Disku.',
     'settings.dataWhereLocal':    'Tvoje týdny jsou uložené jen v tomto prohlížeči - měj zálohu.',
     'settings.dataWeeks':         'Týdny',
@@ -14639,8 +14733,9 @@ async function importAllData(file) {
     endParse(Object.keys(parsed.data).length + ' keys');
 
     // The import rewrites weeks and reopens one; it never has to know about the
-    // Vision, because it leaves it first.
-    if (isVisionInView()) await switchView('mindmap');
+    // Vision, because it leaves it first - and comes back to it at the end.
+    const returnToVision = isVisionInView();
+    if (returnToVision) await switchView('mindmap');
 
     // Wipe existing IDB data
     const endWipe = traceSpan('import:wipe');
@@ -14733,6 +14828,7 @@ async function importAllData(file) {
       await loadAndRender(todayWeekKey());
       endPaint();
       fitMindmapView();
+      if (returnToVision) await switchView('vision');
       endReinit();
       traceMilestone('imported week painted');
       flowFinish('import foreground done');
@@ -24445,16 +24541,18 @@ const container = document.getElementById('canvas-container');
 const mapRoot   = document.getElementById('map-root');
 
 // ─── View state ───────────────────────────────────────────────────────────────
-// All three peer views are persisted and restored on load; anything else in
-// storage coerces to the default (mindmap).
-// The Vision is persisted too, but boot always opens a week first (R1: the
-// record in memory is the week until switchView swaps it), so a stored
-// 'vision' starts as the Mindmap and _bootIntoVision carries it to the swap.
+// A fresh start opens the Start view from Settings (startViewPref); a reload
+// overrides it at boot with the view it left (readReloadRestore). Switching
+// views stores nothing. Boot always opens a week first (R1: the record in
+// memory is the week until switchView swaps it), so a 'vision' start begins as
+// the Mindmap and _bootIntoVision carries it to the swap.
 let _bootIntoVision = false;
 let currentView = (() => {
-  const v = localStorage.getItem('zenit-week-view');
+  // The last-view key this preference replaced.
+  try { localStorage.removeItem('zenit-week-view'); } catch (_) { /* storage unavailable */ }
+  const v = startViewPref();
   if (v === 'vision') { _bootIntoVision = true; return 'mindmap'; }
-  return (v === 'agenda' || v === 'stats') ? v : 'mindmap';
+  return v;
 })();
 
 // The two views that draw a map. Map gestures (focus ring, arrows, fit, view
@@ -24492,7 +24590,8 @@ function checkDateRollover() {
   agendaActiveTab = null;   // re-default the agenda to the new today
 
   if (followWeek) {
-    loadAndRender(week);
+    if (isVisionInView()) openWeekBehindVision(week);
+    else loadAndRender(week);
     return true;
   }
   if (currentView === 'agenda') renderAgenda();
@@ -26152,15 +26251,17 @@ function syncViewTabs(view) {
 function switchView(view, opts) {
   const swapped = !!(opts && opts.swapped);
   if (!swapped && (view === 'vision') !== isVisionInView()) {
+    _viewSwapTarget = view;
     const swap = swapMapRecordFor(view, () => switchView(view, { swapped: true }));
     // A failed load never applies the view, so it must not leave a tab pressed.
     // (An overtaken one needs nothing: the switch that overtook it syncs the tabs.)
-    swap.catch(clearViewTabPress);
+    swap.catch(() => { _viewSwapTarget = null; clearViewTabPress(); });
     return swap;
   }
   // A switch that needs no swap still overtakes one that is loading: V and then
   // M before the vision arrived ends on the Mindmap, with the week.
   if (!swapped) _recordSwapSeq++;
+  _viewSwapTarget = null;
   currentView = view;
   // Any view switch brings the bars back - the rail is how the user gets around.
   setChromeHidden(false);
@@ -26177,7 +26278,6 @@ function switchView(view, opts) {
     closeViewLevels();
     clearKbFocus();
   }
-  localStorage.setItem('zenit-week-view', view);
   document.documentElement.dataset.view = view;
   const canvasEl   = document.getElementById('canvas-container');
   const agendaEl   = document.getElementById('agenda-view');
@@ -29090,6 +29190,13 @@ if (systemDarkQuery) {
 
 // Sync the select to whatever theme was applied by the pre-paint script
 syncThemeSelectUI();
+
+// About the next fresh start, not the screen: no undo step, just the Drive push.
+document.getElementById('start-view-select').addEventListener('change', (e) => {
+  setStartViewPref(e.target.value);
+  saveBranchColors();
+});
+syncStartViewSelectUI();
 
 function syncAutoLayoutToggleUI() {
   const toggle = document.getElementById('autolayout-toggle');

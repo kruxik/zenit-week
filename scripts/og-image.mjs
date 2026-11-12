@@ -87,7 +87,7 @@ async function seedPage(page, { lang, week, colors }) {
   await page.evaluate(async ({ lang, week, colors }) => {
     localStorage.setItem('zenit-week-theme', 'dark');
     localStorage.setItem('zenit-week-lang',  lang);
-    localStorage.setItem('zenit-week-view',  'mindmap');
+    localStorage.setItem('zenit-week-start-view', 'mindmap');
 
     const db = await new Promise((res, rej) => {
       const req = indexedDB.open('zenit-week-db', 1);

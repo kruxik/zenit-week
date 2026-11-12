@@ -17,14 +17,12 @@ describe('switchView', () => {
     expect(_state.getCurrentView()).toBe('mindmap');
   });
 
-  test('agenda persists view to localStorage', () => {
+  test('switching views leaves the Start view setting alone', () => {
+    _state.sandbox.localStorage.setItem('zenit-week-start-view', 'stats');
     switchView('agenda');
-    expect(_state.getLocalStorage('zenit-week-view')).toBe('agenda');
-  });
-
-  test('mindmap persists view to localStorage', () => {
     switchView('mindmap');
-    expect(_state.getLocalStorage('zenit-week-view')).toBe('mindmap');
+    expect(_state.getLocalStorage('zenit-week-start-view')).toBe('stats');
+    expect(_state.getLocalStorage('zenit-week-view')).toBeUndefined();
   });
 
   test('agenda sets documentElement dataset.view', () => {

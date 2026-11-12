@@ -155,7 +155,7 @@ While `currentView === 'vision'`:
 | 4 | Stats `S`, Agenda `A`, Later `L` | Switch view normally; `switchView` swaps the week back first (R1). |
 | 5 | Center node | Label `t('vision.center')`, no completion ring (`updateCenterRing` is skipped), the avatar as today. Its context menu offers nothing in v1 beyond what the center offers on a week minus the week items (section 5). |
 | 6 | Onboarding coachmarks, playground week | Not shown on the Vision yet. The empty-state hint was removed after review (2026-11-08); a Vision playground is to be specified. |
-| 7 | Reload restore | `zenit-week-view` may hold `'vision'`. `readReloadRestore` restores it: boot opens the week as today, then `switchView('vision')`. |
+| 7 | Start and reload | A fresh start opens the Start view from Settings (`zenit-week-start-view`, synced in the colors blob, default `'vision'`); a reload returns to the view it left (`readReloadRestore`, which saves `viewForRestore()` - the Vision while boot or a swap is still loading it). Either way boot opens the week as today, then `switchView('vision')`. Import and a Drive reset reopen the week and come back to the Vision; a week rollover on the Vision moves the week bar only (`openWeekBehindVision`), and the week opens on the next swap to a week view. |
 
 ---
 

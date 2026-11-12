@@ -50,7 +50,7 @@ async function seedPage(page, { lang, theme, view, week, colors }) {
   await page.evaluate(async ({ lang, theme, view, week, colors }) => {
     localStorage.setItem('zenit-week-theme', theme);
     localStorage.setItem('zenit-week-lang', lang);
-    localStorage.setItem('zenit-week-view', view);
+    localStorage.setItem('zenit-week-start-view', view);
 
     // Open IDB exactly like the app does (DB_NAME='zenit-week-db' v1).
     const db = await new Promise((res, rej) => {

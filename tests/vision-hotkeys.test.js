@@ -145,8 +145,10 @@ describe('Esc', () => {
 });
 
 describe('view persistence', () => {
-  it('the Vision is persisted as the view', async () => {
-    await switchView('vision');
-    expect(_state.getLocalStorage('zenit-week-view')).toBe('vision');
+  it('a reload in the middle of the swap to the Vision comes back to the Vision', async () => {
+    const swap = switchView('vision');
+    expect(_state.sandbox.viewForRestore()).toBe('vision');
+    await swap;
+    expect(_state.sandbox.viewForRestore()).toBe('vision');
   });
 });
