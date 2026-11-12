@@ -4428,18 +4428,26 @@ function isProductionHost(hostname) {
 
     .undo-redo-separator { width: 22px; height: 1px; }
 
-    /* Panels start right of the rail (12px edge + 44px rail + 12px gap) and
-       centre in what is left, so the rail stays reachable over them. */
+    /* Panels start right of the rail (12px edge + 44px rail + 12px gap), so the
+       rail stays reachable over them, and run flush to the right and bottom
+       screen edges, where nothing sits beside them. Only the edge facing the
+       rail keeps the window look: its border and rounded bottom corner. */
     .app-panel,
     .app-panel.visible,
     .app-panel.active {
       left: 68px;
-      right: 12px;
+      right: 0;
+      bottom: 0;
       width: auto;
-      max-width: var(--panel-width);
-      margin: 0 auto;
+      max-width: none;
+      margin: 0;
       transform: none;
+      border: none;
+      border-left: 1px solid var(--border-default);
+      border-radius: 0 0 0 8px;
     }
+    /* No top border any more, so the header needs no 1px correction. */
+    .app-panel:not(.caption-top) { --panel-header-top: var(--toolbar-h); }
 
     /* Tap to hide: a tap on empty map hides every bar, the next one brings
        them back (toggleChromeHidden). [data-view] lifts the selector over the
