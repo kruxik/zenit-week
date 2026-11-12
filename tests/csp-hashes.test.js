@@ -47,14 +47,14 @@ describe('Landing page CSP headers (vercel.json)', () => {
     .map(h => h.value);
 
   it('serves a script-src CSP for the landing routes', () => {
-    // One for /, /privacy, /terms - one for /cs.
+    // One for /, /privacy, /terms - one for /cs, /cs/privacy, /cs/terms.
     expect(cspHeaders.length).toBe(2);
   });
 
   it('carries a hash for every executable inline script on the landing pages', () => {
     // Fails whenever an inline <script> on a landing page is edited without
     // updating the hashes in vercel.json headers.
-    for (const page of ['index.html', 'cs/index.html', 'privacy.html', 'terms.html']) {
+    for (const page of ['index.html', 'cs/index.html', 'privacy.html', 'terms.html', 'cs/privacy.html', 'cs/terms.html']) {
       const pageHtml = readFileSync(resolve(root, page), 'utf8');
       for (const body of extractInlineScripts(pageHtml)) {
         const hash = hashScript(body);
@@ -70,7 +70,7 @@ describe('Landing page CSP headers (vercel.json)', () => {
     const strictSources = vercelJson.headers
       .filter(h => h.headers.some(x => x.key === 'Content-Security-Policy' && x.value.includes('script-src')))
       .map(h => new RegExp(`^${h.source}$`));
-    for (const path of ['/', '/index.html', '/privacy', '/privacy.html', '/terms', '/terms.html', '/cs', '/cs/', '/cs/index.html']) {
+    for (const path of ['/', '/index.html', '/privacy', '/privacy.html', '/terms', '/terms.html', '/cs', '/cs/', '/cs/index.html', '/cs/privacy', '/cs/privacy.html', '/cs/terms', '/cs/terms.html']) {
       expect(strictSources.some(re => re.test(path)), `${path} has no strict CSP`).toBe(true);
     }
   });

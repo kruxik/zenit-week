@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="index,follow">
+  <title>Zásady ochrany osobních údajů - Zenit Week</title>
+  <link rel="canonical" href="https://zenitweek.com/cs/privacy">
+  <link rel="alternate" hreflang="en" href="https://zenitweek.com/privacy">
+  <link rel="alternate" hreflang="cs" href="https://zenitweek.com/cs/privacy">
+  <link rel="alternate" hreflang="x-default" href="https://zenitweek.com/privacy">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1a2e'/%3E%3Cpath d='M18,32 C32,32 32,14 42,14' fill='none' stroke='%23A259FF' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M18,32 C32,32 32,50 42,50' fill='none' stroke='%231ABCFE' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='32' r='7' fill='%23f0f0f0'/%3E%3Ccircle cx='48' cy='14' r='5' fill='%23A259FF'/%3E%3Ccircle cx='48' cy='50' r='5' fill='%231ABCFE'/%3E%3C/svg%3E">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f9f9f9;
+      color: #1a1a2e;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    nav {
+      background: #fff;
+      border-bottom: 1px solid #e8e8ee;
+      padding: 0 2rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+    }
+    nav a { text-decoration: none; color: #1a1a2e; font-weight: 600; font-size: 1rem; }
+    nav .lang { margin-left: auto; font-weight: 500; font-size: 0.875rem; color: #6b6b80; }
+    main {
+      max-width: 720px;
+      margin: 3rem auto;
+      padding: 0 1.5rem 4rem;
+    }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .meta { color: #6b6b80; font-size: 0.875rem; margin-bottom: 2.5rem; }
+    h2 { font-size: 1.1rem; font-weight: 700; margin: 2rem 0 0.5rem; }
+    p  { margin-bottom: 0.75rem; }
+    ul { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+    li { margin-bottom: 0.4rem; }
+    a  { color: #7000FF; }
+    code { background: #f0eeff; padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
+    .tldr {
+      background: #fff;
+      border: 1px solid #e8e8ee;
+      border-left: 3px solid #1ABCFE;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0 2rem;
+      font-size: 0.95rem;
+    }
+    .tldr strong { display: block; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6b6b80; margin-bottom: 0.4rem; }
+  </style>
+</head>
+<body>
+  <nav><a href="/cs/">← Zenit Week</a><a class="lang" href="/privacy" hreflang="en" lang="en">English</a></nav>
+  <main>
+    <h1>Zásady ochrany osobních údajů</h1>
+    <p class="meta">Poslední aktualizace: 12. listopadu 2026 · K dispozici také v <a href="/privacy" hreflang="en">angličtině</a>; obě jazykové verze jsou rovnocenné.</p>
+
+    <div class="tldr">
+      <strong>Ve zkratce</strong>
+      Zenit Week neprovozuje žádné servery, které by uchovávaly tvoje data, a sám žádná uživatelská data neukládá. Tvoje plány žijí v tvém prohlížeči, nebo - pokud o to požádáš - ve skryté složce aplikace na tvém vlastním Disku Google. Nikdy je nevidíme. Naší infrastrukturou krátce projde jen tvoje IP adresa při načítání stránky, kterou zpracovává náš poskytovatel hostingu Vercel, a souhrnné počty návštěv bez cookies (bez osobních identifikátorů, nikdy s obsahem tvých úkolů) z Vercel Web Analytics a Umami. Podle nich odhadujeme provoz, vidíme, ze kterých zemí se aplikace používá a zda se lidé vracejí naplánovat další týden. Pokud se přihlásíš přes Google, jedna nezbytně nutná cookie udrží tvé přihlášení; reklamní ani sledovací cookies nenastavujeme a žádnou cookie lištu nezobrazujeme.
+    </div>
+
+    <h2>1. Správce</h2>
+    <p>
+      Zenit Week je <a href="https://github.com/kruxik/zenit-week" target="_blank" rel="noopener">open-source</a> projekt, který provozuje <strong>Petr Burian</strong>, osoba samostatně výdělečně činná se sídlem v České republice (EU).
+    </p>
+    <p>
+      Kontakt ve všech věcech ochrany osobních údajů: <a href="mailto:petr@petrburian.com">petr@petrburian.com</a>. Poštovní adresu na požádání sdělíme na stejném e-mailu.
+    </p>
+    <p>
+      Pověřenec pro ochranu osobních údajů (DPO) jmenován není; rozsah a povaha zpracování to podle článku 37 GDPR nevyžadují.
+    </p>
+
+    <h2>2. Jaká data zpracováváme a kde jsou uložena</h2>
+    <p>Zenit Week nemá <strong>žádné servery, na které by se kdy dostala tvoje plánovací data</strong>. Na straně serveru máme jen dvě malé funkce: funkci pro výměnu tokenu OAuth popsanou v §2.4 a §4, která pracuje pouze s přihlašovacími údaji, a přeposílač na adrese <code>/api/umami-send</code>, který předává počty návštěv Umami bez cookies spolu s tvou IP adresou službě Umami (viz §3) a nic neukládá. Tvoje plánovací data nám nikdy nejsou předána ani je neukládáme. Veškerá dotčená data se zpracovávají na místech uvedených níže.</p>
+
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.1 Ve tvém prohlížeči (vždy)</h3>
+    <p>Aplikace používá místní úložiště tvého prohlížeče (<code>localStorage</code> a <code>IndexedDB</code>) pro:</p>
+    <ul>
+      <li><strong>Plánovací data</strong> - tvé týdenní myšlenkové mapy, větve, aktivity, počítadla, denní záznamy a tvou Vizi (dlouhodobou myšlenkovou mapu životních oblastí a záměrů).</li>
+      <li><strong>Předvolby</strong> - motiv (světlý/tmavý), jazyk (en/cs), barvy větví, nastavení rozvržení.</li>
+      <li><strong>Stav synchronizace</strong> - interní příznaky, například token resetu pro každé zařízení, který brání přepsání novějších dat na tvých dalších zařízeních.</li>
+    </ul>
+    <p>Tato data neopustí tvé zařízení, dokud výslovně nezapneš synchronizaci s Diskem Google. Pokud se přihlásíš přes Google, uloží se do tvého zařízení také dlouhodobý obnovovací token Google OAuth, a to v cookie, nikoli v místním úložišti - viz §3.</p>
+
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.2 Na tvém vlastním Disku Google (jen pokud se přihlásíš)</h3>
+    <p>Pokud se rozhodneš přihlásit přes Google, aplikace uloží kopii tvých plánovacích dat na <em>tvůj vlastní</em> Disk Google, do soukromé složky určené jen pro tuto aplikaci, s oprávněním <code>drive.appdata</code>. Tato složka je neviditelná pro ostatní aplikace i pro nás. Data na tvém Disku nikdy nečteme, nekopírujeme ani nezpracováváme na žádném serveru.</p>
+
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.3 AI agenti (jen pokud je zapneš)</h3>
+    <p>Na počítači můžeš aplikaci propojit s AI agentem spuštěným na stejném počítači (například Claude Desktop nebo Claude Code): v Nastavení zapneš „AI agenti“ a agenta jednou schválíš. Ve výchozím stavu je propojení vypnuté a připojuje se jen na <code>127.0.0.1</code> na tvém vlastním počítači, nikdy na jiné zařízení ani k nám. Když je zapnuté, propojený AI agent čte tvůj týden a tvou Vizi a ty se dostanou k poskytovateli tohoto agenta podle jeho podmínek. Zenit Week sám ani pro tuto funkci neprovozuje žádné servery a nic neukládá: párovací klíč je uložen jen ve tvém prohlížeči a ve složce nastavení agenta na tvém počítači. Párování zruší „Zrušit spárování“ v Nastavení, odhlášení nebo reset aplikace.</p>
+
+    <h3 style="font-size:1rem;font-weight:600;margin:1rem 0 0.4rem;">2.4 Přechodná síťová data (při načítání stránek)</h3>
+    <p>Když otevřeš web, náš poskytovatel hostingu Vercel zpracovává tvou IP adresu a běžná metadata požadavku HTTP (user agent, referrer, časové značky) po dobu nezbytně nutnou k doručení stránky a k provozu našich dvou serverless funkcí: koncového bodu pro výměnu tokenu OAuth na <code>/api/token</code> a přeposílače Umami na <code>/api/umami-send</code>. Vercel nám tato data nepředává v podobě, podle které by tě šlo identifikovat. Podrobnosti viz §4 (Poskytovatelé služeb).</p>
+
+    <h2>3. Cookies a analytika</h2>
+    <p>Zenit Week nepoužívá <strong>žádné reklamní, analytické ani behaviorálně sledovací cookies</strong>. Neprofilujeme uživatele, nesledujeme tě napříč jinými weby a pro analytiku nepoužíváme žádný trvalý identifikátor uložený ve tvém zařízení.</p>
+    <p>Aplikace nastavuje <strong>jedinou nezbytně nutnou cookie</strong>, a to jen pokud se rozhodneš přihlásit se kvůli synchronizaci s Diskem Google:</p>
+    <ul>
+      <li><code>zw_rt</code> - uchovává tvůj <strong>obnovovací token</strong> Google OAuth, dlouhodobý přihlašovací údaj vydaný Googlem, díky kterému si aplikace může obnovit přístup k <em>tvému vlastnímu</em> Disku (do složky aplikace popsané v §4), aniž by se tě znovu ptala. Nastavuje ji náš koncový bod <code>/api/token</code> jako cookie <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code> omezenou na cestu <code>/api/token</code>, takže ji nemůže číst JavaScript a posílá se jen tomuto koncovému bodu. Platí nejvýše 180 dní a při odhlášení se smaže. Slouží výhradně k udržení přihlášení - nikdy ke sledování. Kdykoli ji můžeš odvolat (viz §10).</li>
+    </ul>
+    <p>Abychom rozuměli základnímu souhrnnému používání webu (počet návštěv, počet zobrazení stránek a země, ze které požadavek přichází), používáme <strong>Vercel Web Analytics</strong>, analytický produkt bez cookies šetrný k soukromí od našeho poskytovatele hostingu Vercel. Běží na:</p>
+    <ul>
+      <li>anglické domovské stránce na <code>/</code>;</li>
+      <li>české domovské stránce na <code>/cs</code>;</li>
+      <li>stránce aplikace na <code>/app</code>.</li>
+    </ul>
+    <p>Vercel Web Analytics funguje bez cookies a nic nezapisuje do <code>localStorage</code>, <code>IndexedDB</code> ani do žádného jiného úložiště v prohlížeči. Aby přibližně určil „unikátního návštěvníka“ pro aktuální den, odvozuje Vercel z IP adresy a user agenta návštěvníka krátký solený hash; sůl se denně mění, takže hash nelze použít k rozpoznání stejného návštěvníka v různých dnech ani k propojení návštěv s jiným webem. Země se určí z IP adresy v okamžiku požadavku; samotná IP adresa se po tomto zjištění zahodí a neukládá se spolu s návštěvou. Parametry URL, obsah formulářů ani obsah stránek se nesbírají.</p>
+    <p>Vedle toho používáme <strong>Umami Cloud</strong>, open-source analytickou službu bez cookies, kterou provozuje Umami Software, Inc., na stejných třech stránkách. Počítá:</p>
+    <ul>
+      <li><strong>zobrazení stránek</strong>, s odkazujícím webem a případnými parametry kampaně (<code>utm_*</code>) v odkazu, který tě přivedl na domovskou stránku;</li>
+      <li>tři okamžiky v aplikaci, každý odeslaný jen jako název události: <code>app_opened</code> (stránka aplikace byla otevřena), <code>first_node_created</code> (do týdne, který ještě neobsahoval žádný tvůj úkol, byl přidán první úkol; ukázkové úkoly cvičného týdne se nepočítají) a <code>returned_new_week</code> (aplikace byla použita v novém týdnu na zařízení, které už obsahuje některý dřívější).</li>
+    </ul>
+    <p>Jediným údajem odesílaným s těmito událostmi je jazyk rozhraní aplikace (<code>en</code> nebo <code>cs</code>). Nikdy název úkolu, komentář, název větve ani žádný jiný obsah, který napíšeš. Na stránce aplikace se URL hlásí bez řetězce dotazu a fragmentu, takže se k Umami nedostane ani přihlašovací kód, ani týden, na který se díváš.</p>
+    <p>Umami funguje bez cookies a nic nezapisuje do <code>localStorage</code>, <code>IndexedDB</code> ani do žádného jiného úložiště v prohlížeči a aplikace pro něj nepřidává žádné vlastní úložiště: každá událost se určí z toho, co aplikace v danou chvíli dělá, nikoli z uložené značky. Skript i počty putují přes naši vlastní doménu (<code>zenitweek.com/u/</code>), která je předává Umami spolu s tvou IP adresou a user agentem. Umami z nich odvozuje solený hash relace s pravidelně měněnou solí, takže návštěvy nelze dlouhodobě ani napříč weby propojit, a určuje přibližnou polohu (země, region, město). Databáze sledování Umami nemá pro samotnou IP adresu žádné pole. Zaznamenává také prohlížeč, operační systém, typ zařízení, velikost obrazovky a jazyk prohlížeče. My vidíme vždy jen souhrnné výsledky.</p>
+    <p>Ani jedno z toho nevyžaduje lištu se souhlasem. Ověřovací cookie <code>zw_rt</code> je <strong>nezbytně nutná</strong> k poskytnutí funkce, o kterou výslovně žádáš - trvalé přihlášení k synchronizaci s Diskem Google - a je proto vyjmuta z požadavku souhlasu podle čl. 5 odst. 3 směrnice ePrivacy („zákon o cookies“); nastaví se až poté, co sám zahájíš přihlášení, a nikdy se nepoužívá ke sledování. Zpracování ve Vercel Web Analytics a Umami nic neukládá do tvého zařízení a nedrží v něm žádný analytický identifikátor, takže rovněž nespadá pod čl. 5 odst. 3. Zenit Week proto nezobrazuje cookie lištu. Přechodné zpracování tvé IP adresy společnostmi Vercel a Umami je nezbytné k doručení webu a k vytvoření souhrnných počtů a opírá se o právní základ oprávněného zájmu podle čl. 6 odst. 1 písm. f) GDPR (zájem: rozumět souhrnnému používání bezplatného open-source nástroje, abychom ho mohli udržovat a zlepšovat). Proti tomuto zpracování můžeš kdykoli vznést námitku - viz §10.</p>
+    <p>Kromě dvou výše uvedených analytických skriptů (oba se načítají z naší vlastní domény) nenačítá žádná stránka webu - domovská stránka v EN a CS, zásady ochrany osobních údajů, podmínky ani samotná aplikace (<code>/app</code>) - žádný jiný skript třetí strany. Přihlášení přes Google je přesměrování na vlastní přihlašovací stránku Googlu, nikoli skript na našich stránkách.</p>
+
+    <h2>4. Poskytovatelé služeb (zpracovatelé)</h2>
+    <p>K poskytování služby využíváme výhradně tyto poskytovatele:</p>
+    <ul>
+      <li>
+        <strong>Vercel Inc.</strong> - statický hosting webu, serverless funkce pro výměnu tokenu OAuth (<code>/api/token</code>, která také nastavuje nezbytně nutnou ověřovací cookie popsanou v §3), přeposílací funkce Umami (<code>/api/umami-send</code>, viz §3) a souhrnná analytika bez cookies prostřednictvím Vercel Web Analytics (viz §3). Zpracovává IP adresy a metadata požadavků HTTP při přenosu. Viz <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">zásady ochrany soukromí Vercelu</a> a jeho <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">smlouvu o zpracování osobních údajů</a>.
+      </li>
+      <li>
+        <strong>Umami Software, Inc.</strong> (28 Geary St, Suite 650 #243, San Francisco, Kalifornie, USA) - souhrnná analytika bez cookies prostřednictvím Umami Cloud (viz §3). Přijímá IP adresy, user agenty a údaje o stránkách a událostech popsané v §3, předávané přes naši doménu. Umami Cloud běží na serverech v USA a v EU. Viz <a href="https://umami.is/privacy" target="_blank" rel="noopener">zásady ochrany soukromí Umami</a>, jeho <a href="https://umami.is/dpa" target="_blank" rel="noopener">smlouvu o zpracování osobních údajů</a> a <a href="https://umami.is/subprocessors" target="_blank" rel="noopener">další zpracovatele</a>.
+      </li>
+      <li>
+        <strong>Google LLC</strong> - Google Identity Services a Google Drive API, používané jen když se přihlásíš. Data se ukládají na <em>tvůj vlastní</em> účet Disku Google a řídí se podmínkami tvého účtu Google. Viz <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">zásady ochrany soukromí Googlu</a>.
+      </li>
+    </ul>
+
+    <h2>5. Oprávnění Google API</h2>
+    <p>Když se přihlásíš přes Google, aplikace žádá jen o jedno oprávnění:</p>
+    <ul>
+      <li><code>https://www.googleapis.com/auth/drive.appdata</code> - čtení a zápis souborů ve skryté složce dat aplikace na <em>tvém</em> Disku Google. Žádný přístup k ostatním souborům na tvém Disku, k Gmailu, Kalendáři, profilové fotce ani k žádné jiné službě Google.</li>
+    </ul>
+    <p>
+      Způsob, jakým Zenit Week používá a předává informace získané z Google API, odpovídá
+      <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">zásadám pro uživatelská data služeb Google API</a>
+      (Google API Services User Data Policy), včetně požadavků na omezené použití (Limited Use). Uživatelská data Google nepoužíváme k reklamě, nepředáváme je třetím stranám s výjimkou toho, co je nezbytné k poskytování služby, nedovolujeme lidem je číst a nepoužíváme je k vývoji, zlepšování ani trénování obecných modelů AI/ML.
+    </p>
+
+    <h2>6. Předávání dat do zahraničí</h2>
+    <p>Vercel, Umami a Google působí celosvětově a mohou data zpracovávat ve Spojených státech nebo v jiných zemích mimo EU/EHP. Tito poskytovatelé se jako mechanismem předávání řídí standardními smluvními doložkami EU (SCC) a případně rámcem EU-USA pro ochranu osobních údajů (Data Privacy Framework). Sami žádné další předávání do zahraničí nezahajujeme.</p>
+
+    <h2>7. Právní základ (článek 6 GDPR)</h2>
+    <ul>
+      <li><strong>Čl. 6 odst. 1 písm. a) - Souhlas.</strong> Přihlášení přes Google a synchronizace s Diskem jsou čistě dobrovolné. Souhlas můžeš kdykoli odvolat odhlášením v aplikaci nebo odebráním přístupu v <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">nastavení účtu Google</a>; odvolání nemá vliv na zákonnost zpracování před ním.</li>
+      <li><strong>Čl. 6 odst. 1 písm. f) - Oprávněný zájem.</strong> Ukládání tvých plánů v prohlížeči je nezbytné pro základní funkci aplikace ve tvém zařízení. Přechodné zpracování IP adresy a metadat požadavků Vercelem je nezbytné k doručení webu a k prevenci zneužití; Vercel a Umami je zpracovávají k vytvoření souhrnných statistik používání bez cookies popsaných v §3, abychom rozuměli tomu, jak se tento bezplatný open-source nástroj používá, a mohli ho udržovat.</li>
+    </ul>
+
+    <h2>8. Doba uložení a výmaz</h2>
+    <ul>
+      <li><strong>Data v prohlížeči</strong> - uchovávají se, dokud nevymažeš data webu v prohlížeči, nepoužiješ odhlášení v aplikaci (které odstraní obnovovací token OAuth) nebo prohlížeč neodinstaluješ či neresetuješ.</li>
+      <li><strong>Data na Disku</strong> - uchovávají se na <em>tvém</em> Disku Google, dokud je přímo nesmažeš nebo aplikaci neodebereš přístup. Žádné kopie nedržíme.</li>
+      <li><strong>Protokoly požadavků Vercelu</strong> - podle standardní doby uchování Vercelu (u provozních protokolů obvykle nejvýše 30 dní).</li>
+      <li><strong>Vercel Web Analytics</strong> - uchovávají se jen souhrnné počty (návštěvy, zobrazení stránek, země) podle zásad uchovávání analytiky Vercelu. Samotná IP adresa použitá k odvození denního soleného hashe a země se se souhrnným záznamem neukládá.</li>
+      <li><strong>Umami Cloud</strong> - zobrazení stránek, tři události aplikace a atributy relace popsané v §3 (bez IP adresy, bez obsahu úkolů) se uchovávají po dobu uchovávání dat podle našeho tarifu Umami Cloud a poté se smažou. Prohlížíme si je jen jako souhrnné přehledy.</li>
+    </ul>
+
+    <h2>9. Sdílení dat</h2>
+    <p>Tvoje data neprodáváme, nepronajímáme, nesdílíme ani nezpřístupňujeme žádné třetí straně za žádným účelem. Jedinými zapojenými externími službami jsou zpracovatelé uvedení v §4 a jediná data, která se k nim dostanou, popisuje §2. Pokud zapneš AI agenty (§2.3), to, co propojený AI agent přečte, se na tvůj pokyn dostane k poskytovateli tohoto agenta, nikoli k nám.</p>
+
+    <h2>10. Tvoje práva podle GDPR</h2>
+    <p>Pokud žiješ v EU/EHP, máš právo:</p>
+    <ul>
+      <li>na přístup k osobním údajům, které o tobě zpracováváme (čl. 15);</li>
+      <li>na opravu nepřesných údajů (čl. 16);</li>
+      <li>na výmaz údajů (čl. 17);</li>
+      <li>na omezení zpracování nebo vznesení námitky (čl. 18, 21);</li>
+      <li>na přenositelnost údajů ve strojově čitelném formátu (čl. 20) - přímo to umí funkce aplikace <em>Nastavení → Export</em>;</li>
+      <li>odvolat jakýkoli dříve udělený souhlas (čl. 7).</li>
+    </ul>
+    <p>Protože sami žádná data nedržíme, většinu práv uplatníš přímo:</p>
+    <ul>
+      <li><strong>Data v prohlížeči</strong> - vymaž data webu v prohlížeči nebo použij v aplikaci Nastavení → Reset.</li>
+      <li><strong>Data na Disku</strong> - spravuj je na svém <a href="https://drive.google.com" target="_blank" rel="noopener">Disku Google</a>; náš přístup odeber v <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">oprávněních účtu Google</a>.</li>
+    </ul>
+    <p>S jakýmkoli dotazem nebo formální žádostí napiš na <a href="mailto:petr@petrburian.com">petr@petrburian.com</a>. Odpovíme do 30 dnů bezplatně, v souladu s článkem 12 GDPR.</p>
+    <p>Máš právo podat stížnost u <a href="https://www.uoou.cz" target="_blank" rel="noopener">Úřadu pro ochranu osobních údajů (ÚOOÚ)</a> nebo u dozorového úřadu ve státě EU, kde máš bydliště.</p>
+
+    <h2>11. Děti</h2>
+    <p>Zenit Week není určen dětem mladším 16 let. Vědomě neshromažďujeme údaje o dětech. Pokud se domníváš, že aplikaci použilo dítě, a jsi jeho zákonný zástupce, ozvi se nám a pomůžeme ti odstranit související data z tvých zařízení a z tvého Disku Google (sami je smazat nemůžeme, protože žádné kopie nedržíme).</p>
+
+    <h2>12. Automatizované rozhodování a profilování</h2>
+    <p>Aplikace neprovádí profilování a nepodrobuje uživatele žádnému automatizovanému rozhodování ve smyslu článku 22 GDPR. Zenit Week sám tvá data nijak nezpracovává pomocí AI/ML. Pokud propojíš AI agenta (§2.3), zpracovává tento agent to, co přečte, na tvůj pokyn a podle podmínek svého poskytovatele.</p>
+
+    <h2>13. Zabezpečení</h2>
+    <p>Web se doručuje výhradně přes HTTPS. Tok OAuth používá PKCE a parametr stavu proti CSRF. Klientský tajný klíč Google je uložen na straně serveru v naší serverless funkci Vercel (<code>/api/token</code>) a nikdy se nedostane do prohlížeče. Obnovovací token OAuth uložený ve tvém prohlížeči dává přístup jen do složky aplikace na Disku (§5) a lze ho kdykoli odvolat.</p>
+    <p>Volitelné propojení s AI agenty (§2.3) naslouchá jen na <code>127.0.0.1</code>, takže na něj nelze dosáhnout z jiného zařízení. Přijímá spojení jen z webu Zenit Week a z vývojových webů, které si sám přidáš na svém počítači. Každého agenta jednou schválíš v aplikaci porovnáním kódu s tím, který ukazuje tvůj agent; poté si aplikace a agent při každém spojení vzájemně prokazují sdílený klíč, který sám nikdy spojením neprochází. Než agenta schválíš, aplikace mu o tvých plánech nic neřekne. Každá změna, kterou agent provede, prochází vlastními akcemi aplikace, zobrazí se ti a lze ji vrátit zpět.</p>
+
+    <h2>14. Změny těchto zásad</h2>
+    <p>Podstatné změny se projeví aktualizovaným datem „Poslední aktualizace“ výše a, je-li to namístě, upozorněním v aplikaci. Pokračováním v používání aplikace po změnách je přijímáš.</p>
+  </main>
+</body>
+</html>
