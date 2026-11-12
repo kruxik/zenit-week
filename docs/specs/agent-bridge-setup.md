@@ -193,7 +193,8 @@ Every MCP agent app starts its own copy of the server: Claude Desktop at its lau
 | 2 | Page | Connects to every listening port in the range and keeps one socket per server. While the switch is on and no server answers, it retries the whole range with the backoff of [agent-bridge.md](agent-bridge.md) section 3 (1 s to 30 s). One browser permission covers all ports, since the prompt is per site. CSP already allows `ws://127.0.0.1:*`. |
 | 3 | Calls | Each server forwards only its own agent's calls. The page already runs one call at a time ([agent-bridge.md](agent-bridge.md) 7.1), so calls from two agents queue, they never interleave. |
 | 4 | Pairing | Per site, shared by every server through `pairings.json` (section 4.4). Pairing once through Claude Desktop also pairs Claude Code. |
-| 5 | Settings | Lists every connected agent app (section 3.4, row 5). |
+| 4a | Per-agent access | The pairing trusts the computer; each agent app is then allowed or blocked by the name its server reports, kept in the page's record (`agents`: name -> `allowed` / `blocked`). The agent that showed the pairing code is allowed. Any other agent is asked once: "Allow {client}?" with Allow, Block and Not now (no answer until the page reloads or the switch cycles). Blocked agents are closed before the page names its tab or week, on every reconnect. Settings lists them with Allow; connected ones get Block. A record from before this existed lets every agent in during the first session and records them. Unpair all clears every answer. The name is self-reported, so this is an access switch for well-behaved agents, not a boundary between programs of the same user. |
+| 5 | Settings | Lists every connected agent app, grouped by name with a count (section 3.4, row 5), and every blocked one. |
 | 6 | Server restart | The page sees the socket close and retries the range; the restarted server may take a different port, which needs nothing from the user. |
 
 ---

@@ -94,6 +94,13 @@ async function pairVia(port) {
   return { ws: socketOn(port), req, srv };
 }
 
+// A second agent app on a paired computer: the page asks once, by name.
+async function letIn(srv) {
+  await until(() => dialog?.open && dialog.id === 'bridge-agent', 5000);
+  await allow();
+  await until(() => srv.relay.pickTab());
+}
+
 async function pairedSocket() {
   serve(47831);
   turnOn();
@@ -146,7 +153,7 @@ afterEach(() => {
 describe('record', () => {
   test('a v1 record keeps its switch and drops port and token', () => {
     _state.setLocalStorage('zenit-week-bridge', { enabled: true, port: 47831, token: 'abcdefghijklmnopqrstuvwxyz012345' });
-    expect(loadBridgeRecord()).toEqual({ enabled: true, explained: true, pairingId: '', key: '', pairedAt: '' });
+    expect(loadBridgeRecord()).toEqual({ enabled: true, explained: true, pairingId: '', key: '', pairedAt: '', agents: null });
   });
 
   test('a tampered record falls back to safe values', () => {
@@ -338,7 +345,7 @@ describe('pairing (setup spec section 4)', () => {
     turnOn();
     await until(() => other.relay.hasAnyTab());
     await pairVia(47831);
-    await until(() => other.relay.pickTab(), 5000);
+    await letIn(other);
     expect(_state.getBridgeStatus().clients).toEqual(['claude-ai', 'claude-code']);
   });
 
@@ -409,6 +416,87 @@ describe('pairing (setup spec section 4)', () => {
   });
 });
 
+describe('per-agent access', () => {
+  // Pairs through claude-code; claude-ai then connects on the paired computer.
+  async function twoApps() {
+    const pairings = memoryPairings();
+    serve(47831, { pairings, client: 'claude-code' });
+    const b = serve(47832, { pairings, client: 'claude-ai' });
+    turnOn();
+    await pairVia(47831);
+    await until(() => dialog?.open && dialog.id === 'bridge-agent', 5000);
+    return b;
+  }
+  const ready = () => _state.getBridgeStatus().clients;
+
+  test('the agent that showed the code is allowed; the next one is asked by name', async () => {
+    await twoApps();
+    expect(loadBridgeRecord().agents).toEqual({ 'claude-code': 'allowed' });
+    expect(dialog.title).toContain('claude-ai');
+    expect(ready()).toEqual(['claude-code']);
+  });
+
+  test('Block shuts the agent out and keeps it out without asking again', async () => {
+    const b = await twoApps();
+    dialog.open = false;
+    dialog.onSecondary();
+    await until(() => loadBridgeRecord().agents['claude-ai'] === 'blocked');
+    await settle();
+    expect(b.relay.pickTab()).toBeFalsy();
+    dialog = null;
+    sandbox.bridgeConnect();
+    await settle(); await settle();
+    expect(dialog).toBe(null);
+    expect(ready()).toEqual(['claude-code']);
+  });
+
+  test('Not now keeps it out for now without recording an answer', async () => {
+    const b = await twoApps();
+    deny();
+    await settle();
+    expect(b.relay.pickTab()).toBeFalsy();
+    expect(loadBridgeRecord().agents['claude-ai']).toBeUndefined();
+  });
+
+  test('Block from the list closes a connected agent; Allow lets it back without a question', async () => {
+    const b = await twoApps();
+    await allow();
+    await until(() => b.relay.pickTab());
+    sandbox.bridgeBlockAgent('claude-ai');
+    await until(() => ready().length === 1);
+    expect(ready()).toEqual(['claude-code']);
+    dialog = null;
+    sandbox.bridgeAllowAgent('claude-ai');
+    await until(() => b.relay.pickTab(), 5000);
+    expect(dialog).toBe(null);
+  });
+
+  test('a record from before per-agent access lets every agent in once, and remembers them', async () => {
+    const pairings = memoryPairings();
+    serve(47831, { pairings, client: 'claude-code' });
+    const b = serve(47832, { pairings, client: 'claude-ai' });
+    turnOn();
+    await pairVia(47831);
+    await letIn(b);
+    bridgeDisconnect();
+    const { agents, ...legacy } = loadBridgeRecord();
+    _state.setLocalStorage('zenit-week-bridge', legacy);
+    dialog = null;
+    turnOn();
+    await until(() => ready().length === 2, 5000);
+    expect(dialog).toBe(null);
+    expect(loadBridgeRecord().agents).toEqual({ 'claude-code': 'allowed', 'claude-ai': 'allowed' });
+  });
+
+  test('Unpair all forgets every answer', async () => {
+    await twoApps();
+    dialog.open = false;
+    dialog.onSecondary();
+    bridgeUnpair();
+    expect(loadBridgeRecord().agents).toEqual({});
+  });
+});
+
 describe('several agent apps (setup spec section 5)', () => {
   test('events reach every server; a result goes only to the server that called', async () => {
     const pairings = memoryPairings();
@@ -416,7 +504,7 @@ describe('several agent apps (setup spec section 5)', () => {
     const b = serve(47832, { pairings, client: 'claude-ai' });
     turnOn();
     const { ws: a } = await pairVia(47831);
-    await until(() => b.relay.pickTab(), 5000);
+    await letIn(b);
     const bws = socketOn(47832);
     bridgeNotifyWeekSaved('2026-45', { nodes: [{ id: 'x', type: 'activity', label: 'A' }] });
     expect(a.sent.filter(f => f.event === 'week-saved')).toHaveLength(1);
@@ -432,7 +520,7 @@ describe('several agent apps (setup spec section 5)', () => {
     const b = serve(47832, { pairings, client: 'claude-ai' });
     turnOn();
     const { ws: a } = await pairVia(47831);
-    await until(() => b.relay.pickTab(), 5000);
+    await letIn(b);
     const bws = socketOn(47832);
     const br = branchId();
     await Promise.all([
@@ -457,7 +545,7 @@ describe('several agent apps (setup spec section 5)', () => {
     const b = serve(47832, { pairings, client: 'claude-ai' });
     turnOn();
     const { ws: a } = await pairVia(47831);
-    await until(() => b.relay.pickTab(), 5000);
+    await letIn(b);
     a.close(1001, 'gone');
     await until(() => _state.getBridgeStatus().clients.length === 1);
     expect(_state.getBridgeStatus().clients).toEqual(['claude-ai']);

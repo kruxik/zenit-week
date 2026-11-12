@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-UIuOOkZlCyTtAeboQV7GqouiToAbwOpwqUpw844mCIg=';
+               'sha256-Bs0XAPiyaCrYJuenuLr1LuxtSlUXK0ogf+vNpXjtbZ8=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3987,6 +3987,10 @@ function isProductionHost(hostname) {
   .bridge-agent .settings-badge { width: 24px; height: 24px; font-size: 10px; }
   .bridge-agent[data-agent-state="connected"] .settings-badge { background: var(--accent-success-text); }
   .bridge-agent[data-agent-state="old"] .settings-badge { background: var(--accent-warning-text); }
+  /* A blocked agent: the badge goes grey; its row keeps an Allow button. */
+  .bridge-agent[data-agent-state="blocked"] .settings-badge { background: var(--text-muted); }
+  .bridge-agent .settings-identity { flex: 1; min-width: 0; }
+  .bridge-agent .bridge-agent-action { flex-shrink: 0; margin-left: auto; }
   /* How many of that agent are connected, from two up: a count on the badge's
      corner, ringed in the panel colour so it reads as sitting on top. */
   .bridge-agent .settings-badge { position: relative; }
@@ -12729,6 +12733,12 @@ const TRANSLATIONS = {
     'bridge.state.unsupported':   'Not supported in this browser yet.',
     'bridge.unnamedAgent':        'agent',
     'bridge.agent.connected':     'Connected',
+    'bridge.agent.blocked':       'Blocked',
+    'bridge.agent.block':         'Block',
+    'bridge.agent.allow':         'Allow',
+    'bridge.ask.title':           'Allow {client}?',
+    'bridge.ask.body':            '{client} wants to read and change your weeks on {site}.',
+    'bridge.ask.later':           'Not now',
     'bridge.agent.old':           "Update its Zenit Week server",
     'bridge.guide.title':         'Connect an agent',
     'bridge.statusCaption':       'Status',
@@ -12760,8 +12770,8 @@ const TRANSLATIONS = {
     'bridge.guide.vscodeNote':    'VS Code opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
     'bridge.guide.otherNote':     "Paste it into your app's MCP settings, then restart the app. Needs Node.js 20 or newer.",
     'bridge.copied':              'Copied',
-    'bridge.paired':              'All agents paired',
-    'bridge.pairedOn':            'All agents paired on {date}',
+    'bridge.paired':              'This computer is paired',
+    'bridge.pairedOn':            'This computer paired on {date}',
     'bridge.unpair':              'Unpair all',
     'bridge.explain.title':       'Allow AI agents',
     'bridge.explain.body':        'Your browser will now ask to let Zenit Week access other apps and services on this device. That is how it reaches your AI agent, on this computer only. Choose Allow.',
@@ -12775,7 +12785,7 @@ const TRANSLATIONS = {
     'bridge.pair.toast':          'Paired with {client}. Unpair in Settings if this was not you.',
     'bridge.pair.toastNoName':    'Agent paired. Unpair in Settings if this was not you.',
     'help.bridgeTitle':           'AI agents',
-    'help.bridgeDesc':            'Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP app) read and change your week, as if you clicked: each change shows a toast and is one undo step. Install the zenit-week-mcp server in your agent app (Settings > AI shows how), turn on AI agents and, the first time your agent asks, check that the code matches and click Allow. Desktop Chrome and Firefox only; your phone follows through Drive sync. Unpair in Settings, signing out or resetting removes the pairing.',
+    'help.bridgeDesc':            'Let an AI agent on this computer (Claude Code, Claude Desktop or any MCP app) read and change your week, as if you clicked: each change shows a toast and is one undo step. Install the zenit-week-mcp server in your agent app (Settings > AI shows how), turn on AI agents and, the first time your agent asks, check that the code matches and click Allow. Desktop Chrome and Firefox only; your phone follows through Drive sync. Settings > AI lets you block or allow each agent; Unpair all, signing out or resetting removes the pairing.',
     'settings.tipsReplayDone':    'Tips reset - they’ll show again.',
     'tips.doneCaption':           'Done',
     'tips.unplannedCaption':      'Unplanned',
@@ -13252,6 +13262,12 @@ const TRANSLATIONS = {
     'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje.',
     'bridge.unnamedAgent':        'agent',
     'bridge.agent.connected':     'Připojeno',
+    'bridge.agent.blocked':       'Zablokováno',
+    'bridge.agent.block':         'Zablokovat',
+    'bridge.agent.allow':         'Povolit',
+    'bridge.ask.title':           'Povolit {client}?',
+    'bridge.ask.body':            '{client} chce číst a měnit tvé týdny na {site}.',
+    'bridge.ask.later':           'Teď ne',
     'bridge.agent.old':           'Aktualizuj jeho Zenit Week server',
     'bridge.guide.title':         'Připoj agenta',
     'bridge.statusCaption':       'Stav',
@@ -13283,8 +13299,8 @@ const TRANSLATIONS = {
     'bridge.guide.vscodeNote':    'Otevře se VS Code a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.otherNote':     'Vlož ho do MCP nastavení své aplikace a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
     'bridge.copied':              'Zkopírováno',
-    'bridge.paired':              'Všichni agenti spárováni',
-    'bridge.pairedOn':            'Všichni agenti spárováni {date}',
+    'bridge.paired':              'Tento počítač je spárován',
+    'bridge.pairedOn':            'Tento počítač spárován {date}',
     'bridge.unpair':              'Zrušit spárování všech',
     'bridge.explain.title':       'Povolit AI agenty',
     'bridge.explain.body':        'Prohlížeč se teď zeptá, zda smí Zenit Week přistupovat k jiným aplikacím a službám na tomto zařízení. Tak se spojí s tvým AI agentem, jen na tomto počítači. Zvol Povolit.',
@@ -13298,7 +13314,7 @@ const TRANSLATIONS = {
     'bridge.pair.toast':          'Spárováno s {client}. Pokud to nebyla tvoje žádost, zruš spárování v Nastavení.',
     'bridge.pair.toastNoName':    'Agent spárován. Pokud to nebyla tvoje žádost, zruš spárování v Nastavení.',
     'help.bridgeTitle':           'AI agenti',
-    'help.bridgeDesc':            'Dovol AI agentovi na tomto počítači (Claude Code, Claude Desktop nebo jakákoli MCP aplikace) číst a měnit tvůj týden, jako by šlo o tvé kliknutí: každá změna ukáže oznámení a jde vrátit jedním krokem zpět. Nainstaluj do aplikace agenta server zenit-week-mcp (jak, ukazuje Nastavení > AI), zapni AI agenty a když se agent poprvé zeptá, zkontroluj, že kód sedí, a klikni na Povolit. Jen v Chrome a Firefoxu na počítači; telefon se přizpůsobí přes synchronizaci s Diskem. Zrušení spárování v Nastavení, odhlášení nebo reset párování smaže.',
+    'help.bridgeDesc':            'Dovol AI agentovi na tomto počítači (Claude Code, Claude Desktop nebo jakákoli MCP aplikace) číst a měnit tvůj týden, jako by šlo o tvé kliknutí: každá změna ukáže oznámení a jde vrátit jedním krokem zpět. Nainstaluj do aplikace agenta server zenit-week-mcp (jak, ukazuje Nastavení > AI), zapni AI agenty a když se agent poprvé zeptá, zkontroluj, že kód sedí, a klikni na Povolit. Jen v Chrome a Firefoxu na počítači; telefon se přizpůsobí přes synchronizaci s Diskem. V Nastavení > AI můžeš každého agenta zablokovat nebo povolit; zrušení spárování všech, odhlášení nebo reset párování smaže.',
     'settings.tipsReplayDone':    'Tipy resetovány - zobrazí se znovu.',
     'tips.doneCaption':           'Hotovo',
     'tips.unplannedCaption':      'Neplánované',
@@ -29028,11 +29044,16 @@ function renderBridgeStatus() {
     const key = a.state + '\n' + label;
     const g = groups.get(key);
     if (g) g.count++;
-    else groups.set(key, { state: a.state, label, count: 1 });
+    else groups.set(key, { state: a.state, label, name: a.client || '', count: 1 });
+  }
+  // Blocked agents stay listed, whether running or not, so they can be let back in.
+  const recAgents = shown === 'off' ? null : rec.agents;
+  for (const [name, st] of Object.entries(recAgents || {})) {
+    if (st === 'blocked') groups.set('blocked\n' + name, { state: 'blocked', label: name || t('bridge.unnamedAgent'), name, count: 1 });
   }
   // Each reads like the Drive account row: an initials badge in the agent's
   // state colour, the name, and its state underneath.
-  const rows = [...groups.values()].map(({ state: agentState, label, count }) => {
+  const rows = [...groups.values()].map(({ state: agentState, label, name: agentName, count }) => {
     const row = document.createElement('div');
     row.className = 'settings-row bridge-agent';
     row.dataset.agentState = agentState;
@@ -29056,9 +29077,22 @@ function renderBridgeStatus() {
     name.textContent = label;
     const st = document.createElement('div');
     st.className = 'settings-sub';
-    st.textContent = t(agentState === 'connected' ? 'bridge.agent.connected' : 'bridge.agent.old');
-    identity.append(name, st);
-    row.append(badge, identity);
+    st.textContent = t(agentState === 'connected' ? 'bridge.agent.connected'
+      : agentState === 'blocked' ? 'bridge.agent.blocked' : 'bridge.agent.old');
+    identity.appendChild(name);
+    identity.appendChild(st);
+    row.appendChild(badge);
+    row.appendChild(identity);
+    // Block a connected agent, let a blocked one back in.
+    if (agentState === 'connected' || agentState === 'blocked') {
+      const act = document.createElement('button');
+      act.type = 'button';
+      act.className = 'agenda-action-btn bridge-agent-action';
+      act.dataset.agentAction = agentState === 'connected' ? 'block' : 'allow';
+      act.dataset.agentName = agentName;
+      act.textContent = t(agentState === 'connected' ? 'bridge.agent.block' : 'bridge.agent.allow');
+      row.appendChild(act);
+    }
     return row;
   });
   rows.forEach(r => list.appendChild(r));
@@ -29164,6 +29198,12 @@ function initBridgeSettings() {
   document.getElementById('bridge-guide-action').addEventListener('click', () => {
     BRIDGE_GUIDE[document.getElementById('bridge-guide-app').value]?.run();
   });
+  document.getElementById('bridge-agents').addEventListener('click', e => {
+    const btn = e.target.closest?.('[data-agent-action]');
+    if (!btn) return;
+    if (btn.dataset.agentAction === 'block') bridgeBlockAgent(btn.dataset.agentName);
+    else bridgeAllowAgent(btn.dataset.agentName);
+  });
   document.getElementById('bridge-unpair-btn').addEventListener('click', () => {
     bridgeUnpair();
     renderBridgeStatus();
@@ -29242,9 +29282,20 @@ function bridgePorts() {
 }
 
 // ── Record: device-local, never synced ──
-// { enabled, explained, pairingId, key, pairedAt }. A v1 record (`port`,
+// { enabled, explained, pairingId, key, pairedAt, agents }. A v1 record (`port`,
 // `token`) keeps only its switch: the site pairs once more (setup spec 4.5).
-const BRIDGE_EMPTY_RECORD = { enabled: false, explained: false, pairingId: '', key: '', pairedAt: '' };
+// `agents` maps an agent app's name ('' for one that gives none) to 'allowed'
+// or 'blocked'; null on a record from before per-agent access existed.
+const BRIDGE_EMPTY_RECORD = { enabled: false, explained: false, pairingId: '', key: '', pairedAt: '', agents: null };
+const BRIDGE_AGENTS_MAX = 50;
+function _sanitizeBridgeAgents(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const out = Object.create(null);
+  for (const [name, state] of Object.entries(v).slice(0, BRIDGE_AGENTS_MAX)) {
+    if (name.length <= 80 && (state === 'allowed' || state === 'blocked')) out[name] = state;
+  }
+  return out;
+}
 function loadBridgeRecord() {
   try {
     const rec = JSON.parse(localStorage.getItem(BRIDGE_KEY) || 'null');
@@ -29258,6 +29309,7 @@ function loadBridgeRecord() {
       pairingId: paired ? rec.pairingId : '',
       key: paired ? rec.key : '',
       pairedAt: paired && typeof rec.pairedAt === 'string' ? rec.pairedAt.slice(0, 40) : '',
+      agents: _sanitizeBridgeAgents(rec.agents),
     };
   } catch (_) {
     return { ...BRIDGE_EMPTY_RECORD };
@@ -29269,6 +29321,7 @@ function saveBridgeRecord(rec) {
   try {
     localStorage.setItem(BRIDGE_KEY, JSON.stringify({
       enabled: !!r.enabled, explained: !!r.explained, pairingId: r.pairingId, key: r.key, pairedAt: r.pairedAt,
+      agents: _sanitizeBridgeAgents(r.agents),
     }));
   } catch (_) { /* storage unavailable */ }
 }
@@ -29369,6 +29422,14 @@ let _bridgeStopped = true;
 let _bridgeLastSig = new Map();
 let _bridgeWindowHooked = false;
 let _bridgePair = null; // the one pairing this tab is in, whichever server started it
+// Per-agent access. A record from before it existed lets in every agent that
+// connects during this page's life, so an update shuts nobody out; it is
+// decided once, at the first connect.
+let _bridgeAdopting = null;
+const _bridgeDismissed = new Set(); // "Not now": no question again until the page reloads
+const _bridgeAsking = new Set();     // names with a question queued or on screen
+let _bridgeAskShown = null;          // the name whose question is on screen
+let _bridgeAskChain = Promise.resolve();
 
 const _bridgeConnList = () => [..._bridgeConns.values()].sort((a, b) => a.port - b.port);
 function _readyBridgeConns() {
@@ -29420,6 +29481,7 @@ function bridgeConnect() {
   if (!rec.enabled) { _setBridgeStatus('off'); return; }
   if (!bridgeSupported()) { _setBridgeStatus('unsupported'); return; }
   _bridgeStopped = false;
+  if (_bridgeAdopting === null) _bridgeAdopting = !!rec.key && rec.agents === null;
   _hookBridgeWindowEvents();
   clearTimeout(_bridgeRetryTimer);
   _bridgeLastScan = Date.now();
@@ -29532,6 +29594,16 @@ async function _onBridgeWelcome(conn, frame) {
       try { conn.ws.close(4001, 'refused'); } catch (_) { /* already closing */ }
       return;
     }
+    // The computer is paired; this agent app still needs the user's yes.
+    const verdict = bridgeAgentVerdict(conn.client);
+    if (verdict === 'blocked') { _refuseBridgeAgent(conn); return; }
+    if (verdict === 'ask') {
+      conn.asking = true;
+      _askBridgeAgent(conn.client || '');
+      _refreshBridgeStatus();
+      return;
+    }
+    if (verdict === 'adopt') setBridgeAgent(conn.client, 'allowed');
     await _sendBridgeReady(conn, rec.key);
   } else {
     // Unknown on the agent side: the key stays until the user approves a new
@@ -29554,6 +29626,99 @@ async function _sendBridgeReady(conn, keyB64) {
   conn.unknown = false;
   _bridgeAttempts = 0;
   _refreshBridgeStatus();
+}
+
+// ── Per-agent access ──
+// The pairing trusts this computer; each agent app on it is then allowed or
+// blocked by name, the way apps are listed under an account elsewhere. The
+// page enforces it: a blocked agent's socket is closed before the page names
+// its tab or week, and is closed again each time the agent reconnects.
+function bridgeAgentVerdict(client) {
+  const name = client || '';
+  if (_bridgeDismissed.has(name)) return 'blocked';
+  const agents = loadBridgeRecord().agents;
+  if (agents && agents[name]) return agents[name];
+  return _bridgeAdopting ? 'adopt' : 'ask';
+}
+
+function setBridgeAgent(client, state) {
+  const name = client || '';
+  const rec = loadBridgeRecord();
+  const agents = { ...(rec.agents || {}) };
+  agents[name] = state;
+  _bridgeDismissed.delete(name);
+  saveBridgeRecord({ ...rec, agents });
+}
+
+function _refuseBridgeAgent(conn) {
+  conn.asking = false;
+  try { conn.ws.close(4005, 'blocked'); } catch (_) { /* already closing */ }
+}
+
+// One question per agent name, one dialog at a time, never over the user's
+// editing or another dialog.
+function _askBridgeAgent(name) {
+  if (_bridgeAsking.has(name)) return;
+  _bridgeAsking.add(name);
+  _bridgeAskChain = _bridgeAskChain.then(() => _askBridgeAgentNow(name)).catch(() => {})
+    .finally(() => _bridgeAsking.delete(name));
+}
+
+const _bridgeAskers = name => _bridgeConnList().filter(c => c.asking && (c.client || '') === name);
+
+async function _askBridgeAgentNow(name) {
+  while (_bridgeAskers(name).length && (_bridgePair || _bridgeUserOccupied())) {
+    await new Promise(r => setTimeout(r, 250));
+  }
+  if (_bridgeAskers(name).length && bridgeAgentVerdict(name) === 'ask') {
+    const client = name || t('bridge.unnamedAgent');
+    const site = isProductionHost(location.hostname) ? 'zenitweek.com' : location.host;
+    _bridgeAskShown = name;
+    await new Promise(resolve => showAppConfirm({
+      id: 'bridge-agent',
+      title: t('bridge.ask.title', { client }),
+      body: t('bridge.ask.body', { client, site }),
+      okLabel: t('bridge.agent.allow'),
+      onConfirm: () => { setBridgeAgent(name, 'allowed'); resolve(); },
+      secondaryLabel: t('bridge.agent.block'),
+      secondaryDanger: true,
+      onSecondary: () => { setBridgeAgent(name, 'blocked'); resolve(); },
+      cancelLabel: t('bridge.ask.later'),
+      // Closed by another tab's answer: that answer stands.
+      onCancel: () => { if (bridgeAgentVerdict(name) === 'ask') _bridgeDismissed.add(name); resolve(); },
+    }));
+  }
+  _bridgeAskShown = null;
+  _settleBridgeAgent(name);
+}
+
+// Everyone of that name who was waiting gets the answer.
+function _settleBridgeAgent(name) {
+  const verdict = bridgeAgentVerdict(name);
+  const key = loadBridgeRecord().key;
+  for (const conn of _bridgeAskers(name)) {
+    conn.asking = false;
+    if (verdict === 'allowed' && key) _sendBridgeReady(conn, key);
+    else _refuseBridgeAgent(conn);
+  }
+  _refreshBridgeStatus();
+  renderBridgeStatus();
+}
+
+function bridgeBlockAgent(client) {
+  const name = client || '';
+  setBridgeAgent(name, 'blocked');
+  _bridgeConnList().filter(c => (c.client || '') === name).forEach(_refuseBridgeAgent);
+  _refreshBridgeStatus();
+  renderBridgeStatus();
+}
+
+// Allowed again: the next scan finds the agent and lets it straight in.
+function bridgeAllowAgent(client) {
+  setBridgeAgent(client || '', 'allowed');
+  _bridgeAttempts = 0;
+  if (!_bridgeStopped) bridgeConnect();
+  renderBridgeStatus();
 }
 
 // ── Pairing (setup spec 4.1, 4.4) ──
@@ -29636,6 +29801,8 @@ async function _allowBridgePair(pair) {
   try { conn.ws.send(JSON.stringify({ type: 'pair-ok', pairingId, proof })); } catch (_) { return; }
   const rec = loadBridgeRecord();
   saveBridgeRecord({ ...rec, pairingId, key: pair.key, pairedAt: new Date().toISOString() });
+  // Approving the code is approving the agent that showed it.
+  setBridgeAgent(pair.client, 'allowed');
   await _sendBridgeReady(conn, pair.key);
   showToast(pair.client ? t('bridge.pair.toast', { client: pair.client }) : t('bridge.pair.toastNoName'), 5000);
   // The other servers share the pairing file: reconnect them with the new key.
@@ -29663,7 +29830,8 @@ function _endBridgePair(conn, { tellServer }) {
 function bridgeUnpair() {
   _readyBridgeConns().forEach(c => _bridgeSendTo(c, { type: 'unpair' }));
   const rec = loadBridgeRecord();
-  saveBridgeRecord({ enabled: rec.enabled, explained: rec.explained });
+  saveBridgeRecord({ enabled: rec.enabled, explained: rec.explained, agents: {} });
+  _bridgeDismissed.clear();
   _bridgeRestart();
 }
 
@@ -29708,6 +29876,14 @@ function bridgeDisconnect() {
   _bridgeBlocked = _bridgePermWaiting = false;
   _bridgeRefusedPorts.clear();
   _bridgePortNotes.clear();
+  // A question still on screen goes with the switch, and the switch cycling
+  // decides "Not now" and the pre-update grace afresh.
+  if (_bridgeAskShown !== null && window.isAppConfirmOpen?.('bridge-agent')) window.closeAppConfirm();
+  _bridgeAskShown = null;
+  _bridgeAsking.clear();
+  _bridgeAskChain = Promise.resolve();
+  _bridgeDismissed.clear();
+  _bridgeAdopting = null;
   const conns = _bridgeConnList();
   _bridgeConns.clear();
   conns.forEach(c => { _endBridgePair(c, { tellServer: true }); c.ready = false; try { c.ws.close(1000, 'forget'); } catch (_) { /* already closed */ } });
@@ -29777,6 +29953,9 @@ function _hookBridgeWindowEvents() {
   // Another tab of this site paired, unpaired or turned the switch: follow it.
   window.addEventListener('storage', e => {
     if (e.key !== BRIDGE_KEY && e.key !== null) return;
+    // Another tab answered the question this one is showing: that answer stands.
+    if (_bridgeAskShown !== null && loadBridgeRecord().agents?.[_bridgeAskShown]
+      && window.isAppConfirmOpen?.('bridge-agent')) window.closeAppConfirm();
     if (!_bridgeStopped || loadBridgeRecord().enabled) _bridgeRestart();
   });
 }
