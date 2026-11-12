@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-/f7/XLhhG4bdXtMqWjXRXrJi+8OZsoGtD+/7ZTK+ItY=';
+               'sha256-GMOK97ddRTCO+YiwG1Xhuzjb6J05Cfg1K+Bgs8uJapE=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -14924,6 +14924,9 @@ async function importAllData(file) {
       endReinit();
       traceMilestone('imported week painted');
       flowFinish('import foreground done');
+      // Done: the imported map is the thing to look at now. A failure keeps
+      // Settings open so the error under the Import button stays visible.
+      closeSettings();
     } catch (reinitErr) {
       traceMark('import:reinit-error', reinitErr && reinitErr.message);
       flowFinish('import failed');
@@ -31067,8 +31070,10 @@ async function _bridgeTransfer(tool, fn) {
 }
 
 // ─── Export / Import ──────────────────────────────────────────────────────────
-document.getElementById('export-data-btn').addEventListener('click', () => {
-  exportAllData();
+// The download is the whole action, so Settings closes once it has started.
+document.getElementById('export-data-btn').addEventListener('click', async () => {
+  await exportAllData();
+  closeSettings();
 });
 
 (function() {
