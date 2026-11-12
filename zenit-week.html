@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-90MmIwW3aqr9KYSCw/xdVOh0G3Evg0qiYRy7zZS+2/c=';
+               'sha256-+bRWnprp46v0Y4FxrFRaQjM0glIOMBDy02+t8TVU4oY=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -5608,6 +5608,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.horizon">Horizon - this year, in a few years or someday - is set from the context menu and shown as a badge on the node. Filter by it with the Horizon button or 1-4.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.collapse">Collapse a node with children to hide its subtree; the badge counts what is hidden, and a click expands it.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.focus">Focus branch fits one area and folds and dims the rest; Esc, F, the logo, a click on the centre or the Focus cell ends it.</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);" data-i18n="help.vision.weekKeys">Week keys do nothing here: Done (D), Unplanned (U), days (1-8), Reusable (R), move to another week (N, B), week navigation and Clear week.</div>
       </div>
 
       <div class="help-section">
@@ -13087,6 +13088,7 @@ const TRANSLATIONS = {
     'help.vision.horizon': 'Horizon - this year, in a few years or someday - is set from the context menu and shown as a badge on the node. Filter by it with the Horizon button or 1-4.',
     'help.vision.collapse': 'Collapse a node with children to hide its subtree; the badge counts what is hidden, and a click expands it.',
     'help.vision.focus': 'Focus branch fits one area and folds and dims the rest; Esc, F, the logo, a click on the centre or the Focus cell ends it.',
+    'help.vision.weekKeys': 'Week keys do nothing here: Done (D), Unplanned (U), days (1-8), Reusable (R), move to another week (N, B), week navigation and Clear week.',
     'help.escClose':              'Close panel / menu',
     'help.filterDay':             'Filter day',
     'help.filterHorizon':         'Filter horizon (Vision)',
@@ -13240,7 +13242,7 @@ const TRANSLATIONS = {
     'settings.importConfirmBody': 'Tato akce nahradí všechny tvoje týdny, větve a nastavení souborem z importu. Nelze vrátit zpět.',
     'settings.importConfirmOk':   'Ano, importovat',
     'settings.importError':       'Neplatný soubor - import se nezdařil.',
-    'settings.importReloadHint':  'Data importována - obnovte stránku pro zobrazení.',
+    'settings.importReloadHint':  'Data importována - obnov stránku pro zobrazení.',
     'import.progress':            'Import týdne {week}',
     'import.complete':            'Import dokončen',
     'settings.autoLayout':        'Automatické rozvržení',
@@ -13355,7 +13357,7 @@ const TRANSLATIONS = {
     'tips.doneIntro':             'Přeškrtnuté znamená hotové. Dokončení všech podúkolů odškrtne i ten nadřazený.',
     'tips.priorityIntro':         'Plamínek značí kritickou prioritu, vykřičník vysokou. Priorita zvětšuje úkol na mapě a propíše se na vše pod ním.',
     'tips.undoIntro':             'Každou změnu lze vzít zpět. Klidně zkoušej - nic se neztratí.',
-    'tips.dayFilter':             'Zúží mapu na jeden den. Vyberte den a zbytek týdne ustoupí.',
+    'tips.dayFilter':             'Zúží mapu na jeden den. Vyber den a zbytek týdne ustoupí.',
     'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to klíčové, Oblázky přidají podúkoly - dalším klepnutím jdou o úroveň hlouběji - Písek ukáže vše. Nic se neztratí - jen ustoupí do pozadí.',
     'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek. Vize je dlouhý výhled, podle kterého se týdny plánují.',
     'tips.gotIt':                 'Rozumím',
@@ -13374,7 +13376,7 @@ const TRANSLATIONS = {
     'menu.horizon.someday':       'Jednou',
     'menu.horizon.none':          'Bez horizontu',
     'toast.letGo':                'Necháno být',
-    'toast.controlsHidden':       'Ovládání vrátíte dalším klepnutím na mapu',
+    'toast.controlsHidden':       'Ovládání vrátíš dalším klepnutím na mapu',
     'toast.takenBack':            'Vzato zpět',
     'vision.center':              'Moje vize',
     'agenda.overdue':             'Zpožděné',
@@ -13579,7 +13581,7 @@ const TRANSLATIONS = {
     'help.featureOfflineLead':    'Funguje offline',
     'help.featureOfflineBody':    ' - lze nainstalovat a offline úpravy se po připojení samy synchronizují',
     'help.featureLangLead':       'EN / CS, Světlý / Tmavý',
-    'help.featureLangBody':       ' - upravte si vše podle sebe',
+    'help.featureLangBody':       ' - uprav si vše podle sebe',
     'help.hotkeysTitle':          'Klávesové zkratky aktivit (najetí nebo zaměření)',
     'help.moveFocus':             'Přesun zaměření',
     'help.cyclePriority':         'Přepínat prioritu',
@@ -13617,6 +13619,7 @@ const TRANSLATIONS = {
     'help.vision.horizon': 'Horizont - letos, za pár let nebo jednou - nastavíš v kontextové nabídce a ukáže se jako odznak na uzlu. Filtruješ podle něj tlačítkem Horizont nebo klávesami 1-4.',
     'help.vision.collapse': 'Uzel s potomky můžeš sbalit a skrýt jeho podstrom; odznak ukazuje, kolik je skryto, a kliknutím se rozbalí.',
     'help.vision.focus': 'Zaměřit větev přiblíží jednu oblast a ostatní sbalí a ztlumí; zaměření ukončí Esc, F, logo, klik na střed nebo políčko Fokus.',
+    'help.vision.weekKeys': 'Klávesy týdne tu nic nedělají: Hotovo (D), Neplánováno (U), dny (1-8), Opakované (R), přesun do jiného týdne (N, B), pohyb mezi týdny a Vymazat týden.',
     'help.escClose':              'Zavřít panel / menu',
     'help.filterDay':             'Filtr dne',
     'help.filterHorizon':         'Filtr horizontu (Vize)',
@@ -13671,7 +13674,7 @@ const TRANSLATIONS = {
     'filter.dayShort':            'Den',
     'filter.horizonShort':        'Horizont',
     'filter.focusShort':          'Fokus',
-    'filter.focusEnd':            'Zaměřeno na {name} - kliknutím zobrazíte všechny větve',
+    'filter.focusEnd':            'Zaměřeno na {name} - kliknutím zobrazíš všechny větve',
     'filter.none':                'Žádný',
     'menu.clearDayFilter':        'Zrušit filtr dne',
     'error.quotaExceeded':        'Úložná kvóta byla překročena - změny nemusí být uloženy',

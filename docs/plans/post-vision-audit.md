@@ -37,10 +37,10 @@ Severity: 🔴 severe · 🟠 medium · 🟡 minor
 
 | ID | Sev | Status | Where | Finding | Fix | Commit |
 |---|---|---|---|---|---|---|
-| UI-1 | 🟠 | ✅ | zenit-week.html `help.vision.focus` (en 13089, cs 13619) | Still describes the removed right-hand reading pane. | Delete the sentence (en + cs). | |
-| UI-2 | 🟠 | ✅ | same key | Says focus "dims the rest" and "Esc or a click on the centre ends it"; it also collapses the others, and F, the logo and the Focus cell end it. | Reword (en + cs). | |
-| UI-3 | 🟠 | ✅ | `help.vision.horizon` (en 13087, cs 13617) | "Shown after the name" - it is a badge icon; the `1`-`4` filter is not mentioned. | Reword (en + cs). | |
-| UI-4 | 🟠 | ⬜ | Help 5516-5565 | Week-only hotkeys (D, U, R, N, B, days, week nav, Clear week) carry no "not on the Vision" note. | Mark rows or add one Vision line. | |
+| UI-1 | 🟠 | ✅ | zenit-week.html `help.vision.focus` (en 13089, cs 13619) | Still describes the removed right-hand reading pane. | Delete the sentence (en + cs). | 77c1a77 |
+| UI-2 | 🟠 | ✅ | same key | Says focus "dims the rest" and "Esc or a click on the centre ends it"; it also collapses the others, and F, the logo and the Focus cell end it. | Reword (en + cs). | 77c1a77 |
+| UI-3 | 🟠 | ✅ | `help.vision.horizon` (en 13087, cs 13617) | "Shown after the name" - it is a badge icon; the `1`-`4` filter is not mentioned. | Reword (en + cs). | 77c1a77 |
+| UI-4 | 🟠 | ✅ | Help 5516-5565 | Week-only hotkeys (D, U, R, N, B, days, week nav, Clear week) carry no "not on the Vision" note. | Mark rows or add one Vision line. | |
 | UI-5 | 🟡 | ⬜ | `tips.views` (12830, cs 13360) | "Three views" but four are listed. | "Four views ...". | |
 | UI-6 | 🟡 | ⬜ | `tips.levels` (12829), 5495, 13026 | "Pebbles adds sub-tasks" is wrong on the Vision (Pebbles adds intentions). | Neutral wording. | |
 | UI-7 | 🟡 | ⬜ | `help.featureBackupBody` (13048) | Backup also includes the Vision. | Mention the Vision. | |
@@ -53,8 +53,8 @@ Severity: 🔴 severe · 🟠 medium · 🟡 minor
 
 | ID | Sev | Status | Where | Finding | Fix | Commit |
 |---|---|---|---|---|---|---|
-| I18N-1 | 🟠 | ✅ | cs `help.vision.*` | Vykání ("chcete", "vzdali") in an app that uses tykání. | Rewrite in tykání. | |
-| I18N-2 | 🟠 | ⬜ | cs `filter.focusEnd`, `toast.controlsHidden`, `tips.dayFilter` | Vykání. | Tykání. | |
+| I18N-1 | 🟠 | ✅ | cs `help.vision.*` | Vykání ("chcete", "vzdali") in an app that uses tykání. | Rewrite in tykání. | 77c1a77 |
+| I18N-2 | 🟠 | ✅ | cs `filter.focusEnd`, `toast.controlsHidden`, `tips.dayFilter` | Vykání. | Tykání. | |
 | I18N-3 | 🟡 | ⬜ | cs `menu.focusBranch` vs `filter.focusShort` / `help.vision.focus` | "Zaměřit" vs "Fokus" for one concept. | One term. | |
 | I18N-4 | 🟡 | ⬜ | `nav.prev`, `nav.next`, `weekbar.today`, `stats.trendWeek`, `filter.showing`, `filter.emptyDay`, `filter.emptyDayShort`, `stats.noUnplanned`, `help.fab` | Dead keys (last two referenced only by tests/i18n.test.js). | Remove from en + cs and the test. | |
 | I18N-5 | 🟡 | ⬜ | cs `bridge.toast.*` | Masculine past tense ("Přidal", "Vrátil"). | Neutral form. | |
