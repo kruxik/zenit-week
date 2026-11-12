@@ -20,6 +20,9 @@ weekData = {
       doneAt,                // set when marked done
       unplannedAt,           // set when marked unplanned
       droppedAt,             // set when marked dropped
+      // Vision nodes only:
+      horizon,               // 'year' | 'years' | 'someday', absent = none
+      collapsed,             // layout only (touchLayout): children not drawn
       _ts,                   // epoch ms - Drive merge conflict resolution, content only
       _posTs }               // epoch ms - same role for `offX`/`offY`/`side` alone
   ]
@@ -37,6 +40,8 @@ Node hierarchy:
 Default branch colors: Work `#F24E1E`, Family `#A259FF`, Me `#1ABCFE` (all customizable via color picker)
 
 `BRANCH_CONFIG` - maps branch id → `{ side: 'left' | 'right' }`, controls radial layout placement
+
+**The Vision** is a second map record, shaped like a week (`nodes`, `tombstones`, `crdtVersion`, `savedAt`) so the renderer, merge and context menu read it unchanged. It lives in the IDB `misc` store under `vision` (`VISION_STORAGE_KEY`) and syncs as its own Drive file. While the Vision is in view `weekData` **holds the vision record**, not a week: `mapRecord.kind` says which (`isVisionInView()`), `currentWeekKey` still names a week that is only in IndexedDB, and `isWeekInMemory(wk)` is the test for "this week is `weekData`". Every map edit saves through `saveMapRecord()`, never `saveWeek(currentWeekKey, ...)`. Week-only actions (done, unplanned, days, ticks, reusable, transfers, send to date, week navigation) are refused at the function on the Vision (`VISION_STATUSES`); `validateAndRepairVision` strips every week-only field. Full spec: `docs/specs/vision-canvas.md`.
 
 Week key format: `YYYY-WW` (e.g., `2026-14`), stored in localStorage as `zenit-week-2026-14`
 
@@ -90,7 +95,7 @@ Dated work (Send to the Future, the `schedule` record, occurrences, the Later ta
 - **Dark mode**: Full light/dark theme. Settings offers a System / Light / Dark select; `zenit-week-theme` in `localStorage` (and the synced colors blob) stores that preference, default `system`, which follows `prefers-color-scheme` live. `data-theme` always holds the resolved `light`/`dark`; `applyTheme(pref)` is the only writer
 - **Feedback**: Provide visual cues for hover states and active operations (e.g., "panning" cursor, context menu with context-aware options)
 - **Context menus**: Hide options that don't apply to the current node type
-- **Agenda view**: One of the three top-level views (`M` / `A` / `S`), not a sidebar. A day-tab strip (`1`–`7`, plus an Overdue tab on `0`) over a list of that day's activities, grouped into `Scheduled`, `Done`, `Any day` and `Dropped` - in that render order. Rows drag to reorder, swipe right to toggle done/undone (undrop, in the Dropped group), swipe left for the context menu
+- **Agenda view**: One of the four top-level views (`V` Vision / `M` Mindmap / `A` Agenda / `S` Stats), not a sidebar. A day-tab strip (`1`–`7`, plus an Overdue tab on `0`) over a list of that day's activities, grouped into `Scheduled`, `Done`, `Any day` and `Dropped` - in that render order. Rows drag to reorder, swipe right to toggle done/undone (undrop, in the Dropped group), swipe left for the context menu
 - **Dropped status**: A third value on the outcome axis (open / done / dropped) - "this will not happen", without erasing the task. On the map: branch colour at ~45% opacity, a corner-to-corner diagonal slash and a ⊘ badge; never Done's grey or horizontal strike-through, never the dashed stroke reserved for keyboard focus. Dropped tasks stay in the stats denominator in their own grey band, never arrive via `Transfer Unfinished`, never show as overdue, and are revived (flag cleared) by `Transfer Reusable` and `Next week`. `ctx-undone` is the shared way back to open from either closed state - there is no separate un-drop menu item
 - **Daily log**: Not a separate panel - the Agenda's `Done` section is the day log: one row per activity completed or tick recorded that day, ordered by `doneAt`, with branch color dots and `n/total` tick pills. The `daily-log-*` class prefix is legacy naming for the shared agenda-row internals built by `buildAgendaItem()`; it is only ever called from the Agenda
 - **Week statistics**: Live in the Stats view (`S`) - donut, per-branch follow-through, effort baseline and the multi-week cumulative flow, all fed by `computeWeekStats()`. `updateSummary()` does not render a drawer; it rebuilds the Help legend's branch items, refreshes the root node's completion ring via `updateCenterRing()`, and re-renders the Stats panel when it is open

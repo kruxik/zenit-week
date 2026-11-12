@@ -469,6 +469,13 @@ describe('Claude Desktop extension (setup spec section 3.2)', () => {
     expect(manifest.tools.every(t => t.description)).toBe(true);
   });
 
+  test('each tool description is a whole sentence (no escape left over, no cut at an apostrophe)', () => {
+    for (const t of manifest.tools) {
+      expect(t.description, t.name).not.toMatch(/\\/);
+      expect(t.description, t.name).toMatch(/\w.*\.$/);
+    }
+  });
+
   test('every bundled file exists, the icon among them', async () => {
     const { BUNDLE_FILES } = await import('../scripts/mcp-bundle.mjs');
     for (const f of BUNDLE_FILES) expect(fs.existsSync(new URL(f.from, root)), f.from).toBe(true);

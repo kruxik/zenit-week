@@ -247,7 +247,7 @@ tool('send_to_date', 'Move a task out of this week to a date (YYYY-MM-DD), optio
   });
 tool('transfer_unfinished', 'Copy the previous week\'s unfinished tasks into the week in view, as the context menu does.', {});
 tool('transfer_reusable', 'Copy the previous week\'s reusable tasks into the week in view.', {});
-tool('add_branch', 'Add a branch (category) to the week in view.',
+tool('add_branch', 'Add a branch (category) to the record in view: a week, or the Vision.',
   { label: z.string(), side: z.enum(['left', 'right']).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() });
 tool('rename_branch', 'Rename a branch (category) of the record in view: a week, or the Vision. The label is literal.',
   { branch: z.string().describe('Branch id or its exact name'), label: z.string() });

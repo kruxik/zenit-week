@@ -22,14 +22,14 @@ Severity: 🔴 severe · 🟠 medium · 🟡 minor
 
 | ID | Sev | Status | Where | Finding | Fix | Commit |
 |---|---|---|---|---|---|---|
-| DOCS-1 | 🟠 | ⬜ | CLAUDE.md:93 | "one of the three top-level views (`M` / `A` / `S`)" - there are four. | Four views, name `V`. | |
-| DOCS-2 | 🟠 | ⬜ | CLAUDE.md data model | `horizon`, `collapsed` and the separate vision record (IDB `misc` key `vision`, `weekData` holds it while the Vision is in view) are undocumented; a future agent can corrupt the Vision. | Add a short "Vision record" paragraph with a spec link. | |
-| DOCS-3 | 🟠 | ⬜ | mcp/manifest.json:89, 93 | `transfer_unfinished` / `transfer_reusable` descriptions are truncated ("previous week\\."), likely the apostrophe in "week's". | Fix the generator; add a test that manifest descriptions equal server.js. | |
+| DOCS-1 | 🟠 | ✅ | CLAUDE.md:93 | "one of the three top-level views (`M` / `A` / `S`)" - there are four. | Four views, name `V`. | |
+| DOCS-2 | 🟠 | ✅ | CLAUDE.md data model | `horizon`, `collapsed` and the separate vision record (IDB `misc` key `vision`, `weekData` holds it while the Vision is in view) are undocumented; a future agent can corrupt the Vision. | Add a short "Vision record" paragraph with a spec link. | |
+| DOCS-3 | 🟠 | ✅ | mcp/manifest.json:89, 93 | `transfer_unfinished` / `transfer_reusable` descriptions are truncated ("previous week\\."), likely the apostrophe in "week's". | Fix the generator; add a test that manifest descriptions equal server.js. | |
 | DOCS-4 | 🟠 | ⬜ | docs/specs/vision-canvas.md:3-5 | Header still names the branch and worktree; no Status line. | "Status: Implemented (merged 943a4d6)". | |
 | DOCS-5 | 🟠 | ⬜ | docs/specs/vision-canvas.md:351, 355 | AC 2 requires the removed first-open hint; AC 6 says horizon is an annotation (it is a badge icon). | Update both criteria. | |
 | DOCS-6 | 🟡 | ⬜ | docs/specs/vision-canvas.md:239, 245 | "One resource and one tool" - four tools shipped; cites bridge §8.3 instead of §8.4. | Say four tools, cite §8.4. | |
 | DOCS-7 | 🟡 | ⬜ | docs/specs/vision-canvas.md:90, 94, 276 | Stale call-site counts and line numbers. | Drop them. | |
-| DOCS-8 | 🟡 | ⬜ | mcp/server.js:250, mcp/manifest.json:97 | `add_branch` says "the week in view"; it acts on the record in view. | "record in view". | |
+| DOCS-8 | 🟡 | ✅ | mcp/server.js:250, mcp/manifest.json:97 | `add_branch` says "the week in view"; it acts on the record in view. | "record in view". | |
 | DOCS-9 | 🟡 | ⬜ | docs/specs/agent-bridge.md:3 | Status still "Implemented on branch `agent-bridge`". | Say merged; note the Vision extensions. | |
 | DOCS-10 | 🟡 | ⬜ | SPEC.md | Old stats spec, no Vision. | Decide whether SPEC.md should cover the product; otherwise leave. | |
 
@@ -55,9 +55,9 @@ Severity: 🔴 severe · 🟠 medium · 🟡 minor
 |---|---|---|---|---|---|---|
 | I18N-1 | 🟠 | ✅ | cs `help.vision.*` | Vykání ("chcete", "vzdali") in an app that uses tykání. | Rewrite in tykání. | 77c1a77 |
 | I18N-2 | 🟠 | ✅ | cs `filter.focusEnd`, `toast.controlsHidden`, `tips.dayFilter` | Vykání. | Tykání. | caf8081 |
-| I18N-3 | 🟡 | ✅ | cs `menu.focusBranch` vs `filter.focusShort` / `help.vision.focus` | "Zaměřit" vs "Fokus" for one concept. | One term. | |
-| I18N-4 | 🟡 | ✅ | `nav.prev`, `nav.next`, `weekbar.today`, `stats.trendWeek`, `filter.showing`, `filter.emptyDay`, `filter.emptyDayShort`, `stats.noUnplanned`, `help.fab` | Dead keys (last two referenced only by tests/i18n.test.js). | Remove from en + cs and the test. | |
-| I18N-5 | 🟡 | ✅ | cs `bridge.toast.*` | Masculine past tense ("Přidal", "Vrátil"). | Neutral form. | |
+| I18N-3 | 🟡 | ✅ | cs `menu.focusBranch` vs `filter.focusShort` / `help.vision.focus` | "Zaměřit" vs "Fokus" for one concept. | One term. | e4e0e75 |
+| I18N-4 | 🟡 | ✅ | `nav.prev`, `nav.next`, `weekbar.today`, `stats.trendWeek`, `filter.showing`, `filter.emptyDay`, `filter.emptyDayShort`, `stats.noUnplanned`, `help.fab` | Dead keys (last two referenced only by tests/i18n.test.js). | Remove from en + cs and the test. | e4e0e75 |
+| I18N-5 | 🟡 | ✅ | cs `bridge.toast.*` | Masculine past tense ("Přidal", "Vrátil"). | Neutral form. | e4e0e75 |
 | I18N-6 | 🟡 | ⬜ | cs terminology | Mixed "aktivita" / "úkol" (pre-existing). | Optional cleanup. | |
 
 ## ONB (Tips and Playground)
