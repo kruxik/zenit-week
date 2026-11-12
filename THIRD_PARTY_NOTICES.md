@@ -8,6 +8,22 @@ third-party software, each under its own licence as reproduced below.
 | [Tabler Icons](https://tabler.io/icons) | UI icons (inline SVG sprite in `zenit-week.html`) | MIT |
 | [ProseMirror](https://prosemirror.net) | Rich comment editor (lazy-loaded `vendor/editor.<hash>.js`) | MIT |
 
+## AI agents server (`mcp/`)
+
+The optional MCP server for AI agents (the `zenit-week-mcp` npm package and the
+`zenit-week.mcpb` Claude Desktop extension) is not part of the web app. It
+depends on the packages below. npm installs them from the registry, and the
+`.mcpb` bundle ships them in its `node_modules`, each with its own licence file.
+
+| Software | Used for | Licence |
+|---|---|---|
+| [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) | MCP server protocol | MIT |
+| [ws](https://github.com/websockets/ws) | Loopback connection to the app | MIT |
+| [zod](https://zod.dev) | Tool argument schemas | MIT |
+
+Their own dependencies (96 packages in all) are under MIT, ISC, BSD-2-Clause or
+BSD-3-Clause, all permissive. `npm ls --omit=dev --all` in `mcp/` lists them.
+
 ## Tabler Icons
 
 Copyright (c) 2020-2026 Paweł Kuna
