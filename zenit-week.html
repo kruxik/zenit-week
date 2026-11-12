@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-yZ8yVZwnrrlSDYeEIlmIZkM66XlXjt6uVuaQs6amNuw=';
+               'sha256-zNc4WG86r8Gnx78SWukN/kgz867gPGMrk8X6X+JraPU=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -2959,9 +2959,17 @@ function isProductionHost(hostname) {
      while the new one fades in, so both wear the active fill for a frame or two. */
   .help-close-btn { transition: background 0.15s, color 0.15s; }
 
-  .view-toggle-btn.active {
+  /* Tab state is two classes, written by syncViewTabs / setViewTabPress from
+     VIEW_TABS: `.active` is the view in place, `.pressed` the tab under the
+     finger until its view is applied - meanwhile the active tab lets go. */
+  .view-toggle-btn.active,
+  .view-toggle-btn.pressed {
     background: var(--view-btn-active-bg);
     color: var(--view-btn-active-text);
+  }
+  #view-toggle-bar:has(.pressed) .view-toggle-btn.active:not(.pressed) {
+    background: none;
+    color: var(--text-subtle);
   }
 
   @media (max-width: 767px) {
@@ -2990,16 +2998,14 @@ function isProductionHost(hostname) {
   }
 
   .view-toggle-btn { position: relative; }
-  /* The Vision is a map too: same row, same caret, on its own tab. */
-  html[data-view="mindmap"] #vtb-mindmap .vtb-caret,
-  html[data-view="vision"] #vtb-vision .vtb-caret { display: block; }
-  html.view-levels-open #vtb-mindmap .vtb-caret,
-  html.view-levels-open #vtb-vision .vtb-caret {
+  /* Only the map tabs (VIEW_TABS `again: 'levels'`) carry a caret; it shows on
+     the active one. */
+  .view-toggle-btn.active .vtb-caret { display: block; }
+  html.view-levels-open .vtb-caret {
     transform: rotate(180deg);
     opacity: 0.8;
   }
-  html.view-filtered #vtb-mindmap .vtb-caret,
-  html.view-filtered #vtb-vision .vtb-caret {
+  html.view-filtered .vtb-caret {
     border-bottom-color: var(--accent-primary);
     opacity: 1;
   }
@@ -3038,30 +3044,18 @@ function isProductionHost(hostname) {
       opacity: 1;
     }
   }
-  /* View-toggle pill: highlight the persisted view's button on first paint.
-     ID-based selectors override the static .active class in markup. */
-  html[data-view="agenda"]  #vtb-agenda,
-  html[data-view="mindmap"] #vtb-mindmap,
-  html[data-view="stats"]   #vtb-stats,
-  html[data-view="vision"]  #vtb-vision {
+  /* View tabs before the script runs: light the persisted view's tab (and its
+     caret) on first paint. The markup carries no `.active`; syncViewTabs sets
+     it and adds `view-tabs-ready`, which retires these rules for good. */
+  html:not(.view-tabs-ready)[data-view="agenda"]  #vtb-agenda,
+  html:not(.view-tabs-ready)[data-view="mindmap"] #vtb-mindmap,
+  html:not(.view-tabs-ready)[data-view="stats"]   #vtb-stats,
+  html:not(.view-tabs-ready)[data-view="vision"]  #vtb-vision {
     background: var(--view-btn-active-bg);
     color: var(--view-btn-active-text);
   }
-  /* `:not(:hover)` keeps this ID-specificity reset from outranking
-     `.view-toggle-btn:hover`, which would otherwise never paint. */
-  html[data-view="agenda"]  #vtb-mindmap:not(:hover),
-  html[data-view="agenda"]  #vtb-stats:not(:hover),
-  html[data-view="mindmap"] #vtb-agenda:not(:hover),
-  html[data-view="mindmap"] #vtb-stats:not(:hover),
-  html[data-view="stats"]   #vtb-agenda:not(:hover),
-  html[data-view="stats"]   #vtb-mindmap:not(:hover),
-  html:not([data-view="vision"]) #vtb-vision:not(:hover),
-  html[data-view="vision"]  #vtb-mindmap:not(:hover),
-  html[data-view="vision"]  #vtb-agenda:not(:hover),
-  html[data-view="vision"]  #vtb-stats:not(:hover) {
-    background: none;
-    color: var(--text-subtle);
-  }
+  html:not(.view-tabs-ready)[data-view="mindmap"] #vtb-mindmap .vtb-caret,
+  html:not(.view-tabs-ready)[data-view="vision"]  #vtb-vision .vtb-caret { display: block; }
   /* The Vision has no weeks and no days: the week bar and the day filter cell
      are not drawn there (their hotkeys are inert in the keydown handler). */
   html[data-view="vision"] #week-picker,
@@ -3075,24 +3069,6 @@ function isProductionHost(hostname) {
   /* ...and the horizon cell is drawn only there. */
   html:not([data-view="vision"]) #horizon-filter-btn,
   html:not([data-view="vision"]) #horizon-filter-btn + .view-level-separator { display: none; }
-  /* Pressed tab: on a phone the view's own frame lands ~150 ms after the tap,
-     so the tab the finger is on takes the highlight at pointerdown and the tab
-     being left gives it up. `data-press-view` is the destination, set by the
-     press and cleared by the click that switches (same frame) or a lost press. */
-  html[data-press-view="agenda"][data-view]  #vtb-agenda,
-  html[data-press-view="mindmap"][data-view] #vtb-mindmap,
-  html[data-press-view="stats"][data-view]   #vtb-stats,
-  html[data-press-view="vision"][data-view]  #vtb-vision {
-    background: var(--view-btn-active-bg);
-    color: var(--view-btn-active-text);
-  }
-  html[data-press-view]:not([data-press-view="agenda"])  #vtb-agenda,
-  html[data-press-view]:not([data-press-view="mindmap"]) #vtb-mindmap,
-  html[data-press-view]:not([data-press-view="stats"])   #vtb-stats,
-  html[data-press-view]:not([data-press-view="vision"])  #vtb-vision {
-    background: none;
-    color: var(--text-subtle);
-  }
 
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
   /* Window chrome comes from .app-panel; only the Agenda-specific bits live here:
@@ -4438,8 +4414,7 @@ function isProductionHost(hostname) {
       margin: -2px 0 0 0;
       transform: rotate(90deg);
     }
-    html.view-levels-open #vtb-mindmap .vtb-caret,
-    html.view-levels-open #vtb-vision .vtb-caret { transform: rotate(-90deg); }
+    html.view-levels-open .vtb-caret { transform: rotate(-90deg); }
 
     #view-level-bar {
       left: 62px;
@@ -5049,7 +5024,7 @@ Or remove them later in Settings → Help.</div>
     <span class="vtb-caret" aria-hidden="true"></span>
   </button>
   <div class="view-toggle-separator"></div>
-  <button type="button" class="view-toggle-btn active" id="vtb-mindmap">
+  <button type="button" class="view-toggle-btn" id="vtb-mindmap">
     <svg class="icon" aria-hidden="true" style="transform: rotate(-90deg)"><use href="#icon-sitemap"/></svg>
     <span data-i18n="view.mindmap">Mindmap</span>
     <span class="vtb-caret" aria-hidden="true"></span>
@@ -20881,9 +20856,8 @@ function _windowKeydownHandler(e) {
     if (key === 's') {
       if (!isTypingTarget(e.target)) {
         e.preventDefault();
-        // Toggle Stats; leaving lands on the default (mindmap). With Help open
-        // the press spends itself on dismissing Help, so Stats stays put.
-        switchView(currentView === 'stats' && !isHelpOpen() ? 'mindmap' : 'stats');
+        // The Stats tab's own rule (VIEW_TABS): a second press leaves for Mindmap.
+        switchView(viewTabTarget('stats'));
         return;
       }
     }
@@ -25922,10 +25896,57 @@ function isCommentDialogOpen() {
 // draws a week. A switch that swaps returns a promise and re-enters here with
 // `swapped` once the record is in place; one that does not runs synchronously,
 // as it always has. `swapped` also means the map is redrawn and refitted.
+//
+// The view tabs, in bar order. This one list drives every tab: its click, its
+// press feedback, its active state and the level-row disclosure. `again` is
+// what a click on the tab already in view does: 'levels' toggles the view-level
+// row (the map tabs), a view name leaves for that view (Stats back to Mindmap),
+// null re-enters the view. The DOM id is always `vtb-<view>`.
+const VIEW_TABS = [
+  { view: 'vision',  again: 'levels' },
+  { view: 'mindmap', again: 'levels' },
+  { view: 'agenda',  again: null },
+  { view: 'stats',   again: 'mindmap' },
+];
+const viewTabEl = (tab) => document.getElementById('vtb-' + tab.view);
+const viewTabFor = (view) => VIEW_TABS.find(tab => tab.view === view);
+
+// Where a click on a tab leads: a view name, or 'levels' for the row toggle.
+// With Help open a leave-for-another-view click spends itself on dismissing
+// Help, so the tab's own view is re-entered instead.
+function viewTabTarget(view) {
+  const tab = viewTabFor(view);
+  if (!tab || view !== currentView || !tab.again) return view;
+  if (tab.again !== 'levels' && isHelpOpen()) return view;
+  return tab.again;
+}
+
+// Pressed tab: on a phone the view's own frame lands ~150 ms after the tap, and
+// a switch to or from the Vision first loads a record. So the tab under the
+// finger wears `.pressed` from pointerdown until the view is actually applied
+// (syncViewTabs), and the active tab gives up its fill meanwhile (CSS `:has`).
+function setViewTabPress(view) {
+  for (const tab of VIEW_TABS) viewTabEl(tab).classList.toggle('pressed', tab.view === view);
+}
+function clearViewTabPress() { setViewTabPress(null); }
+
+// The one writer of the tabs' active state; runs in the same step that shows the
+// view, so the highlight and the view paint together. `view-tabs-ready` retires
+// the pre-paint CSS that lit the persisted tab before this first ran.
+function syncViewTabs(view) {
+  for (const tab of VIEW_TABS) viewTabEl(tab).classList.toggle('active', tab.view === view);
+  clearViewTabPress();
+  document.documentElement.classList.add('view-tabs-ready');
+}
+
 function switchView(view, opts) {
   const swapped = !!(opts && opts.swapped);
   if (!swapped && (view === 'vision') !== isVisionInView()) {
-    return swapMapRecordFor(view, () => switchView(view, { swapped: true }));
+    const swap = swapMapRecordFor(view, () => switchView(view, { swapped: true }));
+    // A failed load never applies the view, so it must not leave a tab pressed.
+    // (An overtaken one needs nothing: the switch that overtook it syncs the tabs.)
+    swap.catch(clearViewTabPress);
+    return swap;
   }
   // A switch that needs no swap still overtakes one that is loading: V and then
   // M before the vision arrived ends on the Mindmap, with the week.
@@ -25953,20 +25974,12 @@ function switchView(view, opts) {
   const overlayEl  = document.getElementById('agenda-overlay');
   const statsEl    = document.getElementById('stats-panel');
   const statsOvEl  = document.getElementById('stats-overlay');
-  const btnMM      = document.getElementById('vtb-mindmap');
-  const btnAG      = document.getElementById('vtb-agenda');
-  const btnST      = document.getElementById('vtb-stats');
   const isDesktop  = window.innerWidth >= 768;
 
   const isStats  = view === 'stats';
   const isAgenda = view === 'agenda';
 
-  // Pill highlight
-  btnMM.classList.toggle('active', view === 'mindmap');
-  const btnVI = document.getElementById('vtb-vision');
-  if (btnVI) btnVI.classList.toggle('active', view === 'vision');
-  btnAG.classList.toggle('active', isAgenda);
-  btnST.classList.toggle('active', isStats);
+  syncViewTabs(view);
 
   // Agenda layer
   agendaEl.classList.toggle('active', isAgenda);
@@ -27055,8 +27068,9 @@ function areViewLevelsOpen() {
 
 // Both map tabs (Mindmap and Vision) disclose the same row.
 function setMapTabsExpanded(open) {
-  ['vtb-mindmap', 'vtb-vision'].forEach(id =>
-    document.getElementById(id).setAttribute('aria-expanded', String(open)));
+  for (const tab of VIEW_TABS) {
+    if (tab.again === 'levels') viewTabEl(tab).setAttribute('aria-expanded', String(open));
+  }
 }
 
 function openViewLevels() {
@@ -31314,42 +31328,28 @@ window.addEventListener('load', async () => {
   applyTranslations();
   updateColorDots();
 
-  // View toggle bar
-  // Clicking the tab you are already on is the disclosure gesture for the
-  // view-level row; from any other view it just navigates, as before.
-  // Where a tab leads: Stats toggles back to the default (mindmap), except with
-  // Help open, where the click spends itself on dismissing Help.
-  const viewTabTarget = (view) =>
-    view === 'stats' && currentView === 'stats' && !isHelpOpen() ? 'mindmap' : view;
-  document.getElementById('vtb-mindmap').addEventListener('click', () => {
-    if (currentView === 'mindmap') toggleViewLevels();
-    else switchView('mindmap');
-  });
+  // View toggle bar: every tab is wired from VIEW_TABS. A click on the tab in
+  // view does the tab's `again`; from any other view it navigates. The press
+  // lights the destination tab at pointerdown and switchView clears it when the
+  // view is applied; a press that slides off or is cancelled clears it too.
   setMapTabsExpanded(false);
-  document.getElementById('vtb-agenda').addEventListener('click',  () => switchView('agenda'));
-  document.getElementById('vtb-vision').addEventListener('click', () => {
-    if (currentView === 'vision') toggleViewLevels();
-    else switchView('vision');
-  });
-  document.getElementById('vtb-stats').addEventListener('click', () => switchView(viewTabTarget('stats')));
-
-  // Press feedback: highlight the destination tab at pointerdown (see the
-  // `data-press-view` CSS). The click clears it in the same task that switches,
-  // so the highlight and the new view paint together; a press that slides off
-  // or is cancelled clears it too.
-  const clearViewPress = () => { delete document.documentElement.dataset.pressView; };
-  for (const view of ['mindmap', 'agenda', 'vision', 'stats']) {
-    const btn = document.getElementById('vtb-' + view);
+  for (const tab of VIEW_TABS) {
+    const btn = viewTabEl(tab);
+    btn.addEventListener('click', () => {
+      const target = viewTabTarget(tab.view);
+      if (target === 'levels') { clearViewTabPress(); toggleViewLevels(); }
+      else switchView(target);
+    });
     btn.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      document.documentElement.dataset.pressView = viewTabTarget(view);
+      const target = viewTabTarget(tab.view);
+      setViewTabPress(target === 'levels' ? tab.view : target);
     });
     btn.addEventListener('pointerup', (e) => {
       const under = document.elementFromPoint(e.clientX, e.clientY);
-      if (!under || !btn.contains(under)) clearViewPress();
+      if (!under || !btn.contains(under)) clearViewTabPress();
     });
-    btn.addEventListener('pointercancel', clearViewPress);
-    btn.addEventListener('click', clearViewPress);
+    btn.addEventListener('pointercancel', clearViewTabPress);
   }
 
   // Coachmark: teach the view controls on first hover of either bar.

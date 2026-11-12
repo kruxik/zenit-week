@@ -524,6 +524,7 @@ _state.getIDBStore = function() { return _idbStore; };
 _state.clearIDBStore = function() { for (const k in _idbStore) delete _idbStore[k]; };
 _state.getBranchConfig = function() { return BRANCH_CONFIG; };
 _state.getBranchColors = function() { return BRANCH_COLORS; };
+_state.getViewTabs = function() { return VIEW_TABS; };
 _state.resetPlaygroundNudge = function() { _playgroundNudgeDone = false; _playgroundNudgeShown = false; };
 _state.setPlaygroundNudgeDone = function(v) { _playgroundNudgeDone = v; };
 _state.resetTips = function() { _tipsEnabled = true; _tipsSeen = {}; _coachmarkVisible = false; };
@@ -1052,7 +1053,7 @@ export const {
   hexToHsv,
   hsvToHex,
   // View switching
-  switchView,
+  switchView, viewTabTarget, setViewTabPress,
   // Edge drawing
   taperedPathD,
   // Zoom
