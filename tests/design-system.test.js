@@ -161,9 +161,13 @@ const JS_CLASS_BASELINE = [
 // ---- 4. dialogs wear the dialog vocabulary --------------------------------
 
 // `role="dialog"` elements without `.dialog-shell` + `.dialog-header`, by id.
-const DIALOG_BASELINE = [
-  'week-picker-fold',
-];
+const DIALOG_BASELINE = [];
+
+// Dialogs that wear .dialog-shell but have no caption bar by design - an owner
+// decision, not a baseline. The week picker drops out of the toolbar like a
+// menu and closes on outside click, so it takes no caption and no X
+// (decided 2026-11-12). It must still wear .dialog-shell.
+const DIALOG_NO_CAPTION = ['week-picker-fold'];
 
 // ---- 5. literal colours live in tokens only --------------------------------
 
@@ -317,7 +321,7 @@ describe('design system guard', () => {
       }
       const inner = MARKUP.slice(m.index + m[0].length, end);
       const hasHeader = /\bclass="[^"]*\bdialog-header\b/.test(inner);
-      if (!classes.includes('dialog-shell') || !hasHeader) offenders.push(id);
+      if (!classes.includes('dialog-shell') || (!hasHeader && !DIALOG_NO_CAPTION.includes(id))) offenders.push(id);
     }
     expectBaseline(offenders, DIALOG_BASELINE,
       'a dialog is built from .dialog-shell / .dialog-header / .dialog-title / .dialog-body / .dialog-actions');
