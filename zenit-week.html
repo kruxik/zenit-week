@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-GMOK97ddRTCO+YiwG1Xhuzjb6J05Cfg1K+Bgs8uJapE=';
+               'sha256-z4/GfF+OmnHkFRo6uyZM4U0Lyb6dbUZ8qUGQx5hI2tU=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -4679,6 +4679,7 @@ function isProductionHost(hostname) {
   <symbol id="icon-settings" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
   <symbol id="icon-telescope" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 21l6 -5l6 5"/><path d="M12 13v8"/><path d="M3.294 13.678l.166 .281c.52 .88 1.624 1.265 2.605 .91l14.242 -5.165a1.023 1.023 0 0 0 .565 -1.456l-2.62 -4.705a1.087 1.087 0 0 0 -1.447 -.42l-.056 .032l-12.694 7.618c-1.02 .613 -1.357 1.897 -.76 2.905z"/><path d="M14 5l3 5.5"/></symbol>
   <symbol id="icon-focus" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11.5 12a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0" fill="currentColor"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/></symbol>
+  <symbol id="icon-current-location" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M4 12a8 8 0 1 0 16 0a8 8 0 1 0 -16 0"/><path d="M12 2l0 2"/><path d="M12 20l0 2"/><path d="M20 12l2 0"/><path d="M2 12l2 0"/></symbol>
   <symbol id="icon-chart-donut" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-3.8a4 4 0 1 1 -5 -5v-4a.9 .9 0 0 0 -1 -.8"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a9 9 0 0 0 -1 -1v-4.5"/></symbol>
   <symbol id="icon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
   <symbol id="icon-menu-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></symbol>
@@ -5027,6 +5028,7 @@ Or remove them later in Settings → Help.</div>
   <div class="ctx-separator" id="ctx-sep-2"></div>
   <div class="ctx-item" id="ctx-rename"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"/></svg> <span data-i18n="menu.rename">Rename</span></div>
   <div class="ctx-item" id="ctx-comment"><svg class="icon" aria-hidden="true"><use href="#icon-message"/></svg> <span data-i18n="menu.comment">Comment</span></div>
+  <div class="ctx-item" id="ctx-find-in-map"><svg class="icon" aria-hidden="true"><use href="#icon-current-location"/></svg> <span data-i18n="menu.findInMap">Find in mindmap</span></div>
   <div class="ctx-item" id="ctx-add-child"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg> <span data-i18n="menu.addActivity">Add Activity</span></div>
   <div class="ctx-item" id="ctx-collapse"><svg class="icon" aria-hidden="true"><use href="#icon-caret-up"/></svg> <span data-i18n="menu.collapse">Collapse</span></div>
   <div class="ctx-item" id="ctx-expand"><svg class="icon" aria-hidden="true"><use href="#icon-caret-down"/></svg> <span data-i18n="menu.expand">Expand</span></div>
@@ -13104,6 +13106,7 @@ const TRANSLATIONS = {
     'menu.collapse':              'Collapse',
     'menu.expand':                'Expand',
     'menu.focusBranch':           'Focus branch',
+    'menu.findInMap':             'Find in mindmap',
     'menu.takeBack':              'Take back',
     'menu.horizon.year':          'This year',
     'menu.horizon.years':         'In a few years',
@@ -13643,6 +13646,7 @@ const TRANSLATIONS = {
     'menu.collapse':              'Sbalit',
     'menu.expand':                'Rozbalit',
     'menu.focusBranch':           'Zaměřit větev',
+    'menu.findInMap':             'Najít v mapě',
     'menu.takeBack':              'Vzít zpět',
     'menu.horizon.year':          'Letos',
     'menu.horizon.years':         'Za pár let',
@@ -17882,6 +17886,72 @@ function smoothPanToRevealNode(nodeId) {
       nodeScreenY > margin && nodeScreenY < cH - margin) return;
 
   animatePanTo(cW / 2 - pos.x * zoom, cH / 2 - pos.y * zoom, nodeId, 350, positions);
+}
+
+// The zoom "Find in mindmap" lands on: close enough to read the node, but never
+// further out than the user already is.
+const FIND_ZOOM = 1;
+
+// Eased tween of zoom and pan together, sharing the pan animation's slot so a
+// newer pan or zoom request cancels it and tips wait for it to settle.
+function animateViewTo(targetZoom, targetPanX, targetPanY, duration, onDone) {
+  const myToken = ++_panAnimToken;
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const finish = () => {
+    zoom = targetZoom; panX = targetPanX; panY = targetPanY;
+    applyTransform();
+    endPanAnimation();
+    if (onDone) onDone();
+  };
+  if (reduce) { finish(); return; }
+  _panAnimating = true;
+  _panTargetX = targetPanX;
+  _panTargetY = targetPanY;
+  const startZoom = zoom, startX = panX, startY = panY;
+  const startTime = performance.now();
+  const ease = t => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
+  function step(now) {
+    if (myToken !== _panAnimToken) return;   // superseded by a newer call
+    const t = Math.min((now - startTime) / duration, 1);
+    if (t >= 1) { finish(); return; }
+    const e = ease(t);
+    // Zoom eases on a log scale so the zoom-in reads as an even push, not a lurch.
+    zoom = startZoom * Math.pow(targetZoom / startZoom, e);
+    panX = startX + (targetPanX - startX) * e;
+    panY = startY + (targetPanY - startY) * e;
+    applyTransform();
+    requestAnimationFrame(step);
+  }
+  // Frames stop in a hidden tab: the end is also promised on a timer.
+  setTimeout(() => { if (myToken === _panAnimToken && _panAnimating) finish(); }, duration + 80);
+  requestAnimationFrame(step);
+}
+
+// Agenda's "Find in mindmap": show the map, zoom in on the task and pulse it
+// with the tips' ring. A lone day leaf is drawn on its task, so the task is the
+// target; a filter that prunes the target away is cleared first.
+function findInMindmap(nodeId) {
+  let node = findNode(nodeId);
+  if (!node) return;
+  if (isHiddenDayLeaf(node)) node = findNode(node.parent) || node;
+  const id = node.id;
+  if (currentView !== 'mindmap') switchView('mindmap');
+  let positions = computeLayout();
+  if (!positions[id] || nodeGroupEl(id)?.classList.contains('view-hidden')) {
+    if (clearMapFilters()) renderIfVisible();
+    positions = computeLayout();
+  }
+  const pos = positions[id];
+  if (!pos) return;
+  const svg = document.getElementById('main-svg');
+  const rect = container.getBoundingClientRect();
+  const band = mindmapClearBand(svg, rect.height);
+  const targetZoom = Math.min(ZOOM_MAX, Math.max(zoom, FIND_ZOOM));
+  const targetPanX = rect.width / 2 - pos.x * targetZoom;
+  const targetPanY = (band.top + band.bottom) / 2 - pos.y * targetZoom;
+  animateViewTo(targetZoom, targetPanX, targetPanY, 450, () => {
+    pulseCoachmarkAnchor(nodeGroupEl(id));
+  });
 }
 
 // A new child activity of `parent`, inheriting the parent's branch and its
@@ -22255,6 +22325,8 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
   const isCommentable = isActivity && !isTick && !commentOwner(node).dayChild;
   document.getElementById('ctx-comment').style.display   = isCommentable ? '' : 'none';
+  // Only the Agenda needs a way to the map; on the map the node is already there.
+  document.getElementById('ctx-find-in-map').style.display = (currentView === 'agenda' && isActivity) ? '' : 'none';
   document.getElementById('ctx-reschedule').style.display = ((isStdActivity || isTick) && !node.done) ? '' : 'none';
 
   // Color change (branch only)
@@ -23369,6 +23441,12 @@ document.getElementById('ctx-comment').addEventListener('click', () => {
   // The comment dialog sits below the quick-add panel, so the panel yields.
   if (window.isQuickAddOpen()) window.closeQuickAdd();
   if (id) openCommentDialog(commentOwner(findNode(id))?.id || id);
+});
+
+document.getElementById('ctx-find-in-map').addEventListener('click', () => {
+  const id = contextTarget;
+  hideContextMenu();
+  if (id) findInMindmap(id);
 });
 
 // ─── Comment grammar ──────────────────────────────────────────────────────────
@@ -26690,11 +26768,7 @@ async function resetView() {
   // "Show me the whole week" - so every filter that is hiding part of it goes:
   // the day filter and the view level both prune the map, and a fit to a pruned
   // map is a fit to the wrong thing.
-  const hadFilter = activeDayFilter !== null || activeHorizonFilter !== null || currentViewLevel !== 'full';
-  activeDayFilter = null;
-  activeHorizonFilter = null;
-  applyViewLevel('full');
-  closeViewLevels({ force: true }); // nothing left to name, so the row goes too
+  const hadFilter = clearMapFilters();
   if (currentWeekKey !== todayWeekKey()) {
     await loadAndRender(todayWeekKey());
   } else if (hadFilter) {
@@ -26703,6 +26777,17 @@ async function resetView() {
 
   clearBranchFocus(); // the whole map, so a branch focus goes too
   fitMindmapView();
+}
+
+// Drops every filter that prunes the map (day, horizon, view level) and the
+// level row that names them. Returns whether any was on; the caller re-renders.
+function clearMapFilters() {
+  const hadFilter = activeDayFilter !== null || activeHorizonFilter !== null || currentViewLevel !== 'full';
+  activeDayFilter = null;
+  activeHorizonFilter = null;
+  applyViewLevel('full');
+  closeViewLevels({ force: true }); // nothing left to name, so the row goes too
+  return hadFilter;
 }
 
 function applyAutoLayout() {
