@@ -1,7 +1,7 @@
 # SPEC - Vision Canvas
 
 > Source idea: `docs/ideas/vision-canvas.md`
-> Branch: `vision-canvas` (worktree `../zenit-week-vision-canvas`, off `main` at `5f75429`)
+> Status: Implemented - merged into `main` on 2026-11-12 (`943a4d6`).
 > Scope: a second map record, a fourth top-level view, and the agent surface for it. Touches storage, Drive sync, undo, the renderer's write paths, the context menu, hotkeys, both languages and the MCP server.
 
 ---
@@ -87,7 +87,7 @@ Stripping, not refusing: a record that arrives via Drive from an older build, or
 
 ### 3.1 The record in view
 
-Today the renderer and every edit function read one global, `weekData`, and 28 call sites persist it with `saveWeek(currentWeekKey, weekData)`. The Vision does not introduce a second global for the map to read. Instead:
+Today the renderer and every edit function read one global, `weekData`, and its call sites persisted it with `saveWeek(currentWeekKey, weekData)`. The Vision does not introduce a second global for the map to read. Instead:
 
 - `weekData` keeps its name and stays **the record the map is drawing**. While the Vision view is open it holds the vision record; otherwise the week.
 - One new descriptor, `mapRecord`, says which: `{ kind: 'week' }` or `{ kind: 'vision' }`. `currentWeekKey` is untouched by the Vision and keeps naming the week the week bar is on.
@@ -236,13 +236,13 @@ Toasts: *Let go* / *Taken back* replace *Dropped* / *Undone* when the record is 
 
 ## 6. Agent surface
 
-The bridge spec (`docs/specs/agent-bridge.md`, section 8) gains one resource and one tool; the existing node tools reach vision nodes by id. "The week in view" generalises to **the record in view** everywhere section 7 of that spec says it.
+The bridge spec (`docs/specs/agent-bridge.md`, section 8) gains one resource and four tools (`open_vision`, `set_horizon`, `rename_branch`, `delete_branch`); the existing node tools reach vision nodes by id. "The week in view" generalises to **the record in view** everywhere section 7 of that spec says it.
 
 ### 6.1 Resource
 
 | # | URI | Content |
 |---|---|---|
-| 1 | `zenit://vision` | The vision record projected like section 8.3 of the bridge spec: `{ branches: [{ id, label, color, intentions: [{ id, label, priority, horizon, letGo, letGoAt, comments, children: [...] }] }] }`. From memory when the Vision is in view, else `loadVision()`. `collapsed`, positions and stamps omitted. Wire call `read_vision`, added to `READ_TOOLS`. |
+| 1 | `zenit://vision` | The vision record projected as section 8.4 of the bridge spec defines: `{ branches: [{ id, label, color, intentions: [{ id, label, priority, horizon, letGo, letGoAt, comments, children: [...] }] }] }`. From memory when the Vision is in view, else `loadVision()`. `collapsed`, positions and stamps omitted. Wire call `read_vision`, added to `READ_TOOLS`. |
 
 `urisForWeekSaved` gets a sibling `urisForVisionSaved()` returning `['zenit://vision']`, and `saveVision` calls `bridgeNotifyVisionSaved` with the record's content signature so a no-op save stays silent, as weeks do.
 
@@ -271,12 +271,12 @@ No `recommend` tool. The recommendation is the agent's reasoning over `zenit://v
 |---|---|---|
 | 1 | Storage (`loadSchedule` / `saveSchedule` neighbourhood) | `VISION_STORAGE_KEY`, `loadVision`, `saveVision`, `validateAndRepairVision`, `emptyVision`. |
 | 2 | Drive sync (`syncScheduleToDrive` / `-FromDrive`, `_wKeyForDriveFileName`, `pollDriveChanges`, `initDriveSync`) | Vision twins of the schedule paths; `'vision'` as a non-week key. |
-| 3 | Drive week merge (line ~9571) | `mapRecord.kind === 'week'` guard. |
+| 3 | Drive week merge | `mapRecord.kind === 'week'` guard. |
 | 4 | `tabChannel` receiver | `wk: 'vision'` handled. |
 | 5 | `switchView` | Fourth view; record swap first; week bar and filter strip visibility; `_mapDirty` logic extended to the Vision's canvas. |
 | 6 | `_windowKeydownHandler` | `V` for Vision, cycle view level moved to `W`; inert groups per section 3.6; Esc entries. |
 | 7 | `takeSnapshot`, `undo`, `redo`, `_bridgeRollback`, `updateUndoRedoButtons` | Active stack pair. |
-| 8 | 28 × `saveWeek(currentWeekKey, weekData)` | `saveMapRecord()`. |
+| 8 | Every `saveWeek(currentWeekKey, weekData)` | `saveMapRecord()`. |
 | 9 | `setStatus`, `toggleReusableNode`, `setActivityDays`, `setTickDay`, `sendNodeToDate`, `moveNodeToWeek`, `transferUnfinished`, `transferReusable`, `clearWeek`, baseline | Vision guard, no snapshot, no toast. |
 | 10 | `commitEdit`, `applyLabelEdit` | Skip label magic and day tokens on the Vision. |
 | 11 | `computeLayout` | `collapsed` pruning; focus bounding box. |
@@ -348,12 +348,12 @@ Manual: drag, zoom, pan, collapse badge, focus and Esc, comment editor round tri
 | # | Criterion |
 |---|---|
 | 1 | `V` (and the fourth toggle button) opens the Vision from any view; `M`, `A`, `S`, `L` leave it; reload restores it. |
-| 2 | First open on a fresh, signed-out device shows the week's branches, empty, with the hint; first open on a second signed-in device shows the first device's vision, not a seed. |
+| 2 | First open on a fresh, signed-out device shows the week's branches, empty; first open on a second signed-in device shows the first device's vision, not a seed. |
 | 3 | Add, rename, comment, priority, drag, reorder, branch add / colour / side flip, delete all work on the Vision and survive reload, a second tab and a second device. |
 | 4 | `X` on an intention lets it go (Dropped drawing, *Let go* toast); `U` takes it back; `D` does nothing. |
 | 5 | A label `Pushups 10x` on the Vision is a literal label with no children. |
-| 6 | Horizon shows as an annotation, is set from the menu and the bridge, merges across devices. |
-| 7 | Collapse hides the subtree with a correct count, takes no undo entry, syncs as layout; Focus fits the branch, dims the rest, Esc clears it. |
+| 6 | Horizon shows as a badge icon, is set from the menu and the bridge, merges across devices. |
+| 7 | Collapse hides the subtree with a correct count, takes no undo entry, syncs as layout; Focus fits the branch, folds and dims the rest, Esc clears it. |
 | 8 | A comment on an intention opens and saves through the one comment editor, as on a week. |
 | 9 | Ctrl+Z on the Vision undoes only Vision edits; switching to the week and pressing Ctrl+Z undoes the last week edit. |
 | 10 | While the Vision is open, a week change from another device lands in IDB and is on the map when the user returns to the Mindmap; the Vision never shows week nodes. |

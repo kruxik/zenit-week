@@ -73,10 +73,10 @@ Removes only nodes still carrying `_demo: true`, preserving everything the user 
 - After cleanup, set `zenit-week-onboarded` already true; nothing re-seeds.
 
 ### 5b. Gentle auto-nudge - recommended default
-- **Trigger:** the first boot/interaction where **both**: (a) the user has touched-or-created **≥ 3** nodes (count of non-`_demo` nodes minus the seed's original branch count, i.e. real user nodes ≥ 3), **and** (b) **≥ 1** `_demo` node still remains.
+- **Trigger:** the first boot/interaction where **both**: (a) the user has touched-or-created **≥ 7** nodes (count of non-`_demo` nodes minus the seed's original branch count, i.e. real user nodes ≥ 7, `PLAYGROUND_NUDGE_THRESHOLD`), **and** (b) **≥ 1** `_demo` node still remains.
 - **Form:** a non-blocking, dismissible inline banner/toast: *"Done exploring? Clear the example tasks and keep your own."* with a **Clear** button (runs 5a) and a **Dismiss**.
 - **Frequency:** show **once**. On dismiss or action, set `zenit-week-playground-nudged = true` in `misc`; never nudge again.
-- Rationale for 3: low enough to fire in the first real session, high enough that it doesn't pop on the first accidental edit.
+- Rationale for 7 (raised from the original 3): late enough that the user has started a real week, early enough to fire in the first real session.
 
 ## 6. i18n
 All new strings (`#playground` is not user-visible) added to both `TRANSLATIONS.en` and `TRANSLATIONS.cs` via `t(key)`:

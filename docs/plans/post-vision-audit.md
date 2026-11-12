@@ -22,15 +22,15 @@ Severity: 🔴 severe · 🟠 medium · 🟡 minor
 
 | ID | Sev | Status | Where | Finding | Fix | Commit |
 |---|---|---|---|---|---|---|
-| DOCS-1 | 🟠 | ✅ | CLAUDE.md:93 | "one of the three top-level views (`M` / `A` / `S`)" - there are four. | Four views, name `V`. | |
-| DOCS-2 | 🟠 | ✅ | CLAUDE.md data model | `horizon`, `collapsed` and the separate vision record (IDB `misc` key `vision`, `weekData` holds it while the Vision is in view) are undocumented; a future agent can corrupt the Vision. | Add a short "Vision record" paragraph with a spec link. | |
-| DOCS-3 | 🟠 | ✅ | mcp/manifest.json:89, 93 | `transfer_unfinished` / `transfer_reusable` descriptions are truncated ("previous week\\."), likely the apostrophe in "week's". | Fix the generator; add a test that manifest descriptions equal server.js. | |
-| DOCS-4 | 🟠 | ⬜ | docs/specs/vision-canvas.md:3-5 | Header still names the branch and worktree; no Status line. | "Status: Implemented (merged 943a4d6)". | |
-| DOCS-5 | 🟠 | ⬜ | docs/specs/vision-canvas.md:351, 355 | AC 2 requires the removed first-open hint; AC 6 says horizon is an annotation (it is a badge icon). | Update both criteria. | |
-| DOCS-6 | 🟡 | ⬜ | docs/specs/vision-canvas.md:239, 245 | "One resource and one tool" - four tools shipped; cites bridge §8.3 instead of §8.4. | Say four tools, cite §8.4. | |
-| DOCS-7 | 🟡 | ⬜ | docs/specs/vision-canvas.md:90, 94, 276 | Stale call-site counts and line numbers. | Drop them. | |
-| DOCS-8 | 🟡 | ✅ | mcp/server.js:250, mcp/manifest.json:97 | `add_branch` says "the week in view"; it acts on the record in view. | "record in view". | |
-| DOCS-9 | 🟡 | ⬜ | docs/specs/agent-bridge.md:3 | Status still "Implemented on branch `agent-bridge`". | Say merged; note the Vision extensions. | |
+| DOCS-1 | 🟠 | ✅ | CLAUDE.md:93 | "one of the three top-level views (`M` / `A` / `S`)" - there are four. | Four views, name `V`. | f8e54c9 |
+| DOCS-2 | 🟠 | ✅ | CLAUDE.md data model | `horizon`, `collapsed` and the separate vision record (IDB `misc` key `vision`, `weekData` holds it while the Vision is in view) are undocumented; a future agent can corrupt the Vision. | Add a short "Vision record" paragraph with a spec link. | f8e54c9 |
+| DOCS-3 | 🟠 | ✅ | mcp/manifest.json:89, 93 | `transfer_unfinished` / `transfer_reusable` descriptions are truncated ("previous week\\."), likely the apostrophe in "week's". | Fix the generator; add a test that manifest descriptions equal server.js. | f8e54c9 |
+| DOCS-4 | 🟠 | ✅ | docs/specs/vision-canvas.md:3-5 | Header still names the branch and worktree; no Status line. | "Status: Implemented (merged 943a4d6)". | |
+| DOCS-5 | 🟠 | ✅ | docs/specs/vision-canvas.md:351, 355 | AC 2 requires the removed first-open hint; AC 6 says horizon is an annotation (it is a badge icon). | Update both criteria. | |
+| DOCS-6 | 🟡 | ✅ | docs/specs/vision-canvas.md:239, 245 | "One resource and one tool" - four tools shipped; cites bridge §8.3 instead of §8.4. | Say four tools, cite §8.4. | |
+| DOCS-7 | 🟡 | ✅ | docs/specs/vision-canvas.md:90, 94, 276 | Stale call-site counts and line numbers. | Drop them. | |
+| DOCS-8 | 🟡 | ✅ | mcp/server.js:250, mcp/manifest.json:97 | `add_branch` says "the week in view"; it acts on the record in view. | "record in view". | f8e54c9 |
+| DOCS-9 | 🟡 | ✅ | docs/specs/agent-bridge.md:3 | Status still "Implemented on branch `agent-bridge`". | Say merged; note the Vision extensions. | |
 | DOCS-10 | 🟡 | ⬜ | SPEC.md | Old stats spec, no Vision. | Decide whether SPEC.md should cover the product; otherwise leave. | |
 
 ## UI (English UI text and Help)
@@ -72,8 +72,8 @@ Coachmarks in HINTS order: 1 done, 2 unplanned, 3 counter, 4 days, 5 priority, 6
 | ONB-4 | 🟠 | ⏸️ | HINTS #15 (31208) | Day-filter tip is hidden on the Vision; `#horizon-filter-btn` has no tip. | Add a horizon hint. | |
 | ONB-5 | 🟡 | ⬜ | Hints #5, #7, #11 | Say "task" when shown on the Vision. | Vision wording when `isVisionInView()`. | |
 | ONB-6 | 🟡 | ⏸️ | Hints #13, #14 | Week-nav tip unreachable on the Vision; Quick add on the Vision undecided. | Decide Quick add on the Vision. | |
-| ONB-7 | 🟡 | ⬜ | docs/specs/onboarding-part-b-coachmarks.md | Status Draft, 4 hints vs 15 in code, stale §7 sync section. | Rewrite to match code. | |
-| ONB-8 | 🟡 | ⬜ | docs/specs/onboarding-part-a-playground.md:76 | Nudge threshold 3 in spec, 7 in code. | Update to 7. | |
+| ONB-7 | 🟡 | ✅ | docs/specs/onboarding-part-b-coachmarks.md | Status Draft, 4 hints vs 15 in code, stale §7 sync section. | Rewrite to match code. | |
+| ONB-8 | 🟡 | ✅ | docs/specs/onboarding-part-a-playground.md:76 | Nudge threshold 3 in spec, 7 in code. | Update to 7. | |
 
 ## WEB (Landing pages)
 

@@ -1,6 +1,6 @@
 # Spec - Onboarding Part B: Progressive Coachmarks
 
-Status: **Draft** · Owner: Petr · Branch: `feature/onboarding-playground` (no merge soon; fine-tuning expected)
+Status: **Implemented** on `main` · Owner: Petr. The `HINTS` registry in `zenit-week.html` is the source of truth for the catalog; sections 4 and 7 below were brought up to date on 2026-11-12, the build slices in section 6 are history.
 Relates to: [`onboarding-part-a-playground.md`](onboarding-part-a-playground.md) · [`../ideas/onboarding-playground-week.md`](../ideas/onboarding-playground-week.md)
 
 ## 1. Goal
@@ -8,10 +8,10 @@ Teach features at the moment they're relevant. The first time a user reaches a g
 
 ## 2. Confirmed decisions
 - **Audience / reset:** All users (not just playground), **once-ever per hint**. Seen-state persisted.
-- **Persistence:** **Local-first** in IndexedDB behind a small seam. Cross-device Drive sync added **later**, once the colors/settings-sync path is fixed (see §7 - known bug, owned by user on `main`). Do not build sync on the colors blob until then.
+- **Persistence:** seen-state (`zenit-week-tips-seen`, capped at `MAX_TIPS_SEEN`) and the Show tips switch are stored locally and synced across devices in the settings (colors) blob on Drive. Both are device facts kept by every local wipe (`ONBOARDING_DEVICE_KEYS`).
 - **UI:** **Coachmark bubble** anchored to the target element, with an arrow pointing at it, body text, a **Got it** button, and a subtle line that tips can be turned off in Settings.
 - **Global toggle:** A **"Show tips"** setting (default ON) in Settings. When OFF, no coachmarks fire.
-- **Pacing:** **Explicit "Got it"**, one coachmark on screen at a time; marked seen on dismiss. Each coachmark notes tips can be disabled in Settings (so "Got it" isn't the only signal).
+- **Pacing:** one coachmark on screen at a time; marked seen on "Got it" or Esc, or once it has been on screen for `COACHMARK_SEEN_MS` (1.5 s), so a tip read and moved past is not shown again. Each coachmark notes tips can be disabled in Settings (so "Got it" isn't the only signal).
 - **First batch of hints:** Core hover keys · Magic counters & days · Views & navigation. (Context menu deferred.)
 
 ## 3. The hint engine
@@ -51,15 +51,28 @@ A thin module so sync can be added in one place later:
 - Styled to match app surfaces (reuse tokens; "Got it" = `.agenda-action-btn`).
 - Esc dismisses (counts as seen). Clicking elsewhere does **not** dismiss (avoid accidental skip) - TBD, tune in PB1.
 
-## 4. Hint catalog (first batch)
-| id | Trigger (first occurrence) | Anchor | Body (gist) |
-|----|----------------------------|--------|-------------|
-| `hover-keys` | First hover over an activity node | the hovered node | "Enter rename · Tab add · D done · U unplanned · Del remove" |
-| `counter` | First time a counter node is rendered/seen (label `Nx`) | the counter node | "Type `Nx` for a progress counter - click to tick up" |
-| `days` | First time a day-scheduled item appears, or `(mo)`-style token used | the node / agenda row | "Add `(mo, we)` or `(daily)` to schedule across days" |
-| `views` | First manual view-toggle or zoom interaction | view-toggle / zoom bar | "Switch Mindmap ⇄ Agenda · zoom Rocks · Pebbles · Sand" |
+## 4. Hint catalog
+Fifteen hints, in `HINTS` order. Each is either a plain text (`textKey`) or an intro with kbd rows (`introKey` + `keys`); some carry touch variants (`touchCaptionKey`, `touchTextKey`). Triggers live at the call sites, not in the registry.
 
-Triggers (especially `views`/`days`) are the most likely to need tuning - keep each trigger isolated so it can be adjusted independently.
+| # | id | Teaches |
+|---|----|---------|
+| 1 | `done` | Marking done |
+| 2 | `unplanned` | Unplanned tasks |
+| 3 | `counter` | `Nx` ticks |
+| 4 | `days` | Day selectors |
+| 5 | `priority` | Priority and its layout weight |
+| 6 | `inbox` | The quick-add inbox |
+| 7 | `hover-keys` | Hotkeys on a hovered or focused node (touch variant) |
+| 8 | `undo` | Undo / redo |
+| 9 | `views` | The four views (V / M / A / S) |
+| 10 | `levels` | Rocks / Pebbles / Sand (`W`) |
+| 11 | `root` | The root node |
+| 12 | `signin` | Drive sign-in |
+| 13 | `weeknav` | Week navigation |
+| 14 | `quickadd` | Quick add (`Q`) |
+| 15 | `dayfilter` | The day filter |
+
+Vision-specific hints (first open, horizon filter) are not built yet: see `docs/plans/post-vision-audit.md` ONB-3 / ONB-4.
 
 ## 5. Settings toggle
 - Add a "Show tips" row to the Settings dropdown (near theme/lang), checkbox/switch, default ON.
@@ -74,8 +87,8 @@ Triggers (especially `views`/`days`) are the most likely to need tuning - keep e
 
 Each slice: code + EN/CS + vitest for pure logic (gating/seam) + `npm test` & `npm run validate` green.
 
-## 7. Known blocker for cross-device sync (flagged, not owned here)
-`syncColorsToDrive()` reads the settings blob from `localStorage`, but it's stored only in IndexedDB → theme/lang/colors likely never push to Drive. The user will fix this on `main`. Until then Part B is **local-only**; the storage seam (§3) is where Drive sync attaches afterward.
+## 7. Cross-device sync
+Resolved: the settings blob syncs through Drive, and seen-state and the Show tips switch ride on it (section 2). A hint seen on one device is not shown on another.
 
 ## 8. Acceptance criteria (whole of Part B)
 1. Each hint fires at most once ever (persists across reloads).
