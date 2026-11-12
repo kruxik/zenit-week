@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { _state, saveWeekIDB } from './setup.js';
+import { _state, saveWeekIDB, sandboxGlobal } from './setup.js';
 
 const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8');
 const TABS = ['account', 'general', 'ai', 'data', 'dev'];
@@ -120,6 +120,69 @@ describe('Settings dialog tabs', () => {
     for (const fn of overlay._listeners.click) fn({ target: el('settings-dialog') });
     expect(_state.isSettingsOpen()).toBe(true);
     for (const fn of overlay._listeners.click) fn({ target: overlay });
+    expect(_state.isSettingsOpen()).toBe(false);
+  });
+});
+
+describe('Settings list layout (portrait phone)', () => {
+  const LIST = '(max-width: 520px)';
+  const setList = (on) => { sandboxGlobal.window.matchMedia(LIST).matches = on; };
+  const drilled = () => el('settings-dialog').classList.contains('settings-drilled');
+  const click = (id) => {
+    for (const fn of el('settings-tabs')._listeners.click) fn({ target: { closest: () => ({ id }) } });
+  };
+  const esc = () => _state.triggerKeydown({
+    key: 'Escape', preventDefault: () => {}, stopPropagation: () => {},
+    target: { tagName: 'DIV' }, metaKey: false, ctrlKey: false, shiftKey: false,
+  });
+
+  beforeEach(() => {
+    _state.setEditState(null);
+    _state.setSyncStatus('disconnected');
+    _state.selectSettingsTab('account');
+    _state.closeSettings();
+    setList(true);
+  });
+
+  it('opens on the list, and a row opens its section', () => {
+    _state.openSettings();
+    expect(drilled()).toBe(false);
+    click('settings-tab-data');
+    expect(drilled()).toBe(true);
+    expect(_state.getSettingsTab()).toBe('data');
+  });
+
+  it('goes back to the list on the back arrow and on the first Esc, closing on the second', () => {
+    _state.openSettings();
+    click('settings-tab-general');
+    for (const fn of el('settings-back')._listeners.click) fn({});
+    expect(drilled()).toBe(false);
+    click('settings-tab-general');
+    esc();
+    expect(drilled()).toBe(false);
+    expect(_state.isSettingsOpen()).toBe(true);
+    esc();
+    expect(_state.isSettingsOpen()).toBe(false);
+  });
+
+  it('reopens on the list, or on Account when sync is in error', () => {
+    _state.openSettings();
+    click('settings-tab-data');
+    _state.closeSettings();
+    _state.openSettings();
+    expect(drilled()).toBe(false);
+    _state.closeSettings();
+    _state.setSyncStatus('error');
+    _state.openSettings();
+    expect(drilled()).toBe(true);
+    expect(_state.getSettingsTab()).toBe('account');
+  });
+
+  it('leaves the sidebar alone: Esc closes at once', () => {
+    setList(false);
+    _state.openSettings();
+    click('settings-tab-data');
+    esc();
     expect(_state.isSettingsOpen()).toBe(false);
   });
 });
