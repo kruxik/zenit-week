@@ -25,7 +25,7 @@ Both parts work for guided mentees *and* cold web visitors - nothing depends on 
 - **Seed content:** reuse the week currently depicted in `screenshot.svg` as the seed `weekData` (to be refined later by the author).
 - Seed nodes flagged `_demo: true`; flag drops on any edit/move/status/counter/child-add to that node.
 - **Cleanup:** gentle auto-nudge once the user has created/touched enough of their own nodes, plus a manual action; both route through `showAppConfirm` (no browser dialogs) and delete only remaining `_demo` nodes.
-- EN + CS strings via existing `TRANSLATIONS`; any buttons reuse `.agenda-action-btn`.
+- EN + CS strings via existing `TRANSLATIONS`; any buttons reuse `.btn`.
 
 **Out of MVP:**
 - Progressive hint engine + seen-hints tracking + per-context triggers (**Part B**, separate build).

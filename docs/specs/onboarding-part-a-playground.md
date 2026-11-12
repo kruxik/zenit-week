@@ -85,7 +85,7 @@ The first time the Vision opens while the week still holds untouched examples, `
 All new strings (`#playground` is not user-visible) added to both `TRANSLATIONS.en` and `TRANSLATIONS.cs` via `t(key)`:
 - `onboarding.clearExample` (button), `onboarding.clearConfirmTitle`, `onboarding.clearConfirmBody`, `onboarding.clearConfirmOk`, `onboarding.nudge`, `onboarding.nudgeDismiss`.
 
-Buttons reuse `.agenda-action-btn`; confirm uses the existing danger variant tokens.
+Buttons reuse `.btn`; confirm uses the existing danger variant tokens.
 
 ## 7. Acceptance criteria
 1. Fresh profile (empty IDB) → on first load the current week shows the full seeded mindmap; agenda and summary/balance panels are populated. ✅ when visible without any user action.

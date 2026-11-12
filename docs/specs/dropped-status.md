@@ -287,7 +287,7 @@ Per `CLAUDE.md`, non-negotiable:
 - SVG via `document.createElementNS('http://www.w3.org/2000/svg', tag)`.
 - **Never** `innerHTML`/`outerHTML`/`insertAdjacentHTML` with user-controlled strings. Node labels reach the delete dialog and the agenda rows - use `textContent`. The only permitted `innerHTML` is a fully static constant such as `iconSvg()`.
 - No browser-native `confirm()`/`alert()`/`prompt()` - the delete flow uses `showAppConfirm`, which is already the case.
-- Reuse `.agenda-action-btn`; do not invent a button class. The `.danger` variant exists in confirm dialogs only.
+- Reuse `.btn`; do not invent a button class. The `.danger` variant exists in confirm dialogs only.
 - Surgical `updateNodeUI()` over full `render()` where the change is visual-only. Dropping changes layout only via the badge width, so a full render is needed when the badge appears or disappears - mirror how `unplanned` sets `fullRenderNeeded = true`.
 
 ---

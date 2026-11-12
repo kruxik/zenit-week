@@ -87,7 +87,7 @@ npm run screenshots && npm run hero:svg   # only if regenerating canonical scree
 ## 4. Project Structure (within the single file)
 
 All in `zenit-week.html` - **single-file policy, never split.**
-- **CSS:** new rules in the existing `<style>` in `<head>`; kebab-case ids/classes; Flexbox; reuse `.agenda-action-btn` for any button (no new orphan button classes per project rule); responsive via `@media`.
+- **CSS:** new rules in the existing `<style>` in `<head>`; kebab-case ids/classes; Flexbox; reuse `.btn` for any button (no new orphan button classes per project rule); responsive via `@media`.
 - **Icons:** if a stats/chart icon is needed, add a new `<symbol>` to the inline SVG sprite sheet (~line 2993+), referenced via `<use href="#icon-…">`.
 - **Markup:** new panel container + backdrop following the established panel pattern (e.g. `is-open` class toggling as used by Quick-add at ~line 13336); placed near the other floating panels.
 - **JS:**

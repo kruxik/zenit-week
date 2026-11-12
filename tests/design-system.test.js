@@ -38,7 +38,7 @@ const ENTRIES = catalogueEntries();
 const CATALOGUE = new Set(ENTRIES.filter(e => e.kind === 'control').map(e => e.classes[0]));
 
 const SUGGEST = {
-  button: '`.agenda-action-btn` (or `.help-close-btn` for a close X)',
+  button: '`.btn` (or `.help-close-btn` for a close X)',
   select: '`.dialog-field`',
   input: '`.dialog-field`',
   textarea: 'a shared field class (none exists yet: stop and ask)',
@@ -179,8 +179,8 @@ const LITERAL_COLOR_BASELINE = [
   '#cp-hue-slider::-webkit-slider-thumb',
   '#perf-probe-arm',
   '#perf-probe-badge',
-  '.agenda-action-btn.commit:not(:disabled)',
-  '.agenda-action-btn.commit:not(:disabled):hover',
+  '.btn.commit:not(:disabled)',
+  '.btn.commit:not(:disabled):hover',
   '.agenda-item-drop-above .agenda-item',
   '.agenda-item-drop-below .agenda-item',
   '.agenda-overdue-badge',
@@ -207,7 +207,6 @@ const CONTROL_CLASS_SET = [
   'account-btn-placeholder',
   'add-btn',
   'add-btn-inner',
-  'agenda-action-btn',
   'agenda-rename-input',
   'comment-fmt-toggle',
   'dialog-field',

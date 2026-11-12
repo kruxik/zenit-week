@@ -98,7 +98,7 @@ Order: **S1 → S2 → Checkpoint 1**, then S4 → S5. S3 is independent and may
 
 ## S5b - Phone formatting toolbar (from Checkpoint 2)
 
-- [x] T5b.1 - `#comment-toolbar` above the editor: Bold, Italic, Heading, Bullet, Checkbox; built from `.agenda-action-btn`; hidden on fine-pointer (desktop) devices.
+- [x] T5b.1 - `#comment-toolbar` above the editor: Bold, Italic, Heading, Bullet, Checkbox; built from `.btn`; hidden on fine-pointer (desktop) devices.
 - [x] T5b.2 - Buttons keep caret and keyboard (`mousedown` prevented); marks toggle, block buttons switch the selected lines and switch back when already that type; `aria-pressed` mirrors the caret's state.
 - [x] T5b.3 - EN + CS labels.
 - [x] T5b.4 - Tests: block toggle on/off, multi-line selection, active-state report.

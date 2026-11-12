@@ -28,7 +28,7 @@ Strict order: **S1 → S2 → S3 → S4.** No parallelism (each builds on the pr
 - Colors: `saveBranchColors` / `COLORS_STORAGE_KEY` (`zenit-week-colors` in misc); palette `BRANCH_COLOR_PALETTE` `:4553` (Growth green `#0ACF83`).
 - Mutators for `_demo` drop: inline-input commit `_openInlineInput` `:9712`; move/drag drop handler; done/unplanned setters (D/U keys + ctx menu); priority setter; counter tick; add-child/add-node; (delete = N/A).
 - Snapshot/undo chokepoint: `takeSnapshot()` `:4369` (node-agnostic - do NOT use for per-node drop).
-- Confirm dialog: `showAppConfirm({title,body,okLabel,danger,onConfirm})`. Buttons: `.agenda-action-btn`.
+- Confirm dialog: `showAppConfirm({title,body,okLabel,danger,onConfirm})`. Buttons: `.btn`.
 - Help panel: `#help-panel` / `#help-content` (`:2831`). Build script: `scripts/inject-version.js`, npm `build`.
 
 ---
@@ -81,7 +81,7 @@ Subtasks:
 
 Subtasks:
 1. Cleanup fn: `takeSnapshot()` → tombstone + remove nodes where `_demo===true` (skip branches) → `rebuildNodeMap` → `saveWeek` → `render`.
-2. Permanent entry in Help panel (`.agenda-action-btn`), routed through `showAppConfirm({danger:true})`.
+2. Permanent entry in Help panel (`.btn`), routed through `showAppConfirm({danger:true})`.
 3. i18n: `onboarding.clearExample`, `clearConfirmTitle`, `clearConfirmBody`, `clearConfirmOk` (EN + CS).
 
 **Acceptance criteria**

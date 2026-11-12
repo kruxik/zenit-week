@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-48vzqLfh1/OqjxuRaaNhwx5dSDxqDs+rBGAI55Jd7bo=';
+               'sha256-Sa24vwD6xSOy0dUkE2yFNRUGYIJ5TRG96wz5Z+9jk7U=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -153,7 +153,7 @@ function isProductionHost(hostname) {
      A `control` line's first class is what a button, select, input or
      textarea must carry; a `part` line names the classes of a larger piece.
 
-     control  button          .agenda-action-btn .commit .danger uiButton()
+     control  button          .btn .commit .danger uiButton()
      control  close           .help-close-btn
      control  field           .dialog-field .bare
      control  switch          .theme-toggle .theme-toggle-row
@@ -230,7 +230,7 @@ function isProductionHost(hostname) {
     --accent-primary: #1a73e8;
     --accent-danger: #d93025;
     --accent-danger-dark: #b9261a;
-    /* Filled commit buttons (.agenda-action-btn.commit). Separate from the
+    /* Filled commit buttons (.btn.commit). Separate from the
        accents because those are tuned as text and link colours: the dark
        theme's light blue and red read well as text but glare as a fill and
        fail contrast under white. Each fill holds 4.5:1 against white. */
@@ -801,7 +801,7 @@ function isProductionHost(hostname) {
      reads as a wider space beside it than beside the bordered button. Match what
      the eye measures - glyph to glyph - not what the box model does. */
   #update-banner-text { margin-right: 8px; }
-  #update-banner .agenda-action-btn {
+  #update-banner .btn {
     white-space: nowrap;
     height: 32px;
     padding: 0 12px;
@@ -876,7 +876,7 @@ function isProductionHost(hostname) {
     font-size: 11px;
     color: var(--text-muted);
   }
-  #coachmark-footer .agenda-action-btn {
+  #coachmark-footer .btn {
     white-space: nowrap;
     height: 30px;
     padding: 0 12px;
@@ -1560,9 +1560,9 @@ function isProductionHost(hostname) {
      shrink to fit: an empty separator would collapse to 0px and vanish. */
   .settings-pane > * { flex-shrink: 0; }
 
-  .settings-section > .agenda-action-btn,
-  #bridge-paired > .agenda-action-btn,
-  #bridge-guide > .agenda-action-btn { align-self: flex-end; }
+  .settings-section > .btn,
+  #bridge-paired > .btn,
+  #bridge-guide > .btn { align-self: flex-end; }
 
   /* Only the open tab's pane is shown, so the window is as tall as its
      content. This wrapper is the one that scrolls. */
@@ -1671,16 +1671,16 @@ function isProductionHost(hostname) {
 
 
   @media (max-width: 767px) {
-    .agenda-item .agenda-action-btn { display: none; }
+    .agenda-item .btn { display: none; }
     .agenda-item { min-height: 48px; }
   }
 
-  .agenda-item .agenda-action-btn { font-weight: 400; }
+  .agenda-item .btn { font-weight: 400; }
 
   /* Blur-free for the same reason as #account-btn - and this class is worn by every
      agenda row action and quick-add pill, so it was the densest cluster of
      render surfaces in the app. */
-  .agenda-action-btn {
+  .btn {
     position: relative;
     background: var(--glass-bg);
     color: var(--text-subtle);
@@ -1700,11 +1700,11 @@ function isProductionHost(hostname) {
     transition: color 0.15s, box-shadow 0.15s;
     user-select: none;
   }
-  .agenda-action-btn:hover {
+  .btn:hover {
     color: var(--text-dim);
     box-shadow: 0 4px 12px var(--shadow-md);
   }
-  .agenda-action-btn:hover::before {
+  .btn:hover::before {
     content: '';
     position: absolute;
     top: 3px; left: 3px; right: 3px; bottom: 3px;
@@ -2468,7 +2468,7 @@ function isProductionHost(hostname) {
     display: flex;
     gap: 4px;
   }
-  .stats-trend-range .agenda-action-btn {
+  .stats-trend-range .btn {
     height: 24px;
     padding: 0 8px;
     font-size: 11px;
@@ -2633,7 +2633,7 @@ function isProductionHost(hostname) {
     flex-wrap: wrap;
     gap: 8px;
   }
-  #quick-add-panel .agenda-action-btn {
+  #quick-add-panel .btn {
     height: 36px;
     padding: 0 16px;
     font-weight: 400;
@@ -3551,14 +3551,14 @@ function isProductionHost(hostname) {
   @media (min-width: 768px) {
     #comment-body { --comment-pad-bottom: var(--stack-l1); }
   }
-  #comment-toolbar .agenda-action-btn {
+  #comment-toolbar .btn {
     min-width: 38px;
     height: 34px;
     font-size: 14px;
   }
   #comment-toolbar .comment-fmt-strong { font-weight: 800; }
   #comment-toolbar .comment-fmt-em { font-style: italic; font-family: Georgia, serif; }
-  #comment-toolbar .agenda-action-btn[aria-pressed="true"] {
+  #comment-toolbar .btn[aria-pressed="true"] {
     color: var(--accent-primary);
     border-color: var(--accent-primary);
   }
@@ -3743,28 +3743,28 @@ function isProductionHost(hostname) {
        around it flips from display:none, which a transition would never see. */
     animation: fadeIn 0.12s ease-out;
   }
-  .dialog-actions .agenda-action-btn,
-  #settings-dialog .agenda-action-btn {
+  .dialog-actions .btn,
+  #settings-dialog .btn {
     white-space: nowrap;
     height: 36px;
     padding: 0 16px;
     font-weight: 400;
   }
-  /* Respect the hidden attribute - .agenda-action-btn sets its own display,
+  /* Respect the hidden attribute - .btn sets its own display,
      which would otherwise override [hidden]{display:none} and show an empty
      secondary button on confirms that don't use one. */
-  .dialog-actions .agenda-action-btn[hidden] {
+  .dialog-actions .btn[hidden] {
     display: none;
   }
-  .agenda-action-btn.danger {
+  .btn.danger {
     color: var(--accent-danger);
     border-color: var(--accent-danger-border);
   }
-  .agenda-action-btn.danger:hover {
+  .btn.danger:hover {
     color: var(--accent-danger);
     border-color: var(--accent-danger);
   }
-  .agenda-action-btn.danger:hover::before {
+  .btn.danger:hover::before {
     background: var(--accent-danger-bg);
   }
   /* The one button in a dialog that commits wears a fill, so the eye lands on
@@ -3772,27 +3772,27 @@ function isProductionHost(hostname) {
      other button in the dialog stays the plain pill. Disabled, it stays the
      plain pill too, fully legible, because its label may be the instruction
      (the calendar's "Pick the first day"). */
-  .agenda-action-btn.commit:not(:disabled) {
+  .btn.commit:not(:disabled) {
     background: var(--accent-fill);
     border-color: var(--accent-fill);
     color: #fff;
     font-weight: 600;
   }
-  .agenda-action-btn.commit.danger:not(:disabled) {
+  .btn.commit.danger:not(:disabled) {
     background: var(--accent-danger-fill);
     border-color: var(--accent-danger-fill);
   }
-  .agenda-action-btn.commit:not(:disabled):hover {
+  .btn.commit:not(:disabled):hover {
     color: #fff;
     background: var(--accent-fill-hover);
     border-color: var(--accent-fill-hover);
   }
-  .agenda-action-btn.commit.danger:not(:disabled):hover {
+  .btn.commit.danger:not(:disabled):hover {
     background: var(--accent-danger-fill-hover);
     border-color: var(--accent-danger-fill-hover);
   }
-  .agenda-action-btn.commit::before { content: none; }
-  .agenda-action-btn.commit:disabled { cursor: default; box-shadow: none; }
+  .btn.commit::before { content: none; }
+  .btn.commit:disabled { cursor: default; box-shadow: none; }
   /* Settings > AI, read like the Drive account card: a round badge coloured by
      the connection state, a name and a muted line beside it, the switch on the
      right; then a Status caption, one row per agent and the setup guide. The
@@ -3914,7 +3914,7 @@ function isProductionHost(hostname) {
   #account-section[data-state="drive"] #account-avatar { background: var(--accent-success-text); }
   #account-section[data-state="drive"] .account-avatar-placeholder { display: none; }
   #account-section[data-state="local"] #account-avatar-initials { display: none; }
-  #account-section .bridge-list > .agenda-action-btn { align-self: flex-end; }
+  #account-section .bridge-list > .btn { align-self: flex-end; }
   #account-sync-tip:empty { display: none; }
   #account-section[data-state="drive"][data-status="syncing"] .bridge-status::before { animation: sync-pulse 1s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce) {
@@ -3949,7 +3949,7 @@ function isProductionHost(hostname) {
   .settings-block > .settings-row { align-items: flex-start; min-height: 0; }
   .settings-block .settings-badge { margin-top: 2px; }
   .settings-block .settings-name { white-space: normal; }
-  .settings-block > .agenda-action-btn { align-self: flex-end; }
+  .settings-block > .btn { align-self: flex-end; }
   .settings-badge.settings-badge-warn { color: var(--accent-warning-text); }
   .settings-badge.settings-badge-danger { color: var(--accent-danger); }
   /* An informative hero badge (General, Data, Development): the accent blue,
@@ -4911,8 +4911,8 @@ function isProductionHost(hostname) {
     <div id="playground-nudge-text" data-i18n="onboarding.nudge">Clear the example tasks and keep just your own.
 Or remove them later in Settings → Help.</div>
     <div id="playground-nudge-actions" class="dialog-actions">
-      <button type="button" class="agenda-action-btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Keep exploring</button>
-      <button type="button" class="agenda-action-btn danger" id="playground-nudge-clear" data-i18n="onboarding.clearExample">Clear example tasks</button>
+      <button type="button" class="btn" id="playground-nudge-dismiss" data-i18n="onboarding.nudgeDismiss">Keep exploring</button>
+      <button type="button" class="btn danger" id="playground-nudge-clear" data-i18n="onboarding.clearExample">Clear example tasks</button>
     </div>
   </div>
 </div>
@@ -4923,7 +4923,7 @@ Or remove them later in Settings → Help.</div>
      surface as the onboarding nudge above; the two never show at once. -->
 <div id="update-banner" class="dialog-shell" role="status" aria-live="polite">
   <div id="update-banner-text" data-i18n="update.body">There is a new version of Zenit Week.</div>
-  <button type="button" class="agenda-action-btn" id="update-banner-reload" data-i18n="update.reload">Reload</button>
+  <button type="button" class="btn" id="update-banner-reload" data-i18n="update.reload">Reload</button>
   <button type="button" class="help-close-btn" id="update-banner-dismiss"
     data-i18n-title="help.close" title="Close" data-i18n-aria="help.close" aria-label="Close">
     <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
@@ -4942,7 +4942,7 @@ Or remove them later in Settings → Help.</div>
     <div id="coachmark-text"></div>
     <div id="coachmark-footer">
       <span id="coachmark-tip-off" data-i18n="tips.disableHint">Turn tips off in Settings.</span>
-      <button type="button" class="agenda-action-btn" id="coachmark-got-it" data-i18n="tips.gotIt">Got it</button>
+      <button type="button" class="btn" id="coachmark-got-it" data-i18n="tips.gotIt">Got it</button>
     </div>
   </div>
   <div id="coachmark-arrow"></div>
@@ -5034,7 +5034,7 @@ Or remove them later in Settings → Help.</div>
         <input type="number" id="date-picker-end-count" class="dialog-field" min="1" max="999" value="10" aria-label="Occurrences" hidden>
       </div>
       <div class="dialog-actions">
-        <button type="button" class="agenda-action-btn commit" id="date-picker-set"></button>
+        <button type="button" class="btn commit" id="date-picker-set"></button>
       </div>
     </div>
     <div id="date-picker-actions"></div>
@@ -5058,7 +5058,7 @@ Or remove them later in Settings → Help.</div>
     </div>
     <div id="bp-hint" data-i18n="baseline.hint">Activities per week considered a safe load.</div>
     <div id="bp-buttons" class="dialog-actions">
-      <button type="button" id="bp-apply" class="agenda-action-btn commit" data-i18n="baseline.apply">Apply</button>
+      <button type="button" id="bp-apply" class="btn commit" data-i18n="baseline.apply">Apply</button>
     </div>
   </div>
 </div>
@@ -5079,7 +5079,7 @@ Or remove them later in Settings → Help.</div>
       <input type="text" id="cp-hex" class="dialog-field bare" maxlength="6" placeholder="F24E1E" autocomplete="off" spellcheck="false">
     </div>
     <div id="cp-buttons" class="dialog-actions">
-      <button type="button" id="cp-apply" class="agenda-action-btn commit" data-i18n="colorPicker.apply">Apply</button>
+      <button type="button" id="cp-apply" class="btn commit" data-i18n="colorPicker.apply">Apply</button>
     </div>
   </div>
 </div>
@@ -5098,9 +5098,9 @@ Or remove them later in Settings → Help.</div>
       <div id="app-confirm-highlight" hidden></div>
       <div id="app-confirm-body"></div>
       <div id="app-confirm-actions" class="dialog-actions">
-        <button type="button" class="agenda-action-btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
-        <button type="button" class="agenda-action-btn" id="app-confirm-secondary" hidden></button>
-        <button type="button" class="agenda-action-btn commit" id="app-confirm-ok">OK</button>
+        <button type="button" class="btn" id="app-confirm-cancel" data-i18n="app-confirm.cancel">Cancel</button>
+        <button type="button" class="btn" id="app-confirm-secondary" hidden></button>
+        <button type="button" class="btn commit" id="app-confirm-ok">OK</button>
       </div>
     </div>
   </div>
@@ -5227,7 +5227,7 @@ Or remove them later in Settings → Help.</div>
           <div class="bridge-note" data-i18n="sync.btnTitle">Sign in with Google to sync across devices.</div>
           <!-- Google's own "G" in front of the label, as the toolbar's sign-in
                button had it, so the button reads as Google sign-in at a glance. -->
-          <button type="button" class="agenda-action-btn" id="account-signin-btn">
+          <button type="button" class="btn" id="account-signin-btn">
             <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
               <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
@@ -5243,7 +5243,7 @@ Or remove them later in Settings → Help.</div>
           <div id="account-last-sync" class="bridge-status-line"></div>
           <div id="account-sync-tip" class="bridge-status-line"></div>
           <div class="settings-separator"></div>
-          <button type="button" class="agenda-action-btn" id="account-signout-btn" data-i18n="sync.signOut">Sign out</button>
+          <button type="button" class="btn" id="account-signout-btn" data-i18n="sync.signOut">Sign out</button>
         </div>
       </div>
     </div>
@@ -5313,7 +5313,7 @@ Or remove them later in Settings → Help.</div>
             <span class="theme-toggle-thumb"></span>
           </button>
         </div>
-        <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay">Replay tips</button>
+        <button type="button" class="btn" id="tips-replay-btn" data-i18n="settings.tipsReplay">Replay tips</button>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-ai" role="tabpanel" aria-labelledby="settings-tab-ai" hidden>
@@ -5340,7 +5340,7 @@ Or remove them later in Settings → Help.</div>
              of the status, and Unpair disconnects them all. -->
         <div id="bridge-paired" class="bridge-list" hidden>
           <div id="bridge-paired-date" class="settings-sub"></div>
-          <button type="button" class="agenda-action-btn" id="bridge-unpair-btn" data-i18n="bridge.unpair">Unpair all</button>
+          <button type="button" class="btn" id="bridge-unpair-btn" data-i18n="bridge.unpair">Unpair all</button>
         </div>
         <div id="bridge-guide" class="bridge-list" hidden>
           <div class="settings-separator"></div>
@@ -5357,7 +5357,7 @@ Or remove them later in Settings → Help.</div>
             <option value="other" data-i18n="bridge.guide.other">Other MCP app</option>
           </select>
           <div id="bridge-guide-note" class="bridge-note"></div>
-          <button type="button" class="agenda-action-btn commit" id="bridge-guide-action"></button>
+          <button type="button" class="btn commit" id="bridge-guide-action"></button>
         </div>
       </div>
     </div>
@@ -5393,7 +5393,7 @@ Or remove them later in Settings → Help.</div>
               <div class="settings-sub" data-i18n="settings.exportSub">Every week and setting in one file</div>
             </div>
           </div>
-          <button type="button" class="agenda-action-btn" id="export-data-btn" data-i18n="settings.exportData">Export</button>
+          <button type="button" class="btn" id="export-data-btn" data-i18n="settings.exportData">Export</button>
         </div>
         <div class="settings-block">
           <div class="settings-row">
@@ -5403,7 +5403,7 @@ Or remove them later in Settings → Help.</div>
               <div class="settings-sub" data-i18n="settings.importSub">Replaces everything here</div>
             </div>
           </div>
-          <button type="button" class="agenda-action-btn" id="import-data-btn" data-i18n="settings.importData">Import</button>
+          <button type="button" class="btn" id="import-data-btn" data-i18n="settings.importData">Import</button>
         </div>
         <input type="file" id="import-file-input" accept=".json" style="display:none;">
         <div id="import-error" style="display:none;font-size:11px;color:var(--accent-danger);padding:2px 2px 0;" data-i18n="settings.importError">Invalid file - could not import.</div>
@@ -5442,7 +5442,7 @@ Or remove them later in Settings → Help.</div>
               <div class="settings-sub" data-i18n="dev.probeDesc">The next tap: phase marks, delivered frames, long animation frames.</div>
             </div>
           </div>
-          <button type="button" class="agenda-action-btn" id="dev-probe-btn" data-i18n="dev.probeBtn">Record</button>
+          <button type="button" class="btn" id="dev-probe-btn" data-i18n="dev.probeBtn">Record</button>
         </div>
         <div class="settings-block">
           <div class="settings-row">
@@ -5452,7 +5452,7 @@ Or remove them later in Settings → Help.</div>
               <div class="settings-sub" data-i18n="dev.resetDesc">Wipe all local data and reload as a first-time visitor.</div>
             </div>
           </div>
-          <button type="button" class="agenda-action-btn danger" id="dev-reset-btn" data-i18n="dev.resetBtn">Reset</button>
+          <button type="button" class="btn danger" id="dev-reset-btn" data-i18n="dev.resetBtn">Reset</button>
         </div>
       </div>
     </div>
@@ -5467,9 +5467,9 @@ Or remove them later in Settings → Help.</div>
 <div id="perf-probe-panel" hidden>
   <div id="perf-probe-bar">
     <span>perf trace</span>
-    <button type="button" class="agenda-action-btn" id="perf-probe-copy">Copy</button>
-    <button type="button" class="agenda-action-btn" id="perf-probe-share">Share</button>
-    <button type="button" class="agenda-action-btn" id="perf-probe-close">Close</button>
+    <button type="button" class="btn" id="perf-probe-copy">Copy</button>
+    <button type="button" class="btn" id="perf-probe-share">Share</button>
+    <button type="button" class="btn" id="perf-probe-close">Close</button>
   </div>
   <pre id="perf-probe-output"></pre>
 </div>
@@ -5505,7 +5505,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary); margin-bottom: 10px;">
           <span data-i18n="onboarding.clearHelpBody">This week was started from an example. Edit anything to make it yours - then clear what's left.</span>
         </div>
-        <button type="button" class="agenda-action-btn danger" id="help-clear-example" data-i18n="onboarding.clearExample">Clear example tasks</button>
+        <button type="button" class="btn danger" id="help-clear-example" data-i18n="onboarding.clearExample">Clear example tasks</button>
       </div>
 
       <div class="help-section">
@@ -7854,13 +7854,13 @@ function buildEmptyState(iconName, msgKey, hintKey) {
 // construction; tests/design-system.test.js caps the controls created anywhere
 // else. Labels go in as text, never markup.
 
-// The button (`.agenda-action-btn`). `variant` adds catalogue modifiers
+// The button (`.btn`). `variant` adds catalogue modifiers
 // (`commit`, `danger`), `className` the caller's own hooks. An icon comes first,
 // with the label after a space, as the static markup writes it.
 function uiButton({ label = '', icon = null, variant = '', className = '', title = '', ariaLabel = '', onClick = null } = {}) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = ['agenda-action-btn', variant, className].filter(Boolean).join(' ');
+  btn.className = ['btn', variant, className].filter(Boolean).join(' ');
   if (icon) {
     btn.innerHTML = iconSvg(icon); // static, constant markup
     if (label) btn.appendChild(document.createTextNode(' ' + label));
@@ -25163,7 +25163,7 @@ function wrapAgendaRowForSwipe(item, rowId, leftIcon, leftClass = '') {
 // grip - must not also fire the row's own gesture. The other badges (unplanned,
 // repeat, dropped, the tick pill) are plain marks and count as the row.
 function agendaRowChildHandlesTap(e) {
-  return !!(e.target.closest('.agenda-action-btn')
+  return !!(e.target.closest('.btn')
     || e.target.closest('.daily-log-badge.comment')
     || e.target.closest('.agenda-drag-handle'));
 }

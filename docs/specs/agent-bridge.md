@@ -92,7 +92,7 @@ Off by default on every device. Nothing connects anywhere until the user turns i
 
 | # | Element | Behaviour |
 |---|---|---|
-| 1 | Settings section "Agent bridge" | Below Theme. A toggle, a pairing-code field, a status line, a "Disconnect and forget" button. Reuses `.settings-section`, `.settings-label`, `.dialog-field`, `.agenda-action-btn`. Hidden when `(pointer: fine)` does not match - on a phone it can only confuse. |
+| 1 | Settings section "Agent bridge" | Below Theme. A toggle, a pairing-code field, a status line, a "Disconnect and forget" button. Reuses `.settings-section`, `.settings-label`, `.dialog-field`, `.btn`. Hidden when `(pointer: fine)` does not match - on a phone it can only confuse. |
 | 2 | Pairing code | The server prints a one-line code on first start (`port.token`, token 32 random bytes base64url) and copies it to the clipboard. The user pastes it into the field. The page stores it and connects. This is the single pairing mechanism; no URL-hash variant. Chrome and Firefox ask for permission here, once (section 4). |
 | 3 | Storage | `zenit-week-bridge` in `localStorage`: `{ enabled, token }`. **Device-local, never in the synced colors/settings blob.** A phone must never learn the desktop's token or try to connect. |
 | 4 | Status line | `Off` / `Waiting for server` / `Waiting for permission` / `Connected - <client name>` / `Refused (wrong code)` / `Blocked by browser` / `Not supported in this browser yet`. Driven by socket state and the handshake: `Connected` once the page has verified `proof` and sent `hello`; the client name comes from `proof.client`. `Refused` when the server closes with code `refused` after `hello`. |

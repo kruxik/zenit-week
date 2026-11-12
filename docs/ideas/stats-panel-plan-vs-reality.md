@@ -51,13 +51,13 @@ Variable branch count mostly *validates* the design rather than stressing it: th
 
 ## MVP Scope
 **In:**
-- New toolbar button + Stats panel scaffold (follow the Daily-log / Todo panel pattern; reuse `.agenda-action-btn` per the button-reuse rule).
+- New toolbar button + Stats panel scaffold (follow the Daily-log / Todo panel pattern; reuse `.btn` per the button-reuse rule).
 - Section 1 (Plan vs Reality donut + 3 headline metrics).
 - Section 2 (per-branch stacked bars).
 - Section 3 (reuse existing ratio-bar + baseline gauge logic).
 - **Responsive behavior** per the table above: mobile keeps ① + headlines + ③ ratio-bar, compacts ②, hides ④ - CSS breakpoints only.
 - **Empty / positive state**: a week with no unplanned tasks renders as a clean positive signal ("No unplanned tasks this week 👍"), not a warning - flagging is the user's choice.
-- Full light/dark theming, i18n (EN + CZ `t()` keys), no `innerHTML` with user data, custom dialogs only, reuse `.agenda-action-btn`.
+- Full light/dark theming, i18n (EN + CZ `t()` keys), no `innerHTML` with user data, custom dialogs only, reuse `.btn`.
 - Built on a `feature/stats-panel` branch.
 
 **Out (this iteration):**

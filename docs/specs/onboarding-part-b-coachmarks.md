@@ -48,7 +48,7 @@ A thin module so sync can be added in one place later:
 - One reusable element `#coachmark` (bubble + arrow + text + "Got it" + "tips off in Settings" line).
 - Positioned via JS relative to the anchor's `getBoundingClientRect()`; arrow flips above/below to stay on screen.
 - Built with DOM construction / `textContent` (no `innerHTML` with dynamic data - XSS rule).
-- Styled to match app surfaces (reuse tokens; "Got it" = `.agenda-action-btn`).
+- Styled to match app surfaces (reuse tokens; "Got it" = `.btn`).
 - Esc dismisses (counts as seen). Clicking elsewhere does **not** dismiss (avoid accidental skip) - TBD, tune in PB1.
 
 ## 4. Hint catalog
