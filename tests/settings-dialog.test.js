@@ -272,6 +272,9 @@ describe('Settings dialog markup', () => {
     const body = SRC.slice(at, SRC.indexOf('\n}\n', at));
     expect(body).toContain("getElementById('settings-tab-ai')");
     expect(body).toMatch(/matchMedia\('\(pointer: fine\)'\)/);
+    // Every device sees the tab; a touch device sees it only to read the note.
+    expect(body.indexOf('tab.hidden = false')).toBeLessThan(body.indexOf("'(pointer: fine)'"));
+    expect(body).toContain("'bridge-mobile-note'");
   });
 });
 

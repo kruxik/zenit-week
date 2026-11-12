@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-53nxxcElZsmzt/9KiT0RvDlBTfYBBV7GqBZuSGu6HSc=';
+               'sha256-cxRVbi3CSQc+zWEl35bt/vTUoLxjt7MuROMzIYnb0ms=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3812,6 +3812,9 @@ function isProductionHost(hostname) {
      state colour lives on #bridge-section[data-state], set by
      renderBridgeStatus, so the badge and the status dot never disagree. */
   #bridge-section { --bridge-state: var(--text-muted); }
+  /* A touch device: the badge, the name and the note, nothing to switch. */
+  #bridge-section[data-device="touch"] > :not(.settings-hero):not(#bridge-mobile-note),
+  #bridge-section[data-device="touch"] #bridge-toggle { display: none; }
   #bridge-section[data-state="connected"] { --bridge-state: var(--accent-success-text); }
   #bridge-section[data-state^="waiting"],
   #bridge-section[data-state="approve"] { --bridge-state: var(--accent-warning-text); }
@@ -5152,7 +5155,8 @@ Or remove them later in Settings → Help.</div>
      list that opens one section at a time, the caption then naming it beside a
      back arrow. Help closes the list, under a rule, and opens the Help panel.
      The AI and Development tabs ship hidden:
-     initBridgeSettings reveals AI on a fine pointer, the devResetEnabled()
+     initBridgeSettings reveals AI (on a touch device only to say it needs a
+     computer), the devResetEnabled()
      guard reveals Development. -->
 <div id="settings-overlay">
   <div id="settings-dialog" class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -5294,7 +5298,9 @@ Or remove them later in Settings → Help.</div>
             <span class="theme-toggle-thumb"></span>
           </button>
         </div>
-        <div class="settings-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer.</div>
+        <div class="settings-sub" id="bridge-sub" data-i18n="settings.bridgeTitle">Allow AI agents on this computer.</div>
+        <!-- A phone or tablet: the agents run on a computer, so the tab only says so. -->
+        <div class="settings-sub" id="bridge-mobile-note" data-i18n="bridge.mobileNote" hidden>AI agents work in Zenit Week on a computer, in Chrome or Firefox. Changes they make reach this device through Drive sync.</div>
         <div class="settings-separator"></div>
         <div class="settings-label" data-i18n="bridge.statusCaption">Status</div>
         <div id="bridge-status" class="bridge-status" role="status" aria-live="polite"></div>
@@ -12731,6 +12737,7 @@ const TRANSLATIONS = {
     'bridge.guide.desktopNote':   'No setup needed: open the file and confirm in Claude Desktop.',
     'bridge.state.reload-app':    'Reload Zenit Week - your agent has a newer Zenit Week server.',
     'bridge.state.unsupported':   'Not supported in this browser yet.',
+    'bridge.mobileNote':          'AI agents work in Zenit Week on a computer, in Chrome or Firefox. Changes they make reach this device through Drive sync.',
     'bridge.unnamedAgent':        'agent',
     'bridge.agent.connected':     'Connected',
     'bridge.agent.blocked':       'Blocked',
@@ -13260,6 +13267,7 @@ const TRANSLATIONS = {
     'bridge.guide.desktopNote':   'Bez nastavování: otevři soubor a potvrď v Claude Desktop.',
     'bridge.state.reload-app':    'Obnov Zenit Week - tvůj agent má novější Zenit Week server.',
     'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje.',
+    'bridge.mobileNote':          'AI agenti fungují v Zenit Week na počítači, v Chrome nebo Firefoxu. Změny, které udělají, se sem dostanou přes synchronizaci s Diskem.',
     'bridge.unnamedAgent':        'agent',
     'bridge.agent.connected':     'Připojeno',
     'bridge.agent.blocked':       'Zablokováno',
@@ -28392,7 +28400,8 @@ window.addEventListener('pagehide', _flushOnTeardown);
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 // One modal, five tabs, opened from the account button. AI and Development ship
-// hidden and are revealed at boot (initBridgeSettings, the devResetEnabled()
+// hidden and are revealed at boot (initBridgeSettings - on every device, AI
+// only to say it needs a computer on touch - and the devResetEnabled()
 // guard); a hidden tab is never selected, so the last-used tab falls back to
 // Account on a device without it.
 const SETTINGS_TABS = ['account', 'general', 'ai', 'data', 'dev'];
@@ -29178,10 +29187,16 @@ function _bridgeTurnOn() {
 }
 
 function initBridgeSettings() {
-  if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
   const tab = document.getElementById('settings-tab-ai');
   if (!tab) return;
   tab.hidden = false;
+  // Help points to Settings > AI on every device; a phone or tablet finds the
+  // tab there, saying the agents need a computer, and nothing more.
+  if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) {
+    document.getElementById('bridge-section').dataset.device = 'touch';
+    document.getElementById('bridge-mobile-note').hidden = false;
+    return;
+  }
   onBridgeStatus(renderBridgeStatus);
 
   document.getElementById('bridge-toggle').addEventListener('click', () => {
