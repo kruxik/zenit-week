@@ -74,7 +74,7 @@ Tokens: colour is 322 of 326 declarations via variables (36 literal colours left
   - Done: the section sits under UI/UX Guidelines with today's class names; builders and `.menu` join the table when Phase 3 adds them. The Dialogs bullet keeps `showAppConfirm` and the Cancel rule and points at the table. Row 12 lists the two existing toolbar families (`.undo-redo-btn`, `.view-toggle-btn`), which the guard test treats as catalogue classes.
 - [x] **R7 In-file catalogue comment** at the top of the stylesheet section holding the components: each component, its class, its builder. R1 asserts every catalogue class named there exists in the CSS and vice versa.
   - Done: the COMPONENT CATALOGUE comment (lines of `control|part role .classes builder()`) is the guard test's only source for the catalogue. R7 checks each class has a CSS rule, each builder exists, and the class set equals the CLAUDE.md table's.
-- [ ] **Hook** (needs the owner's explicit approval at the time): a Claude Code PostToolUse hook in `.claude/settings.json` that runs only `tests/design-system.test.js` after an edit to `zenit-week.html`, so a violation is reported within seconds.
+- [x] **Hook** (needs the owner's explicit approval at the time): a Claude Code PostToolUse hook in `.claude/settings.json` that runs only `tests/design-system.test.js` after an edit to `zenit-week.html`, so a violation is reported within seconds.
 - [x] Replace the narrow memory notes (reuse buttons, button match) with one general "sibling first, guard test enforces" note.
 
 ## Phase 3 - merge twins, add builders

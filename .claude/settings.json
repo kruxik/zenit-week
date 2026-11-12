@@ -7,13 +7,10 @@
       "Read(./dist/**)",
       "Read(./coverage/**)",
       "Read(./package-lock.json)",
-
       "Read(./.env)",
       "Read(./.env.local)",
       "Read(./.vercel/**)",
-
       "Read(./private/**)",
-
       "Read(./og-image.svg)",
       "Read(./og-image-cs.svg)",
       "Read(./screenshot.svg)",
@@ -29,11 +26,24 @@
       "Read(**/*.woff2)",
       "Read(**/*.pdf)",
       "Read(**/*.zip)",
-
       "Read(./CHANGELOG.md)",
       "Read(**/.DS_Store)",
       "Read(**/*.swp)",
       "Read(**/*.swo)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e 'let d=\"\";process.stdin.on(\"data\",c=>d+=c).on(\"end\",()=>{const f=((JSON.parse(d||\"{}\").tool_input)||{}).file_path||\"\";if(!/(^|\\/)zenit-week\\.html$/.test(f))return;const r=require(\"child_process\").spawnSync(\"npx\",[\"vitest\",\"run\",\"tests/design-system.test.js\"],{cwd:require(\"path\").dirname(f),encoding:\"utf8\",env:{...process.env,NODE_OPTIONS:\"--no-experimental-webstorage\",FORCE_COLOR:\"0\"}});if(r.status!==0){process.stderr.write(\"Design system guard failed (tests/design-system.test.js). Reuse the catalogue component it names; never add a baseline entry.\\n\"+(r.stdout+r.stderr).split(\"\\n\").slice(-60).join(\"\\n\"));process.exit(2);}})'",
+            "timeout": 60
+          }
+        ]
+      }
     ]
   }
 }
