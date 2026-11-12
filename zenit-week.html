@@ -454,6 +454,12 @@ function isProductionHost(hostname) {
        own JS zoom. Any new panel is restricted automatically. */
     touch-action: pan-x pan-y;
   }
+  /* Form controls take the app font. The UA stylesheet gives buttons, inputs,
+     selects and textareas their own (Arial on macOS), so without this every
+     control needed its own font-family: inherit - and the ones that missed it
+     rendered in a different face. */
+  button, input, select, textarea { font-family: inherit; }
+
 
   /* The browser's own pull-to-refresh is off: the app runs its own (see
      initPullToRefresh), and the native one would otherwise reload the page
@@ -1023,7 +1029,6 @@ function isProductionHost(hostname) {
     box-shadow: 0 2px 8px var(--shadow-md);
     cursor: pointer;
     outline: none;
-    font-family: inherit;
     font-size: 13px;
     font-weight: 400;
     color: var(--text-subtle);
@@ -1126,7 +1131,6 @@ function isProductionHost(hostname) {
     width: 100%;
     border: none;
     background: none;
-    font-family: inherit;
     color: var(--text-dim);
     padding: 2px 0;
     border-radius: 6px;
@@ -1168,7 +1172,6 @@ function isProductionHost(hostname) {
     width: 100%;
     border: none;
     background: none;
-    font-family: inherit;
     text-align: left;
   }
   .wp-today-item { color: var(--accent-warning-text); }
@@ -1200,7 +1203,6 @@ function isProductionHost(hostname) {
     border: none;
     border-radius: 6px;
     background: none;
-    font-family: inherit;
     font-size: 12px;
     color: var(--text-dim);
     cursor: pointer;
@@ -3127,7 +3129,6 @@ function isProductionHost(hostname) {
     gap: 6px;
     font-size: 13px;
     font-weight: 600;
-    font-family: inherit;
     color: var(--text-muted);
     background: none;
     border: none;
@@ -3337,7 +3338,6 @@ function isProductionHost(hostname) {
     border-radius: 4px;
     padding: 1px 4px;
     font-size: inherit;
-    font-family: inherit;
     color: var(--text-primary);
     background: var(--bg-page);
     flex: 1;
@@ -3402,7 +3402,6 @@ function isProductionHost(hostname) {
     outline: none;
     background: transparent;
     color: var(--text-primary);
-    font-family: inherit;
     font-size: 15px;
     line-height: 1.6;
     padding: 0;
@@ -3689,7 +3688,6 @@ function isProductionHost(hostname) {
     height: 32px;
     padding: 0 8px;
     color: var(--text-primary);
-    font-family: inherit;
     font-size: 13px;
     min-width: 0;
   }
@@ -4272,7 +4270,6 @@ function isProductionHost(hostname) {
     border: 2px solid var(--accent-primary);
     outline: none;
     box-shadow: 0 4px 15px var(--shadow-lg);
-    font-family: inherit;
     resize: none;
     overflow: hidden;
     white-space: pre;

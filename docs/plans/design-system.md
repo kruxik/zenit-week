@@ -92,12 +92,14 @@ Tokens: colour is 322 of 326 declarations via variables (36 literal colours left
 
 ## Phase 4 - role names (one name per commit; tests reference them)
 
-- [ ] `.agenda-action-btn` to `.btn`
-- [ ] `.theme-toggle*` to `.switch*`
-- [ ] `.agenda-tab` to `.tab`
-- [ ] `.help-close-btn` to `.icon-btn`
-- [ ] `.dialog-field` to `.field`
-- [ ] Update the CLAUDE.md table, the catalogue comment and R1.6's frozen set with each rename.
+- [x] `.agenda-action-btn` to `.btn`
+- [x] `.theme-toggle*` to `.switch*`
+- [x] `.agenda-tab` to `.tab`
+- [x] `.help-close-btn` to `.icon-btn`
+- [x] `.dialog-field` to `.field`
+- [x] Update the CLAUDE.md table, the catalogue comment and R1.6's frozen set with each rename.
+  - Landed: whole-token renames across code, tests, CLAUDE.md, specs and task notes (this plan and the CHANGELOG keep the old names as history). Derived Agenda names stay (`agenda-tab-content`, `-today`, `-separator`); the switch's parts follow it (`switch-row`, `switch-thumb`). Check 6 now matches the words as whole class segments (`btn`, `field-row`) and exempts catalogue classes, so the role names are still guarded and the frozen set dropped the catalogue entries.
+  - Also: one base rule `button, input, select, textarea { font-family: inherit }` replaces nine per-rule copies; before it, every button without its own copy (view switcher, `.btn`, close X, toolbar) rendered in Arial on macOS.
 
 ## Phase 5 - tokens
 
