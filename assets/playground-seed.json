@@ -749,6 +749,7 @@
         "label": "A team that runs without me",
         "labelCs": "Tým, který jede i beze mě",
         "horizon": "years",
+        "priority": "high",
         "comments": "Why: more time to look ahead, less firefighting. The 1:1s and the Q4 OKRs are the steps.",
         "commentsCs": "Proč: víc času na výhled, míň hašení požárů. Kroky jsou 1:1 a OKR na Q4."
       },
@@ -760,11 +761,38 @@
         "horizon": "year"
       },
       {
+        "id": "vhire",
+        "parent": "vteam",
+        "label": "Hire two engineers",
+        "labelCs": "Přijmout dva inženýry",
+        "horizon": "year"
+      },
+      {
+        "id": "vcompany",
+        "branch": "work",
+        "label": "Start my own company",
+        "labelCs": "Založit vlastní firmu",
+        "horizon": "someday"
+      },
+      {
         "id": "vsummer",
         "branch": "family",
-        "label": "A summer trip together every year",
+        "label": "A summer trip\ntogether every year",
         "labelCs": "Každé léto společný výlet",
-        "horizon": "year"
+        "horizon": "year",
+        "collapsed": true
+      },
+      {
+        "id": "vcroatia",
+        "parent": "vsummer",
+        "label": "Two weeks in Croatia",
+        "labelCs": "Dva týdny v Chorvatsku"
+      },
+      {
+        "id": "vkids",
+        "parent": "vsummer",
+        "label": "Each kid picks one day trip",
+        "labelCs": "Každé dítě vybere jeden výlet"
       },
       {
         "id": "vgrandma",
@@ -773,20 +801,52 @@
         "labelCs": "Zůstat blízko babičce"
       },
       {
+        "id": "vhouse",
+        "branch": "family",
+        "label": "A house with a garden",
+        "labelCs": "Dům se zahradou",
+        "horizon": "someday"
+      },
+      {
         "id": "vstrong",
         "branch": "me",
-        "label": "Strong and healthy for decades",
-        "labelCs": "Silné a zdravé tělo na desítky let",
+        "label": "Strong and healthy\nfor decades",
+        "labelCs": "Silné a zdravé tělo\nna desítky let",
         "horizon": "years",
+        "priority": "critical",
         "comments": "Why: energy for the family and the work. Pushups and reading every day are the habit.",
         "commentsCs": "Proč: energie pro rodinu i práci. Kliky a čtení každý den jsou návyk."
       },
       {
         "id": "vpush",
         "parent": "vstrong",
-        "label": "100 pushups in a row",
-        "labelCs": "100 kliků v kuse",
+        "label": "50 pushups in a row",
+        "labelCs": "50 kliků v kuse",
         "horizon": "year"
+      },
+      {
+        "id": "vmarathon",
+        "parent": "vstrong",
+        "label": "Run a marathon",
+        "labelCs": "Uběhnout maraton",
+        "horizon": "year",
+        "dropped": true,
+        "comments": "Let go: my knees say no. Strength first.",
+        "commentsCs": "Nechávám být: kolena říkají ne. Nejdřív síla."
+      },
+      {
+        "id": "vread",
+        "branch": "me",
+        "label": "Read 20 books a year",
+        "labelCs": "Přečíst 20 knih za rok",
+        "horizon": "year"
+      },
+      {
+        "id": "vtravel",
+        "branch": "me",
+        "label": "A year off to\ntravel the world",
+        "labelCs": "Rok volna na cesty po světě",
+        "horizon": "someday"
       },
       {
         "id": "vproduct",

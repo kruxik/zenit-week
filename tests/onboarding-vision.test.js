@@ -36,21 +36,41 @@ describe('seedVisionFromWeek with a playground week', () => {
     const list = intentions(record);
     expect(list).toHaveLength(seedCount());
     expect(list.every(n => n._demo === true)).toBe(true);
-    const half = list.find(n => n.label === 'Strong and healthy for decades');
+    const half = list.find(n => n.label === 'Strong and healthy\nfor decades');
     expect(colorFrom[half.parent]).toBe('me');
     expect(half.horizon).toBe('years');
     expect(half.comments).toBeTruthy();
-    const step = list.find(n => n.label === '100 pushups in a row');
+    const step = list.find(n => n.label === '50 pushups in a row');
     expect(step.parent).toBe(half.id);
-    expect(half.children).toEqual([step.id]);
+    expect(half.children).toContain(step.id);
     // Branches are areas, never examples.
     expect(record.nodes.filter(n => n.type === 'branch').some(n => n._demo)).toBe(false);
+  });
+
+  it('shows every Vision feature: horizons, priority, a reason, a collapsed and a let-go intention', () => {
+    const { record } = seedVisionFromWeek(playgroundWeek());
+    const list = intentions(record);
+    expect(new Set(list.map(n => n.horizon ?? 'none'))).toEqual(new Set(['year', 'years', 'someday', 'none']));
+    expect(list.some(n => n.priority === 'critical')).toBe(true);
+    // Priority passes down to the steps, as from the menu.
+    const team = list.find(n => n.label === 'A team that runs without me');
+    expect(team.priority).toBe('high');
+    expect(team.children.map(id => list.find(n => n.id === id).priority)).toEqual(['high', 'high']);
+    const folded = list.find(n => n.collapsed);
+    expect(folded.children.length).toBeGreaterThan(0);
+    const letGo = list.find(n => n.dropped);
+    expect(letGo.droppedAt).toBeTruthy();
+    expect(letGo.comments).toBeTruthy();
+    // All of it survives the repair a save runs.
+    const out = validateAndRepairVision(record);
+    expect(intentions(out).find(n => n.id === folded.id).collapsed).toBe(true);
+    expect(intentions(out).find(n => n.id === letGo.id).dropped).toBe(true);
   });
 
   it('writes the examples in the current language', () => {
     _state.setLang('cs');
     const { record } = seedVisionFromWeek(playgroundWeek());
-    expect(intentions(record).map(n => n.label)).toContain('Silné a zdravé tělo na desítky let');
+    expect(intentions(record).map(n => n.label)).toContain('Silné a zdravé tělo\nna desítky let');
   });
 
   it('adds nothing once the week has no untouched examples', () => {
