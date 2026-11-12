@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-u8jkdX56JFId3xlMNFkKCbLyilEPzDBw3d73WuPa53c=';
+               'sha256-ZjtYNwVGYZOHpi3QmDbgnpXA1uObdn7qEBobEhVbAjM=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1457,18 +1457,30 @@ function isProductionHost(hostname) {
      layout. Desktop and a landscape phone show it as a sidebar beside the open
      pane; a portrait phone shows it as a list on its own, one section opened at
      a time (.settings-drilled). The chevron is the list's alone. */
-  .settings-tabs {
+  .settings-nav {
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .settings-tabs {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: 2px;
   }
-  .settings-tabs .agenda-tab[hidden] { display: none; }
-  .settings-tabs .agenda-tab { height: auto; gap: 8px; border-radius: 6px; }
-  .settings-tabs .settings-tab-icon { width: 16px; height: 16px; flex-shrink: 0; }
-  .settings-tabs .settings-tab-chevron { display: none; }
-  .settings-tabs .agenda-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+  /* Help closes the list, under a rule: it opens the Help panel, not a pane,
+     so it is a plain button outside the tablist. */
+  .settings-nav-divider {
+    flex-shrink: 0;
+    height: 1px;
+    margin: 6px 4px;
+    background: var(--border-soft);
+  }
+  .settings-nav .agenda-tab[hidden] { display: none; }
+  .settings-nav .agenda-tab { height: auto; gap: 8px; border-radius: 6px; }
+  .settings-nav .settings-tab-icon { width: 16px; height: 16px; flex-shrink: 0; }
+  .settings-nav .settings-tab-chevron { display: none; }
+  .settings-nav .agenda-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
   /* The back arrow and the section's name in the caption are the list's too. */
   #settings-back,
   #settings-title-section { display: none; }
@@ -1477,17 +1489,19 @@ function isProductionHost(hostname) {
      hover only darkens the text. */
   @media (min-width: 521px) {
     .settings-body { flex-direction: row; }
-    .settings-tabs {
+    .settings-nav {
       width: 116px;
       padding: 10px 8px;
       border-right: 1px solid var(--border-soft);
     }
-    .settings-tabs .agenda-tab { padding: 7px 10px; }
-    .settings-tabs .agenda-tab:hover { background: none; color: var(--text-dim); }
-    .settings-tabs .agenda-tab.active {
+    .settings-nav .agenda-tab { padding: 7px 10px; }
+    .settings-nav .agenda-tab:hover { background: none; color: var(--text-dim); }
+    .settings-nav .agenda-tab.active {
       color: var(--accent-primary);
       background: var(--ctx-hover-bg);
     }
+    /* Help stands at the foot of the sidebar, however tall the pane. */
+    .settings-nav-divider { margin-top: auto; }
   }
 
   /* List: full-width rows of finger height, a chevron at the end, and no
@@ -1495,9 +1509,9 @@ function isProductionHost(hostname) {
      for its pane, and the caption for a back arrow and the row's name; the
      window's height follows either, so neither leaves empty space. */
   @media (max-width: 520px) {
-    .settings-tabs { padding: 6px; }
-    .settings-tabs .agenda-tab,
-    .settings-tabs .agenda-tab.active {
+    .settings-nav { padding: 6px; }
+    .settings-nav .agenda-tab,
+    .settings-nav .agenda-tab.active {
       height: 44px;
       padding: 0 10px;
       gap: 12px;
@@ -1505,9 +1519,9 @@ function isProductionHost(hostname) {
       color: var(--text-primary);
       background: none;
     }
-    .settings-tabs .agenda-tab:hover { background: var(--bg-hover); }
-    .settings-tabs .settings-tab-icon { width: 18px; height: 18px; color: var(--text-muted); }
-    .settings-tabs .settings-tab-chevron {
+    .settings-nav .agenda-tab:hover { background: var(--bg-hover); }
+    .settings-nav .settings-tab-icon { width: 18px; height: 18px; color: var(--text-muted); }
+    .settings-nav .settings-tab-chevron {
       display: inline-block;
       width: 16px;
       height: 16px;
@@ -1515,7 +1529,7 @@ function isProductionHost(hostname) {
       color: var(--text-subtle);
     }
     #settings-dialog:not(.settings-drilled) .settings-panes,
-    #settings-dialog.settings-drilled .settings-tabs,
+    #settings-dialog.settings-drilled .settings-nav,
     #settings-dialog.settings-drilled #settings-title-root { display: none; }
     #settings-dialog.settings-drilled #settings-back { display: flex; }
     #settings-dialog.settings-drilled #settings-title-section { display: inline; }
@@ -4580,6 +4594,7 @@ function isProductionHost(hostname) {
   <symbol id="icon-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/></symbol>
   <symbol id="icon-info-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></symbol>
   <symbol id="icon-alert-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+  <symbol id="icon-help-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 16v.01"/><path d="M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"/></symbol>
   <symbol id="icon-chevron-left" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6"/></symbol>
   <symbol id="icon-chevron-right" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6"/></symbol>
   <symbol id="icon-caret-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 14l-6 -6l-6 6h12"/></symbol>
@@ -5107,7 +5122,8 @@ Or remove them later in Settings → Help.</div>
 <!-- Settings: a window hung under the account button, with a tab sidebar on
      desktop and a landscape phone, and on a portrait phone the same tabs as a
      list that opens one section at a time, the caption then naming it beside a
-     back arrow. The AI and Development tabs ship hidden:
+     back arrow. Help closes the list, under a rule, and opens the Help panel.
+     The AI and Development tabs ship hidden:
      initBridgeSettings reveals AI on a fine pointer, the devResetEnabled()
      guard reveals Development. -->
 <div id="settings-overlay">
@@ -5124,6 +5140,7 @@ Or remove them later in Settings → Help.</div>
       </button>
     </div>
     <div class="settings-body">
+    <div class="settings-nav">
     <div class="settings-tabs" id="settings-tabs" role="tablist" aria-labelledby="settings-title">
       <button type="button" class="agenda-tab active" id="settings-tab-account" role="tab" aria-controls="settings-pane-account" aria-selected="true"><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-user"/></svg><span data-i18n="settings.tabAccount">Account</span><svg class="icon settings-tab-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
       <button type="button" class="agenda-tab" id="settings-tab-general" role="tab" aria-controls="settings-pane-general" aria-selected="false" tabindex="-1"><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-settings"/></svg><span data-i18n="settings.tabGeneral">General</span><svg class="icon settings-tab-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
@@ -5131,6 +5148,9 @@ Or remove them later in Settings → Help.</div>
       <button type="button" class="agenda-tab" id="settings-tab-data" role="tab" aria-controls="settings-pane-data" aria-selected="false" tabindex="-1"><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-database"/></svg><span data-i18n="settings.tabData">Data</span><svg class="icon settings-tab-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
       <!-- Dev-only: shown on development hosts alone. -->
       <button type="button" class="agenda-tab" id="settings-tab-dev" role="tab" aria-controls="settings-pane-dev" aria-selected="false" tabindex="-1" hidden><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-code"/></svg><span data-i18n="dev.tab">Dev</span><svg class="icon settings-tab-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
+    </div>
+    <div class="settings-nav-divider" aria-hidden="true"></div>
+    <button type="button" class="agenda-tab" id="settings-help-btn"><svg class="icon settings-tab-icon" aria-hidden="true"><use href="#icon-help-circle"/></svg><span data-i18n="settings.tabHelp">Help</span><svg class="icon settings-tab-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
     </div>
     <div class="settings-panes">
     <div class="settings-pane" id="settings-pane-account" role="tabpanel" aria-labelledby="settings-tab-account">
@@ -5231,10 +5251,6 @@ Or remove them later in Settings → Help.</div>
           </button>
         </div>
         <button type="button" class="agenda-action-btn" id="tips-replay-btn" data-i18n="settings.tipsReplay">Replay tips</button>
-      </div>
-      <div class="settings-separator"></div>
-      <div class="settings-section">
-        <button type="button" class="agenda-action-btn" id="settings-help-btn" data-i18n="help.fab">Help &amp; Hotkeys</button>
       </div>
     </div>
     <div class="settings-pane" id="settings-pane-ai" role="tabpanel" aria-labelledby="settings-tab-ai" hidden>
@@ -12652,6 +12668,7 @@ const TRANSLATIONS = {
     'settings.tabAi':             'AI',
     'settings.tabData':           'Data',
     'settings.back':              'Back',
+    'settings.tabHelp':           'Help',
     'settings.exportData':        'Export',
     'settings.importData':        'Import',
     'settings.importConfirmTitle':'Overwrite all data?',
@@ -13174,6 +13191,7 @@ const TRANSLATIONS = {
     'settings.tabAi':             'AI',
     'settings.tabData':           'Data',
     'settings.back':              'Zpět',
+    'settings.tabHelp':           'Nápověda',
     'settings.exportData':        'Exportovat',
     'settings.importData':        'Importovat',
     'settings.importConfirmTitle':'Přepsat všechna data?',

@@ -178,6 +178,14 @@ describe('Settings list layout (portrait phone)', () => {
     expect(_state.getSettingsTab()).toBe('account');
   });
 
+  it('keeps Help out of the tablist, last in the menu under a rule', () => {
+    const tablist = SRC.slice(SRC.indexOf('id="settings-tabs"'), SRC.indexOf('class="settings-nav-divider"'));
+    expect(tablist).toContain('id="settings-tab-dev"');
+    expect(tablist).not.toContain('settings-help-btn');
+    const after = SRC.slice(SRC.indexOf('class="settings-nav-divider"'), SRC.indexOf('class="settings-panes"'));
+    expect(after).toContain('id="settings-help-btn"');
+  });
+
   it('leaves the sidebar alone: Esc closes at once', () => {
     setList(false);
     _state.openSettings();
@@ -237,7 +245,7 @@ describe('Settings Data summary', () => {
 
 describe('Settings dialog markup', () => {
   const CONTROLS = {
-    general: ['zoom-track', 'lang-select', 'theme-select', 'autolayout-toggle', 'tips-toggle', 'tips-replay-btn', 'settings-help-btn'],
+    general: ['zoom-track', 'lang-select', 'theme-select', 'autolayout-toggle', 'tips-toggle', 'tips-replay-btn'],
     ai: ['bridge-toggle', 'bridge-status', 'bridge-agents', 'bridge-guide', 'bridge-unpair-btn'],
     data: ['import-data-btn', 'export-data-btn', 'import-file-input', 'import-error'],
     dev: ['dev-probe-btn', 'dev-reset-btn'],
