@@ -53,7 +53,7 @@ class FakeSocket {
   async drop(reason = '', code = 1006) { if (this._dropped) return; this._dropped = true; await this.onclose({ reason, code }); }
 }
 
-const settle = () => new Promise(r => setTimeout(r, 15));
+const settle = () => new Promise(r => setTimeout(r, 2));
 async function until(cond, ms = 2000) {
   const end = Date.now() + ms;
   while (!cond()) { if (Date.now() > end) throw new Error('timed out waiting'); await settle(); }
@@ -129,7 +129,15 @@ const undoDepth = () => _state.getUndoStack().length;
 const call = (tool, args) => bridgeRunTool(tool, args);
 const codeOf = p => p.then(() => 'ok', e => e.code);
 
+// The app's own timers (reconnect backoff, the busy-user poll) run at 1/100
+// speed of their real delays, so the real retry path is exercised without
+// waiting a second for it. Fake-timer tests see the true delays.
+const TIME_SCALE = 100;
+const realSandboxSetTimeout = sandbox.setTimeout;
+
 beforeEach(() => {
+  sandbox.setTimeout = (fn, ms = 0, ...a) =>
+    globalThis.setTimeout(fn, vi.isFakeTimers() ? ms : ms / TIME_SCALE, ...a);
   sockets = [];
   servers = new Map();
   sandbox.WebSocket = FakeSocket;
@@ -147,6 +155,7 @@ beforeEach(() => {
 
 afterEach(() => {
   bridgeDisconnect();
+  sandbox.setTimeout = realSandboxSetTimeout;
   vi.useRealTimers();
 });
 
@@ -318,7 +327,7 @@ describe('pairing (setup spec section 4)', () => {
     await until(() => srv.relay.hasAnyTab());
     _state.setEditState({ nodeId: 'x' });
     await srv.relay.requestPairing();
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 30)); // several busy polls
     expect(dialog).toBeNull();
     _state.setEditState(null);
     await until(() => dialog?.open);
@@ -546,6 +555,7 @@ describe('several agent apps (setup spec section 5)', () => {
     turnOn();
     const { ws: a } = await pairVia(47831);
     await letIn(b);
+    servers.delete(47831); // it quit: nothing listens there any more
     a.close(1001, 'gone');
     await until(() => _state.getBridgeStatus().clients.length === 1);
     expect(_state.getBridgeStatus().clients).toEqual(['claude-ai']);
