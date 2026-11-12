@@ -120,7 +120,7 @@ Before adding any control, find the nearest existing sibling of the same kind in
 | 3 | Select, text or number field | `.dialog-field`; inside a wrapper that already wears it (a prefixed or bare input), the input adds `.bare` |
 | 4 | On/off setting | `.switch` in `.switch-row` |
 | 5 | Settings entry | `.settings-label` + control inside `.settings-section` |
-| 6 | Tabs | `.agenda-tab` |
+| 6 | Tabs | `.tab` |
 | 7 | Dialog | `.dialog-shell` / `.dialog-header` / `.dialog-title` / `.dialog-body` / `.dialog-actions`; confirm via `showAppConfirm` |
 | 8 | Side panel | `.app-panel*` |
 | 9 | Popup menu | `.menu` surface with `.ctx-item` rows |
