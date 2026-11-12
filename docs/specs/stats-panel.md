@@ -1,7 +1,7 @@
 # SPEC - Stats Panel: Plan vs Reality
 
 > Source idea: `docs/ideas/stats-panel-plan-vs-reality.md`
-> Branch: `feature/stats-panel` (off `main`)
+> Status: Implemented on `main` (moved from the repo-root `SPEC.md` on 2026-11-12).
 > Scope: net-new feature, single-file (`zenit-week.html`). No data-model change.
 
 ---
