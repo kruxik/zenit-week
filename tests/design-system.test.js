@@ -16,19 +16,26 @@ import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8');
 
-// The catalogue: the classes a control may carry to get its look. The first
-// class on a JS-built control must be one of these; any of them satisfies the
-// markup check. Today's names - Phase 4 of the plan renames them to roles.
-const CATALOGUE = {
-  'agenda-action-btn': 'button (text or icon+text); `.commit` / `.danger` for the committing one',
-  'help-close-btn': 'icon-only / close button',
-  'dialog-field': 'select, text or number field',
-  'theme-toggle': 'on/off switch, inside `.theme-toggle-row`',
-  'agenda-tab': 'tab',
-  'ctx-item': 'popup menu item (context menu, day filter menu)',
-  'undo-redo-btn': 'toolbar icon button (undo/redo bar)',
-  'view-toggle-btn': 'view switcher button (Vision / Mindmap / Agenda / Stats)',
-};
+// The catalogue lives in zenit-week.html, as the COMPONENT CATALOGUE comment at
+// the top of the main stylesheet: one line per component, `kind role classes
+// builder()`. The first class of a `control` line is what a control must carry
+// to get its look. This test reads it from there, so there is one list, and
+// checks it against the CSS and the CLAUDE.md table (R7).
+function catalogueEntries() {
+  const block = /COMPONENT CATALOGUE[\s\S]*?\n\s*\n([\s\S]*?)\n\s*END COMPONENT CATALOGUE/.exec(SRC);
+  if (!block) return [];
+  return block[1].split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    const [kind, role, ...rest] = line.split(/\s+/);
+    return {
+      kind,
+      role,
+      classes: rest.filter(t => t.startsWith('.')).map(t => t.slice(1)),
+      builders: rest.filter(t => t.endsWith('()')).map(t => t.slice(0, -2)),
+    };
+  });
+}
+const ENTRIES = catalogueEntries();
+const CATALOGUE = new Set(ENTRIES.filter(e => e.kind === 'control').map(e => e.classes[0]));
 
 const SUGGEST = {
   button: '`.agenda-action-btn` (or `.help-close-btn` for a close X)',
@@ -216,15 +223,38 @@ const CONTROL_CLASS_SET = [
 ];
 
 describe('design system guard', () => {
-  it('knows every catalogue class from the stylesheet', () => {
-    const missing = Object.keys(CATALOGUE).filter(c => !new RegExp(`\\.${c}(?![\\w-])`).test(CSS));
-    expect(missing, 'catalogue class with no CSS rule').toEqual([]);
+  it('R7. the catalogue comment is well formed', () => {
+    expect(ENTRIES.length, 'no COMPONENT CATALOGUE block at the top of the stylesheet').toBeGreaterThan(0);
+    const bad = ENTRIES.filter(e => !['control', 'part'].includes(e.kind) || !e.role
+      || (e.kind === 'control' && e.classes.length === 0)).map(e => e.role || '(blank)');
+    expect(bad, 'each line is `control|part role .class ... builder()`; a control names its class first').toEqual([]);
+  });
+
+  it('R7. every class the catalogue names has a CSS rule, every builder exists', () => {
+    const missingClass = ENTRIES.flatMap(e => e.classes)
+      .filter(c => !new RegExp(`\\.${c}(?![\\w-])`).test(CSS));
+    expect(missingClass, 'catalogue class with no CSS rule').toEqual([]);
+    const missingBuilder = ENTRIES.flatMap(e => e.builders)
+      .filter(b => !new RegExp(`function ${b}\\(|\\b${b}\\s*=\\s*(async\\s+)?(function\\b|\\()`).test(SRC));
+    expect(missingBuilder, 'catalogue builder with no function').toEqual([]);
+  });
+
+  it('R7. the CLAUDE.md component table names exactly the catalogue classes', () => {
+    const doc = readFileSync(new URL('../CLAUDE.md', import.meta.url), 'utf8');
+    const section = /### UI components: sibling first\n([\s\S]*?)(?=\n#{2,3} )/.exec(doc);
+    expect(section, 'CLAUDE.md has no "UI components: sibling first" section').not.toBeNull();
+    const rows = section[1].split('\n').filter(l => /^\| \d+ \|/.test(l));
+    const inDoc = new Set(rows.flatMap(r => [...r.matchAll(/`([^`]*)`/g)]
+      .flatMap(code => [...code[1].matchAll(/\.([a-z][\w-]*)/g)].map(m => m[1]))));
+    const inCatalogue = new Set(ENTRIES.flatMap(e => e.classes));
+    expect([...inDoc].filter(c => !inCatalogue.has(c)).sort(), 'in the CLAUDE.md table but not in the catalogue comment').toEqual([]);
+    expect([...inCatalogue].filter(c => !inDoc.has(c)).sort(), 'in the catalogue comment but not in the CLAUDE.md table').toEqual([]);
   });
 
   it('1. every button, select, input and textarea in markup carries a catalogue class', () => {
     const offenders = markupControls()
       .filter(c => !(c.tag === 'input' && ['file', 'range', 'hidden'].includes(c.type)))
-      .filter(c => !c.classes.some(cls => cls in CATALOGUE))
+      .filter(c => !c.classes.some(cls => CATALOGUE.has(cls)))
       .map(c => `${c.tag}#${c.id || '(no id)'}`);
     expectBaseline(offenders, CLASSLESS_BASELINE,
       `give the control a catalogue class: button ${SUGGEST.button}, select/input ${SUGGEST.select}`);
@@ -258,7 +288,7 @@ describe('design system guard', () => {
         const a = assign.exec(lines[j]);
         if (!a) continue;
         const first = a[1].trim().split(/\s+/)[0];
-        if (!(first in CATALOGUE)) offenders.push(first);
+        if (!CATALOGUE.has(first)) offenders.push(first);
         break;
       }
     });

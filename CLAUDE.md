@@ -104,7 +104,29 @@ Dated work (Send to the Future, the `schedule` record, occurrences, the Later ta
 - **Google Drive Sync**: Optional sign-in with Google to sync data across devices; stored only in the user's own Google Drive - Zenit Week runs no servers that hold user data (the sole backend is `/api/token`, an OAuth token-exchange function) and never stores user data itself
 - **Internationalization**: English and Czech UI supported; `t(key)` helper reads from `TRANSLATIONS[currentLang]`; language persisted as `zenit-week-lang` in `localStorage` and synced via Drive
 - **Deleting a task**: `deleteNode(id)` deletes at once, from every entry point (context menu, `Backspace`/`Delete` on the map, `Delete` in the Agenda, and programmatic callers). Nothing is asked: Drop is its own menu item and its own hotkey (`X`), so choosing Delete has already answered that question. The one exception, an occurrence of a repeating schedule entry, is documented in the `schedule` skill.
-- **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog - `showAppConfirm({ title, body, okLabel, danger, onConfirm })`. Every dialog in the app is built from one vocabulary - `.dialog-shell` (glass surface), `.dialog-header` + `.dialog-title` (tinted caption bar, 15px/700, `.help-close-btn` X on the right), `.dialog-body`, `.dialog-actions`, `.dialog-field` - worn by the confirm, the date picker (Reschedule), the colour picker, the baseline panel, quick add, the coachmarks, the onboarding nudge and the update banner. A new dialog reuses those classes; it never invents a caption, field or button style of its own. `Cancel` stays only where the dialog asks a question whose other answers commit (sign-out, reset, import); a dialog that configures a value is cancelled by its X
+- **Dialogs**: Never use browser-native `confirm()`, `alert()`, or `prompt()`. Always use the app's custom confirm dialog - `showAppConfirm({ title, body, okLabel, danger, onConfirm })`. Any other dialog is built from the dialog row of the component table below. `Cancel` stays only where the dialog asks a question whose other answers commit (sign-out, reset, import); a dialog that configures a value is cancelled by its X
+
+### UI components: sibling first
+Before adding any control, find the nearest existing sibling of the same kind in the same container and copy its classes and structure exactly. If no catalogue entry fits, stop and ask; do not invent one.
+- Skin lives on classes, never on IDs. An ID may set layout only (width, flex, margin, display).
+- Every button, select, input, textarea and switch carries a catalogue class. Colours, radii, font sizes and z-index come from `:root` variables.
+- `tests/design-system.test.js` enforces all of this. Its baseline lists may only shrink; never add an entry to make a test pass.
+- The catalogue comment at the top of the stylesheet in `zenit-week.html` is the in-file copy of this table; the guard test keeps it in step with the CSS.
+
+| # | I need | Use |
+|---|---|---|
+| 1 | Button | `.agenda-action-btn` (+ `.commit` on the one committing button of a dialog, `.danger` for destructive) |
+| 2 | Icon-only / close | `.help-close-btn` |
+| 3 | Select, text or number field | `.dialog-field` |
+| 4 | On/off setting | `.theme-toggle` in `.theme-toggle-row` |
+| 5 | Settings entry | `.settings-label` + control inside `.settings-section` |
+| 6 | Tabs | `.agenda-tab` |
+| 7 | Dialog | `.dialog-shell` / `.dialog-header` / `.dialog-title` / `.dialog-body` / `.dialog-actions`; confirm via `showAppConfirm` |
+| 8 | Side panel | `.app-panel*` |
+| 9 | Popup menu item | `.ctx-item` (in `#context-menu` or `#day-filter-menu`) |
+| 10 | Chip | `.agenda-action-btn.qab-pill`, `buildBranchPill()` |
+| 11 | Icon | `iconSvg(name)` |
+| 12 | Toolbar button | `.undo-redo-btn` (undo bar), `.view-toggle-btn` (view switcher) - existing bars only, never a new one |
 
 ## Workflow Rules
 - **One branch, one working tree**: Every branch lives in its own directory, so several branches can be worked on at once on this machine. Never `git checkout` a different branch inside an existing checkout - create a worktree instead (`git worktree add ../zenit-week-<branch> <branch>`). Before the first commit of any branch-scoped task, run `git worktree list` and confirm the current directory is on the intended branch; re-check after any gap, because the checkout can move underneath you.

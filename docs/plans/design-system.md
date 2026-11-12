@@ -49,7 +49,7 @@ Tokens: colour is 322 of 326 declarations via variables (36 literal colours left
 
 ## Phase 2 - guidance that generalizes
 
-- [ ] **CLAUDE.md "UI components: sibling first"** section, replacing the per-incident vocabulary sentences (keep the `showAppConfirm` rule). Draft:
+- [x] **CLAUDE.md "UI components: sibling first"** section, replacing the per-incident vocabulary sentences (keep the `showAppConfirm` rule). Draft:
 
   > **UI components: sibling first.** Before adding any control, find the nearest existing sibling of the same kind in the same container and copy its classes and structure exactly. If no catalogue entry fits, stop and ask; do not invent one.
   > - Skin lives on classes, never on IDs. An ID may set layout only (width, flex, margin, display).
@@ -71,9 +71,11 @@ Tokens: colour is 322 of 326 declarations via variables (36 literal colours left
   > | 11 | Icon | `iconSvg(name)` |
 
   Until the Phase 4 renames land, the table uses today's names (`.agenda-action-btn`, `.help-close-btn`, `.dialog-field`, `.theme-toggle`, `.agenda-tab`); update it in the same commit as each rename.
-- [ ] **R7 In-file catalogue comment** at the top of the stylesheet section holding the components: each component, its class, its builder. R1 asserts every catalogue class named there exists in the CSS and vice versa.
+  - Done: the section sits under UI/UX Guidelines with today's class names; builders and `.menu` join the table when Phase 3 adds them. The Dialogs bullet keeps `showAppConfirm` and the Cancel rule and points at the table. Row 12 lists the two existing toolbar families (`.undo-redo-btn`, `.view-toggle-btn`), which the guard test treats as catalogue classes.
+- [x] **R7 In-file catalogue comment** at the top of the stylesheet section holding the components: each component, its class, its builder. R1 asserts every catalogue class named there exists in the CSS and vice versa.
+  - Done: the COMPONENT CATALOGUE comment (lines of `control|part role .classes builder()`) is the guard test's only source for the catalogue. R7 checks each class has a CSS rule, each builder exists, and the class set equals the CLAUDE.md table's.
 - [ ] **Hook** (needs the owner's explicit approval at the time): a Claude Code PostToolUse hook in `.claude/settings.json` that runs only `tests/design-system.test.js` after an edit to `zenit-week.html`, so a violation is reported within seconds.
-- [ ] Replace the narrow memory notes (reuse buttons, button match) with one general "sibling first, guard test enforces" note.
+- [x] Replace the narrow memory notes (reuse buttons, button match) with one general "sibling first, guard test enforces" note.
 
 ## Phase 3 - merge twins, add builders
 

@@ -145,6 +145,29 @@ function isProductionHost(hostname) {
 })();
 </script>
 <style>
+  /* COMPONENT CATALOGUE - the components every new piece of UI is built from.
+     Reuse the nearest sibling's classes; if nothing here fits, stop and ask.
+     Skin lives on these classes, never on an ID. Mirrors the "UI components:
+     sibling first" table in CLAUDE.md; tests/design-system.test.js reads this
+     block, so keep its shape: kind, role, classes, optional builder().
+     A `control` line's first class is what a button, select, input or
+     textarea must carry; a `part` line names the classes of a larger piece.
+
+     control  button          .agenda-action-btn .commit .danger
+     control  close           .help-close-btn
+     control  field           .dialog-field
+     control  switch          .theme-toggle .theme-toggle-row
+     control  tab             .agenda-tab
+     control  menu-item       .ctx-item
+     control  toolbar         .undo-redo-btn
+     control  view-switcher   .view-toggle-btn
+     part     settings-entry  .settings-section .settings-label
+     part     dialog          .dialog-shell .dialog-header .dialog-title .dialog-body .dialog-actions showAppConfirm()
+     part     side-panel      .app-panel
+     part     chip            .qab-pill buildBranchPill()
+     part     icon            iconSvg()
+     END COMPONENT CATALOGUE */
+
   /* The hidden attribute wins over every component rule in this file. The UA
      stylesheet gives it only `[hidden] { display: none }`, which any class or
      id rule setting `display` outranks - so an element left hidden in the
