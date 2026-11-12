@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-LuaoQZB/CG1izYgmdq2X2QWdr/r3EsZ7uP8gGCqUEjQ=';
+               'sha256-yZ8yVZwnrrlSDYeEIlmIZkM66XlXjt6uVuaQs6amNuw=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -1190,8 +1190,10 @@ function isProductionHost(hostname) {
     outline: none;
     transition: background 0.15s, color 0.15s;
   }
+  /* The focus the picker places on open draws no ring - it would read as a
+     chosen day. The first key press inside the panel brings it back. */
   .dp-day:hover,
-  .dp-day:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-primary); color: var(--accent-primary); }
+  :where(#date-picker-panel:not(.dp-quiet-focus)) .dp-day:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-primary); color: var(--accent-primary); }
   .dp-day.outside { color: var(--text-muted); }
   .dp-day.today { font-weight: 700; color: var(--accent-primary); }
   /* Today's dot, the same mark the agenda day strip uses. */
@@ -1206,6 +1208,21 @@ function isProductionHost(hostname) {
     border-radius: 50%;
     background: currentColor;
   }
+  /* A week number that takes the task to that week with no day. */
+  .dp-weekno {
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    font-family: inherit;
+    color: var(--text-dim);
+    cursor: pointer;
+    outline: none;
+    transition: background 0.15s, color 0.15s;
+  }
+  .dp-weekno:hover,
+  :where(#date-picker-panel:not(.dp-quiet-focus)) .dp-weekno:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-primary); color: var(--accent-primary); }
   .dp-day.selected,
   .dp-day.selected:hover { background: var(--accent-primary); color: #fff; }
   .dp-day:disabled { opacity: 0.35; cursor: default; box-shadow: none; color: var(--text-muted); }
@@ -2653,6 +2670,32 @@ function isProductionHost(hostname) {
     cursor: default;
   }
   .qab-recent-item > .qab-pill-dot { margin-right: 4px; }
+  /* The tappable dot: a 28px target around the 8px dot, pulled back so the
+     dot keeps its place on the input's left edge. */
+  .qab-recent-branch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: 0 -6px 0 -10px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+  }
+  .qab-recent-branch:hover .qab-pill-dot,
+  .qab-recent-branch:focus-visible .qab-pill-dot { transform: scale(1.5); }
+  .qab-recent-branch .qab-pill-dot { transition: transform 0.15s; }
+  .qab-recent-move {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px;
+    border-top: 1px solid var(--border-soft);
+    animation: qab-recent-in 0.2s ease;
+  }
   .qab-recent-icon { display: inline-flex; flex-shrink: 0; }
   .qab-recent-label {
     flex: 1;
@@ -3032,6 +3075,24 @@ function isProductionHost(hostname) {
   /* ...and the horizon cell is drawn only there. */
   html:not([data-view="vision"]) #horizon-filter-btn,
   html:not([data-view="vision"]) #horizon-filter-btn + .view-level-separator { display: none; }
+  /* Pressed tab: on a phone the view's own frame lands ~150 ms after the tap,
+     so the tab the finger is on takes the highlight at pointerdown and the tab
+     being left gives it up. `data-press-view` is the destination, set by the
+     press and cleared by the click that switches (same frame) or a lost press. */
+  html[data-press-view="agenda"][data-view]  #vtb-agenda,
+  html[data-press-view="mindmap"][data-view] #vtb-mindmap,
+  html[data-press-view="stats"][data-view]   #vtb-stats,
+  html[data-press-view="vision"][data-view]  #vtb-vision {
+    background: var(--view-btn-active-bg);
+    color: var(--view-btn-active-text);
+  }
+  html[data-press-view]:not([data-press-view="agenda"])  #vtb-agenda,
+  html[data-press-view]:not([data-press-view="mindmap"]) #vtb-mindmap,
+  html[data-press-view]:not([data-press-view="stats"])   #vtb-stats,
+  html[data-press-view]:not([data-press-view="vision"])  #vtb-vision {
+    background: none;
+    color: var(--text-subtle);
+  }
 
   /* ─── Agenda View ────────────────────────────────────────────────────────── */
   /* Window chrome comes from .app-panel; only the Agenda-specific bits live here:
@@ -5199,6 +5260,7 @@ Or remove them later in Settings → Help.</div>
             <option value="codex">Codex</option>
             <option value="cursor">Cursor</option>
             <option value="gemini">Gemini CLI</option>
+            <option value="grok">Grok Build</option>
             <option value="vscode">VS Code (Copilot)</option>
             <option value="devin">Devin Desktop (Windsurf)</option>
             <option value="other" data-i18n="bridge.guide.other">Other MCP app</option>
@@ -8479,6 +8541,16 @@ function ensureContrast(fg, bg, min = 4.5) {
 // Agenda chip is the node's tint with its label colour, darkened or lightened
 // until it reads. A node from another week (Overdue, an earlier day's Done) is
 // not in this week's map, so it falls back to its branch's open palette.
+// The node that holds a row's comment. A day leaf is only its task on one
+// day, so its comment is the task's: the Agenda shows and edits that one.
+function commentOwner(node) {
+  if (node && node.dayChild) {
+    const p = findNode(node.parent);
+    if (p) return p;
+  }
+  return node;
+}
+
 function commentBadgeColors(node) {
   const bc = BRANCH_COLORS[node.branch]
     || deriveBranchPalette(document.documentElement.dataset.theme === 'dark' ? '#888888' : '#666666');
@@ -12541,6 +12613,7 @@ const TRANSLATIONS = {
     'toolbar.settings':           'Settings',
     'quick_add.placeholder':      'Add a task…',
     'quick_add.title':            'Quick add',
+    'quick_add.moveBranch':       'Move to another branch',
     'week.word':                  'Week',
     'weekbar.today':              'Jump to current week',
     'weekpicker.title':           'Choose week',
@@ -12621,6 +12694,7 @@ const TRANSLATIONS = {
     'bridge.guide.cursorNote':    'Cursor opens and asks to install Zenit Week. Needs Node.js 20 or newer.',
     'bridge.guide.codexNote':     'Paste the command in a terminal, then restart Codex. Needs Node.js 20 or newer.',
     'bridge.guide.geminiNote':    'Paste the command in a terminal, then restart Gemini CLI. Needs Node.js 20 or newer.',
+    'bridge.guide.grokNote':      'Paste the command in a terminal, then restart Grok Build. Already set up in Claude Code or Cursor? Grok Build reads that too. Needs Node.js 20 or newer.',
     'bridge.guide.devinNote':     "Paste it into Devin Desktop's MCP config file (Settings, MCP servers), then restart it. Needs Node.js 20 or newer.",
     'dev.tab':                    'Dev',
     'dev.title':                  'Development',
@@ -12784,6 +12858,7 @@ const TRANSLATIONS = {
     'datePicker.setFrom':         'Repeat from {date}',
     'datePicker.pickEnd':         'Pick the last day',
     'datePicker.pickStart':       'Pick the first day',
+    'datePicker.weekAnyDay':      'Week {week}, any day',
     'sendFuture.noRepeat':        'No repeat',
     'sendFuture.unitDay':         'days',
     'sendFuture.unitWeek':        'weeks',
@@ -13059,6 +13134,7 @@ const TRANSLATIONS = {
     'toolbar.settings':           'Nastavení',
     'quick_add.placeholder':      'Přidat úkol…',
     'quick_add.title':            'Rychlé přidání',
+    'quick_add.moveBranch':       'Přesunout do jiné větve',
     'week.word':                  'Týden',
     'weekbar.today':              'Přejít na aktuální týden',
     'weekpicker.title':           'Vybrat týden',
@@ -13139,6 +13215,7 @@ const TRANSLATIONS = {
     'bridge.guide.cursorNote':    'Otevře se Cursor a nabídne instalaci Zenit Week. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.codexNote':     'Vlož příkaz do terminálu a restartuj Codex. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.geminiNote':    'Vlož příkaz do terminálu a restartuj Gemini CLI. Potřebuje Node.js 20 nebo novější.',
+    'bridge.guide.grokNote':      'Vlož příkaz do terminálu a restartuj Grok Build. Máš už Zenit Week v Claude Code nebo Cursoru? Grok Build si ho načte i odtud. Potřebuje Node.js 20 nebo novější.',
     'bridge.guide.devinNote':     'Vlož ho do MCP nastavení Devin Desktop (Settings, MCP servers) a aplikaci restartuj. Potřebuje Node.js 20 nebo novější.',
     'dev.tab':                    'Vývoj',
     'dev.title':                  'Vývoj',
@@ -13302,6 +13379,7 @@ const TRANSLATIONS = {
     'datePicker.setFrom':         'Opakovat od {date}',
     'datePicker.pickEnd':         'Vyber poslední den',
     'datePicker.pickStart':       'Vyber první den',
+    'datePicker.weekAnyDay':      'Týden {week}, kdykoli',
     'sendFuture.noRepeat':        'Bez opakování',
     'sendFuture.unitDay':         'dní',
     'sendFuture.unitWeek':        'týdnů',
@@ -21811,7 +21889,7 @@ function showContextMenu(x, y, nodeId) {
   document.getElementById('ctx-delete').style.display    = ((!isBranch && !isCenter && !isCounter) || canDeleteBranch) ? '' : 'none';
   document.getElementById('ctx-add-child').style.display = (isCenter || isCounter || isTick || (node && node.dayChild) || (node && node.inbox) || currentView === 'agenda' || !canAddChildAt(contextTarget)) ? 'none' : '';
   document.getElementById('ctx-rename').style.display    = (isCenter  || isCounter || isTick)            ? 'none' : '';
-  const isCommentable = isActivity && !isTick && !node.dayChild;
+  const isCommentable = isActivity && !isTick && !commentOwner(node).dayChild;
   document.getElementById('ctx-comment').style.display   = isCommentable ? '' : 'none';
   document.getElementById('ctx-reschedule').style.display = ((isStdActivity || isTick) && !node.done) ? '' : 'none';
 
@@ -22233,11 +22311,14 @@ function monthOfDayString(date) {
   return part ? { y: part.y, m: part.m - 1 } : null;
 }
 
+// `onPickWeek`, when given, turns the number of each week `isWeekPickable`
+// accepts into a button: the week itself, with no day in it.
 function openDatePicker({ title, anchorRect = null, focusDate, selected = [], weekMark = null,
-                          isDisabled = () => false, onPick, actions = [], repeat = null }) {
+                          isDisabled = () => false, onPick, onPickWeek = null,
+                          isWeekPickable = () => false, actions = [], repeat = null }) {
   _dp = {
     month: monthOfDayString(focusDate) || monthOfDayString(localDateStr()),
-    selected: new Set(selected), weekMark, isDisabled, onPick, anchorRect,
+    selected: new Set(selected), weekMark, isDisabled, onPick, onPickWeek, isWeekPickable, anchorRect,
     repeat: repeat && { ...repeat, start: null, end: null, stage: 'start' },
   };
   if (repeat) {
@@ -22272,7 +22353,7 @@ function openDatePicker({ title, anchorRect = null, focusDate, selected = [], we
   }
 
   renderDatePicker();
-  dpPanel.classList.add('visible');
+  dpPanel.classList.add('visible', 'dp-quiet-focus');
   positionDatePicker();
   focusDatePickerDay(focusDate) || focusDatePickerDay(localDateStr())
     || dpPanel.querySelector('.dp-day:not(:disabled)')?.focus();
@@ -22317,9 +22398,21 @@ function renderDatePicker() {
     const row = document.createElement('div');
     row.className = 'dp-row' + (wk === weekMark ? ' open-week' : '');
 
-    const no = document.createElement('span');
-    no.className = 'wp-weekno';
+    // While a rule is written every click picks one of its days, so no week.
+    const weekPick = _dp.onPickWeek && !dpRepeatOn() && _dp.isWeekPickable(wk);
+    const no = document.createElement(weekPick ? 'button' : 'span');
+    no.className = 'wp-weekno' + (weekPick ? ' dp-weekno' : '');
     no.textContent = String(iso.week);
+    if (weekPick) {
+      no.type = 'button';
+      no.title = t('datePicker.weekAnyDay', { week: iso.week });
+      no.setAttribute('aria-label', no.title);
+      no.addEventListener('click', () => {
+        const { onPickWeek } = _dp;
+        closeDatePicker();
+        onPickWeek(wk);
+      });
+    }
     row.appendChild(no);
 
     for (let i = 0; i < 7; i++) {
@@ -22391,6 +22484,7 @@ function focusDatePickerDay(date) {
   // Arrows walk the days, a week per Up/Down, paging the month when the walk
   // leaves it and stepping over days that cannot be picked.
   dpPanel.addEventListener('keydown', (e) => {
+    dpPanel.classList.remove('dp-quiet-focus');
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
     const from = document.activeElement?.dataset?.date;
     if (!step || !from || !_dp) return;
@@ -22431,9 +22525,16 @@ function rescheduleTargetKind(date, { openWeek, todayWeek, today, canLater }) {
   const wk = weekKeyForDayString(date);
   if (!wk) return 'disabled';
   if (wk === openWeek) return 'retag';
-  if (wk === offsetWeek(openWeek, 1)) return 'move';
-  if (wk < openWeek) return wk >= todayWeek ? 'move' : 'disabled';
+  if (rescheduleWeekMoves(wk, { openWeek, todayWeek })) return 'move';
+  if (wk < openWeek) return 'disabled';
   return canLater && date >= today ? 'later' : 'disabled';
+}
+
+// Whether a task moves into week `wk` as it is (the `move` kind): the next
+// week, or back to any week from today's on. Only these weeks can take a task
+// with no day - a Later entry is always a date.
+function rescheduleWeekMoves(wk, { openWeek, todayWeek }) {
+  return wk === offsetWeek(openWeek, 1) || (wk < openWeek && wk >= todayWeek);
 }
 
 // Whole weeks from week key `from` to `to`, negative going back.
@@ -22553,6 +22654,15 @@ async function afterScheduleWrite(written, { announce }) {
       } else if (kind === 'later') await sendLater(date);
     };
 
+    // A week number: the task moves there on Any day. A task on several days
+    // or counting repetitions keeps its days, as a day click leaves them.
+    const onPickWeek = async (wk) => {
+      if (currentWeekKey !== openWeek || !findNode(node.id)) return;
+      if (!rescheduleWeekMoves(wk, ctx)) return;
+      await moveNodeToWeek(node.id, { offset: weekDistance(openWeek, wk), day: keepDays ? undefined : null });
+      if (currentView === 'agenda') renderAgenda();
+    };
+
     const actions = [{
       icon: 'calendar-down', label: t('menu.now'),
       // Today, pinned to the top of today's agenda (the (now) token's effect).
@@ -22594,10 +22704,13 @@ async function afterScheduleWrite(written, { announce }) {
     }
 
     const selected = datesOfDays(openWeek, chosen);
+    // No day yet: the keyboard starts on today when the open week holds it,
+    // else on its Monday.
+    const openWeekDays = weekDayStrings(openWeek) || [];
     openDatePicker({
       title: t('menu.reschedule'),
       anchorRect,
-      focusDate: selected[0] || (weekDayStrings(openWeek) || [])[3],
+      focusDate: selected[0] || (openWeekDays.includes(ctx.today) ? ctx.today : openWeekDays[0]),
       selected,
       weekMark: openWeek,
       isDisabled: (date) => {
@@ -22610,6 +22723,8 @@ async function afterScheduleWrite(written, { announce }) {
         return false;
       },
       onPick,
+      onPickWeek,
+      isWeekPickable: (wk) => rescheduleWeekMoves(wk, ctx),
       actions,
       // A repeat is a standing intention, so it leaves the week even when its
       // first day falls in it (see sendNodeToDate). Ticks and day leaves repeat
@@ -22889,7 +23004,7 @@ document.getElementById('ctx-comment').addEventListener('click', () => {
   if (entryCtx) { openEntryCommentDialog(entryCtx.entryId, entryCtx.date); return; }
   // The comment dialog sits below the quick-add panel, so the panel yields.
   if (window.isQuickAddOpen()) window.closeQuickAdd();
-  if (id) openCommentDialog(id);
+  if (id) openCommentDialog(commentOwner(findNode(id))?.id || id);
 });
 
 // ─── Comment grammar ──────────────────────────────────────────────────────────
@@ -24907,16 +25022,18 @@ function buildAgendaItem(node, label, opts = {}) {
   }
 
   // Comment indicator - colored badge; click opens the comment dialog.
-  if (node.comments) {
+  // A day-leaf row carries its task's comment.
+  const commentNode = commentOwner(node);
+  if (commentNode.comments) {
     const cmt = document.createElement('span');
     cmt.className = 'daily-log-badge comment';
     cmt.style.cssText = 'height:26px;padding:0 8px;display:inline-flex;align-items:center;';
-    const { chip, chipInk } = commentBadgeColors(node);
+    const { chip, chipInk } = commentBadgeColors(commentNode);
     cmt.style.background = chip;
     cmt.style.color = chipInk;
     cmt.innerHTML = iconSvg('message');
     cmt.title = t('menu.comment');
-    const preview = commentPreview(node.comments);
+    const preview = commentPreview(commentNode.comments);
     if (preview.inline.length) {
       const text = document.createElement('span');
       text.className = 'comment-preview';
@@ -24942,7 +25059,7 @@ function buildAgendaItem(node, label, opts = {}) {
     cmt.addEventListener('click', e => {
       stopClickKeepingDismiss(e);
       if (entryRow) openEntryCommentDialog(entryRow.id, opts.date);
-      else openCommentDialog(node.id);
+      else openCommentDialog(commentNode.id);
     });
     item.appendChild(cmt);
   }
@@ -26739,6 +26856,51 @@ window.addEventListener('pointercancel', (e) => {
   abortActiveDrag();
 });
 
+// Move a task (with its subtree) under a new parent - a task or a branch. The
+// one rebind path: the map's drop and the quick-add strip's branch change both
+// call it. The caller takes the snapshot and saves. `keepInbox` leaves an inbox
+// task unplaced: changing its branch is not filing it.
+function rebindNode(nodeId, targetParentId, { keepInbox = false } = {}) {
+  const node = findNode(nodeId);
+  const newParent = findNode(targetParentId);
+  if (!node || !newParent) return false;
+  // Remove from old parent
+  if (node.parent) {
+    const oldParent = findNode(node.parent);
+    if (oldParent) {
+      oldParent.children = oldParent.children.filter(id => id !== nodeId);
+      touchNode(node.parent);
+    }
+  }
+  // Re-sync old parent (node.parent still points to old parent here)
+  if (node.parent && node.parent !== 'center') {
+    syncStatusUp(nodeId, 'done');
+    syncStatusUp(nodeId, 'unplanned');
+  }
+  node.parent = targetParentId;
+  const newBranch = newParent.branch || newParent.id;
+  node.branch = newBranch;
+  // Rebinding across branches must repaint the whole subtree: colors, summary
+  // stats and CFD filters all read each node's own `branch`, not its parent's.
+  getDescendantIds(nodeId).forEach(cid => {
+    const c = findNode(cid);
+    if (c && c.branch !== newBranch) { c.branch = newBranch; touchNode(cid); }
+  });
+  if (!keepInbox) delete node.inbox; // promote from inbox to permanent map node
+  newParent.children.push(nodeId);
+  touchNode(targetParentId);
+  // Re-sync new parent (node.parent now points to new parent)
+  if (targetParentId !== 'center') {
+    syncStatusUp(nodeId, 'done');
+    syncStatusUp(nodeId, 'unplanned');
+  }
+  // Reset offsets for clean snap to new parent
+  node.offX = 0;
+  node.offY = 0;
+  touchNode(nodeId);
+  return true;
+}
+
 function handleNodeDrop(mouseX, mouseY) {
   const nodeId = dragState.activeNodeId;
   const node = findNode(nodeId);
@@ -26757,44 +26919,7 @@ function handleNodeDrop(mouseX, mouseY) {
   const targetParentId = ( node.dayChild || node.tickChild ) ? null : findRebindTarget(currentDragRect(mouseX, mouseY));
 
   if (targetParentId) {
-    // REBINDING
-    // Remove from old parent
-    if (node.parent) {
-      const oldParent = findNode(node.parent);
-      if (oldParent) {
-        oldParent.children = oldParent.children.filter(id => id !== nodeId);
-        touchNode(node.parent);
-      }
-    }
-    // Re-sync old parent (node.parent still points to old parent here)
-    if (node.parent && node.parent !== 'center') {
-      syncStatusUp(nodeId, 'done');
-      syncStatusUp(nodeId, 'unplanned');
-    }
-    // Set new parent
-    const newParent = findNode(targetParentId);
-    node.parent = targetParentId;
-    const newBranch = newParent.branch || newParent.id;
-    node.branch = newBranch;
-    // Rebinding across branches must repaint the whole subtree: colors, summary
-    // stats and CFD filters all read each node's own `branch`, not its parent's.
-    getDescendantIds(nodeId).forEach(cid => {
-      const c = findNode(cid);
-      if (c && c.branch !== newBranch) { c.branch = newBranch; touchNode(cid); }
-    });
-    delete node.inbox; // promote from inbox to permanent map node
-    newParent.children.push(nodeId);
-    touchNode(targetParentId);
-    // Re-sync new parent (node.parent now points to new parent)
-    if (targetParentId !== 'center') {
-      syncStatusUp(nodeId, 'done');
-      syncStatusUp(nodeId, 'unplanned');
-    }
-
-    // Reset offsets for clean snap to new parent
-    node.offX = 0;
-    node.offY = 0;
-    touchNode(nodeId);
+    rebindNode(nodeId, targetParentId);
   } else {
     // EXISTING REORDER/PAN LOGIC
     if (node.parent) {
@@ -28343,25 +28468,61 @@ function openSettings() {
     });
   }
 
+  // One branch pill: the panel's branch row and a row's branch chooser are the
+  // same control. mousedown acts and keeps focus in the input, so the mobile
+  // keyboard stays up.
+  function buildBranchPill(b, onPick) {
+    const bc = BRANCH_COLORS[b.id] || { main: '#888', light: '#eee', text: '#444' };
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'agenda-action-btn qab-pill';
+    pill.dataset.id = b.id;
+    const dot = document.createElement('span');
+    dot.className = 'qab-pill-dot';
+    dot.style.background = bc.main;
+    pill.appendChild(dot);
+    const label = document.createElement('span');
+    label.textContent = b.label;
+    pill.appendChild(label);
+    pill.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onPick(b.id); });
+    pill.addEventListener('click', (e) => { e.stopPropagation(); });
+    return pill;
+  }
+
   function populateBranches() {
-    branchesRow.innerHTML = '';
-    weekData.nodes.filter(n => n.type === 'branch').forEach(b => {
-      const bc = BRANCH_COLORS[b.id] || { main: '#888', light: '#eee', text: '#444' };
-      const pill = document.createElement('button');
-      pill.type = 'button';
-      pill.className = 'agenda-action-btn qab-pill';
-      pill.dataset.id = b.id;
-      const dot = document.createElement('span');
-      dot.className = 'qab-pill-dot';
-      dot.style.background = bc.main;
-      pill.appendChild(dot);
-      const label = document.createElement('span');
-      label.textContent = b.label;
-      pill.appendChild(label);
-      pill.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); selectBranch(b.id); });
-      pill.addEventListener('click', (e) => { e.stopPropagation(); });
-      branchesRow.appendChild(pill);
+    branchesRow.replaceChildren(...weekData.nodes.filter(n => n.type === 'branch')
+      .map(b => buildBranchPill(b, selectBranch)));
+  }
+
+  // The row's branch dot opens this chooser under the row: the other branches,
+  // as the same pills as the branch row. Picking one moves the task there.
+  function toggleMoveChooser(entry, wrapper) {
+    const open = recentRow.querySelector('.qab-recent-move');
+    const wasThisRow = open && open.dataset.nodeId === entry.id;
+    if (open) open.remove();
+    if (wasThisRow) return;
+    const node = findNode(entry.id);
+    if (!node) return;
+    const chooser = document.createElement('div');
+    chooser.className = 'qab-recent-move';
+    chooser.dataset.nodeId = entry.id;
+    weekData.nodes.filter(n => n.type === 'branch' && n.id !== node.branch).forEach(b => {
+      chooser.appendChild(buildBranchPill(b, (branchId) => moveRecentToBranch(entry, branchId)));
     });
+    wrapper.after(chooser);
+  }
+
+  function moveRecentToBranch(entry, branchId) {
+    const node = findNode(entry.id);
+    if (node && node.branch !== branchId && findNode(branchId)) {
+      takeSnapshot();
+      rebindNode(node.id, branchId, { keepInbox: true });
+      entry.branch = branchId;
+      saveWeek(currentWeekKey, weekData);
+      renderIfVisible();
+      if (currentView === 'agenda') renderAgenda();
+    }
+    refreshRecent();
   }
 
   // Items stored this session, oldest first: { id, label, typed, branch,
@@ -28392,7 +28553,23 @@ function openSettings() {
     // Always the branch colour, whatever the status: the dot says where the
     // task lives, the row's colours say what state it is in.
     dot.style.background = (BRANCH_COLORS[node ? node.branch : entry.branch] || { main: '#888' }).main;
-    item.appendChild(dot);
+    // On a live row with somewhere else to go, the dot is the way to change the
+    // branch - a mis-picked branch is fixed here, not on the map.
+    const canMove = node && weekData.nodes.filter(n => n.type === 'branch').length > 1;
+    let branchBtn = null;
+    if (canMove) {
+      branchBtn = document.createElement('button');
+      branchBtn.type = 'button';
+      branchBtn.className = 'qab-recent-branch';
+      branchBtn.setAttribute('aria-label', t('quick_add.moveBranch'));
+      branchBtn.title = t('quick_add.moveBranch');
+      branchBtn.appendChild(dot);
+      // mousedown keeps focus in the input (mobile keyboard), as the pills do.
+      branchBtn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+      item.appendChild(branchBtn);
+    } else {
+      item.appendChild(dot);
+    }
 
     // Icons in the map's order: priority before the label; unplanned,
     // reusable and dropped after it. Dropped gets the ⊘ but not the map's
@@ -28434,6 +28611,12 @@ function openSettings() {
 
     const wrapper = wrapAgendaRowForSwipe(item, entry.id, iconSvg('circle-check'));
     if (!node) return wrapper;
+    if (branchBtn) {
+      branchBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleMoveChooser(entry, wrapper);
+      });
+    }
 
     item._doneAction = () => {
       setStatus(node.id, node.dropped ? 'undropped' : node.done ? 'undone' : 'done');
@@ -28672,6 +28855,7 @@ const BRIDGE_ADD_CMDS = {
   'claude-code': `claude mcp add --scope user zenit-week -- ${BRIDGE_NPX}`,
   codex: `codex mcp add zenit-week -- ${BRIDGE_NPX}`,
   gemini: 'gemini mcp add --scope user zenit-week npx zenit-week-mcp@1',
+  grok: `grok mcp add zenit-week -- ${BRIDGE_NPX}`,
 };
 // The sites the server accepts without `origins add` (mcp/core.js isAllowedOrigin).
 const BRIDGE_BUILT_IN_ORIGIN = /^(https:\/\/(www\.)?zenitweek\.com|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
@@ -28784,6 +28968,7 @@ const BRIDGE_GUIDE = {
   'claude-code': { note: 'bridge.guide.codeNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('claude-code')) },
   codex: { note: 'bridge.guide.codexNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('codex')) },
   gemini: { note: 'bridge.guide.geminiNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('gemini')) },
+  grok: { note: 'bridge.guide.grokNote', label: 'bridge.guide.copyCommand', run: () => _bridgeCopy(bridgeAddCmd('grok')) },
   cursor: { note: 'bridge.guide.cursorNote', label: 'bridge.guide.addCursor', run: () => _bridgeFollow(BRIDGE_CURSOR_LINK) },
   devin: { note: 'bridge.guide.devinNote', label: 'bridge.guide.copyConfig', run: () => _bridgeCopy(BRIDGE_OTHER_CONFIG) },
   vscode: { note: 'bridge.guide.vscodeNote', label: 'bridge.guide.addVscode', run: () => _bridgeFollow(BRIDGE_VSCODE_LINK) },
@@ -31132,6 +31317,10 @@ window.addEventListener('load', async () => {
   // View toggle bar
   // Clicking the tab you are already on is the disclosure gesture for the
   // view-level row; from any other view it just navigates, as before.
+  // Where a tab leads: Stats toggles back to the default (mindmap), except with
+  // Help open, where the click spends itself on dismissing Help.
+  const viewTabTarget = (view) =>
+    view === 'stats' && currentView === 'stats' && !isHelpOpen() ? 'mindmap' : view;
   document.getElementById('vtb-mindmap').addEventListener('click', () => {
     if (currentView === 'mindmap') toggleViewLevels();
     else switchView('mindmap');
@@ -31142,11 +31331,26 @@ window.addEventListener('load', async () => {
     if (currentView === 'vision') toggleViewLevels();
     else switchView('vision');
   });
-  document.getElementById('vtb-stats').addEventListener('click', () => {
-    // Toggle Stats; leaving lands on the default (mindmap). With Help open the
-    // click spends itself on dismissing Help, so Stats stays put.
-    switchView(currentView === 'stats' && !isHelpOpen() ? 'mindmap' : 'stats');
-  });
+  document.getElementById('vtb-stats').addEventListener('click', () => switchView(viewTabTarget('stats')));
+
+  // Press feedback: highlight the destination tab at pointerdown (see the
+  // `data-press-view` CSS). The click clears it in the same task that switches,
+  // so the highlight and the new view paint together; a press that slides off
+  // or is cancelled clears it too.
+  const clearViewPress = () => { delete document.documentElement.dataset.pressView; };
+  for (const view of ['mindmap', 'agenda', 'vision', 'stats']) {
+    const btn = document.getElementById('vtb-' + view);
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      document.documentElement.dataset.pressView = viewTabTarget(view);
+    });
+    btn.addEventListener('pointerup', (e) => {
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      if (!under || !btn.contains(under)) clearViewPress();
+    });
+    btn.addEventListener('pointercancel', clearViewPress);
+    btn.addEventListener('click', clearViewPress);
+  }
 
   // Coachmark: teach the view controls on first hover of either bar.
   armNodeTouchHintGate();

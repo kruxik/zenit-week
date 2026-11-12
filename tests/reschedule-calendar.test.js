@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { _state, moveNodeToWeek, undo, parseTodoDays, rescheduleTargetKind, weekDistance } from './setup.js';
+import { _state, moveNodeToWeek, undo, parseTodoDays, rescheduleTargetKind, rescheduleWeekMoves, weekDistance } from './setup.js';
 
 // Today is Tuesday 3 Nov 2026, in week 2026-45.
 const TODAY = '2026-11-03';
@@ -52,6 +52,18 @@ describe('rescheduleTargetKind - what a calendar click does', () => {
   });
 });
 
+describe('rescheduleWeekMoves - which week numbers take a task on Any day', () => {
+  it('takes the next week and weeks back to today\'s, never the open week or a Later week', () => {
+    const c = { openWeek: '2026-47', todayWeek: '2026-45' };
+    expect(rescheduleWeekMoves('2026-48', c)).toBe(true);
+    expect(rescheduleWeekMoves('2026-46', c)).toBe(true);
+    expect(rescheduleWeekMoves('2026-45', c)).toBe(true);
+    expect(rescheduleWeekMoves('2026-47', c)).toBe(false);
+    expect(rescheduleWeekMoves('2026-49', c)).toBe(false);
+    expect(rescheduleWeekMoves('2026-44', c)).toBe(false);
+  });
+});
+
 describe('weekDistance', () => {
   it('counts whole weeks in both directions and across years', () => {
     expect(weekDistance('2026-45', '2026-46')).toBe(1);
@@ -99,5 +111,14 @@ describe('moveNodeToWeek - more than one week back', () => {
     await moveNodeToWeek('a1', { offset: -2, day: 4 });
     await undo();
     expect(_state.get().nodes.find(n => n.id === 'a1')?.label).toBe('Call mum (we)');
+  });
+
+  it('a week number lands it on Any day', async () => {
+    await moveNodeToWeek('a1', { offset: -2, day: null });
+    const dest = readDest().nodes;
+    const moved = dest.find(n => n.prevId === 'a1');
+    expect(moved).toBeTruthy();
+    expect(parseTodoDays(moved.label).size).toBe(0);
+    expect(moved.children.some(id => dest.find(x => x.id === id)?.dayChild)).toBe(false);
   });
 });
