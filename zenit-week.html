@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-+bRWnprp46v0Y4FxrFRaQjM0glIOMBDy02+t8TVU4oY=';
+               'sha256-uImLmYCvvRmeXRyZzocxpyzPcTVy0UG+uJUUDOoUld0=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -5489,6 +5489,7 @@ Or remove them later in Settings → Help.</div>
 
       <div class="help-section">
         <div class="help-section-title" data-i18n="help.featuresTitle">Key features</div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureVisionLead">Vision</strong><span data-i18n="help.featureVisionBody"> - the long view: life areas, intentions and why, with horizons</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureMindmapLead">Visual mindmap</strong><span data-i18n="help.featureMindmapBody"> - view your week with customizable branches</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureAgendaLead">Agenda</strong><span data-i18n="help.featureAgendaBody"> view - same week, two lenses</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureStatsLead">Stats</strong><span data-i18n="help.featureStatsBody"> - balance, trend and completion for the week</span></div>
@@ -5504,7 +5505,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureSendFutureLead">Send to date</strong><span data-i18n="help.featureSendFutureBody"> - hand a task to a future date, once or repeating; it arrives in the week that owns that date, under the same parents it left</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureQuickAddLead">Quick add</strong><span data-i18n="help.featureQuickAddBody"> - drop a task on a branch without touching the map</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureUndoLead">Undo / Redo</strong><span data-i18n="help.featureUndoBody"> - made a typo? Revert anytime</span></div>
-        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureBackupLead">Export / Import</strong><span data-i18n="help.featureBackupBody"> - full backup of every week as one JSON file</span></div>
+        <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureBackupLead">Export / Import</strong><span data-i18n="help.featureBackupBody"> - full backup of every week and your Vision as one JSON file</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureOfflineLead">Works offline</strong><span data-i18n="help.featureOfflineBody"> - installable, and edits made offline sync when you are back</span></div>
         <div class="help-row" style="display:block; font-size: 13px; line-height: 1.5; color: var(--text-secondary);"><strong data-i18n="help.featureLangLead">EN / CS, Light / Dark</strong><span data-i18n="help.featureLangBody"> - customize to fit your needs</span></div>
       </div>
@@ -5554,7 +5555,7 @@ Or remove them later in Settings → Help.</div>
         <div class="help-row"><span data-i18n="help.filterDay">Filter day</span> <span><kbd>1</kbd>–<kbd>7</kbd></span></div>
         <div class="help-row"><span data-i18n="filter.unscheduled">Unscheduled</span> <kbd>8</kbd></div>
         <div class="help-row"><span data-i18n="agenda.overdue">Overdue</span> <kbd>0</kbd></div>
-        <div class="help-row"><span data-i18n="help.filterHorizon">Filter horizon (Vision)</span> <span><kbd>1</kbd>–<kbd>4</kbd></span></div>
+        <div class="help-row"><span data-i18n="help.filterHorizon">Filter horizon (Vision) - this year · few years · someday · none</span> <span><kbd>1</kbd>–<kbd>4</kbd></span></div>
         <div class="help-row"><span data-i18n="help.fitView">Fit to view</span> <kbd>F</kbd></div>
         <div class="help-row"><span data-i18n="help.cycleViewLevel">Cycle view level</span> <kbd>W</kbd></div>
         <div class="help-row"><span data-i18n="help.prevWeek">Previous week</span> <span><kbd>[</kbd> <kbd>⇧ ←</kbd></span></div>
@@ -5595,9 +5596,9 @@ Or remove them later in Settings → Help.</div>
       </div>
 
       <div class="help-section">
-        <div class="help-section-title" data-i18n="help.navTitle">Canvas Navigation</div>
+        <div class="help-section-title" data-i18n="help.navTitle">Map navigation</div>
         <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.navDesc">Drag background to pan. Scroll / pinch to zoom.</div>
-        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.navFitDesc">Click the logo to fit everything to the view.</div>
+        <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.navFitDesc">Click the logo to clear filters, levels and focus and fit the whole map.</div>
         <div class="help-row" style="font-size: 13px; line-height: 1.4; color: var(--text-secondary);" data-i18n="help.navKeyboardDesc">Arrow keys move a focus ring from node to node - every activity hotkey then works on the focused node.</div>
       </div>
 
@@ -12827,8 +12828,8 @@ const TRANSLATIONS = {
     'tips.priorityIntro':         'A flame marks critical, an exclamation high. Priority sizes the task on the map and passes down to everything beneath it.',
     'tips.undoIntro':             'Every change can be taken back. Experiment freely - nothing gets lost.',
     'tips.dayFilter':             'Narrows the map to one day. Pick a day here and the rest of the week steps aside.',
-    'tips.levels':                'How much detail the map draws. Rocks shows what matters, Pebbles adds sub-tasks - tap it again to go one level deeper - Sand shows everything. Nothing is lost - it just steps into the background.',
-    'tips.views':                 'Three views of your week: Mindmap to plan, Agenda day by day, Stats for how it went. Vision is the long view the weeks are planned against.',
+    'tips.levels':                'How much detail the map draws. Rocks shows the big picture, Pebbles goes one level deeper with each tap, Sand shows everything. Nothing is lost - it just steps into the background.',
+    'tips.views':                 'Four views: Vision is the long view the weeks are planned against, Mindmap to plan the week, Agenda day by day, Stats for how it went.',
     'tips.gotIt':                 'Got it',
     'tips.disableHint':           'Turn tips off in Settings.',
     'view.mindmap':               'Mindmap',
@@ -13017,6 +13018,8 @@ const TRANSLATIONS = {
     'help.aboutP3Lead':           'Zenit Week',
     'help.aboutP3Body':           ' helps you plan visually. Start with your biggest rocks. See balance - or imbalance - at a glance.',
     'help.featuresTitle':         'Key features',
+    'help.featureVisionLead':     'Vision',
+    'help.featureVisionBody':     ' - the long view: life areas, intentions and why, with horizons',
     'help.featureMindmapLead':    'Visual mindmap',
     'help.featureMindmapBody':    ' - view your week with customizable branches',
     'help.featureAgendaLead':     'Agenda',
@@ -13046,7 +13049,7 @@ const TRANSLATIONS = {
     'help.featureUndoLead':       'Undo / Redo',
     'help.featureUndoBody':       ' - made a typo? Revert anytime',
     'help.featureBackupLead':     'Export / Import',
-    'help.featureBackupBody':     ' - full backup of every week as one JSON file',
+    'help.featureBackupBody':     ' - full backup of every week and your Vision as one JSON file',
     'help.featureOfflineLead':    'Works offline',
     'help.featureOfflineBody':    ' - installable, and edits made offline sync when you are back',
     'help.featureLangLead':       'EN / CS, Light / Dark',
@@ -13091,10 +13094,10 @@ const TRANSLATIONS = {
     'help.vision.weekKeys': 'Week keys do nothing here: Done (D), Unplanned (U), days (1-8), Reusable (R), move to another week (N, B), week navigation and Clear week.',
     'help.escClose':              'Close panel / menu',
     'help.filterDay':             'Filter day',
-    'help.filterHorizon':         'Filter horizon (Vision)',
+    'help.filterHorizon':         'Filter horizon (Vision) - this year · few years · someday · none',
     'help.undo':                  'Undo',
     'help.redo':                  'Redo',
-    'help.navFitDesc':            'Click the logo to fit everything to the view.',
+    'help.navFitDesc':            'Click the logo to clear filters, levels and focus and fit the whole map.',
     'help.dayIndicatorsTitle':    'Magic day indicators',
     'help.dayIndicatorsDescA':    'Add ',
     'help.dayIndicatorsDescKey':  '(day)',
@@ -13122,7 +13125,7 @@ const TRANSLATIONS = {
     'help.countersDescB':         ' to an activity name (e.g. Do Pushups 3x) to create a magic counter.',
     'help.rebindTitle':           'Activity rebinding & organizing',
     'help.rebindDesc':            'Drag a node over another to rebind it as a child. Drag between siblings to reorder.',
-    'help.navTitle':              'Canvas Navigation',
+    'help.navTitle':              'Map navigation',
     'help.navDesc':               'Drag background to pan. Scroll / pinch to zoom.',
     'help.mobileTitle':           'Mobile',
     'help.mobileSwipeRight':      'Swipe right on an Agenda item to mark it done.',
@@ -13358,8 +13361,8 @@ const TRANSLATIONS = {
     'tips.priorityIntro':         'Plamínek značí kritickou prioritu, vykřičník vysokou. Priorita zvětšuje úkol na mapě a propíše se na vše pod ním.',
     'tips.undoIntro':             'Každou změnu lze vzít zpět. Klidně zkoušej - nic se neztratí.',
     'tips.dayFilter':             'Zúží mapu na jeden den. Vyber den a zbytek týdne ustoupí.',
-    'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to klíčové, Oblázky přidají podúkoly - dalším klepnutím jdou o úroveň hlouběji - Písek ukáže vše. Nic se neztratí - jen ustoupí do pozadí.',
-    'tips.views':                 'Tři pohledy na týden: Mapa pro plánování, Agenda po dnech, Statistika pro výsledek. Vize je dlouhý výhled, podle kterého se týdny plánují.',
+    'tips.levels':                'Jak detailně se mapa kreslí. Kameny ukáží to hlavní, Oblázky jdou každým klepnutím o úroveň hlouběji, Písek ukáže vše. Nic se neztratí - jen ustoupí do pozadí.',
+    'tips.views':                 'Čtyři pohledy: Vize je dlouhý výhled, podle kterého se týdny plánují, Mapa pro plánování týdne, Agenda po dnech, Statistika pro výsledek.',
     'tips.gotIt':                 'Rozumím',
     'tips.disableHint':           'Tipy lze vypnout v Nastavení.',
     'view.mindmap':               'Mapa',
@@ -13548,6 +13551,8 @@ const TRANSLATIONS = {
     'help.aboutP3Lead':           'Zenit Week',
     'help.aboutP3Body':           ' ti pomůže plánovat vizuálně. Začni těmi největšími kameny. Rovnováhu - nebo nerovnováhu - uvidíš na první pohled.',
     'help.featuresTitle':         'Klíčové vlastnosti',
+    'help.featureVisionLead':     'Vize',
+    'help.featureVisionBody':     ' - dlouhý výhled: oblasti života, záměry a proč, s horizonty',
     'help.featureMindmapLead':    'Vizuální myšlenková mapa',
     'help.featureMindmapBody':    ' - zobraz si svůj týden s vlastními větvemi',
     'help.featureAgendaLead':     'Agenda',
@@ -13577,7 +13582,7 @@ const TRANSLATIONS = {
     'help.featureUndoLead':       'Zpět / Znovu',
     'help.featureUndoBody':       ' - překlep? Vrátit lze kdykoliv',
     'help.featureBackupLead':     'Export / Import',
-    'help.featureBackupBody':     ' - záloha všech týdnů v jednom JSON souboru',
+    'help.featureBackupBody':     ' - záloha všech týdnů a Vize v jednom JSON souboru',
     'help.featureOfflineLead':    'Funguje offline',
     'help.featureOfflineBody':    ' - lze nainstalovat a offline úpravy se po připojení samy synchronizují',
     'help.featureLangLead':       'EN / CS, Světlý / Tmavý',
@@ -13622,10 +13627,10 @@ const TRANSLATIONS = {
     'help.vision.weekKeys': 'Klávesy týdne tu nic nedělají: Hotovo (D), Neplánováno (U), dny (1-8), Opakované (R), přesun do jiného týdne (N, B), pohyb mezi týdny a Vymazat týden.',
     'help.escClose':              'Zavřít panel / menu',
     'help.filterDay':             'Filtr dne',
-    'help.filterHorizon':         'Filtr horizontu (Vize)',
+    'help.filterHorizon':         'Filtr horizontu (Vize) - letos · za pár let · jednou · bez',
     'help.undo':                  'Zpět',
     'help.redo':                  'Znovu',
-    'help.navFitDesc':            'Kliknutím na logo vyplníš vše do pohledu.',
+    'help.navFitDesc':            'Kliknutím na logo zrušíš filtry, úrovně i zaměření a uvidíš celou mapu.',
     'help.dayIndicatorsTitle':    'Magické denní indikátory',
     'help.dayIndicatorsDescA':    'Přidej ',
     'help.dayIndicatorsDescKey':  '(den)',
@@ -13653,7 +13658,7 @@ const TRANSLATIONS = {
     'help.countersDescB':         ' k názvu aktivity (např. Kliky 3x) pro vytvoření magického počítadla.',
     'help.rebindTitle':           'Přesouvání aktivit',
     'help.rebindDesc':            'Přetáhni uzel na jiný pro přeřazení jako podúkol. Přetáhni mezi sourozenci pro změnu pořadí.',
-    'help.navTitle':              'Navigace na plátně',
+    'help.navTitle':              'Navigace na mapě',
     'help.navDesc':               'Přetáhni pozadí pro posouvání. Scroll / pinch pro zoom.',
     'help.mobileTitle':           'Mobil',
     'help.mobileSwipeRight':      'V Agendě přejeď vpravo pro označení hotovo.',
