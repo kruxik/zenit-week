@@ -11,7 +11,7 @@
                'sha256-EPGZjovq0Kjq/10kGEwCWc50/T56b8fghLAb3TtJEoQ='
                'sha256-EY/OV1HZWkkbXet5NhccS5yeUOHvJLI3DKTerqJqx9E='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-ZjtYNwVGYZOHpi3QmDbgnpXA1uObdn7qEBobEhVbAjM=';
+               'sha256-lAPf3rWtINEcfAjAuanScfNNe5bsIvBMlHU2XNodSXw=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3987,6 +3987,30 @@ function isProductionHost(hostname) {
   .bridge-agent .settings-badge { width: 24px; height: 24px; font-size: 10px; }
   .bridge-agent[data-agent-state="connected"] .settings-badge { background: var(--accent-success-text); }
   .bridge-agent[data-agent-state="old"] .settings-badge { background: var(--accent-warning-text); }
+  /* How many of that agent are connected, from two up: a count on the badge's
+     corner, ringed in the panel colour so it reads as sitting on top. */
+  .bridge-agent .settings-badge { position: relative; }
+  .bridge-agent-count {
+    position: absolute;
+    right: -8px;
+    top: -6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    border: 2px solid var(--settings-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1;
+    color: var(--settings-bg);
+    background: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
   /* A pairing code: the visual centre of its dialog, digits in groups of three. */
   #app-confirm-highlight {
     font-size: 32px;
@@ -28992,20 +29016,38 @@ function renderBridgeStatus() {
   el.textContent = shown === 'update-server' ? t(bridgeUpdateHintKey(agents))
     : t(`bridge.state.${shown}`);
 
-  // One row per agent app the page knows: connected, or speaking an old protocol.
+  // One row per agent app and state, in the order first seen: three Claude Code
+  // sessions are one Claude Code row with a 3 on its badge, so the list grows
+  // with the kinds of agent, not with every window that has one open.
   const list = document.getElementById('bridge-agents');
   list.textContent = '';
+  const groups = new Map();
+  for (const a of shown === 'off' ? [] : agents) {
+    const label = a.state === 'old' && !a.client ? t('bridge.agent.oldServer') : (a.client || t('bridge.unnamedAgent'));
+    const key = a.state + '\n' + label;
+    const g = groups.get(key);
+    if (g) g.count++;
+    else groups.set(key, { state: a.state, label, count: 1 });
+  }
   // Each reads like the Drive account row: an initials badge in the agent's
   // state colour, the name, and its state underneath.
-  const rows = (shown === 'off' ? [] : agents).map(a => {
+  const rows = [...groups.values()].map(({ state: agentState, label, count }) => {
     const row = document.createElement('div');
     row.className = 'settings-row bridge-agent';
-    row.dataset.agentState = a.state;
-    const label = a.state === 'old' && !a.client ? t('bridge.agent.oldServer') : (a.client || t('bridge.unnamedAgent'));
+    row.dataset.agentState = agentState;
+    // The initials are decoration; the count is read out, before the name.
     const badge = document.createElement('span');
     badge.className = 'settings-badge';
-    badge.setAttribute('aria-hidden', 'true');
-    badge.textContent = bridgeInitials(label);
+    const initials = document.createElement('span');
+    initials.setAttribute('aria-hidden', 'true');
+    initials.textContent = bridgeInitials(label);
+    badge.appendChild(initials);
+    if (count > 1) {
+      const n = document.createElement('span');
+      n.className = 'bridge-agent-count';
+      n.textContent = String(count);
+      badge.appendChild(n);
+    }
     const identity = document.createElement('div');
     identity.className = 'settings-identity';
     const name = document.createElement('div');
@@ -29013,7 +29055,7 @@ function renderBridgeStatus() {
     name.textContent = label;
     const st = document.createElement('div');
     st.className = 'settings-sub';
-    st.textContent = t(a.state === 'connected' ? 'bridge.agent.connected' : 'bridge.agent.old');
+    st.textContent = t(agentState === 'connected' ? 'bridge.agent.connected' : 'bridge.agent.old');
     identity.append(name, st);
     row.append(badge, identity);
     return row;
