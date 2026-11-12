@@ -42,7 +42,7 @@ Tokens: colour is 322 of 326 declarations via variables (36 literal colours left
   - [x] 4. Every `role="dialog"` element carries `dialog-shell` and contains a `.dialog-header`. Baseline: `week-picker-fold`.
   - [x] 5. Outside `:root` / `[data-theme]` token blocks, no hex or `rgb()` literal in a declaration. Baseline: the 23 rules, keyed by selector.
   - [x] 6. The set of class names matching `-btn`, `-toggle`, `-field`, `-select`, `-input`, `-close` equals a frozen set; a new one fails with "reuse a catalogue component or add it to the catalogue".
-  - [ ] 7. (Switched on in Phase 5.) `border-radius`, `font-size`, `z-index` values are `var(...)`, `50%`, `0` or `inherit`, with a count ceiling that may only go down.
+  - [x] 7. (Switched on in Phase 5.) `border-radius`, `font-size`, `z-index` values are `var(...)`, `50%`, `0` or `inherit`, with a count ceiling that may only go down.
 - [x] **R2 One field class for Settings.** Delete the ID list rule; give the 4 Settings selects the shared field class. Decide whether Settings fields should look exactly like `.dialog-field`; if a difference is intended, express it once (modifier or `.settings-section` descendant rule on the class), never per ID. Verify in the browser. Shrinks R1.1/R1.2 baselines by 4.
   - Done: Settings selects wear `.dialog-field` exactly (Settings is itself a `.dialog-shell`, so no modifier). The one shared addition is `select.dialog-field { cursor: pointer }`. The `--bg-input` token lost its only user and was removed.
 - Baselines as landed (R1): check 1 found 13 classless controls, not 15 (4 of them now fixed by R2, leaving 9). The catalogue also lists today's toolbar families `.undo-redo-btn` and `.view-toggle-btn`, plus `.ctx-item` and `.agenda-tab` (Phase 2 table rows), so check 3's baseline is `agenda-rename-input`, `dp-day`, `qab-recent-branch`, `wp-week-row`. Check 6 matches the suffix as a segment (`-toggle-row` counts), 17 names. Check 7 is an `it.todo` until Phase 5.
@@ -103,8 +103,10 @@ Tokens: colour is 322 of 326 declarations via variables (36 literal colours left
 
 ## Phase 5 - tokens
 
-- [ ] Add `--radius-sm/md/lg/pill`, `--font-xs..xl`, `--z-*` to `:root`.
-- [ ] Collapse 16 radii to 4-5 and 17 font sizes to about 7; visual review where 5/6/7/9px merge.
-- [ ] Move z-index values onto `--z-*` layers.
-- [ ] Switch on R1.7.
-- [ ] Clear the 23 literal-colour rules last; shrink the R1.5 baseline to empty.
+- [x] Add `--radius-sm/md/lg/pill`, `--font-xs..xl`, `--z-*` to `:root`.
+- [x] Collapse 16 radii to 4-5 and 17 font sizes to about 7; visual review where 5/6/7/9px merge.
+- [x] Move z-index values onto `--z-*` layers.
+- [x] Switch on R1.7.
+- [x] Clear the 23 literal-colour rules last; shrink the R1.5 baseline to empty.
+  - Landed: `--radius-xs/sm/md/lg/pill` (2/4/6/8/999px), `--font-2xs..2xl` (10/11/12/13/14/16/20px) plus `--font-display` 28px and `--font-hero` 44px, and one `--z-*` layer per existing stacking value (numbers unchanged). Merges, reviewed by the owner in before/after screenshots: radius 1->2, 3->4, 5->6, 7->6, 9 and 10->8, 18->pill; font 9->10, 12.5->12, 15->16, 18->16 (icons) or 20 (comment heading), 26 and 32->28. Colours: every literal moved onto a token with the same value (`--text-on-accent`, scrollbar, slider thumb, dev badge, hue spectrum, ...), so colour and z-index render identically in both themes.
+  - Check 7 allows `var()`, `0`, `50%` and `inherit` per value part, with a ceiling of 10 that may only go down: local stacking inside a component (z-index -1..3) and the two view-level dot glyphs (6px / 7px). The R1.5 colour baseline is empty.

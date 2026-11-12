@@ -172,31 +172,8 @@ const DIALOG_NO_CAPTION = ['week-picker-fold'];
 // ---- 5. literal colours live in tokens only --------------------------------
 
 // Rules (by selector) with a hex or rgb() literal outside a custom property.
-const LITERAL_COLOR_BASELINE = [
-  '#account-btn-initials',
-  '#cp-hue-slider',
-  '#cp-hue-slider::-moz-range-thumb',
-  '#cp-hue-slider::-webkit-slider-thumb',
-  '#perf-probe-arm',
-  '#perf-probe-badge',
-  '.btn.commit:not(:disabled)',
-  '.btn.commit:not(:disabled):hover',
-  '.agenda-item-drop-above .agenda-item',
-  '.agenda-item-drop-below .agenda-item',
-  '.agenda-overdue-badge',
-  '.dp-day.selected, .dp-day.selected:hover',
-  '.pie-label',
-  '.ratio-segment',
-  '.settings-badge',
-  '.wp-week-row.open',
-  '.wp-week-row.open .wp-day.today',
-  '.wp-week-row.open .wp-weekno, .wp-week-row.open .wp-day.outside',
-  ':root[data-dev-host] #dev-badge',
-  '[data-theme="dark"] *',
-  '[data-theme="dark"] ::-webkit-scrollbar-thumb',
-  '[data-theme="dark"] ::-webkit-scrollbar-thumb:hover',
-  '[data-theme="dark"] ::-webkit-scrollbar-track',
-];
+// Emptied in Phase 5: every colour is a token.
+const LITERAL_COLOR_BASELINE = [];
 
 // ---- 6. control-like class names are a closed set --------------------------
 
@@ -216,6 +193,15 @@ const CONTROL_CLASS_SET = [
   'view-level-btn',
   'view-toggle-separator',
 ];
+
+// ---- 7. radius, font size and z-index are tokens -------------------------
+
+const TOKEN_PROPS = ['border-radius', 'font-size', 'z-index'];
+
+// Literal values left on purpose, as of Phase 5: local stacking inside a
+// component (z-index -1..3, eight rules) and the two view-level dot glyphs
+// (6px / 7px), which draw a size rather than set text. Ceiling - may only go down.
+const TOKEN_LITERAL_CEILING = 10;
 
 // ---- R5. controls come from the builders ---------------------------------
 
@@ -353,5 +339,18 @@ describe('design system guard', () => {
     expect(count, 'fewer controls are created outside the builders now - lower CREATED_OUTSIDE_BUILDERS_CEILING to match').toBe(CREATED_OUTSIDE_BUILDERS_CEILING);
   });
 
-  it.todo('7. border-radius, font-size and z-index use tokens (switched on in Phase 5)');
+  it('7. border-radius, font-size and z-index come from tokens', () => {
+    const literal = [];
+    for (const rule of RULES) {
+      for (const [prop, value] of rule.decls) {
+        if (!TOKEN_PROPS.includes(prop)) continue;
+        // Each space-separated part (a radius may list four corners) must be a token or a neutral value.
+        const parts = value.replace(/var\([^)]*\)/g, 'VAR').split(/\s+/);
+        if (parts.some(p => !['VAR', '0', '50%', 'inherit'].includes(p))) literal.push(`${rule.selector} { ${prop}: ${value} }`);
+      }
+    }
+    expect(literal.length, `literal radius / font size / z-index - use --radius-*, --font-* or --z-* from :root:\n${literal.join('\n')}`)
+      .toBeLessThanOrEqual(TOKEN_LITERAL_CEILING);
+    expect(literal.length, 'fewer literal values now - lower TOKEN_LITERAL_CEILING to match').toBe(TOKEN_LITERAL_CEILING);
+  });
 });

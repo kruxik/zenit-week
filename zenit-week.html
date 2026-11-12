@@ -302,10 +302,67 @@ function isProductionHost(hostname) {
     --stack-l1: 62px;
     --stack-l2: 118px;
     --stack-l3: 174px;
+
+    /* Radius scale. 50% (a circle) and 0 stay literal. */
+    --radius-xs: 2px;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-pill: 999px;
+
+    /* Type scale: text sizes, then display sizes for headline numbers and
+       large icons. */
+    --font-2xs: 10px;
+    --font-xs: 11px;
+    --font-sm: 12px;
+    --font-md: 13px;
+    --font-lg: 14px;
+    --font-xl: 16px;
+    --font-2xl: 20px;
+    --font-display: 28px;
+    --font-hero: 44px;
+
+    /* Stacking layers, bottom to top. Local stacking inside a component (-1..3)
+       stays literal. */
+    --z-view: 800;
+    --z-spinner: 900;
+    --z-overlay: 950;
+    --z-fab: 1000;
+    --z-inline-editor: 1500;
+    --z-panel: 2000;
+    --z-chrome: 2500;
+    --z-backdrop: 2590;
+    --z-toolbar: 2600;
+    --z-fold: 2650;
+    --z-settings: 2700;
+    --z-pull: 2750;
+    --z-popover: 3000;
+    --z-date-picker: 3100;
+    --z-coachmark-pulse: 3190;
+    --z-dev-probe: 4000;
+    --z-dev-probe-panel: 4001;
+    --z-filter-menu: 9001;
+    --z-coachmark: 9100;
+
+    /* Colours that do not change with the theme. */
+    --text-on-accent: #ffffff;
+    --text-on-accent-muted: rgba(255,255,255,0.78);
+    --text-shadow-on-fill: rgba(0,0,0,0.2);
+    --accent-fallback: #1ABCFE;
+    --dev-badge-bg: #F59E0B;
+    --dev-badge-text: #1a1a2e;
+    --hue-spectrum: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+    --slider-thumb-bg: #ffffff;
+    --slider-thumb-border: rgba(0,0,0,0.35);
+    --slider-thumb-shadow: rgba(0,0,0,0.3);
   }
 
   [data-theme="dark"] {
     color-scheme: dark;
+    /* Scrollbars (dark only; light keeps the platform's) */
+    --scrollbar-track: #1e1e1e;
+    --scrollbar-thumb: #444444;
+    --scrollbar-thumb-hover: #606060;
     /* Backgrounds */
     --bg-page: #111111;
     --bg-canvas: #1a1a1a;
@@ -411,7 +468,7 @@ function isProductionHost(hostname) {
   }
 
   [data-theme="dark"] * {
-    scrollbar-color: #444444 #1e1e1e;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
     scrollbar-width: thin;
   }
 
@@ -421,17 +478,17 @@ function isProductionHost(hostname) {
   }
 
   [data-theme="dark"] ::-webkit-scrollbar-track {
-    background: #1e1e1e;
-    border-radius: 3px;
+    background: var(--scrollbar-track);
+    border-radius: var(--radius-sm);
   }
 
   [data-theme="dark"] ::-webkit-scrollbar-thumb {
-    background: #444444;
-    border-radius: 3px;
+    background: var(--scrollbar-thumb);
+    border-radius: var(--radius-sm);
   }
 
   [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-    background: #606060;
+    background: var(--scrollbar-thumb-hover);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -489,7 +546,7 @@ function isProductionHost(hostname) {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border-default);
-    z-index: 2600; /* Above all panels and toggle bar */
+    z-index: var(--z-toolbar); /* Above all panels and toggle bar */
     position: absolute;
     top: 0;
     left: 0;
@@ -511,10 +568,10 @@ function isProductionHost(hostname) {
     display: inline-block;
     margin-left: 4px;
     padding: 2px 5px;
-    border-radius: 4px;
-    background: #F59E0B;
-    color: #1a1a2e;
-    font-size: 10px;
+    border-radius: var(--radius-sm);
+    background: var(--dev-badge-bg);
+    color: var(--dev-badge-text);
+    font-size: var(--font-2xs);
     font-weight: 800;
     letter-spacing: 0.5px;
     line-height: 1.2;
@@ -533,12 +590,12 @@ function isProductionHost(hostname) {
   }
 
   #zoom-label {
-    font-size: 10px;
+    font-size: var(--font-2xs);
     font-weight: 700;
     color: var(--text-subtle);
     letter-spacing: 0.3px;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     padding: 1px 4px;
     transition: background 0.15s, color 0.15s;
   }
@@ -562,14 +619,14 @@ function isProductionHost(hostname) {
     left: 0; right: 0;
     height: 4px;
     background: var(--zoom-track-bg);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
     overflow: hidden;
   }
 
   #zoom-fill {
     height: 100%;
     background: var(--zoom-fill-color);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
     width: 0%;
   }
 
@@ -579,7 +636,7 @@ function isProductionHost(hostname) {
     width: 2px;
     height: 12px;
     background: var(--zoom-marker);
-    border-radius: 1px;
+    border-radius: var(--radius-xs);
     transform: translate(-50%, -50%);
     pointer-events: none;
     transition: background 0.2s, height 0.2s, box-shadow 0.2s;
@@ -677,10 +734,10 @@ function isProductionHost(hostname) {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 2px 8px var(--shadow-md);
     padding: 3px;
-    z-index: 2500; /* Above Agenda/Help panels (2000) */
+    z-index: var(--z-chrome); /* Above Agenda/Help panels (2000) */
     user-select: none;
   }
   #view-level-bar {
@@ -726,13 +783,13 @@ function isProductionHost(hostname) {
     text-align: left;
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     padding: 8px 18px;
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     color: var(--text-primary);
     box-shadow: 0 4px 16px var(--shadow-md);
-    z-index: 3000;
+    z-index: var(--z-popover);
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s ease;
@@ -758,8 +815,8 @@ function isProductionHost(hostname) {
     flex-direction: column;
     max-width: 460px;
     box-shadow: 0 4px 16px var(--shadow-md);
-    z-index: 3000;
-    font-size: 13px;
+    z-index: var(--z-popover);
+    font-size: var(--font-md);
     line-height: 1.4;
     color: var(--text-primary);
     opacity: 0;
@@ -822,10 +879,10 @@ function isProductionHost(hostname) {
     position: fixed;
     /* Above the day-filter menu (9001), which opens upward into the bubble's
        space; still under the confirm dialog overlay (10000). */
-    z-index: 9100;
+    z-index: var(--z-coachmark);
     max-width: min(86vw, 320px);
     box-shadow: 0 6px 22px var(--shadow-md);
-    font-size: 13px;
+    font-size: var(--font-md);
     line-height: 1.45;
     color: var(--text-primary);
     /* The one dialog whose arrow lives outside its own box, so it cannot clip
@@ -846,7 +903,7 @@ function isProductionHost(hostname) {
      settles, so the eye is sent to the element first and reads the label second. */
   .coachmark-pulse {
     position: fixed;
-    z-index: 3190;
+    z-index: var(--z-coachmark-pulse);
     pointer-events: none;
     border: 2px solid var(--accent-primary);
     animation: coachmark-pulse 700ms ease-out 2;
@@ -860,7 +917,7 @@ function isProductionHost(hostname) {
     #coachmark.visible { transform: none; }
     .coachmark-pulse { display: none; }
   }
-  #coachmark .dialog-header { border-radius: 9px 9px 0 0; }
+  #coachmark .dialog-header { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
   /* A tip is read in a glance, so its body is tighter than a modal's. */
   #coachmark .dialog-body {
     gap: 10px;
@@ -879,7 +936,7 @@ function isProductionHost(hostname) {
     gap: 12px;
   }
   #coachmark-tip-off {
-    font-size: 11px;
+    font-size: var(--font-xs);
     color: var(--text-muted);
   }
   #coachmark-footer .btn {
@@ -921,7 +978,7 @@ function isProductionHost(hostname) {
     gap: 3px;
     width: 36px;
     padding: 6px 4px;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     color: var(--text-subtle);
     font-size: 6px;
@@ -984,7 +1041,7 @@ function isProductionHost(hostname) {
 
   #day-filter-glyph,
   #horizon-filter-glyph {
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0;
@@ -1025,11 +1082,11 @@ function isProductionHost(hostname) {
     padding: 0 14px 0 12px;
     background: var(--glass-bg);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 2px 8px var(--shadow-md);
     cursor: pointer;
     outline: none;
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 400;
     color: var(--text-subtle);
     white-space: nowrap;
@@ -1052,7 +1109,7 @@ function isProductionHost(hostname) {
   /* The icon leads and never shrinks away; the text ellipsises before it does. */
   #week-picker-icon {
     flex-shrink: 0;
-    font-size: 18px;
+    font-size: var(--font-xl);
   }
 
   /* The short face - one letter and the number - is what survives on the
@@ -1078,7 +1135,7 @@ function isProductionHost(hostname) {
     padding: 8px 0;
     /* Above the toolbar's own 2600 so no panel header clips it, below
        #settings-overlay's 2700, which can open over it. */
-    z-index: 2650;
+    z-index: var(--z-fold);
     display: none;
     /* Its own copy of the shared fadeIn: that keyframe animates transform, which
        would spend the translateX(-50%) this card is centred with and slide it
@@ -1101,12 +1158,12 @@ function isProductionHost(hostname) {
   }
   #week-picker-month-label,
   #date-picker-month-label {
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     color: var(--text-primary);
   }
   #week-picker-month .undo-redo-btn,
-  #date-picker-month .undo-redo-btn { width: 30px; height: 30px; font-size: 20px; }
+  #date-picker-month .undo-redo-btn { width: 30px; height: 30px; font-size: var(--font-2xl); }
 
   #week-picker-grid,
   #date-picker-grid { padding: 0 8px; }
@@ -1117,7 +1174,7 @@ function isProductionHost(hostname) {
     align-items: center;
   }
   .wp-head {
-    font-size: 10px;
+    font-size: var(--font-2xs);
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -1133,31 +1190,31 @@ function isProductionHost(hostname) {
     background: none;
     color: var(--text-dim);
     padding: 2px 0;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     outline: none;
     transition: background 0.15s, color 0.15s;
   }
   .wp-week-row:hover,
   .wp-week-row:focus-visible { background: var(--ctx-hover-bg); color: var(--accent-primary); }
-  .wp-week-row.open { background: var(--accent-primary); color: #fff; }
+  .wp-week-row.open { background: var(--accent-primary); color: var(--text-on-accent); }
   .wp-week-row.open .wp-weekno,
-  .wp-week-row.open .wp-day.outside { color: rgba(255,255,255,0.78); opacity: 1; }
+  .wp-week-row.open .wp-day.outside { color: var(--text-on-accent-muted); opacity: 1; }
 
   .wp-weekno {
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 600;
     color: var(--text-muted);
     text-align: center;
   }
   .wp-day {
-    font-size: 12px;
+    font-size: var(--font-sm);
     text-align: center;
     padding: 3px 0;
   }
   .wp-day.outside { color: var(--text-muted); opacity: 0.5; }
   .wp-day.today { font-weight: 700; color: var(--accent-primary); }
-  .wp-week-row.open .wp-day.today { color: #fff; text-decoration: underline; }
+  .wp-week-row.open .wp-day.today { color: var(--text-on-accent); text-decoration: underline; }
 
   /* The actions the Mindmap's week-bar gear used to hold, wearing the context menu's
      own row so there is one vocabulary for "do something to this week". */
@@ -1167,7 +1224,7 @@ function isProductionHost(hostname) {
      these four lines are only what it takes to make a <button> wear .ctx-item. */
   #week-picker-actions .ctx-item,
   #date-picker-actions .ctx-item {
-    font-size: 13px;
+    font-size: var(--font-md);
     padding: 9px 16px;
     width: 100%;
     border: none;
@@ -1184,7 +1241,7 @@ function isProductionHost(hostname) {
   #date-picker-panel {
     display: none;
     position: fixed;
-    z-index: 3100;
+    z-index: var(--z-date-picker);
     width: min(300px, calc(100vw - 16px));
     flex-direction: column;
     box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
@@ -1195,15 +1252,15 @@ function isProductionHost(hostname) {
   #date-picker-panel .dialog-body { padding: 8px 0; gap: 0; overflow-y: auto; }
 
   /* The open week: tinted, so "which week am I in" reads before any day does. */
-  .dp-row { padding: 1px 0; border-radius: 6px; }
+  .dp-row { padding: 1px 0; border-radius: var(--radius-md); }
   .dp-row.open-week { background: var(--ctx-hover-bg); }
   .dp-day {
     position: relative;
     height: 30px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: none;
-    font-size: 12px;
+    font-size: var(--font-sm);
     color: var(--text-dim);
     cursor: pointer;
     outline: none;
@@ -1232,7 +1289,7 @@ function isProductionHost(hostname) {
     height: 30px;
     padding: 0;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: none;
     font-family: inherit;
     color: var(--text-dim);
@@ -1243,7 +1300,7 @@ function isProductionHost(hostname) {
   .dp-weekno:hover,
   :where(#date-picker-panel:not(.dp-quiet-focus)) .dp-weekno:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-primary); color: var(--accent-primary); }
   .dp-day.selected,
-  .dp-day.selected:hover { background: var(--accent-primary); color: #fff; }
+  .dp-day.selected:hover { background: var(--accent-primary); color: var(--text-on-accent); }
   .dp-day:disabled { opacity: 0.35; cursor: default; box-shadow: none; color: var(--text-muted); }
 
   @media (max-width: 520px) {
@@ -1357,10 +1414,10 @@ function isProductionHost(hostname) {
     display: none;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 700;
     letter-spacing: 0.3px;
-    color: #fff;
+    color: var(--text-on-accent);
     background: var(--text-muted);
   }
   #account-btn-photo {
@@ -1448,7 +1505,7 @@ function isProductionHost(hostname) {
     position: fixed;
     inset: 0;
     display: none;
-    z-index: 2700; /* Above Agenda mobile panel (2000) and toolbar (2600), below the confirm (3000) */
+    z-index: var(--z-settings); /* Above Agenda mobile panel (2000) and toolbar (2600), below the confirm (3000) */
   }
   #settings-overlay.visible { display: block; }
   #settings-dialog {
@@ -1496,7 +1553,7 @@ function isProductionHost(hostname) {
     background: var(--border-soft);
   }
   .settings-nav .tab[hidden] { display: none; }
-  .settings-nav .tab { height: auto; gap: 8px; border-radius: 6px; }
+  .settings-nav .tab { height: auto; gap: 8px; border-radius: var(--radius-md); }
   .settings-nav .settings-tab-icon { width: 16px; height: 16px; flex-shrink: 0; }
   .settings-nav .settings-tab-chevron { display: none; }
   .settings-nav .tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
@@ -1534,7 +1591,7 @@ function isProductionHost(hostname) {
       height: 44px;
       padding: 0 10px;
       gap: 12px;
-      font-size: 14px;
+      font-size: var(--font-lg);
       color: var(--text-primary);
       background: none;
     }
@@ -1614,7 +1671,7 @@ function isProductionHost(hostname) {
   }
 
   .settings-label {
-    font-size: 10px;
+    font-size: var(--font-2xs);
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -1641,7 +1698,7 @@ function isProductionHost(hostname) {
     position: relative;
     width: 44px;
     height: 24px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background: var(--border-default);
     border: none;
     cursor: pointer;
@@ -1687,10 +1744,10 @@ function isProductionHost(hostname) {
     background: var(--glass-bg);
     color: var(--text-subtle);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     height: 28px;
     padding: 0 10px;
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 600;
     cursor: pointer;
     display: inline-flex;
@@ -1710,7 +1767,7 @@ function isProductionHost(hostname) {
     content: '';
     position: absolute;
     top: 3px; left: 3px; right: 3px; bottom: 3px;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     background: var(--bg-hover);
     z-index: -1;
   }
@@ -1722,7 +1779,7 @@ function isProductionHost(hostname) {
     position: fixed;
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 8px 30px var(--shadow-md);
     padding: 8px 0;
     display: none;
@@ -1731,7 +1788,7 @@ function isProductionHost(hostname) {
   .menu.visible { display: block; }
 
   #context-menu {
-    z-index: 3000;
+    z-index: var(--z-popover);
     min-width: 180px;
   }
 
@@ -1743,7 +1800,7 @@ function isProductionHost(hostname) {
   .ctx-item {
     padding: 10px 20px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--font-lg);
     color: var(--text-dim);
     display: flex;
     align-items: center;
@@ -1786,7 +1843,7 @@ function isProductionHost(hostname) {
   #baseline-panel {
     display: none;
     position: fixed;
-    z-index: 3000; /* Popover layer, peer of #context-menu: above every view (.app-panel 2000) and the toolbar */
+    z-index: var(--z-popover); /* Popover layer, peer of #context-menu: above every view (.app-panel 2000) and the toolbar */
     box-shadow: 0 8px 32px var(--shadow-lg), 0 2px 8px var(--shadow-sm);
     width: 200px;
     flex-direction: column;
@@ -1798,7 +1855,7 @@ function isProductionHost(hostname) {
   #cp-sb-canvas {
     width: 160px;
     height: 120px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     cursor: crosshair;
     display: block;
     flex-shrink: 0;
@@ -1809,9 +1866,8 @@ function isProductionHost(hostname) {
     appearance: none;
     width: 100%;
     height: 14px;
-    border-radius: 7px;
-    background: linear-gradient(to right,
-      #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+    border-radius: var(--radius-md);
+    background: var(--hue-spectrum);
     outline: none;
     cursor: pointer;
   }
@@ -1820,19 +1876,19 @@ function isProductionHost(hostname) {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: #fff;
-    border: 2px solid rgba(0,0,0,0.35);
+    background: var(--slider-thumb-bg);
+    border: 2px solid var(--slider-thumb-border);
     cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 4px var(--slider-thumb-shadow);
   }
   #cp-hue-slider::-moz-range-thumb {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: #fff;
-    border: 2px solid rgba(0,0,0,0.35);
+    background: var(--slider-thumb-bg);
+    border: 2px solid var(--slider-thumb-border);
     cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 4px var(--slider-thumb-shadow);
   }
 
   #cp-hex-row {
@@ -1843,7 +1899,7 @@ function isProductionHost(hostname) {
   }
   #cp-hex-prefix {
     color: var(--text-subtle);
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     font-family: monospace;
   }
@@ -1863,7 +1919,7 @@ function isProductionHost(hostname) {
   }
 
   #bp-input {
-    font-size: 15px;
+    font-size: var(--font-xl);
     font-weight: 700;
     text-align: center;
     -moz-appearance: textfield;
@@ -1872,7 +1928,7 @@ function isProductionHost(hostname) {
   #bp-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
   #bp-hint {
-    font-size: 11px;
+    font-size: var(--font-xs);
     color: var(--text-faint);
     text-align: center;
     line-height: 1.4;
@@ -1903,7 +1959,7 @@ function isProductionHost(hostname) {
     align-items: center;
     gap: 10px;
     padding: 6px 0 4px;
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -1918,10 +1974,10 @@ function isProductionHost(hostname) {
   }
 
   .daily-log-footer-badge {
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 700;
     padding: 2px 9px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
   }
   .daily-log-footer-badge.done     { background: var(--accent-success-bg); color: var(--accent-success-text); }
   .daily-log-footer-badge.unplanned{ background: var(--accent-warning-bg); color: var(--accent-warning-text); }
@@ -1930,7 +1986,7 @@ function isProductionHost(hostname) {
   .daily-log-empty {
     text-align: center;
     color: var(--text-muted);
-    font-size: 14px;
+    font-size: var(--font-lg);
     padding: 32px 0;
   }
 
@@ -1940,17 +1996,17 @@ function isProductionHost(hostname) {
     gap: 10px;
     padding: 10px 0;
     border-bottom: 1px solid var(--border-faint);
-    font-size: 14px;
+    font-size: var(--font-lg);
     color: var(--text-primary);
   }
   .daily-log-item:last-child { border-bottom: none; }
 
   .daily-log-badge {
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 700;
     padding: 3px 8px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
   }
   .daily-log-badge.done {
     background: var(--accent-success-bg);
@@ -2069,7 +2125,7 @@ function isProductionHost(hostname) {
   #fab-pill {
     bottom: 12px;
     right: 12px;
-    z-index: 1000;
+    z-index: var(--z-fab);
   }
   #fab-add {
     width: 36px;
@@ -2080,7 +2136,7 @@ function isProductionHost(hostname) {
     color: var(--text-subtle);
     background: none;
     border: none;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
     outline: none;
@@ -2122,7 +2178,7 @@ function isProductionHost(hostname) {
     overflow: hidden;
     display: none;
     flex-direction: column;
-    z-index: 2000;
+    z-index: var(--z-panel);
     opacity: 0;
     pointer-events: none;
     /* Fade only: a full-height window has no room to rise into. */
@@ -2144,7 +2200,7 @@ function isProductionHost(hostname) {
       width: var(--panel-width);
       max-width: calc(100vw - 40px);
       border: 1px solid var(--border-default);
-      border-radius: 8px;
+      border-radius: var(--radius-lg);
       box-shadow: 0 20px 60px var(--shadow-xl);
       transform: translateX(-50%);
     }
@@ -2168,7 +2224,7 @@ function isProductionHost(hostname) {
     border-bottom: 1px solid var(--border-soft);
   }
   .app-panel-title {
-    font-size: 20px;
+    font-size: var(--font-2xl);
     font-weight: 700;
     color: var(--text-primary);
     overflow: hidden;
@@ -2193,7 +2249,7 @@ function isProductionHost(hostname) {
      chrome (FAB z1000, undo/redo + view pill z2500) so those stay tappable. */
   @media (max-width: 767px) {
     #agenda-view,
-    #stats-panel { z-index: 800; }
+    #stats-panel { z-index: var(--z-view); }
   }
 
   /* ─── Quick-Add Panel ───────────────────────────────────────────────────── */
@@ -2216,7 +2272,7 @@ function isProductionHost(hostname) {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     display: none;
-    z-index: 950; /* Above canvas, below panels/toolbar */
+    z-index: var(--z-overlay); /* Above canvas, below panels/toolbar */
     opacity: 0;
     transition: opacity 0.3s ease;
   }
@@ -2255,13 +2311,13 @@ function isProductionHost(hostname) {
   /* Sized in the chart's user units: "100%" and "HOTOVO" both keep clear of
      the plate's opaque middle (r 83.75). */
   .pie-center-num {
-    font-size: 44px;
+    font-size: var(--font-hero);
     font-weight: 700;
     fill: var(--text-primary);
     pointer-events: none;
   }
   .pie-center-sub {
-    font-size: 16px;
+    font-size: var(--font-xl);
     font-weight: 600;
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -2275,7 +2331,7 @@ function isProductionHost(hostname) {
     align-items: center;
   }
   .stats-legend-cat {
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 600;
     color: var(--text-secondary);
     white-space: nowrap;
@@ -2288,14 +2344,14 @@ function isProductionHost(hostname) {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: var(--font-xs);
     color: var(--text-secondary);
     white-space: nowrap;
   }
   .stats-legend-dot {
     width: 9px;
     height: 9px;
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
     flex-shrink: 0;
   }
   .stats-headlines {
@@ -2305,7 +2361,7 @@ function isProductionHost(hostname) {
     min-width: 0;
   }
   .stats-headline-label {
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 3px;
@@ -2316,13 +2372,13 @@ function isProductionHost(hostname) {
     gap: 8px;
   }
   .stats-headline-pct {
-    font-size: 26px;
+    font-size: var(--font-display);
     font-weight: 700;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
   }
   .stats-headline-raw {
-    font-size: 14px;
+    font-size: var(--font-lg);
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
   }
@@ -2346,7 +2402,7 @@ function isProductionHost(hostname) {
     display: flex;
     align-items: center;
     gap: 7px;
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     color: var(--text-secondary);
     min-width: 0;
@@ -2359,11 +2415,11 @@ function isProductionHost(hostname) {
   .stats-branch-dot {
     width: 10px;
     height: 10px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     flex-shrink: 0;
   }
   .stats-branch-count {
-    font-size: 12px;
+    font-size: var(--font-sm);
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -2372,7 +2428,7 @@ function isProductionHost(hostname) {
   .stats-bar {
     display: flex;
     height: 16px;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     overflow: hidden;
     background: var(--border-soft);
   }
@@ -2390,17 +2446,17 @@ function isProductionHost(hostname) {
     margin-bottom: 4px;
   }
   .stats-balance-num {
-    font-size: 26px;
+    font-size: var(--font-display);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
   .stats-balance-baseline {
-    font-size: 14px;
+    font-size: var(--font-lg);
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
   }
   .stats-balance-note {
-    font-size: 12.5px;
+    font-size: var(--font-sm);
     color: var(--text-secondary);
     margin-bottom: 14px;
   }
@@ -2408,7 +2464,7 @@ function isProductionHost(hostname) {
     display: flex;
     height: 18px;
     width: 100%;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     background: var(--bg-muted);
     box-shadow: inset 0 1px 2px var(--shadow-md);
@@ -2435,7 +2491,7 @@ function isProductionHost(hostname) {
     width: 22px;
     flex-shrink: 0;
     text-align: right;
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 600;
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
@@ -2450,7 +2506,7 @@ function isProductionHost(hostname) {
   }
   .stats-tl-hbar {
     height: 6px;
-    border-radius: 0 3px 3px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   }
   .stats-tl-done { background: var(--stats-plan); }
   .stats-tl-unpl { background: var(--stats-unplan); }
@@ -2473,12 +2529,12 @@ function isProductionHost(hostname) {
   .stats-trend-range .btn {
     height: 24px;
     padding: 0 8px;
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-variant-numeric: tabular-nums;
   }
   .stats-trend-sub {
     color: var(--text-faint);
-    font-size: 12.5px;
+    font-size: var(--font-sm);
     margin: 2px 0 6px;
   }
   .stats-trend-switch {
@@ -2491,7 +2547,7 @@ function isProductionHost(hostname) {
   #stats-section-trend .stats-legend { margin-top: 10px; }
   .stats-trend-note {
     color: var(--text-placeholder);
-    font-size: 12.5px;
+    font-size: var(--font-sm);
     text-align: center;
     padding: 8px 0;
   }
@@ -2551,7 +2607,7 @@ function isProductionHost(hostname) {
   }
   .empty-state .daily-log-empty { padding: 0; }
   .empty-state-icon {
-    font-size: 44px;
+    font-size: var(--font-hero);
     color: var(--text-placeholder);
     opacity: 0.5;
     margin-bottom: 4px;
@@ -2559,7 +2615,7 @@ function isProductionHost(hostname) {
   .empty-state-hint {
     text-align: center;
     color: var(--text-placeholder);
-    font-size: 12.5px;
+    font-size: var(--font-sm);
     max-width: 34ch;
   }
   .stats-positive {
@@ -2568,15 +2624,15 @@ function isProductionHost(hostname) {
     gap: 6px;
     margin-top: 14px;
     padding: 6px 12px;
-    border-radius: 7px;
+    border-radius: var(--radius-md);
     background: var(--accent-success-bg);
     color: var(--accent-success-text);
-    font-size: 12.5px;
+    font-size: var(--font-sm);
     font-weight: 600;
   }
 
   #quick-add-backdrop {
-    z-index: 2590;
+    z-index: var(--z-backdrop);
   }
   #quick-add-backdrop.is-open {
     display: block;
@@ -2585,7 +2641,7 @@ function isProductionHost(hostname) {
 
   #quick-add-panel {
     position: fixed;
-    z-index: 2600;
+    z-index: var(--z-toolbar);
     box-shadow: 0 8px 32px var(--shadow-md), 0 2px 8px var(--shadow-xs);
     display: none;
     flex-direction: column;
@@ -2601,7 +2657,7 @@ function isProductionHost(hostname) {
     bottom: 12px;
     right: 12px;
     width: 375px;   /* room for four short branch buttons on one line */
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     animation: fadeIn 0.12s ease-out;
   }
   /* mobile: slide-up panel anchored to bottom */
@@ -2609,7 +2665,7 @@ function isProductionHost(hostname) {
     bottom: 12px;
     left: 12px;
     right: 12px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     padding-bottom: 10px;
     transform: translateY(calc(100% + 20px));
     transition: transform 0.25s ease;
@@ -2647,7 +2703,7 @@ function isProductionHost(hostname) {
     content: '';
     position: absolute;
     top: 3px; left: 3px; right: 3px; bottom: 3px;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     background: var(--view-btn-active-bg);
     z-index: -1;
   }
@@ -2665,7 +2721,7 @@ function isProductionHost(hostname) {
     flex-direction: column;
     background: var(--bg-surface);
     border: 1px solid var(--border-soft);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     overflow: hidden;
   }
   #quick-add-recent:empty { display: none; }
@@ -2683,7 +2739,7 @@ function isProductionHost(hostname) {
     height: 36px;
     padding: 0 8px;
     background: var(--bg-surface);
-    font-size: 13px;
+    font-size: var(--font-md);
     color: var(--text-primary);
     cursor: default;
   }
@@ -2725,7 +2781,7 @@ function isProductionHost(hostname) {
   .qab-recent-note {
     margin-left: auto;
     flex-shrink: 0;
-    font-size: 11px;
+    font-size: var(--font-xs);
     color: var(--text-subtle);
   }
   @keyframes qab-recent-in {
@@ -2736,7 +2792,7 @@ function isProductionHost(hostname) {
   #quick-add-input {
     width: 100%;
     height: 36px;
-    font-size: 14px;
+    font-size: var(--font-lg);
     transition: border-color 0.15s;
   }
   #quick-add-input::-webkit-search-cancel-button,
@@ -2759,7 +2815,7 @@ function isProductionHost(hostname) {
     justify-content: center;
     width: 36px;
     height: 36px;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
     color: var(--text-subtle);
@@ -2793,7 +2849,7 @@ function isProductionHost(hostname) {
     transform: translateX(-50%);
     gap: 8px;
     padding: 8px 14px;
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     color: var(--text-dim);
     opacity: 1;
@@ -2804,7 +2860,7 @@ function isProductionHost(hostname) {
     opacity: 0;
   }
   #import-progress-icon {
-    font-size: 16px;
+    font-size: var(--font-xl);
     flex-shrink: 0;
   }
   #import-progress-toast.importing #import-progress-icon {
@@ -2824,7 +2880,7 @@ function isProductionHost(hostname) {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 900;
+    z-index: var(--z-spinner);
     pointer-events: none;
   }
   #import-spinner::after {
@@ -2854,7 +2910,7 @@ function isProductionHost(hostname) {
     height: 160px;
     overflow: hidden;
     pointer-events: none;
-    z-index: 2750;
+    z-index: var(--z-pull);
   }
   #ptr-indicator {
     position: absolute;
@@ -2956,10 +3012,10 @@ function isProductionHost(hostname) {
     gap: 8px;
     height: 36px;
     padding: 0 14px;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     color: var(--text-subtle);
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     border: none;
     background: none;
@@ -3127,12 +3183,12 @@ function isProductionHost(hostname) {
     align-items: center;
     position: relative;
     gap: 6px;
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     color: var(--text-muted);
     background: none;
     border: none;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     white-space: nowrap;
     transition: background 0.15s, color 0.15s;
@@ -3189,12 +3245,12 @@ function isProductionHost(hostname) {
     min-width: 18px;
     height: 18px;
     padding: 0 5px;
-    border-radius: 9px;
-    font-size: 11px;
+    border-radius: var(--radius-lg);
+    font-size: var(--font-xs);
     font-weight: 700;
     line-height: 1;
   }
-  .agenda-overdue-badge { background: var(--accent-danger); color: #fff; }
+  .agenda-overdue-badge { background: var(--accent-danger); color: var(--text-on-accent); }
   .agenda-overdue-badge:empty { display: none; }
   .agenda-section-count { background: var(--text-placeholder); color: var(--bg-surface); }
 
@@ -3243,7 +3299,7 @@ function isProductionHost(hostname) {
        Far cheaper to paint than a 9999px inset box-shadow on low-end GPUs
        (Chromebook 11 etc). */
     background-image: linear-gradient(var(--bg-hover), var(--bg-hover));
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   .agenda-drag-handle {
@@ -3253,7 +3309,7 @@ function isProductionHost(hostname) {
     display: flex;
     align-items: center;
     padding: 0 10px;
-    font-size: 16px;
+    font-size: var(--font-xl);
     transition: color 0.15s;
     touch-action: none;
   }
@@ -3265,8 +3321,8 @@ function isProductionHost(hostname) {
   .agenda-item-dropped > * { opacity: 0.5; }
   .agenda-swipe-wrapper:has(.agenda-item-done) .agenda-swipe-action,
   .agenda-swipe-wrapper:has(.agenda-item-dropped) .agenda-swipe-action { opacity: 0.5; }
-  .agenda-item-drop-above .agenda-item { box-shadow: inset 0 2px 0 0 var(--accent, #1ABCFE); }
-  .agenda-item-drop-below .agenda-item { box-shadow: inset 0 -2px 0 0 var(--accent, #1ABCFE); }
+  .agenda-item-drop-above .agenda-item { box-shadow: inset 0 2px 0 0 var(--accent, var(--accent-fallback)); }
+  .agenda-item-drop-below .agenda-item { box-shadow: inset 0 -2px 0 0 var(--accent, var(--accent-fallback)); }
 
   .agenda-swipe-wrapper, .agenda-item {
     -webkit-touch-callout: none;
@@ -3328,14 +3384,14 @@ function isProductionHost(hostname) {
 
   /* The day-filter menu (a .menu) */
   #day-filter-menu {
-    z-index: 9001;
+    z-index: var(--z-filter-menu);
     min-width: 100px;
   }
 
   /* Agenda inline rename input */
   .agenda-rename-input {
     border: 1px solid var(--accent-primary);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     padding: 1px 4px;
     font-size: inherit;
     color: var(--text-primary);
@@ -3402,7 +3458,7 @@ function isProductionHost(hostname) {
     outline: none;
     background: transparent;
     color: var(--text-primary);
-    font-size: 15px;
+    font-size: var(--font-xl);
     line-height: 1.6;
     padding: 0;
   }
@@ -3417,7 +3473,7 @@ function isProductionHost(hostname) {
     color: var(--text-primary);
     caret-color: var(--text-primary);
     font-family: inherit;
-    font-size: 15px;
+    font-size: var(--font-xl);
     line-height: 1.6;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -3428,7 +3484,7 @@ function isProductionHost(hostname) {
   #comment-editor p { margin: 0; }
   #comment-editor .cm-heading {
     margin: 6px 0 2px;
-    font-size: 18px;
+    font-size: var(--font-2xl);
     font-weight: 700;
     line-height: 1.4;
   }
@@ -3553,7 +3609,7 @@ function isProductionHost(hostname) {
   #comment-toolbar .btn {
     min-width: 38px;
     height: 34px;
-    font-size: 14px;
+    font-size: var(--font-lg);
   }
   #comment-toolbar .comment-fmt-strong { font-weight: 800; }
   #comment-toolbar .comment-fmt-em { font-style: italic; font-family: Georgia, serif; }
@@ -3575,11 +3631,11 @@ function isProductionHost(hostname) {
   /* Floats over text, so it wears the glass the buttons wear to stay legible. */
   #comment-counter {
     text-align: right;
-    font-size: 11px;
+    font-size: var(--font-xs);
     color: var(--text-placeholder);
     font-variant-numeric: tabular-nums;
     padding: 1px 6px;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--glass-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -3631,7 +3687,7 @@ function isProductionHost(hostname) {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
   }
   .dialog-header {
@@ -3646,7 +3702,7 @@ function isProductionHost(hostname) {
     border-bottom: 1px solid var(--border-soft);
   }
   .dialog-title {
-    font-size: 15px;
+    font-size: var(--font-xl);
     font-weight: 700;
     color: var(--text-primary);
     overflow: hidden;
@@ -3662,7 +3718,7 @@ function isProductionHost(hostname) {
     padding: 0 8px;
     flex-shrink: 0;
   }
-  .app-panel-header .icon-btn { font-size: 18px; }
+  .app-panel-header .icon-btn { font-size: var(--font-xl); }
   .dialog-body {
     display: flex;
     flex-direction: column;
@@ -3684,11 +3740,11 @@ function isProductionHost(hostname) {
   .field {
     background: var(--bg-surface);
     border: 1px solid var(--border-soft);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     height: 32px;
     padding: 0 8px;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--font-md);
     min-width: 0;
   }
   .field:focus,
@@ -3722,7 +3778,7 @@ function isProductionHost(hostname) {
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 3000;
+    z-index: var(--z-popover);
     opacity: 0;
     transition: opacity 0.15s ease;
   }
@@ -3773,7 +3829,7 @@ function isProductionHost(hostname) {
   .btn.commit:not(:disabled) {
     background: var(--accent-fill);
     border-color: var(--accent-fill);
-    color: #fff;
+    color: var(--text-on-accent);
     font-weight: 600;
   }
   .btn.commit.danger:not(:disabled) {
@@ -3781,7 +3837,7 @@ function isProductionHost(hostname) {
     border-color: var(--accent-danger-fill);
   }
   .btn.commit:not(:disabled):hover {
-    color: #fff;
+    color: var(--text-on-accent);
     background: var(--accent-fill-hover);
     border-color: var(--accent-fill-hover);
   }
@@ -3822,10 +3878,10 @@ function isProductionHost(hostname) {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 700;
     letter-spacing: 0.3px;
-    color: #fff;
+    color: var(--text-on-accent);
     background: var(--text-muted);
   }
   #bridge-avatar {
@@ -3847,7 +3903,7 @@ function isProductionHost(hostname) {
     min-width: 0;
   }
   .settings-name {
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     color: var(--text-primary);
     overflow: hidden;
@@ -3859,7 +3915,7 @@ function isProductionHost(hostname) {
   .settings-section > .settings-sub { padding: 0 2px 2px; }
   .settings-section > .settings-sub:empty { display: none; }
   .settings-sub {
-    font-size: 11px;
+    font-size: var(--font-xs);
     line-height: 1.35;
     color: var(--text-muted);
   }
@@ -3867,7 +3923,7 @@ function isProductionHost(hostname) {
   .bridge-status {
     display: flex;
     gap: 8px;
-    font-size: 12px;
+    font-size: var(--font-sm);
     line-height: 1.4;
     color: var(--text-secondary);
     padding: 0 2px;
@@ -3881,15 +3937,15 @@ function isProductionHost(hostname) {
     border-radius: 50%;
     background: var(--bridge-state);
   }
-  .bridge-status-line { font-size: 12px; line-height: 1.4; color: var(--text-secondary); padding: 0 2px; }
-  .bridge-note { font-size: 11px; line-height: 1.4; color: var(--text-muted); padding: 0 2px; }
+  .bridge-status-line { font-size: var(--font-sm); line-height: 1.4; color: var(--text-secondary); padding: 0 2px; }
+  .bridge-note { font-size: var(--font-xs); line-height: 1.4; color: var(--text-muted); padding: 0 2px; }
   .bridge-list { display: flex; flex-direction: column; gap: 6px; }
   .settings-row {
     display: flex;
     align-items: center;
     gap: 10px;
     min-height: 36px;
-    font-size: 12px;
+    font-size: var(--font-sm);
     color: var(--text-secondary);
   }
   .settings-row-name {
@@ -3926,13 +3982,13 @@ function isProductionHost(hostname) {
     flex-direction: column;
     gap: 2px;
     padding: 8px 10px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background: var(--bg-muted);
     border: 1px solid var(--border-soft);
   }
   .settings-tile .settings-label { padding: 0; }
   .settings-tile-value {
-    font-size: 16px;
+    font-size: var(--font-xl);
     font-weight: 700;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
@@ -3956,7 +4012,7 @@ function isProductionHost(hostname) {
   .settings-badge-info .icon { width: 18px; height: 18px; }
   /* A read-only value under its caption, shown whole: a long host wraps. */
   .settings-value {
-    font-size: 13px;
+    font-size: var(--font-md);
     color: var(--text-primary);
     padding: 0 2px;
     overflow-wrap: anywhere;
@@ -3965,14 +4021,14 @@ function isProductionHost(hostname) {
   .settings-badge.settings-badge-app {
     width: 24px;
     height: 24px;
-    border-radius: 6px;
-    font-size: 10px;
+    border-radius: var(--radius-md);
+    font-size: var(--font-2xs);
     color: var(--text-secondary);
     background: var(--bg-muted);
     border: 1px solid var(--border-soft);
   }
   /* A connected agent: the badge in the state colour, name over its state. */
-  .bridge-agent .settings-badge { width: 24px; height: 24px; font-size: 10px; }
+  .bridge-agent .settings-badge { width: 24px; height: 24px; font-size: var(--font-2xs); }
   .bridge-agent[data-agent-state="connected"] .settings-badge { background: var(--accent-success-text); }
   .bridge-agent[data-agent-state="old"] .settings-badge { background: var(--accent-warning-text); }
   /* A blocked agent: the badge goes grey; its row keeps an Allow button. */
@@ -3990,12 +4046,12 @@ function isProductionHost(hostname) {
     height: 16px;
     padding: 0 4px;
     box-sizing: border-box;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     border: 2px solid var(--settings-bg);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 9px;
+    font-size: var(--font-2xs);
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1;
@@ -4005,7 +4061,7 @@ function isProductionHost(hostname) {
   }
   /* A pairing code: the visual centre of its dialog, digits in groups of three. */
   #app-confirm-highlight {
-    font-size: 32px;
+    font-size: var(--font-display);
     font-weight: 700;
     letter-spacing: 0.08em;
     font-variant-numeric: tabular-nums;
@@ -4016,7 +4072,7 @@ function isProductionHost(hostname) {
   #app-confirm-body {
     max-width: 360px;
     white-space: pre-line;
-    font-size: 13px;
+    font-size: var(--font-md);
     color: var(--text-secondary);
     line-height: 1.5;
   }
@@ -4041,7 +4097,7 @@ function isProductionHost(hostname) {
   .dp-field-row label {
     width: 56px;
     flex-shrink: 0;
-    font-size: 13px;
+    font-size: var(--font-md);
     color: var(--text-secondary);
   }
   .dp-field-row input[type="number"] { width: 64px; }
@@ -4053,21 +4109,21 @@ function isProductionHost(hostname) {
      its label is the whole action ("Repeat from Mon 9 Nov"). Until the rule is
      complete it stays the plain button, saying which day to pick next - fully
      legible, because that text is the instruction. Complete, it fills. */
-  #date-picker-set { flex: 1; height: 34px; font-size: 13px; }
+  #date-picker-set { flex: 1; height: 34px; font-size: var(--font-md); }
 
   .help-section {
     margin-bottom: 24px;
   }
   .help-version {
     text-align: center;
-    font-size: 11px;
+    font-size: var(--font-xs);
     color: var(--text-placeholder);
     letter-spacing: 0.5px;
     font-variant-numeric: tabular-nums;
     margin-top: 8px;
   }
   .help-section-title {
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -4080,7 +4136,7 @@ function isProductionHost(hostname) {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
-    font-size: 13px;
+    font-size: var(--font-md);
     line-height: 1.5;
     color: var(--text-secondary);
   }
@@ -4088,9 +4144,9 @@ function isProductionHost(hostname) {
   kbd {
     background: var(--kbd-bg);
     border: 1px solid var(--border-kbd);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     padding: 2px 6px;
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 700;
     color: var(--text-button);
     box-shadow: 0 1px 1px var(--shadow-md);
@@ -4102,7 +4158,7 @@ function isProductionHost(hostname) {
     color: var(--accent-primary);
     background: var(--kbd-bg);
     padding: 1px 4px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     display: inline-block;
     line-height: 1;
   }
@@ -4117,7 +4173,7 @@ function isProductionHost(hostname) {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
+    font-size: var(--font-md);
     color: var(--text-faint);
   }
   .legend-dot {
@@ -4255,7 +4311,7 @@ function isProductionHost(hostname) {
      band - a fill or font-size here would beat those and flatten them. */
   .pie-track { fill: var(--border-soft); pointer-events: none; }
   .pie-label {
-    fill: #ffffff;
+    fill: var(--text-on-accent);
     font-weight: 800;
     letter-spacing: -0.5px;
     font-variant-numeric: tabular-nums;
@@ -4265,7 +4321,7 @@ function isProductionHost(hostname) {
 
   #inline-input {
     position: fixed;
-    z-index: 1500;
+    z-index: var(--z-inline-editor);
     display: none;
     border: 2px solid var(--accent-primary);
     outline: none;
@@ -4284,14 +4340,14 @@ function isProductionHost(hostname) {
     position: fixed;
     top: 8px;
     left: 8px;
-    z-index: 4000;
+    z-index: var(--z-dev-probe);
     background: var(--accent-danger);
-    color: #fff;
-    font-size: 11px;
+    color: var(--text-on-accent);
+    font-size: var(--font-xs);
     font-weight: 700;
     letter-spacing: 0.08em;
     padding: 3px 8px;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     pointer-events: none;
   }
 
@@ -4301,15 +4357,15 @@ function isProductionHost(hostname) {
     position: fixed;
     bottom: 12px;
     left: 12px;
-    z-index: 4000;
+    z-index: var(--z-dev-probe);
     background: var(--accent-danger);
-    color: #fff;
+    color: var(--text-on-accent);
     border: none;
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 700;
     letter-spacing: 0.08em;
     padding: 10px 14px;
-    border-radius: 18px;
+    border-radius: var(--radius-pill);
     box-shadow: 0 4px 15px var(--shadow-lg);
   }
 
@@ -4317,15 +4373,15 @@ function isProductionHost(hostname) {
     position: fixed;
     bottom: 12px;
     left: 84px;
-    z-index: 4000;
+    z-index: var(--z-dev-probe);
     background: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 700;
     letter-spacing: 0.08em;
     padding: 10px 14px;
-    border-radius: 18px;
+    border-radius: var(--radius-pill);
   }
 
   #perf-probe-arm[hidden],
@@ -4334,7 +4390,7 @@ function isProductionHost(hostname) {
   #perf-probe-panel {
     position: fixed;
     inset: 0;
-    z-index: 4001;
+    z-index: var(--z-dev-probe-panel);
     background: var(--bg-primary);
     display: flex;
     flex-direction: column;
@@ -4348,7 +4404,7 @@ function isProductionHost(hostname) {
     gap: 8px;
     padding: 8px;
     border-bottom: 1px solid var(--border-color);
-    font-size: 13px;
+    font-size: var(--font-md);
     font-weight: 600;
     color: var(--text-primary);
   }
@@ -4361,7 +4417,7 @@ function isProductionHost(hostname) {
     padding: 8px;
     overflow: auto;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
+    font-size: var(--font-xs);
     line-height: 1.35;
     white-space: pre;
     color: var(--text-primary);
@@ -4388,13 +4444,13 @@ function isProductionHost(hostname) {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    font-size: 10px;
+    color: var(--text-on-accent);
+    font-size: var(--font-2xs);
     font-weight: 800;
     transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
     overflow: hidden;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+    text-shadow: 0 1px 1px var(--text-shadow-on-fill);
   }
 
   .icon {
@@ -4498,7 +4554,7 @@ function isProductionHost(hostname) {
       transform: none;
       border: none;
       border-left: 1px solid var(--border-default);
-      border-radius: 0 0 0 8px;
+      border-radius: 0 0 0 var(--radius-lg);
     }
     /* No top border any more, so the header needs no 1px correction. */
     .app-panel:not(.caption-top) { --panel-header-top: var(--toolbar-h); }
