@@ -160,7 +160,6 @@ function isProductionHost(hostname) {
     --bg-canvas: #ffffff;
     --bg-surface: #ffffff;
     --bg-surface-subtle: #f8f9fa;
-    --bg-input: #f5f5f5;
     --bg-hover: rgba(0,0,0,0.06);
     --bg-muted: #f0f0f0;
 
@@ -288,7 +287,6 @@ function isProductionHost(hostname) {
     --bg-canvas: #1a1a1a;
     --bg-surface: #242424;
     --bg-surface-subtle: #2c2c2c;
-    --bg-input: #1e1e1e;
     --bg-hover: rgba(255,255,255,0.06);
     --bg-muted: #2a2a2a;
 
@@ -1609,25 +1607,6 @@ function isProductionHost(hostname) {
     background: var(--border-faint);
     margin: 2px 0;
   }
-
-  #lang-select,
-  #theme-select,
-  #start-view-select,
-  #bridge-guide-app {
-    width: 100%;
-    padding: 5px 8px;
-    border-radius: 8px;
-    border: 1px solid var(--border-default);
-    background: var(--bg-input);
-    color: var(--text-primary);
-    font-size: 13px;
-    cursor: pointer;
-    outline: none;
-  }
-  #lang-select:focus,
-  #theme-select:focus,
-  #start-view-select:focus,
-  #bridge-guide-app:focus { border-color: var(--border-hover); }
 
   /* Theme toggle pill */
   .theme-toggle-row {
@@ -3704,7 +3683,7 @@ function isProductionHost(hostname) {
   }
   /* One field idiom for every dialog: the bordered box the date dialog already
      used, so a hex code, a baseline number and a quick-add line all read the
-     same. The two wrappers (#cp-hex-row, #bp-input-row) carry it with a
+     same, and so do the Settings selects. The two wrappers (#cp-hex-row, #bp-input-row) carry it with a
      transparent input inside, which is why the ring is also :focus-within. */
   .dialog-field {
     background: var(--bg-surface);
@@ -3722,6 +3701,7 @@ function isProductionHost(hostname) {
     outline: none;
     border-color: var(--accent-primary);
   }
+  select.dialog-field { cursor: pointer; }
   /* Popovers are anchored and narrow: a tighter body and a full-width action
      row, but the same caption, fields and buttons as the modals. */
   #color-picker-panel .dialog-body,
@@ -5288,7 +5268,7 @@ Or remove them later in Settings → Help.</div>
       <div class="settings-separator"></div>
       <div class="settings-section">
         <div class="settings-label" data-i18n="settings.language">Language</div>
-        <select id="lang-select">
+        <select id="lang-select" class="dialog-field">
           <option value="en">English</option>
           <option value="cs">Čeština</option>
         </select>
@@ -5296,7 +5276,7 @@ Or remove them later in Settings → Help.</div>
       <div class="settings-separator"></div>
       <div class="settings-section">
         <div class="settings-label" id="theme-select-label" data-i18n="settings.appearance">Theme</div>
-        <select id="theme-select" aria-labelledby="theme-select-label">
+        <select id="theme-select" class="dialog-field" aria-labelledby="theme-select-label">
           <option value="system" data-i18n="settings.system">System</option>
           <option value="light" data-i18n="settings.light">Light</option>
           <option value="dark" data-i18n="settings.dark">Dark</option>
@@ -5305,7 +5285,7 @@ Or remove them later in Settings → Help.</div>
       <div class="settings-separator"></div>
       <div class="settings-section">
         <div class="settings-label" id="start-view-select-label" data-i18n="settings.startView">Start view</div>
-        <select id="start-view-select" aria-labelledby="start-view-select-label">
+        <select id="start-view-select" class="dialog-field" aria-labelledby="start-view-select-label">
           <option value="vision" data-i18n="view.vision">Vision</option>
           <option value="mindmap" data-i18n="view.mindmap">Mindmap</option>
           <option value="agenda" data-i18n="view.agenda">Agenda</option>
@@ -5361,7 +5341,7 @@ Or remove them later in Settings → Help.</div>
         <div id="bridge-guide" class="bridge-list" hidden>
           <div class="settings-separator"></div>
           <div class="settings-label" id="bridge-guide-label" data-i18n="bridge.guide.title">Connect an agent</div>
-          <select id="bridge-guide-app" aria-labelledby="bridge-guide-label">
+          <select id="bridge-guide-app" class="dialog-field" aria-labelledby="bridge-guide-label">
             <option value="claude-code">Claude Code</option>
             <option value="claude-desktop">Claude Desktop</option>
             <option value="codex">Codex</option>

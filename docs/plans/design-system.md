@@ -35,15 +35,17 @@ Tokens: colour is 322 of 326 declarations via variables (36 literal colours left
 
 ## Phase 1 - close the incident class
 
-- [ ] **R1 Guard test** `tests/design-system.test.js`, modelled on `tests/hidden-attribute.test.js` (stylesheet extraction) and `tests/no-em-dash.test.js`. Each check has a frozen baseline in the test file plus an assertion that every baseline entry still exists in the source (so fixing an offender forces removing it, and adding one fails). Key baselines on selectors and IDs, never line numbers; failure messages name the catalogue component to use. Checks:
-  - [ ] 1. Every `<button>`, `<select>`, `<input>` (except file, range, hidden) and `<textarea>` in markup carries a catalogue class. Baseline: today's 15 classless controls.
-  - [ ] 2. No CSS rule whose final compound selector is a form-control ID sets skin properties (border, background, color, border-radius, font-size, font-weight, padding, box-shadow). Layout (width, flex, margin, display) stays allowed. Baseline: today's 20 IDs. This alone would have failed on `#start-view-select`.
-  - [ ] 3. A `className` assigned to an element from `createElement('button' | 'input' | 'select' | 'textarea')` within the next few lines starts with a catalogue class. Baseline: `dp-day`, `wp-week-row`, `qab-recent-branch`, `ctx-item`, `agenda-tab`.
-  - [ ] 4. Every `role="dialog"` element carries `dialog-shell` and contains a `.dialog-header`. Baseline: `week-picker-fold`.
-  - [ ] 5. Outside `:root` / `[data-theme]` token blocks, no hex or `rgb()` literal in a declaration. Baseline: the 23 rules, keyed by selector.
-  - [ ] 6. The set of class names matching `-btn`, `-toggle`, `-field`, `-select`, `-input`, `-close` equals a frozen set; a new one fails with "reuse a catalogue component or add it to the catalogue".
+- [x] **R1 Guard test** `tests/design-system.test.js`, modelled on `tests/hidden-attribute.test.js` (stylesheet extraction) and `tests/no-em-dash.test.js`. Each check has a frozen baseline in the test file plus an assertion that every baseline entry still exists in the source (so fixing an offender forces removing it, and adding one fails). Key baselines on selectors and IDs, never line numbers; failure messages name the catalogue component to use. Checks:
+  - [x] 1. Every `<button>`, `<select>`, `<input>` (except file, range, hidden) and `<textarea>` in markup carries a catalogue class. Baseline: today's 15 classless controls.
+  - [x] 2. No CSS rule whose final compound selector is a form-control ID sets skin properties (border, background, color, border-radius, font-size, font-weight, padding, box-shadow). Layout (width, flex, margin, display) stays allowed. Baseline: today's 20 IDs. This alone would have failed on `#start-view-select`.
+  - [x] 3. A `className` assigned to an element from `createElement('button' | 'input' | 'select' | 'textarea')` within the next few lines starts with a catalogue class. Baseline: `dp-day`, `wp-week-row`, `qab-recent-branch`, `ctx-item`, `agenda-tab`.
+  - [x] 4. Every `role="dialog"` element carries `dialog-shell` and contains a `.dialog-header`. Baseline: `week-picker-fold`.
+  - [x] 5. Outside `:root` / `[data-theme]` token blocks, no hex or `rgb()` literal in a declaration. Baseline: the 23 rules, keyed by selector.
+  - [x] 6. The set of class names matching `-btn`, `-toggle`, `-field`, `-select`, `-input`, `-close` equals a frozen set; a new one fails with "reuse a catalogue component or add it to the catalogue".
   - [ ] 7. (Switched on in Phase 5.) `border-radius`, `font-size`, `z-index` values are `var(...)`, `50%`, `0` or `inherit`, with a count ceiling that may only go down.
-- [ ] **R2 One field class for Settings.** Delete the ID list rule; give the 4 Settings selects the shared field class. Decide whether Settings fields should look exactly like `.dialog-field`; if a difference is intended, express it once (modifier or `.settings-section` descendant rule on the class), never per ID. Verify in the browser. Shrinks R1.1/R1.2 baselines by 4.
+- [x] **R2 One field class for Settings.** Delete the ID list rule; give the 4 Settings selects the shared field class. Decide whether Settings fields should look exactly like `.dialog-field`; if a difference is intended, express it once (modifier or `.settings-section` descendant rule on the class), never per ID. Verify in the browser. Shrinks R1.1/R1.2 baselines by 4.
+  - Done: Settings selects wear `.dialog-field` exactly (Settings is itself a `.dialog-shell`, so no modifier). The one shared addition is `select.dialog-field { cursor: pointer }`. The `--bg-input` token lost its only user and was removed.
+- Baselines as landed (R1): check 1 found 13 classless controls, not 15 (4 of them now fixed by R2, leaving 9). The catalogue also lists today's toolbar families `.undo-redo-btn` and `.view-toggle-btn`, plus `.ctx-item` and `.agenda-tab` (Phase 2 table rows), so check 3's baseline is `agenda-rename-input`, `dp-day`, `qab-recent-branch`, `wp-week-row`. Check 6 matches the suffix as a segment (`-toggle-row` counts), 17 names. Check 7 is an `it.todo` until Phase 5.
 
 ## Phase 2 - guidance that generalizes
 
