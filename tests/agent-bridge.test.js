@@ -838,6 +838,21 @@ describe('projection', () => {
     expect(ag.groups.map(g => g.group)).toEqual(['pending', 'done', 'anyday', 'dropped']);
     expect(ag.groups[0].rows[0].task.label).toBe('Gym');
   });
+
+  test('read_agenda done rows are what the user closed, in order, each with its doneAt', async () => {
+    // Wednesday of 2026-45. The parent was closed by the roll-up a moment after
+    // its last child: it carries the newest doneAt but is not a row of its own.
+    const parent = addActivity('Clients', { done: true, doneAt: '2026-11-04T09:05:00.001Z' });
+    addActivity('Call Ann', { done: true, doneAt: '2026-11-04T09:00:00.000Z' }, parent);
+    addActivity('Mail Bob', { done: true, doneAt: '2026-11-04T09:05:00.000Z' }, parent);
+    const ag = await call('read_agenda', { day: 3 });
+    const done = ag.groups.find(g => g.group === 'done').rows;
+    expect(done.map(r => [r.task.label, r.doneAt])).toEqual([
+      ['Call Ann', '2026-11-04T09:00:00.000Z'],
+      ['Mail Bob', '2026-11-04T09:05:00.000Z'],
+    ]);
+    expect(ag.groups.find(g => g.group === 'pending').rows.every(r => !('doneAt' in r))).toBe(true);
+  });
 });
 
 describe('week lock', () => {

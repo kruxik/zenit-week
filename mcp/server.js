@@ -88,6 +88,7 @@ const mcp = new McpServer(
       'Read zenit://week/current (or call get_stats) first to learn branch and task ids. Use open_week to switch weeks before writing to another week.',
       'Before proposing what a week should carry, read zenit://vision: the user\'s long view, a mind map of intentions (branches are life areas, comments say why). The Vision has no days, ticks or done; an intention can be let go (set_status dropped) and taken back (undone), and has an optional horizon (set_horizon).',
       'The node tools act on the record in view: call open_vision before writing to an intention and open_week to come back. An id from the other record answers not_in_view.',
+      'To learn what the user finished (the last task done, what got done today), read the done group of zenit://agenda/{day}: one row per task or tick the user closed, oldest first, each with its doneAt. Do not sort the week by doneAt: a parent closed by its children rolling up carries a doneAt of its own but was not closed by the user.',
       'When the user asks to see something ("show me"), call show_task with its id: it brings the browser forward, opens the right week or the Vision and pulses the item.',
       'Days are ISO weekdays: 1 = Monday ... 7 = Sunday. A label ending in "Nx" (e.g. "Pushups 10x") makes N ticks recorded with tick_task; days and Nx do not combine.',
       'Never put relative days (today, tomorrow) in labels: pass days instead.',
@@ -309,7 +310,7 @@ resource('schedule', 'zenit://schedule', 'Dated and repeating entries (the Later
 resource('schedule-app', withApp('zenit://schedule{?app}'), 'zenit://schedule of one app.', { tool: 'read_schedule' });
 resource('vision', 'zenit://vision', 'The Vision: life areas (branches) and intentions with priority, horizon, let-go state and comments (the why). Read it before proposing a week.', { tool: 'read_vision' });
 resource('vision-app', withApp('zenit://vision{?app}'), 'zenit://vision of one app.', { tool: 'read_vision' });
-resource('agenda', withApp('zenit://agenda/{day}'), 'Agenda of the week in view for ISO day 1-7.',
+resource('agenda', withApp('zenit://agenda/{day}'), 'Agenda of the week in view for ISO day 1-7. Its done group is the day\'s log of what the user finished, oldest first.',
   { tool: 'read_agenda', map: v => ({ day: parseInt(v.day, 10) }) });
 
 // zenit://apps: the app tabs connected to this server, answered by the server.

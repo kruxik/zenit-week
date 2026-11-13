@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-c4Q/1LmaQmJWlvdRYja6KtomTS+mIy/B4WnnqSeoL0o=';
+               'sha256-opZuPm6xaqYmBES7iGjV4Yy28uZDcZjG+Ur2q0jYY2g=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -30794,6 +30794,11 @@ const BRIDGE_TOOLS = {
             // A day leaf's row is its task on that day.
             task: projectTask(r.node.dayChild ? findNode(r.node.parent) || r.node : r.node),
             tick: r.tickRecord ? { position: r.tickRecord.position, total: r.tickRecord.total } : null,
+            // Done rows only: when this row was finished - the tick's own time on
+            // a tick row, the task's on any other. The group is in this order, so
+            // its last row is what the user closed last (roll-up parents are no
+            // rows of their own).
+            ...(g.kind === 'done' && { doneAt: (r.tickRecord ? r.tickRecord.tick.doneAt : r.node.doneAt) || null }),
           })),
         })),
       };

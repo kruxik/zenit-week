@@ -141,7 +141,7 @@ Read-only resources:
 | `zenit://week/{YYYY-WW}` | Any stored week. |
 | `zenit://weeks` | Weeks stored on this device, with task counts. |
 | `zenit://schedule` | Dated and repeating entries (the Later tab). |
-| `zenit://agenda/{1-7}` | The agenda of one day of the week in view. |
+| `zenit://agenda/{1-7}` | The agenda of one day of the week in view. Its Done group is that day's log of what you finished, oldest first, each row with its `doneAt`. |
 | `zenit://vision` | The Vision: areas and intentions with priority, horizon, let-go state and comments. |
 | `zenit://apps` | The connected app tabs, answered by the server itself. |
 

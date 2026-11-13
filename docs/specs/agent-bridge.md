@@ -182,7 +182,7 @@ The projection to section 8.3 is a pure function over a week record, so the same
 | 2 | `zenit://week/current` | The week in view, as section 8.3, from memory. |
 | 3 | `zenit://week/{YYYY-WW}` | Any stored week, same shape. From memory if it is the week in view. |
 | 4 | `zenit://schedule` | The `schedule` record (Later tab) as the `schedule` skill documents it. |
-| 5 | `zenit://agenda/{1-7}` | The agenda of the week in view for that day, rows in render order: Scheduled, Done, Any day, Dropped - produced by the same grouping code `renderAgenda` uses, extracted so it returns data instead of DOM. |
+| 5 | `zenit://agenda/{1-7}` | The agenda of the week in view for that day, rows in render order: Scheduled, Done, Any day, Dropped - produced by the same grouping code `renderAgenda` uses, extracted so it returns data instead of DOM. A Done row also carries `doneAt` (a tick row the tick's own time), so the group is the day's log of what the user closed; a parent closed by the roll-up has no row of its own, which is why "what did I finish last" reads this group and never the week sorted by `doneAt`. |
 | 6 | `zenit://vision` | The vision record projected as section 8.4. From memory when the Vision is in view, else `loadVision()`. Wire call `read_vision`, a read (no write budget). A vision save is reported as a `week-saved` event with `wk: 'vision'`, which the server maps to this URI only (`urisForVisionSaved`). |
 
 ### 8.2 Tools
