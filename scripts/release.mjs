@@ -19,6 +19,9 @@
 //      mcp/manifest.json. The release commit carries it, and the deploy
 //      publishes it to npm and attaches the Claude Desktop extension to the
 //      release, so the app, the server and the extension ship together.
+//      The version (bumped or not) is written into BRIDGE_SERVER_LATEST in
+//      zenit-week.html, so the page knows the latest server and can tell
+//      users of an older one to update (docs/specs/mcp-updates.md 5.1).
 //   5. Confirm, commit "chore(release): vX", tag vX.
 //   6. Print the push instruction - never push automatically; tag push
 //      is what triggers production deploy via deploy-production.yml.
@@ -163,6 +166,24 @@ export function withVersion(file, text, version) {
   return JSON.stringify(json, null, 2) + '\n';
 }
 
+// The page's copy of the latest server version.
+export const SERVER_LATEST_RE = /^const BRIDGE_SERVER_LATEST = '([^']*)';$/m;
+export function withServerLatest(html, version) {
+  if (!SERVER_LATEST_RE.test(html)) throw new Error('BRIDGE_SERVER_LATEST not found in zenit-week.html');
+  return html.replace(SERVER_LATEST_RE, `const BRIDGE_SERVER_LATEST = '${version}';`);
+}
+
+// Returns whether the page changed; a change re-hashes the inline scripts.
+function writeServerLatest(version) {
+  const p = resolve(REPO_ROOT, 'zenit-week.html');
+  const html = readFileSync(p, 'utf8');
+  const next = withServerLatest(html, version);
+  if (next === html) return false;
+  writeFileSync(p, next);
+  shInherit('node scripts/csp-hashes.mjs');
+  return true;
+}
+
 function changedMcpFiles(prior) {
   if (!prior) return MCP_RELEASE_FILES.filter(f => existsSync(resolve(REPO_ROOT, f)));
   const out = sh(`git diff --name-only ${prior} -- ${MCP_RELEASE_FILES.join(' ')}`);
@@ -302,6 +323,7 @@ async function main() {
     console.log(`🧪 Dry run complete. CHANGELOG.md restored. No commit, no tag.`);
     console.log(`   Would have committed: chore(release): ${version}`);
     if (mcpPlan.bump) console.log(`   Would have raised:    zenit-week-mcp ${mcpPlan.from} -> ${mcpPlan.version}`);
+    console.log(`   Would have written:   BRIDGE_SERVER_LATEST = ${mcpPlan.version}`);
     console.log(`   Would have tagged:    ${version}\n`);
     return;
   }
@@ -317,7 +339,9 @@ async function main() {
   }
 
   if (mcpPlan.bump) writeMcpVersion(mcpPlan.version);
-  shInherit(`git add CHANGELOG.md${mcpPlan.bump ? ` ${MCP_VERSION_FILES.join(' ')}` : ''}`);
+  const pageChanged = writeServerLatest(mcpPlan.version);
+  const extra = [...(mcpPlan.bump ? MCP_VERSION_FILES : []), ...(pageChanged ? ['zenit-week.html'] : [])];
+  shInherit(`git add CHANGELOG.md${extra.length ? ` ${extra.join(' ')}` : ''}`);
   shInherit(`git commit -m "chore(release): ${version}"`);
   // Annotated tag - `git push --follow-tags` only pushes annotated tags,
   // so lightweight tags get left behind on the local machine and never

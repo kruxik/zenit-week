@@ -25,7 +25,7 @@ import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextp
 import {
   BUILT_IN_SITES, OPEN_WAIT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError,
   addOrigin, appBundleOf, appMatches, browserHint, appName, filePairings, formatPairCode, isAllowedOrigin, lastUsedSite,
-  listenOnFirstFreePort, matchSite, pairingsPath, peerPidFromLsof, readOrigins, removeOrigin, routeWarning, urisForWeekSaved,
+  listenOnFirstFreePort, matchSite, updateNote, pairingsPath, peerPidFromLsof, readOrigins, removeOrigin, routeWarning, urisForWeekSaved,
 } from './core.js';
 
 const { version: VERSION } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
@@ -106,6 +106,7 @@ mcp.server.setRequestHandler(UnsubscribeRequestSchema, async req => { subscripti
 const relay = new Relay({
   pairings,
   install: INSTALL,
+  version: VERSION,
   clientName: () => mcp.server.getClientVersion()?.name || null,
   log: s => err(`zenit-week-mcp: ${s}`),
   // A subscription may name its app (`?app=`); it hears only that app's saves.
@@ -203,10 +204,22 @@ async function raiseBrowser(tab, hint) {
   return (await run('open', ['-a', target])) !== null;
 }
 
+// The first result of a session whose server is behind the latest release
+// carries `update`, once (mcp-updates.md 5.2, row 3): the agent passes it on.
+let updateNoted = false;
+function takeUpdateNote(tab) {
+  if (updateNoted || !tab) return null;
+  const note = updateNote({ version: VERSION, latest: tab.serverLatest, install: INSTALL });
+  if (note) updateNoted = true;
+  return note;
+}
+
 // Every result carries `app` (setup spec section 6, row 6), plus the warning
 // when the agent named no app and several are open.
-function labelled({ app, warning, data }) {
+function labelled({ app, warning, data, tab }) {
   const head = warning ? { app, warning } : { app };
+  const update = takeUpdateNote(tab);
+  if (update) head.update = update;
   return data && typeof data === 'object' && !Array.isArray(data) ? { ...head, ...data } : { ...head, result: data };
 }
 

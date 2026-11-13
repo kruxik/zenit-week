@@ -5,6 +5,7 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   _state, genId, defaultWeekData, findNode, rebuildNodeMap, getTickInfo,
   bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeUnpair, bridgeUpdateHintKey,
+  bridgeServerVerdict, bridgeCompareVersions, bridgeUnknownToolMessage,
   bridgeSocketUrl, bridgeAddCmd, loadBridgeRecord, saveBridgeRecord, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
   mergeWeekData, applyRemoteMerge, weekContentHash, reloadAppFresh,
@@ -14,6 +15,7 @@ import {
 // sit over the view and take the first Esc.
 beforeEach(() => _state.setTipsSeen({ vision: true }));
 import nodeCrypto from 'node:crypto';
+import nodeFs from 'node:fs';
 import { Relay, memoryPairings } from '../mcp/core.js';
 
 const sandbox = _state.sandbox;
@@ -63,8 +65,10 @@ async function until(cond, ms = 2000) {
   while (!cond()) { if (Date.now() > end) throw new Error('timed out waiting'); await settle(); }
 }
 
-function serve(port, { client = 'claude-code', pairings = memoryPairings() } = {}) {
-  const srv = { relay: new Relay({ pairings, clientName: () => client }), tab: null, ws: null };
+// The server release the page knows; a test server is current unless told otherwise.
+const SERVER_LATEST = JSON.parse(nodeFs.readFileSync(new URL('../mcp/package.json', import.meta.url), 'utf8')).version;
+function serve(port, { client = 'claude-code', pairings = memoryPairings(), version = SERVER_LATEST, install = 'npx' } = {}) {
+  const srv = { relay: new Relay({ pairings, clientName: () => client, version, install }), tab: null, ws: null };
   servers.set(port, srv);
   return srv;
 }
@@ -1181,5 +1185,96 @@ describe('agent add commands follow the site', () => {
     expect(bridgeAddCmd('codex', 'https://zenitweek.com')).toBe('codex mcp add zenit-week -- npx -y zenit-week-mcp@1');
     expect(bridgeAddCmd('gemini', 'https://abc.ngrok-free.dev'))
       .toBe('npx -y zenit-week-mcp@1 origins add https://abc.ngrok-free.dev && gemini mcp add --scope user zenit-week npx zenit-week-mcp@1');
+  });
+});
+
+describe('server version (mcp-updates.md section 5)', () => {
+  const bump = (v, d) => v.split('.').map((n, i) => (i === 1 ? Number(n) + d : n)).join('.');
+  const ahead = bump(SERVER_LATEST, 1);
+  let toasts;
+  beforeEach(() => {
+    toasts = [];
+    // Only the update toasts (the agent's); "Paired with" is another one.
+    sandbox.showToast = (msg, ms, opts) => { if (opts?.agent) toasts.push({ msg, ms, ...opts }); };
+  });
+
+  test('versions compare by number; a missing one is older than any', () => {
+    expect(bridgeCompareVersions('1.10.0', '1.9.9')).toBe(1);
+    expect(bridgeCompareVersions('1.2.0', '1.2.0')).toBe(0);
+    expect(bridgeCompareVersions(null, '1.0.0')).toBe(-1);
+    expect(bridgeCompareVersions('x', '1.0.0')).toBe(-1);
+  });
+
+  test('section 5.1: needed below minServer, available below latest, reload above, none when equal', () => {
+    expect(bridgeServerVerdict('1.1.0', { minServer: '1.2.0', latest: '1.3.0' })).toBe('needed');
+    expect(bridgeServerVerdict('1.2.0', { minServer: '1.2.0', latest: '1.3.0' })).toBe('available');
+    expect(bridgeServerVerdict(null, { latest: '1.2.0' })).toBe('available');
+    expect(bridgeServerVerdict('1.3.0', { latest: '1.3.0' })).toBeNull();
+    expect(bridgeServerVerdict('1.4.0', { latest: '1.3.0' })).toBe('reload');
+  });
+
+  test('ready names the latest server release; a current server reads Connected with its version', async () => {
+    const ws = await pairedSocket();
+    expect(ws.sent.find(f => f.type === 'ready').serverLatest).toBe(SERVER_LATEST);
+    expect(_state.getBridgeStatus().state).toBe('connected');
+    expect(_state.getBridgeStatus().agents[0]).toMatchObject({ version: SERVER_LATEST, install: 'npx', update: null });
+    expect(toasts).toEqual([]);
+  });
+
+  test('a server before 1.2.0 (no version) is update-available, with its install hint and one toast per release', async () => {
+    serve(47831, { version: null, install: 'mcpb' });
+    turnOn();
+    await pairVia(47831);
+    await until(() => _state.getBridgeStatus().state === 'update-available');
+    const { agents } = _state.getBridgeStatus();
+    expect(agents[0]).toMatchObject({ version: null, install: 'mcpb', update: 'available' });
+    expect(bridgeUpdateHintKey(agents)).toBe('bridge.state.update-server-mcpb');
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]).toMatchObject({ agent: true });
+    expect(toasts[0].msg).toContain(SERVER_LATEST);
+    expect(_state.getLocalStorage('zenit-week-bridge-update-toast')).toBe(SERVER_LATEST);
+    // Reconnecting, or the tab coming back, does not repeat it.
+    bridgeDisconnect();
+    turnOn();
+    await until(() => _state.getBridgeStatus().state === 'update-available');
+    bridgeConnect();
+    expect(toasts).toHaveLength(1);
+  });
+
+  test('a hidden tab waits with the toast until it is in front', async () => {
+    serve(47831, { version: null });
+    turnOn();
+    await pairVia(47831);
+    await until(() => _state.getBridgeStatus().state === 'update-available');
+    bridgeDisconnect();
+    toasts = [];
+    sandbox.localStorage.removeItem('zenit-week-bridge-update-toast');
+    sandbox.document.visibilityState = 'hidden';
+    turnOn();
+    await until(() => _state.getBridgeStatus().state === 'update-available');
+    expect(toasts).toEqual([]);
+    // Back in front: the visibility handler's refresh shows it.
+    sandbox.document.visibilityState = 'visible';
+    bridgeConnect();
+    expect(toasts).toHaveLength(1);
+  });
+
+  test('a server newer than the page reads Reload Zenit Week', async () => {
+    serve(47831, { version: ahead });
+    turnOn();
+    await pairVia(47831);
+    await until(() => _state.getBridgeStatus().state === 'reload-app');
+    expect(toasts).toEqual([]);
+  });
+
+  test('unknown_tool names the side to fix', async () => {
+    expect(bridgeUnknownToolMessage('new_tool', { version: ahead, install: 'npx' })).toMatch(/reload Zenit Week/);
+    expect(bridgeUnknownToolMessage('old_tool', { version: null, install: 'repo' })).toMatch(/update it: pull the Zenit Week repository/);
+    expect(bridgeUnknownToolMessage('x', { version: SERVER_LATEST, install: 'npx' })).not.toMatch(/reload|update/);
+    serve(47831, { version: ahead });
+    turnOn();
+    const { ws } = await pairVia(47831);
+    await serverCall(ws, { id: 1, tool: 'new_tool', args: {} });
+    expect(ws.sent.at(-1).error.message).toMatch(/^new_tool .*reload Zenit Week/);
   });
 });

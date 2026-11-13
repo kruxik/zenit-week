@@ -7,6 +7,7 @@ import {
   matchSite, listenOnFirstFreePort, formatPairCode, PORTS, PORT_MIN, PORT_MAX, PROTOCOL,
   appName, appMatches, routeWarning, readOrigins, addOrigin, removeOrigin, lastUsedSite,
   HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN, PAIR_TIMEOUT_MS, appBundleOf, peerPidFromLsof, browserHint,
+  compareVersions, updateNote, UPDATE_ACTIONS,
 } from '../mcp/core.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -501,5 +502,59 @@ describe('show_task: which browser to raise', () => {
   test('the page hint reaches open -a only when it is a known browser', () => {
     expect(browserHint('Safari')).toBe('Safari');
     for (const bad of ['-n', '/Applications/Terminal.app', 'Terminal', '', null, 42]) expect(browserHint(bad)).toBeNull();
+  });
+});
+
+describe('server version (mcp-updates.md section 5)', () => {
+  test('welcome names the server version; ready stores the latest the page knows', () => {
+    relay = new Relay({ pairings, version: '1.2.0', install: 'mcpb' });
+    const ws = new Sock();
+    const tab = relay.onOpen(ws, ORIGIN);
+    open(tab, { pairingId: PAIRING_ID, nonce: 'n'.repeat(43) });
+    expect(ws.sent[0]).toMatchObject({ type: 'welcome', version: '1.2.0', install: 'mcpb' });
+    relay.onMessage(tab, JSON.stringify({ type: 'ready', proof: hmacB64(KEY, `page|${ws.sent[0].nonce}`), tabId: 't', serverLatest: '1.3.0' }));
+    expect(tab.serverLatest).toBe('1.3.0');
+  });
+
+  test('an older page sends no latest; junk is ignored', () => {
+    const { tab } = connect();
+    expect(tab.serverLatest).toBeNull();
+    const ws = new Sock();
+    const t2 = relay.onOpen(ws, ORIGIN);
+    open(t2, { pairingId: PAIRING_ID, nonce: 'n'.repeat(43) });
+    relay.onMessage(t2, JSON.stringify({ type: 'ready', proof: hmacB64(KEY, `page|${ws.sent[0].nonce}`), tabId: 't', serverLatest: '<b>9</b>' }));
+    expect(t2.serverLatest).toBeNull();
+  });
+
+  test('versions compare by number', () => {
+    expect(compareVersions('1.10.0', '1.9.0')).toBe(1);
+    expect(compareVersions('1.2.0', '1.2.0')).toBe(0);
+    expect(compareVersions(null, '1.0.0')).toBe(-1);
+  });
+
+  test('the note: only when older, with the action for the install', () => {
+    expect(updateNote({ version: '1.2.0', latest: '1.2.0', install: 'npx' })).toBeNull();
+    expect(updateNote({ version: '1.3.0', latest: '1.2.0', install: 'npx' })).toBeNull();
+    expect(updateNote({ version: '1.1.0', latest: null, install: 'npx' })).toBeNull();
+    for (const install of ['npx', 'mcpb', 'repo']) {
+      const note = updateNote({ version: '1.1.0', latest: '1.2.0', install });
+      expect(note).toContain('This Zenit Week server is 1.1.0; 1.2.0 is out.');
+      expect(note).toContain(UPDATE_ACTIONS[install]);
+    }
+  });
+
+  test('server.js adds the note once per session, on the first labelled result', () => {
+    const src = fs.readFileSync(new URL('../mcp/server.js', import.meta.url), 'utf8');
+    expect(src).toMatch(/version: VERSION,/);
+    expect(src).toMatch(/let updateNoted = false;/);
+    expect(src).toMatch(/if \(note\) updateNoted = true;/);
+  });
+
+  test('the page and the server word the update actions alike', () => {
+    const html = fs.readFileSync(new URL('../zenit-week.html', import.meta.url), 'utf8');
+    for (const [install, action] of Object.entries(UPDATE_ACTIONS)) {
+      if (install === 'mcpb') expect(html).toContain('download the new Zenit Week extension for Claude Desktop (${BRIDGE_DESKTOP_EXTENSION_URL}) and open it');
+      else expect(html).toContain(`${install}: '${action}'`);
+    }
   });
 });

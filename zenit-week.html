@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-opZuPm6xaqYmBES7iGjV4Yy28uZDcZjG+Ur2q0jYY2g=';
+               'sha256-3r0hYtX/b2gk2uLYjZY88xfVn2GaTKz6R/lb95JuOto=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3858,10 +3858,12 @@ function isProductionHost(hostname) {
   #bridge-section[data-device="touch"] #bridge-toggle { display: none; }
   #bridge-section[data-state="connected"] { --bridge-state: var(--accent-success-text); }
   #bridge-section[data-state^="waiting"],
-  #bridge-section[data-state="approve"] { --bridge-state: var(--accent-warning-text); }
+  #bridge-section[data-state="approve"],
+  #bridge-section[data-state="update-available"] { --bridge-state: var(--accent-warning-text); }
   #bridge-section[data-state="blocked"],
   #bridge-section[data-state="unpaired-remote"],
-  #bridge-section[data-state^="update"] { --bridge-state: var(--accent-danger); }
+  #bridge-section[data-state="update-server"],
+  #bridge-section[data-state="update-needed"] { --bridge-state: var(--accent-danger); }
 
   .settings-hero {
     display: flex;
@@ -6381,6 +6383,7 @@ function reloadAppFresh() {
   _reloadFresh = true;
   // A paired agent must not keep access to whoever uses this browser next.
   try { localStorage.removeItem('zenit-week-bridge'); } catch (_) { /* storage unavailable */ }
+  try { localStorage.removeItem('zenit-week-bridge-update-toast'); } catch (_) { /* storage unavailable */ }
   try { localStorage.removeItem(RESTORE_KEY); } catch (_) { /* storage unavailable */ }
   location.reload();
 }
@@ -12999,7 +13002,6 @@ const TRANSLATIONS = {
     'bridge.state.unsupported':   'Not supported in this browser yet.',
     'bridge.mobileNote':          'AI agents work in Zenit Week on a computer, in Chrome or Firefox. Changes they make reach this device through Drive sync.',
     'bridge.unnamedAgent':        'agent',
-    'bridge.agent.connected':     'Connected',
     'bridge.agent.blocked':       'Blocked',
     'bridge.agent.block':         'Block',
     'bridge.agent.allow':         'Allow',
@@ -13007,6 +13009,14 @@ const TRANSLATIONS = {
     'bridge.ask.body':            '{client} wants to read and change your weeks on {site}.',
     'bridge.ask.later':           'Not now',
     'bridge.agent.old':           "Update its Zenit Week server",
+    'bridge.agent.connectedVersion': 'Connected - server {version}',
+    'bridge.agent.behind':        'Connected - server {version}, {latest} is out',
+    'bridge.agent.behindUnknown': 'Connected - older server, {latest} is out',
+    'bridge.agent.ahead':         'Connected - server {version}, newer than this app: reload Zenit Week',
+    'bridge.toast.update':        'A new Zenit Week server for your agent is out ({version}) - restart your agent app, or download the new extension for Claude Desktop in Settings > AI.',
+    'bridge.toast.update-npx':    'A new Zenit Week server for your agent is out ({version}) - restart your agent app to update.',
+    'bridge.toast.update-mcpb':   'A new Zenit Week extension is out ({version}) - download it in Settings > AI and open it.',
+    'bridge.toast.update-repo':   'A new Zenit Week server is out ({version}) - pull the repository and restart your agent app.',
     'bridge.guide.title':         'Connect an agent',
     'bridge.statusCaption':       'Status',
     'bridge.guide.copyCommand':   'Copy command',
@@ -13539,7 +13549,6 @@ const TRANSLATIONS = {
     'bridge.state.unsupported':   'V tomto prohlížeči zatím nefunguje.',
     'bridge.mobileNote':          'AI agenti fungují v Zenit Week na počítači, v Chrome nebo Firefoxu. Změny, které udělají, se sem dostanou přes synchronizaci s Diskem.',
     'bridge.unnamedAgent':        'agent',
-    'bridge.agent.connected':     'Připojeno',
     'bridge.agent.blocked':       'Zablokováno',
     'bridge.agent.block':         'Zablokovat',
     'bridge.agent.allow':         'Povolit',
@@ -13547,6 +13556,14 @@ const TRANSLATIONS = {
     'bridge.ask.body':            '{client} chce číst a měnit tvé týdny na {site}.',
     'bridge.ask.later':           'Teď ne',
     'bridge.agent.old':           'Aktualizuj jeho Zenit Week server',
+    'bridge.agent.connectedVersion': 'Připojeno - server {version}',
+    'bridge.agent.behind':        'Připojeno - server {version}, vyšla verze {latest}',
+    'bridge.agent.behindUnknown': 'Připojeno - starší server, vyšla verze {latest}',
+    'bridge.agent.ahead':         'Připojeno - server {version}, novější než aplikace: obnov Zenit Week',
+    'bridge.toast.update':        'Vyšel nový Zenit Week server pro tvého agenta ({version}) - restartuj aplikaci agenta, nebo v Nastavení > AI stáhni nové rozšíření pro Claude Desktop.',
+    'bridge.toast.update-npx':    'Vyšel nový Zenit Week server pro tvého agenta ({version}) - restartuj aplikaci agenta a aktualizuje se.',
+    'bridge.toast.update-mcpb':   'Vyšlo nové rozšíření Zenit Week ({version}) - stáhni ho v Nastavení > AI a otevři.',
+    'bridge.toast.update-repo':   'Vyšel nový Zenit Week server ({version}) - stáhni změny repozitáře a restartuj aplikaci agenta.',
     'bridge.guide.title':         'Připoj agenta',
     'bridge.statusCaption':       'Stav',
     'bridge.guide.copyCommand':   'Kopírovat příkaz',
@@ -29425,8 +29442,8 @@ function renderBridgeStatus() {
   // One state colour for the badge and the status dot (see #bridge-section CSS).
   document.getElementById('bridge-section').dataset.state = shown;
   // The state alone: the agents are named in their own rows right below.
-  el.textContent = shown === 'update-server' ? t(bridgeUpdateHintKey(agents))
-    : t(`bridge.state.${shown}`);
+  el.textContent = shown === 'update-server' || shown === 'update-needed' || shown === 'update-available'
+    ? t(bridgeUpdateHintKey(agents)) : t(`bridge.state.${shown}`);
 
   // One row per agent app and state, in the order first seen: three Claude Code
   // sessions are one Claude Code row with a 3 on its badge, so the list grows
@@ -29436,10 +29453,11 @@ function renderBridgeStatus() {
   const groups = new Map();
   for (const a of shown === 'off' ? [] : agents) {
     const label = a.state === 'old' && !a.client ? t('bridge.agent.oldServer') : (a.client || t('bridge.unnamedAgent'));
-    const key = a.state + '\n' + label;
+    const sub = a.state === 'connected' ? bridgeAgentSub(a) : '';
+    const key = a.state + '\n' + label + '\n' + sub;
     const g = groups.get(key);
     if (g) g.count++;
-    else groups.set(key, { state: a.state, label, name: a.client || '', count: 1 });
+    else groups.set(key, { state: a.state, label, name: a.client || '', count: 1, sub });
   }
   // Blocked agents stay listed, whether running or not, so they can be let back in.
   const recAgents = shown === 'off' ? null : rec.agents;
@@ -29448,7 +29466,7 @@ function renderBridgeStatus() {
   }
   // Each reads like the Drive account row: an initials badge in the agent's
   // state colour, the name, and its state underneath.
-  const rows = [...groups.values()].map(({ state: agentState, label, name: agentName, count }) => {
+  const rows = [...groups.values()].map(({ state: agentState, label, name: agentName, count, sub }) => {
     const row = document.createElement('div');
     row.className = 'settings-row bridge-agent';
     row.dataset.agentState = agentState;
@@ -29472,8 +29490,7 @@ function renderBridgeStatus() {
     name.textContent = label;
     const st = document.createElement('div');
     st.className = 'settings-sub';
-    st.textContent = t(agentState === 'connected' ? 'bridge.agent.connected'
-      : agentState === 'blocked' ? 'bridge.agent.blocked' : 'bridge.agent.old');
+    st.textContent = sub || t(agentState === 'blocked' ? 'bridge.agent.blocked' : 'bridge.agent.old');
     identity.appendChild(name);
     identity.appendChild(st);
     row.appendChild(badge);
@@ -29507,10 +29524,21 @@ function renderBridgeStatus() {
   }
 }
 
-// How to update the servers that are behind: one hint when they share an
-// install path, both common ones when any cannot say (a v1 server).
+// A connected agent's line: its server version, and whether it is behind.
+function bridgeAgentSub(a) {
+  const latest = BRIDGE_SERVER_LATEST;
+  if (!a.version) return t('bridge.agent.behindUnknown', { latest });
+  if (a.update === 'needed' || a.update === 'available') return t('bridge.agent.behind', { version: a.version, latest });
+  if (a.update === 'reload') return t('bridge.agent.ahead', { version: a.version });
+  return t('bridge.agent.connectedVersion', { version: a.version });
+}
+
+// How to update the servers that are behind (another protocol, or connected on
+// an older release): one hint when they share an install path, both common
+// ones when any cannot say (a v1 server).
 function bridgeUpdateHintKey(agents) {
-  const installs = new Set(agents.filter(a => a.state === 'old').map(a => a.install || 'unknown'));
+  const behind = agents.filter(a => a.state === 'old' || a.update === 'needed' || a.update === 'available');
+  const installs = new Set(behind.map(a => a.install || 'unknown'));
   if (installs.size === 1 && !installs.has('unknown')) return `bridge.state.update-server-${[...installs][0]}`;
   return 'bridge.state.update-server';
 }
@@ -29665,6 +29693,10 @@ const BRIDGE_KEY = 'zenit-week-bridge';
 const BRIDGE_PORT_MIN = 47831;
 const BRIDGE_PORT_MAX = 47838;
 const BRIDGE_PROTOCOL = 2; // mcp/core.js PROTOCOL
+// The latest agent server release (mcp/package.json version). `npm run release`
+// writes it; tests/release-mcp.test.js fails when it lags. Sent in `ready`, so
+// an older server can tell its agent to update (docs/specs/mcp-updates.md 5).
+const BRIDGE_SERVER_LATEST = '1.1.0';
 const BRIDGE_HOST = '127.0.0.1';
 const BRIDGE_PERMISSION_HINT_MS = 10000;
 const BRIDGE_BACKOFF_MIN_MS = 1000;
@@ -29789,9 +29821,50 @@ async function bridgePairCode(pubS, pubP, nonceS, nonceP) {
 }
 const formatBridgePairCode = code => `${code.slice(0, 3)} ${code.slice(3)}`;
 
+// ── Server version (docs/specs/mcp-updates.md 5.1); mcp/core.js does the same ──
+const _BRIDGE_SEMVER = /^(\d{1,6})\.(\d{1,6})\.(\d{1,6})$/;
+const _bridgeVersionOf = v => (typeof v === 'string' && _BRIDGE_SEMVER.test(v) ? v : null);
+// -1, 0 or 1; a missing version (a server before 1.2.0) is older than any.
+function bridgeCompareVersions(a, b) {
+  const pa = _bridgeVersionOf(a)?.split('.').map(Number);
+  const pb = _bridgeVersionOf(b)?.split('.').map(Number);
+  if (!pa || !pb) return pa ? 1 : pb ? -1 : 0;
+  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  return 0;
+}
+// A connected server against what this page knows: 'needed' below the
+// manifest's minServer (the manifest arrives in step 2 of the spec),
+// 'available' below the latest release, 'reload' when the page is the older
+// side, null when it is current.
+function bridgeServerVerdict(version, { minServer = null, latest = BRIDGE_SERVER_LATEST } = {}) {
+  if (_bridgeVersionOf(minServer) && bridgeCompareVersions(version, minServer) < 0) return 'needed';
+  const cmp = bridgeCompareVersions(version, latest);
+  return cmp < 0 ? 'available' : cmp > 0 ? 'reload' : null;
+}
+// What the user does to update, by install path, in the words an agent passes
+// on; mcp/core.js UPDATE_ACTIONS says the same.
+const BRIDGE_UPDATE_ACTIONS = {
+  npx: 'restart your agent app; it fetches the new server on start',
+  mcpb: `download the new Zenit Week extension for Claude Desktop (${BRIDGE_DESKTOP_EXTENSION_URL}) and open it`,
+  repo: 'pull the Zenit Week repository and restart your agent app',
+};
+// A tool this page does not know: say which side is older and the fix.
+function bridgeUnknownToolMessage(tool, conn) {
+  const name = String(tool).slice(0, 64);
+  const v = conn && _bridgeVersionOf(conn.version);
+  const cmp = bridgeCompareVersions(v, BRIDGE_SERVER_LATEST);
+  if (cmp > 0) return `${name} is not a tool of this Zenit Week app: the app is older than this server (${v}). Ask the user to reload Zenit Week.`;
+  if (cmp < 0) {
+    return `${name} is not a tool of this Zenit Week app: this server (${v || 'older than 1.2.0'}) is older than the app, which goes with ${BRIDGE_SERVER_LATEST}. `
+      + `Ask the user to update it: ${BRIDGE_UPDATE_ACTIONS[conn?.install] || BRIDGE_UPDATE_ACTIONS.npx}.`;
+  }
+  return `${name} is not a tool of this Zenit Week app.`;
+}
+
 // ── Status ──
 // off | waiting-server | waiting-permission | blocked | waiting-agent | approve
-// | connected | unpaired-remote | update-server | reload-app | unsupported
+// | connected | update-needed | update-available | unpaired-remote
+// | update-server | reload-app | unsupported
 // `clients` names the agent app of every paired server, in port order;
 // `agents` is one row per server the page knows, for Settings.
 let bridgeStatus = { state: 'off', clients: [], agents: [] };
@@ -29845,13 +29918,20 @@ function _refreshBridgeStatus() {
   const notes = [..._bridgePortNotes.values()];
   const old = [..._bridgePortNotes].filter(([, n]) => n.kind === 'old');
   const agents = [
-    ...ready.map(c => ({ port: c.port, client: c.client || '', state: 'connected' })),
+    ...ready.map(c => ({
+      port: c.port, client: c.client || '', state: 'connected',
+      version: c.version, install: c.install, update: bridgeServerVerdict(c.version),
+    })),
     ...old.map(([port, n]) => ({ port, client: '', state: 'old', install: n.install })),
   ].sort((a, b) => a.port - b.port);
   const clients = ready.map(c => c.client || '');
   // A server on another protocol is named in its own row; it decides the line
   // only when no server of this protocol answers (setup spec 6.1).
+  const updates = new Set(agents.map(a => a.update));
   const state = _bridgePair && _bridgePair.shown ? 'approve'
+    : updates.has('needed') ? 'update-needed'
+    : updates.has('reload') ? 'reload-app'
+    : updates.has('available') ? 'update-available'
     : ready.length ? 'connected'
     : conns.some(c => c.unknown) ? 'unpaired-remote'
     : conns.some(c => c.welcomed) ? 'waiting-agent'
@@ -29861,6 +29941,28 @@ function _refreshBridgeStatus() {
     : _bridgePermWaiting ? 'waiting-permission'
     : 'waiting-server';
   _setBridgeStatus(state, clients, agents);
+  _maybeBridgeUpdateToast();
+}
+
+// Once per server release per device, while the tab is in front: a toast with
+// the one action for the install (mcp-updates.md 5.2, row 1). Device-local.
+// Another toast on screen ("Paired with ...") is let finish first.
+const BRIDGE_UPDATE_TOAST_KEY = 'zenit-week-bridge-update-toast';
+let _bridgeUpdateToastTimer = null;
+function _maybeBridgeUpdateToast() {
+  const { state, agents } = bridgeStatus;
+  if ((state !== 'update-needed' && state !== 'update-available') || !_bridgeVisible()) return;
+  if (_toast.classList.contains('visible')) {
+    clearTimeout(_bridgeUpdateToastTimer);
+    _bridgeUpdateToastTimer = setTimeout(_maybeBridgeUpdateToast, 2500);
+    return;
+  }
+  try {
+    if (localStorage.getItem(BRIDGE_UPDATE_TOAST_KEY) === BRIDGE_SERVER_LATEST) return;
+    localStorage.setItem(BRIDGE_UPDATE_TOAST_KEY, BRIDGE_SERVER_LATEST);
+  } catch (_) { return; } // without storage it would come back on every connect
+  const key = bridgeUpdateHintKey(agents).replace('bridge.state.update-server', 'bridge.toast.update');
+  showToast(t(key, { version: BRIDGE_SERVER_LATEST }), 10000, { agent: true });
 }
 
 function startBridgeWhenIdle() {
@@ -29911,7 +30013,7 @@ function _openBridgeSocket(port) {
   }
   const conn = {
     port, ws, opened: false, welcomed: false, ready: false, unknown: false,
-    client: null, install: null, serverNonce: null, pageNonce: _randomB64(32),
+    client: null, install: null, version: null, serverNonce: null, pageNonce: _randomB64(32),
   };
   _bridgeConns.set(port, conn);
 
@@ -29986,6 +30088,7 @@ async function _onBridgeWelcome(conn, frame) {
   conn.welcomed = true;
   conn.client = typeof frame.client === 'string' ? frame.client.slice(0, 80) : null;
   conn.install = frame.install === 'mcpb' || frame.install === 'npx' ? frame.install : 'repo';
+  conn.version = _bridgeVersionOf(frame.version); // null from a server before 1.2.0
   conn.serverNonce = frame.nonce.slice(0, 64);
   const rec = loadBridgeRecord();
   if (frame.paired && rec.key) {
@@ -30019,7 +30122,7 @@ async function _sendBridgeReady(conn, keyB64) {
   const proof = await bridgeHmac(keyB64, `page|${conn.serverNonce}`);
   try {
     conn.ws.send(JSON.stringify({
-      type: 'ready', proof, tabId: TAB_ID, appVersion: APP_VERSION,
+      type: 'ready', proof, tabId: TAB_ID, appVersion: APP_VERSION, serverLatest: BRIDGE_SERVER_LATEST,
       week: currentWeekKey, lang: currentLang, visible: _bridgeVisible(),
     }));
   } catch (_) { return; }
@@ -30349,7 +30452,7 @@ function _hookBridgeWindowEvents() {
   document.addEventListener('visibilitychange', () => {
     const visible = _bridgeVisible();
     _bridgeSendPresence(visible ? 'focus' : 'pause');
-    if (visible) _bridgeScanOnFocus();
+    if (visible) { _bridgeScanOnFocus(); _maybeBridgeUpdateToast(); }
   });
   // Another tab of this site paired, unpaired or turned the switch: follow it.
   window.addEventListener('storage', e => {
@@ -30377,7 +30480,7 @@ function bridgeHandleCall(frame, conn) {
   const { id, tool } = frame;
   const reply = f => _bridgeSendTo(conn, f);
   const def = Object.prototype.hasOwnProperty.call(BRIDGE_TOOLS, tool) ? BRIDGE_TOOLS[tool] : null;
-  if (!def) { reply({ type: 'result', id, ok: false, error: { code: 'unknown_tool', message: String(tool) } }); return Promise.resolve(); }
+  if (!def) { reply({ type: 'result', id, ok: false, error: { code: 'unknown_tool', message: bridgeUnknownToolMessage(tool, conn) } }); return Promise.resolve(); }
   const run = () => bridgeRunTool(tool, frame.args)
     .then(data => reply({ type: 'result', id, ok: true, data }))
     .catch(err => reply({ type: 'result', id, ok: false, error: {

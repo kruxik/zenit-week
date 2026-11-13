@@ -5,7 +5,7 @@
 import { describe, test, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  nextMinorVersion, planMcpVersion, withVersion, MCP_RELEASE_FILES, MCP_VERSION_FILES,
+  nextMinorVersion, planMcpVersion, withVersion, withServerLatest, SERVER_LATEST_RE, MCP_RELEASE_FILES, MCP_VERSION_FILES,
 } from '../scripts/release.mjs';
 
 const root = new URL('..', import.meta.url);
@@ -46,6 +46,22 @@ describe('agent server version at release', () => {
   test('package and extension carry the same version today', () => {
     expect(JSON.parse(read('mcp/manifest.json')).version).toBe(JSON.parse(read('mcp/package.json')).version);
     expect(JSON.parse(read('mcp/package-lock.json')).version).toBe(JSON.parse(read('mcp/package.json')).version);
+  });
+});
+
+describe('the page knows the latest server (mcp-updates.md 5.1)', () => {
+  test('BRIDGE_SERVER_LATEST equals the mcp/package.json version', () => {
+    const m = SERVER_LATEST_RE.exec(read('zenit-week.html'));
+    expect(m, 'BRIDGE_SERVER_LATEST in zenit-week.html').toBeTruthy();
+    expect(m[1], 'run npm run release, or set BRIDGE_SERVER_LATEST to the mcp/package.json version').toBe(JSON.parse(read('mcp/package.json')).version);
+  });
+
+  test('release rewrites only that line', () => {
+    const html = read('zenit-week.html');
+    const next = withServerLatest(html, '9.8.7');
+    expect(SERVER_LATEST_RE.exec(next)[1]).toBe('9.8.7');
+    expect(withServerLatest(next, SERVER_LATEST_RE.exec(html)[1])).toBe(html);
+    expect(() => withServerLatest('nothing here', '1.0.0')).toThrow();
   });
 });
 

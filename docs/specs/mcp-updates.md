@@ -1,6 +1,6 @@
 # MCP updates - new features reach every user, nothing goes stale silently
 
-Status: plan, 2026-11-13. Extends `agent-bridge.md` (sections 8, 9) and `agent-bridge-setup.md` (sections 3, 4.5, 4.6).
+Status: plan, 2026-11-13. Step 1 (section 5) implemented 2026-11-13; `update-needed` waits for the manifest's `minServer` (step 2). Extends `agent-bridge.md` (sections 8, 9) and `agent-bridge-setup.md` (sections 3, 4.5, 4.6).
 
 ## 1. Objective
 

@@ -83,6 +83,36 @@ export function parseExtraOrigin(value) {
 // connection is a mutual HMAC proof with that key; the key never crosses the
 // socket.
 export const PROTOCOL = 2;
+
+// ── Server version (docs/specs/mcp-updates.md section 5) ──
+// The server names its version in `welcome`; the page names the latest
+// released one in `ready` (BRIDGE_SERVER_LATEST), so both sides can say when
+// this server is behind and what the user does about it.
+const SEMVER = /^(\d{1,6})\.(\d{1,6})\.(\d{1,6})$/;
+export const isVersion = v => typeof v === 'string' && SEMVER.test(v);
+// -1, 0 or 1; a missing or malformed version is older than any real one.
+export function compareVersions(a, b) {
+  const pa = isVersion(a) ? a.split('.').map(Number) : null;
+  const pb = isVersion(b) ? b.split('.').map(Number) : null;
+  if (!pa || !pb) return pa ? 1 : pb ? -1 : 0;
+  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  return 0;
+}
+export const DESKTOP_EXTENSION_URL = 'https://github.com/kruxik/zenit-week/releases/latest/download/zenit-week.mcpb';
+// What the user does to update, by install path, worded for the agent to pass on.
+export const UPDATE_ACTIONS = Object.freeze({
+  npx: 'restart your agent app; it fetches the new server on start',
+  mcpb: `download the new Zenit Week extension for Claude Desktop (${DESKTOP_EXTENSION_URL}) and open it`,
+  repo: 'pull the Zenit Week repository and restart your agent app',
+});
+// The one-time note for the first result of a session when this server is
+// older than the latest release the page knows; null when it is not.
+export function updateNote({ version, latest, install }) {
+  if (!isVersion(latest) || compareVersions(version, latest) >= 0) return null;
+  const action = UPDATE_ACTIONS[install] || UPDATE_ACTIONS.npx;
+  return `This Zenit Week server is ${isVersion(version) ? version : 'an older version'}; ${latest} is out. `
+    + `Tell the user, in your reply, to update it: ${action}. Everything keeps working meanwhile, but new features need the update.`;
+}
 export const PAIR_TIMEOUT_MS = 120000;     // from the moment the dialog is shown
 export const PAIR_UNSHOWN_MAX_MS = 600000; // a dialog that waits behind the user's editing
 const PAIR_INFO = 'zenit-week pairing v2';
@@ -265,13 +295,14 @@ class Tab {
     this.timer = null;
     this.nonce = null;      // the server's nonce of this connection
     this.pairingId = null;  // the pairing this tab proved
+    this.serverLatest = null; // the latest server version the page knows
   }
   get ready() { return this.state === 'ready'; }
 }
 
 export class Relay {
   constructor({
-    pairings = memoryPairings(), clientName = () => null, install = 'npx',
+    pairings = memoryPairings(), clientName = () => null, install = 'npx', version = null,
     onWeekSaved = () => {}, now = () => Date.now(), log = () => {},
   } = {}) {
     this.pairings = pairings;
@@ -286,6 +317,7 @@ export class Relay {
     this.writes = [];
     this.tabWaiters = new Set();
     this.pairing = null; // the one open pairing of this server
+    this.version = isVersion(version) ? version : null;
   }
 
   // A socket that already passed the origin check.
@@ -319,7 +351,7 @@ export class Relay {
     tab.state = 'open';
     tab.nonce = b64(crypto.randomBytes(32));
     this._seen(tab, !!f.visible, !!f.focused);
-    const welcome = { type: 'welcome', protocol: PROTOCOL, install: this.install, client: this.clientName() || null, nonce: tab.nonce, paired: false };
+    const welcome = { type: 'welcome', protocol: PROTOCOL, install: this.install, version: this.version, client: this.clientName() || null, nonce: tab.nonce, paired: false };
     const entry = typeof f.pairingId === 'string' ? this.pairings.get(tab.origin) : null;
     if (entry && entry.pairingId === f.pairingId && typeof f.nonce === 'string' && NONCE.test(f.nonce)) {
       welcome.paired = true;
@@ -354,6 +386,9 @@ export class Relay {
     this.pairings.touch?.(tab.origin, new Date(this.now()).toISOString());
     tab.id = String(f.tabId || '');
     tab.week = f.week || null;
+    // The latest server release the page knows (mcp-updates.md 5.1); an older
+    // page sends none.
+    tab.serverLatest = isVersion(f.serverLatest) ? f.serverLatest : null;
     this._seen(tab, !!f.visible, !!f.visible);
     this.log(`tab ${tab.id} connected (week ${tab.week})`);
     this._wakeTabWaiters();
