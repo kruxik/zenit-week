@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-z4/GfF+OmnHkFRo6uyZM4U0Lyb6dbUZ8qUGQx5hI2tU=';
+               'sha256-c4Q/1LmaQmJWlvdRYja6KtomTS+mIy/B4WnnqSeoL0o=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -17927,15 +17927,18 @@ function animateViewTo(targetZoom, targetPanX, targetPanY, duration, onDone) {
   requestAnimationFrame(step);
 }
 
-// Agenda's "Find in mindmap": show the map, zoom in on the task and pulse it
-// with the tips' ring. A lone day leaf is drawn on its task, so the task is the
-// target; a filter that prunes the target away is cleared first.
+// Agenda's "Find in mindmap" and the agent's show_task: show the map of the
+// record in view (the Mindmap for a week, the Vision for an intention), zoom in
+// on the node and pulse it with the tips' ring. A lone day leaf is drawn on its
+// task, so the task is the target; a filter that prunes the target away is
+// cleared first.
 function findInMindmap(nodeId) {
   let node = findNode(nodeId);
   if (!node) return;
   if (isHiddenDayLeaf(node)) node = findNode(node.parent) || node;
   const id = node.id;
-  if (currentView !== 'mindmap') switchView('mindmap');
+  const mapView = isVisionInView() ? 'vision' : 'mindmap';
+  if (currentView !== mapView) switchView(mapView);
   let positions = computeLayout();
   if (!positions[id] || nodeGroupEl(id)?.classList.contains('view-hidden')) {
     if (clearMapFilters()) renderIfVisible();
@@ -30537,6 +30540,44 @@ async function _bridgeResolveRecord(args) {
     : `${hit} is on the Vision, but week ${currentWeekKey} is in view; call open_vision first`);
 }
 
+// show_task: brings the record that holds `id` into view. The record in view
+// wins; then a named week; then the other record (the Vision behind a week,
+// the week behind the Vision); then the stored weeks, newest first.
+async function _bridgeOpenRecordOf(id, week) {
+  const has = rec => !!(rec && Array.isArray(rec.nodes) && rec.nodes.some(n => n.id === id && n.type !== 'center'));
+  if (week !== undefined) {
+    const wk = _bridgeWeekKey(week);
+    if (!has(await _bridgeWeekRecord(wk))) throw new BridgeError('not_found', `no node ${id} in week ${wk}`);
+    if (wk !== currentWeekKey) await loadAndRender(wk);
+    else if (isVisionInView()) await switchView('mindmap');
+    return;
+  }
+  if (findNode(id) && findNode(id).type !== 'center') return;
+  if (isVisionInView()) {
+    if (has(await loadWeekIDB(currentWeekKey))) { await switchView('mindmap'); return; }
+  } else if (has(await loadVision())) {
+    await switchView('vision');
+    return;
+  }
+  const keys = (await listWeekKeysIDB()).filter(k => /^\d{4}-\d{2}$/.test(k) && k !== currentWeekKey).sort().reverse();
+  for (const wk of keys) {
+    if (has(await loadWeekIDB(wk))) { await loadAndRender(wk); return; }
+  }
+  throw new BridgeError('not_found', `no node ${id} in the Vision or any stored week`);
+}
+
+// The browser's application name, for the server's fallback when it cannot
+// tell which application owns the page's socket (Safari's runs outside it).
+function _bridgeBrowserHint() {
+  const ua = navigator.userAgent || '';
+  if (/Edg\//.test(ua)) return 'Microsoft Edge';
+  if (/OPR\//.test(ua)) return 'Opera';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  if (/Chrome\//.test(ua)) return 'Google Chrome';
+  if (/Safari\//.test(ua)) return 'Safari';
+  return null;
+}
+
 // ── Argument helpers ──
 function _bridgeNode(id, ...types) {
   if (typeof id !== 'string' || !id) throw _bridgeBad('id is required');
@@ -30787,6 +30828,25 @@ const BRIDGE_TOOLS = {
     async run() {
       if (!isVisionInView()) await switchView('vision');
       return projectVision(weekData);
+    },
+  },
+
+  show_task: {
+    async: true, args: ['id', 'week'],
+    // "Show me": opens whichever record holds the node (this week, the Vision,
+    // the week named, else the newest stored week that has it), then zooms the
+    // map in on it and pulses it. Navigation, no undo entry. The server brings
+    // the browser to the front; `browser` is its fallback hint for that.
+    async run({ id, week }) {
+      if (typeof id !== 'string' || !id || id === 'center') throw _bridgeBad('id is required');
+      await _bridgeOpenRecordOf(id, week);
+      findInMindmap(id);
+      const node = findNode(id);
+      return {
+        shown: id, label: node.label,
+        record: isVisionInView() ? 'vision' : currentWeekKey,
+        browser: _bridgeBrowserHint(),
+      };
     },
   },
 

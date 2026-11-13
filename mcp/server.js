@@ -14,7 +14,7 @@
 // can run its own; the page connects to all of them.
 //
 // stdout belongs to the MCP protocol: everything human-readable goes to stderr.
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
@@ -24,8 +24,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import {
   BUILT_IN_SITES, OPEN_WAIT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError,
-  addOrigin, appMatches, appName, filePairings, formatPairCode, isAllowedOrigin, lastUsedSite,
-  listenOnFirstFreePort, matchSite, pairingsPath, readOrigins, removeOrigin, routeWarning, urisForWeekSaved,
+  addOrigin, appBundleOf, appMatches, browserHint, appName, filePairings, formatPairCode, isAllowedOrigin, lastUsedSite,
+  listenOnFirstFreePort, matchSite, pairingsPath, peerPidFromLsof, readOrigins, removeOrigin, routeWarning, urisForWeekSaved,
 } from './core.js';
 
 const { version: VERSION } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
@@ -88,6 +88,7 @@ const mcp = new McpServer(
       'Read zenit://week/current (or call get_stats) first to learn branch and task ids. Use open_week to switch weeks before writing to another week.',
       'Before proposing what a week should carry, read zenit://vision: the user\'s long view, a mind map of intentions (branches are life areas, comments say why). The Vision has no days, ticks or done; an intention can be let go (set_status dropped) and taken back (undone), and has an optional horizon (set_horizon).',
       'The node tools act on the record in view: call open_vision before writing to an intention and open_week to come back. An id from the other record answers not_in_view.',
+      'When the user asks to see something ("show me"), call show_task with its id: it brings the browser forward, opens the right week or the Vision and pulses the item.',
       'Days are ISO weekdays: 1 = Monday ... 7 = Sunday. A label ending in "Nx" (e.g. "Pushups 10x") makes N ticks recorded with tick_task; days and Nx do not combine.',
       'Never put relative days (today, tomorrow) in labels: pass days instead.',
       'The first request may answer that Zenit Week is not connected yet and give a code: tell the user that code, ask them to check it matches the one shown in Zenit Week and click Allow there, and call again only after they confirm.',
@@ -178,7 +179,27 @@ async function forward(tool, args, app = null) {
   const tab = relay.pickTab(app);
   const data = await relay.call(tool, args, { app });
   const name = tab ? appName(tab.origin) : null;
-  return { app: name, warning: app ? null : routeWarning(relay.openApps(), name), data };
+  return { app: name, warning: app ? null : routeWarning(relay.openApps(), name), data, tab };
+}
+
+const run = (cmd, args) => new Promise(resolve => {
+  execFile(cmd, args, { timeout: 3000 }, (e, stdout) => resolve(e ? null : String(stdout)));
+});
+
+// show_task: the browser holding the tab comes to the front. macOS only: the
+// application that owns the tab's socket, else the page's hint by name (Safari
+// runs its sockets outside Safari.app). Says whether it could.
+async function raiseBrowser(tab, hint) {
+  if (process.platform !== 'darwin') return false;
+  let bundle = null;
+  if (tab && tab.peerPort) {
+    const lsof = await run('lsof', ['-nP', `-iTCP:${tab.peerPort}`, '-sTCP:ESTABLISHED', '-Fp']);
+    const pid = lsof && peerPidFromLsof(lsof, process.pid);
+    if (pid) bundle = appBundleOf(await run('ps', ['-o', 'comm=', '-p', String(pid)]));
+  }
+  const target = bundle || browserHint(hint);
+  if (!target) return false;
+  return (await run('open', ['-a', target])) !== null;
 }
 
 // Every result carries `app` (setup spec section 6, row 6), plus the warning
@@ -197,12 +218,14 @@ const asError = e => ({
 const appArg = z.string().optional()
   .describe('Which app: "Zenit Week" or a host name such as abc.ngrok-free.app (see zenit://apps). Default: the focused tab.');
 
-function tool(name, description, shape, annotations = {}) {
+// `after` runs server-side work on a page result before it is returned.
+function tool(name, description, shape, annotations = {}, after = null) {
   mcp.registerTool(name, { description, inputSchema: { ...shape, app: appArg }, annotations }, async args => {
     try {
       const { app, ...rest } = args || {};
       const out = await forward(name, rest, app || null);
-      return out instanceof Notice ? { content: [{ type: 'text', text: out.text }] } : asText(labelled(out));
+      if (out instanceof Notice) return { content: [{ type: 'text', text: out.text }] };
+      return asText(labelled(after ? await after(out) : out));
     } catch (e) { return asError(e); }
   });
 }
@@ -214,6 +237,12 @@ const readOnly = { readOnlyHint: true };
 tool('open_week', 'Show a week in the app (navigation, not an undo step); also leaves the Vision. Required before writing to a week other than the one in view. Creates the week if absent. Returns the week.',
   { week: z.string().regex(/^\d{4}-\d{2}$/).describe('ISO week key YYYY-WW') });
 tool('open_vision', 'Show the Vision (the long-view mind map) in the app: navigation, not an undo step. Required before writing to an intention. Returns the vision.', {});
+tool('show_task', 'Show the user a task, intention or branch, when they say "show me": brings the browser to the front, opens the record that holds it (the week in view, the Vision, the week given, else the newest stored week with it), zooms the map in and pulses it. Navigation, not an undo step. "raised": false means the browser could not be brought forward; ask the user to switch to it.',
+  { id: z.string().describe('Node id: a task, intention or branch'), week: z.string().regex(/^\d{4}-\d{2}$/).optional().describe('ISO week key YYYY-WW, when the id is in a week not in view') },
+  {}, async out => {
+    const { browser, ...data } = out.data || {};
+    return { ...out, data: { ...data, raised: await raiseBrowser(out.tab, browser) } };
+  });
 tool('add_task', 'Add a task to the week in view, or an intention to the Vision when it is in view (no days, no Nx there). A label like "Pushups 10x" makes 10 ticks on a week. Pass days for weekdays; never "today"/"tomorrow" in a week label. Returns the new task.',
   {
     branch: z.string().describe('Branch id or its exact name'),
@@ -320,6 +349,7 @@ if (!bound) {
 const { port: PORT, server: wss } = bound;
 wss.on('connection', (ws, req) => {
   const tab = relay.onOpen(ws, req.headers.origin);
+  tab.peerPort = req.socket.remotePort; // show_task finds the browser by it
   ws.on('message', data => relay.onMessage(tab, data.toString()));
   ws.on('close', () => relay.onClose(tab));
   ws.on('error', () => {});

@@ -6,7 +6,7 @@ import {
   Relay, isAllowedOrigin, parseExtraOrigin, urisForWeekSaved, urisForVisionSaved, READ_TOOLS, hmacB64, memoryPairings, filePairings,
   matchSite, listenOnFirstFreePort, formatPairCode, PORTS, PORT_MIN, PORT_MAX, PROTOCOL,
   appName, appMatches, routeWarning, readOrigins, addOrigin, removeOrigin, lastUsedSite,
-  HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN, PAIR_TIMEOUT_MS,
+  HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN, PAIR_TIMEOUT_MS, appBundleOf, peerPidFromLsof, browserHint,
 } from '../mcp/core.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -480,5 +480,26 @@ describe('Claude Desktop extension (setup spec section 3.2)', () => {
     const { BUNDLE_FILES } = await import('../scripts/mcp-bundle.mjs');
     for (const f of BUNDLE_FILES) expect(fs.existsSync(new URL(f.from, root)), f.from).toBe(true);
     expect(BUNDLE_FILES.map(f => f.to)).toEqual(expect.arrayContaining(['manifest.json', manifest.server.entry_point, 'core.js', manifest.icon]));
+  });
+});
+
+// show_task brings the browser forward: the process at the other end of the
+// tab's socket, and the application bundle around it.
+describe('show_task: which browser to raise', () => {
+  test('the peer pid is the first one that is not ours', () => {
+    expect(peerPidFromLsof('p500\nf12\np812\nf40\n', 500)).toBe(812);
+    expect(peerPidFromLsof('p500\n', 500)).toBeNull();
+    expect(peerPidFromLsof('', 1)).toBeNull();
+  });
+  test('the outermost .app around the executable', () => {
+    expect(appBundleOf('/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Helpers/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper\n'))
+      .toBe('/Applications/Google Chrome.app');
+    expect(appBundleOf('/Applications/Firefox.app/Contents/MacOS/firefox')).toBe('/Applications/Firefox.app');
+    expect(appBundleOf('/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking')).toBeNull();
+    expect(appBundleOf(null)).toBeNull();
+  });
+  test('the page hint reaches open -a only when it is a known browser', () => {
+    expect(browserHint('Safari')).toBe('Safari');
+    for (const bad of ['-n', '/Applications/Terminal.app', 'Terminal', '', null, 42]) expect(browserHint(bad)).toBeNull();
   });
 });

@@ -1098,6 +1098,54 @@ describe('vision', () => {
     const ev = ws.sent.filter(f => f.type === 'event' && f.event === 'week-saved');
     expect(ev.map(f => f.wk)).toEqual(['vision']);
   });
+
+  // show_task ("show me"): opens the record holding the node, no undo entry.
+  test('show_task on a task in view stays on the week, with no undo entry', async () => {
+    const task = _state.get().nodes.find(n => n.type === 'branch');
+    const r = await call('show_task', { id: task.id });
+    expect(r).toMatchObject({ shown: task.id, record: WK });
+    expect(_state.getMapKind()).toBe('week');
+    expect(_state.getCurrentView()).toBe('mindmap');
+    expect(_state.getUndoStack()).toHaveLength(0);
+  });
+
+  test('show_task on an intention opens the Vision; from the Vision a week task comes back', async () => {
+    const weekBranch = _state.get().nodes.find(n => n.type === 'branch').id;
+    const r = await call('show_task', { id: 'nv1' });
+    expect(r).toMatchObject({ shown: 'nv1', record: 'vision', label: 'Live by the sea' });
+    expect(_state.getMapKind()).toBe('vision');
+    expect(_state.getCurrentView()).toBe('vision');
+    expect(visionUndo()).toBe(0);
+    const back = await call('show_task', { id: weekBranch });
+    expect(back.record).toBe(WK);
+    expect(_state.getMapKind()).toBe('week');
+  });
+
+  test('show_task from the Agenda goes to the Mindmap', async () => {
+    _state.setCurrentView('agenda');
+    const task = _state.get().nodes.find(n => n.type === 'branch');
+    await call('show_task', { id: task.id });
+    expect(_state.getCurrentView()).toBe('mindmap');
+  });
+
+  test('show_task finds a node in another stored week, or with week given', async () => {
+    const other = '2026-40';
+    const week = defaultWeekData();
+    const b = week.nodes.find(n => n.type === 'branch');
+    week.nodes.push({ id: 'old1', type: 'activity', branch: b.branch, parent: b.id, label: 'Old', children: [], _ts: 1 });
+    b.children.push('old1');
+    await sandbox.saveWeekIDB(other, week);
+    expect((await call('show_task', { id: 'old1' })).record).toBe(other);
+    expect(_state.getWeekKey()).toBe(other);
+    await call('open_week', { week: WK });
+    expect((await call('show_task', { id: 'old1', week: other })).record).toBe(other);
+  });
+
+  test('show_task on an unknown id, or one missing from the week given, answers not_found', async () => {
+    await expect(codeOf(call('show_task', { id: 'nope' }))).resolves.toBe('not_found');
+    await expect(codeOf(call('show_task', { id: 'nv1', week: WK }))).resolves.toBe('not_found');
+    await expect(codeOf(call('show_task', {}))).resolves.toBe('bad_args');
+  });
 });
 
 describe('agent add commands follow the site', () => {

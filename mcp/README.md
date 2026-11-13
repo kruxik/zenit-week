@@ -113,6 +113,7 @@ The Vision is the user's long view: a mind map of intentions, with life areas as
 |---|---|
 | `open_week` | Shows a week in the app, creating it if absent. Also leaves the Vision. |
 | `open_vision` | Shows the Vision. Required before writing to an intention. |
+| `show_task` | "Show me": brings the browser to the front (macOS), opens the week or the Vision holding the task, zooms in on it and pulses it. |
 | `add_task` | Adds a task to a branch, optionally under a parent, with days, priority and a comment. A label like "Pushups 10x" makes 10 ticks. |
 | `rename_task` | Renames a task. |
 | `set_status` | Marks a task done, undone, dropped, unplanned or planned. On the Vision only dropped (let go) and undone (take back). |

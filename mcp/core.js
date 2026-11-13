@@ -572,6 +572,30 @@ export class Relay {
 }
 
 // The resource URIs a vision save touches.
+// show_task brings the browser to the front (macOS). The page's socket is the
+// way to the browser: lsof names the process at the other end of it, and the
+// outermost .app around that process's executable is the browser to activate.
+// `lsof -F pn` output -> the first pid other than ours.
+export function peerPidFromLsof(out, ownPid) {
+  for (const line of String(out).split('\n')) {
+    if (!line.startsWith('p')) continue;
+    const pid = Number(line.slice(1));
+    if (Number.isInteger(pid) && pid > 0 && pid !== ownPid) return pid;
+  }
+  return null;
+}
+
+// "/Applications/Google Chrome.app/Contents/Frameworks/.../Helper" ->
+// "/Applications/Google Chrome.app"; null outside an application bundle.
+export function appBundleOf(execPath) {
+  const m = /^(\/.*?\.app)(?:\/|$)/.exec(String(execPath || '').trim());
+  return m ? m[1] : null;
+}
+
+// The page's browser hint is untrusted: only these names reach `open -a`.
+export const BROWSER_HINTS = Object.freeze(['Google Chrome', 'Microsoft Edge', 'Opera', 'Firefox', 'Safari']);
+export const browserHint = hint => (BROWSER_HINTS.includes(hint) ? hint : null);
+
 export function urisForVisionSaved() {
   return ['zenit://vision'];
 }
