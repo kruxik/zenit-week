@@ -1,6 +1,6 @@
 # MCP updates - new features reach every user, nothing goes stale silently
 
-Status: plan, 2026-11-13. Steps 1 (section 5) and 2 (section 3) implemented 2026-11-13; both ship as server 1.2.0, so `minServer` is 1.2.0. The baseline (`mcp/baseline-manifest.json`) is rewritten by `npm run mcp:baseline` and does not by itself make a server release. Extends `agent-bridge.md` (sections 8, 9) and `agent-bridge-setup.md` (sections 3, 4.5, 4.6).
+Status: plan, 2026-11-13. Steps 1 (section 5) and 2 (section 3) implemented 2026-11-13, step 3 prepared (section 4.1); both ship as server 1.2.0, so `minServer` is 1.2.0. The baseline (`mcp/baseline-manifest.json`) is rewritten by `npm run mcp:baseline` and does not by itself make a server release. Extends `agent-bridge.md` (sections 8, 9) and `agent-bridge-setup.md` (sections 3, 4.5, 4.6).
 
 ## 1. Objective
 
@@ -89,6 +89,16 @@ The manifest is additive on the wire: an older page sends none, and the server f
 
 Directory prerequisites to check before submitting: privacy policy (exists), icon, annotations on every tool (`readOnlyHint` / `destructiveHint`), a support link, and the review time per update (which section 3 makes rare).
 
+### 4.1 Findings (2026-11-13)
+
+| # | Item | Finding |
+|---|---|---|
+| 1 | npx `@1` | npm 12 revalidates the `zenit-week-mcp` registry entry on every start (`--loglevel=http` shows `GET 200 ... (cache revalidated)`), and the npx cache moved from 1.0.0 to 1.1.0 on its own. The documented command stays; a new 1.x arrives on the next agent start. Offline, the cached copy runs. |
+| 2 | Extension manifest | `tools_generated: true` and `privacy_policies` (`https://zenitweek.com/privacy`, which has section 2.3 on AI agents) added; `mcpb validate` passes the schema. The `tools` list stays as the declared baseline, kept equal to `baseline-manifest.json` by a test. |
+| 3 | Annotations | Every tool carries `readOnlyHint`; the two deletes carry `destructiveHint: true`, other writes `false`, navigation `idempotentHint: true`. |
+| 4 | Icon, support link | Both exist (`assets/icon-512.png` bundled as `icon.png`, the GitHub issues link). |
+| 5 | Left to do | Submitting the extension is the owner's step. Once listed, the Settings guide and the setup guide link to the listing instead of the file, and the extension update hint becomes "updates itself" for directory installs. |
+
 ## 5. Option 3 - never fail silently
 
 ### 5.1 Handshake
@@ -151,7 +161,7 @@ Step 1 comes first so the step 2 server reaches people.
 
 | # | Question | Default if unanswered |
 |---|---|---|
-| 1 | Does npx re-resolve `@1` on each start or reuse its cache? | Verify in step 3; adjust the documented command if needed |
+| 1 | Does npx re-resolve `@1` on each start or reuse its cache? | Answered in 4.1, row 1: it re-resolves |
 | 2 | Directory review: time per update and listing requirements | Submit after step 2, when updates become rare |
 | 3 | Should the map toast also appear for `update-available` (soft), or only for `update-needed`? | Both, once per version; soft is still a real update |
 | 4 | Do other agent apps (Cursor, Zed, others) honour `list_changed`? | Restart note of 3.4 row 4 covers them |

@@ -462,6 +462,16 @@ describe('Claude Desktop extension (setup spec section 3.2)', () => {
     expect(manifest.user_config).toBeUndefined(); // dev sites go through `origins add`, one way for every install
   });
 
+  test('directory-ready: tools come from the app, a privacy policy and a support link (mcp-updates.md section 4)', () => {
+    expect(manifest.tools_generated).toBe(true);
+    expect(manifest.privacy_policies).toEqual(['https://zenitweek.com/privacy']);
+    expect(read('privacy.html')).toContain('AI agents (only if you turn them on)');
+    expect(manifest.support).toMatch(/^https:\/\//);
+    const baseline = JSON.parse(read('mcp/baseline-manifest.json'));
+    for (const t of baseline.tools) expect(typeof t.annotations.readOnlyHint, t.name).toBe('boolean');
+    for (const name of ['delete_task', 'delete_branch']) expect(baseline.tools.find(t => t.name === name).annotations.destructiveHint, name).toBe(true);
+  });
+
   test('same version as the npm package', () => {
     expect(manifest.version).toBe(JSON.parse(read('mcp/package.json')).version);
   });
