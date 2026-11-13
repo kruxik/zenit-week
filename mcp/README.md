@@ -62,6 +62,10 @@ For working on the server itself, run it from a clone instead of npm:
    For another client, the command is `node /path/to/zenit-week/mcp/server.js`.
 3. Continue with step 2 above.
 
+## Updates
+
+The tools your agent sees come from the Zenit Week app itself: when the app adds one, your agent gets it after the app updates, without a new server. Some agent apps pick up new tools only when they restart; the agent then says so. The server itself changes rarely. When it does, Zenit Week shows a note once, Settings > AI says how to update for your install, and the agent mentions it in its first reply.
+
 ## Commands and options
 
 `zenit-week-mcp` below stands for `npx -y zenit-week-mcp@1` (or `node server.js` in a clone).

@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-3r0hYtX/b2gk2uLYjZY88xfVn2GaTKz6R/lb95JuOto=';
+               'sha256-HfCTw8fgTi+lKVcA1/ykDOkNc9BGP17CggH1QTSG2JQ=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -29696,7 +29696,7 @@ const BRIDGE_PROTOCOL = 2; // mcp/core.js PROTOCOL
 // The latest agent server release (mcp/package.json version). `npm run release`
 // writes it; tests/release-mcp.test.js fails when it lags. Sent in `ready`, so
 // an older server can tell its agent to update (docs/specs/mcp-updates.md 5).
-const BRIDGE_SERVER_LATEST = '1.1.0';
+const BRIDGE_SERVER_LATEST = '1.2.0';
 const BRIDGE_HOST = '127.0.0.1';
 const BRIDGE_PERMISSION_HINT_MS = 10000;
 const BRIDGE_BACKOFF_MIN_MS = 1000;
@@ -29833,7 +29833,7 @@ function bridgeCompareVersions(a, b) {
   return 0;
 }
 // A connected server against what this page knows: 'needed' below the
-// manifest's minServer (the manifest arrives in step 2 of the spec),
+// manifest's minServer (it cannot register the tools this app defines),
 // 'available' below the latest release, 'reload' when the page is the older
 // side, null when it is current.
 function bridgeServerVerdict(version, { minServer = null, latest = BRIDGE_SERVER_LATEST } = {}) {
@@ -29920,7 +29920,8 @@ function _refreshBridgeStatus() {
   const agents = [
     ...ready.map(c => ({
       port: c.port, client: c.client || '', state: 'connected',
-      version: c.version, install: c.install, update: bridgeServerVerdict(c.version),
+      version: c.version, install: c.install,
+      update: bridgeServerVerdict(c.version, { minServer: BRIDGE_MANIFEST_MIN_SERVER }),
     })),
     ...old.map(([port, n]) => ({ port, client: '', state: 'old', install: n.install })),
   ].sort((a, b) => a.port - b.port);
@@ -30130,6 +30131,8 @@ async function _sendBridgeReady(conn, keyB64) {
   conn.unknown = false;
   _bridgeAttempts = 0;
   _refreshBridgeStatus();
+  // The tools this app offers; a server before 1.2.0 ignores the frame.
+  try { conn.ws.send(JSON.stringify(await _bridgeManifestFrame())); } catch (_) { /* socket closing */ }
 }
 
 // ── Per-agent access ──
@@ -31291,6 +31294,131 @@ const BRIDGE_TOOLS = {
     },
   },
 };
+
+// ── Manifest: the tools an agent sees (docs/specs/mcp-updates.md section 3) ──
+// The server registers whatever this says, so a tool ships with the app: add
+// it to BRIDGE_TOOLS and describe it here, in one release. Sent after `ready`.
+// mcp/baseline-manifest.json is this manifest as the server bundles it for
+// its first start; `npm run mcp:baseline` rewrites it, a test fails on drift.
+// The lowest server that reads a manifest and has every hook named below.
+const BRIDGE_MANIFEST_MIN_SERVER = '1.2.0';
+const BRIDGE_INSTRUCTIONS = [
+  'Zenit Week is a weekly planner shown as a mind map: branches (categories) hold tasks, tasks may hold sub-tasks.',
+  'All writes act on the week open in the app, exactly as if the user clicked; each call is one undo step and shows the user a toast.',
+  'Read zenit://week/current (or call get_stats) first to learn branch and task ids. Use open_week to switch weeks before writing to another week.',
+  'Before proposing what a week should carry, read zenit://vision: the user\'s long view, a mind map of intentions (branches are life areas, comments say why). The Vision has no days, ticks or done; an intention can be let go (set_status dropped) and taken back (undone), and has an optional horizon (set_horizon).',
+  'The node tools act on the record in view: call open_vision before writing to an intention and open_week to come back. An id from the other record answers not_in_view.',
+  'To learn what the user finished (the last task done, what got done today), read the done group of zenit://agenda/{day}: one row per task or tick the user closed, oldest first, each with its doneAt. Do not sort the week by doneAt: a parent closed by its children rolling up carries a doneAt of its own but was not closed by the user.',
+  'When the user asks to see something ("show me"), call show_task with its id: it brings the browser forward, opens the right week or the Vision and pulses the item.',
+  'Days are ISO weekdays: 1 = Monday ... 7 = Sunday. A label ending in "Nx" (e.g. "Pushups 10x") makes N ticks recorded with tick_task; days and Nx do not combine.',
+  'Never put relative days (today, tomorrow) in labels: pass days instead.',
+  'The first request may answer that Zenit Week is not connected yet and give a code: tell the user that code, ask them to check it matches the one shown in Zenit Week and click Allow there, and call again only after they confirm.',
+  'Every result names the app that ran it in "app": "Zenit Week" for the production site, a host name such as abc.ngrok-free.app for a development copy.',
+  'When zenit://apps lists more than one app, pass "app" on every call (on a resource: ?app=<name>) and say which app you changed.',
+  'A result may carry "update" or "notice": pass it on to the user in your reply.',
+].join(' ');
+
+// JSON Schema pieces shared by the tool table below.
+const _bs = {
+  id: { type: 'string', description: 'Node id from a week read' },
+  week: { type: 'string', pattern: '^\\d{4}-\\d{2}$', description: 'ISO week key YYYY-WW' },
+  days: { type: 'array', items: { type: 'integer', minimum: 1, maximum: 7 }, description: 'ISO weekdays, 1 = Monday ... 7 = Sunday' },
+  priority: { type: 'string', enum: ['normal', 'high', 'critical'] },
+  branch: { type: 'string', description: 'Branch id or its exact name' },
+};
+const _bObj = (properties = {}, required = []) => ({ type: 'object', properties, ...(required.length ? { required } : {}) });
+// Navigation changes what is on screen, never data; a write is one undo step.
+const _bNav = { readOnlyHint: false, destructiveHint: false, idempotentHint: true };
+const _bWrite = { readOnlyHint: false, destructiveHint: false };
+const _bDelete = { readOnlyHint: false, destructiveHint: true };
+
+// One row per tool an agent may call, in the order it is listed.
+const BRIDGE_TOOL_DOCS = [
+  ['open_week', 'Show a week in the app (navigation, not an undo step); also leaves the Vision. Required before writing to a week other than the one in view. Creates the week if absent. Returns the week.',
+    _bObj({ week: _bs.week }, ['week']), _bNav],
+  ['open_vision', 'Show the Vision (the long-view mind map) in the app: navigation, not an undo step. Required before writing to an intention. Returns the vision.',
+    _bObj(), _bNav],
+  ['show_task', 'Show the user a task, intention or branch, when they say "show me": brings the browser to the front, opens the record that holds it (the week in view, the Vision, the week given, else the newest stored week with it), zooms the map in and pulses it. Navigation, not an undo step. "raised": false means the browser could not be brought forward; ask the user to switch to it.',
+    _bObj({ id: { type: 'string', description: 'Node id: a task, intention or branch' }, week: { ..._bs.week, description: 'ISO week key YYYY-WW, when the id is in a week not in view' } }, ['id']),
+    _bNav, 'raise-browser'],
+  ['add_task', 'Add a task to the week in view, or an intention to the Vision when it is in view (no days, no Nx there). A label like "Pushups 10x" makes 10 ticks on a week. Pass days for weekdays; never "today"/"tomorrow" in a week label. Returns the new task.',
+    _bObj({
+      branch: _bs.branch,
+      label: { type: 'string' },
+      parent: { type: 'string', description: 'Task id to add a sub-task under' },
+      days: _bs.days,
+      priority: _bs.priority,
+      comment: { type: 'string', description: 'Markdown: # heading, - bullet, 1. item, - [ ] checkbox, **bold**, *italic*, [text](https://...)' },
+    }, ['branch', 'label']), _bWrite],
+  ['rename_task', 'Rename a task. Day tokens in the label, e.g. "Run (mo, we)", replace its days; "Nx" sets ticks.',
+    _bObj({ id: _bs.id, label: { type: 'string' } }, ['id', 'label']), _bWrite],
+  ['set_status', 'Mark a task done, undone (reopens done or dropped), dropped (will not happen), unplanned or planned. Cascades to sub-tasks. On the Vision only dropped (let go) and undone (take back).',
+    _bObj({ id: _bs.id, status: { type: 'string', enum: ['done', 'undone', 'dropped', 'unplanned', 'planned'] } }, ['id', 'status']), _bWrite],
+  ['set_priority', 'Set a task priority (cascades to sub-tasks). Same value is a no-op.',
+    _bObj({ id: _bs.id, priority: _bs.priority }, ['id', 'priority']), { ..._bWrite, idempotentHint: true }],
+  ['set_horizon', 'Set when an intention is meant to happen: this year, in a few years, someday, or none. Vision only. Same value is a no-op.',
+    _bObj({ id: _bs.id, horizon: { type: 'string', enum: ['year', 'years', 'someday', 'none'] } }, ['id', 'horizon']), { ..._bWrite, idempotentHint: true }],
+  ['set_days', 'Replace the weekdays of a task. Empty array removes all days. Days remove Nx ticks.',
+    _bObj({ id: _bs.id, days: _bs.days }, ['id', 'days']), _bWrite],
+  ['tick_task', 'Record n repetitions of an Nx task (negative n reopens the last ones).',
+    _bObj({ id: _bs.id, n: { type: 'integer', description: 'Default 1' } }, ['id']), _bWrite],
+  ['set_comment', 'Replace the comment of a task with Markdown (max 20000 chars; links http, https or mailto only).',
+    _bObj({ id: _bs.id, markdown: { type: 'string' } }, ['id', 'markdown']), _bWrite],
+  ['set_reusable', 'Mark a task reusable (copied by transfer_reusable to the next week) or not.',
+    _bObj({ id: _bs.id, on: { type: 'boolean' } }, ['id', 'on']), { ..._bWrite, idempotentHint: true }],
+  ['delete_task', 'Delete a task at once. A date of a repeating schedule entry needs scope "occurrence" or "series".',
+    _bObj({ id: _bs.id, scope: { type: 'string', enum: ['occurrence', 'series'] } }, ['id']), _bDelete],
+  ['send_to_date', 'Move a task out of this week to a date (YYYY-MM-DD), optionally repeating. A one-off date inside the same week just sets its weekday.',
+    _bObj({
+      id: _bs.id,
+      date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+      repeat: _bObj({
+        every: { type: 'integer', minimum: 1 },
+        unit: { type: 'string', enum: ['day', 'week', 'month', 'year'] },
+        end: _bObj({ type: { type: 'string', enum: ['never', 'count', 'until'] }, n: { type: 'integer', minimum: 1 }, date: { type: 'string' } }, ['type']),
+      }, ['unit']),
+    }, ['id', 'date']), _bWrite],
+  ['transfer_unfinished', 'Copy the previous week\'s unfinished tasks into the week in view, as the context menu does.', _bObj(), _bWrite],
+  ['transfer_reusable', 'Copy the previous week\'s reusable tasks into the week in view.', _bObj(), _bWrite],
+  ['add_branch', 'Add a branch (category) to the record in view: a week, or the Vision.',
+    _bObj({ label: { type: 'string' }, side: { type: 'string', enum: ['left', 'right'] }, color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' } }, ['label']), _bWrite],
+  ['rename_branch', 'Rename a branch (category) of the record in view: a week, or the Vision. The label is literal.',
+    _bObj({ branch: _bs.branch, label: { type: 'string' } }, ['branch', 'label']), _bWrite],
+  ['delete_branch', 'Delete a branch of the record in view with everything under it. The last branch cannot be deleted.',
+    _bObj({ branch: _bs.branch }, ['branch']), _bDelete],
+  ['undo', 'Undo the last action in the app, whoever made it. Says which action it undid.', _bObj(), _bWrite],
+  ['redo', 'Redo the last undone action.', _bObj(), _bWrite],
+  ['get_stats', 'Completion statistics of the week in view.', _bObj(), { readOnlyHint: true }],
+];
+
+// The resources: a read tool of BRIDGE_TOOLS, or the server's own hook.
+const BRIDGE_RESOURCE_DOCS = [
+  { name: 'weeks', uri: 'zenit://weeks', description: 'Weeks stored on this device with task counts.', tool: 'read_weeks' },
+  { name: 'week-current', uri: 'zenit://week/current', description: 'The week in view: branches, tasks, days, ticks, status, ids.', tool: 'read_week' },
+  { name: 'week', uriTemplate: 'zenit://week/{week}', description: 'Any stored week (YYYY-WW).', tool: 'read_week', args: { week: 'week' } },
+  { name: 'schedule', uri: 'zenit://schedule', description: 'Dated and repeating entries (the Later tab).', tool: 'read_schedule' },
+  { name: 'vision', uri: 'zenit://vision', description: 'The Vision: life areas (branches) and intentions with priority, horizon, let-go state and comments (the why). Read it before proposing a week.', tool: 'read_vision' },
+  { name: 'agenda', uriTemplate: 'zenit://agenda/{day}', description: 'Agenda of the week in view for ISO day 1-7. Its done group is the day\'s log of what the user finished, oldest first.', tool: 'read_agenda', args: { day: 'day' } },
+  { name: 'apps', uri: 'zenit://apps', description: 'The Zenit Week apps (production, dev copies) with a tab connected now: app name, paired, week in view, visible, focused. Pass one of the names as "app".', hook: 'apps' },
+];
+
+function bridgeManifest() {
+  return {
+    minServer: BRIDGE_MANIFEST_MIN_SERVER,
+    instructions: BRIDGE_INSTRUCTIONS,
+    tools: BRIDGE_TOOL_DOCS.map(([name, description, inputSchema, annotations, hook]) => ({
+      name, description, inputSchema, annotations, ...(hook ? { hook } : {}),
+    })),
+    resources: BRIDGE_RESOURCE_DOCS.map(r => ({ ...r })),
+  };
+}
+
+// The frame, with a content hash the server compares (it recomputes its own).
+async function _bridgeManifestFrame() {
+  const m = bridgeManifest();
+  const hash = await _sha256(new TextEncoder().encode(JSON.stringify(m)));
+  return { type: 'manifest', manifest: { manifestVersion: _b64url(hash).slice(0, 22), ...m } };
+}
 
 function _labelRedoTop(label) {
   const stack = activeUndoPair().redo;

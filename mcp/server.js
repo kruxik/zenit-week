@@ -18,14 +18,17 @@ import { execFile, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { z } from 'zod';
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema, ErrorCode, ListResourceTemplatesRequestSchema, ListResourcesRequestSchema, ListToolsRequestSchema,
+  McpError, ReadResourceRequestSchema, SubscribeRequestSchema, UnsubscribeRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import {
   BUILT_IN_SITES, OPEN_WAIT_MS, PORT_MIN, PORT_MAX, STARTUP_GRACE_MS, Relay, RelayError,
   addOrigin, appBundleOf, appMatches, browserHint, appName, filePairings, formatPairCode, isAllowedOrigin, lastUsedSite,
   listenOnFirstFreePort, matchSite, updateNote, pairingsPath, peerPidFromLsof, readOrigins, removeOrigin, routeWarning, urisForWeekSaved,
+  LIST_CHANGED_NOTE, listedTool, manifestNeeds, matchResource, mergeManifests, readManifestCache, validateManifest, writeManifestCache,
 } from './core.js';
 
 const { version: VERSION } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
@@ -77,44 +80,60 @@ if (cmd !== 'serve') { err(`zenit-week-mcp: unknown command "${cmd}"`); process.
 const INSTALL = process.env.ZENIT_WEEK_MCP_INSTALL === 'mcpb' ? 'mcpb'
   : /[\\/]_npx[\\/]/.test(fileURLToPath(import.meta.url)) ? 'npx' : 'repo';
 
-// ── MCP side ──
-const mcp = new McpServer(
+// ── Tools: defined by the page (docs/specs/mcp-updates.md section 3) ──
+// At start: the cached manifest of the site used last, else the baseline
+// bundled with the package. A connected tab's manifest replaces it, and the
+// client hears tools/list_changed. Instructions are fixed for the session.
+const BASELINE = validateManifest(JSON.parse(readFileSync(new URL('./baseline-manifest.json', import.meta.url), 'utf8')));
+if (!BASELINE) { err('zenit-week-mcp: the bundled baseline-manifest.json fails its own check'); process.exit(1); }
+const START = readManifestCache(lastUsedSite(pairings.list())) || BASELINE;
+let registry = mergeManifests(START);
+let listChangedNote = false;
+
+const mcp = new Server(
   { name: 'zenit-week', version: VERSION },
   {
-    capabilities: { resources: { subscribe: true } },
-    instructions: [
-      'Zenit Week is a weekly planner shown as a mind map: branches (categories) hold tasks, tasks may hold sub-tasks.',
-      'All writes act on the week open in the app, exactly as if the user clicked; each call is one undo step and shows the user a toast.',
-      'Read zenit://week/current (or call get_stats) first to learn branch and task ids. Use open_week to switch weeks before writing to another week.',
-      'Before proposing what a week should carry, read zenit://vision: the user\'s long view, a mind map of intentions (branches are life areas, comments say why). The Vision has no days, ticks or done; an intention can be let go (set_status dropped) and taken back (undone), and has an optional horizon (set_horizon).',
-      'The node tools act on the record in view: call open_vision before writing to an intention and open_week to come back. An id from the other record answers not_in_view.',
-      'To learn what the user finished (the last task done, what got done today), read the done group of zenit://agenda/{day}: one row per task or tick the user closed, oldest first, each with its doneAt. Do not sort the week by doneAt: a parent closed by its children rolling up carries a doneAt of its own but was not closed by the user.',
-      'When the user asks to see something ("show me"), call show_task with its id: it brings the browser forward, opens the right week or the Vision and pulses the item.',
-      'Days are ISO weekdays: 1 = Monday ... 7 = Sunday. A label ending in "Nx" (e.g. "Pushups 10x") makes N ticks recorded with tick_task; days and Nx do not combine.',
-      'Never put relative days (today, tomorrow) in labels: pass days instead.',
-      'The first request may answer that Zenit Week is not connected yet and give a code: tell the user that code, ask them to check it matches the one shown in Zenit Week and click Allow there, and call again only after they confirm.',
-      'Every result names the app that ran it in "app": "Zenit Week" for the production site, a host name such as abc.ngrok-free.app for a development copy.',
-      'When zenit://apps lists more than one app, pass "app" on every call and say which app you changed.',
-    ].join(' '),
+    capabilities: { tools: { listChanged: true }, resources: { subscribe: true, listChanged: true } },
+    instructions: START.instructions,
   },
 );
 
 const subscriptions = new Set();
-mcp.server.setRequestHandler(SubscribeRequestSchema, async req => { subscriptions.add(req.params.uri); return {}; });
-mcp.server.setRequestHandler(UnsubscribeRequestSchema, async req => { subscriptions.delete(req.params.uri); return {}; });
+mcp.setRequestHandler(SubscribeRequestSchema, async req => { subscriptions.add(req.params.uri); return {}; });
+mcp.setRequestHandler(UnsubscribeRequestSchema, async req => { subscriptions.delete(req.params.uri); return {}; });
+
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// A tab sent its tools: cache them for its site, re-register, tell the client.
+function onManifest(tab, m) {
+  if (readManifestCache(tab.origin)?.manifestVersion !== m.manifestVersion) {
+    try { writeManifestCache(tab.origin, m); } catch (e) { err(`zenit-week-mcp: cannot cache the manifest (${e.code || e.message})`); }
+  }
+  const { unknownHooks, newerServer } = manifestNeeds(m, VERSION);
+  if (unknownHooks.length || newerServer) {
+    err(`zenit-week-mcp: ${appName(tab.origin)} wants a newer server (${[newerServer && `needs ${m.minServer}`, ...unknownHooks].filter(Boolean).join(', ')}); its tools run without that`);
+  }
+  const next = mergeManifests(START, relay.manifestTabs());
+  const toolsChanged = !sameJson(next.tools, registry.tools);
+  const resourcesChanged = !sameJson(next.resources, registry.resources);
+  registry = next;
+  if (toolsChanged) { listChangedNote = true; mcp.sendToolListChanged().catch(() => {}); }
+  if (resourcesChanged) mcp.sendResourceListChanged().catch(() => {});
+}
 
 const relay = new Relay({
   pairings,
   install: INSTALL,
   version: VERSION,
-  clientName: () => mcp.server.getClientVersion()?.name || null,
+  clientName: () => mcp.getClientVersion()?.name || null,
   log: s => err(`zenit-week-mcp: ${s}`),
+  onManifest,
   // A subscription may name its app (`?app=`); it hears only that app's saves.
   onWeekSaved: (wk, tab) => {
     const touched = new Set(urisForWeekSaved(wk, tab.week));
     for (const uri of subscriptions) {
       const { base, app } = splitAppQuery(uri);
-      if (touched.has(base) && appMatches(app, tab.origin)) mcp.server.sendResourceUpdated({ uri }).catch(() => {});
+      if (touched.has(base) && appMatches(app, tab.origin)) mcp.sendResourceUpdated({ uri }).catch(() => {});
     }
   },
 });
@@ -188,9 +207,10 @@ const run = (cmd, args) => new Promise(resolve => {
   execFile(cmd, args, { timeout: 3000 }, (e, stdout) => resolve(e ? null : String(stdout)));
 });
 
-// show_task: the browser holding the tab comes to the front. macOS only: the
-// application that owns the tab's socket, else the page's hint by name (Safari
-// runs its sockets outside Safari.app). Says whether it could.
+// Hook `raise-browser` (show_task): the browser holding the tab comes to the
+// front. macOS only: the application that owns the tab's socket, else the
+// page's hint by name (Safari runs its sockets outside Safari.app). Says
+// whether it could.
 async function raiseBrowser(tab, hint) {
   if (process.platform !== 'darwin') return false;
   let bundle = null;
@@ -204,6 +224,15 @@ async function raiseBrowser(tab, hint) {
   return (await run('open', ['-a', target])) !== null;
 }
 
+// The server's work after a tool, by the hook its manifest entry names. An
+// unknown hook is skipped: the user loses the extra, never the tool.
+const TOOL_HOOKS = {
+  'raise-browser': async out => {
+    const { browser, ...data } = out.data || {};
+    return { ...out, data: { ...data, raised: await raiseBrowser(out.tab, browser) } };
+  },
+};
+
 // The first result of a session whose server is behind the latest release
 // carries `update`, once (mcp-updates.md 5.2, row 3): the agent passes it on.
 let updateNoted = false;
@@ -215,11 +244,13 @@ function takeUpdateNote(tab) {
 }
 
 // Every result carries `app` (setup spec section 6, row 6), plus the warning
-// when the agent named no app and several are open.
-function labelled({ app, warning, data, tab }) {
+// when the agent named no app and several are open, and the one-time notes.
+function labelled({ app, warning, data, tab }, { tool = false } = {}) {
   const head = warning ? { app, warning } : { app };
   const update = takeUpdateNote(tab);
   if (update) head.update = update;
+  // New tools mid-session: some clients ignore list_changed (section 3.4, row 4).
+  if (tool && listChangedNote) { head.notice = LIST_CHANGED_NOTE; listChangedNote = false; }
   return data && typeof data === 'object' && !Array.isArray(data) ? { ...head, ...data } : { ...head, result: data };
 }
 
@@ -229,108 +260,43 @@ const asError = e => ({
   content: [{ type: 'text', text: `${e instanceof RelayError ? e.code : 'internal'}: ${e.message}` }],
 });
 
-const appArg = z.string().optional()
-  .describe('Which app: "Zenit Week" or a host name such as abc.ngrok-free.app (see zenit://apps). Default: the focused tab.');
+mcp.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: registry.tools.map(listedTool) }));
 
-// `after` runs server-side work on a page result before it is returned.
-function tool(name, description, shape, annotations = {}, after = null) {
-  mcp.registerTool(name, { description, inputSchema: { ...shape, app: appArg }, annotations }, async args => {
-    try {
-      const { app, ...rest } = args || {};
-      const out = await forward(name, rest, app || null);
-      if (out instanceof Notice) return { content: [{ type: 'text', text: out.text }] };
-      return asText(labelled(after ? await after(out) : out));
-    } catch (e) { return asError(e); }
-  });
-}
+// Any name is forwarded: a tool the app lacks answers unknown_tool from the
+// page, which says whether to reload the app or update the server.
+mcp.setRequestHandler(CallToolRequestSchema, async req => {
+  const name = String(req.params.name || '');
+  try {
+    const raw = req.params.arguments;
+    const { app, ...rest } = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    const out = await forward(name, rest, typeof app === 'string' && app ? app : null);
+    if (out instanceof Notice) return { content: [{ type: 'text', text: out.text }] };
+    const hook = TOOL_HOOKS[registry.tools.find(t => t.name === name)?.hook];
+    return asText(labelled(hook ? await hook(out) : out, { tool: true }));
+  } catch (e) { return asError(e); }
+});
 
-const id = z.string().describe('Node id from a week read');
-const isoDays = z.array(z.number().int().min(1).max(7)).describe('ISO weekdays, 1 = Monday ... 7 = Sunday');
-const readOnly = { readOnlyHint: true };
+mcp.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  resources: registry.resources.filter(r => r.uri).map(r => ({ uri: r.uri, name: r.name, description: r.description, mimeType: 'application/json' })),
+}));
+mcp.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+  resourceTemplates: registry.resources.filter(r => r.uriTemplate)
+    .map(r => ({ uriTemplate: r.uriTemplate, name: r.name, description: r.description, mimeType: 'application/json' })),
+}));
 
-tool('open_week', 'Show a week in the app (navigation, not an undo step); also leaves the Vision. Required before writing to a week other than the one in view. Creates the week if absent. Returns the week.',
-  { week: z.string().regex(/^\d{4}-\d{2}$/).describe('ISO week key YYYY-WW') });
-tool('open_vision', 'Show the Vision (the long-view mind map) in the app: navigation, not an undo step. Required before writing to an intention. Returns the vision.', {});
-tool('show_task', 'Show the user a task, intention or branch, when they say "show me": brings the browser to the front, opens the record that holds it (the week in view, the Vision, the week given, else the newest stored week with it), zooms the map in and pulses it. Navigation, not an undo step. "raised": false means the browser could not be brought forward; ask the user to switch to it.',
-  { id: z.string().describe('Node id: a task, intention or branch'), week: z.string().regex(/^\d{4}-\d{2}$/).optional().describe('ISO week key YYYY-WW, when the id is in a week not in view') },
-  {}, async out => {
-    const { browser, ...data } = out.data || {};
-    return { ...out, data: { ...data, raised: await raiseBrowser(out.tab, browser) } };
-  });
-tool('add_task', 'Add a task to the week in view, or an intention to the Vision when it is in view (no days, no Nx there). A label like "Pushups 10x" makes 10 ticks on a week. Pass days for weekdays; never "today"/"tomorrow" in a week label. Returns the new task.',
-  {
-    branch: z.string().describe('Branch id or its exact name'),
-    label: z.string(),
-    parent: id.optional().describe('Task id to add a sub-task under'),
-    days: isoDays.optional(),
-    priority: z.enum(['normal', 'high', 'critical']).optional(),
-    comment: z.string().optional().describe('Markdown: # heading, - bullet, 1. item, - [ ] checkbox, **bold**, *italic*, [text](https://...)'),
-  });
-tool('rename_task', 'Rename a task. Day tokens in the label, e.g. "Run (mo, we)", replace its days; "Nx" sets ticks.', { id, label: z.string() });
-tool('set_status', 'Mark a task done, undone (reopens done or dropped), dropped (will not happen), unplanned or planned. Cascades to sub-tasks. On the Vision only dropped (let go) and undone (take back).',
-  { id, status: z.enum(['done', 'undone', 'dropped', 'unplanned', 'planned']) });
-tool('set_priority', 'Set a task priority (cascades to sub-tasks). Same value is a no-op.', { id, priority: z.enum(['normal', 'high', 'critical']) });
-tool('set_horizon', 'Set when an intention is meant to happen: this year, in a few years, someday, or none. Vision only. Same value is a no-op.',
-  { id, horizon: z.enum(['year', 'years', 'someday', 'none']) });
-tool('set_days', 'Replace the weekdays of a task. Empty array removes all days. Days remove Nx ticks.', { id, days: isoDays });
-tool('tick_task', 'Record n repetitions of an Nx task (negative n reopens the last ones).', { id, n: z.number().int().optional().describe('Default 1') });
-tool('set_comment', 'Replace the comment of a task with Markdown (max 20000 chars; links http, https or mailto only).', { id, markdown: z.string() });
-tool('set_reusable', 'Mark a task reusable (copied by transfer_reusable to the next week) or not.', { id, on: z.boolean() });
-tool('delete_task', 'Delete a task at once. A date of a repeating schedule entry needs scope "occurrence" or "series".',
-  { id, scope: z.enum(['occurrence', 'series']).optional() });
-tool('send_to_date', 'Move a task out of this week to a date (YYYY-MM-DD), optionally repeating. A one-off date inside the same week just sets its weekday.',
-  {
-    id,
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    repeat: z.object({
-      every: z.number().int().min(1).optional(),
-      unit: z.enum(['day', 'week', 'month', 'year']),
-      end: z.object({ type: z.enum(['never', 'count', 'until']), n: z.number().int().min(1).optional(), date: z.string().optional() }).optional(),
-    }).optional(),
-  });
-tool('transfer_unfinished', 'Copy the previous week\'s unfinished tasks into the week in view, as the context menu does.', {});
-tool('transfer_reusable', 'Copy the previous week\'s reusable tasks into the week in view.', {});
-tool('add_branch', 'Add a branch (category) to the record in view: a week, or the Vision.',
-  { label: z.string(), side: z.enum(['left', 'right']).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() });
-tool('rename_branch', 'Rename a branch (category) of the record in view: a week, or the Vision. The label is literal.',
-  { branch: z.string().describe('Branch id or its exact name'), label: z.string() });
-tool('delete_branch', 'Delete a branch of the record in view with everything under it. The last branch cannot be deleted.',
-  { branch: z.string().describe('Branch id or its exact name') });
-tool('undo', 'Undo the last action in the app, whoever made it. Says which action it undid.', {});
-tool('redo', 'Redo the last undone action.', {});
-tool('get_stats', 'Completion statistics of the week in view.', {}, readOnly);
-
-// Every resource takes `?app=<name>` (setup spec section 6, row 5). The SDK's
-// templates either require the query or swallow it into a path variable, so
-// the query is read from the URI here and stripped from the variables.
-function resource(name, uri, description, args) {
-  mcp.registerResource(name, uri, { description, mimeType: 'application/json' }, async (u, vars) => {
-    const { app } = splitAppQuery(u.href);
-    const clean = Object.fromEntries(Object.entries(vars || {}).map(([k, v]) => [k, String(v).split('?')[0]]));
-    const out = await forward(args.tool, args.map ? args.map(clean) : {}, app);
-    if (out instanceof Notice) return { contents: [{ uri: u.href, mimeType: 'text/plain', text: out.text }] };
-    return { contents: [{ uri: u.href, mimeType: 'application/json', text: JSON.stringify(labelled(out), null, 2) }] };
-  });
-}
-const withApp = tpl => new ResourceTemplate(tpl, { list: undefined });
-resource('weeks', 'zenit://weeks', 'Weeks stored on this device with task counts.', { tool: 'read_weeks' });
-resource('weeks-app', withApp('zenit://weeks{?app}'), 'zenit://weeks of one app.', { tool: 'read_weeks' });
-resource('week-current', 'zenit://week/current', 'The week in view: branches, tasks, days, ticks, status, ids.', { tool: 'read_week' });
-// Also serves zenit://week/current?app=..., which no static URI matches.
-resource('week', withApp('zenit://week/{week}'), 'Any stored week (YYYY-WW).',
-  { tool: 'read_week', map: v => (v.week === 'current' ? {} : { week: v.week }) });
-resource('schedule', 'zenit://schedule', 'Dated and repeating entries (the Later tab).', { tool: 'read_schedule' });
-resource('schedule-app', withApp('zenit://schedule{?app}'), 'zenit://schedule of one app.', { tool: 'read_schedule' });
-resource('vision', 'zenit://vision', 'The Vision: life areas (branches) and intentions with priority, horizon, let-go state and comments (the why). Read it before proposing a week.', { tool: 'read_vision' });
-resource('vision-app', withApp('zenit://vision{?app}'), 'zenit://vision of one app.', { tool: 'read_vision' });
-resource('agenda', withApp('zenit://agenda/{day}'), 'Agenda of the week in view for ISO day 1-7. Its done group is the day\'s log of what the user finished, oldest first.',
-  { tool: 'read_agenda', map: v => ({ day: parseInt(v.day, 10) }) });
-
-// zenit://apps: the app tabs connected to this server, answered by the server.
-mcp.registerResource('apps', 'zenit://apps', {
-  description: 'The Zenit Week apps (production, dev copies) with a tab connected now: app name, paired, week in view, visible, focused. Pass one of the names as "app".',
-  mimeType: 'application/json',
-}, async u => ({ contents: [{ uri: u.href, mimeType: 'application/json', text: JSON.stringify(relay.listApps(), null, 2) }] }));
+// Every resource takes `?app=<name>` (setup spec section 6, row 5). Hook `apps`
+// is answered by the server: the app tabs connected to it.
+mcp.setRequestHandler(ReadResourceRequestSchema, async req => {
+  const uri = String(req.params.uri);
+  const hit = matchResource(registry.resources, uri);
+  if (!hit) throw new McpError(ErrorCode.InvalidParams, `unknown resource ${uri}`);
+  const json = data => ({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(data, null, 2) }] });
+  if (hit.resource.hook === 'apps') return json(relay.listApps());
+  if (!hit.resource.tool) throw new McpError(ErrorCode.InvalidParams, `${uri} needs a newer Zenit Week server`);
+  const out = await forward(hit.resource.tool, hit.args, hit.app);
+  if (out instanceof Notice) return { contents: [{ uri, mimeType: 'text/plain', text: out.text }] };
+  return json(labelled(out));
+});
 
 // ── Page side: loopback only ──
 // Resolves to the listening server, or null when the port is taken.

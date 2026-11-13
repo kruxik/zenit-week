@@ -168,6 +168,8 @@ Several tabs may be connected. The server routes each call to the most recently 
 
 ## 8. MCP surface
 
+Since server 1.2.0 the page defines this surface: tools, their descriptions and schemas, resources and the agent instructions live in `zenit-week.html` (`BRIDGE_TOOL_DOCS`, `BRIDGE_RESOURCE_DOCS`, `BRIDGE_INSTRUCTIONS`, next to `BRIDGE_TOOLS`) and reach the server in the `manifest` frame (section 9). The server registers whatever the manifest says. A new tool therefore ships with an app release; see `mcp-updates.md` section 3.
+
 ### 8.1 Resources (read)
 
 The week in view is read from memory (`weekData`), never from IndexedDB, because IndexedDB lags the last completed write (the comment at the Drive merge path, line ~9580, explains the same trap). Other weeks are read with `loadWeekIDB(wk)`. Reads never switch the view, never wait in the write queue and are never held back by an editing user.
@@ -256,6 +258,7 @@ JSON text frames, one object per frame. `id` correlates a request and its reply.
 | 4 | `call` | server -> page | `id`, `tool`, `args` |
 | 5 | `result` | page -> server | `id`, `ok: true`, `data` |
 | 6 | `result` | page -> server | `id`, `ok: false`, `error: { code, message }` |
+| 6a | `manifest` | page -> server | Right after `ready`, paired tabs only: `manifest: { manifestVersion, minServer, instructions, tools, resources }` (`mcp-updates.md` 3.2). The server checks it (`validateManifest`), recomputes the version, caches it per site and registers it; a bad one is ignored. |
 | 7 | `event` | page -> server | `event: 'week-saved' | 'view' | 'focus' | 'pause'`, plus `wk`, and `sig` (the week's content hash) on `week-saved`. The page sends one `week-saved` per distinct content, whichever path wrote it. |
 
 The server answers a bad token by closing with reason `refused`; there is no separate reply frame to `hello`.
@@ -299,7 +302,7 @@ Net: for the mobile user the bridge is "the desktop is where the agent works; th
 | # | Where | What |
 |---|---|---|
 | 1 | `zenit-week.html` | Bridge client (connect, handshake, queue, dispatch table, projection to 8.3), Settings section, i18n keys `bridge.*` in EN and CS, CSP change, and the extractions named in 7.3 and 8.2 (`createTask`, `applyLabelEdit`, `setPriority`, `writeComment`, snapshot-free bodies, data-returning agenda grouping), each adopted by the UI in the same change so there stays one path per action. Stays inside the single file. |
-| 2 | `mcp/server.js`, `mcp/package.json` | The MCP server: `@modelcontextprotocol/sdk` over stdio, `ws` listener on loopback, origin and token checks, rate budget, tab routing, tool and resource schemas, forwarding. Tooling, like `scripts/`, not part of the app. Publishable later as `npx zenit-week-mcp`. |
+| 2 | `mcp/server.js`, `mcp/package.json` | The MCP server: `@modelcontextprotocol/sdk` over stdio, `ws` listener on loopback, origin and token checks, rate budget, tab routing, forwarding, and the hooks only the local process can run. Tools and resources come from the page's manifest (`mcp/baseline-manifest.json` until a tab sends one). Tooling, like `scripts/`, not part of the app. Publishable later as `npx zenit-week-mcp`. |
 | 3 | `tests/agent-bridge.test.js` | Page side: handshake, refusal of non-loopback hosts, queue order, every tool dispatches to the named function with a fake socket, exactly one undo entry per write and one undo restores the full pre-call state, projection omits internal stamps, current week read from memory. |
 | 4 | `tests/mcp-server.test.js` | Server side: origin allowlist, handshake timeout, rate budget, tab routing, `no_app_tab`, resource update notification on `week-saved`. |
 | 5 | `tests/network-guards.test.js` | New case: the bridge never targets a non-loopback host. |

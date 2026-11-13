@@ -155,7 +155,7 @@ The page's first frame carries `protocol: 2`.
 | 2 | v2 server, older page | The server closes with reason `protocol`: `Reload Zenit Week`. |
 | 3 | v1 record in the page (`port`, `token`) | Dropped on first load; the site pairs once more. |
 | 4 | Update hint by install path | Claude Desktop extension: "Download the new extension" (link). `npx`: "Restart your agent app". The server reports its install path in its first frame so the page can pick the hint; a v1 server cannot, so row 1 shows both. |
-| 5 | Same protocol, older server release | `welcome` carries the server's `version` (none before 1.2.0); `ready` carries the page's `serverLatest` (`BRIDGE_SERVER_LATEST`, written by `npm run release`). Below it: `update-available` with the row 4 hint, a one-time toast per release per device, and a one-time `update` note in the agent's first result of a session. Above it: `Reload Zenit Week`. Full rules: `mcp-updates.md` section 5. |
+| 5 | Same protocol, older server release | `welcome` carries the server's `version` (none before 1.2.0); `ready` carries the page's `serverLatest` (`BRIDGE_SERVER_LATEST`, written by `npm run release`). Below it: `update-available` with the row 4 hint, a one-time toast per release per device, and a one-time `update` note in the agent's first result of a session. Above it: `Reload Zenit Week`. Below the manifest's `minServer` (a server before 1.2.0 cannot read the page's tools): `update-needed`. Full rules: `mcp-updates.md` sections 3 and 5. |
 
 ### 4.6 Status line states
 

@@ -1,0 +1,616 @@
+{
+  "manifestVersion": "LikUJzbnJvlibPRzM99tXJ",
+  "minServer": "1.2.0",
+  "instructions": "Zenit Week is a weekly planner shown as a mind map: branches (categories) hold tasks, tasks may hold sub-tasks. All writes act on the week open in the app, exactly as if the user clicked; each call is one undo step and shows the user a toast. Read zenit://week/current (or call get_stats) first to learn branch and task ids. Use open_week to switch weeks before writing to another week. Before proposing what a week should carry, read zenit://vision: the user's long view, a mind map of intentions (branches are life areas, comments say why). The Vision has no days, ticks or done; an intention can be let go (set_status dropped) and taken back (undone), and has an optional horizon (set_horizon). The node tools act on the record in view: call open_vision before writing to an intention and open_week to come back. An id from the other record answers not_in_view. To learn what the user finished (the last task done, what got done today), read the done group of zenit://agenda/{day}: one row per task or tick the user closed, oldest first, each with its doneAt. Do not sort the week by doneAt: a parent closed by its children rolling up carries a doneAt of its own but was not closed by the user. When the user asks to see something (\"show me\"), call show_task with its id: it brings the browser forward, opens the right week or the Vision and pulses the item. Days are ISO weekdays: 1 = Monday ... 7 = Sunday. A label ending in \"Nx\" (e.g. \"Pushups 10x\") makes N ticks recorded with tick_task; days and Nx do not combine. Never put relative days (today, tomorrow) in labels: pass days instead. The first request may answer that Zenit Week is not connected yet and give a code: tell the user that code, ask them to check it matches the one shown in Zenit Week and click Allow there, and call again only after they confirm. Every result names the app that ran it in \"app\": \"Zenit Week\" for the production site, a host name such as abc.ngrok-free.app for a development copy. When zenit://apps lists more than one app, pass \"app\" on every call (on a resource: ?app=<name>) and say which app you changed. A result may carry \"update\" or \"notice\": pass it on to the user in your reply.",
+  "tools": [
+    {
+      "name": "open_week",
+      "description": "Show a week in the app (navigation, not an undo step); also leaves the Vision. Required before writing to a week other than the one in view. Creates the week if absent. Returns the week.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "week": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "description": "ISO week key YYYY-WW"
+          }
+        },
+        "required": [
+          "week"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "open_vision",
+      "description": "Show the Vision (the long-view mind map) in the app: navigation, not an undo step. Required before writing to an intention. Returns the vision.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "show_task",
+      "description": "Show the user a task, intention or branch, when they say \"show me\": brings the browser to the front, opens the record that holds it (the week in view, the Vision, the week given, else the newest stored week with it), zooms the map in and pulses it. Navigation, not an undo step. \"raised\": false means the browser could not be brought forward; ask the user to switch to it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id: a task, intention or branch"
+          },
+          "week": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "description": "ISO week key YYYY-WW, when the id is in a week not in view"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "hook": "raise-browser"
+    },
+    {
+      "name": "add_task",
+      "description": "Add a task to the week in view, or an intention to the Vision when it is in view (no days, no Nx there). A label like \"Pushups 10x\" makes 10 ticks on a week. Pass days for weekdays; never \"today\"/\"tomorrow\" in a week label. Returns the new task.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string",
+            "description": "Branch id or its exact name"
+          },
+          "label": {
+            "type": "string"
+          },
+          "parent": {
+            "type": "string",
+            "description": "Task id to add a sub-task under"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "description": "ISO weekdays, 1 = Monday ... 7 = Sunday"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "high",
+              "critical"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "description": "Markdown: # heading, - bullet, 1. item, - [ ] checkbox, **bold**, *italic*, [text](https://...)"
+          }
+        },
+        "required": [
+          "branch",
+          "label"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "rename_task",
+      "description": "Rename a task. Day tokens in the label, e.g. \"Run (mo, we)\", replace its days; \"Nx\" sets ticks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "set_status",
+      "description": "Mark a task done, undone (reopens done or dropped), dropped (will not happen), unplanned or planned. Cascades to sub-tasks. On the Vision only dropped (let go) and undone (take back).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "done",
+              "undone",
+              "dropped",
+              "unplanned",
+              "planned"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "set_priority",
+      "description": "Set a task priority (cascades to sub-tasks). Same value is a no-op.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "high",
+              "critical"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "priority"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "set_horizon",
+      "description": "Set when an intention is meant to happen: this year, in a few years, someday, or none. Vision only. Same value is a no-op.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "horizon": {
+            "type": "string",
+            "enum": [
+              "year",
+              "years",
+              "someday",
+              "none"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "horizon"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "set_days",
+      "description": "Replace the weekdays of a task. Empty array removes all days. Days remove Nx ticks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "description": "ISO weekdays, 1 = Monday ... 7 = Sunday"
+          }
+        },
+        "required": [
+          "id",
+          "days"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "tick_task",
+      "description": "Record n repetitions of an Nx task (negative n reopens the last ones).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Default 1"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "set_comment",
+      "description": "Replace the comment of a task with Markdown (max 20000 chars; links http, https or mailto only).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "markdown": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "markdown"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "set_reusable",
+      "description": "Mark a task reusable (copied by transfer_reusable to the next week) or not.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "on": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "on"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "delete_task",
+      "description": "Delete a task at once. A date of a repeating schedule entry needs scope \"occurrence\" or \"series\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "occurrence",
+              "series"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "send_to_date",
+      "description": "Move a task out of this week to a date (YYYY-MM-DD), optionally repeating. A one-off date inside the same week just sets its weekday.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Node id from a week read"
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "repeat": {
+            "type": "object",
+            "properties": {
+              "every": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "day",
+                  "week",
+                  "month",
+                  "year"
+                ]
+              },
+              "end": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "never",
+                      "count",
+                      "until"
+                    ]
+                  },
+                  "n": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "date": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            },
+            "required": [
+              "unit"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "date"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "transfer_unfinished",
+      "description": "Copy the previous week's unfinished tasks into the week in view, as the context menu does.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "transfer_reusable",
+      "description": "Copy the previous week's reusable tasks into the week in view.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "add_branch",
+      "description": "Add a branch (category) to the record in view: a week, or the Vision.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "rename_branch",
+      "description": "Rename a branch (category) of the record in view: a week, or the Vision. The label is literal.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string",
+            "description": "Branch id or its exact name"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "branch",
+          "label"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "delete_branch",
+      "description": "Delete a branch of the record in view with everything under it. The last branch cannot be deleted.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string",
+            "description": "Branch id or its exact name"
+          }
+        },
+        "required": [
+          "branch"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "undo",
+      "description": "Undo the last action in the app, whoever made it. Says which action it undid.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "redo",
+      "description": "Redo the last undone action.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "get_stats",
+      "description": "Completion statistics of the week in view.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ],
+  "resources": [
+    {
+      "name": "weeks",
+      "description": "Weeks stored on this device with task counts.",
+      "uri": "zenit://weeks",
+      "tool": "read_weeks"
+    },
+    {
+      "name": "week-current",
+      "description": "The week in view: branches, tasks, days, ticks, status, ids.",
+      "uri": "zenit://week/current",
+      "tool": "read_week"
+    },
+    {
+      "name": "week",
+      "description": "Any stored week (YYYY-WW).",
+      "uriTemplate": "zenit://week/{week}",
+      "tool": "read_week",
+      "args": {
+        "week": "week"
+      }
+    },
+    {
+      "name": "schedule",
+      "description": "Dated and repeating entries (the Later tab).",
+      "uri": "zenit://schedule",
+      "tool": "read_schedule"
+    },
+    {
+      "name": "vision",
+      "description": "The Vision: life areas (branches) and intentions with priority, horizon, let-go state and comments (the why). Read it before proposing a week.",
+      "uri": "zenit://vision",
+      "tool": "read_vision"
+    },
+    {
+      "name": "agenda",
+      "description": "Agenda of the week in view for ISO day 1-7. Its done group is the day's log of what the user finished, oldest first.",
+      "uriTemplate": "zenit://agenda/{day}",
+      "tool": "read_agenda",
+      "args": {
+        "day": "day"
+      }
+    },
+    {
+      "name": "apps",
+      "description": "The Zenit Week apps (production, dev copies) with a tab connected now: app name, paired, week in view, visible, focused. Pass one of the names as \"app\".",
+      "uri": "zenit://apps",
+      "hook": "apps"
+    }
+  ]
+}

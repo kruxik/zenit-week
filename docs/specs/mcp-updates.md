@@ -1,6 +1,6 @@
 # MCP updates - new features reach every user, nothing goes stale silently
 
-Status: plan, 2026-11-13. Step 1 (section 5) implemented 2026-11-13; `update-needed` waits for the manifest's `minServer` (step 2). Extends `agent-bridge.md` (sections 8, 9) and `agent-bridge-setup.md` (sections 3, 4.5, 4.6).
+Status: plan, 2026-11-13. Steps 1 (section 5) and 2 (section 3) implemented 2026-11-13; both ship as server 1.2.0, so `minServer` is 1.2.0. The baseline (`mcp/baseline-manifest.json`) is rewritten by `npm run mcp:baseline` and does not by itself make a server release. Extends `agent-bridge.md` (sections 8, 9) and `agent-bridge-setup.md` (sections 3, 4.5, 4.6).
 
 ## 1. Objective
 

@@ -5,7 +5,7 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   _state, genId, defaultWeekData, findNode, rebuildNodeMap, getTickInfo,
   bridgeRunTool, bridgeConnect, bridgeDisconnect, bridgeUnpair, bridgeUpdateHintKey,
-  bridgeServerVerdict, bridgeCompareVersions, bridgeUnknownToolMessage,
+  bridgeServerVerdict, bridgeCompareVersions, bridgeUnknownToolMessage, bridgeManifest,
   bridgeSocketUrl, bridgeAddCmd, loadBridgeRecord, saveBridgeRecord, projectWeek, commentHasUnsafeLink, bridgeNotifyWeekSaved,
   withWeekLock, undo, redo, setActivityDays, offsetWeek, BRANCH_COLORS,
   mergeWeekData, applyRemoteMerge, weekContentHash, reloadAppFresh,
@@ -1221,13 +1221,13 @@ describe('server version (mcp-updates.md section 5)', () => {
     expect(toasts).toEqual([]);
   });
 
-  test('a server before 1.2.0 (no version) is update-available, with its install hint and one toast per release', async () => {
+  test('a server before 1.2.0 (no version) cannot read the manifest: update-needed, its install hint, one toast per release', async () => {
     serve(47831, { version: null, install: 'mcpb' });
     turnOn();
     await pairVia(47831);
-    await until(() => _state.getBridgeStatus().state === 'update-available');
+    await until(() => _state.getBridgeStatus().state === 'update-needed');
     const { agents } = _state.getBridgeStatus();
-    expect(agents[0]).toMatchObject({ version: null, install: 'mcpb', update: 'available' });
+    expect(agents[0]).toMatchObject({ version: null, install: 'mcpb', update: 'needed' });
     expect(bridgeUpdateHintKey(agents)).toBe('bridge.state.update-server-mcpb');
     expect(toasts).toHaveLength(1);
     expect(toasts[0]).toMatchObject({ agent: true });
@@ -1236,7 +1236,7 @@ describe('server version (mcp-updates.md section 5)', () => {
     // Reconnecting, or the tab coming back, does not repeat it.
     bridgeDisconnect();
     turnOn();
-    await until(() => _state.getBridgeStatus().state === 'update-available');
+    await until(() => _state.getBridgeStatus().state === 'update-needed');
     bridgeConnect();
     expect(toasts).toHaveLength(1);
   });
@@ -1245,13 +1245,13 @@ describe('server version (mcp-updates.md section 5)', () => {
     serve(47831, { version: null });
     turnOn();
     await pairVia(47831);
-    await until(() => _state.getBridgeStatus().state === 'update-available');
+    await until(() => _state.getBridgeStatus().state === 'update-needed');
     bridgeDisconnect();
     toasts = [];
     sandbox.localStorage.removeItem('zenit-week-bridge-update-toast');
     sandbox.document.visibilityState = 'hidden';
     turnOn();
-    await until(() => _state.getBridgeStatus().state === 'update-available');
+    await until(() => _state.getBridgeStatus().state === 'update-needed');
     expect(toasts).toEqual([]);
     // Back in front: the visibility handler's refresh shows it.
     sandbox.document.visibilityState = 'visible';
@@ -1276,5 +1276,35 @@ describe('server version (mcp-updates.md section 5)', () => {
     const { ws } = await pairVia(47831);
     await serverCall(ws, { id: 1, tool: 'new_tool', args: {} });
     expect(ws.sent.at(-1).error.message).toMatch(/^new_tool .*reload Zenit Week/);
+  });
+});
+
+describe('manifest (mcp-updates.md section 3)', () => {
+  test('sent right after ready, to a paired server only', async () => {
+    const ws = await pairedSocket();
+    await until(() => ws.sent.some(f => f.type === 'manifest'));
+    const types = ws.sent.map(f => f.type);
+    expect(types.indexOf('manifest')).toBe(types.indexOf('ready') + 1);
+    const { manifest } = ws.sent.find(f => f.type === 'manifest');
+    expect(manifest.manifestVersion).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(manifest.tools.map(t => t.name)).toEqual(bridgeManifest().tools.map(t => t.name));
+    expect(servers.get(47831).tab.manifest.tools.length).toBe(manifest.tools.length);
+  });
+
+  test('every tool an agent sees runs here; every write tool is described; resources name read tools', () => {
+    const tools = _state.getBridgeTools();
+    const m = bridgeManifest();
+    for (const t of m.tools) {
+      expect(tools[t.name], t.name).toBeTruthy();
+      expect(t.description, t.name).toMatch(/\w.*\.$/);
+      expect(t.inputSchema.type, t.name).toBe('object');
+      expect(typeof t.annotations.readOnlyHint, t.name).toBe('boolean');
+    }
+    const listed = new Set(m.tools.map(t => t.name));
+    const viaResource = new Set(m.resources.map(r => r.tool).filter(Boolean));
+    for (const [name, def] of Object.entries(tools)) {
+      expect(listed.has(name) || (def.read && viaResource.has(name)), `${name} is neither listed nor read by a resource`).toBe(true);
+    }
+    for (const r of m.resources) if (r.tool) expect(tools[r.tool]?.read, r.name).toBe(true);
   });
 });

@@ -8,6 +8,8 @@ import {
   appName, appMatches, routeWarning, readOrigins, addOrigin, removeOrigin, lastUsedSite,
   HANDSHAKE_TIMEOUT_MS, WRITE_BUDGET_PER_MIN, PAIR_TIMEOUT_MS, appBundleOf, peerPidFromLsof, browserHint,
   compareVersions, updateNote, UPDATE_ACTIONS,
+  validateManifest, cleanSchema, mergeManifests, matchResource, manifestNeeds, manifestHash, listedTool,
+  readManifestCache, writeManifestCache, manifestPath, MANIFEST_LIMITS,
 } from '../mcp/core.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -464,8 +466,8 @@ describe('Claude Desktop extension (setup spec section 3.2)', () => {
     expect(manifest.version).toBe(JSON.parse(read('mcp/package.json')).version);
   });
 
-  test('declares exactly the tools the server registers', () => {
-    const registered = [...read('mcp/server.js').matchAll(/^tool\('([a-z_]+)'/gm)].map(m => m[1]);
+  test('declares exactly the tools of the baseline the server starts with', () => {
+    const registered = JSON.parse(read('mcp/baseline-manifest.json')).tools.map(t => t.name);
     expect(manifest.tools.map(t => t.name)).toEqual(registered);
     expect(manifest.tools.every(t => t.description)).toBe(true);
   });
@@ -477,10 +479,11 @@ describe('Claude Desktop extension (setup spec section 3.2)', () => {
     }
   });
 
-  test('every bundled file exists, the icon among them', async () => {
+  test('every bundled file exists, the icon and the baseline tools among them', async () => {
     const { BUNDLE_FILES } = await import('../scripts/mcp-bundle.mjs');
     for (const f of BUNDLE_FILES) expect(fs.existsSync(new URL(f.from, root)), f.from).toBe(true);
-    expect(BUNDLE_FILES.map(f => f.to)).toEqual(expect.arrayContaining(['manifest.json', manifest.server.entry_point, 'core.js', manifest.icon]));
+    expect(BUNDLE_FILES.map(f => f.to)).toEqual(expect.arrayContaining(['manifest.json', manifest.server.entry_point, 'core.js', 'baseline-manifest.json', manifest.icon]));
+    expect(JSON.parse(read('mcp/package.json')).files).toContain('baseline-manifest.json');
   });
 });
 
@@ -556,5 +559,144 @@ describe('server version (mcp-updates.md section 5)', () => {
       if (install === 'mcpb') expect(html).toContain('download the new Zenit Week extension for Claude Desktop (${BRIDGE_DESKTOP_EXTENSION_URL}) and open it');
       else expect(html).toContain(`${install}: '${action}'`);
     }
+  });
+});
+
+describe('manifest: the page defines the tools (mcp-updates.md section 3)', () => {
+  const baseline = JSON.parse(fs.readFileSync(new URL('../mcp/baseline-manifest.json', import.meta.url), 'utf8'));
+  const tool = (name, extra = {}) => ({ name, description: `${name} does it.`, inputSchema: { type: 'object', properties: {} }, ...extra });
+  const mk = (extra = {}) => ({ instructions: 'Use it.', tools: [tool('a_tool')], resources: [], ...extra });
+
+  test('the baseline passes its own check and keeps its version', () => {
+    const m = validateManifest(baseline);
+    expect(m).toEqual(baseline);
+    expect(m.manifestVersion).toBe(manifestHash(m));
+  });
+
+  test('the version is the server\'s own hash, never the sender\'s', () => {
+    const m = validateManifest({ ...mk(), manifestVersion: 'forged' });
+    expect(m.manifestVersion).not.toBe('forged');
+    expect(validateManifest(mk()).manifestVersion).toBe(m.manifestVersion);
+    expect(validateManifest(mk({ instructions: 'Other.' })).manifestVersion).not.toBe(m.manifestVersion);
+  });
+
+  test('bounds: names, counts, lengths, duplicates', () => {
+    expect(validateManifest(mk({ tools: [tool('Bad-Name')] }))).toBeNull();
+    expect(validateManifest(mk({ tools: [] }))).toBeNull();
+    expect(validateManifest(mk({ tools: Array.from({ length: MANIFEST_LIMITS.tools + 1 }, (_, i) => tool(`t_${'x'.repeat(i % 20)}${String.fromCharCode(97 + (i % 26))}`)) }))).toBeNull();
+    expect(validateManifest(mk({ tools: [tool('a'), tool('a')] }))).toBeNull();
+    expect(validateManifest(mk({ instructions: 'x'.repeat(MANIFEST_LIMITS.instructions + 1) }))).toBeNull();
+    expect(validateManifest(mk({ tools: [tool('a', { description: 'x'.repeat(MANIFEST_LIMITS.description + 1) })] }))).toBeNull();
+    expect(validateManifest(mk({ minServer: 'soon' }))).toBeNull();
+    expect(validateManifest(null)).toBeNull();
+  });
+
+  test('schemas: plain JSON Schema only, nothing pointing outside, no app of their own', () => {
+    expect(cleanSchema({ type: 'object', properties: { d: { type: 'array', items: { type: 'integer', minimum: 1 } } }, required: ['d'] })).toBeTruthy();
+    expect(cleanSchema({ $ref: 'https://evil.example/schema' })).toBeNull();
+    expect(cleanSchema({ type: 'object', properties: { x: { anyOf: [] } } })).toBeNull();
+    expect(cleanSchema({ type: 'string', pattern: '(' })).toBeNull();
+    expect(cleanSchema({ type: 'object', additionalProperties: { type: 'string' } })).toBeNull();
+    let deep = { type: 'string' };
+    for (let i = 0; i < 10; i++) deep = { type: 'array', items: deep };
+    expect(cleanSchema(deep)).toBeNull();
+    expect(validateManifest(mk({ tools: [tool('a', { inputSchema: { type: 'string' } })] }))).toBeNull();
+    expect(validateManifest(mk({ tools: [tool('a', { inputSchema: { type: 'object', properties: { app: { type: 'string' } } } })] }))).toBeNull();
+  });
+
+  test('resources: a fixed argument vocabulary, the template variable mapped', () => {
+    const r = (extra) => mk({ resources: [{ name: 'res', description: 'A resource.', tool: 'read_x', ...extra }] });
+    expect(validateManifest(r({ uri: 'zenit://x' }))).toBeTruthy();
+    expect(validateManifest(r({ uriTemplate: 'zenit://x/{day}', args: { day: 'day' } }))).toBeTruthy();
+    expect(validateManifest(r({ uriTemplate: 'zenit://x/{day}' }))).toBeNull();
+    expect(validateManifest(r({ uriTemplate: 'zenit://x/{day}', args: { day: 'eval' } }))).toBeNull();
+    expect(validateManifest(r({ uri: 'https://example.com' }))).toBeNull();
+    expect(validateManifest(r({ uri: 'zenit://x?y=1' }))).toBeNull();
+  });
+
+  test('a listed tool gets app added to its schema', () => {
+    const t = listedTool(validateManifest(baseline).tools.find(x => x.name === 'open_week'));
+    expect(Object.keys(t.inputSchema.properties)).toEqual(['week', 'app']);
+    expect(t.inputSchema.required).toEqual(['week']);
+  });
+
+  test('resource URIs: exact, templates, ?app, week current means none', () => {
+    const { resources } = validateManifest(baseline);
+    expect(matchResource(resources, 'zenit://week/current')).toMatchObject({ resource: { name: 'week-current' }, args: {}, app: null });
+    expect(matchResource(resources, 'zenit://week/current?app=abc.ngrok-free.app')).toMatchObject({ resource: { name: 'week-current' }, app: 'abc.ngrok-free.app' });
+    expect(matchResource(resources, 'zenit://week/2026-45')).toMatchObject({ resource: { name: 'week' }, args: { week: '2026-45' } });
+    expect(matchResource(resources, 'zenit://agenda/3?app=Zenit%20Week')).toMatchObject({ resource: { name: 'agenda' }, args: { day: 3 }, app: 'Zenit Week' });
+    expect(matchResource(resources, 'zenit://agenda/x')).toBeNull();
+    expect(matchResource(resources, 'zenit://apps')).toMatchObject({ resource: { hook: 'apps' } });
+    expect(matchResource(resources, 'zenit://nope')).toBeNull();
+  });
+
+  test('merge: the base, then each app, the default app last; instructions stay the base\'s', () => {
+    const base = validateManifest(mk({ tools: [tool('a', { description: 'Old a.' }), tool('b')] }));
+    const dev = validateManifest({ instructions: 'Dev.', tools: [tool('a', { description: 'Dev a.' }), tool('dev_only')], resources: [] });
+    const prod = validateManifest({ instructions: 'Prod.', tools: [tool('a', { description: 'Prod a.' })], resources: [] });
+    const m = mergeManifests(base, [dev, prod]);
+    expect(m.instructions).toBe('Use it.');
+    expect(m.tools.map(t => t.name)).toEqual(['a', 'b', 'dev_only']);
+    expect(m.tools[0].description).toBe('Prod a.');
+  });
+
+  test('an unknown hook or a higher minServer: tools kept, the server says it is behind', () => {
+    const m = validateManifest(mk({ minServer: '9.0.0', tools: [tool('a', { hook: 'teleport' }), tool('b', { hook: 'raise-browser' })] }));
+    expect(m.tools.map(t => t.name)).toEqual(['a', 'b']);
+    expect(manifestNeeds(m, '1.2.0')).toEqual({ unknownHooks: ['teleport'], newerServer: true });
+    expect(manifestNeeds(validateManifest(baseline), '1.2.0')).toEqual({ unknownHooks: [], newerServer: false });
+  });
+
+  test('the relay takes a valid manifest from a paired tab; a bad one is ignored and the last kept', () => {
+    const got = [];
+    relay = new Relay({ pairings, onManifest: (tab, m) => got.push([tab.id, m.tools.length]) });
+    const c = connect({ tabId: 'p1' });
+    relay.onMessage(c.tab, JSON.stringify({ type: 'manifest', manifest: mk() }));
+    expect(got).toEqual([['p1', 1]]);
+    relay.onMessage(c.tab, JSON.stringify({ type: 'manifest', manifest: { ...mk(), tools: [{ name: '$ref' }] } }));
+    expect(got).toHaveLength(1);
+    expect(c.tab.manifest.tools[0].name).toBe('a_tool');
+    expect(relay.manifestTabs()).toEqual([c.tab]);
+  });
+
+  test('an unpaired tab cannot send one', () => {
+    const got = [];
+    relay = new Relay({ pairings: memoryPairings(), onManifest: () => got.push(1) });
+    const ws = new Sock();
+    const tab = relay.onOpen(ws, ORIGIN);
+    open(tab);
+    relay.onMessage(tab, JSON.stringify({ type: 'manifest', manifest: mk() }));
+    expect(got).toEqual([]);
+  });
+
+  test('cache per site, owner-only, beside pairings.json; a tampered file reads as none', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'zw-manifest-'));
+    const prev = process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      const m = validateManifest(mk());
+      expect(readManifestCache(ORIGIN, home)).toBeNull();
+      writeManifestCache(ORIGIN, m, home);
+      expect(readManifestCache(ORIGIN, home)).toEqual(m);
+      expect(readManifestCache('https://abc.ngrok-free.app', home)).toBeNull();
+      const file = manifestPath(ORIGIN, home);
+      expect(path.basename(file)).toBe('manifest-zenitweek.com.json');
+      expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+      fs.writeFileSync(file, JSON.stringify({ ...m, tools: [{ name: 'x', inputSchema: { $ref: '#' } }] }));
+      expect(readManifestCache(ORIGIN, home)).toBeNull();
+    } finally {
+      if (prev !== undefined) process.env.XDG_CONFIG_HOME = prev;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test('server.js registers the manifest, starts from the cache or the baseline, and says when tools changed', () => {
+    const src = fs.readFileSync(new URL('../mcp/server.js', import.meta.url), 'utf8');
+    expect(src).toContain('readManifestCache(lastUsedSite(pairings.list())) || BASELINE');
+    expect(src).toContain('mcp.sendToolListChanged()');
+    expect(src).toContain('mcp.sendResourceListChanged()');
+    expect(src).toMatch(/head\.notice = LIST_CHANGED_NOTE/);
+    expect(src).not.toMatch(/registerTool|from 'zod'/);
   });
 });

@@ -42,7 +42,8 @@
     "release": "node scripts/release.mjs",
     "release:notes": "node scripts/extract-release-notes.mjs",
     "mcp:publish": "node scripts/mcp-publish.mjs",
-    "mcp:bundle": "node scripts/mcp-bundle.mjs"
+    "mcp:bundle": "node scripts/mcp-bundle.mjs",
+    "mcp:baseline": "ZW_WRITE_BASELINE=1 NODE_OPTIONS=--no-experimental-webstorage vitest run tests/mcp-baseline.test.js"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.5",

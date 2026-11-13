@@ -438,6 +438,7 @@ _state.getUndoStack = function() { return undoStack; };
 _state.getRedoStack = function() { return redoStack; };
 _state.getBridgeStatus = function() { return bridgeStatus; };
 _state.getBridgeQueueBusy = function() { return _bridgeBusy; };
+_state.getBridgeTools = function() { return Object.fromEntries(Object.entries(BRIDGE_TOOLS).map(([k, d]) => [k, { read: !!d.read }])); };
 _state.flushPendingMerge = function() { return _flushPendingMerge(); };
 _state.getNextWeekRawCache = function() { return _nextWeekRawCache; };
 _state.setNextWeekRawCache = function(v) { _nextWeekRawCache = v; };
@@ -853,6 +854,7 @@ export const {
   bridgeServerVerdict,
   bridgeCompareVersions,
   bridgeUnknownToolMessage,
+  bridgeManifest,
   bridgeAddCmd,
   loadBridgeRecord,
   saveBridgeRecord,

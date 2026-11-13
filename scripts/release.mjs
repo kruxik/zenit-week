@@ -137,7 +137,9 @@ function runEditorChecks() {
 }
 
 // ── Agent server version ──
-// The files whose change makes a new server release. The README alone does not.
+// The files whose change makes a new server release. The README alone does not,
+// nor does mcp/baseline-manifest.json: tools ship with the app, and the
+// baseline only serves a server's very first start; it rides the next release.
 export const MCP_RELEASE_FILES = ['mcp/server.js', 'mcp/core.js', 'mcp/package.json', 'mcp/manifest.json'];
 // The files that carry the version, written together.
 export const MCP_VERSION_FILES = ['mcp/package.json', 'mcp/package-lock.json', 'mcp/manifest.json'];

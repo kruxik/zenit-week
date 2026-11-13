@@ -296,6 +296,7 @@ class Tab {
     this.nonce = null;      // the server's nonce of this connection
     this.pairingId = null;  // the pairing this tab proved
     this.serverLatest = null; // the latest server version the page knows
+    this.manifest = null;     // the page's tools (mcp-updates.md section 3), validated
   }
   get ready() { return this.state === 'ready'; }
 }
@@ -303,8 +304,9 @@ class Tab {
 export class Relay {
   constructor({
     pairings = memoryPairings(), clientName = () => null, install = 'npx', version = null,
-    onWeekSaved = () => {}, now = () => Date.now(), log = () => {},
+    onWeekSaved = () => {}, onManifest = () => {}, now = () => Date.now(), log = () => {},
   } = {}) {
+    this.onManifest = onManifest;
     this.pairings = pairings;
     this.clientName = clientName;
     this.install = install;
@@ -405,6 +407,13 @@ export class Relay {
     } else if (f.type === 'event') {
       this._event(tab, f);
       if (f.event === 'week-saved' && typeof f.wk === 'string') this.onWeekSaved(f.wk, tab);
+    } else if (f.type === 'manifest') {
+      // The page's tool list (mcp-updates.md section 3). A bad one is ignored
+      // and the tools registered so far stay.
+      const m = validateManifest(f.manifest);
+      if (!m) { this.log(`tab ${tab.id} sent a manifest that fails the check; ignored`); return; }
+      tab.manifest = m;
+      this.onManifest(tab, m);
     } else if (f.type === 'unpair') {
       // Settings "Unpair": this site's pairing goes for every server, since
       // they share the file; every tab of the site here is shut out with it.
@@ -451,6 +460,13 @@ export class Relay {
   // The sites with a tab here, paired or not, by name, in a stable order.
   openApps() {
     return [...new Set([...this.tabs].filter(t => t.state !== 'new').map(t => appName(t.origin)))].sort();
+  }
+
+  // Paired tabs with a manifest, the one a call goes to by default last.
+  manifestTabs() {
+    const chosen = this.pickTab();
+    const tabs = [...this.tabs].filter(t => t.ready && t.manifest && t !== chosen);
+    return chosen && chosen.manifest ? [...tabs, chosen] : tabs;
   }
 
   // zenit://apps: every connected app tab of this server.
@@ -646,3 +662,219 @@ export function urisForWeekSaved(wk, currentWeek) {
   }
   return uris;
 }
+
+// ── Manifest: the page defines the tools (docs/specs/mcp-updates.md section 3) ──
+// The page sends its tools, resources and agent instructions after `ready`;
+// the server registers whatever it says. The only work left in the server is
+// its hooks: what a page cannot do.
+export const KNOWN_HOOKS = Object.freeze(['raise-browser', 'apps']);
+export const MANIFEST_LIMITS = Object.freeze({
+  tools: 64, resources: 32, description: 2000, instructions: 8000, schemaDepth: 6, schemaKeys: 64,
+});
+const TOOL_NAME = /^[a-z_]{1,64}$/;
+const RESOURCE_NAME = /^[a-z-]{1,64}$/;
+const HOOK_NAME = /^[a-z-]{1,32}$/;
+const RESOURCE_URI = /^zenit:\/\/[a-z0-9/_-]{1,120}$/;
+const RESOURCE_TEMPLATE = /^zenit:\/\/[a-z0-9/_-]{0,100}\{[a-z]{1,16}\}$/;
+// Template variables map to a fixed vocabulary: `day` an integer, `week` a
+// week key where `current` means none.
+export const RESOURCE_ARG_KINDS = Object.freeze(['day', 'week']);
+// Plain JSON Schema only: nothing that points outside the schema.
+const SCHEMA_TYPES = new Set(['object', 'string', 'integer', 'number', 'boolean', 'array', 'null']);
+const ANNOTATION_KEYS = ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint'];
+
+const isText = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
+
+// A copy of `schema` holding only the allowed keywords, or null.
+export function cleanSchema(schema, depth = 0) {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema) || depth > MANIFEST_LIMITS.schemaDepth) return null;
+  const out = {};
+  for (const [k, v] of Object.entries(schema)) {
+    switch (k) {
+      case 'type':
+        if (!SCHEMA_TYPES.has(v)) return null;
+        out.type = v; break;
+      case 'description':
+        if (!isText(v, MANIFEST_LIMITS.description)) return null;
+        out.description = v; break;
+      case 'pattern':
+        if (!isText(v, 200)) return null;
+        try { new RegExp(v); } catch (_) { return null; }
+        out.pattern = v; break;
+      case 'minimum': case 'maximum': case 'minLength': case 'maxLength': case 'minItems': case 'maxItems':
+        if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+        out[k] = v; break;
+      case 'enum':
+        if (!Array.isArray(v) || !v.length || v.length > 32 || !v.every(x => typeof x === 'string' || typeof x === 'number')) return null;
+        out.enum = [...v]; break;
+      case 'required':
+        if (!Array.isArray(v) || !v.every(x => typeof x === 'string' && TOOL_NAME.test(x))) return null;
+        out.required = [...v]; break;
+      case 'additionalProperties':
+        if (typeof v !== 'boolean') return null;
+        out.additionalProperties = v; break;
+      case 'items': {
+        const c = cleanSchema(v, depth + 1);
+        if (!c) return null;
+        out.items = c; break;
+      }
+      case 'properties': {
+        if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+        const entries = Object.entries(v);
+        if (entries.length > MANIFEST_LIMITS.schemaKeys) return null;
+        out.properties = {};
+        for (const [name, sub] of entries) {
+          const c = TOOL_NAME.test(name) ? cleanSchema(sub, depth + 1) : null;
+          if (!c) return null;
+          out.properties[name] = c;
+        }
+        break;
+      }
+      default: return null; // $ref, $defs, anyOf ... : refused, not dropped
+    }
+  }
+  return out;
+}
+
+function cleanTool(t) {
+  if (!t || typeof t !== 'object' || !TOOL_NAME.test(t.name) || !isText(t.description, MANIFEST_LIMITS.description)) return null;
+  const inputSchema = cleanSchema(t.inputSchema);
+  if (!inputSchema || inputSchema.type !== 'object' || (inputSchema.properties && 'app' in inputSchema.properties)) return null;
+  const annotations = {};
+  for (const k of ANNOTATION_KEYS) if (typeof t.annotations?.[k] === 'boolean') annotations[k] = t.annotations[k];
+  if (t.hook !== undefined && !(typeof t.hook === 'string' && HOOK_NAME.test(t.hook))) return null;
+  return { name: t.name, description: t.description, inputSchema, annotations, ...(t.hook ? { hook: t.hook } : {}) };
+}
+
+function cleanResource(r) {
+  if (!r || typeof r !== 'object' || !RESOURCE_NAME.test(r.name) || !isText(r.description, MANIFEST_LIMITS.description)) return null;
+  const isTemplate = r.uriTemplate !== undefined;
+  if (isTemplate ? !RESOURCE_TEMPLATE.test(r.uriTemplate) : !RESOURCE_URI.test(r.uri)) return null;
+  if (r.hook !== undefined && !(typeof r.hook === 'string' && HOOK_NAME.test(r.hook))) return null;
+  if (!r.hook && !TOOL_NAME.test(r.tool)) return null;
+  const args = {};
+  if (r.args !== undefined) {
+    if (!r.args || typeof r.args !== 'object' || Array.isArray(r.args)) return null;
+    for (const [k, kind] of Object.entries(r.args)) {
+      if (!/^[a-z]{1,16}$/.test(k) || !RESOURCE_ARG_KINDS.includes(kind)) return null;
+      args[k] = kind;
+    }
+  }
+  if (isTemplate) {
+    const v = /\{([a-z]+)\}$/.exec(r.uriTemplate)[1];
+    if (!args[v]) return null; // the template's one variable must be mapped
+  }
+  return {
+    name: r.name, description: r.description,
+    ...(isTemplate ? { uriTemplate: r.uriTemplate } : { uri: r.uri }),
+    ...(r.tool ? { tool: r.tool } : {}), ...(Object.keys(args).length ? { args } : {}), ...(r.hook ? { hook: r.hook } : {}),
+  };
+}
+
+// The manifest as the server keeps it, or null when it fails the check.
+// `manifestVersion` is recomputed here, never taken from the sender.
+export function validateManifest(m) {
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return null;
+  if (!isText(m.instructions, MANIFEST_LIMITS.instructions)) return null;
+  if (m.minServer !== undefined && m.minServer !== null && !isVersion(m.minServer)) return null;
+  if (!Array.isArray(m.tools) || !m.tools.length || m.tools.length > MANIFEST_LIMITS.tools) return null;
+  if (!Array.isArray(m.resources) || m.resources.length > MANIFEST_LIMITS.resources) return null;
+  const tools = m.tools.map(cleanTool);
+  const resources = m.resources.map(cleanResource);
+  if (tools.includes(null) || resources.includes(null)) return null;
+  if (new Set(tools.map(t => t.name)).size !== tools.length) return null;
+  if (new Set(resources.map(r => r.name)).size !== resources.length) return null;
+  const out = { minServer: m.minServer || null, instructions: m.instructions, tools, resources };
+  return { manifestVersion: manifestHash(out), ...out };
+}
+
+// Content hash of a manifest without its version; the page computes the same.
+export function manifestHash(m) {
+  const { manifestVersion, ...rest } = m;
+  return crypto.createHash('sha256').update(JSON.stringify(rest)).digest('base64url').slice(0, 22);
+}
+
+// Hooks this server does not have, and whether the manifest needs a newer
+// server: either way the user is told to update (section 3.3); the tools
+// still work, without the extra.
+export function manifestNeeds(m, version) {
+  const hooks = [...m.tools, ...m.resources].map(x => x.hook).filter(Boolean);
+  return {
+    unknownHooks: [...new Set(hooks.filter(h => !KNOWN_HOOKS.includes(h)))],
+    newerServer: !!m.minServer && compareVersions(version, m.minServer) < 0,
+  };
+}
+
+// What the server registers: the base manifest (cache or baseline), then each
+// connected app's on top, the default app's last (section 3.5). Instructions
+// stay the base's: MCP fixes them at session start.
+export function mergeManifests(base, overlays = []) {
+  const tools = new Map(base.tools.map(t => [t.name, t]));
+  const resources = new Map(base.resources.map(r => [r.name, r]));
+  for (const m of overlays) {
+    m.tools.forEach(t => tools.set(t.name, t));
+    m.resources.forEach(r => resources.set(r.name, r));
+  }
+  return { instructions: base.instructions, tools: [...tools.values()], resources: [...resources.values()] };
+}
+
+// A resource URI -> { resource, args, app }, or null. Every resource takes
+// `?app=<name>` (setup spec section 6, row 5).
+export function matchResource(resources, uri) {
+  const s = String(uri);
+  const q = s.indexOf('?');
+  const base = q < 0 ? s : s.slice(0, q);
+  const app = q < 0 ? null : new URLSearchParams(s.slice(q + 1)).get('app');
+  const exact = resources.find(r => r.uri === base);
+  if (exact) return { resource: exact, args: {}, app };
+  for (const r of resources) {
+    if (!r.uriTemplate) continue;
+    const prefix = r.uriTemplate.slice(0, r.uriTemplate.indexOf('{'));
+    const name = /\{([a-z]+)\}$/.exec(r.uriTemplate)[1];
+    if (!base.startsWith(prefix)) continue;
+    const raw = decodeURIComponent(base.slice(prefix.length));
+    if (!raw || raw.includes('/')) continue;
+    const kind = r.args[name];
+    if (kind === 'day') {
+      if (!/^\d{1,2}$/.test(raw)) continue;
+      return { resource: r, args: { [name]: parseInt(raw, 10) }, app };
+    }
+    if (kind === 'week') return { resource: r, args: raw === 'current' ? {} : { [name]: raw }, app };
+  }
+  return null;
+}
+
+// ~/.config/zenit-week-mcp/manifest-<site>.json, owner-only, beside pairings.json.
+export function manifestPath(origin, home) {
+  let host;
+  try { host = new URL(origin).host; } catch (_) { host = String(origin); }
+  return path.join(configDir(home), `manifest-${host.replace(/[^a-z0-9.-]/gi, '_')}.json`);
+}
+
+export function readManifestCache(origin, home) {
+  try { return validateManifest(JSON.parse(fs.readFileSync(manifestPath(origin, home), 'utf8'))); } catch (_) { return null; }
+}
+
+export function writeManifestCache(origin, m, home) {
+  const file = manifestPath(origin, home);
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(m, null, 2) + '\n', { mode: 0o600 });
+  fs.chmodSync(tmp, 0o600);
+  fs.renameSync(tmp, file);
+}
+
+// The tools of an MCP listing: the manifest's schema plus `app`.
+export const APP_ARG = Object.freeze({
+  type: 'string',
+  description: 'Which app: "Zenit Week" or a host name such as abc.ngrok-free.app (see zenit://apps). Default: the focused tab.',
+});
+export function listedTool(t) {
+  return {
+    name: t.name, description: t.description,
+    inputSchema: { ...t.inputSchema, type: 'object', properties: { ...(t.inputSchema.properties || {}), app: APP_ARG } },
+    ...(Object.keys(t.annotations || {}).length ? { annotations: t.annotations } : {}),
+  };
+}
+
+export const LIST_CHANGED_NOTE = 'Zenit Week has new tools for this session. If one is missing, ask the user to restart the agent app.';

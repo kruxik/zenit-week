@@ -5,7 +5,7 @@
 //
 // Flow:
 //   1. Check that mcp/manifest.json and mcp/package.json agree on the version.
-//   2. Stage the server in mcp/dist/bundle: manifest, server, core, package
+//   2. Stage the server in mcp/dist/bundle: manifest, server, core, baseline tools, package
 //      files, licence, readme, icon - nothing else from the repository.
 //   3. Install the production dependencies there (`npm ci --omit=dev`).
 //   4. Validate the manifest and pack with the official tool
@@ -30,6 +30,7 @@ export const BUNDLE_FILES = [
   { from: 'mcp/manifest.json', to: 'manifest.json' },
   { from: 'mcp/server.js', to: 'server.js' },
   { from: 'mcp/core.js', to: 'core.js' },
+  { from: 'mcp/baseline-manifest.json', to: 'baseline-manifest.json' },
   { from: 'mcp/package.json', to: 'package.json' },
   { from: 'mcp/package-lock.json', to: 'package-lock.json' },
   { from: 'mcp/LICENSE', to: 'LICENSE' },
