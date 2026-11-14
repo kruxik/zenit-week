@@ -83,7 +83,7 @@ The manifest is additive on the wire: an older page sends none, and the server f
 
 | # | Install | Plan |
 |---|---|---|
-| 1 | Claude Desktop extension | Submit `zenit-week.mcpb` to Anthropic's extension directory. Directory installs update automatically. The manifest sets `tools_generated: true`, since the tool list now comes from the page. The setup guide and Settings link to the directory listing instead of the file download once it is listed; the file stays for people outside the directory |
+| 1 | Claude Desktop extension | **Superseded, see 4.1 row 5 and 4.2.** Submit `zenit-week.mcpb` to Anthropic's extension directory. Directory installs update automatically. The manifest sets `tools_generated: true`, since the tool list now comes from the page. The setup guide and Settings link to the directory listing instead of the file download once it is listed; the file stays for people outside the directory |
 | 2 | npx `zenit-week-mcp@1` | Already updates on the next agent start after `mcp:publish`. Verify that npx re-resolves `@1` on every start rather than reusing its cache; if it does not, switch the documented command to one that does and note it in Settings |
 | 3 | Repository | Developers only. No change; section 5 tells them to pull |
 
@@ -97,7 +97,19 @@ Directory prerequisites to check before submitting: privacy policy (exists), ico
 | 2 | Extension manifest | `tools_generated: true` and `privacy_policies` (`https://zenitweek.com/privacy`, which has section 2.3 on AI agents) added; `mcpb validate` passes the schema. The `tools` list stays as the declared baseline, kept equal to `baseline-manifest.json` by a test. |
 | 3 | Annotations | Every tool carries `readOnlyHint`; the two deletes carry `destructiveHint: true`, other writes `false`, navigation `idempotentHint: true`. |
 | 4 | Icon, support link | Both exist (`assets/icon-512.png` bundled as `icon.png`, the GitHub issues link). |
-| 5 | Left to do | Submitting the extension is the owner's step. Once listed, the Settings guide and the setup guide link to the listing instead of the file, and the extension update hint becomes "updates itself" for directory installs. |
+| 5 | Directory (2026-11-14) | **Row 1 of the plan above no longer holds.** Anthropic's directory no longer accepts desktop extensions (MCPB); a local server is listed only inside a **plugin** (a folder in a public GitHub repository, `.claude-plugin/plugin.json` plus `.mcp.json`). Updates then come from merging to the tracked branch: the directory scans each commit and serves it to people who have the plugin. See 4.2. |
+
+### 4.2 Plugin route: what it reaches and what it costs
+
+Source: claude.com/docs `directory/publish`, `plugins/platform-support`, `plugins/pre-submission-checklist`, read 2026-11-14.
+
+| # | Fact | Consequence for Zenit Week |
+|---|---|---|
+| 1 | A plugin's local MCP server loads in Claude Code and in Cowork running on the user's computer; in **Chat** (claude.ai, the Claude desktop app's chat, mobile) it is ignored | A plugin does not serve people who chat with Claude Desktop. For them the `.mcpb` file stays the only install, and it does not update itself: section 5 (toast, Settings, agent note) is their update path |
+| 2 | An `npx` launcher must pin an exact version (`zenit-week-mcp@1.2.0`); a range such as `@1` blocks submission, and even a pinned package is always held for a reviewer | Each server release means a plugin version bump (`plugin.json` and `.mcp.json`), which `npm run release` can write, and a review of that version |
+| 3 | Bundling the server into the plugin instead (`node ${CLAUDE_PLUGIN_ROOT}/server.js`) avoids the launcher but files over 256 KiB, a lockfile install or a program the validator cannot read through are held for a reviewer too | No cheaper path; npx pinned is the simpler one |
+| 4 | Required: README of 40 words or more and a licence in the plugin folder; name not built on reserved words (`mcp`, `claude`, `plugin`); everything the plugin runs and sends described in the README | A `zenit-week` plugin folder with its own README; the privacy page already covers the bridge |
+| 5 | Claude Code users already update by themselves through `npx zenit-week-mcp@1` (4.1, row 1) | The plugin adds discovery in the directory and Cowork, not faster updates for Claude Code |
 
 ## 5. Option 3 - never fail silently
 
@@ -155,13 +167,14 @@ Step 1 comes first so the step 2 server reaches people.
 - [ ] A server older than the latest one shows the user a toast with the right action for their install, once per version, and the agent says so in its first reply of a session.
 - [ ] No state exists in which a feature is missing and neither the app nor the agent says why.
 - [ ] Production and a dev copy with different tool sets work side by side; a call to the older one says to reload it.
-- [ ] The extension updates itself when installed from the directory.
+- [ ] ~~The extension updates itself when installed from the directory.~~ Not possible any more (4.2 row 1): Claude Desktop chat users update the `.mcpb` by hand, prompted by section 5.
 
 ## 10. Open questions
 
 | # | Question | Default if unanswered |
 |---|---|---|
 | 1 | Does npx re-resolve `@1` on each start or reuse its cache? | Answered in 4.1, row 1: it re-resolves |
-| 2 | Directory review: time per update and listing requirements | Submit after step 2, when updates become rare |
+| 2 | Directory review: time per update and listing requirements | Answered in 4.2: MCPB no longer accepted; a plugin version with a pinned npx package is always held for a reviewer, review time not fixed |
+| 5 | Ship a `zenit-week` plugin (Claude Code, Cowork) for the directory listing? | Decided 2026-11-14: no. Steps 1 and 2 cover updates; Claude Desktop chat stays on the `.mcpb` file |
 | 3 | Should the map toast also appear for `update-available` (soft), or only for `update-needed`? | Both, once per version; soft is still a real update |
 | 4 | Do other agent apps (Cursor, Zed, others) honour `list_changed`? | Restart note of 3.4 row 4 covers them |
