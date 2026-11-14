@@ -710,3 +710,80 @@ describe('manifest: the page defines the tools (mcp-updates.md section 3)', () =
     expect(src).not.toMatch(/registerTool|from 'zod'/);
   });
 });
+
+// The whole server process, as an agent app runs it: MCP over stdio, a paired
+// page on the socket. Unit tests of the parts once missed a crash here (a
+// manifest from a paired tab took the process down), so this runs the real thing.
+describe('server process with a paired page (mcp-updates.md section 3)', () => {
+  test('a manifest with a new tool: the process lives, lists it, says list_changed, and notes it once', async () => {
+    const { spawn } = await import('node:child_process');
+    const { createRequire } = await import('node:module');
+    const crypto = (await import('node:crypto')).default;
+    const WebSocket = createRequire(new URL('../mcp/server.js', import.meta.url))('ws');
+    const xdg = fs.mkdtempSync(path.join(os.tmpdir(), 'zw-proc-'));
+    const key = crypto.randomBytes(32).toString('base64url');
+    fs.mkdirSync(path.join(xdg, 'zenit-week-mcp'), { recursive: true });
+    fs.writeFileSync(path.join(xdg, 'zenit-week-mcp', 'pairings.json'),
+      JSON.stringify({ version: 1, pairings: [{ pairingId: PAIRING_ID, origin: ORIGIN, key, pairedAt: '2026-11-14T00:00:00.000Z' }] }));
+    const { fileURLToPath } = await import('node:url');
+    const srv = spawn(process.execPath, [fileURLToPath(new URL('../mcp/server.js', import.meta.url))], {
+      env: { ...process.env, XDG_CONFIG_HOME: xdg, ZENIT_WEEK_MCP_INSTALL: 'repo' },
+    });
+    let exited = null;
+    srv.on('exit', code => { exited = code; });
+    const out = [];
+    let buf = '';
+    srv.stdout.on('data', d => {
+      buf += d;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) { out.push(JSON.parse(buf.slice(0, i))); buf = buf.slice(i + 1); }
+    });
+    const port = await new Promise((resolve, reject) => {
+      let errText = '';
+      srv.stderr.on('data', d => { errText += d; const m = /127\.0\.0\.1:(\d+)/.exec(errText); if (m) resolve(Number(m[1])); });
+      setTimeout(() => reject(new Error(`no port: ${errText}`)), 5000);
+    });
+    const rpc = (id, method, params) => srv.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, ...(params ? { params } : {}) }) + '\n');
+    const reply = id => until(() => out.find(m => m.id === id));
+    async function until(fn, ms = 5000) {
+      const end = Date.now() + ms;
+      for (;;) { const v = fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await new Promise(r => setTimeout(r, 10)); }
+    }
+    try {
+      rpc(0, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test-agent', version: '1' } });
+      await reply(0);
+      srv.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/`, { origin: ORIGIN });
+      const pageNonce = crypto.randomBytes(32).toString('base64url');
+      const hmac = m => crypto.createHmac('sha256', Buffer.from(key, 'base64url')).update(m).digest('base64url');
+      const baseline = JSON.parse(fs.readFileSync(new URL('../mcp/baseline-manifest.json', import.meta.url), 'utf8'));
+      const extra = { name: 'new_tool', description: 'A tool only the app knows.', inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true } };
+      ws.on('open', () => ws.send(JSON.stringify({ type: 'open', protocol: PROTOCOL, visible: true, focused: true, pairingId: PAIRING_ID, nonce: pageNonce })));
+      ws.on('message', d => {
+        const f = JSON.parse(d);
+        if (f.type === 'welcome') {
+          ws.send(JSON.stringify({ type: 'ready', proof: hmac(`page|${f.nonce}`), tabId: 't', week: '2026-46', visible: true, serverLatest: '1.2.0' }));
+          ws.send(JSON.stringify({ type: 'manifest', manifest: { ...baseline, tools: [...baseline.tools, extra] } }));
+        } else if (f.type === 'call') {
+          ws.send(JSON.stringify({ type: 'result', id: f.id, ok: true, data: { called: f.tool } }));
+        }
+      });
+
+      await until(() => out.find(m => m.method === 'notifications/tools/list_changed'));
+      rpc(1, 'tools/list');
+      expect((await reply(1)).result.tools.map(t => t.name)).toContain('new_tool');
+      rpc(2, 'tools/call', { name: 'new_tool', arguments: {} });
+      const first = JSON.parse((await reply(2)).result.content[0].text);
+      expect(first).toMatchObject({ app: 'Zenit Week', called: 'new_tool', notice: expect.stringContaining('restart the agent app') });
+      rpc(3, 'tools/call', { name: 'new_tool', arguments: {} });
+      expect(JSON.parse((await reply(3)).result.content[0].text).notice).toBeUndefined();
+      expect(exited).toBeNull();
+      expect(fs.existsSync(path.join(xdg, 'zenit-week-mcp', 'manifest-zenitweek.com.json'))).toBe(true);
+      ws.close();
+    } finally {
+      srv.kill();
+      fs.rmSync(xdg, { recursive: true, force: true });
+    }
+  }, 20000);
+});

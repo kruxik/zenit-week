@@ -413,7 +413,8 @@ export class Relay {
       const m = validateManifest(f.manifest);
       if (!m) { this.log(`tab ${tab.id} sent a manifest that fails the check; ignored`); return; }
       tab.manifest = m;
-      this.onManifest(tab, m);
+      // The server's handling never takes the process down with it.
+      try { this.onManifest(tab, m); } catch (e) { this.log(`manifest of tab ${tab.id} not applied: ${e.message}`); }
     } else if (f.type === 'unpair') {
       // Settings "Unpair": this site's pairing goes for every server, since
       // they share the file; every tab of the site here is shut out with it.

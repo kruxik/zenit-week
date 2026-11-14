@@ -113,7 +113,7 @@ function onManifest(tab, m) {
   if (unknownHooks.length || newerServer) {
     err(`zenit-week-mcp: ${appName(tab.origin)} wants a newer server (${[newerServer && `needs ${m.minServer}`, ...unknownHooks].filter(Boolean).join(', ')}); its tools run without that`);
   }
-  const next = mergeManifests(START, relay.manifestTabs());
+  const next = mergeManifests(START, relay.manifestTabs().map(t => t.manifest));
   const toolsChanged = !sameJson(next.tools, registry.tools);
   const resourcesChanged = !sameJson(next.resources, registry.resources);
   registry = next;
