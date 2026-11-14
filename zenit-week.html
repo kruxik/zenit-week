@@ -12,7 +12,7 @@
                'sha256-KCffmTZfo+rnm7rs2EGzkYcxOqr4eM/JAp8f5EB8gFQ='
                'sha256-mOVxiIUznj7SGPDadWJ47kSKfd2LeGLmx5luDd3ROWc='
                'sha256-IXyj74gCNdgepKOwYWQaLPjM2suoEVBajYu5u1JyBc4='
-               'sha256-HfCTw8fgTi+lKVcA1/ykDOkNc9BGP17CggH1QTSG2JQ=';
+               'sha256-/A3llMWIEVqna8wjwdyoHZQubPa1wRBnDL7uDyXvCBQ=';
   connect-src  'self' https://www.googleapis.com ws://127.0.0.1:* ws://localhost:*;
   worker-src   'self';
   img-src      'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com;
@@ -3859,11 +3859,12 @@ function isProductionHost(hostname) {
   #bridge-section[data-state="connected"] { --bridge-state: var(--accent-success-text); }
   #bridge-section[data-state^="waiting"],
   #bridge-section[data-state="approve"],
-  #bridge-section[data-state="update-available"] { --bridge-state: var(--accent-warning-text); }
+  /* Behind but working: the agents still connect and act. */
+  #bridge-section[data-state="update-available"],
+  #bridge-section[data-state="update-needed"] { --bridge-state: var(--accent-warning-text); }
   #bridge-section[data-state="blocked"],
   #bridge-section[data-state="unpaired-remote"],
-  #bridge-section[data-state="update-server"],
-  #bridge-section[data-state="update-needed"] { --bridge-state: var(--accent-danger); }
+  #bridge-section[data-state="update-server"] { --bridge-state: var(--accent-danger); }
 
   .settings-hero {
     display: flex;
@@ -4032,7 +4033,8 @@ function isProductionHost(hostname) {
   /* A connected agent: the badge in the state colour, name over its state. */
   .bridge-agent .settings-badge { width: 24px; height: 24px; font-size: var(--font-2xs); }
   .bridge-agent[data-agent-state="connected"] .settings-badge { background: var(--accent-success-text); }
-  .bridge-agent[data-agent-state="old"] .settings-badge { background: var(--accent-warning-text); }
+  .bridge-agent[data-agent-state="old"] .settings-badge,
+  .bridge-agent[data-agent-behind] .settings-badge { background: var(--accent-warning-text); }
   /* A blocked agent: the badge goes grey; its row keeps an Allow button. */
   .bridge-agent[data-agent-state="blocked"] .settings-badge { background: var(--text-muted); }
   .bridge-agent .settings-identity { flex: 1; min-width: 0; }
@@ -29457,7 +29459,7 @@ function renderBridgeStatus() {
     const key = a.state + '\n' + label + '\n' + sub;
     const g = groups.get(key);
     if (g) g.count++;
-    else groups.set(key, { state: a.state, label, name: a.client || '', count: 1, sub });
+    else groups.set(key, { state: a.state, label, name: a.client || '', count: 1, sub, behind: !!a.update });
   }
   // Blocked agents stay listed, whether running or not, so they can be let back in.
   const recAgents = shown === 'off' ? null : rec.agents;
@@ -29466,10 +29468,12 @@ function renderBridgeStatus() {
   }
   // Each reads like the Drive account row: an initials badge in the agent's
   // state colour, the name, and its state underneath.
-  const rows = [...groups.values()].map(({ state: agentState, label, name: agentName, count, sub }) => {
+  const rows = [...groups.values()].map(({ state: agentState, label, name: agentName, count, sub, behind }) => {
     const row = document.createElement('div');
     row.className = 'settings-row bridge-agent';
     row.dataset.agentState = agentState;
+    // Connected on an older or newer server: works, but needs the user's action.
+    if (behind) row.dataset.agentBehind = '';
     // The initials are decoration; the count is read out, before the name.
     const badge = document.createElement('span');
     badge.className = 'settings-badge';
